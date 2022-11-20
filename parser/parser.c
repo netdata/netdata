@@ -29,14 +29,15 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
+PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     parser->user = user;
-    parser->input = input;
-    parser->output = output;
+    parser->fd = fd;
+    parser->fp_input = fp_input;
+    parser->fp_output = fp_output;
 #ifdef ENABLE_HTTPS
     parser->ssl_output = ssl;
 #endif
@@ -222,19 +223,21 @@ int parser_next(PARSER *parser)
     }
 
     if (unlikely(parser->read_function))
-        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
+        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->fp_input);
+    else if(likely(parser->fp_input))
+        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->fp_input);
     else
-        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
+        tmp = NULL;
 
     if (unlikely(!tmp)) {
         if (unlikely(parser->eof_function)) {
-            int rc = parser->eof_function(parser->input);
+            int rc = parser->eof_function(parser->fp_input);
             error("read failed: user defined function returned %d", rc);
         }
         else {
-            if (feof((FILE *)parser->input))
+            if (feof((FILE *)parser->fp_input))
                 error("read failed: end of file");
-            else if (ferror((FILE *)parser->input))
+            else if (ferror((FILE *)parser->fp_input))
                 error("read failed: input error");
             else
                 error("read failed: unknown error");

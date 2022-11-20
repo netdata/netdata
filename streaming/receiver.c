@@ -111,16 +111,16 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
     return PARSER_RC_OK;
 }
 
-static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t size) {
+static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     if(unlikely(!size)) {
         internal_error(true, "%s() asked to read zero bytes", __FUNCTION__);
         return 0;
     }
 
-    int bytes_read;
-
 #ifdef ENABLE_HTTPS
     if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        int bytes_read;
+
         ERR_clear_error();
 
         bytes_read = SSL_read(r->ssl.conn, buffer, (int)size);
@@ -141,17 +141,22 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
     }
 #endif
 
-    int fd = fileno(fp);
-
-    bytes_read = (int)read(fd, buffer, size);
-    if(bytes_read == 0) {
-        internal_error(true, "%s(): EOF while reading data from socket", __FUNCTION__);
-        bytes_read = -1;
-    }
-    if(bytes_read < 0) {
-        internal_error(true, "%s(): failed to read data from socket", __FUNCTION__);
-        bytes_read = -2;
-    }
+    ssize_t bytes_read;
+    do {
+        bytes_read = read(r->fd, buffer, size);
+        if(bytes_read == 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINPROGRESS)) {
+            info("STREAM: %s(): timeout on socket, retrying...", __FUNCTION__);
+            sleep_usec(100 * USEC_PER_MS);
+        }
+        else if (bytes_read == 0) {
+            error("STREAM: %s(): EOF while reading data from socket!", __FUNCTION__);
+            bytes_read = -1;
+        }
+        else if (bytes_read < 0) {
+            error("STREAM: %s() failed to read from socket!", __FUNCTION__);
+            bytes_read = -2;
+        }
+    } while(bytes_read == 0);
 
 //    do {
 //        bytes_read = (int) fread(buffer, 1, size, fp);
@@ -170,16 +175,16 @@ static int read_stream(struct receiver_state *r, FILE *fp, char* buffer, size_t 
 //            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
 //    } while(bytes_read == 0);
 
-    return bytes_read;
+    return (int)bytes_read;
 }
 
-static bool receiver_read_uncompressed(struct receiver_state *r, FILE *fp) {
+static bool receiver_read_uncompressed(struct receiver_state *r) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->read_buffer[r->read_len] != '\0')
         fatal("%s(): read_buffer does not start with zero", __FUNCTION__ );
 #endif
 
-    int bytes_read = read_stream(r, fp, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
+    int bytes_read = read_stream(r, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
     if(unlikely(bytes_read <= 0))
         return false;
 
@@ -192,7 +197,7 @@ static bool receiver_read_uncompressed(struct receiver_state *r, FILE *fp) {
 }
 
 #ifdef ENABLE_COMPRESSION
-static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
+static bool receiver_read_compressed(struct receiver_state *r) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(r->read_buffer[r->read_len] != '\0')
@@ -230,7 +235,7 @@ static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
     // we have to do a loop here, because read_stream() may return less than the data we need
     int bytes_read = 0;
     do {
-        int ret = read_stream(r, fp, r->read_buffer + r->read_len + bytes_read, r->decompressor->signature_size - bytes_read);
+        int ret = read_stream(r, r->read_buffer + r->read_len + bytes_read, r->decompressor->signature_size - bytes_read);
         if (unlikely(ret <= 0))
             return false;
 
@@ -264,7 +269,7 @@ static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
         size_t start = compressed_bytes_read;
         size_t remaining = compressed_message_size - start;
 
-        int last_read_bytes = read_stream(r, fp, &compressed[start], remaining);
+        int last_read_bytes = read_stream(r, &compressed[start], remaining);
         if (unlikely(last_read_bytes <= 0)) {
             internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
             return false;
@@ -295,8 +300,8 @@ static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
     return true;
 }
 #else // !ENABLE_COMPRESSION
-static bool receiver_read_compressed(struct receiver_state *r, FILE *fp) {
-    return receiver_read_uncompressed(r, fp);
+static bool receiver_read_compressed(struct receiver_state *r) {
+    return receiver_read_uncompressed(r);
 }
 #endif // ENABLE_COMPRESSION
 
@@ -358,7 +363,7 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
-static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, FILE *fp_in, FILE *fp_out, void *ssl) {
+static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
@@ -369,7 +374,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, F
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, fp_in, fp_out, PARSER_INPUT_SPLIT, ssl);
+    PARSER *parser = parser_init(rpt->host, &user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
 
     rrd_collector_started();
 
@@ -402,9 +407,9 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, F
         if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
             bool have_new_data;
             if(compressed_connection)
-                have_new_data = receiver_read_compressed(rpt, fp_in);
+                have_new_data = receiver_read_compressed(rpt);
             else
-                have_new_data = receiver_read_uncompressed(rpt, fp_in);
+                have_new_data = receiver_read_uncompressed(rpt);
 
             if(!have_new_data)
                 break;
@@ -685,37 +690,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
     if (unlikely(setsockopt(rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
-    // convert the socket to a FILE *
-    // It seems that the same FILE * cannot be used for both reading and writing.
-    // (reads and writes seem to interfere with each other, with undefined results).
-
-    int fd_in = rpt->fd;
-    int fd_out = fcntl(rpt->fd, F_DUPFD_CLOEXEC, 0);
-    if(fd_out == -1) {
-        error("STREAM %s [receive from [%s]:%s]: failed to duplicate FD %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        close(fd_in);
-        return 0;
-    }
-
-    FILE *fp_out = fdopen(fd_out, "w");
-    if(!fp_out) {
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_out %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        close(fd_in);
-        close(fd_out);
-        return 0;
-    }
-
-    FILE *fp_in  = fdopen(fd_in, "r");
-    if(!fp_in) {
-        error("STREAM %s [receive from [%s]:%s]: failed to get a FILE pointer for fd_in %d.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - SOCKET ERROR");
-        close(fd_in);
-        fclose(fp_out);
-        return 0;
-    }
-
     rrdhost_wrlock(rpt->host);
 /* if(rpt->host->connected_senders > 0) {
         rrdhost_unlock(rpt->host);
@@ -772,7 +746,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
-    size_t count = streaming_parser(rpt, &cd, fp_in, fp_out,
+    size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
                                     (rpt->ssl.conn) ? &rpt->ssl : NULL
 #else
@@ -831,8 +805,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     // cleanup
-    fclose(fp_in);
-    fclose(fp_out);
+    close(rpt->fd);
     return (int)count;
 }
 

@@ -5,6 +5,8 @@
 #define LOG_FUNCTIONS false
 
 static int send_to_plugin(const char *txt, void *data) {
+    error_limit_static_global_var(erl, 1, 0);
+
     PARSER *parser = data;
 
     if(!txt || !*txt)
@@ -18,15 +20,41 @@ static int send_to_plugin(const char *txt, void *data) {
             return SSL_write(ssl->conn, txt, (int)size);
         }
 
-        error("cannot write to SSL connection - connection is not ready.");
+        error_limit(&erl, "PLUGINSD: cannot write to SSL connection - connection is not ready.");
         return -1;
     }
 #endif
 
-    FILE *fp = parser->output;
-    int ret = fprintf(fp, "%s", txt);
-    fflush(fp);
-    return ret;
+    if(parser->fp_output) {
+        int bytes = fprintf(parser->fp_output, "%s", txt);
+        if(bytes <= 0) {
+            error_limit(&erl, "PLUGINSD: cannot write to FILE ptr.");
+            return -2;
+        }
+        fflush(parser->fp_output);
+        return bytes;
+    }
+
+    if(parser->fd != -1) {
+        size_t bytes = 0;
+        size_t total = strlen(txt);
+        ssize_t sent;
+
+        do {
+            sent = write(parser->fd, txt, strlen(txt));
+            if(sent <= 0) {
+                error_limit(&erl, "PLUGINSD: cannot write to file descriptor %d", parser->fd);
+                return -3;
+            }
+            bytes += sent;
+        }
+        while(bytes < total);
+
+        return (int)bytes;
+    }
+
+    error_limit(&erl, "PLUGINSD: no output socket/pipe/file given.");
+    return -3;
 }
 
 PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
@@ -1252,7 +1280,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     };
 
     // fp_plugin_output = our input; fp_plugin_input = our output
-    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, PARSER_INPUT_SPLIT, NULL);
+    PARSER *parser = parser_init(host, &user, fp_plugin_output, fp_plugin_input, -1, PARSER_INPUT_SPLIT, NULL);
 
     rrd_collector_started();
 
