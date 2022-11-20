@@ -270,6 +270,7 @@ typedef struct ebpf_module {
     netdata_ebpf_targets_t *targets;
     struct bpf_link **probe_links;
     struct bpf_object *objects;
+    struct netdata_static_thread *thread;
 } ebpf_module_t;
 
 int ebpf_get_kernel_version();
