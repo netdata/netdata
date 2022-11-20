@@ -573,7 +573,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
          * syslog_severity_s will consist of 1 char (plus '\0'), 
          * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
         if(likely(syslog_severity)){
-            snprintf(syslog_severity_s, 2, "%.*s", (int) syslog_severity_size, syslog_severity);
+            snprintfz(syslog_severity_s, 2, "%.*s", (int) syslog_severity_size, syslog_severity);
             if(likely(str2int(&syslog_severity_d, syslog_severity_s, 10) == STR2XX_SUCCESS)){
                 p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
             } // else parsing errors ++ ??
@@ -583,7 +583,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
          * syslog_facility_s will consist of up to 2 chars (plus '\0'), 
          * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
         if(likely(syslog_facility)){
-            snprintf(syslog_facility_s, 3, "%.*s", (int) syslog_facility_size, syslog_facility);
+            snprintfz(syslog_facility_s, 3, "%.*s", (int) syslog_facility_size, syslog_facility);
             if(likely(str2int(&syslog_facility_d, syslog_facility_s, 10) == STR2XX_SUCCESS)){
                 p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
             } // else parsing errors ++ ??
@@ -592,7 +592,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         if(likely(syslog_severity && syslog_facility)){
             /* Definition of syslog priority value == facility * 8 + severity */
             syslog_prival_d = syslog_facility_d * 8 + syslog_severity_d; 
-            syslog_prival_s_size = snprintf(syslog_prival_s, 4, "%d", syslog_prival_d);
+            syslog_prival_s_size = snprintfz(syslog_prival_s, 4, "%d", syslog_prival_d);
             m_assert(syslog_prival_s_size < 4 && syslog_prival_s_size > 0, "error with snprintf()");
     
             new_tmp_text_size += syslog_prival_s_size + 2; // +2 for '<' and '>'
@@ -690,11 +690,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         if(likely(docker_ev_time && docker_ev_timeNano)){
             struct timespec ts;
             ts.tv_sec = docker_ev_time;
-            if(0 == strftime( docker_ev_datetime, docker_ev_datetime_size, 
-                              "%Y-%m-%dT%H:%M:%S.000000000%z", localtime(&ts.tv_sec))) { /* do what if error? */};
-            const size_t docker_ev_timeNano_s_size = sizeof "515121500";
+            if(unlikely(0 == strftime( docker_ev_datetime, docker_ev_datetime_size, 
+                              "%Y-%m-%dT%H:%M:%S.000000000%z", localtime(&ts.tv_sec)))) { /* TODO: do what if error? */};
+            const size_t docker_ev_timeNano_s_size = sizeof "802840200";
             char docker_ev_timeNano_s[docker_ev_timeNano_s_size];
-            snprintf(docker_ev_timeNano_s, docker_ev_timeNano_s_size, "%09ld", docker_ev_timeNano % 1000000000);
+            snprintfz(docker_ev_timeNano_s, docker_ev_timeNano_s_size, "%ld", docker_ev_timeNano % 1000000000);
             memcpy(&docker_ev_datetime[20], &docker_ev_timeNano_s, docker_ev_timeNano_s_size - 1);
 
             new_tmp_text_size += docker_ev_datetime_size; // -1 for null terminator, +1 for ' ' character
@@ -852,7 +852,7 @@ int flb_add_input(struct File_info *const p_file_info){
 
     static unsigned tag = 0; // incremental tag id to link flb inputs to outputs
     char tag_s[5];
-    snprintf(tag_s, 5, "%u", tag++);
+    snprintfz(tag_s, 5, "%u", tag++);
 
     struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
 
@@ -869,7 +869,7 @@ int flb_add_input(struct File_info *const p_file_info){
         case FLB_WEB_LOG: {
 
             char update_every_str[10]; 
-            snprintf(update_every_str, 10, "%d", p_file_info->update_every);
+            snprintfz(update_every_str, 10, "%d", p_file_info->update_every);
 
             debug(D_LOGS_MANAG, "Setting up FLB_WEB_LOG tail for %s (basename:%s)", 
                   p_file_info->filename, p_file_info->file_basename);

@@ -125,7 +125,7 @@ then
 	# Run Netdata
 	if [ "$build_for_release" -eq 0 ]
 	then
-		sudo -u netdata -g netdata -s gdb -ex=run --args $INSTALL_PATH/netdata/usr/sbin/netdata -D -W debug_flags=0x0000001000000000
+		sudo -u netdata -g netdata -s gdb -ex="set confirm off" -ex=run --args $INSTALL_PATH/netdata/usr/sbin/netdata -D -W debug_flags=0x0000001000000000
 	else
 		sudo -u netdata -g netdata ASAN_OPTIONS=log_path=stdout $INSTALL_PATH/netdata/usr/sbin/netdata -D
 	fi
