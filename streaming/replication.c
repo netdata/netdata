@@ -591,13 +591,21 @@ static const DICTIONARY_ITEM *replication_request_acquire_first_available() {
 
     replication_unlock();
 
+    const DICTIONARY_ITEM *item = NULL;
+
     if(sender && chart_id) {
-        return dictionary_get_and_acquire_item(
+        item = dictionary_get_and_acquire_item(
                 sender->replication_requests,
                 string2str(chart_id));
+
+        if(!item) {
+            internal_error(true, "REPLICATION: request to replicate chart '%s' of host '%s' is not available anymore. Ignoring it.",
+                           string2str(chart_id), rrdhost_hostname(sender->host));
+        }
     }
 
-    return NULL;
+    string_freez(chart_id);
+    return item;
 }
 
 // ----------------------------------------------------------------------------
