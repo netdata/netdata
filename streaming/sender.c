@@ -746,7 +746,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
 #ifdef ENABLE_HTTPS
     SSL *conn = s->host->sender->ssl.conn ;
     if(conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
-        ret = SSL_write(conn, chunk, outstanding);
+        ret = netdata_ssl_write(conn, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
 #else
@@ -780,24 +780,14 @@ static ssize_t attempt_read(struct sender_state *s) {
 
 #ifdef ENABLE_HTTPS
     if (s->host->sender->ssl.conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-        ERR_clear_error();
-        int desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = SSL_read(s->host->sender->ssl.conn, s->read_buffer, desired);
+        size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
+        ret = netdata_ssl_read(s->host->sender->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
-            s->read_len += ret;
+            s->read_len += (int)ret;
             return ret;
         }
-        int sslerrno = SSL_get_error(s->host->sender->ssl.conn, desired);
-        if (sslerrno == SSL_ERROR_WANT_READ || sslerrno == SSL_ERROR_WANT_WRITE)
-            return ret;
 
         worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-        u_long err;
-        char buf[256];
-        while ((err = ERR_get_error()) != 0) {
-            ERR_error_string_n(err, buf, sizeof(buf));
-            error("STREAM %s [send to %s] SSL error: %s", rrdhost_hostname(s->host), s->connected_to, buf);
-        }
         rrdpush_sender_thread_close_socket(s->host);
         return ret;
     }

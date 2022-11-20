@@ -118,27 +118,8 @@ static int read_stream(struct receiver_state *r, char* buffer, size_t size) {
     }
 
 #ifdef ENABLE_HTTPS
-    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-        int bytes_read;
-
-        ERR_clear_error();
-
-        bytes_read = SSL_read(r->ssl.conn, buffer, (int)size);
-
-        if(unlikely(bytes_read <= 0)) {
-            u_long err;
-            char buf[256];
-            while ((err = ERR_get_error()) != 0) {
-                ERR_error_string_n(err, buf, sizeof(buf));
-                error("STREAM %s [receive from %s] ssl error: %s", r->hostname, r->client_ip, buf);
-            }
-            bytes_read = -1;
-        }
-        else
-            worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, bytes_read);
-
-        return bytes_read;
-    }
+    if (r->ssl.conn && r->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+        return (int)netdata_ssl_read(r->ssl.conn, buffer, size);
 #endif
 
     ssize_t bytes_read = read(r->fd, buffer, size);

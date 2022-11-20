@@ -13,10 +13,8 @@ static int send_to_plugin(const char *txt, void *data) {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *ssl = parser->ssl_output;
     if(ssl) {
-        if(ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
-            size_t size = strlen(txt);
-            return SSL_write(ssl->conn, txt, (int)size);
-        }
+        if(ssl->conn && ssl->flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+            return (int)netdata_ssl_write(ssl->conn, (void *)txt, strlen(txt));
 
         error("PLUGINSD: cannot send command (SSL)");
         return -1;
@@ -39,7 +37,7 @@ static int send_to_plugin(const char *txt, void *data) {
         ssize_t sent;
 
         do {
-            sent = write(parser->fd, txt, strlen(txt));
+            sent = write(parser->fd, &txt[bytes], total - bytes);
             if(sent <= 0) {
                 error("PLUGINSD: cannot send command (fd)");
                 return -3;
