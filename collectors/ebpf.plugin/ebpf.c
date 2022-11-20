@@ -527,7 +527,7 @@ static void ebpf_stop_threads(int sig)
         int j;
         pthread_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_threads[j].name != NULL; j++) {
-            if (ebpf_threads[j].enabled != NETDATA_MAIN_THREAD_EXITED)
+            if (ebpf_threads[j].enabled != NETDATA_THREAD_EBPF_STOPPED)
                 i++;
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
@@ -536,7 +536,7 @@ static void ebpf_stop_threads(int sig)
     //Unload threads(except sync and filesystem)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED && i != EBPF_MODULE_FILESYSTEM_IDX &&
+        if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
             i != EBPF_MODULE_SYNC_IDX)
             ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
     }
@@ -544,7 +544,7 @@ static void ebpf_stop_threads(int sig)
 
     //Unload filesystem
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
+    if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
         for (i = 0; localfs[i].filesystem != NULL; i++) {
             ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
         }
@@ -553,7 +553,7 @@ static void ebpf_stop_threads(int sig)
 
     //Unload Sync
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
+    if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
         for (i = 0; local_syscalls[i].syscall != NULL; i++) {
             ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
         }
@@ -2206,11 +2206,15 @@ int main(int argc, char **argv)
     int i;
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         struct netdata_static_thread *st = &ebpf_threads[i];
-        st->thread = mallocz(sizeof(netdata_thread_t));
 
         ebpf_module_t *em = &ebpf_modules[i];
-        em->thread_id = i;
-        netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+        if (em->enabled) {
+            st->thread = mallocz(sizeof(netdata_thread_t));
+            em->thread_id = i;
+            netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
+        } else {
+            st->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        }
     }
 
     usec_t step = USEC_PER_SEC;
