@@ -69,8 +69,8 @@ void *logsmanagement_plugin_main(void *ptr){
 	netdata_thread_cleanup_push(logsmanagement_plugin_main_cleanup, ptr);
 
     /* wait for p_file_infos_arr initialisation */
-    for(int retries = 100; !p_file_infos_arr_ready; retries--){
-        sleep_usec(100 * USEC_PER_MS);
+    for(int retries = 20; !p_file_infos_arr_ready; retries--){
+        sleep_usec(500 * USEC_PER_MS);
         if(retries == 0) goto cleanup;
     }
 

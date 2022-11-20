@@ -195,11 +195,14 @@ size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_t
             buff->in->data_max_size = required_space;
             buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
         }
-        else{
+        else if(likely(!buff->full)){
             int head = buff->head % buff->num_of_items;
             int tail = buff->tail % buff->num_of_items;
 
-            for (int i = head; i != tail; i = (i + 1) % buff->num_of_items) {
+            for ( int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
+                  i != tail; i = (i + 1) % buff->num_of_items) {
+                
+                m_assert(i <= buff->num_of_items, "i > buff->num_of_items");
                 buff->items[i].data_max_size = 1;
                 buff->items[i].data = reallocz(buff->items[i].data, buff->items[i].data_max_size);
             }
@@ -266,7 +269,7 @@ Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
 
     Circ_buff_item_t *item = &buff->items[buff->read % buff->num_of_items];
 
-    m_assert(item->status >= 0 && item->status <= 3, "Invalid status");
+    m_assert(item->status >= 0 && item->status <= CIRC_BUFF_ITEM_STATUS_DONE, "Invalid status");
 
     if( buff->read % buff->num_of_items == buff->head % buff->num_of_items || /* No more records to be retrieved in the buffer */
         item->status != CIRC_BUFF_ITEM_STATUS_DONE /* current item either not parsed or streamed */){

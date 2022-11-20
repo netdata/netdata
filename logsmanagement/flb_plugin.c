@@ -362,9 +362,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         m_assert(text, "text is NULL");
 
                         new_tmp_text_size = buff->in->text_size + text_size + 1; // +1 for '\n'
-                        size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-                        m_assert(available_text_space != 0, "available_text_space is 0");
-                        // TODO: What do if available_text_space == 0 ??
+                        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+                        while(avail_t_space == 0){
+                            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
+                            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+                        }
 
                         memcpy(&buff->in->data[buff->in->text_size], text, text_size);
                         buff->in->text_size = new_tmp_text_size;
@@ -618,9 +620,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 5; // +5 for '[', ']', ':' and ' ' characters around and after pid and '\n' at the end
 
         /* Metrics extracted, now prepare circular buffer for write */
-        const size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        m_assert(available_text_space != 0, "available_text_space is 0");
-        // TODO: What do if available_text_space == 0 ??
+        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+        while(avail_t_space == 0){
+            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
+            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+        }
 
         size_t tmp_item_off = buff->in->text_size;
 
@@ -763,9 +767,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 1; // +1 fpr '\n' character at the end
         
         /* Metrics extracted, now prepare circular buffer for write */
-        const size_t available_text_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        m_assert(available_text_space != 0, "available_text_space is 0");
-        // TODO: What do if available_text_space == 0 ??
+        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+        while(avail_t_space == 0){
+            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
+            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
+        }
 
         size_t tmp_item_off = buff->in->text_size;
 
