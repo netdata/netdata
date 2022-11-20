@@ -165,6 +165,8 @@ struct sender_state {
     DICTIONARY *replication_requests;
     time_t replication_first_time;
     time_t replication_min_time;
+
+    usec_t last_flush_time_ut;
 };
 
 struct receiver_state {
@@ -228,6 +230,7 @@ void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
 void sender_init(RRDHOST *host);
+
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);

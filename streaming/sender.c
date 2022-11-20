@@ -21,27 +21,17 @@
 #define WORKER_SENDER_JOB_BUFFER_RATIO              15
 #define WORKER_SENDER_JOB_BYTES_RECEIVED            16
 #define WORKER_SENDER_JOB_BYTES_SENT                17
-#define WORKER_SENDER_JOB_REPLICATION               18
-#define WORKER_SENDER_JOB_REPLAY_REQUEST            19
-#define WORKER_SENDER_JOB_REPLAY_RESPONSE           20
-#define WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE         21
-#define WORKER_SENDER_JOB_REPLAY_COMPLETION         22
-#define WORKER_SENDER_JOB_FUNCTION                  23
+#define WORKER_SENDER_JOB_REPLAY_REQUEST            18
+#define WORKER_SENDER_JOB_FUNCTION_REQUEST          19
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 24
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 24
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 20
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 20
 #endif
 
 extern struct config stream_config;
 extern int netdata_use_ssl_on_stream;
 extern char *netdata_ssl_ca_path;
 extern char *netdata_ssl_ca_file;
-
-struct replication_request {
-    bool start_streaming;
-    time_t after;
-    time_t before;
-};
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
@@ -269,13 +259,14 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 }
 
 static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
+    __atomic_store_n(&host->sender->last_flush_time_ut, now_realtime_usec(), __ATOMIC_SEQ_CST);
+
     netdata_mutex_lock(&host->sender->mutex);
     cbuffer_flush(host->sender->buffer);
     netdata_mutex_unlock(&host->sender->mutex);
 
     rrdpush_sender_thread_reset_all_charts(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
-    dictionary_flush(host->sender->replication_requests);
     replication_flush_sender(host->sender);
 }
 
@@ -890,7 +881,7 @@ void execute_commands(struct sender_state *s) {
         const char *keyword = get_word(words, num_words, 0);
 
         if(keyword && strcmp(keyword, PLUGINSD_KEYWORD_FUNCTION) == 0) {
-            worker_is_busy(WORKER_SENDER_JOB_FUNCTION);
+            worker_is_busy(WORKER_SENDER_JOB_FUNCTION_REQUEST);
 
             char *transaction = get_word(words, num_words, 1);
             char *timeout_s = get_word(words, num_words, 2);
@@ -938,14 +929,8 @@ void execute_commands(struct sender_state *s) {
                       start_streaming ? start_streaming : "(unset)",
                       after ? after : "(unset)",
                       before ? before : "(unset)");
-            } else {
-//                struct replication_request tmp = {
-//                        .start_streaming = !strcmp(start_streaming, "true"),
-//                        .after = strtoll(after, NULL, 0),
-//                        .before = strtoll(before, NULL, 0),
-//                };
-//                dictionary_set(s->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
-
+            }
+            else {
                 replication_add_request(s, chart_id,
                                         strtoll(after, NULL, 0),
                                         strtoll(before, NULL, 0),
@@ -1059,44 +1044,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     freez(data);
 }
 
-static void replication_request_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *sender_state __maybe_unused) {
-    ;
-}
-static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *sender_state) {
-    struct sender_state *s = sender_state; (void)s;
-    struct replication_request *rr = old_value;
-    struct replication_request *rr_new = new_value;
-
-    internal_error(
-            true,
-            "STREAM %s [send to %s]: duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
-            rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
-            (unsigned long long)rr->after, (unsigned long long)rr->before, rr->start_streaming?"true":"false",
-            (unsigned long long)rr_new->after, (unsigned long long)rr_new->before, rr_new->start_streaming?"true":"false");
-
-    bool updated = false;
-
-    if(rr_new->after < rr->after) {
-        rr->after = rr_new->after;
-        updated = true;
-    }
-
-    if(rr_new->before > rr->before) {
-        rr->before = rr_new->before;
-        updated = true;
-    }
-
-    if(rr_new->start_streaming != rr->start_streaming) {
-        rr->start_streaming = true;
-        updated = true;
-    }
-
-    return updated;
-}
-static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *sender_state __maybe_unused) {
-    ;
-}
-
 void sender_init(RRDHOST *host)
 {
     if (host->sender)
@@ -1121,115 +1068,7 @@ void sender_init(RRDHOST *host)
 #endif
 
     netdata_mutex_init(&host->sender->mutex);
-
-    host->sender->replication_requests = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
-    dictionary_register_insert_callback(host->sender->replication_requests, replication_request_insert_callback, host->sender);
-    dictionary_register_conflict_callback(host->sender->replication_requests, replication_request_conflict_callback, host->sender);
-    dictionary_register_delete_callback(host->sender->replication_requests, replication_request_delete_callback, host->sender);
-}
-
-static size_t sender_buffer_used_percent(struct sender_state *s) {
-    netdata_mutex_lock(&s->mutex);
-    size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-    netdata_mutex_unlock(&s->mutex);
-
-    return (s->host->sender->buffer->max_size - available) * 100 / s->host->sender->buffer->max_size;
-}
-
-int replication_request_compar(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2) {
-    struct replication_request *rr1 = dictionary_acquired_item_value(*item1);
-    struct replication_request *rr2 = dictionary_acquired_item_value(*item2);
-
-    time_t after1 = rr1->after;
-    time_t after2 = rr2->after;
-
-    if(after1 < after2)
-        return -1;
-    if(after1 > after2)
-        return 1;
-
-    return 0;
-}
-
-int process_one_replication_request(const DICTIONARY_ITEM *item, void *value, void *data) {
-    struct sender_state *s = data;
-
-    size_t used_percent = sender_buffer_used_percent(s);
-    if(used_percent >= 10) return -1; // signal the traversal to stop
-
-    worker_is_busy(WORKER_SENDER_JOB_REPLAY_RESPONSE);
-
-    struct replication_request *rr = value;
-    const char *name = dictionary_acquired_item_name(item);
-
-    // delete it from the dictionary
-    // the current item is referenced - it will not go away until the next iteration of the dfe loop
-    dictionary_del(s->replication_requests, name);
-
-    // find the chart
-    RRDSET *st = rrdset_find(s->host, name);
-    if(unlikely(!st)) {
-        internal_error(true,
-                       "STREAM %s [send to %s]: cannot find chart '%s' to satisfy pending replication command."
-                       , rrdhost_hostname(s->host), s->connected_to, name);
-        return 0;
-    }
-
-    if(rr->after < s->replication_first_time || !s->replication_first_time)
-        s->replication_first_time = rr->after;
-
-    if(rr->before < s->replication_min_time || !s->replication_min_time)
-        s->replication_min_time = rr->before;
-
-    netdata_thread_disable_cancelability();
-
-    // send the replication data
-    bool start_streaming = replicate_chart_response(st->rrdhost, st,
-                                                    rr->start_streaming, rr->after, rr->before);
-
-    netdata_thread_enable_cancelability();
-
-    // enable normal streaming if we have to
-    if (start_streaming) {
-        debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
-              rrdhost_hostname(s->host), rrdset_id(st));
-
-        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-    }
-
-    return 1;
-}
-
-static void process_replication_requests(struct sender_state *s) {
-    worker_is_busy(WORKER_SENDER_JOB_REPLICATION);
-
-    size_t entries = dictionary_entries(s->replication_requests);
-
-    worker_set_metric(WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE, (NETDATA_DOUBLE)entries);
-
-    if(!entries) {
-        worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, 100.0);
-        return;
-    }
-
-    s->replication_min_time = 0;
-
-    int count = dictionary_sorted_walkthrough_rw(s->replication_requests, DICTIONARY_LOCK_WRITE,
-                                     process_one_replication_request, s,
-                                     replication_request_compar);
-
-    if(count != 0 && s->replication_min_time && s->replication_first_time) {
-        time_t now = now_realtime_sec();
-        if(now > s->replication_first_time && now >= s->replication_min_time) {
-            time_t completed = s->replication_min_time - s->replication_first_time;
-            time_t all_duration = now - s->replication_first_time;
-
-            NETDATA_DOUBLE percent = (NETDATA_DOUBLE) completed * 100.0 / (NETDATA_DOUBLE) all_duration;
-            worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, percent);
-        }
-    }
-
-    worker_is_idle();
+    replication_init_sender(host->sender);
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -1252,18 +1091,12 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_NO_COMPRESSION, "disconnect no compression");
     worker_register_job_name(WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE, "disconnect bad handshake");
 
-    worker_register_job_name(WORKER_SENDER_JOB_REPLICATION, "replication");
     worker_register_job_name(WORKER_SENDER_JOB_REPLAY_REQUEST, "replay request");
-    worker_register_job_name(WORKER_SENDER_JOB_REPLAY_RESPONSE, "replay response");
-    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION, "function");
+    worker_register_job_name(WORKER_SENDER_JOB_FUNCTION_REQUEST, "function");
 
     worker_register_job_custom_metric(WORKER_SENDER_JOB_BUFFER_RATIO, "used buffer ratio", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENTAL);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_QUEUE_SIZE, "replications pending", "commands", WORKER_METRIC_ABSOLUTE);
-
-    worker_set_metric(WORKER_SENDER_JOB_REPLAY_COMPLETION, 100.0);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, "bytes received", "bytes/s", WORKER_METRIC_INCREMENT);
+    worker_register_job_custom_metric(WORKER_SENDER_JOB_BYTES_SENT, "bytes sent", "bytes/s", WORKER_METRIC_INCREMENT);
 
     struct sender_state *s = ptr;
     s->tid = gettid();
@@ -1455,8 +1288,6 @@ void *rrdpush_sender_thread(void *ptr) {
 
         if(unlikely(s->read_len))
             execute_commands(s);
-
-        // process_replication_requests(s);
 
         if(unlikely(fds[Collector].revents & (POLLERR|POLLHUP|POLLNVAL))) {
             char *error = NULL;

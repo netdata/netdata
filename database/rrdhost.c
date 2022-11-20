@@ -1055,7 +1055,7 @@ void stop_streaming_sender(RRDHOST *host)
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
-    dictionary_destroy(host->sender->replication_requests);
+    replication_cleanup_sender(host->sender);
     freez(host->sender);
     host->sender = NULL;
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
