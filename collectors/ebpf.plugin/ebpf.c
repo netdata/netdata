@@ -29,6 +29,7 @@ int ebpf_nprocs;
 int isrh = 0;
 
 pthread_mutex_t lock;
+pthread_mutex_t ebpf_exit_cleanup;
 pthread_mutex_t collect_data_mutex;
 pthread_cond_t collect_data_cond_var;
 
@@ -467,12 +468,12 @@ char *btf_path = NULL;
 static void ebpf_exit()
 {
 #ifdef LIBBPF_MAJOR_VERSION
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (default_btf) {
         btf__free(default_btf);
         default_btf = NULL;
     }
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 #endif
 
     char filename[FILENAME_MAX + 1];
@@ -524,32 +525,40 @@ static void ebpf_stop_threads(int sig)
         sleep_usec(step);
         i = 0;
         int j;
+        pthread_mutex_lock(&ebpf_exit_cleanup);
         for (j = 0; ebpf_threads[j].name != NULL; j++) {
             if (ebpf_threads[j].enabled != NETDATA_MAIN_THREAD_EXITED)
                 i++;
         }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
     //Unload threads(except sync and filesystem)
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         if (ebpf_threads[i].enabled == NETDATA_MAIN_THREAD_EXITED && i != EBPF_MODULE_FILESYSTEM_IDX &&
             i != EBPF_MODULE_SYNC_IDX)
             ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
     }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     //Unload filesystem
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
         for (i = 0; localfs[i].filesystem != NULL; i++) {
             ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
         }
     }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     //Unload Sync
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_MAIN_THREAD_EXITED) {
         for (i = 0; local_syscalls[i].syscall != NULL; i++) {
             ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
         }
     }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit();
 }
