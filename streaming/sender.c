@@ -351,7 +351,7 @@ struct {
         .dynamic = false,
         .error = "remote server rejected this stream, the host we are trying to stream is already streamed to it",
         .worker_job_id = WORKER_SENDER_JOB_DISCONNECT_BAD_HANDSHAKE,
-        .postpone_reconnect_seconds = 10 * 60, // 10 minutes
+        .postpone_reconnect_seconds = 2 * 60, // 2 minutes
     },
     {
         .response = START_STREAMING_ERROR_NOT_PERMITTED,
