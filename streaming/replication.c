@@ -448,13 +448,47 @@ static struct replication_thread {
         .JudyL_array = NULL,
 };
 
-void replication_lock() {
-    netdata_mutex_lock(&rep.mutex);
+void replication_judy_recursive_lock(char mode) {
+    static __thread bool i_am_the_locker = false;
+    static __thread int recursions = 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if((i_am_the_locker && recursions < 1) || (!i_am_the_locker && recursions != 0))
+        fatal("REPLICATION: invalid lock status");
+#endif
+
+    if(mode == 'L') {
+        if(i_am_the_locker) {
+            recursions++;
+            return;
+        }
+
+        netdata_mutex_lock(&rep.mutex);
+        i_am_the_locker = true;
+        recursions++;
+    }
+    else {
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(!i_am_the_locker)
+            fatal("REPLICATION: this thread is not the locker");
+#endif
+
+        recursions--;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(recursions < 0)
+            fatal("REPLICATION: recursions is %d", recursions);
+#endif
+
+        if(!recursions) {
+            netdata_mutex_unlock(&rep.mutex);
+            i_am_the_locker = false;
+        }
+    }
 }
 
-void replication_unlock() {
-    netdata_mutex_unlock(&rep.mutex);
-}
+#define replication_recursive_lock() replication_judy_recursive_lock('L')
+#define replication_recursive_unlock() replication_judy_recursive_lock('U')
 
 // ----------------------------------------------------------------------------
 // replication sort entry management
@@ -481,7 +515,7 @@ static void replication_sort_entry_destroy(struct replication_sort_entry *t) {
 static struct replication_sort_entry *replication_sort_entry_add(struct replication_request *r, const void *unique_id) {
     struct replication_sort_entry *t = replication_sort_entry_create(r, unique_id);
 
-    replication_lock();
+    replication_recursive_lock();
 
     rep.added++;
 
@@ -497,7 +531,7 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
     if(!rep.first_time_t || r->after < rep.first_time_t)
         rep.first_time_t = r->after;
 
-    replication_unlock();
+    replication_recursive_unlock();
 
     return t;
 }
@@ -506,7 +540,7 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
     Pvoid_t *PValue;
     struct replication_sort_entry *to_delete = NULL;
 
-    replication_lock();
+    replication_recursive_lock();
 
     rep.removed++;
 
@@ -552,7 +586,7 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
         fatal("Cannot find sort entry to delete for host '%s', chart '%s', time %ld.",
               rrdhost_hostname(sender->host), string2str(chart_id), after);
 
-    replication_unlock();
+    replication_recursive_unlock();
 
     replication_sort_entry_destroy(to_delete);
 }
@@ -562,11 +596,11 @@ static struct replication_request replication_request_get_first_available() {
     Pvoid_t *PValue;
     Word_t Index;
 
-    replication_lock();
+    replication_recursive_lock();
 
     rep.requests_count = JudyLCount(rep.JudyL_array, 0, 0xFFFFFFFF, PJE0);
     if(!rep.requests_count) {
-        replication_unlock();
+        replication_recursive_unlock();
         return (struct replication_request){ .found = false };
     }
 
@@ -601,7 +635,7 @@ static struct replication_request replication_request_get_first_available() {
     else
         ret.found = false;
 
-    replication_unlock();
+    replication_recursive_unlock();
 
     return ret;
 }
@@ -671,7 +705,10 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
 }
 
 void replication_flush_sender(struct sender_state *sender) {
+    // allow the dictionary destructor to go faster on locks
+    replication_recursive_lock();
     dictionary_flush(sender->replication_requests);
+    replication_recursive_unlock();
 }
 
 void replication_init_sender(struct sender_state *sender) {
@@ -682,7 +719,10 @@ void replication_init_sender(struct sender_state *sender) {
 }
 
 void replication_cleanup_sender(struct sender_state *sender) {
+    // allow the dictionary destructor to go faster on locks
+    replication_recursive_lock();
     dictionary_destroy(sender->replication_requests);
+    replication_recursive_unlock();
 }
 
 // ----------------------------------------------------------------------------
@@ -722,7 +762,13 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_is_busy(WORKER_JOB_ITERATION);
 
         // this call also updates our statistics
+        replication_recursive_lock();
         struct replication_request r = replication_request_get_first_available();
+        if(r.found) {
+            // delete the request from the dictionary
+            dictionary_del(r.sender->replication_requests, string2str(r.chart_id));
+        }
+        replication_recursive_unlock();
 
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
@@ -740,9 +786,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             sleep_usec(1 * USEC_PER_MS);
             continue;
         }
-
-        // delete the request from the dictionary
-        dictionary_del(r.sender->replication_requests, string2str(r.chart_id));
 
         RRDSET *st = rrdset_find(r.sender->host, string2str(r.chart_id));
         if(!st) {
