@@ -1266,3 +1266,112 @@ int sql_metadata_cache_stats(int op)
     sqlite3_db_status(db_meta, op, &count, &dummy, 0);
     return count;
 }
+
+#define SQL_FIND_CHART_UUID                                                                                            \
+    "SELECT chart_id FROM chart WHERE host_id = @host AND type=@type AND id=@id AND (name IS NULL OR name=@name) AND chart_id IS NOT NULL;"
+
+#define SQL_FIND_DIMENSION_UUID \
+    "SELECT dim_id FROM dimension WHERE chart_id=@chart AND id=@id AND name=@name AND LENGTH(dim_id)=16;"
+
+
+//Do a database lookup to find the UUID of a chart
+//If found store it in store_uuid and return 0
+int sql_find_chart_uuid(RRDHOST *host, RRDSET *st, uuid_t *store_uuid)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+
+    const char *name = string2str(st->parts.name);
+
+    if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return 1;
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_FIND_CHART_UUID, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement to lookup chart UUID in the database");
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, 1, &host->host_uuid, sizeof(host->host_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_text(res, 2,  string2str(st->parts.type), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_text(res, 3, string2str(st->parts.id), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_text(res, 4, name && *name ? name : string2str(st->parts.id), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    int status = 1;
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW)) {
+        uuid_copy(*store_uuid, sqlite3_column_blob(res, 0));
+        status = 0;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
+
+    return status;
+
+bind_fail:
+    error_report("Failed to bind input parameter to perform chart UUID database lookup, rc = %d", rc);
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement when searching for a chart UUID, rc = %d", rc);
+    return 1;
+}
+
+int sql_find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid)
+{
+    static __thread sqlite3_stmt *res = NULL;
+    int rc;
+    int status = 1;
+
+    if (unlikely(!db_meta) && default_rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE)
+        return 1;
+
+    if (unlikely(!res)) {
+        rc = prepare_statement(db_meta, SQL_FIND_DIMENSION_UUID, &res);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to bind prepare statement to lookup dimension UUID in the database");
+            return 1;
+        }
+    }
+
+    rc = sqlite3_bind_blob(res, 1, st->chart_uuid, sizeof(*st->chart_uuid), SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_text(res, 2, rrddim_id(rd), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_bind_text(res, 3, rrddim_name(rd), -1, SQLITE_STATIC);
+    if (unlikely(rc != SQLITE_OK))
+        goto bind_fail;
+
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW)) {
+        uuid_copy(*store_uuid, *((uuid_t *) sqlite3_column_blob(res, 0)));
+        status = 0;
+    }
+
+    rc = sqlite3_reset(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to reset statement find dimension uuid, rc = %d", rc);
+    return status;
+
+bind_fail:
+    error_report("Failed to bind input parameter to perform dimension UUID database lookup, rc = %d", rc);
+    return 1;
+}

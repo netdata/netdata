@@ -1848,6 +1848,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
     { .name = "RRDCONTEXT",  .family = "workers contexts",                .priority = 1000000 },
+    { .name = "REPLICATION", .family = "workers replication sender",      .priority = 1000000 },
     { .name = "SERVICE",     .family = "workers service",                 .priority = 1000000 },
 
     // has to be terminated with a NULL
@@ -2203,7 +2204,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     {
         size_t i;
         for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
-            if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL)
+            if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENT && wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL_TOTAL)
                 continue;
 
             if(!wu->per_job_type[i].count_value)

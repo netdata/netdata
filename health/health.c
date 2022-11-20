@@ -692,7 +692,7 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     health_silencers_init();
 }
 
-static void health_sleep(time_t next_run, unsigned int loop, RRDHOST *host) {
+static void health_sleep(time_t next_run, unsigned int loop __maybe_unused, RRDHOST *host) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();

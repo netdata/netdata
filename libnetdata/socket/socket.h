@@ -67,6 +67,8 @@ int connect_to_one_of_urls(const char *destination, int default_port, struct tim
 #ifdef ENABLE_HTTPS
 ssize_t recv_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(struct netdata_ssl *ssl,int sockfd, void *buf, size_t len, int flags, int timeout);
+ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num);
+ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num);
 #else
 ssize_t recv_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);
 ssize_t send_timeout(int sockfd, void *buf, size_t len, int flags, int timeout);

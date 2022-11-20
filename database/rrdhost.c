@@ -4,7 +4,7 @@
 #include "rrd.h"
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
-size_t storage_tiers = 1;
+size_t storage_tiers = 3;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
@@ -290,7 +290,11 @@ int is_legacy = 1;
             host, rrdpush_enabled, rrdpush_destination, rrdpush_api_key, rrdpush_send_charts_matching);
     }
 
-    host->rrdpush_enable_replication = rrdpush_enable_replication;
+    if(rrdpush_enable_replication)
+        rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
+    else
+        rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
+
     host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
     host->rrdpush_replication_step = rrdpush_replication_step;
 
@@ -616,10 +620,13 @@ void rrdhost_update(RRDHOST *host
         rrdcalctemplate_index_init(host);
         rrdcalc_rrdhost_index_init(host);
 
-        host->rrdpush_enable_replication = rrdpush_enable_replication;
+        if(rrdpush_enable_replication)
+            rrdhost_option_set(host, RRDHOST_OPTION_REPLICATION);
+        else
+            rrdhost_option_clear(host, RRDHOST_OPTION_REPLICATION);
+
         host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
         host->rrdpush_replication_step = rrdpush_replication_step;
-
 
         rrd_hosts_available++;
         ml_new_host(host);
@@ -783,6 +790,7 @@ void dbengine_init(char *hostname) {
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
+    int divisor = 1;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(tier == 0)
             snprintfz(dbenginepath, FILENAME_MAX, "%s/dbengine", netdata_configured_cache_dir);
@@ -795,8 +803,11 @@ void dbengine_init(char *hostname) {
             break;
         }
 
-        int page_cache_mb = default_rrdeng_page_cache_mb;
-        int disk_space_mb = default_multidb_disk_quota_mb;
+        if(tier > 0)
+            divisor *= 2;
+
+        int page_cache_mb = default_rrdeng_page_cache_mb / divisor;
+        int disk_space_mb = default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
@@ -863,6 +874,7 @@ void dbengine_init(char *hostname) {
         storage_tiers = 1;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
+    dbengine_enabled = false;
 #endif
 }
 
@@ -881,32 +893,34 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
 
     if (unlikely(strcmp(hostname, "unittest") == 0)) {
         dbengine_enabled = true;
-        goto unittest;
     }
+    else {
+        health_init();
+        rrdpush_init();
 
-    health_init();
-    rrdpush_init();
-
-    if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || storage_tiers > 1 || rrdpush_receiver_needs_dbengine()) {
-        info("Initializing dbengine...");
-        dbengine_init(hostname);
-    }
-    else
-        info("Not initializing dbengine...");
-
-    if(!dbengine_enabled) {
-        if (storage_tiers > 1) {
-            error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1", storage_tiers);
+        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE || rrdpush_receiver_needs_dbengine()) {
+            info("Initializing dbengine...");
+            dbengine_init(hostname);
+        }
+        else {
+            info("Not initializing dbengine...");
             storage_tiers = 1;
         }
 
-        if(default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            error("dbengine is not enabled, but it has been given as the default db mode. Resetting db mode to alloc");
-            default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+        if (!dbengine_enabled) {
+            if (storage_tiers > 1) {
+                error("dbengine is not enabled, but %zu tiers have been requested. Resetting tiers to 1",
+                      storage_tiers);
+                storage_tiers = 1;
+            }
+
+            if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+                error("dbengine is not enabled, but it has been given as the default db mode. Resetting db mode to alloc");
+                default_rrd_memory_mode = RRD_MEMORY_MODE_ALLOC;
+            }
         }
     }
 
-unittest:
     metadata_sync_init();
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     rrd_wrlock();
@@ -1041,7 +1055,7 @@ void stop_streaming_sender(RRDHOST *host)
     if (host->sender->compressor)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
-    dictionary_destroy(host->sender->replication_requests);
+    replication_cleanup_sender(host->sender);
     freez(host->sender);
     host->sender = NULL;
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);

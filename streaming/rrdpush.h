@@ -7,7 +7,6 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
-#include "replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -36,6 +35,7 @@ typedef enum {
     STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
+    STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
 
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
@@ -45,12 +45,12 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
 #else
 #define STREAM_HAS_COMPRESSION 0
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_COMPRESSION
 
 #define STREAM_OUR_CAPABILITIES ( \
     STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
     STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
-    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION )
+    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION | STREAM_CAP_BINARY )
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
@@ -107,21 +107,14 @@ struct compressor_state {
 };
 
 struct decompressor_state {
-    char *buffer;
-    size_t buffer_size;
-    size_t buffer_len;
-    size_t buffer_pos;
-    char *out_buffer;
-    size_t out_buffer_len;
-    size_t out_buffer_pos;
+    size_t signature_size;
     size_t total_compressed;
     size_t total_uncompressed;
     size_t packet_count;
-    struct decompressor_data *data; // Decompression API specific data
+    struct decompressor_stream *stream; // Decompression API specific data
     void (*reset)(struct decompressor_state *state);
     size_t (*start)(struct decompressor_state *state, const char *header, size_t header_size);
-    size_t (*put)(struct decompressor_state *state, const char *data, size_t size);
-    size_t (*decompress)(struct decompressor_state *state);
+    size_t (*decompress)(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
     size_t (*decompressed_bytes_in_buffer)(struct decompressor_state *state);
     size_t (*get)(struct decompressor_state *state, char *data, size_t size);
     void (*destroy)(struct decompressor_state **state);
@@ -149,7 +142,7 @@ struct sender_state {
     size_t sent_bytes;
     size_t sent_bytes_on_this_connection;
     size_t send_attempts;
-    time_t last_sent_t;
+    time_t last_traffic_seen_t;
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
@@ -170,6 +163,12 @@ struct sender_state {
 #endif
 
     DICTIONARY *replication_requests;
+    size_t replication_pending_requests;
+    time_t replication_first_time;
+    time_t replication_min_time;
+
+    usec_t last_flush_time_ut;
+    size_t receiving_metrics;
 };
 
 struct receiver_state {
@@ -204,6 +203,8 @@ struct receiver_state {
     unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
+
+    time_t replication_first_time_t;
 };
 
 struct rrdpush_destinations {
@@ -233,6 +234,7 @@ void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
 void sender_init(RRDHOST *host);
+
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
@@ -264,12 +266,13 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
-size_t is_compressed_data(const char *data, size_t data_size);
 #endif
 
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+
+#include "replication.h"
 
 #endif //NETDATA_RRDPUSH_H

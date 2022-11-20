@@ -366,6 +366,21 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         if (ctr->react_action & RRDSET_REACT_NEW) {
             if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid))) {
                 uuid_generate(st->chart_uuid);
+                bool found_in_sql = false; (void)found_in_sql;
+
+//                bool found_in_sql = true;
+//                if(unlikely(sql_find_chart_uuid(host, st, &st->chart_uuid))) {
+//                    uuid_generate(st->chart_uuid);
+//                    found_in_sql = false;
+//                }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+                char uuid_str[UUID_STR_LEN];
+                uuid_unparse_lower(st->chart_uuid, uuid_str);
+                error_report("Chart UUID for host %s chart [%s] not found in context. It is now set to %s (%s)",
+                             string2str(host->hostname),
+                             string2str(st->name), uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
+#endif
             }
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
