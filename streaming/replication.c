@@ -512,6 +512,8 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
     PValue = JudyLGet(rep.JudyL_array, after, PJE0);
     if(PValue) {
         struct replication_sort_entry *t = *PValue;
+        t->executed = true; // make sure we don't get it again
+
         if(!t->next) {
             // we are alone here, delete the judy entry
 
