@@ -142,7 +142,7 @@ struct sender_state {
     size_t sent_bytes;
     size_t sent_bytes_on_this_connection;
     size_t send_attempts;
-    time_t last_sent_t;
+    time_t last_traffic_seen_t;
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.

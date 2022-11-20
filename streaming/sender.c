@@ -698,8 +698,6 @@ static bool attempt_to_connect(struct sender_state *state)
     state->send_attempts = 0;
 
     if(rrdpush_sender_thread_connect_to_parent(state->host, state->default_port, state->timeout, state)) {
-        state->last_sent_t = now_monotonic_sec();
-
         // reset the buffer, to properly send charts and metrics
         rrdpush_sender_thread_data_flush(state->host);
 
@@ -760,7 +758,6 @@ static ssize_t attempt_to_send(struct sender_state *s) {
         s->sent_bytes_on_this_connection += ret;
         s->sent_bytes += ret;
         debug(D_STREAM, "STREAM %s [send to %s]: Sent %zd bytes", rrdhost_hostname(s->host), s->connected_to, ret);
-        s->last_sent_t = now_monotonic_sec();
     }
     else if (ret == -1 && (errno == EAGAIN || errno == EINTR || errno == EWOULDBLOCK))
         debug(D_STREAM, "STREAM %s [send to %s]: unavailable after polling POLLOUT", rrdhost_hostname(s->host), s->connected_to);
@@ -1180,6 +1177,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(unlikely(!attempt_to_connect(s)))
                 continue;
 
+            s->last_traffic_seen_t = now_monotonic_sec();
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
 
@@ -1190,7 +1188,7 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(now_monotonic_sec() - s->last_sent_t > s->timeout &&
+        if(unlikely(now_monotonic_sec() - s->last_traffic_seen_t > s->timeout &&
             __atomic_load_n(&s->replication_pending_requests, __ATOMIC_SEQ_CST) == 0) &&
             __atomic_load_n(&s->receiving_metrics, __ATOMIC_SEQ_CST) != 0) {
             worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_TIMEOUT);
@@ -1269,8 +1267,10 @@ void *rrdpush_sender_thread(void *ptr) {
         if(likely(outstanding && (fds[Socket].revents & POLLOUT))) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_SEND);
             ssize_t bytes = attempt_to_send(s);
-            if(bytes > 0)
-                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, bytes);
+            if(bytes > 0) {
+                s->last_traffic_seen_t = now_monotonic_sec();
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_SENT, (NETDATA_DOUBLE)bytes);
+            }
         }
 
         // If the collector woke us up then empty the pipe to remove the signal
@@ -1286,8 +1286,10 @@ void *rrdpush_sender_thread(void *ptr) {
         if (fds[Socket].revents & POLLIN) {
             worker_is_busy(WORKER_SENDER_JOB_SOCKET_RECEIVE);
             ssize_t bytes = attempt_read(s);
-            if(bytes > 0)
-                worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, bytes);
+            if(bytes > 0) {
+                s->last_traffic_seen_t = now_monotonic_sec();
+                worker_set_metric(WORKER_SENDER_JOB_BYTES_RECEIVED, (NETDATA_DOUBLE)bytes);
+            }
         }
 
         if(unlikely(s->read_len))
