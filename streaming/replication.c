@@ -404,26 +404,26 @@ static size_t sender_buffer_used_percent(struct sender_state *s) {
 // ----------------------------------------------------------------------------
 // replication thread
 
-// replication sort entry in JudyL array
-// used for sorting all requests, across all nodes
-struct replication_sort_entry {
-    struct sender_state *sender;
-    STRING *chart_id;
-    time_t after;
-    const DICTIONARY_ITEM *item;
-
-    bool executed;
-    struct replication_sort_entry *next;
-};
-
 // replication request in sender DICTIONARY
 // used for de-duplicating the requests
 struct replication_request {
     struct sender_state *sender;
+    usec_t sender_last_flush_ut;
     STRING *chart_id;
-    bool start_streaming;
-    time_t after;
+    time_t after;                       // key for sorting (JudyL)
     time_t before;
+    bool start_streaming;
+    bool found;
+};
+
+// replication sort entry in JudyL array
+// used for sorting all requests, across all nodes
+struct replication_sort_entry {
+    struct replication_request req;
+
+    const void *unique_id;              // used as a key to identify the sort entry - we never access its contents
+    bool executed;
+    struct replication_sort_entry *next;
 };
 
 // the global variables for the replication thread
@@ -458,24 +458,27 @@ void replication_unlock() {
 // ----------------------------------------------------------------------------
 // replication sort entry management
 
-static struct replication_sort_entry *replication_sort_entry_create(struct sender_state *sender, STRING *chart_id, time_t after, const DICTIONARY_ITEM *item) {
+static struct replication_sort_entry *replication_sort_entry_create(struct replication_request *r, const void *unique_id) {
     struct replication_sort_entry *t = mallocz(sizeof(struct replication_sort_entry));
-    t->sender = sender;
-    t->chart_id = string_dup(chart_id);
-    t->after = after;
-    t->item = item;
+
+    // copy the request
+    t->req = *r;
+    t->req.chart_id = string_dup(r->chart_id);
+
+
+    t->unique_id = unique_id;
     t->executed = false;
     t->next = NULL;
     return t;
 }
 
 static void replication_sort_entry_destroy(struct replication_sort_entry *t) {
-    string_freez(t->chart_id);
+    string_freez(t->req.chart_id);
     freez(t);
 }
 
-static struct replication_sort_entry *replication_sort_entry_add(struct sender_state *sender, STRING *chart_id, time_t after, const DICTIONARY_ITEM *item) {
-    struct replication_sort_entry *t = replication_sort_entry_create(sender, chart_id, after, item);
+static struct replication_sort_entry *replication_sort_entry_add(struct replication_request *r, const void *unique_id) {
+    struct replication_sort_entry *t = replication_sort_entry_create(r, unique_id);
 
     replication_lock();
 
@@ -483,15 +486,15 @@ static struct replication_sort_entry *replication_sort_entry_add(struct sender_s
 
     Pvoid_t *PValue;
 
-    PValue = JudyLGet(rep.JudyL_array, (Word_t) after, PJE0);
+    PValue = JudyLGet(rep.JudyL_array, (Word_t) r->after, PJE0);
     if(!PValue)
-        PValue = JudyLIns(&rep.JudyL_array, (Word_t) after, PJE0);
+        PValue = JudyLIns(&rep.JudyL_array, (Word_t) r->after, PJE0);
 
     t->next = *PValue;
     *PValue = t;
 
-    if(!rep.first_time_t || after < rep.first_time_t)
-        rep.first_time_t = after;
+    if(!rep.first_time_t || r->after < rep.first_time_t)
+        rep.first_time_t = r->after;
 
     replication_unlock();
 
@@ -512,7 +515,7 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
         if(!t->next) {
             // we are alone here, delete the judy entry
 
-            if(t->item != item)
+            if(t->unique_id != item)
                 fatal("Item to delete is not matching host '%s', chart '%s', time %ld.",
                       rrdhost_hostname(sender->host), string2str(chart_id), after);
 
@@ -524,7 +527,7 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
 
             struct replication_sort_entry *t_old = NULL;
             do {
-                if(t->item == item) {
+                if(t->unique_id == item) {
                     to_delete = t;
 
                     if(t_old)
@@ -551,7 +554,7 @@ static void replication_sort_entry_del(struct sender_state *sender, STRING *char
     replication_sort_entry_destroy(to_delete);
 }
 
-static const DICTIONARY_ITEM *replication_request_acquire_first_available() {
+static struct replication_request replication_request_get_first_available() {
     struct replication_sort_entry *found = NULL;
     Pvoid_t *PValue;
     Word_t Index;
@@ -561,7 +564,7 @@ static const DICTIONARY_ITEM *replication_request_acquire_first_available() {
     rep.requests_count = JudyLCount(rep.JudyL_array, 0, 0xFFFFFFFF, PJE0);
     if(!rep.requests_count) {
         replication_unlock();
-        return NULL;
+        return (struct replication_request){ .found = false };
     }
 
     Index = 0;
@@ -570,7 +573,10 @@ static const DICTIONARY_ITEM *replication_request_acquire_first_available() {
         struct replication_sort_entry *t;
 
         for(t = *PValue; t ;t = t->next) {
-            if(!t->executed && sender_buffer_used_percent(t->sender) <= 10) {
+            if(!t->executed
+                && sender_buffer_used_percent(t->req.sender) <= 10
+                && t->req.sender_last_flush_ut == __atomic_load_n(&t->req.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
+                ) {
                 found = t;
                 found->executed = true;
                 break;
@@ -582,30 +588,19 @@ static const DICTIONARY_ITEM *replication_request_acquire_first_available() {
     }
 
     // copy the values we need, while we have the lock
-    struct sender_state *sender = NULL;
-    STRING *chart_id = NULL;
+    struct replication_request ret;
+
     if(found) {
-        sender = found->sender;
-        chart_id = string_dup(found->chart_id);
+        ret = found->req;
+        ret.chart_id = string_dup(ret.chart_id);
+        ret.found = true;
     }
+    else
+        ret.found = false;
 
     replication_unlock();
 
-    const DICTIONARY_ITEM *item = NULL;
-
-    if(sender && chart_id) {
-        item = dictionary_get_and_acquire_item(
-                sender->replication_requests,
-                string2str(chart_id));
-
-        if(!item) {
-            internal_error(true, "REPLICATION: request to replicate chart '%s' of host '%s' is not available anymore. Ignoring it.",
-                           string2str(chart_id), rrdhost_hostname(sender->host));
-        }
-    }
-
-    string_freez(chart_id);
-    return item;
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -625,7 +620,7 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item, void
     // may see the replication sort entry, but fail to find the dictionary item
     // related to it.
 
-    replication_sort_entry_add(r->sender, r->chart_id, r->after, item);
+    replication_sort_entry_add(r, item);
     __atomic_fetch_add(&r->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
 }
 
@@ -665,7 +660,8 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .chart_id = string_strdupz(chart_id),
             .after = after,
             .before = before,
-            .start_streaming = start_streaming
+            .start_streaming = start_streaming,
+            .sender_last_flush_ut = __atomic_load_n(&sender->last_flush_time_ut, __ATOMIC_SEQ_CST),
     };
 
     dictionary_set(sender->replication_requests, chart_id, &tmp, sizeof(struct replication_request));
@@ -723,72 +719,65 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_is_busy(WORKER_JOB_ITERATION);
 
         // this call also updates our statistics
-        const DICTIONARY_ITEM *item = replication_request_acquire_first_available();
+        struct replication_request r = replication_request_get_first_available();
 
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.removed);
-        if(!item && !rep.requests_count) {
+
+        if(!r.found && !rep.requests_count) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
             worker_is_idle();
             sleep_usec(1000 * USEC_PER_MS);
             continue;
         }
 
-        if(!item) {
+        if(!r.found) {
             worker_is_idle();
             sleep_usec(1 * USEC_PER_MS);
             continue;
         }
 
-        struct replication_request *r = dictionary_acquired_item_value(item);
-        dictionary_del(r->sender->replication_requests, string2str(r->chart_id));
+        // delete the request from the dictionary
+        dictionary_del(r.sender->replication_requests, string2str(r.chart_id));
 
-        RRDSET *st = rrdset_find(r->sender->host, string2str(r->chart_id));
+        RRDSET *st = rrdset_find(r.sender->host, string2str(r.chart_id));
         if(!st) {
             internal_error(true, "REPLAY: chart '%s' not found on host '%s'",
-                           string2str(r->chart_id), rrdhost_hostname(r->sender->host));
+                           string2str(r.chart_id), rrdhost_hostname(r.sender->host));
 
-            dictionary_acquired_item_release(r->sender->replication_requests, item);
             continue;
         }
 
         worker_is_busy(WORKER_JOB_REPLAYING);
 
-        usec_t last_sender_flush = __atomic_load_n(&r->sender->last_flush_time_ut, __ATOMIC_SEQ_CST);
+        time_t latest_first_time_t = r.after;
 
-        time_t latest_first_time_t = r->after;
+        if(r.after < r.sender->replication_first_time || !r.sender->replication_first_time)
+            r.sender->replication_first_time = r.after;
 
-        if(r->after < r->sender->replication_first_time || !r->sender->replication_first_time)
-            r->sender->replication_first_time = r->after;
-
-        if(r->before < r->sender->replication_min_time || !r->sender->replication_min_time)
-            r->sender->replication_min_time = r->before;
+        if(r.before < r.sender->replication_min_time || !r.sender->replication_min_time)
+            r.sender->replication_min_time = r.before;
 
         netdata_thread_disable_cancelability();
 
         // send the replication data
         bool start_streaming = replicate_chart_response(st->rrdhost, st,
-                                                        r->start_streaming, r->after, r->before);
+                                                        r.start_streaming, r.after, r.before);
 
         netdata_thread_enable_cancelability();
 
-        if(start_streaming && last_sender_flush == __atomic_load_n(&r->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
-            __atomic_fetch_add(&r->sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
+        if(start_streaming && r.sender_last_flush_ut == __atomic_load_n(&r.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
+            __atomic_fetch_add(&r.sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
 
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 
             debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
-                  rrdhost_hostname(r->sender->host), rrdset_id(st));
+                  rrdhost_hostname(r.sender->host), rrdset_id(st));
 
             rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
         }
-
-        dictionary_acquired_item_release(r->sender->replication_requests, item);
-
-        // garbage collect dictionary
-        dictionary_version(r->sender->replication_requests);
 
         // statistics
         {
