@@ -166,6 +166,7 @@ static bool receiver_read_uncompressed(struct receiver_state *r) {
     if(unlikely(bytes_read <= 0))
         return false;
 
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes_read);
 
     r->read_len += bytes_read;
@@ -220,6 +221,8 @@ static bool receiver_read_compressed(struct receiver_state *r) {
         bytes_read += ret;
     } while(unlikely(bytes_read < (int)r->decompressor->signature_size));
 
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
+
     if(unlikely(bytes_read != (int)r->decompressor->signature_size))
         fatal("read %d bytes, but expected compression signature of size %zu", bytes_read, r->decompressor->signature_size);
 
@@ -256,6 +259,8 @@ static bool receiver_read_compressed(struct receiver_state *r) {
         compressed_bytes_read += last_read_bytes;
 
     } while(unlikely(compressed_message_size > compressed_bytes_read));
+
+    worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)compressed_bytes_read);
 
     // decompress the compressed block
     size_t bytes_to_parse = r->decompressor->decompress(r->decompressor, compressed, compressed_bytes_read);
