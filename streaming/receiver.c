@@ -685,7 +685,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
 
     struct timeval timeout;
-    timeout.tv_sec = 120;
+    timeout.tv_sec = 600;
     timeout.tv_usec = 0;
     if (unlikely(setsockopt(rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
         error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);

@@ -1119,7 +1119,7 @@ void *rrdpush_sender_thread(void *ptr) {
     info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->tid);
 
     s->timeout = (int)appconfig_get_number(
-        &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 60);
+        &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 600);
 
     s->default_port = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "default port", 19999);
