@@ -442,6 +442,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'nginxplus': {
+        title: 'Nginx Plus',
+        icon: '<i class="fas fa-eye"></i>',
+        info: undefined
+    },
+
     'apache': {
         title: 'Apache',
         icon: '<i class="fas fa-eye"></i>',
