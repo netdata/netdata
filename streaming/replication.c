@@ -3,6 +3,9 @@
 #include "replication.h"
 #include "Judy.h"
 
+#define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 30
+#define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10
+
 static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before, bool enable_streaming) {
     size_t dimensions = rrdset_number_of_dimensions(st);
 
@@ -431,6 +434,9 @@ static struct replication_thread {
     Word_t next_unique_id;
     struct replication_request *requests;
 
+    Word_t last_after;
+    Word_t last_unique_id;
+
     Pvoid_t JudyL_array;
 } rep = {
         .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -568,11 +574,18 @@ static struct replication_request replication_request_get_first_available() {
 
     struct replication_request rq = (struct replication_request){ .found = false };
 
-    Word_t first_after = 0;
-    while(!rq.found && (inner_judy_pptr = JudyLNext(rep.JudyL_array, &first_after, PJE0))) {
+
+    if(rep.last_after && rep.last_unique_id) {
+        rep.last_after = rep.last_after - 1;
+    }
+    else {
+        rep.last_after = 0;
+        rep.last_unique_id = 0;
+    }
+
+    while(!rq.found && (inner_judy_pptr = JudyLNext(rep.JudyL_array, &rep.last_after, PJE0))) {
         Pvoid_t *our_item_pptr;
-        Word_t first_unique_id = 0;
-        while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &first_unique_id, PJE0))) {
+        while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &rep.last_unique_id, PJE0))) {
             struct replication_sort_entry *rse = *our_item_pptr;
             struct sender_state *s = rse->rq->sender;
 
@@ -583,7 +596,7 @@ static struct replication_request replication_request_get_first_available() {
                     rse->rq->sender_last_flush_ut != __atomic_load_n(&s->last_flush_time_ut, __ATOMIC_SEQ_CST);
 
             bool sender_has_room_to_spare =
-                    s->replication_sender_buffer_percent_used <= 10;
+                    s->replication_sender_buffer_percent_used <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED;
 
             if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
                 if(replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
@@ -695,7 +708,21 @@ void replication_cleanup_sender(struct sender_state *sender) {
 
 void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-    s->replication_sender_buffer_percent_used = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
+    size_t percentage = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
+
+    if(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
+        s->replication_reached_max = true;
+
+    if(s->replication_reached_max &&
+        percentage <= MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED) {
+        s->replication_reached_max = false;
+        replication_recursive_lock();
+        rep.last_after = 0;
+        rep.last_unique_id = 0;
+        replication_recursive_unlock();
+    }
+
+    s->replication_sender_buffer_percent_used = percentage;
 }
 
 // ----------------------------------------------------------------------------
@@ -761,6 +788,10 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
             if(!rep.requests_count)
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
+
+            // make it start from the beginning
+            rep.last_after = 0;
+            rep.last_unique_id = 0;
 
             sleep_usec(1000 * USEC_PER_MS);
             continue;
