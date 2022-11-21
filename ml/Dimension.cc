@@ -7,9 +7,14 @@
 using namespace ml;
 
 bool Dimension::isActive() const {
-    bool SetObsolete = rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE);
-    bool DimObsolete = rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE);
-    return !SetObsolete && !DimObsolete;
+    if (!rrdset_is_available_for_viewers(RD->rrdset))
+        return false;
+
+    if (rrddim_option_check(RD, RRDDIM_OPTION_HIDDEN) ||
+        rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE))
+        return false;
+
+    return true;
 }
 
 std::pair<CalculatedNumber *, size_t> Dimension::getCalculatedNumbers() {
