@@ -507,10 +507,10 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
 
     if(rq->after < (time_t)rep.last_after) {
         // make it find this request first
-        rep.last_after = rq->after - 1;
-        rep.last_unique_id = rq->unique_id - 1;
+        rep.last_after = rq->after;
+        rep.last_unique_id = rq->unique_id;
     }
-    
+
     rep.added++;
     rep.requests_count++;
 
@@ -591,7 +591,8 @@ static struct replication_request replication_request_get_first_available() {
 
 
     if(rep.last_after && rep.last_unique_id) {
-        rep.last_after = rep.last_after - 1;
+        rep.last_after--;
+        rep.last_unique_id--;
     }
     else {
         rep.last_after = 0;
@@ -600,6 +601,7 @@ static struct replication_request replication_request_get_first_available() {
 
     while(!rq.found && (inner_judy_pptr = JudyLNext(rep.JudyL_array, &rep.last_after, PJE0))) {
         Pvoid_t *our_item_pptr;
+
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &rep.last_unique_id, PJE0))) {
             struct replication_sort_entry *rse = *our_item_pptr;
             struct sender_state *s = rse->rq->sender;
@@ -632,6 +634,9 @@ static struct replication_request replication_request_get_first_available() {
             else
                 rep.skipped_no_room++;
         }
+
+        // prepare for the next iteration on the outer loop
+        rep.last_unique_id = 0;
     }
 
     replication_recursive_unlock();
