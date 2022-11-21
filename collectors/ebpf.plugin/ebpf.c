@@ -2281,7 +2281,8 @@ int main(int argc, char **argv)
 
         ebpf_module_t *em = &ebpf_modules[i];
         em->thread = st;
-        if (em->enabled) {
+        // We always initialize process, because it is responsible to take care of apps integration
+        if (em->enabled || !i) {
             st->thread = mallocz(sizeof(netdata_thread_t));
             em->thread_id = i;
             netdata_thread_create(st->thread, st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, em);
