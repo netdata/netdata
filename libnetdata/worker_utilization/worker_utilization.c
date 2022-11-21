@@ -151,10 +151,17 @@ void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
-    if(worker->per_job_type[job_id].type == WORKER_METRIC_INCREMENTAL)
-        worker->per_job_type[job_id].custom_value += value;
-    else
-        worker->per_job_type[job_id].custom_value = value;
+    switch(worker->per_job_type[job_id].type) {
+        case WORKER_METRIC_INCREMENT:
+            worker->per_job_type[job_id].custom_value += value;
+            break;
+
+        case WORKER_METRIC_INCREMENTAL_TOTAL:
+        case WORKER_METRIC_ABSOLUTE:
+        default:
+            worker->per_job_type[job_id].custom_value = value;
+            break;
+    }
 }
 
 // statistics interface
@@ -200,11 +207,12 @@ void workers_foreach(const char *workname, void (*callback)(
 
             switch(p->per_job_type[i].type) {
                 default:
-                case WORKER_METRIC_EMPTY:
+                case WORKER_METRIC_EMPTY: {
                     per_job_type_jobs_started[i] = 0;
                     per_job_type_busy_time[i] = 0;
                     per_job_custom_values[i] = NAN;
                     break;
+                }
 
                 case WORKER_METRIC_IDLE_BUSY: {
                     size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
@@ -219,14 +227,16 @@ void workers_foreach(const char *workname, void (*callback)(
                     break;
                 }
 
-                case WORKER_METRIC_ABSOLUTE:
+                case WORKER_METRIC_ABSOLUTE: {
                     per_job_type_jobs_started[i] = 0;
                     per_job_type_busy_time[i] = 0;
 
                     per_job_custom_values[i] = p->per_job_type[i].custom_value;
                     break;
+                }
 
-                case WORKER_METRIC_INCREMENTAL: {
+                case WORKER_METRIC_INCREMENTAL_TOTAL:
+                case WORKER_METRIC_INCREMENT: {
                     per_job_type_jobs_started[i] = 0;
                     per_job_type_busy_time[i] = 0;
 

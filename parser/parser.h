@@ -7,7 +7,10 @@
 
 #define PARSER_MAX_CALLBACKS 20
 #define PARSER_MAX_RECOVER_KEYWORDS 128
-#define WORKER_PARSER_FIRST_JOB 1
+#define WORKER_PARSER_FIRST_JOB 3
+
+// this has to be in-sync with the same at receiver.c
+#define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
 // PARSER return codes
 typedef enum parser_rc {
@@ -47,8 +50,9 @@ typedef struct parser {
     size_t worker_job_next_id;
     uint8_t version;                // Parser version
     RRDHOST *host;
-    void *input;                    // Input source e.g. stream
-    void *output;                   // Stream to send commands to plugin
+    int fd;                         // Socket
+    FILE *fp_input;                 // Input source e.g. stream
+    FILE *fp_output;                // Stream to send commands to plugin
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *ssl_output;
 #endif
@@ -56,6 +60,7 @@ typedef struct parser {
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
     void    *user;                  // User defined structure to hold extra state between calls
     uint32_t flags;
+    size_t line;
 
     char *(*read_function)(char *buffer, long unsigned int, void *input);
     int (*eof_function)(void *input);
@@ -85,7 +90,7 @@ typedef struct parser {
 
 int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl);
+PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser);
 int parser_action(PARSER *working_parser, char *input);

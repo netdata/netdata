@@ -65,16 +65,15 @@ int get_host_id(uuid_t *node_id, uuid_t *host_id);
 struct node_instance_list *get_node_list(void);
 void sql_load_node_id(RRDHOST *host);
 char *get_hostname_by_node_id(char *node_id);
+int sql_find_chart_uuid(RRDHOST *host, RRDSET *st, uuid_t *store_uuid);
+int sql_find_dimension_uuid(RRDSET *st, RRDDIM *rd, uuid_t *store_uuid);
 
 // Help build archived hosts in memory when agent starts
 void sql_build_host_system_info(uuid_t *host_id, struct rrdhost_system_info *system_info);
 DICTIONARY *sql_load_host_labels(uuid_t *host_id);
 
 // For queries: To be removed when context queries are implemented
-RRDHOST *sql_create_host_by_uuid(char *guid);
 void sql_rrdset2json(RRDHOST *host, BUFFER *wb);
-void sql_build_context_param_list(ONEWAYALLOC  *owa, struct context_param **param_list, RRDHOST *host, char *context, char *chart);
-void free_temporary_host(RRDHOST *host);
 
 // TODO: move to metadata
 int update_node_id(uuid_t *host_id, uuid_t *node_id);

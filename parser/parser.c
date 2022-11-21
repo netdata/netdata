@@ -29,14 +29,15 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, void *input, void *output, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
+PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     parser->user = user;
-    parser->input = input;
-    parser->output = output;
+    parser->fd = fd;
+    parser->fp_input = fp_input;
+    parser->fp_output = fp_output;
 #ifdef ENABLE_HTTPS
     parser->ssl_output = ssl;
 #endif
@@ -222,19 +223,21 @@ int parser_next(PARSER *parser)
     }
 
     if (unlikely(parser->read_function))
-        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->input);
+        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->fp_input);
+    else if(likely(parser->fp_input))
+        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->fp_input);
     else
-        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->input);
+        tmp = NULL;
 
     if (unlikely(!tmp)) {
         if (unlikely(parser->eof_function)) {
-            int rc = parser->eof_function(parser->input);
+            int rc = parser->eof_function(parser->fp_input);
             error("read failed: user defined function returned %d", rc);
         }
         else {
-            if (feof((FILE *)parser->input))
+            if (feof((FILE *)parser->fp_input))
                 error("read failed: end of file");
-            else if (ferror((FILE *)parser->input))
+            else if (ferror((FILE *)parser->fp_input))
                 error("read failed: input error");
             else
                 error("read failed: unknown error");
@@ -253,6 +256,8 @@ int parser_next(PARSER *parser)
 
 inline int parser_action(PARSER *parser, char *input)
 {
+    parser->line++;
+
     PARSER_RC rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS];
     char command[PLUGINSD_LINE_MAX + 1];
@@ -288,7 +293,7 @@ inline int parser_action(PARSER *parser, char *input)
                 if(buffer_strlen(parser->defer.response) > 10 * 1024 * 1024) {
                     // more than 10MB of data
                     // a bad plugin that did not send the end_keyword
-                    internal_error(true, "Deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
+                    internal_error(true, "PLUGINSD: deferred response is too big (%zu bytes). Stopping this plugin.", buffer_strlen(parser->defer.response));
                     return 1;
                 }
             }
@@ -321,11 +326,10 @@ inline int parser_action(PARSER *parser, char *input)
 
     size_t worker_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES + 1; // set an invalid value by default
     while(tmp_keyword) {
-        if (command_hash == tmp_keyword->keyword_hash &&
-                (!strcmp(command, tmp_keyword->keyword))) {
-                    action_function_list = &tmp_keyword->func[0];
-                    worker_job_id = tmp_keyword->worker_job_id;
-                    break;
+        if (command_hash == tmp_keyword->keyword_hash && (!strcmp(command, tmp_keyword->keyword))) {
+            action_function_list = &tmp_keyword->func[0];
+            worker_job_id = tmp_keyword->worker_job_id;
+            break;
         }
         tmp_keyword = tmp_keyword->next;
     }
@@ -335,17 +339,14 @@ inline int parser_action(PARSER *parser, char *input)
             rc = parser->unknown_function(words, num_words, parser->user);
         else
             rc = PARSER_RC_ERROR;
-
-        internal_error(rc != PARSER_RC_OK, "Unknown keyword [%s]", input);
     }
     else {
         worker_is_busy(worker_job_id);
         while ((action_function = *action_function_list) != NULL) {
                 rc = action_function(words, num_words, parser->user);
-                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP)) {
-                    internal_error(true, "action_function() failed with rc = %u", rc);
+                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
                     break;
-                }
+
                 action_function_list++;
         }
         worker_is_idle();
@@ -354,7 +355,25 @@ inline int parser_action(PARSER *parser, char *input)
     if (likely(input == parser->buffer))
         parser->flags |= PARSER_INPUT_PROCESSED;
 
-    internal_error(rc == PARSER_RC_ERROR, "parser_action() failed.");
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(rc == PARSER_RC_ERROR) {
+        BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX);
+        for(size_t i = 0; i < num_words ;i++) {
+            if(i) buffer_fast_strcat(wb, " ", 1);
+
+            buffer_fast_strcat(wb, "\"", 1);
+            const char *s = get_word(words, num_words, i);
+            buffer_strcat(wb, s?s:"");
+            buffer_fast_strcat(wb, "\"", 1);
+        }
+
+        internal_error(true, "PLUGINSD: parser_action('%s') failed on line %zu: { %s } (quotes added to show parsing)",
+                       command, parser->line, buffer_tostring(wb));
+
+        buffer_free(wb);
+    }
+#endif
+
     return (rc == PARSER_RC_ERROR);
 }
 

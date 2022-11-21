@@ -1056,7 +1056,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
-            bytes = SSL_write(w->ssl.conn,buf, len) ;
+            bytes = netdata_ssl_write(w->ssl.conn, buf, len) ;
         } else {
             bytes = send(w->ofd,buf, len , flags);
         }
@@ -1212,25 +1212,9 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-           if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
-                while((bytes = SSL_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output))) < 0) {
-                    count++;
-                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                        error("Cannot send HTTPS headers to web client.");
-                        break;
-                    }
-                }
-            } else {
-                while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
-                    count++;
-
-                    if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
-                        error("Cannot send HTTP headers to web client.");
-                        break;
-                    }
-                }
-            }
-    } else {
+        if ( ( w->ssl.conn ) && ( w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ) )
+            bytes = netdata_ssl_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
+        else {
             while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
                 count++;
 
@@ -1239,6 +1223,17 @@ static inline void web_client_send_http_header(struct web_client *w) {
                     break;
                 }
             }
+        }
+    }
+    else {
+        while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
+            count++;
+
+            if(count > 100 || (errno != EAGAIN && errno != EWOULDBLOCK)) {
+                error("Cannot send HTTP headers to web client.");
+                break;
+            }
+        }
     }
 #else
     while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
@@ -1909,7 +1904,7 @@ ssize_t web_client_receive(struct web_client *w)
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
-            bytes = SSL_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+            bytes = netdata_ssl_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
         }else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }

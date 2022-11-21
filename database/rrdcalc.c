@@ -408,6 +408,8 @@ struct rrdcalc_constructor {
         RRDCALC_REACT_NONE,
         RRDCALC_REACT_NEW,
     } react_action;
+
+    bool existing_from_template;
 };
 
 static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *constructor_data) {
@@ -543,6 +545,20 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     ctr->react_action = RRDCALC_REACT_NEW;
 }
 
+static bool rrdcalc_rrdhost_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *rrdcalc_new __maybe_unused, void *constructor_data ) {
+    RRDCALC *rc = rrdcalc;
+    struct rrdcalc_constructor *ctr = constructor_data;
+
+    if(rc->run_flags & RRDCALC_FLAG_FROM_TEMPLATE)
+        ctr->existing_from_template = true;
+    else
+        ctr->existing_from_template = false;
+
+    ctr->react_action = RRDCALC_REACT_NONE;
+
+    return false;
+}
+
 static void rrdcalc_rrdhost_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdcalc, void *constructor_data) {
     RRDCALC *rc = rrdcalc;
     struct rrdcalc_constructor *ctr = constructor_data;
@@ -612,6 +628,7 @@ void rrdcalc_rrdhost_index_init(RRDHOST *host) {
         host->rrdcalc_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
 
         dictionary_register_insert_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_insert_callback, NULL);
+        dictionary_register_conflict_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_conflict_callback, NULL);
         dictionary_register_react_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_react_callback, NULL);
         dictionary_register_delete_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_delete_callback, host);
     }
@@ -635,11 +652,12 @@ void rrdcalc_add_from_rrdcalctemplate(RRDHOST *host, RRDCALCTEMPLATE *rt, RRDSET
         .overwrite_alert_name = overwrite_alert_name,
         .overwrite_dimensions = overwrite_dimensions,
         .react_action = RRDCALC_REACT_NONE,
+        .existing_from_template = false,
     };
 
     dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)(key_len + 1), NULL, sizeof(RRDCALC), &tmp);
-    if(tmp.react_action != RRDCALC_REACT_NEW)
-        error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It already exists.",
+    if(tmp.react_action != RRDCALC_REACT_NEW && tmp.existing_from_template == false)
+        error("RRDCALC: from template '%s' on chart '%s' with key '%s', failed to be added to host '%s'. It is manually configured.",
               string2str(rt->name), rrdset_id(st), key, rrdhost_hostname(host));
 }
 
