@@ -508,7 +508,7 @@ In general the below steps should be sufficient to use a third party collector.
 
 1. Download collector code file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
 2. Download default collector configuration file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
-3. Edit configuration file from step 2 if required.
+3. [Edit configuration file](https://learn.netdata.cloud/docs/collect/enable-configure#configure-a-collector) from step 2 if required.
 4. Enable collector.
 5. [Restart Netdata](/docs/configure/start-stop-restart.md) 
 
