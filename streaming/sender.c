@@ -176,6 +176,8 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+
+    replication_flush_sender(host->sender);
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
