@@ -440,6 +440,7 @@ static struct replication_thread {
     size_t skipped_not_connected;
     size_t skipped_no_room;
     size_t sender_resets;
+    size_t waits;
 
     Pvoid_t JudyL_array;
 } rep = {
@@ -452,6 +453,7 @@ static struct replication_thread {
         .skipped_no_room = 0,
         .skipped_not_connected = 0,
         .sender_resets = 0,
+        .waits = 0,
         .requests = NULL,
         .JudyL_array = NULL,
 };
@@ -762,6 +764,7 @@ static void replication_main_cleanup(void *ptr) {
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  11
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
 #define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          13
+#define WORKER_JOB_CUSTOM_METRIC_WAITS                  14
 
 void *replication_thread_main(void *ptr __maybe_unused) {
     netdata_thread_cleanup_push(replication_main_cleanup, ptr);
@@ -781,6 +784,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
 
     time_t latest_first_time_t = 0;
 
@@ -795,6 +799,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)rep.skipped_not_connected);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)rep.skipped_no_room);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)rep.sender_resets);
+        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, (NETDATA_DOUBLE)rep.waits);
 
         if(latest_first_time_t) {
             time_t now = now_realtime_sec();
@@ -813,6 +818,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             rep.last_after = 0;
             rep.last_unique_id = 0;
 
+            rep.waits++;
+            
             sleep_usec(1000 * USEC_PER_MS);
             continue;
         }
