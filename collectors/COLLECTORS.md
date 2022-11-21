@@ -506,8 +506,8 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 <br>
 In general the below steps should be sufficient to use a third party collector.
 
-1. Download collector code file into [folder expected by Netdata](/docs/agent/collectors/plugins.d#environment-variables).
-2. Download default collector configuration file into [folder expected by Netdata](/docs/agent/collectors/plugins.d#environment-variables).
+1. Download collector code file into [folder expected by Netdata](/collectors/plugins.d#environment-variables).
+2. Download default collector configuration file into [folder expected by Netdata](/collectors/plugins.d#environment-variables).
 3. [Edit configuration file](/docs/collect/enable-configure#configure-a-collector) from step 2 if required.
 4. [Enable collector](/docs/collect/enable-configure#enable-a-collector-or-its-orchestrator).
 5. [Restart Netdata](/docs/configure/start-stop-restart.md) 
