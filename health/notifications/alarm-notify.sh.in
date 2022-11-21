@@ -2418,7 +2418,7 @@ status_email_subject="${status}"
 case "${status}" in
 CRITICAL)
   image="${images_base_url}/images/alert-128-red.png"
-  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_critical.png"
+  alarm_badge="https://app.netdata.cloud/static/email/img/label_critical.png"
   status_message="is critical"
   status_email_subject="Critical"
   color="#ca414b"
@@ -2431,7 +2431,7 @@ CRITICAL)
 
 WARNING)
   image="${images_base_url}/images/alert-128-orange.png"
-  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_warning.png"
+  alarm_badge="https://app.netdata.cloud/static/email/img/label_warning.png"
   status_message="needs attention"
   status_email_subject="Warning"
   color="#ffc107"
@@ -2444,7 +2444,7 @@ WARNING)
 
 CLEAR)
   image="${images_base_url}/images/check-mark-2-128-green.png"
-  alarm_badge="${NETDATA_REGISTRY_CLOUD_BASE_URL}/static/email/img/label_recovered.png"
+  alarm_badge="https://app.netdata.cloud/static/email/img/label_recovered.png"
   status_message="recovered"
   status_email_subject="Clear"
   color="#77ca6d"
