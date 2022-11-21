@@ -437,6 +437,10 @@ static struct replication_thread {
     Word_t last_after;
     Word_t last_unique_id;
 
+    size_t skipped_not_connected;
+    size_t skipped_no_room;
+    size_t sender_resets;
+
     Pvoid_t JudyL_array;
 } rep = {
         .mutex = NETDATA_MUTEX_INITIALIZER,
@@ -445,6 +449,9 @@ static struct replication_thread {
         .first_time_t = 0,
         .requests_count = 0,
         .next_unique_id = 1,
+        .skipped_no_room = 0,
+        .skipped_not_connected = 0,
+        .sender_resets = 0,
         .requests = NULL,
         .JudyL_array = NULL,
 };
@@ -599,6 +606,7 @@ static struct replication_request replication_request_get_first_available() {
                     s->replication_sender_buffer_percent_used <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED;
 
             if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
+                rep.skipped_not_connected++;
                 if(replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
                     break;
             }
@@ -613,6 +621,8 @@ static struct replication_request replication_request_get_first_available() {
                 if(replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
                     break;
             }
+            else
+                rep.skipped_no_room++;
         }
     }
 
@@ -719,6 +729,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         replication_recursive_lock();
         rep.last_after = 0;
         rep.last_unique_id = 0;
+        rep.sender_resets++;
         replication_recursive_unlock();
     }
 
@@ -738,16 +749,19 @@ static void replication_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-#define WORKER_JOB_FIND_NEXT 1
-#define WORKER_JOB_QUERYING 2
-#define WORKER_JOB_DELETE_ENTRY 3
-#define WORKER_JOB_FIND_CHART 4
-#define WORKER_JOB_STATISTICS 5
-#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING 6
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS 7
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION 8
-#define WORKER_JOB_CUSTOM_METRIC_ADDED 9
-#define WORKER_JOB_CUSTOM_METRIC_DONE 10
+#define WORKER_JOB_FIND_NEXT                            1
+#define WORKER_JOB_QUERYING                             2
+#define WORKER_JOB_DELETE_ENTRY                         3
+#define WORKER_JOB_FIND_CHART                           4
+#define WORKER_JOB_STATISTICS                           5
+#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING            6
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       7
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             8
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  9
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   10
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  11
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          13
 
 void *replication_thread_main(void *ptr __maybe_unused) {
     netdata_thread_cleanup_push(replication_main_cleanup, ptr);
@@ -775,6 +789,9 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.executed);
+        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)rep.skipped_not_connected);
+        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)rep.skipped_no_room);
+        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)rep.sender_resets);
 
         if(latest_first_time_t) {
             time_t now = now_realtime_sec();
