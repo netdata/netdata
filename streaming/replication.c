@@ -395,17 +395,6 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 }
 
 // ----------------------------------------------------------------------------
-
-static size_t sender_buffer_used_percent(struct sender_state *s) {
-    netdata_mutex_lock(&s->mutex);
-    size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-    netdata_mutex_unlock(&s->mutex);
-
-    return (s->host->sender->buffer->max_size - available) * 100 / s->host->sender->buffer->max_size;
-}
-
-
-// ----------------------------------------------------------------------------
 // replication thread
 
 // replication request in sender DICTIONARY
@@ -580,7 +569,7 @@ static struct replication_request replication_request_get_first_available() {
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &first_unique_id, PJE0))) {
             struct replication_sort_entry *rse = *our_item_pptr;
 
-            if(sender_buffer_used_percent(rse->rq->sender) <= 10 &&
+            if(rse->rq->sender->replication_sender_buffer_percent_used <= 10 &&
                 rrdhost_flag_check(rse->rq->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
                 rse->rq->sender_last_flush_ut == __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
                 ) {
@@ -683,6 +672,11 @@ void replication_cleanup_sender(struct sender_state *sender) {
     replication_recursive_lock();
     dictionary_destroy(sender->replication_requests);
     replication_recursive_unlock();
+}
+
+void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
+    size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+    s->replication_sender_buffer_percent_used = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
 }
 
 // ----------------------------------------------------------------------------

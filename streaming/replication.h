@@ -18,5 +18,6 @@ void replication_init_sender(struct sender_state *sender);
 void replication_cleanup_sender(struct sender_state *sender);
 void replication_flush_sender(struct sender_state *sender);
 void replication_add_request(struct sender_state *sender, const char *chart_id, time_t after, time_t before, bool start_streaming);
+void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s);
 
 #endif /* REPLICATION_H */
