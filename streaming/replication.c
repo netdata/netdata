@@ -419,15 +419,15 @@ struct replication_request {
     Word_t unique_id;
     bool start_streaming;
     bool found;
+    bool index_in_judy;
 };
 
 // replication sort entry in JudyL array
 // used for sorting all requests, across all nodes
 struct replication_sort_entry {
-    struct replication_request req;
+    struct replication_request *rq;
 
     size_t unique_id;              // used as a key to identify the sort entry - we never access its contents
-    bool executed;
 };
 
 // the global variables for the replication thread
@@ -482,19 +482,16 @@ static struct replication_sort_entry *replication_sort_entry_create(struct repli
     struct replication_sort_entry *rse = mallocz(sizeof(struct replication_sort_entry));
 
     // copy the request
-    rse->req = *rq;
-    rse->req.chart_id = string_dup(rq->chart_id);
-
+    rse->rq = rq;
     rse->unique_id = rep.next_unique_id++;
-    rse->executed = false;
 
     // save the unique id into the request, to be able to delete it later
     rq->unique_id = rse->unique_id;
+    rq->index_in_judy = false;
     return rse;
 }
 
 static void replication_sort_entry_destroy(struct replication_sort_entry *rse) {
-    string_freez(rse->req.chart_id);
     freez(rse);
 }
 
@@ -516,6 +513,7 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
     // add it to the inner judy, using unique_id as key
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
     *item = rse;
+    rq->index_in_judy = true;
 
     if(!rep.first_time_t || rq->after < rep.first_time_t)
         rep.first_time_t = rq->after;
@@ -525,76 +523,77 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
     return rse;
 }
 
-static void replication_sort_entry_del(struct sender_state *sender, STRING *chart_id, time_t after, Word_t unique_id) {
-    Pvoid_t *inner_judy_ptr;
-    struct replication_sort_entry *rse_to_delete = NULL;
-
-    replication_recursive_lock();
-
+static void replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t *inner_judy_pptr) {
     rep.removed++;
     rep.requests_count--;
 
-    inner_judy_ptr = JudyLGet(rep.JudyL_array, after, PJE0);
-    if(inner_judy_ptr) {
-        Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_ptr, unique_id, PJE0);
-        if(our_item_pptr) {
-            rse_to_delete = *our_item_pptr;
-            rse_to_delete->executed = true; // make sure we don't get it again
+    rse->rq->index_in_judy = false;
 
-            // delete it from the inner judy
-            JudyLDel(inner_judy_ptr, unique_id, PJE0);
+    // delete it from the inner judy
+    JudyLDel(inner_judy_pptr, rse->rq->unique_id, PJE0);
 
-            // if no items left, delete it from the outer judy
-            if(*inner_judy_ptr == NULL)
-                JudyLDel(&rep.JudyL_array, after, PJE0);
+    // if no items left, delete it from the outer judy
+    if(*inner_judy_pptr == NULL)
+        JudyLDel(&rep.JudyL_array, rse->rq->after, PJE0);
+
+    // free memory
+    replication_sort_entry_destroy(rse);
+}
+
+static void replication_sort_entry_del(struct replication_request *rq) {
+    Pvoid_t *inner_judy_pptr;
+    struct replication_sort_entry *rse_to_delete = NULL;
+
+    replication_recursive_lock();
+    if(rq->index_in_judy) {
+
+        inner_judy_pptr = JudyLGet(rep.JudyL_array, rq->after, PJE0);
+        if (inner_judy_pptr) {
+            Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_pptr, rq->unique_id, PJE0);
+            if (our_item_pptr) {
+                rse_to_delete = *our_item_pptr;
+                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, inner_judy_pptr);
+            }
         }
+
+        if (!rse_to_delete)
+            fatal("Cannot find sort entry to delete for host '%s', chart '%s', time %ld.",
+                  rrdhost_hostname(rq->sender->host), string2str(rq->chart_id), rq->after);
+
     }
 
-    if(!rse_to_delete)
-        fatal("Cannot find sort entry to delete for host '%s', chart '%s', time %ld.",
-              rrdhost_hostname(sender->host), string2str(chart_id), after);
-
     replication_recursive_unlock();
-
-    replication_sort_entry_destroy(rse_to_delete);
 }
 
 static struct replication_request replication_request_get_first_available() {
-    struct replication_sort_entry *rse_found = NULL;
-    Pvoid_t *inner_judy_ptr;
+    Pvoid_t *inner_judy_pptr;
 
     replication_recursive_lock();
 
-    Word_t first_after = 0;
-    while(!rse_found && (inner_judy_ptr = JudyLNext(rep.JudyL_array, &first_after, PJE0))) {
-        Pvoid_t *our_item_ptr;
-        Word_t first_unique_id = 0;
-        while(!rse_found && (our_item_ptr = JudyLNext(*inner_judy_ptr, &first_unique_id, PJE0))) {
-            struct replication_sort_entry *rse = *our_item_ptr;
+    struct replication_request rq = (struct replication_request){ .found = false };
 
-            if(!rse->executed
-               && sender_buffer_used_percent(rse->req.sender) <= 10
-               && rse->req.sender_last_flush_ut == __atomic_load_n(&rse->req.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
-                    ) {
-                rse_found = rse;
-                rse_found->executed = true;
+    Word_t first_after = 0;
+    while(!rq.found && (inner_judy_pptr = JudyLNext(rep.JudyL_array, &first_after, PJE0))) {
+        Pvoid_t *our_item_pptr;
+        Word_t first_unique_id = 0;
+        while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &first_unique_id, PJE0))) {
+            struct replication_sort_entry *rse = *our_item_pptr;
+
+            if(sender_buffer_used_percent(rse->rq->sender) <= 10 &&
+                rse->rq->sender_last_flush_ut == __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
+                ) {
+                // copy the request to return it
+                rq = *rse->rq;
+
+                // set the return result to found
+                rq.found = true;
+
+                replication_sort_entry_unlink_and_free_unsafe(rse, inner_judy_pptr);
             }
         }
     }
 
-    // copy the values we need, while we have the lock
-    struct replication_request rq;
-
-    if(rse_found) {
-        rq = rse_found->req;
-        rq.chart_id = string_dup(rq.chart_id);
-        rq.found = true;
-    }
-    else
-        rq.found = false;
-
     replication_recursive_unlock();
-
     return rq;
 }
 
@@ -639,7 +638,8 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *sender_state __maybe_unused) {
     struct replication_request *rq = value;
 
-    replication_sort_entry_del(rq->sender, rq->chart_id, rq->after, rq->unique_id);
+    if(rq->index_in_judy)
+        replication_sort_entry_del(rq);
 
     string_freez(rq->chart_id);
     __atomic_fetch_sub(&rq->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
@@ -731,16 +731,12 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.removed);
 
-        if(!rq.found && !rep.requests_count) {
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
+        if(!rq.found) {
+            if(!rep.requests_count)
+                worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
+
             worker_is_idle();
             sleep_usec(1000 * USEC_PER_MS);
-            continue;
-        }
-
-        if(!rq.found) {
-            worker_is_idle();
-            sleep_usec(1 * USEC_PER_MS);
             continue;
         }
 
