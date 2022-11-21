@@ -435,6 +435,7 @@ static struct replication_thread {
     netdata_mutex_t mutex;
 
     size_t added;
+    size_t executed;
     size_t removed;
     time_t first_time_t;
     size_t requests_count;
@@ -445,7 +446,7 @@ static struct replication_thread {
 } rep = {
         .mutex = NETDATA_MUTEX_INITIALIZER,
         .added = 0,
-        .removed = 0,
+        .executed = 0,
         .first_time_t = 0,
         .requests_count = 0,
         .next_unique_id = 1,
@@ -580,6 +581,7 @@ static struct replication_request replication_request_get_first_available() {
             struct replication_sort_entry *rse = *our_item_pptr;
 
             if(sender_buffer_used_percent(rse->rq->sender) <= 10 &&
+                rrdhost_flag_check(rse->rq->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
                 rse->rq->sender_last_flush_ut == __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
                 ) {
                 // copy the request to return it
@@ -729,7 +731,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
-        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.removed);
+        worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.executed);
 
         if(!rq.found) {
             if(!rep.requests_count)
@@ -765,6 +767,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                                                         rq.start_streaming, rq.after, rq.before);
 
         netdata_thread_enable_cancelability();
+
+        rep.executed++;
 
         if(start_streaming && rq.sender_last_flush_ut == __atomic_load_n(&rq.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
             __atomic_fetch_add(&rq.sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
