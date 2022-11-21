@@ -562,7 +562,7 @@ static bool try_to_remove_v2_descriptor( struct rrdengine_instance *ctx, struct 
         return true;
 
     rrdeng_page_descr_mutex_lock(ctx, descr);
-    unsigned flags = descr->pg_cache_descr->flags & RRD_PAGE_POPULATED;
+    unsigned flags = descr->pg_cache_descr->flags & (RRD_PAGE_POPULATED | RRD_PAGE_READ_PENDING);
     if ((!flags || expired) && pg_cache_try_get_unsafe(descr, 1)) {
         rrdeng_page_descr_mutex_unlock(ctx, descr);
         pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
