@@ -121,7 +121,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@v121
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
@@ -156,7 +156,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@v121
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
@@ -191,7 +191,7 @@ jobs:
           ref: ${{ needs.update-changelogs.outputs.ref }}
       - name: Trigger build
         id: trigger
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@v121
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
           repo: ${{ github.repository }}
