@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- remove retries from SSL [\#14026](https://github.com/netdata/netdata/pull/14026) ([ktsaou](https://github.com/ktsaou))
+- streaming compression, query planner and replication fixes [\#14023](https://github.com/netdata/netdata/pull/14023) ([ktsaou](https://github.com/ktsaou))
 - Change relative links to absolute for learn components [\#14015](https://github.com/netdata/netdata/pull/14015) ([tkatsoulas](https://github.com/tkatsoulas))
 - allow statsd tags to modify chart metadata on the fly [\#14014](https://github.com/netdata/netdata/pull/14014) ([ktsaou](https://github.com/ktsaou))
 - minor - silence misleading error [\#14013](https://github.com/netdata/netdata/pull/14013) ([underhood](https://github.com/underhood))
@@ -346,7 +348,6 @@
 - Add additional Docker image build with debug info included. [\#13359](https://github.com/netdata/netdata/pull/13359) ([Ferroin](https://github.com/Ferroin))
 - Move host tags to netdata\_info [\#13358](https://github.com/netdata/netdata/pull/13358) ([vlvkobal](https://github.com/vlvkobal))
 - Get rid of extra comma in OpenTSDB exporting [\#13355](https://github.com/netdata/netdata/pull/13355) ([vlvkobal](https://github.com/vlvkobal))
-- Fix chart update ebpf.plugin [\#13351](https://github.com/netdata/netdata/pull/13351) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
