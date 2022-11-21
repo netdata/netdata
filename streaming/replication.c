@@ -569,10 +569,19 @@ static struct replication_request replication_request_get_first_available() {
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &first_unique_id, PJE0))) {
             struct replication_sort_entry *rse = *our_item_pptr;
 
-            if(rse->rq->sender->replication_sender_buffer_percent_used <= 10 &&
-                rrdhost_flag_check(rse->rq->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) &&
-                rse->rq->sender_last_flush_ut == __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST)
-                ) {
+            bool sender_is_connected =
+                    rrdhost_flag_check(rse->rq->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+
+            bool sender_has_been_flushed_since_this_request =
+                    rse->rq->sender_last_flush_ut != __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST);
+
+            bool sender_has_room_to_spare =
+                    rse->rq->sender->replication_sender_buffer_percent_used <= 10;
+
+            if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request))
+                replication_sort_entry_unlink_and_free_unsafe(rse, inner_judy_pptr);
+
+            else if(sender_has_room_to_spare) {
                 // copy the request to return it
                 rq = *rse->rq;
 
