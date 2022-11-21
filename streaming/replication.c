@@ -513,21 +513,27 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
     return rse;
 }
 
-static void replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t *inner_judy_pptr) {
+static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr) {
+    bool inner_judy_deleted = false;
+
     rep.removed++;
     rep.requests_count--;
 
     rse->rq->index_in_judy = false;
 
     // delete it from the inner judy
-    JudyLDel(inner_judy_pptr, rse->rq->unique_id, PJE0);
+    JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
 
     // if no items left, delete it from the outer judy
-    if(*inner_judy_pptr == NULL)
+    if(**inner_judy_ppptr == NULL) {
         JudyLDel(&rep.JudyL_array, rse->rq->after, PJE0);
+        inner_judy_deleted = true;
+    }
 
     // free memory
     replication_sort_entry_destroy(rse);
+
+    return inner_judy_deleted;
 }
 
 static void replication_sort_entry_del(struct replication_request *rq) {
@@ -542,7 +548,7 @@ static void replication_sort_entry_del(struct replication_request *rq) {
             Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_pptr, rq->unique_id, PJE0);
             if (our_item_pptr) {
                 rse_to_delete = *our_item_pptr;
-                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, inner_judy_pptr);
+                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr);
             }
         }
 
@@ -568,18 +574,21 @@ static struct replication_request replication_request_get_first_available() {
         Word_t first_unique_id = 0;
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &first_unique_id, PJE0))) {
             struct replication_sort_entry *rse = *our_item_pptr;
+            struct sender_state *s = rse->rq->sender;
 
             bool sender_is_connected =
-                    rrdhost_flag_check(rse->rq->sender->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+                    rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
             bool sender_has_been_flushed_since_this_request =
-                    rse->rq->sender_last_flush_ut != __atomic_load_n(&rse->rq->sender->last_flush_time_ut, __ATOMIC_SEQ_CST);
+                    rse->rq->sender_last_flush_ut != __atomic_load_n(&s->last_flush_time_ut, __ATOMIC_SEQ_CST);
 
             bool sender_has_room_to_spare =
-                    rse->rq->sender->replication_sender_buffer_percent_used <= 10;
+                    s->replication_sender_buffer_percent_used <= 10;
 
-            if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request))
-                replication_sort_entry_unlink_and_free_unsafe(rse, inner_judy_pptr);
+            if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
+                if(replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
+                    break;
+            }
 
             else if(sender_has_room_to_spare) {
                 // copy the request to return it
@@ -588,7 +597,8 @@ static struct replication_request replication_request_get_first_available() {
                 // set the return result to found
                 rq.found = true;
 
-                replication_sort_entry_unlink_and_free_unsafe(rse, inner_judy_pptr);
+                if(replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
+                    break;
             }
         }
     }
