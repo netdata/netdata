@@ -711,50 +711,67 @@ static void replication_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
-#define WORKER_JOB_ITERATION 1
-#define WORKER_JOB_REPLAYING 2
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS 3
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION 4
-#define WORKER_JOB_CUSTOM_METRIC_ADDED 5
-#define WORKER_JOB_CUSTOM_METRIC_DONE 6
+#define WORKER_JOB_FIND_NEXT 1
+#define WORKER_JOB_QUERYING 2
+#define WORKER_JOB_DELETE_ENTRY 3
+#define WORKER_JOB_FIND_CHART 4
+#define WORKER_JOB_STATISTICS 5
+#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING 6
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS 7
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION 8
+#define WORKER_JOB_CUSTOM_METRIC_ADDED 9
+#define WORKER_JOB_CUSTOM_METRIC_DONE 10
 
 void *replication_thread_main(void *ptr __maybe_unused) {
     netdata_thread_cleanup_push(replication_main_cleanup, ptr);
 
     worker_register("REPLICATION");
 
-    worker_register_job_name(WORKER_JOB_ITERATION, "iteration");
-    worker_register_job_name(WORKER_JOB_REPLAYING, "replaying");
+    worker_register_job_name(WORKER_JOB_FIND_NEXT, "find next");
+    worker_register_job_name(WORKER_JOB_QUERYING, "querying");
+    worker_register_job_name(WORKER_JOB_DELETE_ENTRY, "dict delete");
+    worker_register_job_name(WORKER_JOB_FIND_CHART, "find chart");
+    worker_register_job_name(WORKER_JOB_ACTIVATE_ENABLE_STREAMING, "enable streaming");
 
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, "pending requests", "requests", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, "completion", "%", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, "added requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
 
-    while(!netdata_exit) {
-        worker_is_busy(WORKER_JOB_ITERATION);
+    time_t latest_first_time_t = 0;
 
-        // this call also updates our statistics
+    while(!netdata_exit) {
+        worker_is_busy(WORKER_JOB_FIND_NEXT);
         struct replication_request rq = replication_request_get_first_available();
 
-        if(rq.found) {
-            // delete the request from the dictionary
-            dictionary_del(rq.sender->replication_requests, string2str(rq.chart_id));
-        }
-
+        worker_is_busy(WORKER_JOB_STATISTICS);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)rep.requests_count);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)rep.added);
         worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)rep.executed);
 
+        if(latest_first_time_t) {
+            time_t now = now_realtime_sec();
+            time_t total = now - rep.first_time_t;
+            time_t done = latest_first_time_t - rep.first_time_t;
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, (NETDATA_DOUBLE)done * 100.0 / (NETDATA_DOUBLE)total);
+        }
+
         if(!rq.found) {
+            worker_is_idle();
+
             if(!rep.requests_count)
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
 
-            worker_is_idle();
             sleep_usec(1000 * USEC_PER_MS);
             continue;
         }
+        else {
+            // delete the request from the dictionary
+            worker_is_busy(WORKER_JOB_DELETE_ENTRY);
+            dictionary_del(rq.sender->replication_requests, string2str(rq.chart_id));
+        }
 
+        worker_is_busy(WORKER_JOB_FIND_CHART);
         RRDSET *st = rrdset_find(rq.sender->host, string2str(rq.chart_id));
         if(!st) {
             internal_error(true, "REPLAY: chart '%s' not found on host '%s'",
@@ -763,9 +780,9 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             continue;
         }
 
-        worker_is_busy(WORKER_JOB_REPLAYING);
+        worker_is_busy(WORKER_JOB_QUERYING);
 
-        time_t latest_first_time_t = rq.after;
+        latest_first_time_t = rq.after;
 
         if(rq.after < rq.sender->replication_first_time || !rq.sender->replication_first_time)
             rq.sender->replication_first_time = rq.after;
@@ -784,6 +801,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         rep.executed++;
 
         if(start_streaming && rq.sender_last_flush_ut == __atomic_load_n(&rq.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
+            worker_is_busy(WORKER_JOB_ACTIVATE_ENABLE_STREAMING);
             __atomic_fetch_add(&rq.sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
 
             // enable normal streaming if we have to
@@ -793,14 +811,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                   rrdhost_hostname(rq.sender->host), rrdset_id(st));
 
             rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-        }
-
-        // statistics
-        {
-            time_t now = now_realtime_sec();
-            time_t total = now - rep.first_time_t;
-            time_t done = latest_first_time_t - rep.first_time_t;
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, (NETDATA_DOUBLE)done * 100.0 / (NETDATA_DOUBLE)total);
         }
     }
 
