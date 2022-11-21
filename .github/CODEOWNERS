@@ -10,28 +10,28 @@
 aclk/ @stelfrag @underhood
 build/ @Ferroin
 contrib/debian @Ferroin
-collectors/ @vlvkobal
-collectors/ebpf.plugin/ @thiagoftsm @vlvkobal
+collectors/ @thiagoftsm
+collectors/ebpf.plugin/ @thiagoftsm
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
-collectors/freebsd.plugin/ @vlvkobal @thiagoftsm
-collectors/macos.plugin/ @vlvkobal @thiagoftsm
+collectors/freebsd.plugin/ @thiagoftsm
+collectors/macos.plugin/ @thiagoftsm
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @vlvkobal @thiagoftsm
-exporting/  @vlvkobal @thiagoftsm
+collectors/cups.plugin/ @simonnagl @thiagoftsm
+exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
 docs/ @DShreve2
-health/ @thiagoftsm @vlvkobal @vkalintiris
-health/health.d/ @thiagoftsm @vlvkobal
-health/notifications/ @Ferroin @thiagoftsm
+health/ @thiagoftsm @vkalintiris @MrZammler
+health/health.d/ @thiagoftsm @MrZammler
+health/notifications/ @Ferroin @thiagoftsm @MrZammler
 ml/ @andrewm4894 @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
 packaging/ @Ferroin
 registry/ @jacekkolasa
-streaming/ @thiagoftsm @vlvkobal
+streaming/ @thiagoftsm
 system/ @Ferroin
 tests/ @Ferroin @vkalintiris
-web/ @thiagoftsm @vlvkobal @vkalintiris
+web/ @thiagoftsm @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
