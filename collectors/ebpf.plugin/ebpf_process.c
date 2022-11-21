@@ -682,7 +682,9 @@ static void ebpf_process_exit(void *ptr)
 
     ebpf_process_disable_tracepoints();
 
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /*****************************************************************
