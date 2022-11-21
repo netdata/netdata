@@ -505,6 +505,12 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
 
     struct replication_sort_entry *rse = replication_sort_entry_create(rq);
 
+    if(rq->after < (time_t)rep.last_after) {
+        // make it find this request first
+        rep.last_after = rq->after - 1;
+        rep.last_unique_id = rq->unique_id - 1;
+    }
+    
     rep.added++;
     rep.requests_count++;
 
@@ -819,7 +825,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             rep.last_unique_id = 0;
 
             rep.waits++;
-            
+
             sleep_usec(1000 * USEC_PER_MS);
             continue;
         }
