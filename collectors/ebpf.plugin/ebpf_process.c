@@ -382,13 +382,6 @@ void *ebpf_cgroup_update_shm(void *ptr)
  */
 static void ebpf_update_process_cgroup()
 {
-    // Start cgroup integration before other threads
-    cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
-    cgroup_thread.start_routine = ebpf_cgroup_update_shm;
-
-    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_cgroup_update_shm, NULL);
-
     ebpf_cgroup_target_t *ect ;
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
 
@@ -1111,6 +1104,12 @@ void ebpf_send_statistic_data()
  */
 static void process_collector(ebpf_module_t *em)
 {
+    // Start cgroup integration before other threads
+    cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
+    cgroup_thread.start_routine = ebpf_cgroup_update_shm;
+
+    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
+                          ebpf_cgroup_update_shm, NULL);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
