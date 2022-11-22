@@ -742,6 +742,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
     if(host != protected_host
        && host != localhost
        && rrdhost_receiver_replicating_charts(host) == 0
+       && rrdhost_sender_replicating_charts(host) == 0
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
        && !host->receiver

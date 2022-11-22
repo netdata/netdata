@@ -243,6 +243,8 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
 }
 
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
+    rrdpush_sender_set_flush_time(host->sender);
+
     netdata_mutex_lock(&host->sender->mutex);
 
     // flush the output buffer from any data it may have
@@ -280,7 +282,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
     // do not flush the circular buffer here
-    // this function is called sometimes with the mutex locked
+    // this function is called sometimes with the mutex lock, sometimes without the lock
     rrdpush_sender_charts_and_replication_reset(host);
 }
 
