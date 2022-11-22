@@ -290,7 +290,7 @@ static bool send_replay_chart_cmd(send_command callback, void *callback_data, RR
 #ifdef NETDATA_INTERNAL_CHECKS
     internal_error(
             st->replay.after != 0 || st->replay.before != 0,
-            "REPLAY: host '%s', chart '%s': sending replication request, while there is another inflight",
+            "REPLAY ERROR: host '%s', chart '%s': sending replication request, while there is another inflight",
             rrdhost_hostname(st->rrdhost), rrdset_id(st)
             );
 
@@ -587,11 +587,11 @@ static void replication_sort_entry_del(struct replication_request *rq) {
     replication_recursive_unlock();
 }
 
-static inline PPvoid_t JudyLFirstOrNext(Pcvoid_t PArray, Word_t * PIndex, PJError_t PJError, bool first) {
+static inline PPvoid_t JudyLFirstOrNext(Pcvoid_t PArray, Word_t * PIndex, bool first) {
     if(unlikely(first))
-        return JudyLFirst(PArray, PIndex, PJError);
+        return JudyLFirst(PArray, PIndex, PJE0);
 
-    return JudyLNext(PArray, PIndex, PJError);
+    return JudyLNext(PArray, PIndex, PJE0);
 }
 
 static struct replication_request replication_request_get_first_available() {
@@ -608,7 +608,7 @@ static struct replication_request replication_request_get_first_available() {
     }
 
     bool find_same_after = true;
-    while(!rq.found && (inner_judy_pptr = JudyLFirstOrNext(rep.JudyL_array, &rep.last_after, PJE0, find_same_after))) {
+    while(!rq.found && (inner_judy_pptr = JudyLFirstOrNext(rep.JudyL_array, &rep.last_after, find_same_after))) {
         Pvoid_t *our_item_pptr;
 
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &rep.last_unique_id, PJE0))) {
@@ -662,6 +662,14 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item __may
     struct sender_state *s = sender_state; (void)s;
     struct replication_request *rq = value;
 
+    RRDSET *st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+    if(!st) {
+        internal_error(true, "REPLAY: chart '%s' not found on host '%s'",
+                       string2str(rq->chart_id), rrdhost_hostname(rq->sender->host));
+    }
+    else
+        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_QUEUED);
+
     // IMPORTANT:
     // We use the react instead of the insert callback
     // because we want the item to be atomically visible
@@ -685,7 +693,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 
     internal_error(
             true,
-            "STREAM %s [send to %s]: ignoring duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+            "STREAM %s [send to %s]: REPLAY ERROR: merging duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
             rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
             (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
             (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
@@ -723,7 +731,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 
         internal_error(
                 true,
-                "STREAM %s [send to %s]: updated duplicate replication command for chart '%s' (from %llu to %llu [%s])",
+                "STREAM %s [send to %s]: REPLAY ERROR: updated duplicate replication command for chart '%s' (from %llu to %llu [%s])",
                 rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
                 (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false");
     }
@@ -896,7 +904,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         worker_is_busy(WORKER_JOB_FIND_CHART);
         RRDSET *st = rrdset_find(rq.sender->host, string2str(rq.chart_id));
         if(!st) {
-            internal_error(true, "REPLAY: chart '%s' not found on host '%s'",
+            internal_error(true, "REPLAY ERROR: chart '%s' not found on host '%s'",
                            string2str(rq.chart_id), rrdhost_hostname(rq.sender->host));
 
             continue;
@@ -907,6 +915,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
             rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
         }
+        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_QUEUED);
 
         worker_is_busy(WORKER_JOB_QUERYING);
 
@@ -940,7 +949,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
             }
             else
-                internal_error(true, "REPLICATION: received start streaming command for chart '%s' or host '%s', but the chart is not in progress replicating",
+                internal_error(true, "REPLAY ERROR: received start streaming command for chart '%s' or host '%s', but the chart is not in progress replicating",
                                string2str(rq.chart_id), rrdhost_hostname(st->rrdhost));
         }
     }
