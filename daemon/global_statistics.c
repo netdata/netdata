@@ -1697,9 +1697,9 @@ struct worker_job_type_gs {
 
 struct worker_thread {
     pid_t pid;
-    int enabled;
+    bool enabled;
 
-    int cpu_enabled;
+    bool cpu_enabled;
     double cpu;
 
     kernel_uint_t utime;
@@ -1715,6 +1715,7 @@ struct worker_thread {
     usec_t busy_time;
 
     struct worker_thread *next;
+    struct worker_thread *prev;
 };
 
 struct worker_utilization {
@@ -1727,6 +1728,7 @@ struct worker_utilization {
 
     struct worker_job_type_gs per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
+    size_t workers_max_job_id;
     size_t workers_registered;
     size_t workers_busy;
     usec_t workers_total_busy_time;
@@ -1975,7 +1977,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        for(i = 0; i <= wu->workers_max_job_id ;i++) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
@@ -2018,7 +2020,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        for(i = 0; i <= wu->workers_max_job_id ;i++) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
@@ -2073,7 +2075,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+        for (i = 0; i <= wu->workers_max_job_id; i++) {
             if(wu->per_job_type[i].type != WORKER_METRIC_ABSOLUTE)
                 continue;
 
@@ -2129,7 +2131,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+        for (i = 0; i <= wu->workers_max_job_id ; i++) {
             if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENT && wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL_TOTAL)
                 continue;
 
@@ -2214,8 +2216,8 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
     struct worker_thread *wt;
     for(wt = wu->threads; wt ; wt = wt->next) {
-        wt->enabled = 0;
-        wt->cpu_enabled = 0;
+        wt->enabled = false;
+        wt->cpu_enabled = false;
     }
 }
 
@@ -2243,31 +2245,30 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 #endif
 }
 
+static Pvoid_t workers_by_pid_JudyL_array = NULL;
+
 static void workers_threads_cleanup(struct worker_utilization *wu) {
-    struct worker_thread *t;
+    struct worker_thread *t = wu->threads;
+    while(t) {
+        struct worker_thread *next = t->next;
 
-    // free threads at the beginning of the linked list
-    while(wu->threads && !wu->threads->enabled) {
-        t = wu->threads;
-        wu->threads = t->next;
-        t->next = NULL;
-        freez(t);
+        if(!t->enabled) {
+            JudyLDel(&workers_by_pid_JudyL_array, t->pid, PJE0);
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wu->threads, t, prev, next);
+            freez(t);
+        }
+
+        t = next;
     }
+ }
 
-    // free threads in the middle of the linked list
-    for(t = wu->threads; t && t->next ; t = t->next) {
-        if(t->next->enabled) continue;
+static struct worker_thread *worker_thread_find(struct worker_utilization *wu __maybe_unused, pid_t pid) {
+    struct worker_thread *wt = NULL;
 
-        struct worker_thread *to_remove = t->next;
-        t->next = to_remove->next;
-        to_remove->next = NULL;
-        freez(to_remove);
-    }
-}
+    Pvoid_t *PValue = JudyLGet(workers_by_pid_JudyL_array, pid, PJE0);
+    if(PValue)
+        wt = *PValue;
 
-static struct worker_thread *worker_thread_find(struct worker_utilization *wu, pid_t pid) {
-    struct worker_thread *wt;
-    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
     return wt;
 }
 
@@ -2277,9 +2278,11 @@ static struct worker_thread *worker_thread_create(struct worker_utilization *wu,
     wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
     wt->pid = pid;
 
+    Pvoid_t *PValue = JudyLIns(&workers_by_pid_JudyL_array, pid, PJE0);
+    *PValue = wt;
+
     // link it
-    wt->next = wu->threads;
-    wu->threads = wt;
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wu->threads, wt, prev, next);
 
     return wt;
 }
@@ -2295,6 +2298,7 @@ static struct worker_thread *worker_thread_find_or_create(struct worker_utilizat
 static void worker_utilization_charts_callback(void *ptr
                                                , pid_t pid __maybe_unused
                                                , const char *thread_tag __maybe_unused
+                                               , size_t max_job_id __maybe_unused
                                                , size_t utilization_usec __maybe_unused
                                                , size_t duration_usec __maybe_unused
                                                , size_t jobs_started __maybe_unused
@@ -2311,13 +2315,16 @@ static void worker_utilization_charts_callback(void *ptr
     // find the worker_thread in the list
     struct worker_thread *wt = worker_thread_find_or_create(wu, pid);
 
-    wt->enabled = 1;
+    wt->enabled = true;
     wt->busy_time = utilization_usec;
     wt->jobs_started = jobs_started;
 
     wt->utime_old = wt->utime;
     wt->stime_old = wt->stime;
     wt->collected_time_old = wt->collected_time;
+
+    if(max_job_id > wu->workers_max_job_id)
+        wu->workers_max_job_id = max_job_id;
 
     wu->workers_total_busy_time += utilization_usec;
     wu->workers_total_duration += duration_usec;
@@ -2334,7 +2341,7 @@ static void worker_utilization_charts_callback(void *ptr
 
     // accumulate per job type statistics
     size_t i;
-    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+    for(i = 0; i <= max_job_id ;i++) {
         if(!wu->per_job_type[i].name && job_types_names[i])
             wu->per_job_type[i].name = string_dup(job_types_names[i]);
 
@@ -2372,13 +2379,13 @@ static void worker_utilization_charts_callback(void *ptr
         double stime = (double)(wt->stime - wt->stime_old) / (double)system_hz * 100.0 * (double)USEC_PER_SEC / (double)delta;
         double cpu = utime + stime;
         wt->cpu = cpu;
-        wt->cpu_enabled = 1;
+        wt->cpu_enabled = true;
 
         wu->workers_cpu_total += cpu;
         if(cpu < wu->workers_cpu_min) wu->workers_cpu_min = cpu;
         if(cpu > wu->workers_cpu_max) wu->workers_cpu_max = cpu;
     }
-    wu->workers_cpu_registered += wt->cpu_enabled;
+    wu->workers_cpu_registered += (wt->cpu_enabled) ? 1 : 0;
 }
 
 static void worker_utilization_charts(void) {
@@ -2420,7 +2427,8 @@ static void worker_utilization_finish(void) {
 
         // mark all threads as not enabled
         struct worker_thread *t;
-        for(t = wu->threads; t ; t = t->next) t->enabled = 0;
+        for(t = wu->threads; t ; t = t->next)
+            t->enabled = false;
 
         // let the cleanup job free them
         workers_threads_cleanup(wu);
