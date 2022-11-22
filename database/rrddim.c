@@ -435,13 +435,18 @@ time_t rrddim_last_entry_t(RRDDIM *rd) {
     return latest;
 }
 
+time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+        return 0;
+
+    return rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+}
+
 time_t rrddim_first_entry_t(RRDDIM *rd) {
     time_t oldest = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
-
-        time_t t = rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
         if(t != 0 && (oldest == 0 || t < oldest))
             oldest = t;
     }

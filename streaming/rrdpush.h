@@ -166,6 +166,8 @@ struct sender_state {
     size_t replication_pending_requests;
     time_t replication_first_time;
     time_t replication_min_time;
+    size_t replication_sender_buffer_percent_used;
+    bool replication_reached_max;
 
     usec_t last_flush_time_ut;
     size_t receiving_metrics;

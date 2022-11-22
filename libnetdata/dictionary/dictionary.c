@@ -1075,6 +1075,13 @@ static inline const char *item_get_name(const DICTIONARY_ITEM *item) {
         return item->caller_name;
 }
 
+static inline size_t item_get_name_len(const DICTIONARY_ITEM *item) {
+    if(item->options & ITEM_OPTION_ALLOCATED_NAME)
+        return string_strlen(item->string_name);
+    else
+        return strlen(item->caller_name);
+}
+
 static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item;
 
@@ -1794,10 +1801,10 @@ void dictionary_flush(DICTIONARY *dict) {
     if(unlikely(!dict))
         return;
 
-    // delete the index
-    dictionary_index_lock_wrlock(dict);
-    hashtable_destroy_unsafe(dict);
-    dictionary_index_lock_unlock(dict);
+//    // delete the index
+//    dictionary_index_lock_wrlock(dict);
+//    hashtable_destroy_unsafe(dict);
+//    dictionary_index_lock_unlock(dict);
 
     // delete all items
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE); // get write lock here, to speed it up (it is recursive)
@@ -1805,8 +1812,9 @@ void dictionary_flush(DICTIONARY *dict) {
     for (item = dict->items.list; item; item = item_next) {
         item_next = item->next;
 
-        if(!item_flag_check(item, ITEM_FLAG_DELETED))
-            dict_item_free_or_mark_deleted(dict, item);
+//        if(!item_flag_check(item, ITEM_FLAG_DELETED))
+//            dict_item_free_or_mark_deleted(dict, item);
+        dict_item_del(dict, item_get_name(item), (ssize_t)item_get_name_len(item));
     }
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 

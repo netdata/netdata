@@ -549,6 +549,24 @@ time_t rrdset_first_entry_t(RRDSET *st) {
     return first_entry_t;
 }
 
+time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier) {
+    if(unlikely(tier > storage_tiers))
+        return 0;
+
+    RRDDIM *rd;
+    time_t first_entry_t = LONG_MAX;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
+        if(t && t < first_entry_t)
+            first_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    if (unlikely(LONG_MAX == first_entry_t)) return 0;
+    return first_entry_t;
+}
+
 inline void rrdset_is_obsolete(RRDSET *st) {
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED))) {
         info("Cannot obsolete already archived chart %s", rrdset_name(st));

@@ -1265,8 +1265,10 @@ void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
 
 time_t rrddim_first_entry_t(RRDDIM *rd);
+time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier);
 time_t rrddim_last_entry_t(RRDDIM *rd);
 time_t rrdset_last_entry_t(RRDSET *st);
+time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
 time_t rrdset_first_entry_t(RRDSET *st);
 time_t rrdhost_last_entry_t(RRDHOST *h);
 

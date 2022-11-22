@@ -163,6 +163,8 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
         s->flags |= SENDER_FLAG_OVERFLOW;
 #endif
 
+    replication_recalculate_buffer_used_ratio_unsafe(s);
+
     netdata_mutex_unlock(&s->mutex);
     rrdpush_signal_sender_to_wake_up(s);
 }
@@ -176,6 +178,8 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
 
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+
+    replication_flush_sender(host->sender);
 }
 
 static inline void rrdpush_sender_add_host_variable_to_buffer(BUFFER *wb, const RRDVAR_ACQUIRED *rva) {
@@ -263,6 +267,7 @@ static inline void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 
     netdata_mutex_lock(&host->sender->mutex);
     cbuffer_flush(host->sender->buffer);
+    replication_recalculate_buffer_used_ratio_unsafe(host->sender);
     netdata_mutex_unlock(&host->sender->mutex);
 
     rrdpush_sender_thread_reset_all_charts(host);
@@ -770,6 +775,7 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     else
         debug(D_STREAM, "STREAM: send() returned 0 -> no error but no transmission");
 
+    replication_recalculate_buffer_used_ratio_unsafe(s);
     netdata_mutex_unlock(&s->mutex);
 
     return ret;

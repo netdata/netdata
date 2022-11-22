@@ -293,7 +293,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
-        time_t first_entry_local = rrdset_first_entry_t(st);
+        time_t first_entry_local = rrdset_first_entry_t_of_tier(st, 0);
         time_t last_entry_local = st->last_updated.tv_sec;
 
         if(!last_entry_local) {
