@@ -530,7 +530,7 @@ static void ebpf_stop_threads(int sig)
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    usec_t max = 2 * USEC_PER_SEC, step = 100000;
+    usec_t max = 3 * USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
         sleep_usec(step);
@@ -2236,7 +2236,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    for (;;) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
     }
 
