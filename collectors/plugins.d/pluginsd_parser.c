@@ -330,8 +330,9 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
         st->replay.before = 0;
 #endif
 
-        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
         rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+        rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
         ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child,
                                           last_entry_child, 0, 0);
@@ -912,11 +913,6 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
         ((PARSER_USER_OBJECT *) user)->st = st;
     }
 
-    if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED)) {
-        error("REPLAY: chart '%s' on host '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st), rrdhost_hostname(host));
-        rrdset_isnot_obsolete(st);
-    }
-
     if(start_time_str && end_time_str) {
         time_t start_time = strtol(start_time_str, NULL, 0);
         time_t end_time = strtol(end_time_str, NULL, 0);
@@ -1236,9 +1232,15 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         if (st->update_every != update_every_child)
             rrdset_set_update_every(st, update_every_child);
 
-        rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
-        rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
-        rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+        if(rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
+            rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
+            rrdset_flag_clear(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
+            rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
+        }
+        else
+            internal_error(true, "REPLAY: got a " PLUGINSD_KEYWORD_REPLAY_END " on host '%s', chart '%s' with enable_streaming = true, but there is no replication in progress for this chart.",
+                  rrdhost_hostname(host), rrdset_id(st));
 
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);
 

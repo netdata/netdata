@@ -135,10 +135,11 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
     st->rrdhost = host;
 
-    st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
-
-    if(host == localhost || !host->receiver || !stream_has_capability(host->receiver, STREAM_CAP_REPLICATION))
-        st->flags |= RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED;
+    st->flags =   RRDSET_FLAG_SYNC_CLOCK
+                | RRDSET_FLAG_INDEXED_ID
+                | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
+                | RRDSET_FLAG_SENDER_REPLICATION_FINISHED
+                ;
 
     netdata_rwlock_init(&st->alerts.rwlock);
 

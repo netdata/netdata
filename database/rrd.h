@@ -505,43 +505,48 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now);
 // and may lead to missing information.
 
 typedef enum rrdset_flags {
-    RRDSET_FLAG_DETAIL                  = (1 << 1),  // if set, the data set should be considered as a detail of another
-                                                     // (the master data set should be the one that has the same family and is not detail)
-    RRDSET_FLAG_DEBUG                   = (1 << 2),  // enables or disables debugging for a chart
-    RRDSET_FLAG_OBSOLETE                = (1 << 3),  // this is marked by the collector/module as obsolete
-    RRDSET_FLAG_EXPORTING_SEND          = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
-    RRDSET_FLAG_EXPORTING_IGNORE        = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
+    RRDSET_FLAG_DETAIL                           = (1 << 1),  // if set, the data set should be considered as a detail of another
+                                                              // (the master data set should be the one that has the same family and is not detail)
+    RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
+    RRDSET_FLAG_OBSOLETE                         = (1 << 3),  // this is marked by the collector/module as obsolete
+    RRDSET_FLAG_EXPORTING_SEND                   = (1 << 4),  // if set, this chart should be sent to Prometheus web API and external databases
+    RRDSET_FLAG_EXPORTING_IGNORE                 = (1 << 5),  // if set, this chart should not be sent to Prometheus web API and external databases
 
-    RRDSET_FLAG_UPSTREAM_SEND           = (1 << 6),  // if set, this chart should be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_IGNORE         = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
-    RRDSET_FLAG_UPSTREAM_EXPOSED        = (1 << 8),  // if set, we have sent this chart definition to netdata parent (streaming)
+    RRDSET_FLAG_UPSTREAM_SEND                    = (1 << 6),  // if set, this chart should be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_IGNORE                  = (1 << 7),  // if set, this chart should not be sent upstream (streaming)
+    RRDSET_FLAG_UPSTREAM_EXPOSED                 = (1 << 8),  // if set, we have sent this chart definition to netdata parent (streaming)
 
-    RRDSET_FLAG_STORE_FIRST             = (1 << 9),  // if set, do not eliminate the first collection during interpolation
-    RRDSET_FLAG_HETEROGENEOUS           = (1 << 10), // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
-    RRDSET_FLAG_HOMOGENEOUS_CHECK       = (1 << 11), // if set, the chart should be checked to determine if the dimensions are homogeneous
-    RRDSET_FLAG_HIDDEN                  = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
-    RRDSET_FLAG_SYNC_CLOCK              = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
-    RRDSET_FLAG_OBSOLETE_DIMENSIONS     = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
-                                                     // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
-                                                     // least rrdset_free_obsolete_time seconds ago.
-    RRDSET_FLAG_ARCHIVED                = (1 << 15),
-    RRDSET_FLAG_METADATA_UPDATE         = (1 << 16), // Mark that metadata needs to be stored
-    RRDSET_FLAG_ANOMALY_DETECTION       = (1 << 18), // flag to identify anomaly detection charts.
-    RRDSET_FLAG_INDEXED_ID              = (1 << 19), // the rrdset is indexed by its id
-    RRDSET_FLAG_INDEXED_NAME            = (1 << 20), // the rrdset is indexed by its name
+    RRDSET_FLAG_STORE_FIRST                      = (1 << 9),  // if set, do not eliminate the first collection during interpolation
+    RRDSET_FLAG_HETEROGENEOUS                    = (1 << 10), // if set, the chart is not homogeneous (dimensions in it have multiple algorithms, multipliers or dividers)
+    RRDSET_FLAG_HOMOGENEOUS_CHECK                = (1 << 11), // if set, the chart should be checked to determine if the dimensions are homogeneous
+    RRDSET_FLAG_HIDDEN                           = (1 << 12), // if set, do not show this chart on the dashboard, but use it for exporting
+    RRDSET_FLAG_SYNC_CLOCK                       = (1 << 13), // if set, microseconds on next data collection will be ignored (the chart will be synced to now)
+    RRDSET_FLAG_OBSOLETE_DIMENSIONS              = (1 << 14), // this is marked by the collector/module when a chart has obsolete dimensions
+                                                              // No new values have been collected for this chart since agent start, or it was marked RRDSET_FLAG_OBSOLETE at
+                                                              // least rrdset_free_obsolete_time seconds ago.
+    RRDSET_FLAG_ARCHIVED                         = (1 << 15),
+    RRDSET_FLAG_METADATA_UPDATE                  = (1 << 16), // Mark that metadata needs to be stored
+    RRDSET_FLAG_ANOMALY_DETECTION                = (1 << 18), // flag to identify anomaly detection charts.
+    RRDSET_FLAG_INDEXED_ID                       = (1 << 19), // the rrdset is indexed by its id
+    RRDSET_FLAG_INDEXED_NAME                     = (1 << 20), // the rrdset is indexed by its name
 
-    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION = (1 << 21),
+    RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 21),
 
-    RRDSET_FLAG_SENDER_REPLICATION_FINISHED   = (1 << 22), // the sending side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED = (1 << 23), // the receiving side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 24), // the receiving side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_QUEUED        = (1 << 22), // the sending side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 23), // the sending side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 24), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 25), // the receiving side has replication in progress
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 26), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES = (1 << 25), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 27), // a custom variable has been updated and needs to be exposed to parent
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
+
+#define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_SENDER_REPLICATION_QUEUED) \
+    && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
 
 struct rrdset {
     uuid_t chart_uuid;                             // the global UUID for this chart
@@ -951,11 +956,13 @@ struct rrdhost {
 
     time_t rrdpush_seconds_to_replicate;            // max time we want to replicate from the child
     time_t rrdpush_replication_step;                // seconds per replication step
+    size_t rrdpush_receiver_replicating_charts;     // the number of charts currently being replicated from a child
 
     // the following are state information for the threading
     // streaming metrics from this netdata to an upstream netdata
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
+    size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
     void *dbsync_worker;
 
     // ------------------------------------------------------------------------
@@ -1055,6 +1062,16 @@ extern RRDHOST *localhost;
 
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
+
+#define rrdhost_receiver_replicating_charts(host) (__atomic_load_n(&((host)->rrdpush_receiver_replicating_charts), __ATOMIC_RELAXED))
+#define rrdhost_receiver_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_receiver_replicating_charts), 1, __ATOMIC_RELAXED))
+#define rrdhost_receiver_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_receiver_replicating_charts), 1, __ATOMIC_RELAXED))
+#define rrdhost_receiver_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_receiver_replicating_charts), 0, __ATOMIC_RELAXED))
+
+#define rrdhost_sender_replicating_charts(host) (__atomic_load_n(&((host)->rrdpush_sender_replicating_charts), __ATOMIC_RELAXED))
+#define rrdhost_sender_replicating_charts_plus_one(host) (__atomic_add_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
+#define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
+#define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
 long rrdhost_hosts_available(void);
 
