@@ -142,7 +142,6 @@ struct extent_io_descriptor {
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
-    int worker_job_id;
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
 

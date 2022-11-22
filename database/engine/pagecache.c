@@ -332,9 +332,7 @@ static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned numb
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    pg_cache_release_pages_unsafe(ctx, number);
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    __atomic_fetch_sub(&pg_cache->populated_pages, number, __ATOMIC_SEQ_CST);
 }
 
 /*
@@ -382,20 +380,17 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
     assert(number < ctx->max_cache_pages);
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
+    if (__atomic_load_n(&pg_cache->populated_pages, __ATOMIC_SEQ_CST) + number >= pg_cache_hard_limit(ctx) + 1)
         debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
                 number);
 
-    while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
-
+    while (__atomic_load_n(&pg_cache->populated_pages, __ATOMIC_SEQ_CST) + number >= pg_cache_hard_limit(ctx) + 1) {
         if (!(pg_cache_try_evict_one_page_unsafe(ctx))) {
             /* failed to evict */
             struct completion compl;
             struct rrdeng_cmd cmd;
 
             ++failures;
-            uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 
             completion_init(&compl);
             cmd.opcode = RRDENG_FLUSH_PAGES;
@@ -417,11 +412,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 
                 (void)sleep_usec(usecs_to_sleep);
             }
-            uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
         }
     }
-    pg_cache->populated_pages += number;
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    __atomic_fetch_add(&pg_cache->populated_pages, number, __ATOMIC_SEQ_CST);
 }
 
 /*
@@ -437,8 +430,7 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
 
     assert(number < ctx->max_cache_pages);
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
+    if (__atomic_load_n(&pg_cache->populated_pages, __ATOMIC_SEQ_CST) + number >= pg_cache_soft_limit(ctx) + 1) {
         debug(D_RRDENGINE,
               "==Page cache full. Trying to reserve %u pages.==",
               number);
@@ -454,7 +446,6 @@ static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned n
         pg_cache->populated_pages += number;
         ret = 1; /* success */
     }
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
     return ret;
 }
 
@@ -566,14 +557,13 @@ uint8_t pg_cache_punch_hole(
     uv_rwlock_wrunlock(&page_index->lock);
     fatal_assert(1 == ret);
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    ++ctx->stats.pg_cache_deletions;
+    __atomic_fetch_add(&ctx->stats.pg_cache_deletions, 1, __ATOMIC_SEQ_CST);
     if (update_page_duration)
-        --pg_cache->page_descriptors;
+        __atomic_fetch_sub(&pg_cache->page_descriptors, 1, __ATOMIC_SEQ_CST);
+
 
     if (is_descr_journal_v2(descr))
-        --pg_cache->active_descriptors;
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+        __atomic_fetch_sub(&pg_cache->active_descriptors, 1, __ATOMIC_SEQ_CST);
 
     rrdeng_page_descr_mutex_lock(ctx, descr);
     pg_cache_descr = descr->pg_cache_descr;
@@ -1017,14 +1007,12 @@ struct rrdeng_page_descr *pg_cache_insert(
     if (lock_and_count)
         uv_rwlock_wrunlock(&page_index->lock);
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     if (lock_and_count) {
-        ++ctx->stats.pg_cache_insertions;
-        ++pg_cache->page_descriptors;
+        __atomic_fetch_add(&ctx->stats.pg_cache_insertions, 1, __ATOMIC_SEQ_CST);
+        __atomic_fetch_add(&pg_cache->page_descriptors, 1, __ATOMIC_SEQ_CST);
     }
     if (is_descr_journal_v2(descr))
-        ++pg_cache->active_descriptors;
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+        __atomic_fetch_add(&pg_cache->active_descriptors, 1, __ATOMIC_SEQ_CST);
 
     return descr;
 }

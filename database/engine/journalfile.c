@@ -937,7 +937,6 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         pg_cache->page_descriptors += metric_list_header->entries;
         metric++;
     }
-
     uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
 
     info("Journal file \"%s\" loaded (size:%"PRIu64") with %lu metrics in %d ms",
