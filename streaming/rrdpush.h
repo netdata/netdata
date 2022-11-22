@@ -159,19 +159,35 @@ struct sender_state {
     struct compressor_state *compressor;
 #endif
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                  // Structure used to encrypt the connection
+    struct netdata_ssl ssl;                     // structure used to encrypt the connection
 #endif
 
-    DICTIONARY *replication_requests;
-    size_t replication_pending_requests;
-    time_t replication_first_time;
-    time_t replication_min_time;
-    size_t replication_sender_buffer_percent_used;
-    bool replication_reached_max;
+    DICTIONARY *replication_requests;           // de-duplication of replication requests, per chart
 
-    usec_t last_flush_time_ut;
-    size_t receiving_metrics;
+    size_t replication_pending_requests;        // the currently outstanding replication requests
+    size_t replication_charts_replicating;      // the number of unique charts having pending replication requests (on every request one is added and is removed when we finish it - it does not track completion of the replication for this chart)
+
+    time_t replication_first_time;              // the oldest time that has been requested to be replicated
+    time_t replication_current_time;            // the minimum(before) of the executed replication requests
+
+    bool replication_reached_max;               // used to avoid resetting the replication thread too frequently
+
+    size_t buffer_used_percentage;              // the current utilization of the sending buffer
+    usec_t last_flush_time_ut;                  // the last time the sender flushed the sending buffer in USEC
 };
+
+#define rrdpush_sender_set_flush_time(sender) __atomic_store_n(&((sender)->last_flush_time_ut), now_realtime_usec(), __ATOMIC_RELAXED);
+#define rrdpush_sender_get_flush_time(sender) __atomic_load_n(&((sender)->last_flush_time_ut), __ATOMIC_RELAXED)
+
+#define rrdpush_sender_replicating_charts(sender) __atomic_load_n(&((sender)->replication_charts_replicating), __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_plus_one(sender) __atomic_add_fetch(&((sender)->replication_charts_replicating), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_minus_one(sender) __atomic_sub_fetch(&((sender)->replication_charts_replicating), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_zero(sender) __atomic_store_n(&((sender)->replication_charts_replicating), 0, __ATOMIC_RELAXED)
+
+#define rrdpush_sender_pending_replication_requests(sender) __atomic_load_n(&((sender)->replication_pending_requests), __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_plus_one(sender) __atomic_add_fetch(&((sender)->replication_pending_requests), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication_pending_requests), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication_pending_requests), 0, __ATOMIC_RELAXED)
 
 struct receiver_state {
     RRDHOST *host;

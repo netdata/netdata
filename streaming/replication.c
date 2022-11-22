@@ -411,7 +411,7 @@ struct replication_request {
     Word_t unique_id;
     bool start_streaming;
     bool found;
-    bool index_in_judy;
+    bool indexed_in_judy;
 };
 
 // replication sort entry in JudyL array
@@ -486,13 +486,15 @@ static void replication_recursive_unlock() {
 static struct replication_sort_entry *replication_sort_entry_create(struct replication_request *rq) {
     struct replication_sort_entry *rse = mallocz(sizeof(struct replication_sort_entry));
 
+    rrdpush_sender_pending_replication_requests_plus_one(rq->sender);
+
     // copy the request
     rse->rq = rq;
     rse->unique_id = rep.next_unique_id++;
 
     // save the unique id into the request, to be able to delete it later
     rq->unique_id = rse->unique_id;
-    rq->index_in_judy = false;
+    rq->indexed_in_judy = false;
     return rse;
 }
 
@@ -524,7 +526,7 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
     // add it to the inner judy, using unique_id as key
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
     *item = rse;
-    rq->index_in_judy = true;
+    rq->indexed_in_judy = true;
 
     if(!rep.first_time_t || rq->after < rep.first_time_t)
         rep.first_time_t = rq->after;
@@ -540,7 +542,9 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     rep.removed++;
     rep.requests_count--;
 
-    rse->rq->index_in_judy = false;
+    rrdpush_sender_pending_replication_requests_minus_one(rse->rq->sender);
+
+    rse->rq->indexed_in_judy = false;
 
     // delete it from the inner judy
     JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
@@ -562,7 +566,7 @@ static void replication_sort_entry_del(struct replication_request *rq) {
     struct replication_sort_entry *rse_to_delete = NULL;
 
     replication_recursive_lock();
-    if(rq->index_in_judy) {
+    if(rq->indexed_in_judy) {
 
         inner_judy_pptr = JudyLGet(rep.JudyL_array, rq->after, PJE0);
         if (inner_judy_pptr) {
@@ -610,10 +614,10 @@ static struct replication_request replication_request_get_first_available() {
                     rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
             bool sender_has_been_flushed_since_this_request =
-                    rse->rq->sender_last_flush_ut != __atomic_load_n(&s->last_flush_time_ut, __ATOMIC_SEQ_CST);
+                    rse->rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(s);
 
             bool sender_has_room_to_spare =
-                    s->replication_sender_buffer_percent_used <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED;
+                    s->buffer_used_percentage <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED;
 
             if(unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
                 rep.skipped_not_connected++;
@@ -661,7 +665,9 @@ static void replication_request_react_callback(const DICTIONARY_ITEM *item __may
     // related to it.
 
     replication_sort_entry_add(rq);
-    __atomic_fetch_add(&rq->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
+
+    // this request is about a unique chart for this sender
+    rrdpush_sender_replicating_charts_plus_one(s);
 }
 
 static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *sender_state) {
@@ -684,11 +690,13 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *sender_state __maybe_unused) {
     struct replication_request *rq = value;
 
-    if(rq->index_in_judy)
+    // this request is about a unique chart for this sender
+    rrdpush_sender_replicating_charts_minus_one(rq->sender);
+
+    if(rq->indexed_in_judy)
         replication_sort_entry_del(rq);
 
     string_freez(rq->chart_id);
-    __atomic_fetch_sub(&rq->sender->replication_pending_requests, 1, __ATOMIC_SEQ_CST);
 }
 
 
@@ -702,7 +710,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .after = after,
             .before = before,
             .start_streaming = start_streaming,
-            .sender_last_flush_ut = __atomic_load_n(&sender->last_flush_time_ut, __ATOMIC_SEQ_CST),
+            .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
     };
 
     dictionary_set(sender->replication_requests, chart_id, &rq, sizeof(struct replication_request));
@@ -746,7 +754,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
         replication_recursive_unlock();
     }
 
-    s->replication_sender_buffer_percent_used = percentage;
+    s->buffer_used_percentage = percentage;
 }
 
 // ----------------------------------------------------------------------------
@@ -849,6 +857,12 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             continue;
         }
 
+        if(!rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        }
+
         worker_is_busy(WORKER_JOB_QUERYING);
 
         latest_first_time_t = rq.after;
@@ -856,8 +870,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         if(rq.after < rq.sender->replication_first_time || !rq.sender->replication_first_time)
             rq.sender->replication_first_time = rq.after;
 
-        if(rq.before < rq.sender->replication_min_time || !rq.sender->replication_min_time)
-            rq.sender->replication_min_time = rq.before;
+        if(rq.before < rq.sender->replication_current_time || !rq.sender->replication_current_time)
+            rq.sender->replication_current_time = rq.before;
 
         netdata_thread_disable_cancelability();
 
@@ -869,17 +883,20 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         rep.executed++;
 
-        if(start_streaming && rq.sender_last_flush_ut == __atomic_load_n(&rq.sender->last_flush_time_ut, __ATOMIC_SEQ_CST)) {
+        if(start_streaming && rq.sender_last_flush_ut == rrdpush_sender_get_flush_time(rq.sender)) {
             worker_is_busy(WORKER_JOB_ACTIVATE_ENABLE_STREAMING);
-            __atomic_fetch_add(&rq.sender->receiving_metrics, 1, __ATOMIC_SEQ_CST);
 
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 
-            debug(D_REPLICATION, "Enabling metric streaming for chart %s.%s",
-                  rrdhost_hostname(rq.sender->host), rrdset_id(st));
-
-            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+                rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+                rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+                rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+            }
+            else
+                internal_error(true, "REPLICATION: received start streaming command for chart '%s' or host '%s', but the chart is not in progress replicating",
+                               string2str(rq.chart_id), rrdhost_hostname(st->rrdhost));
         }
     }
 
