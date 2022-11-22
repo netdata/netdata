@@ -27,6 +27,7 @@ struct config collector_config = { .first_section = NULL,
 int running_on_kernel = 0;
 int ebpf_nprocs;
 int isrh = 0;
+int main_thread_id = 0;
 
 pthread_mutex_t lock;
 pthread_mutex_t ebpf_exit_cleanup;
@@ -517,6 +518,10 @@ static void ebpf_stop_threads(int sig)
 {
     UNUSED(sig);
     ebpf_exit_plugin = 1;
+    // Child thread should be closed by itself.
+    if (main_thread_id != gettid())
+        return;
+
     int i;
     pthread_mutex_lock(&ebpf_exit_cleanup);
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
@@ -2149,6 +2154,7 @@ static void ebpf_manage_pid(pid_t pid)
 int main(int argc, char **argv)
 {
     clocks_init();
+    main_thread_id = gettid();
 
     set_global_variables();
     ebpf_parse_args(argc, argv);
