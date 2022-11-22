@@ -80,7 +80,7 @@ public:
         for (std::shared_ptr<Dimension> &D : Dimensions)
             D->update(TV, Iteration);
 
-        rrdset_timed_done(RS, TV);
+        rrdset_timed_done(RS, TV, /* pending_rrdset_next */ false);
     }
 
 private:
@@ -133,9 +133,9 @@ void *profile_main(void *ptr)
 {
     netdata_thread_cleanup_push(profile_main_cleanup, ptr);
 
-    size_t NumCharts = config_get_number(CONFIG_SECTION_GLOBAL, "profplug charts", 500);
-    size_t NumDimsPerChart = config_get_number(CONFIG_SECTION_GLOBAL, "profplug dimensions", 5);
-    size_t SecondsToFill = config_get_number(CONFIG_SECTION_GLOBAL, "profplug seconds to fill", 3600);
+    size_t NumCharts = config_get_number(CONFIG_SECTION_GLOBAL, "profplug charts", 1);
+    size_t NumDimsPerChart = config_get_number(CONFIG_SECTION_GLOBAL, "profplug dimensions", 1);
+    size_t SecondsToFill = config_get_number(CONFIG_SECTION_GLOBAL, "profplug seconds to fill", 0);
     time_t UpdateEvery = 1;
 
     std::vector<std::shared_ptr<Chart>> Charts = createCharts(NumCharts, NumDimsPerChart, UpdateEvery);

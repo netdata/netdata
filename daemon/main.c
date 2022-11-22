@@ -1027,11 +1027,6 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
-#ifdef ENABLE_ML_TESTS
-                        else if(strcmp(optarg, "mltest") == 0) {
-                            return test_ml(argc, argv);
-                        }
-#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
                             unittest_running = true;
