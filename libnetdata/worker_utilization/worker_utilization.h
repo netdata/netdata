@@ -30,6 +30,7 @@ void workers_foreach(const char *workname, void (*callback)(
                                                       void *data
                                                       , pid_t pid
                                                       , const char *thread_tag
+                                                      , size_t max_job_id
                                                       , size_t utilization_usec
                                                       , size_t duration_usec
                                                       , size_t jobs_started

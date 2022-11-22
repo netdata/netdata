@@ -24,7 +24,6 @@ struct worker {
     pid_t pid;
     const char *tag;
     const char *workname;
-    uint32_t workname_hash;
 
     // statistics controlled variables
     volatile usec_t statistics_last_checkpoint;
@@ -32,6 +31,7 @@ struct worker {
     usec_t statistics_last_busy_time;
 
     // the worker controlled variables
+    size_t worker_max_job_id;
     volatile size_t job_id;
     volatile size_t jobs_started;
     volatile usec_t busy_time;
@@ -44,9 +44,9 @@ struct worker {
     struct worker *prev;
 };
 
-static netdata_mutex_t base_lock = NETDATA_MUTEX_INITIALIZER;
-static struct worker *base = NULL;
+static netdata_mutex_t workers_base_lock = NETDATA_MUTEX_INITIALIZER;
 static __thread struct worker *worker = NULL;
+static Pvoid_t workers_per_workname_JudyHS_array = NULL;
 
 void worker_register(const char *workname) {
     if(unlikely(worker)) return;
@@ -55,16 +55,24 @@ void worker_register(const char *workname) {
     worker->pid = gettid();
     worker->tag = strdupz(netdata_thread_tag());
     worker->workname = strdupz(workname);
-    worker->workname_hash = simple_hash(worker->workname);
 
     usec_t now = now_realtime_usec();
     worker->statistics_last_checkpoint = now;
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
 
-    netdata_mutex_lock(&base_lock);
-    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(base, worker, prev, next);
-    netdata_mutex_unlock(&base_lock);
+    size_t workname_size = strlen(workname) + 1;
+    netdata_mutex_lock(&workers_base_lock);
+
+    Pvoid_t *PValue = JudyHSGet(workers_per_workname_JudyHS_array, (void *)workname, workname_size);
+    if(!PValue)
+        PValue = JudyHSIns(&workers_per_workname_JudyHS_array, (void *)workname, workname_size, PJE0);
+
+    struct worker *base = *PValue;
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, worker, prev, next);
+    *PValue = base;
+
+    netdata_mutex_unlock(&workers_base_lock);
 }
 
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type) {
@@ -74,6 +82,10 @@ void worker_register_job_custom_metric(size_t job_id, const char *name, const ch
         error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
+
+    if(job_id > worker->worker_max_job_id)
+        worker->worker_max_job_id = job_id;
+
     if(worker->per_job_type[job_id].name) {
         if(strcmp(string2str(worker->per_job_type[job_id].name), name) != 0 || worker->per_job_type[job_id].type != type || strcmp(string2str(worker->per_job_type[job_id].units), units) != 0)
             error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, string2str(worker->per_job_type[job_id].name), name);
@@ -92,9 +104,18 @@ void worker_register_job_name(size_t job_id, const char *name) {
 void worker_unregister(void) {
     if(unlikely(!worker)) return;
 
-    netdata_mutex_lock(&base_lock);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(base, worker, prev, next);
-    netdata_mutex_unlock(&base_lock);
+    size_t workname_size = strlen(worker->workname) + 1;
+    netdata_mutex_lock(&workers_base_lock);
+    Pvoid_t *PValue = JudyHSGet(workers_per_workname_JudyHS_array, (void *)worker->workname, workname_size);
+    if(PValue) {
+        struct worker *base = *PValue;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(base, worker, prev, next);
+        *PValue = base;
+
+        if(!base)
+            JudyHSDel(&workers_per_workname_JudyHS_array, (void *)worker->workname, workname_size, PJE0);
+    }
+    netdata_mutex_unlock(&workers_base_lock);
 
     for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
         string_freez(worker->per_job_type[i].name);
@@ -170,6 +191,7 @@ void workers_foreach(const char *workname, void (*callback)(
                                                void *data
                                                , pid_t pid
                                                , const char *thread_tag
+                                               , size_t max_job_id
                                                , size_t utilization_usec
                                                , size_t duration_usec
                                                , size_t jobs_started, size_t is_running
@@ -181,15 +203,18 @@ void workers_foreach(const char *workname, void (*callback)(
                                                , NETDATA_DOUBLE *job_custom_values
                                                )
                                                , void *data) {
-    netdata_mutex_lock(&base_lock);
-    uint32_t hash = simple_hash(workname);
+    netdata_mutex_lock(&workers_base_lock);
     usec_t busy_time, delta;
     size_t i, jobs_started, jobs_running;
 
+    size_t workname_size = strlen(workname) + 1;
+    struct worker *base = NULL;
+    Pvoid_t *PValue = JudyHSGet(workers_per_workname_JudyHS_array, (void *)workname, workname_size);
+    if(PValue)
+        base = *PValue;
+
     struct worker *p;
     DOUBLE_LINKED_LIST_FOREACH_FORWARD(base, p, prev, next) {
-        if(hash != p->workname_hash || strcmp(workname, p->workname) != 0) continue;
-
         usec_t now = now_realtime_usec();
 
         // find per job type statistics
@@ -200,7 +225,8 @@ void workers_foreach(const char *workname, void (*callback)(
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
         NETDATA_DOUBLE per_job_custom_values[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
-        for(i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        size_t max_job_id = p->worker_max_job_id;
+        for(i  = 0; i <= max_job_id ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
             per_job_type_units[i] = p->per_job_type[i].units;
             per_job_metric_type[i] = p->per_job_type[i].type;
@@ -286,6 +312,7 @@ void workers_foreach(const char *workname, void (*callback)(
         callback(data
                  , p->pid
                  , p->tag
+                 , max_job_id
                  , busy_time
                  , delta
                  , jobs_started
@@ -299,5 +326,5 @@ void workers_foreach(const char *workname, void (*callback)(
                  );
     }
 
-    netdata_mutex_unlock(&base_lock);
+    netdata_mutex_unlock(&workers_base_lock);
 }
