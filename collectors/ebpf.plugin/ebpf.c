@@ -483,7 +483,7 @@ static void ebpf_exit()
     if (unlink(filename))
         error("Cannot remove PID file %s", filename);
 
-    ebpf_exit_plugin = 2;
+    exit(0);
 }
 
 /**
@@ -2236,7 +2236,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    while (ebpf_exit_plugin != 2) {
+    for (;;) {
         (void)heartbeat_next(&hb, step);
     }
 
