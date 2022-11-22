@@ -403,15 +403,16 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
 // replication request in sender DICTIONARY
 // used for de-duplicating the requests
 struct replication_request {
-    struct sender_state *sender;
-    usec_t sender_last_flush_ut;
-    STRING *chart_id;
-    time_t after;                       // key for sorting (JudyL)
-    time_t before;
-    Word_t unique_id;
-    bool start_streaming;
-    bool found;
-    bool indexed_in_judy;
+    struct sender_state *sender;        // the sender we should put the reply at
+    STRING *chart_id;                   // the chart of the request
+    time_t after;                       // the start time of the query (maybe zero) key for sorting (JudyL)
+    time_t before;                      // the end time of the query (maybe zero)
+    bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
+
+    usec_t sender_last_flush_ut;        // the timestamp of the sender, at the time we indexed this request
+    Word_t unique_id;                   // auto-increment, later requests have bigger
+    bool found;                         // used as a result boolean for the find call
+    bool indexed_in_judy;               // true when the request is indexed in judy
 };
 
 // replication sort entry in JudyL array
@@ -586,6 +587,13 @@ static void replication_sort_entry_del(struct replication_request *rq) {
     replication_recursive_unlock();
 }
 
+static inline PPvoid_t JudyLFirstOrNext(Pcvoid_t PArray, Word_t * PIndex, PJError_t PJError, bool first) {
+    if(unlikely(first))
+        return JudyLFirst(PArray, PIndex, PJError);
+
+    return JudyLNext(PArray, PIndex, PJError);
+}
+
 static struct replication_request replication_request_get_first_available() {
     Pvoid_t *inner_judy_pptr;
 
@@ -594,16 +602,13 @@ static struct replication_request replication_request_get_first_available() {
     struct replication_request rq = (struct replication_request){ .found = false };
 
 
-    if(rep.last_after && rep.last_unique_id) {
-        rep.last_after--;
-        rep.last_unique_id--;
-    }
-    else {
+    if(unlikely(!rep.last_after || !rep.last_unique_id)) {
         rep.last_after = 0;
         rep.last_unique_id = 0;
     }
 
-    while(!rq.found && (inner_judy_pptr = JudyLNext(rep.JudyL_array, &rep.last_after, PJE0))) {
+    bool find_same_after = true;
+    while(!rq.found && (inner_judy_pptr = JudyLFirstOrNext(rep.JudyL_array, &rep.last_after, PJE0, find_same_after))) {
         Pvoid_t *our_item_pptr;
 
         while(!rq.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &rep.last_unique_id, PJE0))) {
@@ -638,6 +643,9 @@ static struct replication_request replication_request_get_first_available() {
             else
                 rep.skipped_no_room++;
         }
+
+        // call JudyLNext from now on
+        find_same_after = false;
 
         // prepare for the next iteration on the outer loop
         rep.last_unique_id = 0;
@@ -682,9 +690,46 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
             (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
             (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
 
-    string_freez(rq_new->chart_id);
+    bool updated_after = false, updated_before = false, updated_start_streaming = false, updated = false;
 
-    return false;
+    if(rq_new->after < rq->after && rq_new->after != 0)
+        updated_after = true;
+
+    if(rq_new->before > rq->before)
+        updated_before = true;
+
+    if(rq_new->start_streaming != rq->start_streaming)
+        updated_start_streaming = true;
+
+    if(updated_after || updated_before || updated_start_streaming) {
+        replication_recursive_lock();
+
+        if(rq->indexed_in_judy)
+            replication_sort_entry_del(rq);
+
+        if(rq_new->after < rq->after && rq_new->after != 0)
+            rq->after = rq_new->after;
+
+        if(rq->after == 0)
+            rq->before = 0;
+        else if(rq_new->before > rq->before)
+            rq->before = rq_new->before;
+
+        rq->start_streaming = rq->start_streaming;
+        replication_sort_entry_add(rq);
+
+        replication_recursive_unlock();
+        updated = true;
+
+        internal_error(
+                true,
+                "STREAM %s [send to %s]: updated duplicate replication command for chart '%s' (from %llu to %llu [%s])",
+                rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
+                (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false");
+    }
+
+    string_freez(rq_new->chart_id);
+    return updated;
 }
 
 static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *sender_state __maybe_unused) {
