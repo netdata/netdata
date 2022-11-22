@@ -173,6 +173,11 @@ struct extent_cache {
     struct extent_cache_element *replaceQ_tail; /* MRU */
 };
 
+#define DESCRIPTOR_INITIAL_CLEANUP    (60)
+#ifndef DESCRIPTOR_INTERVAL_CLEANUP
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
+#endif
+
 struct rrdengine_worker_config {
     struct rrdengine_instance *ctx;
 
@@ -187,7 +192,7 @@ struct rrdengine_worker_config {
     unsigned long cleanup_deleting_descriptors;  /* set to 0 when now_deleting_descriptors is still running */
 
     unsigned long running_journal_migration;
-
+    time_t next_descriptor_cleanup;
     /* dirty page deletion thread */
     uv_thread_t *now_invalidating_dirty_pages;
     /* set to 0 when now_invalidating_dirty_pages is still running */
@@ -217,6 +222,13 @@ struct rrdengine_statistics {
     rrdeng_stats_t pg_cache_deletions;
     rrdeng_stats_t pg_cache_hits;
     rrdeng_stats_t pg_cache_misses;
+    rrdeng_stats_t pg_cache_preload;
+    rrdeng_stats_t pg_index_lookup_hit;
+    rrdeng_stats_t pg_index_lookup_miss;
+    rrdeng_stats_t pg_index_lookup_v2_preload;
+    rrdeng_stats_t pg_index_lookup_v2_hit;
+    rrdeng_stats_t pg_index_lookup_v2_miss;
+    rrdeng_stats_t pg_index_lookup_notfound;
     rrdeng_stats_t pg_cache_backfills;
     rrdeng_stats_t pg_cache_evictions;
     rrdeng_stats_t before_decompress_bytes;

@@ -780,6 +780,8 @@ static struct rrdeng_page_descr *add_pages_from_timerange(
         struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
         if (unlikely(added_descr != new_descr))
             rrdeng_page_descr_freez(new_descr);
+        else
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_v2_preload, 1);
 
         if (!descr) {
             descr = added_descr;
@@ -883,6 +885,7 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit, 1);
             update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
@@ -890,8 +893,12 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
 
     if (likely(db_engine_journal_indexing)) {
         descr = populate_page_index(page_index, start_time_ut, end_time_ut, cache_pages);
-        if (descr)
+        if (descr) {
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_v2_hit, 1);
             return descr;
+        }
+        else
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_v2_miss, 1);
     }
 
     Index = (Word_t) (start_time_ut / USEC_PER_SEC);
@@ -899,11 +906,13 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit, 1);
             update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
     }
 
+    rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_miss, 1);
     return NULL;
 }
 
@@ -1169,6 +1178,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     if (NULL == PValue) {
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
         *ret_page_indexp = NULL;
+        rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_notfound, 1);
         return 0;
     }
 
@@ -1292,6 +1302,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         freez(*page_info_arrayp);
         *page_info_arrayp = NULL;
     }
+    rrd_stat_atomic_add(&ctx->stats.pg_cache_preload, preload_count);
     netdata_thread_enable_cancelability();
     return count;
 }

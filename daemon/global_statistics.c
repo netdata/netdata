@@ -1046,6 +1046,55 @@ static void dbengine_statistics_charts(void) {
             // ----------------------------------------------------------------
 
             {
+                static RRDSET *st_pg_cache_lookup = NULL;
+                static RRDDIM *rd_pg_cache_preload = NULL;
+                static RRDDIM *rd_pg_index_lookup_hit = NULL;
+                static RRDDIM *rd_pg_index_lookup_miss = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_preload = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_hit = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_miss = NULL;
+                static RRDDIM *rd_pg_index_preload_notfound = NULL;
+
+
+                if (unlikely(!st_pg_cache_lookup)) {
+                    st_pg_cache_lookup = rrdset_create_localhost(
+                        "netdata",
+                        "page_cache_lookups",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "Netdata DB engine page cache lookups",
+                        "operations",
+                        "netdata",
+                        "stats",
+                        132001,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_STACKED);
+
+                    rd_pg_cache_preload = rrddim_add(st_pg_cache_lookup, "preload", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_hit = rrddim_add(st_pg_cache_lookup, "lookup hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_miss = rrddim_add(st_pg_cache_lookup, "lookup miss", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_preload = rrddim_add(st_pg_cache_lookup, "v2 preload", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_hit = rrddim_add(st_pg_cache_lookup, "v2 hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_miss = rrddim_add(st_pg_cache_lookup, "v2 miss", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_preload_notfound = rrddim_add(st_pg_cache_lookup, "preload not found", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                } else
+                    rrdset_next(st_pg_cache_lookup);
+
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_cache_preload, stats_array[38]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_hit, stats_array[39]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_miss, stats_array[40]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_preload, stats_array[41]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_hit, stats_array[42]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_miss, stats_array[43]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_preload_notfound, stats_array[44]);
+
+                rrdset_done(st_pg_cache_lookup);
+            }
+
+
+            {
                 static RRDSET *st_pg_cache_hit_ratio = NULL;
                 static RRDDIM *rd_hit_ratio = NULL;
 
