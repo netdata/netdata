@@ -528,7 +528,12 @@ static void ebpf_stop_threads(int sig)
     UNUSED(sig);
     ebpf_exit_plugin = 1;
     int i;
-    for (i = 0; ebpf_threads[i].name != NULL; i++);
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    for (i = 0; ebpf_threads[i].name != NULL; i++) {
+        if (ebpf_threads[i].enabled != NETDATA_THREAD_EBPF_STOPPED)
+            netdata_thread_cancel(*ebpf_threads[i].thread);
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     usec_t max = 2 * USEC_PER_SEC, step = 100000;
     while (i && max) {
@@ -543,6 +548,9 @@ static void ebpf_stop_threads(int sig)
         }
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
+
+    if (!i)
+        netdata_thread_cancel(*cgroup_thread.thread);
 
     //Unload threads(except sync and filesystem)
     pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -570,11 +578,6 @@ static void ebpf_stop_threads(int sig)
         }
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    // We did not use all necessary time to stop threads, so they were previosly closed
-    if (max) {
-        freez(cgroup_thread.thread);
-    }
 
     ebpf_exit();
 }
