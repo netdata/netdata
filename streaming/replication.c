@@ -693,51 +693,51 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 
     internal_error(
             true,
-            "STREAM %s [send to %s]: REPLAY ERROR: merging duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+            "STREAM %s [send to %s]: REPLAY ERROR: ignoring duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
             rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
             (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
             (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
 
-    bool updated_after = false, updated_before = false, updated_start_streaming = false, updated = false;
-
-    if(rq_new->after < rq->after && rq_new->after != 0)
-        updated_after = true;
-
-    if(rq_new->before > rq->before)
-        updated_before = true;
-
-    if(rq_new->start_streaming != rq->start_streaming)
-        updated_start_streaming = true;
-
-    if(updated_after || updated_before || updated_start_streaming) {
-        replication_recursive_lock();
-
-        if(rq->indexed_in_judy)
-            replication_sort_entry_del(rq);
-
-        if(rq_new->after < rq->after && rq_new->after != 0)
-            rq->after = rq_new->after;
-
-        if(rq->after == 0)
-            rq->before = 0;
-        else if(rq_new->before > rq->before)
-            rq->before = rq_new->before;
-
-        rq->start_streaming = rq->start_streaming;
-        replication_sort_entry_add(rq);
-
-        replication_recursive_unlock();
-        updated = true;
-
-        internal_error(
-                true,
-                "STREAM %s [send to %s]: REPLAY ERROR: updated duplicate replication command for chart '%s' (from %llu to %llu [%s])",
-                rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
-                (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false");
-    }
+//    bool updated_after = false, updated_before = false, updated_start_streaming = false, updated = false;
+//
+//    if(rq_new->after < rq->after && rq_new->after != 0)
+//        updated_after = true;
+//
+//    if(rq_new->before > rq->before)
+//        updated_before = true;
+//
+//    if(rq_new->start_streaming != rq->start_streaming)
+//        updated_start_streaming = true;
+//
+//    if(updated_after || updated_before || updated_start_streaming) {
+//        replication_recursive_lock();
+//
+//        if(rq->indexed_in_judy)
+//            replication_sort_entry_del(rq);
+//
+//        if(rq_new->after < rq->after && rq_new->after != 0)
+//            rq->after = rq_new->after;
+//
+//        if(rq->after == 0)
+//            rq->before = 0;
+//        else if(rq_new->before > rq->before)
+//            rq->before = rq_new->before;
+//
+//        rq->start_streaming = rq->start_streaming;
+//        replication_sort_entry_add(rq);
+//
+//        replication_recursive_unlock();
+//        updated = true;
+//
+//        internal_error(
+//                true,
+//                "STREAM %s [send to %s]: REPLAY ERROR: updated duplicate replication command for chart '%s' (from %llu to %llu [%s])",
+//                rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
+//                (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false");
+//    }
 
     string_freez(rq_new->chart_id);
-    return updated;
+    return false;
 }
 
 static void replication_request_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *sender_state __maybe_unused) {
