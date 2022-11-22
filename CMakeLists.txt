@@ -525,10 +525,6 @@ target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 set(APPS_PLUGIN_FILES
         collectors/apps.plugin/apps_plugin.c)
 
-set(CHECKS_PLUGIN_FILES
-        collectors/checks.plugin/plugin_checks.c
-        )
-
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c
         collectors/freebsd.plugin/plugin_freebsd.h
@@ -1059,7 +1055,6 @@ set(NETDATA_FILES
         ${DAEMON_FILES}
         ${API_PLUGIN_FILES}
         ${EXPORTING_ENGINE_FILES}
-        ${CHECKS_PLUGIN_FILES}
         ${HEALTH_PLUGIN_FILES}
         ${IDLEJITTER_PLUGIN_FILES}
         ${ML_FILES}

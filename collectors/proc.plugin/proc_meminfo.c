@@ -154,8 +154,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     if (first_ff_read)
         first_ff_read = 0;
 
-    // --------------------------------------------------------------------
-
     // http://calimeroteknik.free.fr/blag/?article20/really-used-memory-on-gnu-linux
     unsigned long long MemCached = Cached + SReclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
@@ -190,13 +188,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
                 rd_cached  = rrddim_add(st_system_ram, "cached",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                 rd_buffers = rrddim_add(st_system_ram, "buffers", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_system_ram);
 
             rrddim_set_by_pointer(st_system_ram, rd_free,    MemFree);
             rrddim_set_by_pointer(st_system_ram, rd_used,    MemUsed);
             rrddim_set_by_pointer(st_system_ram, rd_cached,  MemCached);
             rrddim_set_by_pointer(st_system_ram, rd_buffers, Buffers);
-
             rrdset_done(st_system_ram);
         }
 
@@ -222,15 +218,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
                 rd_avail   = rrddim_add(st_mem_available, "MemAvailable", "avail", 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st_mem_available);
 
             rrddim_set_by_pointer(st_mem_available, rd_avail, MemAvailable);
-
             rrdset_done(st_mem_available);
         }
     }
-
-    // --------------------------------------------------------------------
 
     unsigned long long SwapUsed = SwapTotal - SwapFree;
 
@@ -263,15 +255,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_free = rrddim_add(st_system_swap, "free",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_used = rrddim_add(st_system_swap, "used",    NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_system_swap);
 
         rrddim_set_by_pointer(st_system_swap, rd_used, SwapUsed);
         rrddim_set_by_pointer(st_system_swap, rd_free, SwapFree);
-
         rrdset_done(st_system_swap);
     }
-
-    // --------------------------------------------------------------------
 
     if(arl_hwcorrupted->flags & ARL_ENTRY_FLAG_FOUND &&
        (do_hwcorrupt == CONFIG_BOOLEAN_YES || (do_hwcorrupt == CONFIG_BOOLEAN_AUTO &&
@@ -302,14 +290,10 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
             rd_corrupted = rrddim_add(st_mem_hwcorrupt, "HardwareCorrupted", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_hwcorrupt);
 
         rrddim_set_by_pointer(st_mem_hwcorrupt, rd_corrupted, HardwareCorrupted);
-
         rrdset_done(st_mem_hwcorrupt);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_committed) {
         static RRDSET *st_mem_committed = NULL;
@@ -335,14 +319,10 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
             rd_committed = rrddim_add(st_mem_committed, "Committed_AS", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_committed);
 
         rrddim_set_by_pointer(st_mem_committed, rd_committed, Committed_AS);
-
         rrdset_done(st_mem_committed);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_writeback) {
         static RRDSET *st_mem_writeback = NULL;
@@ -371,14 +351,12 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_nfs_writeback = rrddim_add(st_mem_writeback, "NfsWriteback",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_bounce        = rrddim_add(st_mem_writeback, "Bounce",        NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_writeback);
 
         rrddim_set_by_pointer(st_mem_writeback, rd_dirty,         Dirty);
         rrddim_set_by_pointer(st_mem_writeback, rd_writeback,     Writeback);
         rrddim_set_by_pointer(st_mem_writeback, rd_fusewriteback, WritebackTmp);
         rrddim_set_by_pointer(st_mem_writeback, rd_nfs_writeback, NFS_Unstable);
         rrddim_set_by_pointer(st_mem_writeback, rd_bounce,        Bounce);
-
         rrdset_done(st_mem_writeback);
     }
 
@@ -414,7 +392,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             if (do_percpu)
                 rd_percpu  = rrddim_add(st_mem_kernel, "Percpu",      NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_kernel);
 
         rrddim_set_by_pointer(st_mem_kernel, rd_slab,        Slab);
         rrddim_set_by_pointer(st_mem_kernel, rd_kernelstack, KernelStack);
@@ -425,8 +402,6 @@ int do_proc_meminfo(int update_every, usec_t dt) {
 
         rrdset_done(st_mem_kernel);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_slab) {
         static RRDSET *st_mem_slab = NULL;
@@ -453,15 +428,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_reclaimable   = rrddim_add(st_mem_slab, "reclaimable",   NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_unreclaimable = rrddim_add(st_mem_slab, "unreclaimable", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_slab);
 
         rrddim_set_by_pointer(st_mem_slab, rd_reclaimable, SReclaimable);
         rrddim_set_by_pointer(st_mem_slab, rd_unreclaimable, SUnreclaim);
-
         rrdset_done(st_mem_slab);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_hugepages == CONFIG_BOOLEAN_YES || (do_hugepages == CONFIG_BOOLEAN_AUTO &&
                                               ((Hugepagesize && HugePages_Total) ||
@@ -494,17 +465,13 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_surp = rrddim_add(st_mem_hugepages, "surplus",  NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_rsvd = rrddim_add(st_mem_hugepages, "reserved", NULL, Hugepagesize, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_hugepages);
 
         rrddim_set_by_pointer(st_mem_hugepages, rd_used, HugePages_Total - HugePages_Free - HugePages_Rsvd);
         rrddim_set_by_pointer(st_mem_hugepages, rd_free, HugePages_Free);
         rrddim_set_by_pointer(st_mem_hugepages, rd_rsvd, HugePages_Rsvd);
         rrddim_set_by_pointer(st_mem_hugepages, rd_surp, HugePages_Surp);
-
         rrdset_done(st_mem_hugepages);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_transparent_hugepages == CONFIG_BOOLEAN_YES || (do_transparent_hugepages == CONFIG_BOOLEAN_AUTO &&
                                                           (AnonHugePages ||
@@ -536,11 +503,9 @@ int do_proc_meminfo(int update_every, usec_t dt) {
             rd_anonymous = rrddim_add(st_mem_transparent_hugepages, "anonymous",  NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_shared    = rrddim_add(st_mem_transparent_hugepages, "shmem",      NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st_mem_transparent_hugepages);
 
         rrddim_set_by_pointer(st_mem_transparent_hugepages, rd_anonymous, AnonHugePages);
         rrddim_set_by_pointer(st_mem_transparent_hugepages, rd_shared, ShmemHugePages);
-
         rrdset_done(st_mem_transparent_hugepages);
     }
 

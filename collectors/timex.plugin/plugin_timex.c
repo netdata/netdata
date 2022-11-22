@@ -109,8 +109,6 @@ void *timex_main(void *ptr)
                     RRDSET_TYPE_LINE);
 
                 rd_sync_state = rrddim_add(st_sync_state, "state", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(st_sync_state);
             }
 
             rrddim_set_by_pointer(st_sync_state, rd_sync_state, sync_state != TIME_ERROR ? 1 : 0);
@@ -137,13 +135,11 @@ void *timex_main(void *ptr)
                     sta_codes[i].rd =
                         rrddim_add(st_clock_status, sta_codes[i].name, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
-            } else {
-                rrdset_next(st_clock_status);
             }
 
-            for (int i = 0; sta_codes[i].name != NULL; i++) {
+            for (int i = 0; sta_codes[i].name != NULL; i++)
                 rrddim_set_by_pointer(st_clock_status, sta_codes[i].rd, timex_buf.status & sta_codes[i].code ? 1 : 0);
-            }
+
             rrdset_done(st_clock_status);
         }
 
@@ -167,8 +163,6 @@ void *timex_main(void *ptr)
                     RRDSET_TYPE_LINE);
 
                 rd_offset = rrddim_add(st_offset, "offset", NULL, 1, divisor, RRD_ALGORITHM_ABSOLUTE);
-            } else {
-                rrdset_next(st_offset);
             }
 
             rrddim_set_by_pointer(st_offset, rd_offset, timex_buf.offset);

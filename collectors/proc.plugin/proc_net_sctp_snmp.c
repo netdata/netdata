@@ -148,7 +148,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
 
             rd_established = rrddim_add(st, "SctpCurrEstab",  "established",  1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_established, SctpCurrEstab);
         rrdset_done(st);
@@ -190,7 +189,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rd_aborted  = rrddim_add(st, "SctpAborteds",      "aborted",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_shutdown = rrddim_add(st, "SctpShutdowns",     "shutdown", -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_active,    SctpActiveEstabs);
         rrddim_set_by_pointer(st, rd_passive,   SctpPassiveEstabs);
@@ -230,7 +228,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rd_received = rrddim_add(st, "SctpInSCTPPacks",  "received",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_sent     = rrddim_add(st, "SctpOutSCTPPacks", "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_received, SctpInSCTPPacks);
         rrddim_set_by_pointer(st, rd_sent,     SctpOutSCTPPacks);
@@ -268,7 +265,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rd_invalid = rrddim_add(st, "SctpOutOfBlues",     "invalid",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_csum    = rrddim_add(st, "SctpChecksumErrors", "checksum", 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_invalid, SctpOutOfBlues);
         rrddim_set_by_pointer(st, rd_csum,    SctpChecksumErrors);
@@ -306,7 +302,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rd_reassembled = rrddim_add(st, "SctpReasmUsrMsgs", "reassembled",  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_fragmented  = rrddim_add(st, "SctpFragUsrMsgs",  "fragmented",  -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_reassembled, SctpReasmUsrMsgs);
         rrddim_set_by_pointer(st, rd_fragmented,  SctpFragUsrMsgs);
@@ -357,7 +352,6 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
             rd_OutOrder   = rrddim_add(st, "SctpOutOrderChunks",   "OutOrder",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_OutUnorder = rrddim_add(st, "SctpOutUnorderChunks", "OutUnorder", -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_InCtrl,     SctpInCtrlChunks);
         rrddim_set_by_pointer(st, rd_InOrder,    SctpInOrderChunks);

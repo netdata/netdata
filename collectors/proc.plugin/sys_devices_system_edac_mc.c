@@ -150,8 +150,6 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
         }
-        else
-            rrdset_next(ce_st);
 
         for(m = mc_root; m; m = m->next) {
             if (m->ce_count_filename && m->ce_updated) {
@@ -189,8 +187,6 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
         }
-        else
-            rrdset_next(ue_st);
 
         for(m = mc_root; m; m = m->next) {
             if (m->ue_count_filename && m->ue_updated) {

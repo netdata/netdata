@@ -390,16 +390,12 @@ int do_ipc(int update_every, usec_t dt) {
             return 0;
         }
 
-        if(st_semaphores->counter_done) rrdset_next(st_semaphores);
         rrddim_set_by_pointer(st_semaphores, rd_semaphores, status.semaem);
         rrdset_done(st_semaphores);
 
-        if(st_arrays->counter_done) rrdset_next(st_arrays);
         rrddim_set_by_pointer(st_arrays, rd_arrays, status.semusz);
         rrdset_done(st_arrays);
     }
-
-    // --------------------------------------------------------------------
 
     if(likely(do_msg != CONFIG_BOOLEAN_NO)) {
         static RRDSET *st_msq_messages = NULL, *st_msq_bytes = NULL;
@@ -422,8 +418,6 @@ int do_ipc(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
-            else
-                rrdset_next(st_msq_messages);
 
             if(unlikely(!st_msq_bytes))
                 st_msq_bytes = rrdset_create_localhost(
@@ -440,8 +434,6 @@ int do_ipc(int update_every, usec_t dt) {
                         , update_every
                         , RRDSET_TYPE_STACKED
                 );
-            else
-                rrdset_next(st_msq_bytes);
 
             struct message_queue *msq = message_queue_root, *msq_prev = NULL;
             while(likely(msq)){
@@ -506,8 +498,6 @@ int do_ipc(int update_every, usec_t dt) {
         }
     }
 
-    // --------------------------------------------------------------------
-
     if(likely(do_shm != CONFIG_BOOLEAN_NO)) {
         static RRDSET *st_shm_segments = NULL, *st_shm_bytes = NULL;
         static RRDDIM *rd_shm_segments = NULL, *rd_shm_bytes = NULL;
@@ -532,14 +522,9 @@ int do_ipc(int update_every, usec_t dt) {
 
                 rd_shm_segments = rrddim_add(st_shm_segments, "segments", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(st_shm_segments);
 
             rrddim_set_by_pointer(st_shm_segments, rd_shm_segments, shm.segments);
-
             rrdset_done(st_shm_segments);
-
-            // --------------------------------------------------------------------
 
             if(unlikely(!st_shm_bytes)) {
                 st_shm_bytes = rrdset_create_localhost(
@@ -559,11 +544,8 @@ int do_ipc(int update_every, usec_t dt) {
 
                 rd_shm_bytes = rrddim_add(st_shm_bytes, "bytes", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(st_shm_bytes);
 
             rrddim_set_by_pointer(st_shm_bytes, rd_shm_bytes, shm.bytes);
-
             rrdset_done(st_shm_bytes);
         }
     }

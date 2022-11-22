@@ -128,7 +128,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     // --------------------------------------------------------------------
 
     static RRDSET *st_system_softirqs = NULL;
-    if(unlikely(!st_system_softirqs))
+    if(unlikely(!st_system_softirqs)) {
         st_system_softirqs = rrdset_create_localhost(
                 "system"
                 , "softirqs"
@@ -143,8 +143,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 , update_every
                 , RRDSET_TYPE_STACKED
         );
-    else
-        rrdset_next(st_system_softirqs);
+    }
 
     for(l = 0; l < lines ;l++) {
         struct interrupt *irr = irrindex(irrs, l, cpus);
@@ -222,8 +221,6 @@ int do_proc_softirqs(int update_every, usec_t dt) {
                 snprintfz(core, 50, "cpu%d", c);
                 rrdlabels_add(core_st[c]->rrdlabels, "cpu", core, RRDLABEL_SRC_AUTO);
             }
-            else
-                rrdset_next(core_st[c]);
 
             for(l = 0; l < lines ;l++) {
                 struct interrupt *irr = irrindex(irrs, l, cpus);

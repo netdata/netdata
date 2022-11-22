@@ -39,8 +39,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
     if (unlikely(kr != KERN_SUCCESS))
         return -1;
 
-    // --------------------------------------------------------------------
-
     if (likely(do_cpu)) {
         if (unlikely(HOST_CPU_LOAD_INFO_COUNT != 4)) {
             error("MACOS: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
@@ -78,7 +76,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "idle", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(st, "idle");
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "user", cp_time[CPU_STATE_USER]);
                 rrddim_set(st, "nice", cp_time[CPU_STATE_NICE]);
@@ -87,9 +84,7 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                 rrdset_done(st);
             }
         }
-     }
-
-    // --------------------------------------------------------------------
+    }
 
     if (likely(do_ram || do_swapio || do_pgfaults)) {
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
@@ -137,7 +132,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "speculative", NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "free",      NULL, system_pagesize, 1048576, RRD_ALGORITHM_ABSOLUTE);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "active",    vm_statistics.active_count);
                 rrddim_set(st, "wired",     vm_statistics.wire_count);
@@ -153,8 +147,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             }
 
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
-            // --------------------------------------------------------------------
-
             if (likely(do_swapio)) {
                 st = rrdset_find_active_localhost("system.swapio");
                 if (unlikely(!st)) {
@@ -176,15 +168,12 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "in",  NULL, system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "out", NULL, -system_pagesize, 1024, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "in", vm_statistics.swapins);
                 rrddim_set(st, "out", vm_statistics.swapouts);
                 rrdset_done(st);
             }
 #endif
-
-            // --------------------------------------------------------------------
 
             if (likely(do_pgfaults)) {
                 st = rrdset_find_active_localhost("mem.pgfaults");
@@ -217,7 +206,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
                     rrddim_add(st, "reactivate", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "purge",     NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "memory", vm_statistics.faults);
                 rrddim_set(st, "cow", vm_statistics.cow_faults);
@@ -234,8 +222,6 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     return 0;
 }

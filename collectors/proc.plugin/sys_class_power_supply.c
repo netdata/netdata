@@ -365,8 +365,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
                 add_labels_to_power_supply(ps, ps->capacity->st);
             }
-            else
-                rrdset_next(ps->capacity->st);
 
             if(unlikely(!ps->capacity->rd)) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
@@ -398,8 +396,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
                 add_labels_to_power_supply(ps, pr->st);
             }
-            else
-                rrdset_next(pr->st);
 
             struct ps_property_dim *pd;
             for(pd = pr->property_dim_root; pd; pd = pd->next) {

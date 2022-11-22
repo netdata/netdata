@@ -47,18 +47,15 @@ void *cpuidlejitter_main(void *ptr) {
 
     usec_t update_every_ut = localhost->rrd_update_every * USEC_PER_SEC;
     struct timeval before, after;
-    unsigned long long counter;
 
-    for(counter = 0; 1 ;counter++) {
+    while (!netdata_exit) {
         int iterations = 0;
         usec_t error_total = 0,
                 error_min = 0,
                 error_max = 0,
                 elapsed = 0;
 
-        if(netdata_exit) break;
-
-        while(elapsed < update_every_ut) {
+        while (elapsed < update_every_ut) {
             now_monotonic_high_precision_timeval(&before);
             worker_is_idle();
             sleep_usec(sleep_ut);
@@ -82,10 +79,7 @@ void *cpuidlejitter_main(void *ptr) {
             iterations++;
         }
 
-        if(netdata_exit) break;
-
         if(iterations) {
-            if (likely(counter)) rrdset_next(st);
             rrddim_set_by_pointer(st, rd_min, error_min);
             rrddim_set_by_pointer(st, rd_max, error_max);
             rrddim_set_by_pointer(st, rd_avg, error_total / iterations);

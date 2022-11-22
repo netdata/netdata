@@ -39,8 +39,7 @@ static void aclk_stats_collect(struct aclk_metrics_per_sample *per_sample, struc
             "connected", "netdata", "stats", 200000, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_online_status = rrddim_add(st_aclkstats, "online", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_aclkstats);
+    }
 
     rrddim_set_by_pointer(st_aclkstats, rd_online_status, per_sample->offline_during_sample ? 0 : permanent->online);
 
@@ -60,8 +59,7 @@ static void aclk_stats_query_queue(struct aclk_metrics_per_sample *per_sample)
 
         rd_queued = rrddim_add(st_query_thread, "added", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_dispatched = rrddim_add(st_query_thread, "dispatched", NULL, -1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_query_thread);
+    }
 
     rrddim_set_by_pointer(st_query_thread, rd_queued, per_sample->queries_queued);
     rrddim_set_by_pointer(st_query_thread, rd_dispatched, per_sample->queries_dispatched);
@@ -83,8 +81,8 @@ static void aclk_stats_latency(struct aclk_metrics_per_sample *per_sample)
 
         rd_avg = rrddim_add(st, "avg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_max = rrddim_add(st, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st);
+    }
+
     if(per_sample->latency_count)
         rrddim_set_by_pointer(st, rd_avg, roundf((float)per_sample->latency_total / per_sample->latency_count));
     else
@@ -109,8 +107,7 @@ static void aclk_stats_cloud_req(struct aclk_metrics_per_sample *per_sample)
 
         rd_rq_rcvd = rrddim_add(st, "received", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_err = rrddim_add(st, "malformed", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st);
+    }
 
     rrddim_set_by_pointer(st, rd_rq_rcvd, per_sample->cloud_req_recvd - per_sample->cloud_req_err);
     rrddim_set_by_pointer(st, rd_rq_err, per_sample->cloud_req_err);
@@ -131,8 +128,7 @@ static void aclk_stats_cloud_req_type(struct aclk_metrics_per_sample *per_sample
         for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
             dims[i] = rrddim_add(st, aclk_query_get_name(i, 1), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
 
-    } else
-        rrdset_next(st);
+    }
 
     for (int i = 0; i < ACLK_QUERY_TYPE_COUNT; i++)
         rrddim_set_by_pointer(st, dims[i], per_sample->queries_per_type[i]);
@@ -171,8 +167,7 @@ static void aclk_stats_cloud_req_http_type(struct aclk_metrics_per_sample *per_s
 
         for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
             rd_rq_types[i] = rrddim_add(st, cloud_req_http_type_names[i], NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st);
+    }
 
     for (int i = 0; i < ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT; i++)
         rrddim_set_by_pointer(st, rd_rq_types[i], per_sample->cloud_req_http_by_type[i]);
@@ -197,8 +192,7 @@ static void aclk_stats_query_threads(uint32_t *queries_per_thread)
                 error("snprintf encoding error");
             aclk_qt_data[i].dim = rrddim_add(st, dim_name, NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
-    } else
-        rrdset_next(st);
+    }
 
     for (int i = 0; i < aclk_stats_cfg.query_thread_count; i++) {
         rrddim_set_by_pointer(st, aclk_qt_data[i].dim, queries_per_thread[i]);
@@ -222,8 +216,7 @@ static void aclk_stats_query_time(struct aclk_metrics_per_sample *per_sample)
         rd_rq_avg = rrddim_add(st, "avg", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_max = rrddim_add(st, "max", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         rd_rq_total = rrddim_add(st, "total", NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st);
+    }
 
     if(per_sample->cloud_q_process_count)
         rrddim_set_by_pointer(st, rd_rq_avg, roundf((float)per_sample->cloud_q_process_total / per_sample->cloud_q_process_count));
@@ -248,8 +241,7 @@ static void aclk_stats_newproto_rx(uint32_t *rx_msgs_sample)
         for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++) {
             aclk_stats_cfg.rx_msg_dims[i] = rrddim_add(st, rx_handler_get_name(i), NULL, 1, localhost->rrd_update_every, RRD_ALGORITHM_ABSOLUTE);
         }
-    } else
-        rrdset_next(st);
+    }
 
     for (unsigned int i = 0; i < aclk_stats_cfg.proto_hdl_cnt; i++)
         rrddim_set_by_pointer(st, aclk_stats_cfg.rx_msg_dims[i], rx_msgs_sample[i]);
@@ -275,8 +267,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
 
         rd_sent  = rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(st);
+    }
 
     rrddim_set_by_pointer(st, rd_sent, sent);
     rrddim_set_by_pointer(st, rd_recvd, recvd);

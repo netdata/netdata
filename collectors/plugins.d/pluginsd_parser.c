@@ -155,7 +155,11 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
     ((PARSER_USER_OBJECT *) user)->count++;
-    rrdset_done(st);
+
+    struct timeval now;
+    now_realtime_timeval(&now);
+    rrdset_timed_done(st, now, /* pending_rrdset_next = */ false);
+
     return PARSER_RC_OK;
 }
 

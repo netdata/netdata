@@ -204,8 +204,6 @@ static void calculate_values_and_show_charts(
         error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
-    // --------------------------------------------------------------------------
-
     int rendered = 0;
 
     if(m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
@@ -239,8 +237,6 @@ static void calculate_values_and_show_charts(
             m->rd_space_used     = rrddim_add(m->st_space, "used", NULL, (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root", (collected_number)bsize, 1024 * 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(m->st_space);
 
         rrddim_set_by_pointer(m->st_space, m->rd_space_avail,    (collected_number)bavail);
         rrddim_set_by_pointer(m->st_space, m->rd_space_used,     (collected_number)bused);
@@ -249,8 +245,6 @@ static void calculate_values_and_show_charts(
 
         rendered++;
     }
-
-    // --------------------------------------------------------------------------
 
     if(m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                               (favail || freserved_root || fused ||
@@ -283,8 +277,6 @@ static void calculate_values_and_show_charts(
             m->rd_inodes_used     = rrddim_add(m->st_inodes, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             m->rd_inodes_reserved = rrddim_add(m->st_inodes, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(m->st_inodes);
 
         rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_avail,    (collected_number)favail);
         rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_used,     (collected_number)fused);
@@ -293,8 +285,6 @@ static void calculate_values_and_show_charts(
 
         rendered++;
     }
-
-    // --------------------------------------------------------------------------
 
     if(likely(rendered))
         m->collected++;

@@ -306,7 +306,6 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
 
             d->bcache_priority_stats_update_every_usec = update_every * USEC_PER_SEC;
         }
-        else rrdset_next(d->st_bcache_cache_allocations);
 
         rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unused, unused);
         rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_dirty, dirty);
@@ -1116,14 +1115,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_io);
             }
-            else rrdset_next(d->st_io);
 
             last_readsectors  = rrddim_set_by_pointer(d->st_io, d->rd_io_reads, readsectors);
             last_writesectors = rrddim_set_by_pointer(d->st_io, d->rd_io_writes, writesectors);
             rrdset_done(d->st_io);
         }
-
-        // --------------------------------------------------------------------
 
         if (do_dc_stats && d->do_io == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if (unlikely(!d->st_ext_io)) {
@@ -1145,14 +1141,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->rd_io_discards = rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_disk(d, d->st_ext_io);
-            } else
-                rrdset_next(d->st_ext_io);
+            }
 
             last_discardsectors = rrddim_set_by_pointer(d->st_ext_io, d->rd_io_discards, discardsectors);
             rrdset_done(d->st_ext_io);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
                                                (reads || writes || discards || flushes ||
@@ -1182,14 +1175,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ops);
             }
-            else rrdset_next(d->st_ops);
 
             last_reads  = rrddim_set_by_pointer(d->st_ops, d->rd_ops_reads, reads);
             last_writes = rrddim_set_by_pointer(d->st_ops, d->rd_ops_writes, writes);
             rrdset_done(d->st_ops);
         }
-
-        // --------------------------------------------------------------------
 
         if (do_dc_stats && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if (unlikely(!d->st_ext_ops)) {
@@ -1216,16 +1206,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_ops);
             }
-            else
-                rrdset_next(d->st_ext_ops);
 
             last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
             if (do_fl_stats)
                 last_flushes = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_flushes, flushes);
             rrdset_done(d->st_ext_ops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_qops == CONFIG_BOOLEAN_YES || (d->do_qops == CONFIG_BOOLEAN_AUTO &&
                                                 (queued_ios || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1253,13 +1239,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_qops);
             }
-            else rrdset_next(d->st_qops);
 
             rrddim_set_by_pointer(d->st_qops, d->rd_qops_operations, queued_ios);
             rrdset_done(d->st_qops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_backlog == CONFIG_BOOLEAN_YES || (d->do_backlog == CONFIG_BOOLEAN_AUTO &&
                                                    (backlog_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1287,13 +1270,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_backlog);
             }
-            else rrdset_next(d->st_backlog);
 
             rrddim_set_by_pointer(d->st_backlog, d->rd_backlog_backlog, backlog_ms);
             rrdset_done(d->st_backlog);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
                                                 (busy_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1321,12 +1301,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_busy);
             }
-            else rrdset_next(d->st_busy);
 
             last_busy_ms = rrddim_set_by_pointer(d->st_busy, d->rd_busy_busy, busy_ms);
             rrdset_done(d->st_busy);
-
-        // --------------------------------------------------------------------
 
             if(unlikely(!d->st_util)) {
                 d->st_util = rrdset_create_localhost(
@@ -1350,7 +1327,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_util);
             }
-            else rrdset_next(d->st_util);
 
             collected_number disk_utilization = (busy_ms - last_busy_ms) / (10 * update_every);
             if (disk_utilization > 100)
@@ -1359,8 +1335,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_util, d->rd_util_utilization, disk_utilization);
             rrdset_done(d->st_util);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_mops == CONFIG_BOOLEAN_YES || (d->do_mops == CONFIG_BOOLEAN_AUTO &&
                                                 (mreads || mwrites || mdiscards ||
@@ -1390,14 +1364,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_mops);
             }
-            else rrdset_next(d->st_mops);
 
             rrddim_set_by_pointer(d->st_mops, d->rd_mops_reads,  mreads);
             rrddim_set_by_pointer(d->st_mops, d->rd_mops_writes, mwrites);
             rrdset_done(d->st_mops);
         }
-
-        // --------------------------------------------------------------------
 
         if(do_dc_stats && d->do_mops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             d->do_mops = CONFIG_BOOLEAN_YES;
@@ -1424,14 +1395,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_mops);
             }
-            else
-                rrdset_next(d->st_ext_mops);
 
             rrddim_set_by_pointer(d->st_ext_mops, d->rd_mops_discards, mdiscards);
             rrdset_done(d->st_ext_mops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
                                                   (readms || writems || discardms || flushms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1460,14 +1427,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_iotime);
             }
-            else rrdset_next(d->st_iotime);
 
             last_readms  = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_reads, readms);
             last_writems = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_writes, writems);
             rrdset_done(d->st_iotime);
         }
-
-        // --------------------------------------------------------------------
 
         if(do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if(unlikely(!d->st_ext_iotime)) {
@@ -1494,8 +1458,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_iotime);
             }
-            else
-                rrdset_next(d->st_ext_iotime);
 
             last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
             if (do_fl_stats)
@@ -1503,7 +1465,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_ext_iotime);
         }
 
-        // --------------------------------------------------------------------
         // calculate differential charts
         // only if this is not the first time we run
 
@@ -1538,7 +1499,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_await);
                 }
-                else rrdset_next(d->st_await);
 
                 rrddim_set_by_pointer(d->st_await, d->rd_await_reads,  (reads  - last_reads)  ? (readms  - last_readms)  / (reads  - last_reads)  : 0);
                 rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
@@ -1570,8 +1530,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_ext_await);
                 }
-                else
-                    rrdset_next(d->st_ext_await);
 
                 rrddim_set_by_pointer(
                     d->st_ext_await, d->rd_await_discards,
@@ -1613,7 +1571,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_avgsz);
                 }
-                else rrdset_next(d->st_avgsz);
 
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (reads  - last_reads)  ? (readsectors  - last_readsectors)  / (reads  - last_reads)  : 0);
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
@@ -1643,8 +1600,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_ext_avgsz);
                 }
-                else
-                    rrdset_next(d->st_ext_avgsz);
 
                 rrddim_set_by_pointer(
                     d->st_ext_avgsz, d->rd_avgsz_discards,
@@ -1682,15 +1637,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_svctm);
                 }
-                else
-                    rrdset_next(d->st_svctm);
 
                 rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
                 rrdset_done(d->st_svctm);
             }
         }
 
-        // --------------------------------------------------------------------------
         // read bcache metrics and generate the bcache charts
 
         if(d->device_is_bcache && d->do_bcache != CONFIG_BOOLEAN_NO) {
@@ -1791,8 +1743,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_hit_ratio);
                 }
-                else
-                    rrdset_next(d->st_bcache_hit_ratio);
 
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_5min, stats_five_minute_cache_hit_ratio);
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_1hour, stats_hour_cache_hit_ratio);
@@ -1824,8 +1774,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_rates);
                 }
-                else
-                    rrdset_next(d->st_bcache_rates);
 
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_writeback, writeback_rate);
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_congested, cache_congested);
@@ -1853,8 +1801,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_size);
                 }
-                else
-                    rrdset_next(d->st_bcache_size);
 
                 rrddim_set_by_pointer(d->st_bcache_size, d->rd_bcache_dirty_size, dirty_data);
                 rrdset_done(d->st_bcache_size);
@@ -1881,8 +1827,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_usage);
                 }
-                else
-                    rrdset_next(d->st_bcache_usage);
 
                 rrddim_set_by_pointer(d->st_bcache_usage, d->rd_bcache_available_percent, cache_available_percent);
                 rrdset_done(d->st_bcache_usage);
@@ -1911,8 +1855,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_cache_read_races);
                 }
-                else
-                    rrdset_next(d->st_bcache_cache_read_races);
 
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_read_races, cache_read_races);
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_io_errors, cache_io_errors);
@@ -1950,8 +1892,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache);
                 }
-                else
-                    rrdset_next(d->st_bcache);
 
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_hits, stats_total_cache_hits);
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_misses, stats_total_cache_misses);
@@ -1988,7 +1928,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_bypass);
                 }
-                else rrdset_next(d->st_bcache_bypass);
 
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_hits, stats_total_cache_bypass_hits);
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_misses, stats_total_cache_bypass_misses);
@@ -1997,8 +1936,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         }
     }
 
-
-    // ------------------------------------------------------------------------
     // update the system total I/O
 
     if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
@@ -2026,15 +1963,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_io);
 
         rrddim_set_by_pointer(st_io, rd_in, system_read_kb);
         rrddim_set_by_pointer(st_io, rd_out, system_write_kb);
         rrdset_done(st_io);
     }
 
-
-    // ------------------------------------------------------------------------
     // cleanup removed disks
 
     struct disk *d = disk_root, *last = NULL;

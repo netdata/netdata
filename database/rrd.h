@@ -1253,7 +1253,7 @@ void rrdset_next_usec(RRDSET *st, usec_t microseconds);
 void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t microseconds);
 #define rrdset_next(st) rrdset_next_usec(st, 0ULL)
 
-void rrdset_timed_done(RRDSET *st, struct timeval now);
+void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next);
 void rrdset_done(RRDSET *st);
 
 void rrdset_is_obsolete(RRDSET *st);

@@ -206,8 +206,6 @@ static void global_statistics_charts(void) {
             rd_cpu_user   = rrddim_add(st_cpu, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
             rd_cpu_system = rrddim_add(st_cpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_cpu);
 
         rrddim_set_by_pointer(st_cpu, rd_cpu_user,   me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
         rrddim_set_by_pointer(st_cpu, rd_cpu_system, me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
@@ -236,8 +234,7 @@ static void global_statistics_charts(void) {
                 RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        } else
-            rrdset_next(st_uptime);
+        }
 
         rrddim_set_by_pointer(st_uptime, rd_uptime, netdata_uptime);
         rrdset_done(st_uptime);
@@ -267,8 +264,6 @@ static void global_statistics_charts(void) {
 
             rd_clients = rrddim_add(st_clients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_clients);
 
         rrddim_set_by_pointer(st_clients, rd_clients, gs.connected_clients);
         rrdset_done(st_clients);
@@ -298,8 +293,6 @@ static void global_statistics_charts(void) {
 
             rd_requests = rrddim_add(st_reqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_reqs);
 
         rrddim_set_by_pointer(st_reqs, rd_requests, (collected_number) gs.web_requests);
         rrdset_done(st_reqs);
@@ -331,8 +324,6 @@ static void global_statistics_charts(void) {
             rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_bytes);
 
         rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.bytes_received);
         rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.bytes_sent);
@@ -365,8 +356,6 @@ static void global_statistics_charts(void) {
             rd_average = rrddim_add(st_duration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             rd_max = rrddim_add(st_duration, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_duration);
 
         uint64_t gweb_usec = gs.web_usec;
         uint64_t gweb_requests = gs.web_requests;
@@ -413,8 +402,6 @@ static void global_statistics_charts(void) {
 
             rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_compression);
 
         // since we don't lock here to read the global statistics
         // read the smaller value first
@@ -460,8 +447,6 @@ static void global_statistics_charts(void) {
 
             rd_queries = rrddim_add(st_rrdr_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_rrdr_queries);
 
         rrddim_set_by_pointer(st_rrdr_queries, rd_queries, (collected_number)gs.rrdr_queries_made);
 
@@ -494,8 +479,6 @@ static void global_statistics_charts(void) {
             rd_points_read = rrddim_add(st_rrdr_points, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_points_generated = rrddim_add(st_rrdr_points, "generated", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_rrdr_points);
 
         rrddim_set_by_pointer(st_rrdr_points, rd_points_read, (collected_number)gs.rrdr_db_points_read);
         rrddim_set_by_pointer(st_rrdr_points, rd_points_generated, (collected_number)gs.rrdr_result_points_generated);
@@ -527,8 +510,6 @@ static void global_statistics_charts(void) {
 
             rd_queries = rrddim_add(st_sqlite3_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_queries);
 
         rrddim_set_by_pointer(st_sqlite3_queries, rd_queries, (collected_number)gs.sqlite3_queries_made);
 
@@ -562,8 +543,6 @@ static void global_statistics_charts(void) {
             rd_busy   = rrddim_add(st_sqlite3_queries_by_status, "busy",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_locked = rrddim_add(st_sqlite3_queries_by_status, "locked", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_queries_by_status);
 
         rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_ok,     (collected_number)gs.sqlite3_queries_made);
         rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_failed, (collected_number)gs.sqlite3_queries_failed);
@@ -597,8 +576,6 @@ static void global_statistics_charts(void) {
 
             rd_rows = rrddim_add(st_sqlite3_rows, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_rows);
 
         rrddim_set_by_pointer(st_sqlite3_rows, rd_rows, (collected_number)gs.sqlite3_rows);
 
@@ -633,8 +610,6 @@ static void global_statistics_charts(void) {
             rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_cache);
 
         rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
         rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
@@ -672,8 +647,6 @@ static void global_statistics_charts(void) {
             rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_cache);
 
         rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
         rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
@@ -750,8 +723,7 @@ static void dbengine_statistics_charts(void) {
                         RRDSET_TYPE_LINE);
 
                     rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_compression);
+                }
 
                 unsigned long long ratio;
                 unsigned long long compressed_content_size = stats_array[12];
@@ -790,8 +762,7 @@ static void dbengine_statistics_charts(void) {
                         RRDSET_TYPE_LINE);
 
                     rd_hit_ratio = rrddim_add(st_pg_cache_hit_ratio, "ratio", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_pg_cache_hit_ratio);
+                }
 
                 static unsigned long long old_hits = 0;
                 static unsigned long long old_misses = 0;
@@ -849,8 +820,7 @@ static void dbengine_statistics_charts(void) {
                     rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_used_by_collectors =
                         rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_pg_cache_pages);
+                }
 
                 rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
                 rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
@@ -890,8 +860,7 @@ static void dbengine_statistics_charts(void) {
                     rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_flushing_pressure_deletions = rrddim_add(
                         st_long_term_pages, "flushing_pressure_deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_long_term_pages);
+                }
 
                 rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
@@ -925,8 +894,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_io_stats);
+                }
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[17]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[15]);
@@ -957,8 +925,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_io_stats);
+                }
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
@@ -992,8 +959,7 @@ static void dbengine_statistics_charts(void) {
                     rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     pg_cache_over_half_dirty_events =
                         rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_errors);
+                }
 
                 rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
                 rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
@@ -1025,8 +991,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_fd);
+                }
 
                 rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
                 /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
@@ -1067,8 +1032,7 @@ static void dbengine_statistics_charts(void) {
                     rd_cache_metadata = rrddim_add(st_ram_usage, "cache metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                     rd_pages_metadata = rrddim_add(st_ram_usage, "pages metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                     rd_index_metadata = rrddim_add(st_ram_usage, "index metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_ram_usage);
+                }
 
                 API_producers = (collected_number)stats_array[0];
                 pages_on_disk = (collected_number)stats_array[2];
@@ -1124,8 +1088,7 @@ static void update_strings_charts() {
         rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(st_ops);
+    }
 
     rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
     rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
@@ -1151,8 +1114,7 @@ static void update_strings_charts() {
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, -1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_entries);
+    }
 
     rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
     rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
@@ -1174,8 +1136,7 @@ static void update_strings_charts() {
             , RRDSET_TYPE_AREA);
 
         rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_mem);
+    }
 
     rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
     rrdset_done(st_mem);
@@ -1205,8 +1166,7 @@ static void update_heartbeat_charts() {
         rd_heartbeat_min = rrddim_add(st_heartbeat, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_heartbeat_max = rrddim_add(st_heartbeat, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_heartbeat_avg = rrddim_add(st_heartbeat, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_heartbeat);
+    }
 
     usec_t min, max, average;
     size_t count;
@@ -1313,8 +1273,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_dicts->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_dicts);
 
         rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_active,  (collected_number)stats.dictionaries.active);
         rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_deleted, (collected_number)stats.dictionaries.deleted);
@@ -1357,8 +1315,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_items->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_items);
 
         rrddim_set_by_pointer(c->st_items, c->rd_items_entries,             stats.items.entries);
         rrddim_set_by_pointer(c->st_items, c->rd_items_pending_deletion,    stats.items.pending_deletion);
@@ -1416,8 +1372,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_ops->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_ops);
 
         rrddim_set_by_pointer(c->st_ops, c->rd_ops_creations,           (collected_number)stats.ops.creations);
         rrddim_set_by_pointer(c->st_ops, c->rd_ops_destructions,        (collected_number)stats.ops.destructions);
@@ -1471,8 +1425,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_callbacks->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_callbacks);
 
         rrddim_set_by_pointer(c->st_callbacks, c->rd_callbacks_inserts, (collected_number)stats.callbacks.inserts);
         rrddim_set_by_pointer(c->st_callbacks, c->rd_callbacks_conflicts, (collected_number)stats.callbacks.conflicts);
@@ -1518,8 +1470,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_memory->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_memory);
 
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.indexed);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_values, (collected_number)stats.memory.values);
@@ -1564,8 +1514,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_spins->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_spins);
 
         rrddim_set_by_pointer(c->st_spins, c->rd_spins_use, (collected_number)stats.spin_locks.use);
         rrddim_set_by_pointer(c->st_spins, c->rd_spins_search, (collected_number)stats.spin_locks.search);
@@ -1653,8 +1601,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_STACKED
         );
     }
-    else
-        rrdset_next(tmp.st_memory);
 
     if(!tmp.st_ops) {
         tmp.st_ops = rrdset_create_localhost(
@@ -1672,8 +1618,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_LINE
         );
     }
-    else
-        rrdset_next(tmp.st_ops);
 
     if(!tmp.st_allocations) {
         tmp.st_allocations = rrdset_create_localhost(
@@ -1691,8 +1635,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_STACKED
         );
     }
-    else
-        rrdset_next(tmp.st_allocations);
 
     if(!tmp.st_avg_alloc) {
         tmp.st_avg_alloc = rrdset_create_localhost(
@@ -1710,8 +1652,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_LINE
         );
     }
-    else
-        rrdset_next(tmp.st_avg_alloc);
 
     malloc_trace_walkthrough(do_memory_trace_item, &tmp);
 
@@ -1880,8 +1820,6 @@ static void workers_total_cpu_utilization_chart(void) {
             RRDSET_TYPE_STACKED);
     }
 
-    rrdset_next(st);
-
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
         if(!wu->workers_cpu_registered) continue;
@@ -1942,8 +1880,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(unlikely(!wu->rd_workers_time_avg))
         wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-    rrdset_next(wu->st_workers_time);
-
     if(unlikely(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_min_busy_time = 0.0;
 
     if(wu->rd_workers_time_min)
@@ -1995,8 +1931,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         if(unlikely(!wu->rd_workers_cpu_avg))
             wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdset_next(wu->st_workers_cpu);
-
         if(unlikely(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_cpu_min = 0.0;
 
         if(wu->rd_workers_cpu_min)
@@ -2038,8 +1972,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_STACKED
         );
     }
-
-    rrdset_next(wu->st_workers_jobs_per_job_type);
 
     {
         size_t i;
@@ -2083,8 +2015,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             , RRDSET_TYPE_STACKED
         );
     }
-
-    rrdset_next(wu->st_workers_busy_per_job_type);
 
     {
         size_t i;
@@ -2132,8 +2062,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(wu->st_workers_threads);
 
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->workers_registered - wu->workers_busy));
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
@@ -2187,8 +2115,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
                 wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(wu->per_job_type[i].st);
 
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));
@@ -2245,8 +2171,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
                 wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(wu->per_job_type[i].st);
 
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));

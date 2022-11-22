@@ -951,8 +951,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
         //        , d->rframe, d->tcollisions, d->tcarrier
         //        );
 
-        // --------------------------------------------------------------------
-
         if(unlikely(d->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
                     (d->rbytes || d->tbytes || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
             d->do_bandwidth = CONFIG_BOOLEAN_YES;
@@ -988,7 +986,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_tbytes = td;
                 }
             }
-            else rrdset_next(d->st_bandwidth);
 
             rrddim_set_by_pointer(d->st_bandwidth, d->rd_rbytes, (collected_number)d->rbytes);
             rrddim_set_by_pointer(d->st_bandwidth, d->rd_tbytes, (collected_number)d->tbytes);
@@ -1048,7 +1045,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                                 d->rd_speed = rrddim_add(d->st_speed, "speed",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                             }
-                            else rrdset_next(d->st_speed);
 
                             rrddim_set_by_pointer(d->st_speed, d->rd_speed, (collected_number)d->speed * KILOBITS_IN_A_MEGABIT);
                             rrdset_done(d->st_speed);
@@ -1065,8 +1061,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 }
             }
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_duplex != CONFIG_BOOLEAN_NO && d->filename_duplex) {
             if(unlikely(!d->st_duplex)) {
@@ -1093,15 +1087,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_duplex_half = rrddim_add(d->st_duplex, "half", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_duplex_unknown = rrddim_add(d->st_duplex, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(d->st_duplex);
 
             rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_full, (collected_number)(d->duplex == NETDEV_DUPLEX_FULL));
             rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_half, (collected_number)(d->duplex == NETDEV_DUPLEX_HALF));
             rrddim_set_by_pointer(d->st_duplex, d->rd_duplex_unknown, (collected_number)(d->duplex == NETDEV_DUPLEX_UNKNOWN));
             rrdset_done(d->st_duplex);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_operstate != CONFIG_BOOLEAN_NO && d->filename_operstate) {
             if(unlikely(!d->st_operstate)) {
@@ -1132,7 +1123,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_operstate_dormant = rrddim_add(d->st_operstate, "dormant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_operstate_unknown = rrddim_add(d->st_operstate, "unknown", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(d->st_operstate);
 
             rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_up, (collected_number)(d->operstate == NETDEV_OPERSTATE_UP));
             rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_down, (collected_number)(d->operstate == NETDEV_OPERSTATE_DOWN));
@@ -1143,8 +1133,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_operstate, d->rd_operstate_unknown, (collected_number)(d->operstate == NETDEV_OPERSTATE_UNKNOWN));
             rrdset_done(d->st_operstate);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_carrier != CONFIG_BOOLEAN_NO && d->carrier_file_exists) {
             if(unlikely(!d->st_carrier)) {
@@ -1170,14 +1158,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_carrier_up = rrddim_add(d->st_carrier, "up",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
                 d->rd_carrier_down = rrddim_add(d->st_carrier, "down",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(d->st_carrier);
 
             rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_up, (collected_number)(d->carrier == 1));
             rrddim_set_by_pointer(d->st_carrier, d->rd_carrier_down, (collected_number)(d->carrier != 1));
             rrdset_done(d->st_carrier);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if(unlikely(!d->st_mtu)) {
@@ -1202,13 +1187,10 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                 d->rd_mtu = rrddim_add(d->st_mtu, "mtu",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(d->st_mtu);
 
             rrddim_set_by_pointer(d->st_mtu, d->rd_mtu, (collected_number)d->mtu);
             rrdset_done(d->st_mtu);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_packets == CONFIG_BOOLEAN_AUTO &&
            (d->rpackets || d->tpackets || d->rmulticast || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1248,15 +1230,12 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_tpackets = td;
                 }
             }
-            else rrdset_next(d->st_packets);
 
             rrddim_set_by_pointer(d->st_packets, d->rd_rpackets, (collected_number)d->rpackets);
             rrddim_set_by_pointer(d->st_packets, d->rd_tpackets, (collected_number)d->tpackets);
             rrddim_set_by_pointer(d->st_packets, d->rd_rmulticast, (collected_number)d->rmulticast);
             rrdset_done(d->st_packets);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_errors == CONFIG_BOOLEAN_AUTO &&
                     (d->rerrors || d->terrors || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1295,14 +1274,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_terrors = td;
                 }
             }
-            else rrdset_next(d->st_errors);
 
             rrddim_set_by_pointer(d->st_errors, d->rd_rerrors, (collected_number)d->rerrors);
             rrddim_set_by_pointer(d->st_errors, d->rd_terrors, (collected_number)d->terrors);
             rrdset_done(d->st_errors);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_drops == CONFIG_BOOLEAN_AUTO &&
                     (d->rdrops || d->tdrops || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1341,14 +1317,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_tdrops = td;
                 }
             }
-            else rrdset_next(d->st_drops);
 
             rrddim_set_by_pointer(d->st_drops, d->rd_rdrops, (collected_number)d->rdrops);
             rrddim_set_by_pointer(d->st_drops, d->rd_tdrops, (collected_number)d->tdrops);
             rrdset_done(d->st_drops);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_fifo == CONFIG_BOOLEAN_AUTO &&
                     (d->rfifo || d->tfifo || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1387,14 +1360,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_tfifo = td;
                 }
             }
-            else rrdset_next(d->st_fifo);
 
             rrddim_set_by_pointer(d->st_fifo, d->rd_rfifo, (collected_number)d->rfifo);
             rrddim_set_by_pointer(d->st_fifo, d->rd_tfifo, (collected_number)d->tfifo);
             rrdset_done(d->st_fifo);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_compressed == CONFIG_BOOLEAN_AUTO &&
                     (d->rcompressed || d->tcompressed || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1433,14 +1403,11 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->rd_tcompressed = td;
                 }
             }
-            else rrdset_next(d->st_compressed);
 
             rrddim_set_by_pointer(d->st_compressed, d->rd_rcompressed, (collected_number)d->rcompressed);
             rrddim_set_by_pointer(d->st_compressed, d->rd_tcompressed, (collected_number)d->tcompressed);
             rrdset_done(d->st_compressed);
         }
-
-        // --------------------------------------------------------------------
 
         if(unlikely(d->do_events == CONFIG_BOOLEAN_AUTO &&
                     (d->rframe || d->tcollisions || d->tcarrier || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES)))
@@ -1472,7 +1439,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                 d->rd_tcollisions = rrddim_add(d->st_events, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 d->rd_tcarrier    = rrddim_add(d->st_events, "carrier",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-            else rrdset_next(d->st_events);
 
             rrddim_set_by_pointer(d->st_events, d->rd_rframe,      (collected_number)d->rframe);
             rrddim_set_by_pointer(d->st_events, d->rd_tcollisions, (collected_number)d->tcollisions);
@@ -1507,8 +1473,6 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             rd_in  = rrddim_add(st_system_net, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_system_net, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_system_net);
 
         rrddim_set_by_pointer(st_system_net, rd_in,  (collected_number)system_rbytes);
         rrddim_set_by_pointer(st_system_net, rd_out, (collected_number)system_tbytes);

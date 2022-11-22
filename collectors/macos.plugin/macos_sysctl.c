@@ -218,8 +218,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     // NEEDED BY: do_uptime
     struct timespec boot_time, cur_time;
 
-    // --------------------------------------------------------------------
-
     if (next_loadavg_dt <= dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL_BY_NAME("vm.loadavg", sysload))) {
@@ -247,7 +245,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "load5", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                     rrddim_add(st, "load15", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "load1", (collected_number) ((double)sysload.ldavg[0] / sysload.fscale * 1000));
                 rrddim_set(st, "load5", (collected_number) ((double)sysload.ldavg[1] / sysload.fscale * 1000));
@@ -259,8 +256,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         next_loadavg_dt = st->update_every * USEC_PER_SEC;
     }
     else next_loadavg_dt -= dt;
-
-    // --------------------------------------------------------------------
 
     if (likely(do_swap)) {
         if (unlikely(GETSYSCTL_BY_NAME("vm.swapusage", swap_usage))) {
@@ -288,15 +283,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_add(st, "free",    NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
                 rrddim_add(st, "used",    NULL, 1, 1048576, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st);
 
             rrddim_set(st, "free", swap_usage.xsu_avail);
             rrddim_set(st, "used", swap_usage.xsu_used);
             rrdset_done(st);
         }
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_bandwidth)) {
         mib[0] = CTL_NET;
@@ -349,7 +341,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "InOctets", iftot.ift_ibytes);
                 rrddim_set(st, "OutOctets", iftot.ift_obytes);
@@ -357,8 +348,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syscookies || do_ecn)) {
@@ -398,15 +387,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "InSegs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutSegs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InSegs", tcpstat.tcps_rcvtotal);
                 rrddim_set(st, "OutSegs", tcpstat.tcps_sndtotal);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_tcp_errors)) {
                 st = rrdset_find_active_localhost("ipv4.tcperrors");
@@ -430,16 +416,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InErrs", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "RetransSegs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InErrs", tcpstat.tcps_rcvbadoff + tcpstat.tcps_rcvshort);
                 rrddim_set(st, "InCsumErrors", tcpstat.tcps_rcvbadsum);
                 rrddim_set(st, "RetransSegs", tcpstat.tcps_sndrexmitpack);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_tcp_handshake)) {
                 st = rrdset_find_active_localhost("ipv4.tcphandshake");
@@ -464,8 +447,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "ActiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "PassiveOpens", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "AttemptFails", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "EstabResets", tcpstat.tcps_drops);
                 rrddim_set(st, "ActiveOpens", tcpstat.tcps_connattempt);
@@ -473,8 +455,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "AttemptFails", tcpstat.tcps_conndrops);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_connaborts == CONFIG_BOOLEAN_YES || (do_tcpext_connaborts == CONFIG_BOOLEAN_AUTO &&
                                                                (tcpstat.tcps_rcvpackafterwin ||
@@ -505,7 +485,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "TCPAbortOnMemory",  "nomemory",    1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "TCPAbortOnTimeout", "timeout",     1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "TCPAbortOnData",    tcpstat.tcps_rcvpackafterwin);
                 rrddim_set(st, "TCPAbortOnClose",   tcpstat.tcps_rcvafterclose);
@@ -513,8 +492,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "TCPAbortOnTimeout", tcpstat.tcps_persistdrop);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_ofo == CONFIG_BOOLEAN_YES || (do_tcpext_ofo == CONFIG_BOOLEAN_AUTO &&
                                                         (tcpstat.tcps_rcvoopack ||
@@ -539,13 +516,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "TCPOFOQueue", "inqueue",  1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "TCPOFOQueue",   tcpstat.tcps_rcvoopack);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_tcpext_syscookies == CONFIG_BOOLEAN_YES || (do_tcpext_syscookies == CONFIG_BOOLEAN_AUTO &&
                                                                (tcpstat.tcps_sc_sendcookie ||
@@ -575,16 +549,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "SyncookiesSent",   "sent",     -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "SyncookiesFailed", "failed",   -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "SyncookiesRecv",   tcpstat.tcps_sc_recvcookie);
                 rrddim_set(st, "SyncookiesSent",   tcpstat.tcps_sc_sendcookie);
                 rrddim_set(st, "SyncookiesFailed", tcpstat.tcps_sc_zonefail);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
-
 
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
             if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
@@ -613,7 +583,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "InCEPkts", tcpstat.tcps_ecn_recv_ce);
                 rrddim_set(st, "InNoECTPkts", tcpstat.tcps_ecn_not_supported);
@@ -623,8 +592,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
         }
     }
-
-    // --------------------------------------------------------------------
 
     // see http://net-snmp.sourceforge.net/docs/mibs/udp.html
     if (likely(do_udp_packets || do_udp_errors)) {
@@ -654,15 +621,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "InDatagrams", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutDatagrams", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InDatagrams", udpstat.udps_ipackets);
                 rrddim_set(st, "OutDatagrams", udpstat.udps_opackets);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_udp_errors)) {
                 st = rrdset_find_active_localhost("ipv4.udperrors");
@@ -690,8 +654,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
                     rrddim_add(st, "IgnoredMulti", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InErrors", udpstat.udps_hdrops + udpstat.udps_badlen);
                 rrddim_set(st, "NoPorts", udpstat.udps_noport);
@@ -706,8 +669,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_icmp_packets || do_icmpmsg)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet.icmp.stats", icmpstat))) {
@@ -745,15 +706,11 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "InMsgs", "received", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutMsgs", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InMsgs", icmp_total.msgs_in);
                 rrddim_set(st, "OutMsgs", icmp_total.msgs_out);
-
                 rrdset_done(st);
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_localhost("ipv4.icmp_errors");
                 if (unlikely(!st)) {
@@ -775,17 +732,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutErrors", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InCsumErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InErrors", icmpstat.icps_badcode + icmpstat.icps_badlen + icmpstat.icps_checksum + icmpstat.icps_tooshort);
                 rrddim_set(st, "OutErrors", icmpstat.icps_error);
                 rrddim_set(st, "InCsumErrors", icmpstat.icps_checksum);
-
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_icmpmsg)) {
                 st = rrdset_find_active_localhost("ipv4.icmpmsg");
@@ -809,20 +762,16 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutEchoReps", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InEchos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
-                    rrddim_set(st, "InEchoReps", icmpstat.icps_inhist[ICMP_ECHOREPLY]);
-                    rrddim_set(st, "OutEchoReps", icmpstat.icps_outhist[ICMP_ECHOREPLY]);
-                    rrddim_set(st, "InEchos", icmpstat.icps_inhist[ICMP_ECHO]);
-                    rrddim_set(st, "OutEchos", icmpstat.icps_outhist[ICMP_ECHO]);
-
+                rrddim_set(st, "InEchoReps", icmpstat.icps_inhist[ICMP_ECHOREPLY]);
+                rrddim_set(st, "OutEchoReps", icmpstat.icps_outhist[ICMP_ECHOREPLY]);
+                rrddim_set(st, "InEchos", icmpstat.icps_inhist[ICMP_ECHO]);
+                rrddim_set(st, "OutEchos", icmpstat.icps_outhist[ICMP_ECHO]);
                 rrdset_done(st);
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     // see also http://net-snmp.sourceforge.net/docs/mibs/ip.html
     if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
@@ -858,8 +807,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutRequests", "sent", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "ForwDatagrams", "forwarded", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InDelivers", "delivered", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "OutRequests", ipstat.ips_localout);
                 rrddim_set(st, "InReceives", ipstat.ips_total);
@@ -867,8 +815,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "InDelivers", ipstat.ips_delivered);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsout)) {
                 st = rrdset_find_active_localhost("ipv4.fragsout");
@@ -892,16 +838,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "FragOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "FragFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "FragCreates", "created", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "FragOKs", ipstat.ips_fragmented);
                 rrddim_set(st, "FragFails", ipstat.ips_cantfrag);
                 rrddim_set(st, "FragCreates", ipstat.ips_ofragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_fragsin)) {
                 st = rrdset_find_active_localhost("ipv4.fragsin");
@@ -925,16 +868,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "ReasmOKs", "ok", 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "ReasmFails", "failed", -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "ReasmReqds", "all", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "ReasmOKs", ipstat.ips_fragments);
                 rrddim_set(st, "ReasmFails", ipstat.ips_fragdropped);
                 rrddim_set(st, "ReasmReqds", ipstat.ips_reassembled);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_ip_errors)) {
                 st = rrdset_find_active_localhost("ipv4.errors");
@@ -963,8 +903,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "InAddrErrors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InUnknownProtos", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InDiscards", ipstat.ips_badsum + ipstat.ips_tooshort + ipstat.ips_toosmall + ipstat.ips_toolong);
                 rrddim_set(st, "OutDiscards", ipstat.ips_odropped);
@@ -976,8 +915,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet6.ip6.stats", ip6stat))) {
@@ -1018,8 +955,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "forwarded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "delivers", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "sent", ip6stat.ip6s_localout);
                 rrddim_set(st, "received", ip6stat.ip6s_total);
@@ -1027,8 +963,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "delivers", ip6stat.ip6s_delivered);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_fragsout == CONFIG_BOOLEAN_YES || (do_ip6_fragsout == CONFIG_BOOLEAN_AUTO &&
                                                           (ip6stat.ip6s_fragmented ||
@@ -1057,16 +991,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "ok", ip6stat.ip6s_fragmented);
                 rrddim_set(st, "failed", ip6stat.ip6s_cantfrag);
                 rrddim_set(st, "all", ip6stat.ip6s_ofragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_fragsin == CONFIG_BOOLEAN_YES || (do_ip6_fragsin == CONFIG_BOOLEAN_AUTO &&
                                                          (ip6stat.ip6s_reassembled ||
@@ -1097,8 +1028,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "failed", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "timeout", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "all", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "ok", ip6stat.ip6s_reassembled);
                 rrddim_set(st, "failed", ip6stat.ip6s_fragdropped);
@@ -1106,8 +1036,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "all", ip6stat.ip6s_fragments);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_ip6_errors == CONFIG_BOOLEAN_YES || (do_ip6_errors == CONFIG_BOOLEAN_AUTO &&
                                                         (ip6stat.ip6s_toosmall ||
@@ -1148,8 +1076,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "InNoRoutes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                     rrddim_add(st, "OutNoRoutes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InDiscards", ip6stat.ip6s_toosmall);
                 rrddim_set(st, "OutDiscards", ip6stat.ip6s_odropped);
@@ -1165,8 +1092,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet6.icmp6.stats", icmp6stat))) {
@@ -1202,15 +1127,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "sent", icmp6_total.msgs_in);
                 rrddim_set(st, "received", icmp6_total.msgs_out);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_redir == CONFIG_BOOLEAN_YES || (do_icmp6_redir == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[ND_REDIRECT] ||
@@ -1236,15 +1158,12 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
                     rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "sent", icmp6stat.icp6s_inhist[ND_REDIRECT]);
                 rrddim_set(st, "received", icmp6stat.icp6s_outhist[ND_REDIRECT]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_errors == CONFIG_BOOLEAN_YES || (do_icmp6_errors == CONFIG_BOOLEAN_AUTO &&
                                                           (icmp6stat.icp6s_badcode ||
@@ -1288,8 +1207,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutDestUnreachs", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutTimeExcds", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutParmProblems", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InErrors", icmp6stat.icp6s_badcode + icmp6stat.icp6s_badlen + icmp6stat.icp6s_checksum + icmp6stat.icp6s_tooshort);
                 rrddim_set(st, "OutErrors", icmp6stat.icp6s_error);
@@ -1303,8 +1221,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "OutParmProblems", icmp6stat.icp6s_outhist[ICMP6_PARAM_PROB]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_echos == CONFIG_BOOLEAN_YES || (do_icmp6_echos == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST] ||
@@ -1334,8 +1250,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutEchos", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InEchoReplies", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutEchoReplies", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InEchos", icmp6stat.icp6s_inhist[ICMP6_ECHO_REQUEST]);
                 rrddim_set(st, "OutEchos", icmp6stat.icp6s_outhist[ICMP6_ECHO_REQUEST]);
@@ -1343,8 +1258,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "OutEchoReplies", icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_router == CONFIG_BOOLEAN_YES || (do_icmp6_router == CONFIG_BOOLEAN_AUTO &&
                                                           (icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT] ||
@@ -1374,8 +1287,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InSolicits", icmp6stat.icp6s_inhist[ND_ROUTER_SOLICIT]);
                 rrddim_set(st, "OutSolicits", icmp6stat.icp6s_outhist[ND_ROUTER_SOLICIT]);
@@ -1383,8 +1295,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 rrddim_set(st, "OutAdvertisements", icmp6stat.icp6s_outhist[ND_ROUTER_ADVERT]);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_neighbor == CONFIG_BOOLEAN_YES || (do_icmp6_neighbor == CONFIG_BOOLEAN_AUTO &&
                                                             (icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT] ||
@@ -1414,17 +1324,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutSolicits", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "InAdvertisements", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutAdvertisements", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InSolicits", icmp6stat.icp6s_inhist[ND_NEIGHBOR_SOLICIT]);
                 rrddim_set(st, "OutSolicits", icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]);
                 rrddim_set(st, "InAdvertisements", icmp6stat.icp6s_inhist[ND_NEIGHBOR_ADVERT]);
                 rrddim_set(st, "OutAdvertisements", icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]);
-                rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (do_icmp6_types == CONFIG_BOOLEAN_YES || (do_icmp6_types == CONFIG_BOOLEAN_AUTO &&
                                                          (icmp6stat.icp6s_inhist[1] ||
@@ -1466,8 +1372,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                     rrddim_add(st, "OutType133", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutType135", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "OutType143", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set(st, "InType1", icmp6stat.icp6s_inhist[1]);
                 rrddim_set(st, "InType128", icmp6stat.icp6s_inhist[128]);
@@ -1483,8 +1388,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
             }
         }
     }
-
-    // --------------------------------------------------------------------
 
     if (likely(do_uptime)) {
         if (unlikely(GETSYSCTL_BY_NAME("kern.boottime", boot_time))) {
@@ -1511,7 +1414,6 @@ int do_macos_sysctl(int update_every, usec_t dt) {
                 );
                 rrddim_add(st, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             }
-            else rrdset_next(st);
 
             rrddim_set(st, "uptime", cur_time.tv_sec - boot_time.tv_sec);
             rrdset_done(st);
@@ -1520,4 +1422,3 @@ int do_macos_sysctl(int update_every, usec_t dt) {
 
     return 0;
 }
-

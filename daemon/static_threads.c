@@ -4,7 +4,6 @@
 
 void *aclk_main(void *ptr);
 void *analytics_main(void *ptr);
-void *checks_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
 void *global_statistics_main(void *ptr);
 void *health_main(void *ptr);
@@ -25,15 +24,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = timex_main
-    },
-    {
-        .name = "PLUGIN[check]",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "checks",
-        .enabled = 0,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = checks_main
     },
     {
         .name = "PLUGIN[idlejitter]",

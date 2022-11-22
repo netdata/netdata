@@ -379,7 +379,6 @@ void registry_statistics(void) {
 
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(sts);
 
     rrddim_set(sts, "sessions", registry.usages_count);
     rrdset_done(sts);
@@ -408,7 +407,6 @@ void registry_statistics(void) {
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stc);
 
     rrddim_set(stc, "persons",       registry.persons_count);
     rrddim_set(stc, "machines",      registry.machines_count);
@@ -441,7 +439,6 @@ void registry_statistics(void) {
         rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stm);
 
     rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_for_registry(registry.persons));
     rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_for_registry(registry.machines));

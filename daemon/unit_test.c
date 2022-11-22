@@ -1206,7 +1206,9 @@ int run_test(struct test *test)
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
-        rrdset_done(st);
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st, now, false);
 
         // align the first entry to second boundary
         if(!c) {
@@ -1797,7 +1799,10 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         for (j = 0; j < DIMS; ++j) {
             rrddim_set_by_pointer_fake_time(rd[i][j], 69, 2 * API_RELATIVE_TIME_MAX); // set first value to 69
         }
-        rrdset_done(st[i]);
+
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st[i], now, false);
     }
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
@@ -1831,7 +1836,8 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
         time_now += update_every; // time_now = start + (c + 1) * update_every
-        for (i = 0 ; i < CHARTS ; ++i) {
+
+         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
             for (j = 0; j < DIMS; ++j) {
@@ -1839,7 +1845,12 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
                        j * REGION_POINTS[current_region] + c;
                 rrddim_set_by_pointer_fake_time(rd[i][j], next, time_now);
             }
-            rrdset_done(st[i]);
+
+            struct timeval now;
+            now.tv_sec = time_now;
+            now.tv_usec = 0;
+
+            rrdset_timed_done(st[i], now, false);
         }
     }
     return time_now; //time_end
