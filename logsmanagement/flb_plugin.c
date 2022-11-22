@@ -362,11 +362,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         m_assert(text, "text is NULL");
 
                         new_tmp_text_size = buff->in->text_size + text_size + 1; // +1 for '\n'
-                        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-                        while(avail_t_space == 0){
-                            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
-                            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-                        }
+                        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 
                         memcpy(&buff->in->data[buff->in->text_size], text, text_size);
                         buff->in->text_size = new_tmp_text_size;
@@ -620,11 +616,8 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 5; // +5 for '[', ']', ':' and ' ' characters around and after pid and '\n' at the end
 
         /* Metrics extracted, now prepare circular buffer for write */
-        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        while(avail_t_space == 0){
-            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
-            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        }
+        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 
         size_t tmp_item_off = buff->in->text_size;
 
@@ -767,11 +760,8 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         new_tmp_text_size += 1; // +1 fpr '\n' character at the end
         
         /* Metrics extracted, now prepare circular buffer for write */
-        size_t avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        while(avail_t_space == 0){
-            sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
-            avail_t_space = circ_buff_prepare_write(buff, new_tmp_text_size);
-        }
+        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
 
         size_t tmp_item_off = buff->in->text_size;
 
@@ -821,6 +811,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     }
     /* FLB_DOCKER_EV case end */
 
+skip_collect_and_drop_logs:
     /* Following code is equivalent to msgpack_unpacked_destroy(&result) due 
      * to that function call being unavailable when using dl_open() */
     if(result.zone != NULL) {

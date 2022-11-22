@@ -47,6 +47,7 @@ typedef struct Circ_buff {
     atomic_bool full;							/**< When head == tail, this indicates if buffer is full or empty **/
     atomic_size_t total_cached_mem;				/**< Total memory allocated for Circ_buff (excluding *in) **/
     size_t total_cached_mem_max;				/**< Maximum allowable size for total_cached_mem **/
+    int allow_dropped_logs;                     /**< Boolean to indicate whether logs are allowed to be dropped if buffer is full */
     atomic_size_t text_size_total;				/**< Total size of items[]->text_size **/
     atomic_size_t text_compressed_size_total;	/**< Total size of items[]->text_compressed_size **/
     // atomic_int valid_items;
@@ -58,7 +59,7 @@ void circ_buff_search(Circ_buff_t *buff, logs_query_params_t *p_query_params);
 size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space);
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);
-Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size);
+Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size, const int allow_dropped_logs);
 void circ_buff_destroy(void);
 
 #endif  // CIRCULAR_BUFFER_H_

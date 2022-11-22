@@ -71,6 +71,7 @@ int g_logs_manag_update_every = 1;
 static struct File_info *monitor_log_file_init(const char *filename, 
                                                const enum log_source_t log_type,
                                                const size_t circular_buffer_max_size, 
+                                               const int circular_buffer_allow_dropped_logs,
                                                const int compression_accel, 
                                                const int buff_flush_to_db_interval,
                                                const int64_t blob_max_size,
@@ -88,8 +89,9 @@ static struct File_info *monitor_log_file_init(const char *filename,
     p_file_info->blob_max_size = blob_max_size;
     p_file_info->log_type = log_type;
     p_file_info->update_every = update_every;
+    debug(D_LOGS_MANAG, "circular_buffer_allow_dropped_logs:%d", circular_buffer_allow_dropped_logs);
     p_file_info->circ_buff = circ_buff_init( buff_flush_to_db_interval + CIRCULAR_BUFF_SPARE_ITEMS,
-                                             circular_buffer_max_size);
+                                             circular_buffer_max_size, circular_buffer_allow_dropped_logs);
 
     /* Add input */
     switch(log_type){
@@ -242,7 +244,7 @@ static void logs_manag_config_init(){
 
         /* TODO: There can be only one log_type = FLB_SYSTEMD, catch this edge case */
 
-        /* Initialize circular buffer configuration parameters - Max size*/
+        /* Initialize circular buffer max size*/
         size_t circular_buffer_max_size = ((size_t)appconfig_get_number(&log_management_config, 
                                                                         config_section->name,
                                                                         "circular buffer max size", 
@@ -264,6 +266,12 @@ static void logs_manag_config_init(){
         } 
 
         info("Circular buffer max size for %s will be set to: %zu.", config_section->name, circular_buffer_max_size);
+
+        /* Initialize circular buffer configuration to drop logs if full or else block until logs are consumed */
+        int circular_buffer_allow_dropped_logs = appconfig_get_boolean( &log_management_config, 
+                                                                        config_section->name,
+                                                                        "circular buffer drop logs if full", 0);
+        info("Circular buffer drop logs if full for %s will be set to: %d.", config_section->name, circular_buffer_allow_dropped_logs);
 
         /* Get compression acceleration*/
         int compression_accel = (int) appconfig_get_number( &log_management_config, 
@@ -320,9 +328,9 @@ static void logs_manag_config_init(){
 
         /* Check if log monitoring initialisation is successful */
         // TODO: Add option to enable parser only without log storage and queries??
-        struct File_info *p_file_info = monitor_log_file_init( log_path, log_type, circular_buffer_max_size, 
-                                                               compression_accel, buff_flush_to_db_interval,
-                                                               blob_max_size, update_every);
+        struct File_info *p_file_info = monitor_log_file_init(  log_path, log_type, circular_buffer_max_size, 
+                                                                circular_buffer_allow_dropped_logs, compression_accel, 
+                                                                buff_flush_to_db_interval, blob_max_size, update_every);
         if(p_file_info) info("Monitoring for %s initialized successfully.", config_section->name);
         else {
             error("Monitoring initialization for %s failed.", config_section->name);

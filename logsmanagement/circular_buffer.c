@@ -160,47 +160,59 @@ void circ_buff_search(  Circ_buff_t *const buff, logs_query_params_t *const p_qu
  * @brief Query circular buffer if there is space for item insertion.
  * @param buff Circular buffer to query for available space.
  * @param requested_text_space Size of raw (uncompressed) space needed.
+ * @note If buff->allow_dropped_logs is 0, then this function will block and
+ * it will only return once there is available space as requested. In this 
+ * case, it will never return 0.
  * @return \p requested_text_space if there is enough space, else 0.
  */
 size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_text_space){
-    size_t available_text_space = requested_text_space;
 
     /* Calculate how much is the maximum compressed space that will 
      * be required on top of the requested space for the raw data. */
     buff->in->text_compressed_size = (size_t) LZ4_compressBound(requested_text_space);
     m_assert(buff->in->text_compressed_size != 0, "requested text compressed space is zero");
     size_t const required_space = requested_text_space + buff->in->text_compressed_size;
+
+    size_t available_text_space = 0;
+    size_t total_cached_mem_ex_in;
     
-    size_t total_cached_mem_ex_in = 0;
+try_to_acquire_space:
+    total_cached_mem_ex_in = 0;
     for (int i = 0; i < buff->num_of_items; i++){
         total_cached_mem_ex_in += buff->items[i].data_max_size;
     }
 
     /* If the required space is more than the allocated space of the input
-     * buffer, then we need to check if the input buffer can be reallocated:
-     * 
-     * a) If the total memory consumption of the circular buffer plus the 
-     * required space is less than the limit set by "circular buffer max size" 
-     * for this log source, then the input buffer can be reallocated.
-     * 
-     * b) If the total memory consumption of the circular buffer plus the 
-     * required space is more than the limit set by "circular buffer max size" 
-     * for this log source, we will attempt to reclaim some of the circular 
-     * buffer allocated memory from any empty items. If after reclaiming the 
-     * total memory consumption is still beyond the configuration limit, 0
-     * will be returned as the available space for raw logs in the input buffer.
-     * */
+    * buffer, then we need to check if the input buffer can be reallocated:
+    * 
+    * a) If the total memory consumption of the circular buffer plus the 
+    * required space is less than the limit set by "circular buffer max size" 
+    * for this log source, then the input buffer can be reallocated.
+    * 
+    * b) If the total memory consumption of the circular buffer plus the 
+    * required space is more than the limit set by "circular buffer max size" 
+    * for this log source, we will attempt to reclaim some of the circular 
+    * buffer allocated memory from any empty items. 
+    * 
+    * c) If after reclaiming the total memory consumption is still beyond the 
+    * configuration limit, either 0 will be returned as the available space 
+    * for raw logs in the input buffer, or the function will block and repeat
+    * the same process, until there is available space to be returned, depending
+    * of the configuration value of buff->allow_dropped_logs.
+    * */
     if(required_space > buff->in->data_max_size) {
         if(likely(total_cached_mem_ex_in + required_space <= buff->total_cached_mem_max)){
             buff->in->data_max_size = required_space;
             buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
+
+            available_text_space = requested_text_space;
         }
         else if(likely(!buff->full)){
             int head = buff->head % buff->num_of_items;
             int tail = buff->tail % buff->num_of_items;
 
-            for ( int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
-                  i != tail; i = (i + 1) % buff->num_of_items) {
+            for (int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
+                i != tail; i = (i + 1) % buff->num_of_items) {
                 
                 m_assert(i <= buff->num_of_items, "i > buff->num_of_items");
                 buff->items[i].data_max_size = 1;
@@ -215,6 +227,8 @@ size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_t
             if(total_cached_mem_ex_in + required_space <= buff->total_cached_mem_max){
                 buff->in->data_max_size = required_space;
                 buff->in->data = reallocz(buff->in->data, buff->in->data_max_size);
+
+                available_text_space = requested_text_space;
             }
             else available_text_space = 0;
         }
@@ -222,6 +236,13 @@ size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_t
 
     buff->total_cached_mem = total_cached_mem_ex_in + buff->in->data_max_size;
 
+    if(unlikely(!buff->allow_dropped_logs && !available_text_space)){
+        sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
+        goto try_to_acquire_space;
+    }
+        
+    m_assert(available_text_space || 
+            (!available_text_space && buff->allow_dropped_logs), "!available_text_space == 0 && !buff->allow_dropped_logs");
     return available_text_space;
 }
 
@@ -291,15 +312,19 @@ Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
  * @brief Create a new circular buffer.
  * @param num_of_items Number of Circ_buff_item_t items in the buffer.
  * @param max_size Maximum memory the circular buffer can occupy.
+ * @param allow_dropped_logs Maximum memory the circular buffer can occupy.
  * @return Pointer to the new circular buffer structure.
  */
-Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size) {
+Circ_buff_t *circ_buff_init(const int num_of_items, 
+                            const size_t max_size,
+                            const int allow_dropped_logs ) {
     Circ_buff_t *buff = callocz(1, sizeof(Circ_buff_t));
     buff->num_of_items = num_of_items;
     buff->items = callocz(buff->num_of_items, sizeof(Circ_buff_item_t));
     buff->in = callocz(1, sizeof(Circ_buff_item_t));
 
     buff->total_cached_mem_max = max_size;
+    buff->allow_dropped_logs = allow_dropped_logs;
 
     return buff;
 }
