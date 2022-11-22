@@ -242,17 +242,21 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdhost_sender_replicating_charts_zero(host);
 }
 
-static void rrdpush_sender_thread_data_flush(RRDHOST *host) {
+static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
+    netdata_mutex_lock(&host->sender->mutex);
+
+    // flush the output buffer from any data it may have
+    cbuffer_flush(host->sender->buffer);
+    replication_recalculate_buffer_used_ratio_unsafe(host->sender);
+
+    netdata_mutex_unlock(&host->sender->mutex);
+}
+
+static void rrdpush_sender_charts_and_replication_reset(RRDHOST *host) {
     rrdpush_sender_set_flush_time(host->sender);
 
     // stop all replication commands inflight
-    replication_flush_sender(host->sender);
-
-    // flush the output buffer from any data it may have
-    netdata_mutex_lock(&host->sender->mutex);
-    cbuffer_flush(host->sender->buffer);
-    replication_recalculate_buffer_used_ratio_unsafe(host->sender);
-    netdata_mutex_unlock(&host->sender->mutex);
+    replication_sender_delete_pending_requests(host->sender);
 
     // reset the state of all charts
     rrdpush_sender_thread_reset_all_charts(host);
@@ -261,12 +265,9 @@ static void rrdpush_sender_thread_data_flush(RRDHOST *host) {
 }
 
 static void rrdpush_sender_on_connect(RRDHOST *host) {
-    rrdpush_sender_thread_data_flush(host);
+    rrdpush_sender_cbuffer_flush(host);
+    rrdpush_sender_charts_and_replication_reset(host);
     rrdpush_sender_thread_send_custom_host_variables(host);
-}
-
-static void rrdpush_sender_on_disconnect(RRDHOST *host) {
-    rrdpush_sender_thread_data_flush(host);
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
@@ -278,7 +279,9 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host) {
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
 
-    rrdpush_sender_on_disconnect(host);
+    // do not flush the circular buffer here
+    // this function is called sometimes with the mutex locked
+    rrdpush_sender_charts_and_replication_reset(host);
 }
 
 void rrdpush_encode_variable(stream_encoded_t *se, RRDHOST *host)

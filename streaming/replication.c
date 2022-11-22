@@ -716,7 +716,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
     dictionary_set(sender->replication_requests, chart_id, &rq, sizeof(struct replication_request));
 }
 
-void replication_flush_sender(struct sender_state *sender) {
+void replication_sender_delete_pending_requests(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
     replication_recursive_lock();
     dictionary_flush(sender->replication_requests);
