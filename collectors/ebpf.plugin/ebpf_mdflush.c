@@ -92,6 +92,7 @@ static void mdflush_exit(void *ptr)
 static void mdflush_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*mdflush_threads.thread);
     ebpf_mdflush_free(em);
 }
 

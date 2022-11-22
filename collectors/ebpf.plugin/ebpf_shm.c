@@ -329,6 +329,7 @@ static void ebpf_shm_free(ebpf_module_t *em)
 static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*shm_threads.thread);
     ebpf_shm_free(em);
 }
 

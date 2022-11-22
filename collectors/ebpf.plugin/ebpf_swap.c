@@ -268,6 +268,7 @@ static void ebpf_swap_free(ebpf_module_t *em)
 static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*swap_threads.thread);
     ebpf_swap_free(em);
 }
 
