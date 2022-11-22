@@ -6,11 +6,15 @@
 
 **Merged pull requests:**
 
+- use 2 levels of judy arrays to speed up replication on very busy parents [\#14031](https://github.com/netdata/netdata/pull/14031) ([ktsaou](https://github.com/ktsaou))
+- bump go.d.plugin v0.44.0 [\#14030](https://github.com/netdata/netdata/pull/14030) ([ilyam8](https://github.com/ilyam8))
 - remove retries from SSL [\#14026](https://github.com/netdata/netdata/pull/14026) ([ktsaou](https://github.com/ktsaou))
+- Fix documentation TLS streaming [\#14024](https://github.com/netdata/netdata/pull/14024) ([thiagoftsm](https://github.com/thiagoftsm))
 - streaming compression, query planner and replication fixes [\#14023](https://github.com/netdata/netdata/pull/14023) ([ktsaou](https://github.com/ktsaou))
 - Change relative links to absolute for learn components [\#14015](https://github.com/netdata/netdata/pull/14015) ([tkatsoulas](https://github.com/tkatsoulas))
 - allow statsd tags to modify chart metadata on the fly [\#14014](https://github.com/netdata/netdata/pull/14014) ([ktsaou](https://github.com/ktsaou))
 - minor - silence misleading error [\#14013](https://github.com/netdata/netdata/pull/14013) ([underhood](https://github.com/underhood))
+- Change static image urls to app.netdata.cloud in alarm-notify.sh [\#14007](https://github.com/netdata/netdata/pull/14007) ([MrZammler](https://github.com/MrZammler))
 - Fix connection resets on big parents [\#14004](https://github.com/netdata/netdata/pull/14004) ([underhood](https://github.com/underhood))
 - minor typo in the uninstall command [\#14002](https://github.com/netdata/netdata/pull/14002) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "New journal disk based indexing for agent memory reduction" [\#14000](https://github.com/netdata/netdata/pull/14000) ([ktsaou](https://github.com/ktsaou))
@@ -343,11 +347,6 @@
 - bump go.d.plugin version to v0.33.1 [\#13369](https://github.com/netdata/netdata/pull/13369) ([ilyam8](https://github.com/ilyam8))
 - Add Oracle Linux 9 to officially supported platforms. [\#13367](https://github.com/netdata/netdata/pull/13367) ([Ferroin](https://github.com/Ferroin))
 - Address Coverity issues [\#13364](https://github.com/netdata/netdata/pull/13364) ([stelfrag](https://github.com/stelfrag))
-- chore\(python.d\): improve config file parsing error message [\#13363](https://github.com/netdata/netdata/pull/13363) ([ilyam8](https://github.com/ilyam8))
-- in source Judy [\#13362](https://github.com/netdata/netdata/pull/13362) ([underhood](https://github.com/underhood))
-- Add additional Docker image build with debug info included. [\#13359](https://github.com/netdata/netdata/pull/13359) ([Ferroin](https://github.com/Ferroin))
-- Move host tags to netdata\_info [\#13358](https://github.com/netdata/netdata/pull/13358) ([vlvkobal](https://github.com/vlvkobal))
-- Get rid of extra comma in OpenTSDB exporting [\#13355](https://github.com/netdata/netdata/pull/13355) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
