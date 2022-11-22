@@ -53,7 +53,7 @@ void Config::readMLConfig(void) {
     MaxTrainSamples = clamp<unsigned>(MaxTrainSamples, 1 * 3600, 24 * 3600);
     MinTrainSamples = clamp<unsigned>(MinTrainSamples, 1 * 900, 6 * 3600);
     TrainEvery = clamp<unsigned>(TrainEvery, 1 * 3600, 6 * 3600);
-    NumModelsToUse = clamp<unsigned>(TrainEvery, 1, 7 * 24);
+    NumModelsToUse = clamp<unsigned>(NumModelsToUse, 1, 7 * 24);
 
     DiffN = clamp(DiffN, 0u, 1u);
     SmoothN = clamp(SmoothN, 0u, 5u);
@@ -84,10 +84,17 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
+ #if 1
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
-    Cfg.NumModelsToUse = NumModelsToUse;
+    Cfg.NumModelsToUse = 1;
+ #else
+    Cfg.MaxTrainSamples = 30;
+    Cfg.MinTrainSamples = 15;
+    Cfg.TrainEvery = 30;
+    Cfg.NumModelsToUse = 1;
+ #endif
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;
@@ -106,8 +113,12 @@ void Config::readMLConfig(void) {
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
     // Always exclude anomaly_detection charts from training.
+ #if 1
     Cfg.ChartsToSkip = "anomaly_detection.* ";
     Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "netdata.*");
+ #else
+    Cfg.ChartsToSkip = "!prof_type.* *";
+ #endif
     Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
     Cfg.StreamADCharts = config_get_boolean(ConfigSectionML, "stream anomaly detection charts", true);
