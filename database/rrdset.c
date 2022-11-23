@@ -1109,8 +1109,36 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
         }
     }
 }
-
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags, const char *function) {
+#else // !NETDATA_LOG_COLLECTION_ERRORS
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+#endif // !NETDATA_LOG_COLLECTION_ERRORS
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+    rd->rrddim_store_metric_count++;
+
+    if(likely(rd->rrddim_store_metric_count > 1)) {
+        usec_t expected = rd->rrddim_store_metric_last_ut + rd->update_every * USEC_PER_SEC;
+
+        if(point_end_time_ut != rd->rrddim_store_metric_last_ut) {
+            internal_error(true,
+                           "%s COLLECTION: 'host:%s/chart:%s/dim:%s' granularity %d, collection %zu, expected to store at tier 0 a value at %llu, but it gave %llu [%s%llu usec] (called from %s(), previously by %s())",
+                           (point_end_time_ut < rd->rrddim_store_metric_last_ut) ? "**PAST**" : "GAP",
+                           rrdhost_hostname(rd->rrdset->rrdhost), rrdset_id(rd->rrdset), rrddim_id(rd),
+                           rd->update_every,
+                           rd->rrddim_store_metric_count,
+                           expected, point_end_time_ut,
+                           (point_end_time_ut < rd->rrddim_store_metric_last_ut)?"by -" : "gap ",
+                           expected - point_end_time_ut,
+                           function,
+                           rd->rrddim_store_metric_last_caller?rd->rrddim_store_metric_last_caller:"none");
+        }
+    }
+
+    rd->rrddim_store_metric_last_ut = point_end_time_ut;
+    rd->rrddim_store_metric_last_caller = function;
+#endif // NETDATA_LOG_COLLECTION_ERRORS
+
     // store the metric on tier 0
     rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
 

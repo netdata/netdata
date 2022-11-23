@@ -298,21 +298,32 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 
         if(!last_entry_local) {
             internal_error(true,
-                           "RRDSET: '%s' last updated time zero. Querying db for last updated time.",
-                           rrdset_id(st));
+                           "RRDSET: 'host:%s/chart:%s' db reports last updated time zero.",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
 
             last_entry_local = rrdset_last_entry_t(st);
             time_t now = now_realtime_sec();
+
             if(last_entry_local > now) {
                 internal_error(true,
-                               "RRDSET: '%s' last updated time %llu is in the future (now is %llu)",
-                               rrdset_id(st), (unsigned long long)last_entry_local, (unsigned long long)now);
+                               "RRDSET: 'host:%s/chart:%s' last updated time %llu is in the future (now is %llu)",
+                               rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                               (unsigned long long)last_entry_local, (unsigned long long)now);
                 last_entry_local = now;
             }
         }
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu\n",
                        (unsigned long long)first_entry_local, (unsigned long long)last_entry_local);
+
+        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+        internal_error(true, "REPLAY: 'host:%s/chart:%s' replication starts",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
@@ -344,7 +355,8 @@ static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_sta
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
-            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' is updated but not exposed", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+            internal_error(true, "STREAM: 'host:%s/chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             // we will include it in the next iteration
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }

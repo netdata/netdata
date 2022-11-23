@@ -1225,6 +1225,7 @@ struct dictionary_categories {
     RRDDIM *rd_spins_use;
     RRDDIM *rd_spins_search;
     RRDDIM *rd_spins_insert;
+    RRDDIM *rd_spins_delete;
 
 } dictionary_categories[] = {
     { .stats = &dictionary_stats_category_other, "dictionaries", "dictionaries", 900000 },
@@ -1481,9 +1482,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     total = 0;
-    load_dictionary_stats_entry(spin_locks.use);
-    load_dictionary_stats_entry(spin_locks.search);
-    load_dictionary_stats_entry(spin_locks.insert);
+    load_dictionary_stats_entry(spin_locks.use_spins);
+    load_dictionary_stats_entry(spin_locks.search_spins);
+    load_dictionary_stats_entry(spin_locks.insert_spins);
+    load_dictionary_stats_entry(spin_locks.delete_spins);
 
     if(c->st_spins || total != 0) {
         if (unlikely(!c->st_spins)) {
@@ -1511,13 +1513,15 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             c->rd_spins_use = rrddim_add(c->st_spins, "use", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             c->rd_spins_search = rrddim_add(c->st_spins, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             c->rd_spins_insert = rrddim_add(c->st_spins, "insert", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            c->rd_spins_delete = rrddim_add(c->st_spins, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(c->st_spins->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
 
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_use, (collected_number)stats.spin_locks.use);
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_search, (collected_number)stats.spin_locks.search);
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_insert, (collected_number)stats.spin_locks.insert);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_use, (collected_number)stats.spin_locks.use_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_search, (collected_number)stats.spin_locks.search_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_insert, (collected_number)stats.spin_locks.insert_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_delete, (collected_number)stats.spin_locks.delete_spins);
 
         rrdset_done(c->st_spins);
     }
