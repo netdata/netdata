@@ -189,6 +189,7 @@ static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t 
  *
  *****************************************************************/
 
+#ifdef LIBBPF_MAJOR_VERSION
 /**
  * Cleanup Objects
  *
@@ -199,23 +200,11 @@ void ebpf_sync_cleanup_objects()
     int i;
     for (i = 0; local_syscalls[i].syscall; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (w->probe_links) {
-            struct bpf_program *prog;
-            size_t j = 0 ;
-            bpf_object__for_each_program(prog, w->objects) {
-                bpf_link__destroy(w->probe_links[j]);
-                j++;
-            }
-            freez(w->probe_links);
-            if (w->objects)
-                bpf_object__close(w->objects);
-        }
-#ifdef LIBBPF_MAJOR_VERSION
-        else if (w->sync_obj)
+        if (w->sync_obj)
             sync_bpf__destroy(w->sync_obj);
-#endif
     }
 }
+#endif
 
 /**
  * Sync Free
@@ -234,7 +223,9 @@ static void ebpf_sync_free(ebpf_module_t *em)
     }
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
+#ifdef LIBBPF_MAJOR_VERSION
     ebpf_sync_cleanup_objects();
+#endif
     freez(sync_threads.thread);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -252,6 +243,7 @@ static void ebpf_sync_free(ebpf_module_t *em)
 static void ebpf_sync_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    pthread_cancel(*sync_threads.thread);
     ebpf_sync_free(em);
 }
 
