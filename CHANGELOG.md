@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
+- Replication fixes \#3 [\#14035](https://github.com/netdata/netdata/pull/14035) ([ktsaou](https://github.com/ktsaou))
+- improve performance of worker utilization statistics [\#14034](https://github.com/netdata/netdata/pull/14034) ([ktsaou](https://github.com/ktsaou))
 - use 2 levels of judy arrays to speed up replication on very busy parents [\#14031](https://github.com/netdata/netdata/pull/14031) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.44.0 [\#14030](https://github.com/netdata/netdata/pull/14030) ([ilyam8](https://github.com/ilyam8))
 - remove retries from SSL [\#14026](https://github.com/netdata/netdata/pull/14026) ([ktsaou](https://github.com/ktsaou))
@@ -53,6 +56,7 @@
 - fix compiling without dbengine [\#13931](https://github.com/netdata/netdata/pull/13931) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.42.1 [\#13930](https://github.com/netdata/netdata/pull/13930) ([ilyam8](https://github.com/ilyam8))
 - Remove pluginsd action param & dead code. [\#13928](https://github.com/netdata/netdata/pull/13928) ([vkalintiris](https://github.com/vkalintiris))
+- Do not force internal collectors to call rrdset\_next. [\#13926](https://github.com/netdata/netdata/pull/13926) ([vkalintiris](https://github.com/vkalintiris))
 - Return accidentaly removed 32bit RPi keep alive fix [\#13925](https://github.com/netdata/netdata/pull/13925) ([underhood](https://github.com/underhood))
 - error\_limit\(\) function to limit number of error lines per instance [\#13924](https://github.com/netdata/netdata/pull/13924) ([ktsaou](https://github.com/ktsaou))
 - fix crash on query plan switch [\#13920](https://github.com/netdata/netdata/pull/13920) ([ktsaou](https://github.com/ktsaou))
@@ -344,9 +348,6 @@
 - Fix bitmap unit tests [\#13374](https://github.com/netdata/netdata/pull/13374) ([stelfrag](https://github.com/stelfrag))
 - chore\(dashboard\): update chrony dashboard info [\#13371](https://github.com/netdata/netdata/pull/13371) ([ilyam8](https://github.com/ilyam8))
 - chore\(python.d\): remove python.d/\* announced in v1.35.0 deprecation notice [\#13370](https://github.com/netdata/netdata/pull/13370) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin version to v0.33.1 [\#13369](https://github.com/netdata/netdata/pull/13369) ([ilyam8](https://github.com/ilyam8))
-- Add Oracle Linux 9 to officially supported platforms. [\#13367](https://github.com/netdata/netdata/pull/13367) ([Ferroin](https://github.com/Ferroin))
-- Address Coverity issues [\#13364](https://github.com/netdata/netdata/pull/13364) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
