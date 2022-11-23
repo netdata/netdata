@@ -705,6 +705,7 @@ static struct replication_request replication_request_get_first_available() {
             else if(sender_has_room_to_spare) {
                 // copy the request to return it
                 rq = *rse->rq;
+                rq.chart_id = string_dup(rq.chart_id);
 
                 // set the return result to found
                 rq.found = true;
@@ -1036,6 +1037,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 internal_error(true, "REPLAY ERROR: received start streaming command for chart '%s' or host '%s', but the chart is not in progress replicating",
                                string2str(rq.chart_id), rrdhost_hostname(st->rrdhost));
         }
+
+        string_freez(rq.chart_id);
     }
 
     netdata_thread_cleanup_pop(1);

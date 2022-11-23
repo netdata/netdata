@@ -32,7 +32,8 @@ typedef enum item_options {
 
 typedef enum item_flags {
     ITEM_FLAG_NONE              = 0,
-    ITEM_FLAG_DELETED           = (1 << 0), // this item is deleted, so it is not available for traversal
+    ITEM_FLAG_DELETED           = (1 << 0), // this item is marked deleted, so it is not available for traversal (deleted from the index too)
+    ITEM_FLAG_BEING_CREATED     = (1 << 1), // this item is currently being created - this flag is removed when construction finishes
 
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
@@ -175,15 +176,19 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline const char *item_get_name(const DICTIONARY_ITEM *item);
-static bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static inline int hashtable_delete_unsafe(DICTIONARY *dict, const char *name, size_t name_len, void *item);
 static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item);
+static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
-#define ITEM_OK 0
-#define ITEM_MARKED_FOR_DELETION (-1)  // the item is marked for deletion
-#define ITEM_IS_CURRENTLY_BEING_DELETED (-2) // the item is currently being deleted
-#define item_check_and_acquire(dict, item) (item_check_and_acquire_advanced(dict, item, false) == ITEM_OK)
+#define RC_ITEM_OK                         ( 0)
+#define RC_ITEM_MARKED_FOR_DELETION        (-1) // the item is marked for deletion
+#define RC_ITEM_IS_CURRENTLY_BEING_DELETED (-2) // the item is currently being deleted
+#define RC_ITEM_IS_CURRENTLY_BEING_CREATED (-3) // the item is currently being deleted
+#define RC_ITEM_IS_REFERENCED              (-4) // the item is currently referenced
+#define item_check_and_acquire(dict, item) (item_check_and_acquire_advanced(dict, item, false) == RC_ITEM_OK)
 static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock);
+#define item_is_not_referenced_and_can_be_removed(dict, item) (item_is_not_referenced_and_can_be_removed_advanced(dict, item) == RC_ITEM_OK)
+static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
 // ----------------------------------------------------------------------------
 // memory statistics
@@ -345,14 +350,23 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.deletes, 1, __ATOMIC_RELAXED);
     __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
 
+    size_t entries;
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
-        dict->entries--;
+        entries = dict->entries++;
     }
     else {
         __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
+        entries = __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
     }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(entries == 0))
+        fatal("DICT: negative number of entries in dictionary created from %s() (%zu@%s)",
+              dict->creation_function,
+              dict->creation_line,
+              dict->creation_file);
+#endif
 }
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
@@ -369,13 +383,16 @@ static inline void DICTIONARY_STATS_WALKTHROUGHS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.walkthroughs, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_CHECK_SPINS_PLUS(DICTIONARY *dict, size_t count) {
-    __atomic_fetch_add(&dict->stats->spin_locks.use, count, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->spin_locks.use_spins, count, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_INSERT_SPINS_PLUS(DICTIONARY *dict, size_t count) {
-    __atomic_fetch_add(&dict->stats->spin_locks.insert, count, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->spin_locks.insert_spins, count, __ATOMIC_RELAXED);
+}
+static inline void DICTIONARY_STATS_DELETE_SPINS_PLUS(DICTIONARY *dict, size_t count) {
+    __atomic_fetch_add(&dict->stats->spin_locks.delete_spins, count, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->spin_locks.search, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->spin_locks.search_spins, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->callbacks.inserts, 1, __ATOMIC_RELAXED);
@@ -422,10 +439,22 @@ static inline long int DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
 static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
 
+    long int referenced_items;
     if(unlikely(is_dictionary_single_threaded(dict)))
-        return --dict->referenced_items;
+        referenced_items = --dict->referenced_items;
     else
-        return __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
+        referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(referenced_items < 0))
+        fatal("DICT: negative number of referenced items (%ld) in dictionary created from %s() (%zu@%s)",
+              referenced_items,
+              dict->creation_function,
+              dict->creation_line,
+              dict->creation_file);
+#endif
+
+    return referenced_items;
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
@@ -683,8 +712,8 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
         item_next = item->next;
         int rc = item_check_and_acquire_advanced(dict, item, is_view);
 
-        if(rc == ITEM_MARKED_FOR_DELETION) {
-            // we don't have got a reference
+        if(rc == RC_ITEM_MARKED_FOR_DELETION) {
+            // we didn't get a reference
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
                 DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
@@ -696,10 +725,10 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
                     break;
             }
         }
-        else if(rc == ITEM_IS_CURRENTLY_BEING_DELETED)
-            ; // do not touch this item (we haven't got a reference)
+        else if(rc == RC_ITEM_IS_CURRENTLY_BEING_DELETED)
+            ; // do not touch this item (we didn't get a reference)
 
-        else if(rc == ITEM_OK)
+        else if(rc == RC_ITEM_OK)
             item_release(dict, item);
 
         item = item_next;
@@ -829,6 +858,8 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
     size_t spins = 0;
     REFCOUNT refcount, desired;
 
+    int ret = RC_ITEM_OK;
+
     do {
         spins++;
 
@@ -836,12 +867,14 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
         if(refcount < 0) {
             // we can't use this item
-            return ITEM_IS_CURRENTLY_BEING_DELETED;
+            ret = RC_ITEM_IS_CURRENTLY_BEING_DELETED;
+            break;
         }
 
         if(item_flag_check(item, ITEM_FLAG_DELETED)) {
             // we can't use this item
-            return ITEM_MARKED_FOR_DELETION;
+            ret = RC_ITEM_MARKED_FOR_DELETION;
+            break;
         }
 
         desired = refcount + 1;
@@ -849,63 +882,89 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
     } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
                                           false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
-    // we acquired the item
+    // if ret == ITEM_OK, we acquired the item
 
-    if(is_view_dictionary(dict) && item_shared_flag_check(item, ITEM_FLAG_DELETED) && !item_flag_check(item, ITEM_FLAG_DELETED)) {
-        // but, we can't use this item
+    if(ret == RC_ITEM_OK) {
+        if (is_view_dictionary(dict) &&
+            item_shared_flag_check(item, ITEM_FLAG_DELETED) &&
+            !item_flag_check(item, ITEM_FLAG_DELETED)) {
+            // but, we can't use this item
 
-        if(having_index_lock) {
-            // delete it from the hashtable
-            hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
+            if (having_index_lock) {
+                // delete it from the hashtable
+                hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
 
-            // mark it in our dictionary as deleted too
-            // this is safe to be done here, because we have got
-            // a reference counter on item
-            item_flag_set(item, ITEM_FLAG_DELETED);
+                // mark it in our dictionary as deleted too
+                // this is safe to be done here, because we have got
+                // a reference counter on item
+                dict_item_set_deleted(dict, item);
 
-            DICTIONARY_ENTRIES_MINUS1(dict);
+                // decrement the refcount we incremented above
+                if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
+                    // this is a deleted item, and we are the last one
+                    DICTIONARY_PENDING_DELETES_PLUS1(dict);
+                }
 
-            // decrement the refcount we incremented above
-            if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
-                // this is a deleted item, and we are the last one
-                DICTIONARY_PENDING_DELETES_PLUS1(dict);
+                // do not touch the item below this point
+            } else {
+                // this is traversal / walkthrough
+                // decrement the refcount we incremented above
+                __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
             }
 
-            // do not touch the item below this point
-        }
-        else {
-            // this is traversal / walkthrough
-            // decrement the refcount we incremented above
-            __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
+            return RC_ITEM_MARKED_FOR_DELETION;
         }
 
-        return ITEM_MARKED_FOR_DELETION;
+        if(desired == 1)
+            DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
     }
 
-    if(desired == 1)
-        DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
 
-    if(unlikely(spins > 2 && dict->stats))
-        DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 2);
+    if(unlikely(spins > 1 && dict->stats))
+        DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 1);
 
-    return ITEM_OK; // we can use this item
+    return ret;
 }
 
 // if a dictionary item can be deleted, return true, otherwise return false
 // we use the private reference counter
-static inline bool item_is_not_referenced_and_can_be_removed(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
-    REFCOUNT expected = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
-    if(expected == 0 && __atomic_compare_exchange_n(&item->refcount, &expected, REFCOUNT_DELETING,
-                                                     false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    size_t spins = 0;
+    REFCOUNT refcount, desired = REFCOUNT_DELETING;
 
-        // we are going to delete it
-        return true;
-    }
+    int ret = RC_ITEM_OK;
 
-    // we can't delete this
-    return false;
+    do {
+        spins++;
+
+        refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+
+        if(refcount < 0) {
+            // we can't use this item
+            ret = RC_ITEM_IS_CURRENTLY_BEING_DELETED;
+            break;
+        }
+
+        if(refcount > 0) {
+            // we can't delete this
+            ret = RC_ITEM_IS_REFERENCED;
+            break;
+        }
+
+        if(item_flag_check(item, ITEM_FLAG_BEING_CREATED)) {
+            // we can't use this item
+            ret = RC_ITEM_IS_CURRENTLY_BEING_CREATED;
+            break;
+        }
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
+                                                         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    if(unlikely(spins > 1 && dict->stats))
+        DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, spins - 1);
+
+    return ret;
 }
 
 // if a dictionary item can be freed, return true, otherwise return false
@@ -954,7 +1013,7 @@ static inline void **hashtable_insert_unsafe(DICTIONARY *dict, const char *name,
     JError_t J_Error;
     Pvoid_t *Rc = JudyHSIns(&dict->index.JudyHSArray, (void *)name, name_len, &J_Error);
     if (unlikely(Rc == PJERR)) {
-        fatal("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
+        error("DICTIONARY: Cannot insert entry with name '%s' to JudyHS, JU_ERRNO_* == %u, ID == %d",
               name, JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
@@ -1031,6 +1090,10 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     else
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
 
+    // clear the BEING created flag,
+    // after it has been inserted into the linked list
+    item_flag_clear(item, ITEM_FLAG_BEING_CREATED);
+
     garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
@@ -1088,6 +1151,7 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     size_t size = sizeof(DICTIONARY_ITEM);
     item = callocz(1, size);
     item->refcount = 1;
+    item->flags = ITEM_FLAG_BEING_CREATED;
     *allocated_bytes += size;
 
     if(master_item) {
@@ -1218,6 +1282,9 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     debug(D_DICTIONARY, "Destroying name value entry for name '%s'.", item_get_name(item));
 
+    if(!item_flag_check(item, ITEM_FLAG_DELETED))
+        DICTIONARY_ENTRIES_MINUS1(dict);
+
     size_t item_size = 0, key_size = 0, value_size = 0;
 
     key_size += item->key_len;
@@ -1260,20 +1327,51 @@ static void dict_item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item
     }
 }
 
-static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(item_is_not_referenced_and_can_be_removed(dict, item)) {
-        dict_item_shared_set_deleted(dict, item);
-        item_linked_list_remove(dict, item);
-        dict_item_free_with_hooks(dict, item);
-    }
-    else {
-        dict_item_shared_set_deleted(dict, item);
-        item_flag_set(item, ITEM_FLAG_DELETED);
-        // after this point do not touch the item
-    }
+// returns true if we set the deleted flag on this item
+static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    ITEM_FLAGS expected, desired;
 
-    // the item is not available anymore
+    do {
+        expected = __atomic_load_n(&item->flags, __ATOMIC_SEQ_CST);
+
+        if (expected & ITEM_FLAG_DELETED)
+            return false;
+
+        desired = expected | ITEM_FLAG_DELETED;
+
+    } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired,
+                                         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
     DICTIONARY_ENTRIES_MINUS1(dict);
+    return true;
+}
+
+static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
+    int rc = item_is_not_referenced_and_can_be_removed_advanced(dict, item);
+    switch(rc) {
+        case RC_ITEM_OK:
+            // the item is ours, refcount set to -100
+            dict_item_shared_set_deleted(dict, item);
+            item_linked_list_remove(dict, item);
+            dict_item_free_with_hooks(dict, item);
+            break;
+
+        case RC_ITEM_IS_REFERENCED:
+        case RC_ITEM_IS_CURRENTLY_BEING_CREATED:
+            // the item is currently referenced by others
+            dict_item_shared_set_deleted(dict, item);
+            dict_item_set_deleted(dict, item);
+            // after this point do not touch the item
+            break;
+
+        case RC_ITEM_IS_CURRENTLY_BEING_DELETED:
+            // an item that is currently being deleted by someone else - don't touch it
+            break;
+
+        default:
+            internal_error(true, "Hey dev! You forgot to add the new condition here!");
+            break;
+    }
 }
 
 // this is used by traversal functions to remove the current item
@@ -1404,10 +1502,11 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
             dictionary_index_lock_unlock(dict);
 
             item_linked_list_add(dict, item);
+
             added_or_updated = true;
         }
         else {
-            if(item_check_and_acquire_advanced(dict, *item_pptr, true) != ITEM_OK) {
+            if(item_check_and_acquire_advanced(dict, *item_pptr, true) != RC_ITEM_OK) {
                 spins++;
                 continue;
             }
@@ -1443,6 +1542,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
                 }
 
                 else {
+                    // conflict callback returned false
                     // we did really nothing!
                     ;
                 }
@@ -1530,10 +1630,9 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
         // cache item->next
         // because we are going to free item
         DICTIONARY_ITEM *item_next = item->next;
+
         item_size += dict_item_free_with_hooks(dict, item);
         item = item_next;
-
-        DICTIONARY_ENTRIES_MINUS1(dict);
 
         // to speed up destruction, we don't
         // unlink item from the linked-list here
@@ -1801,22 +1900,11 @@ void dictionary_flush(DICTIONARY *dict) {
     if(unlikely(!dict))
         return;
 
-//    // delete the index
-//    dictionary_index_lock_wrlock(dict);
-//    hashtable_destroy_unsafe(dict);
-//    dictionary_index_lock_unlock(dict);
-
-    // delete all items
-    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE); // get write lock here, to speed it up (it is recursive)
-    DICTIONARY_ITEM *item, *item_next;
-    for (item = dict->items.list; item; item = item_next) {
-        item_next = item->next;
-
-//        if(!item_flag_check(item, ITEM_FLAG_DELETED))
-//            dict_item_free_or_mark_deleted(dict, item);
-        dict_item_del(dict, item_get_name(item), (ssize_t)item_get_name_len(item));
+    void *value;
+    dfe_start_write(dict, value) {
+        dictionary_del_advanced(dict, item_get_name(value_dfe.item), (ssize_t)item_get_name_len(value_dfe.item) + 1);
     }
-    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
+    dfe_done(value);
 
     DICTIONARY_STATS_DICT_FLUSHES_PLUS1(dict);
 }
@@ -2905,8 +2993,29 @@ static void *unittest_dict_thread(void *arg) {
         }
 
         dictionary_acquired_item_release(tu->dict, item);
-
         dictionary_del(tu->dict, "dict thread checking 1234567890");
+
+        // test concurrent deletions and flushes
+        {
+            if(gettid() % 2) {
+                char buf [256 + 1];
+
+                for (int i = 0; i < 1000; i++) {
+                    snprintfz(buf, 256, "del/flush test %d", i);
+                    dictionary_set(tu->dict, buf, NULL, 0);
+                }
+
+                for (int i = 0; i < 1000; i++) {
+                    snprintfz(buf, 256, "del/flush test %d", i);
+                    dictionary_del(tu->dict, buf);
+                }
+            }
+            else {
+                for (int i = 0; i < 10; i++) {
+                    dictionary_flush(tu->dict);
+                }
+            }
+        }
     }
 
     return arg;
@@ -2955,23 +3064,27 @@ static int dictionary_unittest_threads() {
             ", deletes %zu"
             ", searches %zu"
             ", resets %zu"
+            ", flushes %zu"
             ", entries %ld"
             ", referenced_items %ld"
             ", pending deletions %ld"
             ", check spins %zu"
             ", insert spins %zu"
+            ", delete spins %zu"
             ", search ignores %zu"
             "\n",
             tu.dict->stats->ops.inserts,
             tu.dict->stats->ops.deletes,
             tu.dict->stats->ops.searches,
             tu.dict->stats->ops.resets,
+            tu.dict->stats->ops.flushes,
             tu.dict->entries,
             tu.dict->referenced_items,
             tu.dict->pending_deletion_items,
-            tu.dict->stats->spin_locks.use,
-            tu.dict->stats->spin_locks.insert,
-            tu.dict->stats->spin_locks.search
+            tu.dict->stats->spin_locks.use_spins,
+            tu.dict->stats->spin_locks.insert_spins,
+            tu.dict->stats->spin_locks.delete_spins,
+            tu.dict->stats->spin_locks.search_spins
     );
     dictionary_destroy(tu.dict);
     tu.dict = NULL;
@@ -3118,6 +3231,7 @@ static int dictionary_unittest_view_threads() {
             ", pending deletions %ld"
             ", check spins %zu"
             ", insert spins %zu"
+            ", delete spins %zu"
             ", search ignores %zu"
             "\n",
             stats_master.ops.inserts,
@@ -3127,9 +3241,10 @@ static int dictionary_unittest_view_threads() {
             tv.master->entries,
             tv.master->referenced_items,
             tv.master->pending_deletion_items,
-            stats_master.spin_locks.use,
-            stats_master.spin_locks.insert,
-            stats_master.spin_locks.search
+            stats_master.spin_locks.use_spins,
+            stats_master.spin_locks.insert_spins,
+            stats_master.spin_locks.delete_spins,
+            stats_master.spin_locks.search_spins
     );
     fprintf(stderr,
             "VIEW  : inserts %zu"
@@ -3141,6 +3256,7 @@ static int dictionary_unittest_view_threads() {
             ", pending deletions %ld"
             ", check spins %zu"
             ", insert spins %zu"
+            ", delete spins %zu"
             ", search ignores %zu"
             "\n",
             stats_view.ops.inserts,
@@ -3150,9 +3266,10 @@ static int dictionary_unittest_view_threads() {
             tv.view->entries,
             tv.view->referenced_items,
             tv.view->pending_deletion_items,
-            stats_view.spin_locks.use,
-            stats_view.spin_locks.insert,
-            stats_view.spin_locks.search
+            stats_view.spin_locks.use_spins,
+            stats_view.spin_locks.insert_spins,
+            stats_view.spin_locks.delete_spins,
+            stats_view.spin_locks.search_spins
     );
     dictionary_destroy(tv.master);
     dictionary_destroy(tv.view);

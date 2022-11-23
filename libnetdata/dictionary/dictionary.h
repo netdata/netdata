@@ -98,9 +98,10 @@ struct dictionary_stats {
 
     // spin locks
     struct {
-        size_t use;                 // number of times a reference to item had to spin to acquire it or ignore it
-        size_t search;              // number of times a successful search result had to be thrown away
-        size_t insert;              // number of times an insertion to the hash table had to be repeated
+        size_t use_spins;           // number of times a reference to item had to spin to acquire it or ignore it
+        size_t search_spins;        // number of times a successful search result had to be thrown away
+        size_t insert_spins;        // number of times an insertion to the hash table had to be repeated
+        size_t delete_spins;        // number of times a deletion had to spin to get a decision
     } spin_locks;
 };
 
