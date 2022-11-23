@@ -4283,35 +4283,11 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // WMI (IIS)
 
-    'wmi.iis_website_traffic': {
-        info: 'The total bytes of data that have been sent and received by the web service.'
-    },
-    'wmi.iis_website_requests_rate': {
-        info: 'The number of requests per second that have been made to the web service.'
-    },
-    'wmi.iis_website_active_connections_count': {
-        info: 'The number of active connections to the web service.'
-    },
-    'wmi.iis_website_users_count': {
-        info: 'The number of users who currently have a request pending with the web service.'
-    },
-    'wmi.iis_website_connection_attempts_rate': {
-        info: 'The number of connections per second to the web service that have been attempted.'
-    },
     'wmi.iis_website_isapi_extension_requests_count': {
         info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are being processed simultaneously by the web service.'
     },
-    'wmi.iis_website_ftp_file_transfer_rate': {
-        info: 'The number of files that have been sent and received per second by the FTP service.'
-    },
-    'wmi.iis_website_logon_attempts_rate': {
-        info: 'The number of attempts per second to log on to the web service that have occurred.'
-    },
     'wmi.iis_website_errors_rate': {
         info: 'Rate of errors:</p><p><b>Document_locked</b> - The number of requests that have been made that could not be satisfied by the server because the requested document was locked. Usually reported as HTTP error 423. <b>document_not_found</b> - The number of requests that have been made that were not satisfied by the server because the requested document was not found. Usually reported as HTTP error 404</p>'
-    },
-    'wmi.iis_website_uptime': {
-        info: 'The total time elapsed since the web service started.'
     },
 
     // ------------------------------------------------------------------------
