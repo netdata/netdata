@@ -517,9 +517,15 @@ int ebpf_exit_plugin = 0;
 static void ebpf_stop_threads(int sig)
 {
     UNUSED(sig);
+    static int only_one = 0;
     // Child thread should be closed by itself.
-    if (main_thread_id != gettid())
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (main_thread_id != gettid() || only_one) {
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
+    }
+    only_one = 1;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     int i;
     pthread_mutex_lock(&ebpf_exit_cleanup);
@@ -2232,7 +2238,7 @@ int main(int argc, char **argv)
         }
     }
 
-    usec_t step = USEC_PER_SEC;
+    usec_t step = EBPF_DEFAULT_UPDATE_EVERY * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
