@@ -257,6 +257,13 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     static uint64_t sent = 0;
     static uint64_t recvd = 0;
 
+    static RRDSET *st_txbuf = NULL;
+    static RRDDIM *rd_tx_buffer_usable = NULL;
+    static RRDDIM *rd_tx_buffer_reclaimable = NULL;
+    static RRDDIM *rd_tx_buffer_used = NULL;
+    static RRDDIM *rd_tx_buffer_free = NULL;
+    static RRDDIM *rd_tx_buffer_size = NULL;
+
     sent += stats->bytes_tx;
     recvd += stats->bytes_rx;
 
@@ -269,10 +276,29 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
+    if (unlikely(!st_txbuf)) {
+        st_txbuf = rrdset_create_localhost(
+            "netdata", "aclk_mqtt_tx_queue", NULL, "aclk", NULL, "State of transmit MQTT queue.", "B",
+            "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+
+        rd_tx_buffer_usable = rrddim_add(st_txbuf, "usable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_tx_buffer_reclaimable = rrddim_add(st_txbuf, "reclaimable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_tx_buffer_used = rrddim_add(st_txbuf, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_tx_buffer_free = rrddim_add(st_txbuf, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_tx_buffer_size = rrddim_add(st_txbuf, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
     rrddim_set_by_pointer(st, rd_sent, sent);
     rrddim_set_by_pointer(st, rd_recvd, recvd);
 
+    rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_usable, stats->mqtt.tx_buffer_reclaimable + stats->mqtt.tx_buffer_free);
+    rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_reclaimable, stats->mqtt.tx_buffer_reclaimable);
+    rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_used, stats->mqtt.tx_buffer_used);
+    rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_free, stats->mqtt.tx_buffer_free);
+    rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_size, stats->mqtt.tx_buffer_size);
+
     rrdset_done(st);
+    rrdset_done(st_txbuf);
 }
 
 void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
