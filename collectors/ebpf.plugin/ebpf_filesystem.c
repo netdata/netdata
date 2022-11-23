@@ -323,17 +323,6 @@ void ebpf_filesystem_cleanup_ebpf_data()
 
             freez(efp->hadditional.name);
             freez(efp->hadditional.title);
-
-            struct bpf_link **probe_links = efp->probe_links;
-            size_t j = 0 ;
-            struct bpf_program *prog;
-            bpf_object__for_each_program(prog, efp->objects) {
-                bpf_link__destroy(probe_links[j]);
-                j++;
-            }
-            freez(probe_links);
-            if (efp->objects)
-                bpf_object__close(efp->objects);
         }
     }
 }
@@ -378,6 +367,7 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
 static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*filesystem_threads.thread);
     ebpf_filesystem_free(em);
 }
 
