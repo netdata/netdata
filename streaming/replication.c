@@ -457,7 +457,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
         // wow, we can do it in one request
         r.wanted.before = r.gap.to;
 
-    // don't ask from the child more that it has
+    // don't ask from the child more than it has
     if(r.wanted.before > r.child_db.last_entry_t)
         r.wanted.before = r.child_db.last_entry_t;
 
