@@ -755,12 +755,26 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
     struct replication_request *rq = old_value; (void)rq;
     struct replication_request *rq_new = new_value;
 
-    internal_error(
-            true,
-            "STREAM %s [send to %s]: REPLAY ERROR: ignoring duplicate replication command received for chart '%s' (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
-            rrdhost_hostname(s->host), s->connected_to, dictionary_acquired_item_name(item),
-            (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
-            (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
+        replication_recursive_lock();
+
+        if(!rq->indexed_in_judy) {
+            replication_sort_entry_add(rq);
+            internal_error(
+                    true,
+                    "STREAM %s [send to %s]: REPLAY: 'host:%s/chart:%s' adding duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+                    rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
+                    (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
+                    (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
+        }
+        else
+            internal_error(
+                    true,
+                    "STREAM %s [send to %s]: REPLAY: 'host:%s/chart:%s' ignoring duplicate replication command received (existing from %llu to %llu [%s], new from %llu to %llu [%s])",
+                    rrdhost_hostname(s->host), s->connected_to, rrdhost_hostname(s->host), dictionary_acquired_item_name(item),
+                    (unsigned long long)rq->after, (unsigned long long)rq->before, rq->start_streaming ? "true" : "false",
+                    (unsigned long long)rq_new->after, (unsigned long long)rq_new->before, rq_new->start_streaming ? "true" : "false");
+
+        replication_recursive_unlock();
 
 //    bool updated_after = false, updated_before = false, updated_start_streaming = false, updated = false;
 //
@@ -944,7 +958,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, (NETDATA_DOUBLE)done * 100.0 / (NETDATA_DOUBLE)total);
         }
 
-        if(!rq.found) {
+        if(unlikely(!rq.found)) {
             worker_is_idle();
 
             if(!rep.requests_count)
@@ -962,7 +976,15 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         else {
             // delete the request from the dictionary
             worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-            dictionary_del(rq.sender->replication_requests, string2str(rq.chart_id));
+            if(!dictionary_del(rq.sender->replication_requests, string2str(rq.chart_id)))
+                error("REPLAY: 'host:%s/chart:%s' failed to be deleted from sender dictionary",
+                      rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
+
+            if(rq.sender->replication_pending_requests == 0 && dictionary_entries(rq.sender->replication_requests) != 0)
+                error("REPLAY: 'host:%s/chart:%s' sender dictionary has %zu entries, but sender pending requests are %zu",
+                      rrdhost_hostname(rq.sender->host), string2str(rq.chart_id),
+                      dictionary_entries(rq.sender->replication_requests),
+                      rq.sender->replication_pending_requests);
         }
 
         worker_is_busy(WORKER_JOB_FIND_CHART);
@@ -1006,7 +1028,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-                internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' normal streaming starts",
+                internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
 #endif
             }
