@@ -1000,6 +1000,11 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
                 rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+                internal_error(true, "REPLAY: 'host:%s/chart:%s' normal streaming starts",
+                               rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
             }
             else
                 internal_error(true, "REPLAY ERROR: received start streaming command for chart '%s' or host '%s', but the chart is not in progress replicating",

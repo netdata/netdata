@@ -365,7 +365,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {
-        internal_error(true, "PLUGINSD: 'host:%s/chart:%s' not sending duplicate replication request",
+        internal_error(true, "REPLAY: 'host:%s/chart:%s' not sending duplicate replication request",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
     }
 #endif
@@ -981,7 +981,7 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(
                 (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
-                "PLUGINSD: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
+                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
                 rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, st->replay.after, st->replay.before);
 #endif
 
@@ -1255,7 +1255,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         else
-            internal_error(true, "PLUGINSD: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
+            internal_error(true, "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
                   rrdhost_hostname(host), rrdset_id(st));
 #endif
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);

@@ -319,6 +319,11 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
         rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+        internal_error(true, "REPLAY: 'host:%s/chart:%s' replication starts",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
