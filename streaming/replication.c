@@ -457,6 +457,10 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
         // wow, we can do it in one request
         r.wanted.before = r.gap.to;
 
+    // don't ask from the child more that it has
+    if(r.wanted.before > r.child_db.last_entry_t)
+        r.wanted.before = r.child_db.last_entry_t;
+
     // the child should start streaming immediately if the wanted duration is small
     r.wanted.start_streaming = (r.wanted.before == r.child_db.last_entry_t);
 
@@ -1002,7 +1006,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-                internal_error(true, "REPLAY: 'host:%s/chart:%s' normal streaming starts",
+                internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' normal streaming starts",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
 #endif
             }
