@@ -697,7 +697,10 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
 static int _optimized_add(struct header_buffer *buf, mqtt_wss_log_ctx_t log_ctx, void *data, size_t data_len, free_fnc_t data_free_fnc, struct buffer_fragment **frag)
 {
     if (data_len > SMALL_STRING_DONT_FRAGMENT_LIMIT) {
-        if( (*frag = buffer_new_frag(buf, BUFFER_FRAG_DATA_EXTERNAL)) == NULL ) {
+        buffer_frag_flag_t flags = BUFFER_FRAG_DATA_EXTERNAL;
+        if ((*frag)->flags & BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND)
+            flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
+        if( (*frag = buffer_new_frag(buf, flags)) == NULL ) {
             mws_error(log_ctx, "Out of buffer space while generating the message");
             return 1;
         }
@@ -948,6 +951,10 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
     mqtt_msg_data mqtt_msg = NULL;
 
     BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, BUFFER_FRAG_MQTT_PACKET_HEAD, frag, goto fail_rollback );
+    // in case of QOS 0 we can garbage collect immediatelly after sending
+    uint8_t qos = (publish_flags >> 1) & 0x03;
+    if (!qos)
+        frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
     mqtt_msg = frag;
 
     // MQTT Fixed Header
@@ -981,6 +988,8 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
         goto fail_rollback;
 
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
+    if (!qos)
+        trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_GARBAGE_COLLECT_ON_SEND;
     transaction_buffer_transaction_commit(trx_buf);
     return MQTT_NG_MSGGEN_OK;
 fail_rollback:
