@@ -314,6 +314,12 @@ struct rrddim {
     collected_number collected_value;               // the current value, as collected - resets to 0 after being used
     collected_number last_collected_value;          // the last value that was collected, after being processed
 
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+    usec_t rrddim_store_metric_last_ut;             // the timestamp we last called rrddim_store_metric()
+    size_t rrddim_store_metric_count;               // the rrddim_store_metric() counter
+    const char *rrddim_store_metric_last_caller;    // the name of the function that last called rrddim_store_metric()
+#endif
+
     // ------------------------------------------------------------------------
     // db mode RAM, SAVE, MAP, ALLOC, NONE specifics
     // TODO - they should be managed by storage engine
@@ -532,20 +538,19 @@ typedef enum rrdset_flags {
 
     RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION    = (1 << 21),
 
-    RRDSET_FLAG_SENDER_REPLICATION_QUEUED        = (1 << 22), // the sending side has replication in progress
-    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 23), // the sending side has replication in progress
-    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 24), // the sending side has completed replication
-    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 25), // the receiving side has replication in progress
-    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 26), // the receiving side has completed replication
+    RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS   = (1 << 22), // the sending side has replication in progress
+    RRDSET_FLAG_SENDER_REPLICATION_FINISHED      = (1 << 23), // the sending side has completed replication
+    RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS = (1 << 24), // the receiving side has replication in progress
+    RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 25), // the receiving side has completed replication
 
-    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 27), // a custom variable has been updated and needs to be exposed to parent
+    RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 26), // a custom variable has been updated and needs to be exposed to parent
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
 #define rrdset_flag_set(st, flag)   __atomic_or_fetch(&((st)->flags), flag, __ATOMIC_SEQ_CST)
 #define rrdset_flag_clear(st, flag) __atomic_and_fetch(&((st)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-#define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_SENDER_REPLICATION_QUEUED) \
+#define rrdset_is_replicating(st) (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS|RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS) \
     && !rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED|RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
 
 struct rrdset {
@@ -666,13 +671,13 @@ struct rrdset {
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
     struct {
         bool start_streaming;
         time_t after;
         time_t before;
     } replay;
-#endif
+#endif // NETDATA_LOG_REPLICATION_REQUESTS
 };
 
 #define rrdset_plugin_name(st) string2str((st)->plugin_name)
@@ -1330,7 +1335,12 @@ time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
 #endif
 long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+#define rrddim_store_metric(rd, point_end_time_ut, n, flags) rrddim_store_metric_with_trace(rd, point_end_time_ut, n, flags, __FUNCTION__)
+void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags, const char *function);
+#else
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
+#endif
 
 // ----------------------------------------------------------------------------
 // Miscellaneous functions
