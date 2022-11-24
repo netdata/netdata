@@ -30,6 +30,7 @@ declare -a package_tree=(
   gzip
   bison
   flex
+  cmake3
 )
 
 os_version() {

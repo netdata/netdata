@@ -663,24 +663,28 @@ declare -A pkg_cmake=(
   ['default']="cmake"
 )
 
+# bison and flex are required by Fluent-Bit to compile with --enable-logsmanagement
 declare -A pkg_bison=(
   ['default']="bison"
-
-  ['centos-7']="bison bison-devel"
 )
 
 declare -A pkg_flex=(
   ['default']="flex"
-
-  ['centos-7']="flex flex-devel"
 )
 
+# fts-dev is required by Fluent-Bit to compile with --enable-logsmanagement on Alpine
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
   ['alpine']="musl-fts-dev"
   ['alpine-3.16']="fts-dev"
   ['alpine-3.15']="fts-dev"
   ['alpine-3.14']="fts-dev"
+)
+
+# cmake3 is required by Fluent-Bit to compile with --enable-logsmanagement on CentOS 7
+declare -A pkg_cmake3=(
+  ['default']="NOTREQUIRED"
+  ['centos-7']="cmake3"
 )
 
 declare -A pkg_json_c_dev=(
@@ -1194,6 +1198,7 @@ packages() {
   require_cmd automake || suitable_package automake
   require_cmd pkg-config || suitable_package pkg-config
   require_cmd cmake || suitable_package cmake
+  require_cmd cmake3 || suitable_package cmake3
 
   # -------------------------------------------------------------------------
   # debugging tools for development

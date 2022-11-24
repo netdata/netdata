@@ -901,7 +901,7 @@ bundle_ebpf_co_re
 
 # -----------------------------------------------------------------------------
 build_fluentbit() {
-  env_cmd=''
+  local env_cmd=''
 
   if [ -z "${DONT_SCRUB_CFLAGS_EVEN_THOUGH_IT_MAY_BREAK_THINGS}" ]; then
     env_cmd="env CFLAGS='-fPIC -pipe' CXXFLAGS='-fPIC -pipe' LDFLAGS="
@@ -911,7 +911,7 @@ build_fluentbit() {
   cd fluent-bit/build > /dev/null || return 1
   
   rm CMakeCache.txt
-  run eval "${env_cmd} cmake -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../" || return 1
+  run eval "${env_cmd} $1 -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../" || return 1
   run eval "${env_cmd} ${make} ${MAKEOPTS}" || return 1
   cd - > /dev/null || return 1
 }
@@ -921,18 +921,24 @@ bundle_fluentbit() {
     return 0
   fi
 
-  if [ -z "$(command -v cmake)" ]; then
-    run_failed "Could not find cmake, which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
-    return 0
-  fi
+  progress "Prepare Fluent-Bit"
 
   if [ ! -d "fluent-bit" ]; then
     run_failed "Missing submodule Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
     return 0
   fi
 
+  if [ "$(command -v cmake)" ] && [ "$(cmake --version | head -1 | cut -d ' ' -f 3 | cut -c-1)" -ge 3 ]; then
+    cmake="cmake"
+  elif [ "$(command -v cmake3)" ]; then
+    cmake="cmake3"
+  else
+    run_failed "Could not find a compatible CMake version (>= 3.0), which is required to build Fluent-Bit. The install process will continue, but Netdata Logs Management support will be disabled."
+    return 0
+  fi
+
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.
-  libc=$(detect_libc)
+  local libc=$(detect_libc)
   if [ -z "$libc" ]; then
     run_failed "Cannot detect a supported libc on your system, Logs Management support will be disabled."
     return 0
@@ -940,12 +946,9 @@ bundle_fluentbit() {
     patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
   fi
   
-
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
 
-  progress "Prepare Fluent-Bit"
-
-  if build_fluentbit; then
+  if build_fluentbit "$cmake"; then
     FLUENT_BIT_BUILD_SUCCESS=1
     run_ok "Fluent-Bit built successfully."
   else
