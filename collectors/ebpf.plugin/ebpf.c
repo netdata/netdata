@@ -1337,6 +1337,7 @@ static void read_local_addresses()
 int ebpf_start_pthread_variables()
 {
     pthread_mutex_init(&lock, NULL);
+    pthread_mutex_init(&ebpf_exit_cleanup, NULL);
     pthread_mutex_init(&collect_data_mutex, NULL);
 
     if (pthread_cond_init(&collect_data_cond_var, NULL)) {
