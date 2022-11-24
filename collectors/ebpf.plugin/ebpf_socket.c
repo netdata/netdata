@@ -2170,9 +2170,6 @@ void *ebpf_socket_read_hash(void *ptr)
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
 
-        if (ebpf_exit_plugin)
-            break;
-
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
