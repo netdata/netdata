@@ -74,7 +74,7 @@ void generic_parser(void *arg){
         if(unlikely(netdata_exit)) break;
 
         buff->parse++;
-        item->status |= CIRC_BUFF_ITEM_STATUS_PARSED | CIRC_BUFF_ITEM_STATUS_STREAMED;
+        __atomic_or_fetch(&item->status, CIRC_BUFF_ITEM_STATUS_PARSED | CIRC_BUFF_ITEM_STATUS_STREAMED, __ATOMIC_RELAXED);
     }
 }
 
@@ -89,10 +89,11 @@ void generic_parser(void *arg){
  */
 void circ_buff_search(  Circ_buff_t *const buff, logs_query_params_t *const p_query_params) {
 
-    int head = buff->head % buff->num_of_items;
-    int tail = buff->tail % buff->num_of_items;
+    int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
 
-    if ((head == tail) && !buff->full) {
+    if ((head == tail) && !full) {
         debug(D_LOGS_MANAG, "Circ buff empty! Won't be searched.");
         return;  // Nothing to do if buff is empty
     }
@@ -207,9 +208,9 @@ try_to_acquire_space:
 
             available_text_space = requested_text_space;
         }
-        else if(likely(!buff->full)){
-            int head = buff->head % buff->num_of_items;
-            int tail = buff->tail % buff->num_of_items;
+        else if(likely(__atomic_load_n(&buff->full, __ATOMIC_SEQ_CST) == 0)){
+            int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
+            int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
 
             for (int i = (head == tail ? (head + 1) % buff->num_of_items : head); 
                 i != tail; i = (i + 1) % buff->num_of_items) {
@@ -234,7 +235,7 @@ try_to_acquire_space:
         }
     }
 
-    buff->total_cached_mem = total_cached_mem_ex_in + buff->in->data_max_size;
+    __atomic_store_n(&buff->total_cached_mem, total_cached_mem_ex_in + buff->in->data_max_size, __ATOMIC_RELAXED);
 
     if(unlikely(!buff->allow_dropped_logs && !available_text_space)){
         sleep_usec(CIRC_BUFF_PREP_WR_RETRY_AFTER_MS * USEC_PER_MS);
@@ -247,15 +248,20 @@ try_to_acquire_space:
 }
 
 int circ_buff_insert(Circ_buff_t *const buff){
+
+    // TODO: Probably can be changed to __ATOMIC_RELAXED, but ideally a mutex should be used here.
+    int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
+    int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
     
-    if (unlikely((buff->head % buff->num_of_items == buff->tail % buff->num_of_items) && buff->full)) {
+    if (unlikely(( head == tail ) && full )) {
         error("Logs circular buffer out of space! Losing data!");
         m_assert(0, "Buff full");
         // TODO: How to handle this case, when circular buffer is out of space?
         return -1;
     }
 
-    Circ_buff_item_t *cur_item = &buff->items[buff->head % buff->num_of_items];
+    Circ_buff_item_t *cur_item = &buff->items[head];
 
     char *tmp_data = cur_item->data;
     size_t tmp_data_max_size = cur_item->data_max_size;
@@ -276,12 +282,20 @@ int circ_buff_insert(Circ_buff_t *const buff){
     buff->in->text_compressed_size = 0;
     buff->in->data_max_size = tmp_data_max_size;
 
-    buff->text_size_total += cur_item->text_size;
-    buff->text_compressed_size_total += cur_item->text_compressed_size;
-    buff->compression_ratio = buff->text_compressed_size_total ? buff->text_size_total / buff->text_compressed_size_total : 0;
+    __atomic_add_fetch(&buff->text_size_total, cur_item->text_size, __ATOMIC_SEQ_CST);
+    
+    if( __atomic_add_fetch(&buff->text_compressed_size_total, cur_item->text_compressed_size, __ATOMIC_SEQ_CST)){
+            __atomic_store_n(&buff->compression_ratio, 
+            __atomic_load_n(&buff->text_size_total, __ATOMIC_SEQ_CST) / 
+            __atomic_load_n(&buff->text_compressed_size_total, __ATOMIC_SEQ_CST), 
+            __ATOMIC_SEQ_CST);
+    } else __atomic_store_n( &buff->compression_ratio, 0, __ATOMIC_SEQ_CST);
 
-    buff->head++;
-    if(unlikely(buff->head % buff->num_of_items == buff->tail % buff->num_of_items)) buff->full = 1;
+
+    if(unlikely(__atomic_add_fetch(&buff->head, 1, __ATOMIC_SEQ_CST) % buff->num_of_items == 
+                __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items)){ 
+        __atomic_store_n(&buff->full, 1, __ATOMIC_SEQ_CST);
+    }
 
     return 0;
 }
@@ -290,16 +304,20 @@ Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
 
     Circ_buff_item_t *item = &buff->items[buff->read % buff->num_of_items];
 
-    m_assert(item->status >= 0 && item->status <= CIRC_BUFF_ITEM_STATUS_DONE, "Invalid status");
+    m_assert(__atomic_load_n(&item->status, __ATOMIC_RELAXED) <= CIRC_BUFF_ITEM_STATUS_DONE, "Invalid status");
 
-    if( buff->read % buff->num_of_items == buff->head % buff->num_of_items || /* No more records to be retrieved in the buffer */
-        item->status != CIRC_BUFF_ITEM_STATUS_DONE /* current item either not parsed or streamed */){
+    if( /* No more records to be retrieved from the buffer */ 
+        (buff->read % buff->num_of_items == __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items) ||
+        /* Current item either not parsed or streamed */
+        __atomic_load_n(&item->status, __ATOMIC_RELAXED) != CIRC_BUFF_ITEM_STATUS_DONE ){
         
-        buff->tail = buff->read;
+        __atomic_store_n(&buff->tail, buff->read, __ATOMIC_SEQ_CST);
+
         /* Tail moved so update buff full flag in case it is set */
-        buff->full = 0;
-        buff->text_size_total = 0;
-        buff->text_compressed_size_total = 0;
+        __atomic_store_n(&buff->full, 0, __ATOMIC_SEQ_CST);
+
+        __atomic_store_n(&buff->text_size_total, 0, __ATOMIC_RELAXED);
+        __atomic_store_n(&buff->text_compressed_size_total, 0, __ATOMIC_RELAXED);
         return NULL;
     }
 

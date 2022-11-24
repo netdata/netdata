@@ -239,17 +239,17 @@ void *logsmanagement_plugin_main(void *ptr){
 
         /* Circular buffer total memory stats - collect first time 
          * (no need to be within p_file_info->parser_metrics_mut lock) */
-        stats_chart_data->num_circ_buff_mem_total_arr[i] = p_file_info->circ_buff->total_cached_mem;
+        stats_chart_data->num_circ_buff_mem_total_arr[i] = __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
 
         /* Circular buffer compressed & uncompressed buffered items memory stats - collect first time */
-        stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = p_file_info->circ_buff->text_size_total;
-        stats_chart_data->num_circ_buff_mem_compressed_arr[i] = p_file_info->circ_buff->text_compressed_size_total;
+        stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
+        stats_chart_data->num_circ_buff_mem_compressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
 
         /* Compression - collect first time */
-        stats_chart_data->num_compression_ratio_arr[i] = p_file_info->circ_buff->compression_ratio;
+        stats_chart_data->num_compression_ratio_arr[i] = __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED);
 
         /* DB disk usage - collect first time */
-        stats_chart_data->num_disk_usage_arr[i] = p_file_info->blob_total_size;
+        stats_chart_data->num_disk_usage_arr[i] = __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED);
 
 
         uv_mutex_lock(p_file_info->parser_metrics_mut);
@@ -337,17 +337,17 @@ void *logsmanagement_plugin_main(void *ptr){
             worker_is_busy(WORKER_JOB_COLLECT);
 
             /* Circular buffer total memory stats - collect (no need to be within p_file_info->parser_metrics_mut lock) */
-            stats_chart_data->num_circ_buff_mem_total_arr[i] = p_file_info->circ_buff->total_cached_mem;
+            stats_chart_data->num_circ_buff_mem_total_arr[i] = __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
 
             /* Circular buffer buffered uncompressed & compressed memory stats - collect */
-            stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = p_file_info->circ_buff->text_size_total;
-            stats_chart_data->num_circ_buff_mem_compressed_arr[i] = p_file_info->circ_buff->text_compressed_size_total;
+            stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
+            stats_chart_data->num_circ_buff_mem_compressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
 
             /* Compression stats - collect */
-            stats_chart_data->num_compression_ratio_arr[i] = p_file_info->circ_buff->compression_ratio;
+            stats_chart_data->num_compression_ratio_arr[i] = __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED);
 
             /* DB disk usage stats - collect */
-            stats_chart_data->num_disk_usage_arr[i] = p_file_info->blob_total_size;
+            stats_chart_data->num_disk_usage_arr[i] = __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED);
 
 
             uv_mutex_lock(p_file_info->parser_metrics_mut);

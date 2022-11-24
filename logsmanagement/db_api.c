@@ -286,7 +286,7 @@ static void db_writer(void *arg){
         /* Update total disk usage of all BLOBs for this log source */
         rc = sqlite3_step(stmt_blobs_get_total_filesize);
         if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
-        p_file_info->blob_total_size = sqlite3_column_int64(stmt_blobs_get_total_filesize, 0);
+        __atomic_store_n(&p_file_info->blob_total_size, sqlite3_column_int64(stmt_blobs_get_total_filesize, 0), __ATOMIC_RELAXED);
         // debug(D_LOGS_MANAG, "p_file_info->blob_total_size: %lld for: %s\n", p_file_info->blob_total_size, p_file_info->filename);
         rc = sqlite3_reset(stmt_blobs_get_total_filesize);
         if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);

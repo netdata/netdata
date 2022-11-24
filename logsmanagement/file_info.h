@@ -8,7 +8,6 @@
 #define FILE_INFO_H_
 
 #include <uv.h>
-#include <stdatomic.h>
 #include "../database/sqlite/sqlite3.h"
 #include "logsmanagement_conf.h"
 #include "parser.h"
@@ -44,7 +43,7 @@ struct File_info {
     int blob_write_handle_offset;                   /**< File offset denoting HEAD of currently open database BLOB file **/
     int buff_flush_to_db_interval;                  /**< Frequency at which RAM buffers of this log source will be flushed to the database **/
     int64_t blob_max_size;                          /**< When the size of a BLOB exceeds this value, the BLOB gets rotated. **/
-    atomic_llong blob_total_size;                   /**< This is the total disk space that all BLOBs occupy (for this log source) **/
+    int64_t blob_total_size;                   /**< This is the total disk space that all BLOBs occupy (for this log source) **/
 
     /* Struct members used only by log file sources */
     uv_file file_handle;                            /**< Log source file handle **/

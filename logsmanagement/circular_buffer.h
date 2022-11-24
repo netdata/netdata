@@ -9,21 +9,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdatomic.h>
 #include <string.h>
 #include <uv.h>
 #include "logsmanagement_conf.h"
 #include "query.h"
 #include "file_info.h"
 
-enum {
+typedef enum {
     CIRC_BUFF_ITEM_STATUS_UNPROCESSED = 0,
     CIRC_BUFF_ITEM_STATUS_PARSED = 1,
     CIRC_BUFF_ITEM_STATUS_STREAMED = 2,
     CIRC_BUFF_ITEM_STATUS_DONE = 3 // == CIRC_BUFF_ITEM_STATUS_PARSED | CIRC_BUFF_ITEM_STATUS_STREAMED
-};
-
-typedef atomic_int circ_buff_item_status_t;
+} circ_buff_item_status_t;
 
 typedef struct Circ_buff_item {
     circ_buff_item_status_t status;				/**< Denotes if item is unprocessed, in processing or processed **/
@@ -40,18 +37,17 @@ typedef struct Circ_buff {
     Circ_buff_item_t *items;
     Circ_buff_item_t *in;
     // atomic_int size;                            
-    atomic_int head;							/**< Position of next item insertion **/
-    atomic_int read;							/**< Index between tail and head, used to read items out of Circ_buff **/
-    atomic_int tail;							/**< Last valid item in Circ_buff **/
+    int head;							        /**< Position of next item insertion **/
+    int read;							        /**< Index between tail and head, used to read items out of Circ_buff **/
+    int tail;							        /**< Last valid item in Circ_buff **/
     int parse;									/**< Points to next item in buffer to be parsed **/
-    atomic_bool full;							/**< When head == tail, this indicates if buffer is full or empty **/
-    atomic_size_t total_cached_mem;				/**< Total memory allocated for Circ_buff (excluding *in) **/
+    int full;							        /**< When head == tail, this indicates if buffer is full or empty **/
+    size_t total_cached_mem;				    /**< Total memory allocated for Circ_buff (excluding *in) **/
     size_t total_cached_mem_max;				/**< Maximum allowable size for total_cached_mem **/
     int allow_dropped_logs;                     /**< Boolean to indicate whether logs are allowed to be dropped if buffer is full */
-    atomic_size_t text_size_total;				/**< Total size of items[]->text_size **/
-    atomic_size_t text_compressed_size_total;	/**< Total size of items[]->text_compressed_size **/
-    // atomic_int valid_items;
-    atomic_int compression_ratio;				/**< text_size_total / text_compressed_size_total **/
+    size_t text_size_total;				        /**< Total size of items[]->text_size **/
+    size_t text_compressed_size_total;	        /**< Total size of items[]->text_compressed_size **/
+    int compression_ratio;				        /**< text_size_total / text_compressed_size_total **/
 } Circ_buff_t;
 
 void generic_parser(void *arg);
