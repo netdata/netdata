@@ -1170,9 +1170,9 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
             rrdeng_page_descr_mutex_lock(ctx, descr);
-            descr->extent_entry = &extent_list[page_entry->extent_index];
-            descr->extent = NULL;
-            descr->file = file;
+            __atomic_store_n(&descr->extent_entry, &extent_list[page_entry->extent_index], __ATOMIC_SEQ_CST);
+            __atomic_store_n(&descr->extent, NULL, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&descr->file, file, __ATOMIC_SEQ_CST);
             rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
         }

@@ -80,12 +80,15 @@ enum rrdeng_opcode {
 };
 
 enum rrdeng_callback_opcode {
-    RRDENG_READ_PAGE_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_READ_PAGE,
-    RRDENG_READ_EXTENT_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_READ_EXTENT,
-    RRDENG_COMMIT_PAGE_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_COMMIT_PAGE,
-    RRDENG_FLUSH_PAGES_CB = RRDENG_MAX_OPCODE + 2 + RRDENG_FLUSH_PAGES,
-    RRDENG_EXT_DECOMPRESSION = RRDENG_FLUSH_PAGES_CB + 1,
-    RRDENG_PAGE_POPULATION = RRDENG_FLUSH_PAGES_CB + 2
+    RRDENG_READ_PAGE_CB = RRDENG_MAX_OPCODE + 2,
+    RRDENG_READ_EXTENT_CB,
+    RRDENG_COMMIT_PAGE_CB,
+    RRDENG_FLUSH_PAGES_CB,
+    RRDENG_EXT_DECOMPRESSION,
+    RRDENG_PAGE_POPULATION,
+    RRDENG_READ_MMAP_EXTENT,
+    RRDENG_QUEUE_FLASH_CALLBACK,
+    RRDENG_EXTENT_PROCESSING
 };
 
 
@@ -139,6 +142,7 @@ struct extent_io_descriptor {
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
+    int worker_job_id;
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
 

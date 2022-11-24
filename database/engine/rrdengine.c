@@ -1480,7 +1480,7 @@ void rrdeng_worker(void* arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
     int set_name = 0;
-    wc->next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INTERVAL_CLEANUP;
+    wc->next_descriptor_cleanup = now_realtime_sec() + DESCRIPTOR_INITIAL_CLEANUP;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
