@@ -518,6 +518,8 @@ static void ebpf_stop_threads(int sig)
 {
     UNUSED(sig);
     static int only_one = 0;
+
+    int i;
     // Child thread should be closed by itself.
     pthread_mutex_lock(&ebpf_exit_cleanup);
     if (main_thread_id != gettid() || only_one) {
@@ -525,10 +527,6 @@ static void ebpf_stop_threads(int sig)
         return;
     }
     only_one = 1;
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    int i;
-    pthread_mutex_lock(&ebpf_exit_cleanup);
     for (i = 0; ebpf_threads[i].name != NULL; i++) {
         if (ebpf_threads[i].enabled != NETDATA_THREAD_EBPF_STOPPED)
             netdata_thread_cancel(*ebpf_threads[i].thread);
