@@ -1122,7 +1122,9 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
              PValue = JudyLNext(metric_info->JudyL_array, &index_time, PJE0),
                  descr = unlikely(NULL == PValue) ? NULL : *PValue) {
 
-            rrdeng_page_descr_freez(descr);
+            int ret = JudyLDel(&metric_info->page_index->JudyL_array, index_time, PJE0);
+            if (ret)
+                rrdeng_page_descr_freez(descr);
         }
     }
     else {
