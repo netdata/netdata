@@ -80,6 +80,10 @@ typedef struct dictionary_item_shared {
 struct dictionary_item {
 #ifdef NETDATA_INTERNAL_CHECKS
     DICTIONARY *dict;
+    pid_t creator_pid;
+    pid_t deleter_pid;
+    pid_t ll_adder_pid;
+    pid_t ll_remover_pid;
 #endif
 
     DICTIONARY_ITEM_SHARED *shared;
@@ -169,6 +173,11 @@ struct dictionary {
     long int entries;                   // how many items are currently in the index (the linked list may have more)
     long int referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
     long int pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_t global_pointer_registry_mutex;
+    Pvoid_t global_pointer_registry;
+#endif
 };
 
 // forward definitions of functions used in reverse order in the code
@@ -189,6 +198,60 @@ static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item, bool having_index_lock);
 #define item_is_not_referenced_and_can_be_removed(dict, item) (item_is_not_referenced_and_can_be_removed_advanced(dict, item) == RC_ITEM_OK)
 static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item);
+
+static inline void pointer_index_init(DICTIONARY *dict) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_init(&dict->global_pointer_registry_mutex);
+#else
+    ;
+#endif
+}
+
+static inline void pointer_destroy_index(DICTIONARY *dict) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_lock(&dict->global_pointer_registry_mutex);
+    JudyHSFreeArray(&dict->global_pointer_registry, PJE0);
+    netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    ;
+#endif
+}
+static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_lock(&dict->global_pointer_registry_mutex);
+    Pvoid_t *PValue = JudyHSIns(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
+    if(*PValue != NULL)
+        fatal("pointer already exists in registry");
+    *PValue = item;
+    netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    ;
+#endif
+}
+
+static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_lock(&dict->global_pointer_registry_mutex);
+    Pvoid_t *PValue = JudyHSGet(dict->global_pointer_registry, &item, sizeof(void *));
+    if(PValue == NULL)
+        fatal("pointer is not found in registry");
+    netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    ;
+#endif
+}
+
+static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    netdata_mutex_lock(&dict->global_pointer_registry_mutex);
+    int ret = JudyHSDel(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
+    if(!ret)
+        fatal("pointer to be deleted does not exist in registry");
+    netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
+#else
+    ;
+#endif
+}
 
 // ----------------------------------------------------------------------------
 // memory statistics
@@ -666,13 +729,21 @@ static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
 
     netdata_rwlock_rdlock(&dict->index.rwlock);
 }
+
+static inline void dictionary_index_rdlock_unlock(DICTIONARY *dict) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
+        return;
+
+    netdata_rwlock_unlock(&dict->index.rwlock);
+}
+
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
     netdata_rwlock_wrlock(&dict->index.rwlock);
 }
-static inline void dictionary_index_lock_unlock(DICTIONARY *dict) {
+static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
@@ -735,7 +806,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
     }
 
     if(is_view)
-        dictionary_index_lock_unlock(dict);
+        dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
@@ -892,7 +963,10 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
             if (having_index_lock) {
                 // delete it from the hashtable
-                hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item);
+                if(hashtable_delete_unsafe(dict, item_get_name(item), item->key_len, item) == 0)
+                    error("DICTIONARY: INTERNAL ERROR VIEW: tried to delete item with name '%s', name_len %u that is not in the index", item_get_name(item), (KEY_LEN_TYPE)(item->key_len - 1));
+                else
+                    pointer_del(dict, item);
 
                 // mark it in our dictionary as deleted too
                 // this is safe to be done here, because we have got
@@ -961,6 +1035,11 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
     } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
                                                          false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(ret == RC_ITEM_OK)
+        item->deleter_pid = gettid();
+#endif
+
     if(unlikely(spins > 1 && dict->stats))
         DICTIONARY_STATS_DELETE_SPINS_PLUS(dict, spins - 1);
 
@@ -995,6 +1074,8 @@ static size_t hashtable_init_unsafe(DICTIONARY *dict) {
 
 static size_t hashtable_destroy_unsafe(DICTIONARY *dict) {
     if(unlikely(!dict->index.JudyHSArray)) return 0;
+
+    pointer_destroy_index(dict);
 
     JError_t J_Error;
     Word_t ret = JudyHSFreeArray(&dict->index.JudyHSArray, &J_Error);
@@ -1061,6 +1142,7 @@ static inline DICTIONARY_ITEM *hashtable_get_unsafe(DICTIONARY *dict, const char
     Rc = JudyHSGet(dict->index.JudyHSArray, (void *)name, name_len);
     if(likely(Rc)) {
         // found in the hash table
+        pointer_check(dict, (DICTIONARY_ITEM *)*Rc);
         return (DICTIONARY_ITEM *)*Rc;
     }
     else {
@@ -1090,6 +1172,10 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     else
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    item->ll_adder_pid = gettid();
+#endif
+
     // clear the BEING created flag,
     // after it has been inserted into the linked list
     item_flag_clear(item, ITEM_FLAG_BEING_CREATED);
@@ -1102,6 +1188,10 @@ static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *it
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    item->ll_remover_pid = gettid();
+#endif
 
     garbage_collect_pending_deletes(dict);
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
@@ -1150,8 +1240,14 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
 
     size_t size = sizeof(DICTIONARY_ITEM);
     item = callocz(1, size);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    item->creator_pid = gettid();
+#endif
+
     item->refcount = 1;
     item->flags = ITEM_FLAG_BEING_CREATED;
+
     *allocated_bytes += size;
 
     if(master_item) {
@@ -1431,14 +1527,16 @@ static bool dict_item_del(DICTIONARY *dict, const char *name, ssize_t name_len) 
     int ret;
     DICTIONARY_ITEM *item = hashtable_get_unsafe(dict, name, name_len);
     if(unlikely(!item)) {
-        dictionary_index_lock_unlock(dict);
+        dictionary_index_wrlock_unlock(dict);
         ret = false;
     }
     else {
         if(hashtable_delete_unsafe(dict, name, name_len, item) == 0)
-            error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s' that is not in the index", name);
+            error("DICTIONARY: INTERNAL ERROR: tried to delete item with name '%s', name_len %zd that is not in the index", name, name_len - 1);
+        else
+            pointer_del(dict, item);
 
-        dictionary_index_lock_unlock(dict);
+        dictionary_index_wrlock_unlock(dict);
 
         dict_item_free_or_mark_deleted(dict, item);
         ret = true;
@@ -1487,25 +1585,29 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
     DICTIONARY_ITEM *item = NULL;
     do {
         DICTIONARY_ITEM **item_pptr = (DICTIONARY_ITEM **)hashtable_insert_unsafe(dict, name, name_len);
-        if (likely(*item_pptr == 0)) {
+        if (likely(*item_pptr == NULL)) {
             // a new item added to the index
 
             // create the dictionary item
             item = *item_pptr =
                 dict_item_create_with_hooks(dict, name, name_len, value, value_len, constructor_data, master_item);
 
+            pointer_add(dict, item);
+
             // call the hashtable react
             hashtable_inserted_item_unsafe(dict, item);
 
             // unlock the index lock, before we add it to the linked list
             // DONT DO IT THE OTHER WAY AROUND - DO NOT CROSS THE LOCKS!
-            dictionary_index_lock_unlock(dict);
+            dictionary_index_wrlock_unlock(dict);
 
             item_linked_list_add(dict, item);
 
             added_or_updated = true;
         }
         else {
+            pointer_check(dict, *item_pptr);
+
             if(item_check_and_acquire_advanced(dict, *item_pptr, true) != RC_ITEM_OK) {
                 spins++;
                 continue;
@@ -1548,7 +1650,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
                 }
             }
 
-            dictionary_index_lock_unlock(dict);
+            dictionary_index_wrlock_unlock(dict);
         }
     } while(!item);
 
@@ -1592,7 +1694,7 @@ static DICTIONARY_ITEM *dict_item_find_and_acquire(DICTIONARY *dict, const char 
         DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(dict);
     }
 
-    dictionary_index_lock_unlock(dict);
+    dictionary_index_rdlock_unlock(dict);
 
     return item;
 }
@@ -1622,7 +1724,7 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     // destroy the index
     dictionary_index_lock_wrlock(dict);
     index_size += hashtable_destroy_unsafe(dict);
-    dictionary_index_lock_unlock(dict);
+    dictionary_index_wrlock_unlock(dict);
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
     DICTIONARY_ITEM *item = dict->items.list;
@@ -1846,6 +1948,8 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     dict_size += reference_counter_init(dict);
     dict_size += hashtable_init_unsafe(dict);
 
+    pointer_index_init(dict);
+
     DICTIONARY_STATS_PLUS_MEMORY(dict, 0, dict_size, 0);
 
     return dict;
@@ -1914,6 +2018,8 @@ size_t dictionary_destroy(DICTIONARY *dict) {
 
     if(!dict) return 0;
 
+    ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
+
     dict_flag_set(dict, DICT_FLAG_DESTROYED);
     DICTIONARY_STATS_DICT_DESTRUCTIONS_PLUS1(dict);
 
@@ -1931,8 +2037,11 @@ size_t dictionary_destroy(DICTIONARY *dict) {
             dict->referenced_items,
             dict->entries);
 
+        ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
         return 0;
     }
+
+    ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 
     size_t freed;
     dictionary_free_all_resources(dict, &freed, true);
@@ -2391,7 +2500,7 @@ static char **dictionary_unittest_generate_names(size_t entries) {
     char **names = mallocz(sizeof(char *) * entries);
     for(size_t i = 0; i < entries ;i++) {
         char buf[25 + 1] = "";
-        snprintfz(buf, 25, "name.%zu.0123456789.%zu \t !@#$%%^&*(),./[]{}\\|~`", i, entries / 2 + i);
+        snprintfz(buf, 25, "name.%zu.0123456789.%zu!@#$%%^&*(),./[]{}\\|~`", i, entries / 2 + i);
         names[i] = strdupz(buf);
     }
     return names;
@@ -3030,7 +3139,7 @@ static int dictionary_unittest_threads() {
     };
 
     // threads testing of dictionary
-    tu.dict = dictionary_create(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    tu.dict = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
     time_t seconds_to_run = 5;
     int threads_to_create = 2;
     fprintf(
