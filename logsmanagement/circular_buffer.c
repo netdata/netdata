@@ -233,7 +233,7 @@ try_to_acquire_space:
             }
             else available_text_space = 0;
         }
-    }
+    } else available_text_space = requested_text_space;
 
     __atomic_store_n(&buff->total_cached_mem, total_cached_mem_ex_in + buff->in->data_max_size, __ATOMIC_RELAXED);
 
