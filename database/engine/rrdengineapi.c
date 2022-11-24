@@ -621,8 +621,7 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
     }
 
     usec_t wanted_start_time_ut = handle->wanted_start_time_s * USEC_PER_SEC;
-    descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
-        wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
+    descr = pg_cache_lookup_next(ctx, handle->page_index, wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
 
     if (NULL == descr)
         return 1;

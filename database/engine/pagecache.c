@@ -1275,31 +1275,16 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-struct rrdeng_page_descr *
-pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                     usec_t start_time_ut, usec_t end_time_ut)
+struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
     struct page_cache_descr *pg_cache_descr = NULL;
     unsigned long flags;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
     uint8_t page_not_in_cache;
 
-    if (unlikely(NULL == index)) {
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (NULL == PValue) {
-            return NULL;
-        }
-    } else {
-        page_index = index;
-    }
+    if (unlikely(!page_index))
+        return NULL;
+
     pg_cache_reserve_pages(ctx, 1);
 
     page_not_in_cache = 0;
