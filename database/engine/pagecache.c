@@ -1145,61 +1145,37 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
  * Does not get a reference.
  * @param ctx DB context
- * @param id UUID
+ * @param page_index the page index that we are trying to preload
  * @param start_time_ut inclusive starting time in usec
  * @param end_time_ut inclusive ending time in usec
- * @param page_info_arrayp It allocates (*page_arrayp) and populates it with information of pages that overlap
- *        with the time range [start_time,end_time]. The caller must free (*page_info_arrayp) with freez().
- *        If page_info_arrayp is set to NULL nothing was allocated.
- * @param ret_page_indexp Sets the page index pointer (*ret_page_indexp) for the given UUID.
  * @return the number of pages that overlap with the time range [start_time,end_time].
  */
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
-                          struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp)
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL, *preload_array[PAGE_CACHE_MAX_PRELOAD_PAGES];
     struct page_cache_descr *pg_cache_descr = NULL;
-    unsigned i, j, k, preload_count, count, page_info_array_max_size;
+    unsigned i, j, k, preload_count, count;
     unsigned long flags;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
     Word_t Index;
     uint8_t failed_to_reserve;
 
-    fatal_assert(NULL != ret_page_indexp);
+    if (unlikely(NULL == page_index))
+        return 0;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        *ret_page_indexp = page_index = *PValue;
-    }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
+    uv_rwlock_rdlock(&page_index->lock);
+    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
+    if (unlikely(NULL == descr)) {
+        uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-        *ret_page_indexp = NULL;
+
         rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_notfound, 1);
         return 0;
     }
 
+    Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
+
     netdata_thread_disable_cancelability();
-    uv_rwlock_rdlock(&page_index->lock);
-    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut, PAGE_CACHE_MAX_PRELOAD_PAGES);
-    if (NULL == descr) {
-        uv_rwlock_rdunlock(&page_index->lock);
-        debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-        *ret_page_indexp = NULL;
-
-        netdata_thread_enable_cancelability();
-        return 0;
-    } else {
-        Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
-    }
-    if (page_info_arrayp) {
-        page_info_array_max_size = PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
-        *page_info_arrayp = mallocz(page_info_array_max_size);
-    }
-
     struct rrdeng_page_descr *last_descr = NULL;
     for (count = 0, preload_count = 0 ;
          descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
@@ -1214,15 +1190,6 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
 
         if (unlikely(0 == descr->page_length))
             continue;
-        if (page_info_arrayp) {
-            if (unlikely(count >= page_info_array_max_size / sizeof(struct rrdeng_page_info))) {
-                page_info_array_max_size += PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
-                *page_info_arrayp = reallocz(*page_info_arrayp, page_info_array_max_size);
-            }
-            (*page_info_arrayp)[count].start_time_ut = descr->start_time_ut;
-            (*page_info_arrayp)[count].end_time_ut = descr->end_time_ut;
-            (*page_info_arrayp)[count].page_length = descr->page_length;
-        }
         ++count;
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -1297,10 +1264,6 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
     if (!preload_count) {
         /* no such page */
         debug(D_RRDENGINE, "%s: No page was eligible to attempt preload.", __func__);
-    }
-    if (unlikely(0 == count && page_info_arrayp)) {
-        freez(*page_info_arrayp);
-        *page_info_arrayp = NULL;
     }
     rrd_stat_atomic_add(&ctx->stats.pg_cache_preload, preload_count);
     netdata_thread_enable_cancelability();

@@ -227,9 +227,7 @@ void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_c
                                             usec_t point_in_time_ut, pg_cache_page_info_filter_t *filter,
                                             struct rrdeng_page_info *page_info);
 struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t(*id), usec_t start_time_ut, struct pg_alignment *alignment);
-unsigned
-        pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
-                         struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp);
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut);
 struct rrdeng_page_descr *
         pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
                      usec_t start_time_ut, usec_t end_time_ut);
