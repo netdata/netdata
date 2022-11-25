@@ -44,7 +44,6 @@ struct netdata_static_thread shm_threads = {
                                             .init_routine = NULL,
                                             .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_shm_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t shm_targets[] = { {.name = "shmget", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "shmat", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -291,6 +290,36 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
  *****************************************************************/
 
 /**
+ * SHM Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_shm_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_cleanup_publish_syscall(shm_publish_aggregated);
+
+    freez(shm_vector);
+    freez(shm_values);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        shm_bpf__destroy(bpf_obj);
+#endif
+
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+}
+
+/**
  * SHM Exit
  *
  * Cancel child thread.
@@ -300,12 +329,8 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
 static void ebpf_shm_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*shm_threads.thread);
+    ebpf_shm_free(em);
 }
 
 /**
@@ -318,21 +343,7 @@ static void ebpf_shm_exit(void *ptr)
 static void ebpf_shm_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_shm_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_cleanup_publish_syscall(shm_publish_aggregated);
-
-    freez(shm_vector);
-    freez(shm_values);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        shm_bpf__destroy(bpf_obj);
-#endif
-
-    shm_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_shm_free(em);
 }
 
 /*****************************************************************
@@ -514,16 +525,11 @@ void *ebpf_shm_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SHM_SLEEP_MS * em->update_every;
-    while (ebpf_shm_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_shm_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_shm_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1091,15 +1097,11 @@ void *ebpf_shm_thread(void *ptr)
 
     ebpf_update_pid_table(&shm_maps[NETDATA_PID_SHM_TABLE], em);
 
-    if (!em->enabled) {
-        goto endshm;
-    }
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_shm_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endshm;
     }
 
@@ -1128,8 +1130,7 @@ void *ebpf_shm_thread(void *ptr)
     shm_collector(em);
 
 endshm:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

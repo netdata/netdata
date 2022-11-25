@@ -44,7 +44,6 @@ struct netdata_static_thread vfs_threads = {
     .init_routine = NULL,
     .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_vfs_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "vfs_writev", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -399,34 +398,23 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
  *  FUNCTIONS TO CLOSE THE THREAD
  *
  *****************************************************************/
+
 /**
- * Exit
+ * Cachestat Free
  *
- * Cancel thread and exit.
+ * Cleanup variables after child threads to stop
  *
  * @param ptr thread data.
-**/
-static void ebpf_vfs_exit(void *ptr)
+ */
+static void ebpf_vfs_free(ebpf_module_t *em)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
-
-    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
-* Clean up the main thread.
-*
-* @param ptr thread data.
-**/
-static void ebpf_vfs_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_vfs_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(vfs_hash_values);
     freez(vfs_vector);
@@ -437,8 +425,34 @@ static void ebpf_vfs_cleanup(void *ptr)
         vfs_bpf__destroy(bpf_obj);
 #endif
 
-    vfs_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
+ * Exit
+ *
+ * Cancel thread and exit.
+ *
+ * @param ptr thread data.
+**/
+static void ebpf_vfs_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*vfs_threads.thread);
+    ebpf_vfs_free(em);
+}
+
+/**
+* Clean up the main thread.
+*
+* @param ptr thread data.
+**/
+static void ebpf_vfs_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_vfs_free(em);
 }
 
 /*****************************************************************
@@ -879,16 +893,11 @@ void *ebpf_vfs_read_hash(void *ptr)
 
     usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
     //This will be cancelled by its parent
-    while (ebpf_vfs_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_vfs_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_vfs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1943,14 +1952,11 @@ void *ebpf_vfs_thread(void *ptr)
 
     ebpf_vfs_allocate_global_vectors(em->apps_charts);
 
-    if (!em->enabled)
-        goto endvfs;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_vfs_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endvfs;
     }
 
@@ -1970,8 +1976,7 @@ void *ebpf_vfs_thread(void *ptr)
     vfs_collector(em);
 
 endvfs:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

@@ -54,20 +54,19 @@ struct config process_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
 
-static struct netdata_static_thread cgroup_thread = {
-                                        .name = "EBPF CGROUP",
-                                        .config_section = NULL,
-                                        .config_name = NULL,
-                                        .env_name = NULL,
-                                        .enabled = 1,
-                                        .thread = NULL,
-                                        .init_routine = NULL,
-                                        .start_routine = NULL
-};
-static enum ebpf_threads_status ebpf_process_exited = NETDATA_THREAD_EBPF_RUNNING;
-
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
+
+static struct netdata_static_thread cgroup_thread = {
+    .name = "EBPF CGROUP",
+    .config_section = NULL,
+    .config_name = NULL,
+    .env_name = NULL,
+    .enabled = 1,
+    .thread = NULL,
+    .init_routine = NULL,
+    .start_routine = NULL
+};
 
 /*****************************************************************
  *
@@ -325,6 +324,55 @@ static void ebpf_process_update_apps_data()
 
         pids = pids->next;
     }
+}
+
+/**
+ * Cgroup Exit
+ *
+ * Function used with netdata_thread_clean_push
+ *
+ * @param ptr unused argument
+ */
+static void ebpf_cgroup_exit(void *ptr)
+{
+    UNUSED(ptr);
+}
+
+/**
+ * Cgroup update shm
+ *
+ * This is the thread callback.
+ * This thread is necessary, because we cannot freeze the whole plugin to read the data from shared memory.
+ *
+ * @param ptr It is a NULL value for this thread.
+ *
+ * @return It always returns NULL.
+ */
+void *ebpf_cgroup_update_shm(void *ptr)
+{
+    netdata_thread_cleanup_push(ebpf_cgroup_exit, ptr);
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
+    usec_t step = 3 * USEC_PER_SEC;
+    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
+    //This will be cancelled by its parent
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
+
+        // We are using a small heartbeat time to wake up thread,
+        // but we should not update so frequently the shared memory data
+        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
+            counter = 0;
+            if (!shm_ebpf_cgroup.header)
+                ebpf_map_cgroup_shared_memory();
+
+            ebpf_parse_cgroup_shm_data();
+        }
+    }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
 }
 
 /**
@@ -687,31 +735,17 @@ static void ebpf_process_disable_tracepoints()
  */
 static void ebpf_process_exit(void *ptr)
 {
-    (void)ptr;
-    ebpf_process_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Process cleanup
- *
- * Cleanup allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_process_cleanup(void *ptr)
-{
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_process_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
 
     ebpf_cleanup_publish_syscall(process_publish_aggregated);
     freez(process_hash_values);
-    freez(cgroup_thread.thread);
 
     ebpf_process_disable_tracepoints();
 
-    cgroup_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+    pthread_cancel(*cgroup_thread.thread);
 }
 
 /*****************************************************************
@@ -720,47 +754,6 @@ static void ebpf_process_cleanup(void *ptr)
  *
  *****************************************************************/
 
-/**
- * Cgroup update shm
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data from shared memory.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_cgroup_update_shm(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_process_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    usec_t step = 3 * USEC_PER_SEC;
-    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
-    //This will be cancelled by its parent
-    while (ebpf_process_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_process_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        // We are using a small heartbeat time to wake up thread,
-        // but we should not update so frequently the shared memory data
-        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
-            counter = 0;
-            if (!shm_ebpf_cgroup.header)
-                ebpf_map_cgroup_shared_memory();
-
-            ebpf_parse_cgroup_shm_data();
-        }
-    }
-
-    ebpf_process_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
-}
 
 /**
  * Sum PIDs
@@ -1111,11 +1104,12 @@ void ebpf_send_statistic_data()
  */
 static void process_collector(ebpf_module_t *em)
 {
+    // Start cgroup integration before other threads
     cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
     cgroup_thread.start_routine = ebpf_cgroup_update_shm;
 
     netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_cgroup_update_shm, em);
+                          ebpf_cgroup_update_shm, NULL);
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1233,34 +1227,6 @@ static void set_local_pointers()
  *****************************************************************/
 
 /**
- *
- */
-static void wait_for_all_threads_die()
-{
-    ebpf_modules[EBPF_MODULE_PROCESS_IDX].enabled = 0;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    int max = 10;
-    int i;
-    for (i = 0; i < max; i++) {
-        heartbeat_next(&hb, 200000);
-
-        size_t j, counter = 0, compare = 0;
-        for (j = 0; ebpf_modules[j].thread_name; j++) {
-            if (!ebpf_modules[j].enabled)
-                counter++;
-
-            compare++;
-        }
-
-        if (counter == compare)
-            break;
-    }
-}
-
-/**
  * Enable tracepoints
  *
  * Enable necessary tracepoints for thread.
@@ -1356,7 +1322,6 @@ endprocess:
     if (!em->enabled)
         ebpf_update_disabled_plugin_stats(em);
 
-    wait_for_all_threads_die();
     netdata_thread_cleanup_pop(1);
     return NULL;
 }

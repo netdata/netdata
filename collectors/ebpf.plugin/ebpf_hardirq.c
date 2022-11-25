@@ -145,7 +145,33 @@ static struct netdata_static_thread hardirq_threads = {
                                         .init_routine = NULL,
                                         .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNING;
+
+/**
+ * Hardirq Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_hardirq_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    freez(hardirq_threads.thread);
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
+    freez(hardirq_ebpf_vals);
+    freez(hardirq_ebpf_static_vals);
+
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+}
 
 /**
  * Hardirq Exit
@@ -157,12 +183,8 @@ static enum ebpf_threads_status ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNIN
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*hardirq_threads.thread);
+    ebpf_hardirq_free(em);
 }
 
 /**
@@ -175,19 +197,7 @@ static void hardirq_exit(void *ptr)
 static void hardirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    if (ebpf_hardirq_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(hardirq_threads.thread);
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-    freez(hardirq_ebpf_vals);
-    freez(hardirq_ebpf_static_vals);
-
-    hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_hardirq_free(em);
 }
 
 /*****************************************************************
@@ -330,16 +340,12 @@ static void *hardirq_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_every;
-    while (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        UNUSED(dt);
-        if (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
         hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
     }
-    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -479,26 +485,21 @@ void *ebpf_hardirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = hardirq_maps;
 
-    if (!em->enabled) {
-        goto endhardirq;
-    }
-
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
     hardirq_collector(em);
 
 endhardirq:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
 

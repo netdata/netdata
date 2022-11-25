@@ -38,7 +38,6 @@ struct netdata_static_thread fd_thread = {"FD KERNEL",
                                           .init_routine = NULL,
                                           .start_routine = NULL};
 
-static enum ebpf_threads_status ebpf_fd_exited = NETDATA_THREAD_EBPF_RUNNING;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -332,33 +331,21 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * FD Exit
+ * FD Free
  *
- * Cancel child thread and exit.
+ * Cleanup variables after child threads to stop
  *
  * @param ptr thread data.
  */
-static void ebpf_fd_exit(void *ptr)
+static void ebpf_fd_free(ebpf_module_t *em)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
-
-    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_fd_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_fd_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
@@ -370,8 +357,34 @@ static void ebpf_fd_cleanup(void *ptr)
         fd_bpf__destroy(bpf_obj);
 #endif
 
-    fd_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
+ * FD Exit
+ *
+ * Cancel child thread and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_fd_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*fd_thread.thread);
+    ebpf_fd_free(em);
+}
+
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_fd_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_fd_free(em);
 }
 
 /*****************************************************************
@@ -445,16 +458,11 @@ void *ebpf_fd_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
-    while (ebpf_fd_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_fd_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1143,14 +1151,13 @@ void *ebpf_fd_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fd_maps;
 
-    if (!em->enabled)
-        goto endfd;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
-    if (ebpf_fd_load_bpf(em))
+    if (ebpf_fd_load_bpf(em))  {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endfd;
+    }
 
     ebpf_fd_allocate_global_vectors(em->apps_charts);
 
@@ -1169,8 +1176,7 @@ void *ebpf_fd_thread(void *ptr)
     fd_collector(em);
 
 endfd:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

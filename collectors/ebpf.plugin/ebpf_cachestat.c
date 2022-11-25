@@ -44,7 +44,6 @@ struct config cachestat_config = { .first_section = NULL,
     .mutex = NETDATA_MUTEX_INITIALIZER,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
         .rwlock = AVL_LOCK_INITIALIZER } };
-static enum ebpf_threads_status ebpf_cachestat_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = "mark_page_accessed", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -323,6 +322,38 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
  *****************************************************************/
 
 /**
+ * Cachestat Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_cachestat_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
+
+    freez(cachestat_vector);
+    freez(cachestat_values);
+    freez(cachestat_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        cachestat_bpf__destroy(bpf_obj);
+#endif
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Cachestat exit.
  *
  * Cancel child and exit.
@@ -332,12 +363,8 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*cachestat_threads.thread);
+    ebpf_cachestat_free(em);
 }
 
 /**
@@ -350,21 +377,7 @@ static void ebpf_cachestat_exit(void *ptr)
 static void ebpf_cachestat_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_cachestat_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
-
-    freez(cachestat_vector);
-    freez(cachestat_values);
-    freez(cachestat_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        cachestat_bpf__destroy(bpf_obj);
-#endif
-    cachestat_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_cachestat_free(em);
 }
 
 /*****************************************************************
@@ -682,16 +695,11 @@ void *ebpf_cachestat_read_hash(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_cachestat_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_cachestat_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1292,16 +1300,13 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
-    if (!em->enabled)
-        goto endcachestat;
-
     ebpf_cachestat_set_internal_value();
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_cachestat_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endcachestat;
     }
 
@@ -1323,8 +1328,7 @@ void *ebpf_cachestat_thread(void *ptr)
     cachestat_collector(em);
 
 endcachestat:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

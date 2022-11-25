@@ -97,7 +97,6 @@ struct netdata_static_thread socket_threads = {
     .init_routine = NULL,
     .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_socket_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/socket.skel.h" // BTF code
@@ -588,35 +587,21 @@ static void clean_ip_structure(ebpf_network_viewer_ip_list_t **clean)
 }
 
 /**
- * Socket exit
+ * Socket Free
  *
- * Clean up the main thread.
+ * Cleanup variables after child threads to stop
  *
  * @param ptr thread data.
  */
-static void ebpf_socket_exit(void *ptr)
+static void ebpf_socket_free(ebpf_module_t *em )
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
-
-    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Socket cleanup
- *
- * Clean up allocated addresses.
- *
- * @param ptr thread data.
- */
-void ebpf_socket_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_socket_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_cleanup_publish_syscall(socket_publish_aggregated);
     freez(socket_hash_values);
@@ -646,8 +631,37 @@ void ebpf_socket_cleanup(void *ptr)
     if (bpf_obj)
         socket_bpf__destroy(bpf_obj);
 #endif
-    socket_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
+ * Socket exit
+ *
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_socket_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    netdata_thread_cancel(*socket_threads.thread);
+    ebpf_socket_free(em);
+}
+
+/**
+ * Socket cleanup
+ *
+ * Clean up allocated addresses.
+ *
+ * @param ptr thread data.
+ */
+void ebpf_socket_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_socket_free(em);
 }
 
 /*****************************************************************
@@ -2153,11 +2167,8 @@ void *ebpf_socket_read_hash(void *ptr)
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
     int network_connection = em->optional;
-    while (ebpf_socket_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_socket_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
@@ -2166,8 +2177,6 @@ void *ebpf_socket_read_hash(void *ptr)
         wait_to_plot = 1;
         pthread_mutex_unlock(&nv_mutex);
     }
-
-    ebpf_socket_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -3919,11 +3928,8 @@ void *ebpf_socket_thread(void *ptr)
     parse_service_name_section(&socket_config);
     parse_table_size_options(&socket_config);
 
-    if (!em->enabled)
-        goto endsocket;
-
     if (pthread_mutex_init(&nv_mutex, NULL)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto endsocket;
     }
@@ -3963,8 +3969,7 @@ void *ebpf_socket_thread(void *ptr)
     socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
 
 endsocket:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

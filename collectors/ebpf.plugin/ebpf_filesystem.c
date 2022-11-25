@@ -41,8 +41,6 @@ struct netdata_static_thread filesystem_threads = {
                                  .start_routine = NULL
 };
 
-static enum ebpf_threads_status ebpf_fs_exited = NETDATA_THREAD_EBPF_RUNNING;
-
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
@@ -325,19 +323,38 @@ void ebpf_filesystem_cleanup_ebpf_data()
 
             freez(efp->hadditional.name);
             freez(efp->hadditional.title);
-
-            struct bpf_link **probe_links = efp->probe_links;
-            size_t j = 0 ;
-            struct bpf_program *prog;
-            bpf_object__for_each_program(prog, efp->objects) {
-                bpf_link__destroy(probe_links[j]);
-                j++;
-            }
-            freez(probe_links);
-            if (efp->objects)
-                bpf_object__close(efp->objects);
         }
     }
+}
+
+/**
+ * Filesystem Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_filesystem_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    freez(filesystem_threads.thread);
+    ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
+
+    ebpf_filesystem_cleanup_ebpf_data();
+    if (dimensions)
+        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+    freez(filesystem_hash_values);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**
@@ -350,12 +367,8 @@ void ebpf_filesystem_cleanup_ebpf_data()
 static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*filesystem_threads.thread);
+    ebpf_filesystem_free(em);
 }
 
 /**
@@ -368,19 +381,7 @@ static void ebpf_filesystem_exit(void *ptr)
 static void ebpf_filesystem_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_fs_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(filesystem_threads.thread);
-    ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
-
-    ebpf_filesystem_cleanup_ebpf_data();
-    if (dimensions)
-        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
-    freez(filesystem_hash_values);
-
-    filesystem_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_filesystem_free(em);
 }
 
 /*****************************************************************
@@ -491,11 +492,8 @@ void *ebpf_filesystem_read_hash(void *ptr)
     heartbeat_init(&hb);
     usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
     int update_every = em->update_every;
-    while (ebpf_fs_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_fs_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         (void) ebpf_update_partitions(em);
         ebpf_obsolete_fs_charts(update_every);
@@ -506,8 +504,6 @@ void *ebpf_filesystem_read_hash(void *ptr)
 
         read_filesystem_tables();
     }
-
-    ebpf_fs_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -611,9 +607,6 @@ void *ebpf_filesystem_thread(void *ptr)
     em->maps = fs_maps;
     ebpf_update_filesystem();
 
-    if (!em->enabled)
-        goto endfilesystem;
-
     // Initialize optional as zero, to identify when there are not partitions to monitor
     em->optional = 0;
 
@@ -621,7 +614,7 @@ void *ebpf_filesystem_thread(void *ptr)
         if (em->optional)
             info("Netdata cannot monitor the filesystems used on this host.");
 
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endfilesystem;
     }
 
@@ -638,8 +631,7 @@ void *ebpf_filesystem_thread(void *ptr)
     filesystem_collector(em);
 
 endfilesystem:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

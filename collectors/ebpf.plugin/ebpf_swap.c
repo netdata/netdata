@@ -44,7 +44,6 @@ struct netdata_static_thread swap_threads = {
     .init_routine = NULL,
     .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_swap_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 netdata_ebpf_targets_t swap_targets[] = { {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -228,6 +227,38 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
  *****************************************************************/
 
 /**
+ * Cachestat Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_swap_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
+
+    freez(swap_vector);
+    freez(swap_values);
+    freez(swap_threads.thread);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        swap_bpf__destroy(bpf_obj);
+#endif
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Swap exit
  *
  * Cancel thread and exit.
@@ -237,12 +268,8 @@ static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t 
 static void ebpf_swap_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*swap_threads.thread);
+    ebpf_swap_free(em);
 }
 
 /**
@@ -255,21 +282,7 @@ static void ebpf_swap_exit(void *ptr)
 static void ebpf_swap_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_swap_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_cleanup_publish_syscall(swap_publish_aggregated);
-
-    freez(swap_vector);
-    freez(swap_values);
-    freez(swap_threads.thread);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        swap_bpf__destroy(bpf_obj);
-#endif
-    swap_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_swap_free(em);
 }
 
 /*****************************************************************
@@ -436,16 +449,11 @@ void *ebpf_swap_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_SWAP_SLEEP_MS * em->update_every;
-    while (ebpf_swap_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_swap_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_swap_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -878,14 +886,11 @@ void *ebpf_swap_thread(void *ptr)
 
     ebpf_update_pid_table(&swap_maps[NETDATA_PID_SWAP_TABLE], em);
 
-    if (!em->enabled)
-        goto endswap;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
    if (ebpf_swap_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+       em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endswap;
     }
 
@@ -903,8 +908,7 @@ void *ebpf_swap_thread(void *ptr)
     swap_collector(em);
 
 endswap:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

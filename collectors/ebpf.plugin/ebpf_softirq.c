@@ -64,7 +64,35 @@ static struct netdata_static_thread softirq_threads = {
     .init_routine = NULL,
     .start_routine = NULL
 };
-static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNING;
+
+/**
+ * Cachestat Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_softirq_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+        return;
+    }
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    freez(softirq_threads.thread);
+
+    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
+    }
+    freez(softirq_ebpf_vals);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
 
 /**
  * Exit
@@ -76,12 +104,8 @@ static enum ebpf_threads_status ebpf_softirq_exited = NETDATA_THREAD_EBPF_RUNNIN
 static void softirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPING;
+    netdata_thread_cancel(*softirq_threads.thread);
+    ebpf_softirq_free(em);
 }
 
 /**
@@ -94,18 +118,7 @@ static void softirq_exit(void *ptr)
 static void softirq_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_softirq_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(softirq_threads.thread);
-
-    for (int i = 0; softirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&softirq_tracepoints[i]);
-    }
-    freez(softirq_ebpf_vals);
-
-    softirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_softirq_free(em);
 }
 
 /*****************************************************************
@@ -145,15 +158,11 @@ static void *softirq_reader(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     usec_t step = NETDATA_SOFTIRQ_SLEEP_MS * em->update_every;
-    while (ebpf_softirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        UNUSED(dt);
-        if (ebpf_softirq_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         softirq_read_latency_map();
     }
-    ebpf_softirq_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -259,26 +268,21 @@ void *ebpf_softirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = softirq_maps;
 
-    if (!em->enabled) {
-        goto endsoftirq;
-    }
-
     if (ebpf_enable_tracepoints(softirq_tracepoints) == 0) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endsoftirq;
     }
 
     softirq_collector(em);
 
 endsoftirq:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
 
