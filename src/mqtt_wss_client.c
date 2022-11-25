@@ -58,8 +58,20 @@ char *util_openssl_ret_err(int err)
             return "SSL_ERROR_WANT_CONNECT";
         case SSL_ERROR_WANT_ACCEPT:
             return "SSL_ERROR_WANT_ACCEPT";
+        case SSL_ERROR_WANT_X509_LOOKUP:
+            return "SSL_ERROR_WANT_X509_LOOKUP";
+        case SSL_ERROR_WANT_ASYNC:
+            return "SSL_ERROR_WANT_ASYNC";
+        case SSL_ERROR_WANT_ASYNC_JOB:
+            return "SSL_ERROR_WANT_ASYNC_JOB";
+        case SSL_ERROR_WANT_CLIENT_HELLO_CB:
+            return "SSL_ERROR_WANT_CLIENT_HELLO_CB";
+        case SSL_ERROR_SYSCALL:
+            return "SSL_ERROR_SYSCALL";
+        case SSL_ERROR_SSL:
+            return "SSL_ERROR_SSL";
     }
-    return "Unknown!!!";
+    return "UNKNOWN";
 }
 
 struct mqtt_c_client {
@@ -1137,6 +1149,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             pthread_mutex_unlock(&client->stat_lock);
             rbuf_bump_head(client->ws_client->buf_read, ret);
         } else {
+            int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "Read Err: %s", util_openssl_ret_err(ret));
@@ -1144,6 +1157,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                mws_error(client->log, "SSL_read error: %d %s", ret, util_openssl_ret_err(ret));
+                if (ret == SSL_ERROR_SYSCALL)
+                    mws_error(client->log, "SSL_read SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
                 return MQTT_WSS_ERR_CONN_DROP;
             }
         }
@@ -1184,6 +1200,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             pthread_mutex_unlock(&client->stat_lock);
             rbuf_bump_tail(client->ws_client->buf_write, ret);
         } else {
+            int errnobkp = errno;
             ret = SSL_get_error(client->ssl, ret);
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "Write Err: %s", util_openssl_ret_err(ret));
@@ -1191,6 +1208,9 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             set_socket_pollfds(client, ret);
             if (ret != SSL_ERROR_WANT_READ &&
                 ret != SSL_ERROR_WANT_WRITE) {
+                mws_error(client->log, "SSL_write error: %d %s", ret, util_openssl_ret_err(ret));
+                if (ret == SSL_ERROR_SYSCALL)
+                    mws_error(client->log, "SSL_write SYSCALL errno: %d %s", errnobkp, strerror(errnobkp));
                 return MQTT_WSS_ERR_CONN_DROP;
             }
         }
