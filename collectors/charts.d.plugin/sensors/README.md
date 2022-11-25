@@ -1,6 +1,10 @@
 <!--
 title: "Linux machine sensors monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md"
+sidebar_label: "sensors-charts.d.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Devices"
 -->
 
 # Linux machine sensors monitoring with Netdata

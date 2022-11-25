@@ -1,6 +1,10 @@
 <!--
 title: "nfacct.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/nfacct.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/nfacct.plugin/README.md"
+sidebar_label: "nfacct.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Networking"
 -->
 
 # nfacct.plugin

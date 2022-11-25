@@ -1,7 +1,11 @@
 <!--
 title: "Alarm notifications"
 description: "Reference documentation for Netdata's alarm notification feature, which supports dozens of endpoints, user roles, and more."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/README.md"
+sidebar_label: "Notifications Reference"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "General References"
 -->
 
 # Alarm notifications

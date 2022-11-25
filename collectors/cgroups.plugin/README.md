@@ -1,6 +1,10 @@
 <!--
 title: "cgroups.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cgroups.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/cgroups.plugin/README.md"
+sidebar_label: "cgroups.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "System metrics"
 -->
 
 # cgroups.plugin

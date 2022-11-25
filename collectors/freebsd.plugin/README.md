@@ -1,6 +1,10 @@
 <!--
 title: "freebsd.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/freebsd.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/freebsd.plugin/README.md"
+sidebar_label: "freebsd.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "System metrics"
 -->
 
 # freebsd.plugin
