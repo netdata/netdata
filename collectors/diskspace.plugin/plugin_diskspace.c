@@ -511,12 +511,19 @@ void *diskspace_slow_worker(void *ptr)
     netdata_thread_cleanup_push(diskspace_slow_worker_cleanup, data->slow_thread);
 
     usec_t step = slow_update_every * USEC_PER_SEC;
+    usec_t real_step = USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
 
     while(!netdata_exit) {
         worker_is_idle();
-        heartbeat_next(&hb, step);
+        heartbeat_next(&hb, USEC_PER_SEC);
+
+        if (real_step < step) {
+            real_step += USEC_PER_SEC;
+            continue;
+        }
+        real_step = USEC_PER_SEC;
 
         usec_t start_time = now_monotonic_high_precision_usec();
 
