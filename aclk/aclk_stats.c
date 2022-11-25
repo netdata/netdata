@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#define MQTT_WSS_CPUSTATS
+
 #include "aclk_stats.h"
 
 #include "aclk_query.h"
@@ -266,6 +268,13 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     static RRDDIM *rd_tx_buffer_free = NULL;
     static RRDDIM *rd_tx_buffer_size = NULL;
 
+    static RRDSET *st_timing = NULL;
+    static RRDDIM *rd_keepalive = NULL;
+    static RRDDIM *rd_read_socket = NULL;
+    static RRDDIM *rd_write_socket = NULL;
+    static RRDDIM *rd_process_websocket = NULL;
+    static RRDDIM *rd_process_mqtt = NULL;
+
     sent += stats->bytes_tx;
     recvd += stats->bytes_rx;
 
@@ -290,6 +299,18 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_tx_buffer_size = rrddim_add(st_txbuf, "size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    if (unlikely(!st_timing)) {
+        st_timing = rrdset_create_localhost(
+            "netdata", "aclk_mqtt_wss_time", NULL, "aclk", NULL, "Time spent handling MQTT, WSS, SSL and network communication.", "us",
+            "netdata", "stats", 200013, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+
+        rd_keepalive = rrddim_add(st_timing, "keep-alive", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_read_socket = rrddim_add(st_timing, "socket_read_ssl", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_write_socket = rrddim_add(st_timing, "socket_write_ssl", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_process_websocket = rrddim_add(st_timing, "process_websocket", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        rd_process_mqtt = rrddim_add(st_timing, "process_mqtt", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
     rrddim_set_by_pointer(st, rd_sent, sent);
     rrddim_set_by_pointer(st, rd_recvd, recvd);
 
@@ -299,8 +320,15 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_free, stats->mqtt.tx_buffer_free);
     rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_size, stats->mqtt.tx_buffer_size);
 
+    rrddim_set_by_pointer(st_timing, rd_keepalive, stats->time_keepalive);
+    rrddim_set_by_pointer(st_timing, rd_read_socket, stats->time_read_socket);
+    rrddim_set_by_pointer(st_timing, rd_write_socket, stats->time_write_socket);
+    rrddim_set_by_pointer(st_timing, rd_process_websocket, stats->time_process_websocket);
+    rrddim_set_by_pointer(st_timing, rd_process_mqtt, stats->time_process_mqtt);
+
     rrdset_done(st);
     rrdset_done(st_txbuf);
+    rrdset_done(st_timing);
 }
 
 void aclk_stats_thread_prepare(int query_thread_count, unsigned int proto_hdl_cnt)
