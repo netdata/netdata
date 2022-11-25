@@ -223,7 +223,9 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+    bool replication_progress = false;
+
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -296,29 +298,43 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
         time_t first_entry_local = rrdset_first_entry_t_of_tier(st, 0);
         time_t last_entry_local = st->last_updated.tv_sec;
 
-        if(!last_entry_local) {
-            internal_error(true,
-                           "RRDSET: 'host:%s/chart:%s' db reports last updated time zero.",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
-
+        if(unlikely(!last_entry_local))
             last_entry_local = rrdset_last_entry_t(st);
-            time_t now = now_realtime_sec();
 
-            if(last_entry_local > now) {
-                internal_error(true,
-                               "RRDSET: 'host:%s/chart:%s' last updated time %llu is in the future (now is %llu)",
-                               rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                               (unsigned long long)last_entry_local, (unsigned long long)now);
-                last_entry_local = now;
-            }
+        time_t now = now_realtime_sec();
+        if(unlikely(last_entry_local > now)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' last updated time %ld is in the future, adjusting it to now %ld",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           last_entry_local, now);
+            last_entry_local = now;
         }
 
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu\n",
-                       (unsigned long long)first_entry_local, (unsigned long long)last_entry_local);
+        if(unlikely(first_entry_local && last_entry_local && first_entry_local >= last_entry_local)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first updated time %ld is equal or bigger than last updated time %ld, adjusting it last updated time - update every",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           first_entry_local, last_entry_local);
+            first_entry_local = last_entry_local - st->update_every;
+        }
+
+        if(unlikely(!first_entry_local && last_entry_local)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first time %ld, last time %ld, setting both to last time",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           first_entry_local, last_entry_local);
+            first_entry_local = last_entry_local;
+        }
+
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu %llu\n",
+                       (unsigned long long)first_entry_local,
+                       (unsigned long long)last_entry_local,
+                       (unsigned long long)now);
 
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
         rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        replication_progress = true;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(true, "REPLAY: 'host:%s/chart:%s' replication starts",
@@ -327,6 +343,7 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    return replication_progress;
 }
 
 // sends the current chart dimensions
@@ -411,16 +428,19 @@ void rrdset_done_push(RRDSET *st) {
     }
 
     RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
+    bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
+    bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-    if(unlikely(!should_send_chart_matching(st, rrdset_flags)))
+    if(unlikely((exposed_upstream && replication_in_progress) ||
+                !should_send_chart_matching(st, rrdset_flags)))
         return;
 
     BUFFER *wb = sender_start(host->sender);
 
-    if(unlikely(!(rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED)))
-        rrdpush_send_chart_definition(wb, st);
+    if(unlikely(!exposed_upstream))
+        replication_in_progress = rrdpush_send_chart_definition(wb, st);
 
-    if (likely(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
+    if (likely(!replication_in_progress))
         rrdpush_send_chart_metrics(wb, st, host->sender, rrdset_flags);
 
     sender_commit(host->sender, wb);

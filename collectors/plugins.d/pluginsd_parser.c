@@ -151,6 +151,20 @@ PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user)
     if (microseconds_txt && *microseconds_txt)
         microseconds = str2ull(microseconds_txt);
 
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+    if(st->replay.log_next_data_collection) {
+        st->replay.log_next_data_collection = false;
+
+        internal_error(true,
+                       "REPLAY: 'host:%s/chart:%s' first BEGIN after replication, last collected %llu, last updated %llu, microseconds %llu",
+                       rrdhost_hostname(host), rrdset_id(st),
+                       st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec,
+                       st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec,
+                       microseconds
+                       );
+    }
+#endif
+
     if (likely(st->counter_done)) {
         if (likely(microseconds)) {
             if (((PARSER_USER_OBJECT *)user)->trust_durations)
@@ -312,6 +326,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 {
     const char *first_entry_txt = get_word(words, num_words, 1);
     const char *last_entry_txt = get_word(words, num_words, 2);
+    const char *world_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
@@ -319,22 +334,14 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    if(unlikely(!first_entry_txt || !last_entry_txt)) {
-        error("PLUGINSD: 'host:%s' got a " PLUGINSD_KEYWORD_CHART_DEFINITION_END " without first or last entry. Disabling it.",
-              rrdhost_hostname(host));
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
+    time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
+    time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
+    time_t child_world_time = (world_time_txt && *world_time_txt) ? (time_t)str2ul(world_time_txt) : now_realtime_sec();
 
-    long first_entry_child = str2l(first_entry_txt);
-    long last_entry_child = str2l(last_entry_txt);
-
-    internal_error(
-            (first_entry_child != 0 || last_entry_child != 0)
-            && (first_entry_child == 0 || last_entry_child == 0),
-            "PLUGINSD: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %llu, last time %llu).",
-            rrdhost_hostname(host), rrdset_id(st),
-            (unsigned long long)first_entry_child, (unsigned long long)last_entry_child
-            );
+    if((first_entry_child != 0 || last_entry_child != 0) && (first_entry_child == 0 || last_entry_child == 0))
+        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %ld, last time %ld, world time %ld).",
+              rrdhost_hostname(host), rrdset_id(st),
+              first_entry_child, last_entry_child, child_world_time);
 
     bool ok = true;
     if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
@@ -350,8 +357,9 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
         rrdhost_receiver_replicating_charts_plus_one(st->rrdhost);
 
         PARSER *parser = ((PARSER_USER_OBJECT *)user)->parser;
-        ok = replicate_chart_request(send_to_plugin, parser, host, st, first_entry_child,
-                                          last_entry_child, 0, 0);
+        ok = replicate_chart_request(send_to_plugin, parser, host, st,
+                                     first_entry_child, last_entry_child, child_world_time,
+                                     0, 0);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     else {
@@ -910,7 +918,7 @@ PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words _
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CLABEL_COMMIT);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
     debug(D_PLUGINSD, "requested to commit chart labels");
@@ -950,28 +958,35 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
     ((PARSER_USER_OBJECT *) user)->st = st;
 
     if(start_time_str && end_time_str) {
-        time_t start_time = strtol(start_time_str, NULL, 0);
-        time_t end_time = strtol(end_time_str, NULL, 0);
+        time_t start_time = (time_t)str2ul(start_time_str);
+        time_t end_time = (time_t)str2ul(end_time_str);
 
         time_t wall_clock_time = 0, tolerance;
         bool wall_clock_comes_from_child; (void)wall_clock_comes_from_child;
         if(child_now_str) {
-            wall_clock_time = strtol(child_now_str, NULL, 0);
+            wall_clock_time = (time_t)str2ul(child_now_str);
             tolerance = st->update_every + 1;
             wall_clock_comes_from_child = true;
         }
 
         if(wall_clock_time <= 0) {
             wall_clock_time = now_realtime_sec();
-            tolerance = st->update_every + 60;
+            tolerance = st->update_every + 5;
             wall_clock_comes_from_child = false;
         }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(
                 (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
-                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
+                "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
                 rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, st->replay.after, st->replay.before);
+
+        internal_error(
+                true,
+                "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, child wall clock is %ld (%s), had requested %ld to %ld",
+                rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                start_time, end_time, wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
+                st->replay.after, st->replay.before);
 #endif
 
         if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
@@ -1002,10 +1017,9 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
             return PARSER_RC_OK;
         }
 
-        internal_error(true,
-                       "PLUGINSD: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, but timestamps are invalid (now is %ld [%s], tolerance %ld).",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
-                       wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock", tolerance);
+        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, but timestamps are invalid (now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
+              rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
+              wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock", tolerance);
     }
 
     // the child sends an RBEGIN without any parameters initially
@@ -1051,7 +1065,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
               dimension,
               ((PARSER_USER_OBJECT *) user)->replay.start_time,
               ((PARSER_USER_OBJECT *) user)->replay.end_time);
-        return PARSER_RC_ERROR;
+        return PLUGINSD_DISABLE_PLUGIN(user);
     }
 
     if (unlikely(!value_str || !*value_str))
@@ -1064,15 +1078,6 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
         RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
 
         RRDDIM_FLAGS rd_flags = rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED);
-
-        if(unlikely(rd_flags & RRDDIM_FLAG_OBSOLETE)) {
-            error("PLUGINSD: 'host:%s/chart:%s/dim:%s' has the OBSOLETE flag set, but it is collected.",
-                  rrdhost_hostname(st->rrdhost),
-                  rrdset_id(st),
-                  rrddim_id(rd)
-                  );
-            rrddim_isnot_obsolete(st, rd);
-        }
 
         if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
             NETDATA_DOUBLE value = strtondd(value_str, NULL);
@@ -1106,9 +1111,11 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
             rd->last_collected_time.tv_usec = 0;
             rd->collections_counter++;
         }
-        else
-            error("PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is collected. Ignoring data.",
-                  rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
+        else {
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s/dim:%s' has the ARCHIVED flag set, but it is replicated. Ignoring data.",
+                        rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_name(rd));
+        }
     }
 
     rrddim_acquired_release(rda);
@@ -1180,18 +1187,29 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
 
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 {
-    if (num_words < 7) {
+    if (num_words < 7) { // accepts 7, but the 7th is optional
         error("REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
         return PARSER_RC_ERROR;
     }
 
-    time_t update_every_child = str2l(get_word(words, num_words, 1));
-    time_t first_entry_child = (time_t)str2ull(get_word(words, num_words, 2));
-    time_t last_entry_child = (time_t)str2ull(get_word(words, num_words, 3));
+    const char *update_every_child_txt = get_word(words, num_words, 1);
+    const char *first_entry_child_txt = get_word(words, num_words, 2);
+    const char *last_entry_child_txt = get_word(words, num_words, 3);
+    const char *start_streaming_txt = get_word(words, num_words, 4);
+    const char *first_entry_requested_txt = get_word(words, num_words, 5);
+    const char *last_entry_requested_txt = get_word(words, num_words, 6);
+    const char *child_world_time_txt = get_word(words, num_words, 7); // optional
 
-    bool start_streaming = (strcmp(get_word(words, num_words, 4), "true") == 0);
-    time_t first_entry_requested = (time_t)str2ull(get_word(words, num_words, 5));
-    time_t last_entry_requested = (time_t)str2ull(get_word(words, num_words, 6));
+    time_t update_every_child = (time_t)str2ul(update_every_child_txt);
+    time_t first_entry_child = (time_t)str2ul(first_entry_child_txt);
+    time_t last_entry_child = (time_t)str2ul(last_entry_child_txt);
+
+    bool start_streaming = (strcmp(start_streaming_txt, "true") == 0);
+    time_t first_entry_requested = (time_t)str2ul(first_entry_requested_txt);
+    time_t last_entry_requested = (time_t)str2ul(last_entry_requested_txt);
+
+    // the optional child world time
+    time_t child_world_time = (child_world_time_txt && *child_world_time_txt) ? (time_t)str2ul(child_world_time_txt) : now_realtime_sec();
 
     PARSER_USER_OBJECT *user_object = user;
 
@@ -1201,13 +1219,15 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_END, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
-#ifdef NETDATATA_LOG_REPLICATION_REQUESTS
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
     internal_error(true,
-                   "PLUGINSD: 'host:%s/chart:%s': received " PLUGINSD_KEYWORD_REPLAY_END " child first_t = %llu, last_t = %llu, start_streaming = %s, requested first_t = %llu, last_t = %llu",
+                   "PLUGINSD REPLAY: 'host:%s/chart:%s': got a " PLUGINSD_KEYWORD_REPLAY_END " child db from %llu to %llu, start_streaming %s, had requested from %llu to %llu, wall clock %llu",
                    rrdhost_hostname(host), rrdset_id(st),
                    (unsigned long long)first_entry_child, (unsigned long long)last_entry_child,
                    start_streaming?"true":"false",
-                   (unsigned long long)first_entry_requested, (unsigned long long)last_entry_requested);
+                   (unsigned long long)first_entry_requested, (unsigned long long)last_entry_requested,
+                   (unsigned long long)child_world_time
+                   );
 #endif
 
     ((PARSER_USER_OBJECT *) user)->st = NULL;
@@ -1236,6 +1256,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     st->replay.start_streaming = false;
     st->replay.after = 0;
     st->replay.before = 0;
+    if(start_streaming)
+        st->replay.log_next_data_collection = true;
 #endif
 
     if (start_streaming) {
@@ -1250,7 +1272,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         else
-            internal_error(true, "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
+            internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
                   rrdhost_hostname(host), rrdset_id(st));
 #endif
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);
@@ -1260,7 +1282,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     rrdcontext_updated_retention_rrdset(st);
 
-    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st, first_entry_child, last_entry_child,
+    bool ok = replicate_chart_request(send_to_plugin, user_object->parser, host, st,
+                                      first_entry_child, last_entry_child, child_world_time,
                                       first_entry_requested, last_entry_requested);
     return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
 }

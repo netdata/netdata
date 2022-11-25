@@ -56,7 +56,7 @@ void worker_register(const char *workname) {
     worker->tag = strdupz(netdata_thread_tag());
     worker->workname = strdupz(workname);
 
-    usec_t now = now_realtime_usec();
+    usec_t now = now_monotonic_usec();
     worker->statistics_last_checkpoint = now;
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
@@ -145,14 +145,14 @@ static inline void worker_is_idle_with_time(usec_t now) {
 void worker_is_idle(void) {
     if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
 
-    worker_is_idle_with_time(now_realtime_usec());
+    worker_is_idle_with_time(now_monotonic_usec());
 }
 
 void worker_is_busy(size_t job_id) {
     if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
-    usec_t now = now_realtime_usec();
+    usec_t now = now_monotonic_usec();
 
     if(worker->last_action == WORKER_BUSY)
         worker_is_idle_with_time(now);
@@ -215,7 +215,7 @@ void workers_foreach(const char *workname, void (*callback)(
 
     struct worker *p;
     DOUBLE_LINKED_LIST_FOREACH_FORWARD(base, p, prev, next) {
-        usec_t now = now_realtime_usec();
+        usec_t now = now_monotonic_usec();
 
         // find per job type statistics
         STRING *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
