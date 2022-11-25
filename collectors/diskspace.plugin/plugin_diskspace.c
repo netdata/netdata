@@ -556,6 +556,7 @@ void *diskspace_slow_worker(void *ptr)
 
         for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
             struct mount_point_metadata *m = dictionary_get(dict_mountpoints, bmi->mount_point);
+
             if (m)
                 mount_point_cleanup(bmi->mount_point, m, 1);
         }
