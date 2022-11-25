@@ -2,8 +2,6 @@
 
 #include "sqlite_metadata.h"
 
-extern DICTIONARY *rrdhost_root_index;
-
 // SQL statements
 
 #define SQL_STORE_CLAIM_ID  "insert into node_instance " \

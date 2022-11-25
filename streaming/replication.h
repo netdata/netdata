@@ -11,7 +11,7 @@ typedef int (*send_command)(const char *txt, void *data);
 
 bool replicate_chart_request(send_command callback, void *callback_data,
                              RRDHOST *rh, RRDSET *rs,
-                             time_t first_entry_child, time_t last_entry_child,
+                             time_t first_entry_child, time_t last_entry_child, time_t child_world_time,
                              time_t response_first_start_time, time_t response_last_end_time);
 
 void replication_init_sender(struct sender_state *sender);

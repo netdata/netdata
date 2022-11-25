@@ -673,6 +673,7 @@ struct rrdset {
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     struct {
+        bool log_next_data_collection;
         bool start_streaming;
         time_t after;
         time_t before;
@@ -1078,6 +1079,7 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_minus_one(host) (__atomic_sub_fetch(&((host)->rrdpush_sender_replicating_charts), 1, __ATOMIC_RELAXED))
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
+extern DICTIONARY *rrdhost_root_index;
 long rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
