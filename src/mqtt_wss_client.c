@@ -60,12 +60,18 @@ char *util_openssl_ret_err(int err)
             return "SSL_ERROR_WANT_ACCEPT";
         case SSL_ERROR_WANT_X509_LOOKUP:
             return "SSL_ERROR_WANT_X509_LOOKUP";
+#ifdef SSL_ERROR_WANT_ASYNC
         case SSL_ERROR_WANT_ASYNC:
             return "SSL_ERROR_WANT_ASYNC";
+#endif
+#ifdef SSL_ERROR_WANT_ASYNC_JOB
         case SSL_ERROR_WANT_ASYNC_JOB:
             return "SSL_ERROR_WANT_ASYNC_JOB";
+#endif
+#ifdef SSL_ERROR_WANT_CLIENT_HELLO_CB
         case SSL_ERROR_WANT_CLIENT_HELLO_CB:
             return "SSL_ERROR_WANT_CLIENT_HELLO_CB";
+#endif
         case SSL_ERROR_SYSCALL:
             return "SSL_ERROR_SYSCALL";
         case SSL_ERROR_SSL:
