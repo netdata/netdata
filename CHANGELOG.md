@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix dictionaries unittest [\#14042](https://github.com/netdata/netdata/pull/14042) ([ktsaou](https://github.com/ktsaou))
 - replication fixes \#5 [\#14038](https://github.com/netdata/netdata/pull/14038) ([ktsaou](https://github.com/ktsaou))
 - do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
 - Replication fixes \#3 [\#14035](https://github.com/netdata/netdata/pull/14035) ([ktsaou](https://github.com/ktsaou))
@@ -123,6 +124,7 @@
 - ARAL optimal alloc size [\#13804](https://github.com/netdata/netdata/pull/13804) ([ktsaou](https://github.com/ktsaou))
 - internal log error, when passing NULL dictionary [\#13803](https://github.com/netdata/netdata/pull/13803) ([ktsaou](https://github.com/ktsaou))
 - Properly propagate errors from installer/updater to kickstart script. [\#13802](https://github.com/netdata/netdata/pull/13802) ([Ferroin](https://github.com/Ferroin))
+- Add up to date info on improving performance [\#13801](https://github.com/netdata/netdata/pull/13801) ([cakrit](https://github.com/cakrit))
 - Return memory freed properly [\#13799](https://github.com/netdata/netdata/pull/13799) ([stelfrag](https://github.com/stelfrag))
 - Use string\_freez instead of freez in rrdhost\_init\_timezone [\#13798](https://github.com/netdata/netdata/pull/13798) ([MrZammler](https://github.com/MrZammler))
 - Fix runtime directory ownership when installed as non-root user. [\#13797](https://github.com/netdata/netdata/pull/13797) ([Ferroin](https://github.com/Ferroin))
@@ -346,7 +348,6 @@
 - Fix coverity issue 379240 \(Unchecked return value\) [\#13401](https://github.com/netdata/netdata/pull/13401) ([stelfrag](https://github.com/stelfrag))
 - Fix netdata-updater.sh sha256sum on BSDs [\#13391](https://github.com/netdata/netdata/pull/13391) ([tnyeanderson](https://github.com/tnyeanderson))
 - chore\(python.d\): clarify haproxy module readme  [\#13388](https://github.com/netdata/netdata/pull/13388) ([ilyam8](https://github.com/ilyam8))
-- Fix bitmap unit tests [\#13374](https://github.com/netdata/netdata/pull/13374) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
