@@ -926,9 +926,15 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
             error_limit(&erl, "DBENGINE: Ignoring page index latest time as it is in the future(now=%llu, page=%llu)", now_usec_t, page_index->latest_time_ut);
             page_index->latest_time_ut = now_usec_t;
         }
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
 
-        ++page_index->page_count;
-        ++pg_cache->page_descriptors;
+#ifdef NETDATA_INTERNAL_CHECKS
+        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
+        fatal_assert(metric->entries == metric_list_header->entries);
+#endif
+
+        page_index->page_count += metric_list_header->entries;
+        pg_cache->page_descriptors += metric_list_header->entries;
         metric++;
     }
 
