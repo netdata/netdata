@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- replication fixes \#6 [\#14046](https://github.com/netdata/netdata/pull/14046) ([ktsaou](https://github.com/ktsaou))
+- fix build on old openssl versions on centos [\#14045](https://github.com/netdata/netdata/pull/14045) ([underhood](https://github.com/underhood))
+- Don't let slow disk plugin thread delay shutdown [\#14044](https://github.com/netdata/netdata/pull/14044) ([MrZammler](https://github.com/MrZammler))
+- minor - wss to point to master instead of branch [\#14043](https://github.com/netdata/netdata/pull/14043) ([underhood](https://github.com/underhood))
 - fix dictionaries unittest [\#14042](https://github.com/netdata/netdata/pull/14042) ([ktsaou](https://github.com/ktsaou))
+- minor - Adds better information in case of SSL error [\#14041](https://github.com/netdata/netdata/pull/14041) ([underhood](https://github.com/underhood))
 - replication fixes \#5 [\#14038](https://github.com/netdata/netdata/pull/14038) ([ktsaou](https://github.com/ktsaou))
 - do not merge duplicate replication requests  [\#14037](https://github.com/netdata/netdata/pull/14037) ([ktsaou](https://github.com/ktsaou))
 - Replication fixes \#3 [\#14035](https://github.com/netdata/netdata/pull/14035) ([ktsaou](https://github.com/ktsaou))
@@ -19,6 +24,7 @@
 - Change relative links to absolute for learn components [\#14015](https://github.com/netdata/netdata/pull/14015) ([tkatsoulas](https://github.com/tkatsoulas))
 - allow statsd tags to modify chart metadata on the fly [\#14014](https://github.com/netdata/netdata/pull/14014) ([ktsaou](https://github.com/ktsaou))
 - minor - silence misleading error [\#14013](https://github.com/netdata/netdata/pull/14013) ([underhood](https://github.com/underhood))
+- Improve eBPF exit [\#14012](https://github.com/netdata/netdata/pull/14012) ([thiagoftsm](https://github.com/thiagoftsm))
 - Change static image urls to app.netdata.cloud in alarm-notify.sh [\#14007](https://github.com/netdata/netdata/pull/14007) ([MrZammler](https://github.com/MrZammler))
 - Fix connection resets on big parents [\#14004](https://github.com/netdata/netdata/pull/14004) ([underhood](https://github.com/underhood))
 - minor typo in the uninstall command [\#14002](https://github.com/netdata/netdata/pull/14002) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -347,7 +353,6 @@
 - Store host system information in the database [\#13402](https://github.com/netdata/netdata/pull/13402) ([stelfrag](https://github.com/stelfrag))
 - Fix coverity issue 379240 \(Unchecked return value\) [\#13401](https://github.com/netdata/netdata/pull/13401) ([stelfrag](https://github.com/stelfrag))
 - Fix netdata-updater.sh sha256sum on BSDs [\#13391](https://github.com/netdata/netdata/pull/13391) ([tnyeanderson](https://github.com/tnyeanderson))
-- chore\(python.d\): clarify haproxy module readme  [\#13388](https://github.com/netdata/netdata/pull/13388) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
