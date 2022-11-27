@@ -239,7 +239,7 @@ static int kernel_is_rejected()
     }
 
     fclose(kernel_reject_list);
-    freez(reject_string);
+    free(reject_string);
 
     return 0;
 }
