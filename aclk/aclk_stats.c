@@ -259,6 +259,9 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     static uint64_t sent = 0;
     static uint64_t recvd = 0;
 
+    static RRDSET *st_txbuf_perc = NULL;
+    static RRDDIM *rd_txbuf_perc = NULL;
+
     static RRDSET *st_txbuf = NULL;
     static RRDDIM *rd_tx_buffer_usable = NULL;
     static RRDDIM *rd_tx_buffer_reclaimable = NULL;
@@ -285,10 +288,18 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
         rd_recvd = rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
+    if (unlikely(!st_txbuf_perc)) {
+        st_txbuf_perc = rrdset_create_localhost(
+            "netdata", "aclk_mqtt_tx_perc", NULL, "aclk", NULL, "Activelly used percentage of MQTT Tx Buffer,", "%",
+            "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+        
+        rd_txbuf_perc = rrddim_add(st_txbuf_perc, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+    }
+
     if (unlikely(!st_txbuf)) {
         st_txbuf = rrdset_create_localhost(
             "netdata", "aclk_mqtt_tx_queue", NULL, "aclk", NULL, "State of transmit MQTT queue.", "B",
-            "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
+            "netdata", "stats", 200013, localhost->rrd_update_every, RRDSET_TYPE_LINE);
 
         rd_tx_buffer_usable = rrddim_add(st_txbuf, "usable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_tx_buffer_reclaimable = rrddim_add(st_txbuf, "reclaimable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -300,7 +311,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     if (unlikely(!st_timing)) {
         st_timing = rrdset_create_localhost(
             "netdata", "aclk_mqtt_wss_time", NULL, "aclk", NULL, "Time spent handling MQTT, WSS, SSL and network communication.", "us",
-            "netdata", "stats", 200013, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
+            "netdata", "stats", 200014, localhost->rrd_update_every, RRDSET_TYPE_STACKED);
 
         rd_keepalive = rrddim_add(st_timing, "keep-alive", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_read_socket = rrddim_add(st_timing, "socket_read_ssl", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -311,6 +322,10 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
 
     rrddim_set_by_pointer(st, rd_sent, sent);
     rrddim_set_by_pointer(st, rd_recvd, recvd);
+
+    float usage = ((float)stats->mqtt.tx_buffer_free + stats->mqtt.tx_buffer_reclaimable) / stats->mqtt.tx_buffer_size;
+    usage = (1 - usage) * 10000;
+    rrddim_set_by_pointer(st_txbuf_perc, rd_txbuf_perc, usage);
 
     rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_usable, stats->mqtt.tx_buffer_reclaimable + stats->mqtt.tx_buffer_free);
     rrddim_set_by_pointer(st_txbuf, rd_tx_buffer_reclaimable, stats->mqtt.tx_buffer_reclaimable);
@@ -325,6 +340,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
     rrddim_set_by_pointer(st_timing, rd_process_mqtt, stats->time_process_mqtt);
 
     rrdset_done(st);
+    rrdset_done(st_txbuf_perc);
     rrdset_done(st_txbuf);
     rrdset_done(st_timing);
 }
