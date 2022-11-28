@@ -283,6 +283,8 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
             print_page_cache_descr(descr, "Page has empty metrics only, deleting", true);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL, true);
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "%s: Deleting empty pages", __func__);
         } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
     } else {
