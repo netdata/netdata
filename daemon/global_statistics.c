@@ -2474,6 +2474,8 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 static Pvoid_t workers_by_pid_JudyL_array = NULL;
 
 static void workers_threads_cleanup(struct worker_utilization *wu) {
+    netdata_thread_disable_cancelability();
+
     struct worker_thread *t = wu->threads;
     while(t) {
         struct worker_thread *next = t->next;
@@ -2483,9 +2485,10 @@ static void workers_threads_cleanup(struct worker_utilization *wu) {
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wu->threads, t, prev, next);
             freez(t);
         }
-
         t = next;
     }
+
+    netdata_thread_enable_cancelability();
  }
 
 static struct worker_thread *worker_thread_find(struct worker_utilization *wu __maybe_unused, pid_t pid) {
