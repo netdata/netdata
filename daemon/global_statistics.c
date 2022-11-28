@@ -2713,9 +2713,6 @@ void *global_statistics_main(void *ptr)
         worker_is_idle();
         heartbeat_next(&hb, step);
 
-        worker_is_busy(WORKER_JOB_WORKERS);
-        worker_utilization_charts();
-
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
 
