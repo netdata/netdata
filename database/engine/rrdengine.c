@@ -349,19 +349,18 @@ static void do_fs_read_extent_cb(uv_fs_t *req)
     freez(xt_io_descr);
 }
 
-static void read_mmap_extent_cb(uv_work_t *req, int status __maybe_unused)
+static void read_mmap_extent_cb(uv_work_t *req_worker, int status __maybe_unused)
 {
-    struct rrdengine_worker_config *wc = req->loop->data;
+    struct rrdengine_worker_config *wc = req_worker->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
-    xt_io_descr = req->data;
+    xt_io_descr = req_worker->data;
 
     if (xt_io_descr->release_descr)
         worker_is_busy(RRDENG_READ_EXTENT_CB);
     else
         worker_is_busy(RRDENG_READ_PAGE_CB);
     if (likely(xt_io_descr->map_base)) {
-        xt_io_descr->req_worker.data = xt_io_descr;
         int ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_extent_processing_work, do_mmap_extent_processing_work_cb);
         if (!ret) {
             worker_is_idle();
@@ -378,7 +377,7 @@ static void read_mmap_extent_cb(uv_work_t *req, int status __maybe_unused)
     unsigned real_io_size = ALIGN_BYTES_CEILING( xt_io_descr->bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
     xt_io_descr->req.data = xt_io_descr;
-    ret = uv_fs_read(req->loop, &xt_io_descr->req, xt_io_descr->file, &xt_io_descr->iov, 1, (unsigned) xt_io_descr->pos, do_fs_read_extent_cb);
+    ret = uv_fs_read(req_worker->loop, &xt_io_descr->req, xt_io_descr->file, &xt_io_descr->iov, 1, (unsigned) xt_io_descr->pos, do_fs_read_extent_cb);
     fatal_assert(-1 != ret);
     ctx->stats.io_read_bytes += real_io_size;
     ctx->stats.io_read_extent_bytes += real_io_size;
