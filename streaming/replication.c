@@ -23,8 +23,8 @@
 #define WORKER_JOB_CUSTOM_METRIC_DONE                   12
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  13
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        14
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          15
-#define WORKER_JOB_CUSTOM_METRIC_WAITS                  16
+#define WORKER_JOB_CUSTOM_METRIC_WAITS                  15
+//#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          16
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -616,8 +616,8 @@ static struct replication_thread {
         size_t removed;                 // number of requests removed from the queue
         size_t skipped_not_connected;   // number of requests skipped, because the sender is not connected to a parent
         size_t skipped_no_room;         // number of requests skipped, because the sender has no room for responses
-        size_t skipped_no_room_since_last_reset;
-        size_t sender_resets;           // number of times a sender reset our last position in the queue
+//        size_t skipped_no_room_since_last_reset;
+//        size_t sender_resets;           // number of times a sender reset our last position in the queue
         time_t first_time_t;            // the minimum 'after' we encountered
 
         struct {
@@ -651,8 +651,8 @@ static struct replication_thread {
                 .removed = 0,
                 .skipped_not_connected = 0,
                 .skipped_no_room = 0,
-                .skipped_no_room_since_last_reset = 0,
-                .sender_resets = 0,
+//                .skipped_no_room_since_last_reset = 0,
+//                .sender_resets = 0,
 
                 .first_time_t = 0,
 
@@ -748,13 +748,13 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
 
     struct replication_sort_entry *rse = replication_sort_entry_create_unsafe(rq);
 
-    if(rq->after < (time_t)replication_globals.protected.queue.after &&
-        rq->sender->buffer_used_percentage <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED &&
-       !replication_globals.protected.skipped_no_room_since_last_reset) {
-
-        // make it find this request first
-        replication_set_next_point_in_time(rq->after, rq->unique_id);
-    }
+//    if(rq->after < (time_t)replication_globals.protected.queue.after &&
+//        rq->sender->buffer_used_percentage <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED &&
+//       !replication_globals.protected.skipped_no_room_since_last_reset) {
+//
+//        // make it find this request first
+//        replication_set_next_point_in_time(rq->after, rq->unique_id);
+//    }
 
     replication_globals.protected.added++;
     replication_globals.protected.pending++;
@@ -893,7 +893,7 @@ static struct replication_request replication_request_get_first_available() {
             }
             else {
                 replication_globals.protected.skipped_no_room++;
-                replication_globals.protected.skipped_no_room_since_last_reset++;
+//                replication_globals.protected.skipped_no_room_since_last_reset++;
             }
         }
 
@@ -1086,10 +1086,10 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     if(s->replication_reached_max &&
         percentage <= MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED) {
         s->replication_reached_max = false;
-        replication_recursive_lock();
-        replication_set_next_point_in_time(0, 0);
-        replication_globals.protected.sender_resets++;
-        replication_recursive_unlock();
+//        replication_recursive_lock();
+//        replication_set_next_point_in_time(0, 0);
+//        replication_globals.protected.sender_resets++;
+//        replication_recursive_unlock();
     }
 
     s->buffer_used_percentage = percentage;
@@ -1183,7 +1183,7 @@ static void replication_initialize_workers(bool master) {
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+//        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     }
 }
@@ -1302,7 +1302,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             if(replication_reset_next_point_in_time_countdown-- == 0) {
                 // once per second, make it scan all the pending requests next time
                 replication_set_next_point_in_time(0, 0);
-                replication_globals.protected.skipped_no_room_since_last_reset = 0;
+//                replication_globals.protected.skipped_no_room_since_last_reset = 0;
                 replication_reset_next_point_in_time_countdown = SECONDS_TO_RESET_POINT_IN_TIME;
             }
 
@@ -1336,7 +1336,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)__atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED));
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)replication_globals.protected.skipped_not_connected);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.protected.skipped_no_room);
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.protected.sender_resets);
+//            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.protected.sender_resets);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, (NETDATA_DOUBLE)replication_globals.main_thread.waits);
 
             replication_recursive_unlock();
