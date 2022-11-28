@@ -50,7 +50,7 @@ to work on these platforms with minimal user effort.
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
-| Alpine Linux | 3.16 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
+| Alpine Linux | 3.17 | No | The latest release of Alpine Linux is guaranteed to remain at **Core** tier due to usage for our Docker images |
 | Alma Linux | 9.x | x86\_64, AArch64 | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives |
 | Alma Linux | 8.x | x86\_64, AArch64 | Also includes support for Rocky Linux and other ABI compatible RHEL derivatives |
 | CentOS | 7.x | x86\_64 | |
@@ -83,6 +83,7 @@ with minimal user effort.
 
 | Platform | Version | Official Native Packages | Notes |
 | -------- | ------- | ------------------------ | ----- |
+| Alpine Linux | 3.16 | No | |
 | Alpine Linux | 3.15 | No | |
 | Alpine Linux | 3.14 | No | |
 | Arch Linux | Latest | No | We officially recommend the community packages available for Arch Linux |

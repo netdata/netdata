@@ -27,6 +27,8 @@ include:
     test:
       ebpf-core: true
   - <<: *alpine
+    version: "3.17"
+  - <<: *alpine
     version: "3.16"
   - <<: *alpine
     version: "3.15"
