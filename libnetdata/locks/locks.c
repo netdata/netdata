@@ -287,6 +287,8 @@ void netdata_spinlock_init(SPINLOCK *spinlock) {
 }
 
 void netdata_spinlock_lock(SPINLOCK *spinlock) {
+    netdata_thread_disable_cancelability();
+
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
     bool expected = false, desired = true;
 
@@ -306,6 +308,8 @@ void netdata_spinlock_lock(SPINLOCK *spinlock) {
 
 void netdata_spinlock_unlock(SPINLOCK *spinlock) {
     __atomic_store_n(&spinlock->locked, false, __ATOMIC_RELEASE);
+
+    netdata_thread_enable_cancelability();
 }
 
 #ifdef NETDATA_TRACE_RWLOCKS

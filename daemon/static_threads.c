@@ -134,7 +134,7 @@ const struct netdata_static_thread static_threads_common[] = {
 #endif
 
     {
-        .name = "rrdcontext",
+        .name = "RRDCONTEXT",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
@@ -144,7 +144,7 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 
     {
-            .name = "replication",
+            .name = "REPLICATION",
             .config_section = NULL,
             .config_name = NULL,
             .enabled = 1,
