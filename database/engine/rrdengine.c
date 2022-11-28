@@ -209,16 +209,22 @@ after_crc_check:
         uint8_t is_prefetched_page;
         descr = NULL;
         for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
-            struct rrdeng_page_descr *descrj;
+            struct rrdeng_page_descr descrj;
 
-            descrj = xt_io_descr->descr_array[j];
+            descrj = xt_io_descr->descr_read_array[j];
             /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
-                header->descr[i].page_length == descrj->page_length &&
-                header->descr[i].start_time_ut == descrj->start_time_ut &&
-                header->descr[i].end_time_ut == descrj->end_time_ut) {
-                descr = descrj;
-                bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, j, 0);
+            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj.id) &&
+                header->descr[i].page_length == descrj.page_length &&
+                header->descr[i].start_time_ut == descrj.start_time_ut &&
+                header->descr[i].end_time_ut == descrj.end_time_ut) {
+                //descr = descrj;
+                descr = get_descriptor(page_index, (time_t) (descrj.start_time_ut / USEC_PER_SEC));
+                if (likely(descr))
+                    bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, j, 0);
+                else {
+                    error_limit_static_thread_var(erl, 1, 0);
+                    error_limit(&erl, "%s: Required descriptor is not in the page index anymore", __FUNCTION__);
+                }
                 break;
             }
         }
@@ -272,24 +278,23 @@ after_crc_check:
         completion_mark_complete(xt_io_descr->completion);
 }
 
-static void do_mmap_extent_processing_work_cb(uv_work_t *req, int status __maybe_unused)
+static void do_mmap_extent_processing_work_cb(uv_work_t *req_worker, int status __maybe_unused)
 {
-    struct extent_io_descriptor *xt_io_descr;
-    xt_io_descr = req->data;
+    struct extent_io_descriptor *xt_io_descr = req_worker->data;
 
     munmap(xt_io_descr->map_base, xt_io_descr->map_length);
     freez(xt_io_descr);
 }
 
-static void do_mmap_extent_processing_work(uv_work_t *req)
+static void do_mmap_extent_processing_work(uv_work_t *req_worker)
 {
     static __thread int worker = -1;
     if (unlikely(worker == -1))
         register_libuv_worker_jobs();
 
     worker_is_busy(RRDENG_EXTENT_PROCESSING);
-    struct extent_io_descriptor *xt_io_descr = (struct extent_io_descriptor * )req->data;
-    struct rrdengine_worker_config *wc = req->loop->data;
+    struct extent_io_descriptor *xt_io_descr = (struct extent_io_descriptor * )req_worker->data;
+    struct rrdengine_worker_config *wc = req_worker->loop->data;
 
     do_extent_processing(wc, xt_io_descr, false);
 
@@ -449,6 +454,7 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
         // TODO: Add extent information here for this descriptor (datafile, POS , SIZE)
         xt_io_descr->descr_array[i] = descr[i];
+        xt_io_descr->descr_read_array[i] = *(descr[i]);
         bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, i, 1);
     }
     xt_io_descr->descr_count = count;
