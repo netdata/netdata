@@ -593,7 +593,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle->page_index = page_index;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
     pages_nr = pg_cache_preload(ctx, page_index, start_time_s * USEC_PER_SEC, end_time_s * USEC_PER_SEC);
-    if (unlikely(NULL == handle->page_index || 0 == pages_nr))
+    if (unlikely(0 == pages_nr))
         // there are no metrics to load
         handle->wanted_start_time_s = INVALID_TIME;
 }
