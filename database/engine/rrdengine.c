@@ -361,6 +361,7 @@ static void read_mmap_extent_cb(uv_work_t *req, int status __maybe_unused)
     else
         worker_is_busy(RRDENG_READ_PAGE_CB);
     if (likely(xt_io_descr->map_base)) {
+        xt_io_descr->req_worker.data = xt_io_descr;
         int ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_extent_processing_work, do_mmap_extent_processing_work_cb);
         if (!ret) {
             worker_is_idle();
