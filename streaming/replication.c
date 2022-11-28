@@ -1345,10 +1345,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
             replication_recursive_lock();
 
-            // make it scan all the pending requests next time
-            replication_set_next_point_in_time(0, 0);
-            replication_reset_next_point_in_time_countdown = SECONDS_TO_RESET_POINT_IN_TIME;
-
             // the timeout also defines now frequently we will traverse all the pending requests
             // when the outbound buffers of all senders is full
             usec_t timeout;
@@ -1373,6 +1369,11 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
             worker_is_idle();
             sleep_usec(timeout);
+
+            // make it scan all the pending requests next time
+            replication_set_next_point_in_time(0, 0);
+            replication_reset_next_point_in_time_countdown = SECONDS_TO_RESET_POINT_IN_TIME;
+
             continue;
         }
     }
