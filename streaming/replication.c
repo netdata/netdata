@@ -859,7 +859,7 @@ static struct replication_request replication_request_get_first_available() {
             struct replication_request *rq = rse->rq;
             struct sender_state *s = rq->sender;
 
-            if(likely(s->buffer_used_percentage <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)) {
+            if(likely(__atomic_load_n(&s->buffer_used_percentage, __ATOMIC_RELAXED) <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)) {
                 // there is room for this request in the sender buffer
 
                 bool sender_is_connected =
@@ -1048,7 +1048,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
     };
 
-    if(start_streaming && sender->buffer_used_percentage <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
+    if(start_streaming && __atomic_load_n(&sender->buffer_used_percentage, __ATOMIC_RELAXED) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
         replication_execute_request(&rq, false);
 
     else
@@ -1092,7 +1092,7 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 //        replication_recursive_unlock();
     }
 
-    s->buffer_used_percentage = percentage;
+    __atomic_store_n(&s->buffer_used_percentage, percentage, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
