@@ -12,18 +12,17 @@
 #define WORKER_JOB_DELETE_ENTRY                         3
 #define WORKER_JOB_FIND_CHART                           4
 #define WORKER_JOB_STATISTICS                           5
-#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING            6
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       7
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             8
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  9
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   10
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  11
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          13
-#define WORKER_JOB_CUSTOM_METRIC_WAITS                  14
-#define WORKER_JOB_CHECK_CONSISTENCY                    15
-#define WORKER_JOB_BUFFER_COMMIT                        16
-#define WORKER_JOB_CLEANUP                              17
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       6
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             7
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  8
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   9
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  10
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        11
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          12
+#define WORKER_JOB_CUSTOM_METRIC_WAITS                  13
+#define WORKER_JOB_CHECK_CONSISTENCY                    14
+#define WORKER_JOB_BUFFER_COMMIT                        15
+#define WORKER_JOB_CLEANUP                              16
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 10
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -923,7 +922,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     string_freez(rq->chart_id);
 }
 
-bool execute_request(struct replication_request *rq, bool workers) {
+static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
 
     if(likely(workers))
@@ -955,9 +954,6 @@ bool execute_request(struct replication_request *rq, bool workers) {
     netdata_thread_enable_cancelability();
 
     if(start_streaming && rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender)) {
-        if(likely(workers))
-            worker_is_busy(WORKER_JOB_ACTIVATE_ENABLE_STREAMING);
-
         // enable normal streaming if we have to
         // but only if the sender buffer has not been flushed since we started
 
@@ -1013,7 +1009,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
 
 
     if(start_streaming && sender->buffer_used_percentage <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED) {
-        if(execute_request(&rq, false))
+        if(replication_execute_request(&rq, false))
             executed_from_sender_increment();
     }
     else {
@@ -1149,7 +1145,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     worker_register_job_name(WORKER_JOB_QUERYING, "querying");
     worker_register_job_name(WORKER_JOB_DELETE_ENTRY, "dict delete");
     worker_register_job_name(WORKER_JOB_FIND_CHART, "find chart");
-    worker_register_job_name(WORKER_JOB_ACTIVATE_ENABLE_STREAMING, "enable streaming");
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
     worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
     worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
@@ -1263,8 +1258,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
 
         latest_first_time_t = rq.after;
 
-        replication_globals.executed += (execute_request(&rq, true) ? 1 : 0) +
-                executed_from_sender_get_and_reset();
+        replication_globals.executed += (replication_execute_request(&rq, true) ? 1 : 0) +
+                                        executed_from_sender_get_and_reset();
     }
 
     netdata_thread_cleanup_pop(1);
