@@ -603,7 +603,7 @@ struct replication_sort_entry {
 
 // the global variables for the replication thread
 static struct replication_thread {
-    SPINLOCK spinlock;
+    netdata_mutex_t mutex;
 
     struct {
         size_t pending;                 // number of requests pending in the queue
@@ -640,7 +640,7 @@ static struct replication_thread {
     } main_thread;                      // access is allowed only by the main thread
 
 } replication_globals = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .mutex = NETDATA_MUTEX_INITIALIZER,
         .protected = {
                 .pending = 0,
                 .unique_id = 0,
@@ -680,11 +680,11 @@ static inline bool replication_recursive_lock_mode(char mode) {
 
     if(mode == 'L') { // (L)ock
         if(++recursions == 1)
-            netdata_spinlock_lock(&replication_globals.spinlock);
+            netdata_mutex_lock(&replication_globals.mutex);
     }
     else if(mode == 'U') { // (U)nlock
         if(--recursions == 0)
-            netdata_spinlock_unlock(&replication_globals.spinlock);
+            netdata_mutex_unlock(&replication_globals.mutex);
     }
     else if(mode == 'C') { // (C)heck
         if(recursions > 0)
