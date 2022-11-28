@@ -3,10 +3,33 @@
 #include "replication.h"
 #include "Judy.h"
 
+#define STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50
 #define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 20
 #define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10
 
+#define WORKER_JOB_FIND_NEXT                            1
+#define WORKER_JOB_QUERYING                             2
+#define WORKER_JOB_DELETE_ENTRY                         3
+#define WORKER_JOB_FIND_CHART                           4
+#define WORKER_JOB_STATISTICS                           5
+#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING            6
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       7
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             8
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  9
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   10
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  11
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          13
+#define WORKER_JOB_CUSTOM_METRIC_WAITS                  14
+#define WORKER_JOB_CHECK_CONSISTENCY                    15
+#define WORKER_JOB_BUFFER_COMMIT                        16
+#define WORKER_JOB_CLEANUP                              17
+
+#define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 10
+#define SECONDS_TO_RESET_POINT_IN_TIME 10
+
 static struct replication_query_statistics replication_queries = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .queries_started = 0,
         .queries_finished = 0,
         .points_read = 0,
@@ -14,7 +37,10 @@ static struct replication_query_statistics replication_queries = {
 };
 
 struct replication_query_statistics replication_get_query_statistics(void) {
-    return replication_queries;
+    netdata_spinlock_lock(&replication_queries.spinlock);
+    struct replication_query_statistics ret = replication_queries;
+    netdata_spinlock_unlock(&replication_queries.spinlock);
+    return ret;
 }
 
 // ----------------------------------------------------------------------------
@@ -177,6 +203,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
 
     // release all the dictionary items acquired
     // finalize the queries
+    size_t queries = 0;
     for(size_t i = 0; i < dimensions ;i++) {
         struct replication_dimension *d = &data[i];
         if(unlikely(!d->enabled)) continue;
@@ -186,12 +213,15 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         dictionary_acquired_item_release(d->dict, d->rda);
 
         // update global statistics
-        replication_queries.queries_started++;
-        replication_queries.queries_finished++;
+        queries++;
     }
 
+    netdata_spinlock_lock(&replication_queries.spinlock);
+    replication_queries.queries_started += queries;
+    replication_queries.queries_finished += queries;
     replication_queries.points_read += points_read;
     replication_queries.points_generated += points_generated;
+    netdata_spinlock_unlock(&replication_queries.spinlock);
 
     return before;
 }
@@ -323,7 +353,9 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
                    , (unsigned long long)world_clock_time
                    );
 
+    worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
+    worker_is_busy(WORKER_JOB_CLEANUP);
 
     return enable_streaming;
 }
@@ -576,6 +608,7 @@ static struct replication_thread {
     size_t added;
     size_t executed;
     size_t removed;
+    size_t executed_from_sender;
     size_t last_executed;
     time_t first_time_t;
     Word_t next_unique_id;
@@ -598,6 +631,7 @@ static struct replication_thread {
         .added = 0,
         .executed = 0,
         .last_executed = 0,
+        .executed_from_sender = 0,
         .first_time_t = 0,
         .next_unique_id = 1,
         .skipped_no_room = 0,
@@ -889,6 +923,80 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     string_freez(rq->chart_id);
 }
 
+bool execute_request(struct replication_request *rq, bool workers) {
+    bool ret = false;
+
+    if(likely(workers))
+        worker_is_busy(WORKER_JOB_FIND_CHART);
+
+    RRDSET *st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+    if(!st) {
+        internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' not found",
+                       rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
+
+        goto cleanup;
+    }
+
+    if(likely(workers))
+        worker_is_busy(WORKER_JOB_QUERYING);
+
+    if(rq->after < rq->sender->replication_first_time || !rq->sender->replication_first_time)
+        rq->sender->replication_first_time = rq->after;
+
+    if(rq->before < rq->sender->replication_current_time || !rq->sender->replication_current_time)
+        rq->sender->replication_current_time = rq->before;
+
+    netdata_thread_disable_cancelability();
+
+    // send the replication data
+    bool start_streaming = replicate_chart_response(
+            st->rrdhost, st, rq->start_streaming, rq->after, rq->before);
+
+    netdata_thread_enable_cancelability();
+
+    if(start_streaming && rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender)) {
+        if(likely(workers))
+            worker_is_busy(WORKER_JOB_ACTIVATE_ENABLE_STREAMING);
+
+        // enable normal streaming if we have to
+        // but only if the sender buffer has not been flushed since we started
+
+        if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+            internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
+        }
+        else
+            internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
+                           rrdhost_hostname(st->rrdhost), string2str(rq->chart_id));
+    }
+
+    ret = true;
+
+cleanup:
+    string_freez(rq->chart_id);
+    return ret;
+}
+
+void executed_from_sender_increment() {
+    __atomic_add_fetch(&replication_globals.executed_from_sender, 1, __ATOMIC_RELAXED);
+}
+
+size_t executed_from_sender_get_and_reset() {
+    size_t expected;
+
+    do {
+        expected = __atomic_load_n(&replication_globals.executed_from_sender, __ATOMIC_RELAXED);
+    } while(expected && !__atomic_compare_exchange_n(&replication_globals.executed_from_sender, &expected, 0,
+                                         false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+
+    return expected;
+}
 
 // ----------------------------------------------------------------------------
 // public API
@@ -903,7 +1011,14 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
     };
 
-    dictionary_set(sender->replication_requests, chart_id, &rq, sizeof(struct replication_request));
+
+    if(start_streaming && sender->buffer_used_percentage <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED) {
+        if(execute_request(&rq, false))
+            executed_from_sender_increment();
+    }
+    else {
+        dictionary_set(sender->replication_requests, chart_id, &rq, sizeof(struct replication_request));
+    }
 }
 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
@@ -958,25 +1073,6 @@ static void replication_main_cleanup(void *ptr) {
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
-
-#define WORKER_JOB_FIND_NEXT                            1
-#define WORKER_JOB_QUERYING                             2
-#define WORKER_JOB_DELETE_ENTRY                         3
-#define WORKER_JOB_FIND_CHART                           4
-#define WORKER_JOB_STATISTICS                           5
-#define WORKER_JOB_ACTIVATE_ENABLE_STREAMING            6
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       7
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             8
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  9
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   10
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  11
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          13
-#define WORKER_JOB_CUSTOM_METRIC_WAITS                  14
-#define WORKER_JOB_CHECK_CONSISTENCY                    15
-
-#define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 10
-#define SECONDS_TO_RESET_POINT_IN_TIME 10
 
 static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     internal_error(
@@ -1056,6 +1152,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     worker_register_job_name(WORKER_JOB_ACTIVATE_ENABLE_STREAMING, "enable streaming");
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
     worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
+    worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
+    worker_register_job_name(WORKER_JOB_CLEANUP, "commit");
 
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, "pending requests", "requests", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, "completion", "%", WORKER_METRIC_ABSOLUTE);
@@ -1163,57 +1261,10 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             error("REPLAY ERROR: 'host:%s/chart:%s' failed to be deleted from sender pending charts index",
                   rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
 
-        worker_is_busy(WORKER_JOB_FIND_CHART);
-        RRDSET *st = rrdset_find(rq.sender->host, string2str(rq.chart_id));
-        if(!st) {
-            internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' not found",
-                           rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
-
-            continue;
-        }
-
-        worker_is_busy(WORKER_JOB_QUERYING);
-
         latest_first_time_t = rq.after;
 
-        if(rq.after < rq.sender->replication_first_time || !rq.sender->replication_first_time)
-            rq.sender->replication_first_time = rq.after;
-
-        if(rq.before < rq.sender->replication_current_time || !rq.sender->replication_current_time)
-            rq.sender->replication_current_time = rq.before;
-
-        netdata_thread_disable_cancelability();
-
-        // send the replication data
-        bool start_streaming = replicate_chart_response(
-                st->rrdhost, st, rq.start_streaming, rq.after, rq.before);
-
-        netdata_thread_enable_cancelability();
-
-        replication_globals.executed++;
-
-        if(start_streaming && rq.sender_last_flush_ut == rrdpush_sender_get_flush_time(rq.sender)) {
-            worker_is_busy(WORKER_JOB_ACTIVATE_ENABLE_STREAMING);
-
-            // enable normal streaming if we have to
-            // but only if the sender buffer has not been flushed since we started
-
-            if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-                rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-                rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-                rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
-
-#ifdef NETDATA_LOG_REPLICATION_REQUESTS
-                internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
-                               rrdhost_hostname(st->rrdhost), rrdset_id(st));
-#endif
-            }
-            else
-                internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
-                               rrdhost_hostname(st->rrdhost), string2str(rq.chart_id));
-        }
-
-        string_freez(rq.chart_id);
+        replication_globals.executed += (execute_request(&rq, true) ? 1 : 0) +
+                executed_from_sender_get_and_reset();
     }
 
     netdata_thread_cleanup_pop(1);
