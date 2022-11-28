@@ -122,11 +122,13 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     *last_timestamp = before;
 
+    size_t points_read = 0;
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
     for (rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, after, before); !rd->tiers[0]->query_ops->is_finished(&handle);) {
         STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
+        points_read++;
 
         if (unlikely(storage_point_is_empty(sp))) {
             // not collected
@@ -137,6 +139,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         counter += sp.count;
     }
     rd->tiers[0]->query_ops->finalize(&handle);
+    global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
         debug(

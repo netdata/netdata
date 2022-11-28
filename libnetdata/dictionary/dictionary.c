@@ -199,7 +199,10 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 #define item_is_not_referenced_and_can_be_removed(dict, item) (item_is_not_referenced_and_can_be_removed_advanced(dict, item) == RC_ITEM_OK)
 static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY *dict, DICTIONARY_ITEM *item);
 
-static inline void pointer_index_init(DICTIONARY *dict) {
+// ----------------------------------------------------------------------------
+// validate each pointer is indexed once - internal checks only
+
+static inline void pointer_index_init(DICTIONARY *dict __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_init(&dict->global_pointer_registry_mutex);
 #else
@@ -207,7 +210,7 @@ static inline void pointer_index_init(DICTIONARY *dict) {
 #endif
 }
 
-static inline void pointer_destroy_index(DICTIONARY *dict) {
+static inline void pointer_destroy_index(DICTIONARY *dict __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     JudyHSFreeArray(&dict->global_pointer_registry, PJE0);
@@ -216,7 +219,7 @@ static inline void pointer_destroy_index(DICTIONARY *dict) {
     ;
 #endif
 }
-static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSIns(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
@@ -229,7 +232,7 @@ static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 #endif
 }
 
-static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSGet(dict->global_pointer_registry, &item, sizeof(void *));
@@ -241,7 +244,7 @@ static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITE
 #endif
 }
 
-static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
+static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     int ret = JudyHSDel(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
@@ -413,7 +416,7 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.deletes, 1, __ATOMIC_RELAXED);
     __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
 
-    size_t entries;
+    size_t entries; (void)entries;
     if(unlikely(is_dictionary_single_threaded(dict))) {
         dict->version++;
         entries = dict->entries++;

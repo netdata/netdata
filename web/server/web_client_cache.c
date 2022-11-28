@@ -209,7 +209,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
     web_clients_cache.used_count++;
 
     // initialize it
-    w->id = web_client_connected();
+    w->id = global_statistics_web_client_connected();
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     netdata_thread_enable_cancelability();
@@ -230,7 +230,7 @@ void web_client_release(struct web_client *w) {
 
     web_server_log_connection(w, "DISCONNECTED");
     web_client_request_done(w);
-    web_client_disconnected();
+    global_statistics_web_client_disconnected();
 
     netdata_thread_disable_cancelability();
 

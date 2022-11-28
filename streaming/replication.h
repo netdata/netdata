@@ -5,6 +5,15 @@
 
 #include "daemon/common.h"
 
+struct replication_query_statistics {
+    size_t queries_started;
+    size_t queries_finished;
+    size_t points_read;
+    size_t points_generated;
+};
+
+struct replication_query_statistics replication_get_query_statistics(void);
+
 bool replicate_chart_response(RRDHOST *rh, RRDSET *rs, bool start_streaming, time_t after, time_t before);
 
 typedef int (*send_command)(const char *txt, void *data);

@@ -1039,7 +1039,8 @@ void *health_main(void *ptr) {
                                               0, rc->options,
                                               &rc->db_after,&rc->db_before,
                                               NULL, NULL, NULL,
-                                              &value_is_null, NULL, 0, 0);
+                                              &value_is_null, NULL, 0, 0,
+                                              QUERY_SOURCE_HEALTH);
 
                 if (unlikely(ret != 200)) {
                     // database lookup failed

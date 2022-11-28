@@ -22,6 +22,7 @@ public:
     void init(time_t AfterT, time_t BeforeT) {
         Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT);
         Initialized = true;
+        points_read = 0;
     }
 
     bool isFinished() {
@@ -29,11 +30,15 @@ public:
     }
 
     ~Query() {
-        if (Initialized)
+        if (Initialized) {
             Ops->finalize(&Handle);
+            global_statistics_ml_query_completed(points_read);
+            points_read = 0;
+        }
     }
 
     std::pair<time_t, CalculatedNumber> nextMetric() {
+        points_read++;
         STORAGE_POINT sp = Ops->next_metric(&Handle);
         return { sp.start_time, sp.sum / sp.count };
     }
@@ -41,6 +46,7 @@ public:
 private:
     RRDDIM *RD;
     bool Initialized;
+    size_t points_read;
 
     struct storage_engine_query_ops *Ops;
     struct storage_engine_query_handle Handle;

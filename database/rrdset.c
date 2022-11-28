@@ -1046,12 +1046,14 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
+static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
+
 static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
     time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
     return now + loop - ((now + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_time))
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
 
@@ -1079,6 +1081,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
                 0, SN_FLAG_NONE);
         }
 
+        rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
     }
@@ -1141,6 +1144,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
     // store the metric on tier 0
     rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
@@ -1167,8 +1171,12 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
             rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
         }
 
-        store_metric_at_tier(rd, t, sp, point_end_time_ut);
+        store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
     }
+}
+
+void store_metric_collection_completed() {
+    global_statistics_rrdset_done_chart_collection_completed(rrdset_done_statistics_points_stored_per_tier);
 }
 
 // caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
@@ -1934,6 +1942,8 @@ after_second_database_work:
     rrdcontext_collected_rrdset(st);
 
     netdata_thread_enable_cancelability();
+
+    store_metric_collection_completed();
 }
 
 time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
