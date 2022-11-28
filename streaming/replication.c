@@ -11,18 +11,20 @@
 #define WORKER_JOB_QUERYING                             2
 #define WORKER_JOB_DELETE_ENTRY                         3
 #define WORKER_JOB_FIND_CHART                           4
-#define WORKER_JOB_STATISTICS                           5
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       6
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             7
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  8
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   9
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  10
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        11
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          12
-#define WORKER_JOB_CUSTOM_METRIC_WAITS                  13
-#define WORKER_JOB_CHECK_CONSISTENCY                    14
-#define WORKER_JOB_BUFFER_COMMIT                        15
-#define WORKER_JOB_CLEANUP                              16
+#define WORKER_JOB_CHECK_CONSISTENCY                    5
+#define WORKER_JOB_BUFFER_COMMIT                        6
+#define WORKER_JOB_CLEANUP                              7
+
+// master thread worker jobs
+#define WORKER_JOB_STATISTICS                           8
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       9
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             10
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  11
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   12
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  13
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        14
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          15
+#define WORKER_JOB_CUSTOM_METRIC_WAITS                  16
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -1163,25 +1165,27 @@ static void verify_all_hosts_charts_are_streaming_now(void) {
     replication_globals.main_thread.last_executed = executed;
 }
 
-static void replication_initialize_workers(void) {
+static void replication_initialize_workers(bool master) {
     worker_register("REPLICATION");
     worker_register_job_name(WORKER_JOB_FIND_NEXT, "find next");
     worker_register_job_name(WORKER_JOB_QUERYING, "querying");
     worker_register_job_name(WORKER_JOB_DELETE_ENTRY, "dict delete");
     worker_register_job_name(WORKER_JOB_FIND_CHART, "find chart");
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
-    worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
     worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
-    worker_register_job_name(WORKER_JOB_CLEANUP, "commit");
+    worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
 
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, "pending requests", "requests", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, "completion", "%", WORKER_METRIC_ABSOLUTE);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, "added requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-    worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    if(master) {
+        worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, "pending requests", "requests", WORKER_METRIC_ABSOLUTE);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, "completion", "%", WORKER_METRIC_ABSOLUTE);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, "added requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+    }
 }
 
 #define REQUEST_OK (0)
@@ -1214,7 +1218,7 @@ static void replication_worker_cleanup(void *ptr __maybe_unused) {
 }
 
 static void *replication_worker_thread(void *ptr) {
-    replication_initialize_workers();
+    replication_initialize_workers(false);
 
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
@@ -1248,7 +1252,7 @@ static void replication_main_cleanup(void *ptr) {
 }
 
 void *replication_thread_main(void *ptr __maybe_unused) {
-    replication_initialize_workers();
+    replication_initialize_workers(true);
 
     int threads = config_get_number(CONFIG_SECTION_DB, "replication threads", 1);
     if(threads < 1 || threads > MAX_REPLICATION_THREADS) {
