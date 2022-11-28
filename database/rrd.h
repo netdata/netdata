@@ -33,6 +33,16 @@ typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 typedef void *ml_host_t;
 typedef void *ml_dimension_t;
 
+typedef enum {
+    QUERY_SOURCE_UNKNOWN,
+    QUERY_SOURCE_API_DATA,
+    QUERY_SOURCE_API_BADGE,
+    QUERY_SOURCE_API_WEIGHTS,
+    QUERY_SOURCE_HEALTH,
+    QUERY_SOURCE_ML,
+    QUERY_SOURCE_UNITTEST,
+} QUERY_SOURCE;
+
 // forward declarations
 struct rrddim_tier;
 

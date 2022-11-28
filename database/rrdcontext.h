@@ -171,6 +171,7 @@ typedef struct query_target_request {
     const char *group_options;
     time_t resampling_time;
     size_t tier;
+    QUERY_SOURCE query_source;
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {

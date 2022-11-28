@@ -1473,7 +1473,8 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr) {
 // ----------------------------------------------------------------------------
 // fill the gap of a tier
 
-extern void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
+void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
+void store_metric_collection_completed(void);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) {
     if(unlikely(tier >= storage_tiers)) return;
@@ -1494,8 +1495,6 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
 
     struct storage_engine_query_handle handle;
 
-    size_t all_points_read = 0;
-
     // for each lower tier
     for(int tr = (int)tier - 1; tr >= 0 ;tr--){
         time_t smaller_tier_first_time = rd->tiers[tr]->query_ops->oldest_time(rd->tiers[tr]->db_metric_handle);
@@ -1508,27 +1507,26 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
         struct rrddim_tier *tmp = rd->tiers[tr];
         tmp->query_ops->init(tmp->db_metric_handle, &handle, after_wanted, before_wanted);
 
-        size_t points = 0;
+        size_t points_read = 0;
 
         while(!tmp->query_ops->is_finished(&handle)) {
 
             STORAGE_POINT sp = tmp->query_ops->next_metric(&handle);
+            points_read++;
 
             if(sp.end_time > latest_time_t) {
                 latest_time_t = sp.end_time;
-                store_metric_at_tier(rd, t, sp, sp.end_time * USEC_PER_SEC);
-                points++;
+                store_metric_at_tier(rd, tr, t, sp, sp.end_time * USEC_PER_SEC);
             }
         }
 
-        all_points_read += points;
         tmp->query_ops->finalize(&handle);
+        store_metric_collection_completed();
+        global_statistics_backfill_query_completed(points_read);
 
         //internal_error(true, "DBENGINE: backfilled chart '%s', dimension '%s', tier %d, from %ld to %ld, with %zu points from tier %d",
         //               rd->rrdset->name, rd->name, tier, after_wanted, before_wanted, points, tr);
     }
-
-    rrdr_query_completed(all_points_read, all_points_read);
 }
 
 // ----------------------------------------------------------------------------
@@ -1977,7 +1975,7 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier) {
+        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source) {
 
     QUERY_TARGET_REQUEST qtr = {
             .st = st,
@@ -1991,6 +1989,7 @@ RRDR *rrd2rrdr_legacy(
             .group_options = group_options,
             .timeout = timeout,
             .tier = tier,
+            .query_source = query_source,
     };
 
     return rrd2rrdr(owa, query_target_create(&qtr));
@@ -2170,6 +2169,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-    rrdr_query_completed(r->internal.db_points_read, r->internal.result_points_generated);
+    global_statistics_rrdr_query_completed(dimensions_used, r->internal.db_points_read,
+                                           r->internal.result_points_generated, qt->request.query_source);
     return r;
 }

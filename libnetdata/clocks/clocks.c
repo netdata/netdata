@@ -341,20 +341,21 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
 void sleep_usec(usec_t usec) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
-    struct timespec rem, req = {
+    struct timespec rem = { 0, 0 }, req = {
             .tv_sec = (time_t) (usec / USEC_PER_SEC),
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
 #ifdef __linux__
-    while ((errno = clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem)) != 0) {
+    while (clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem) != 0) {
 #else
-    while ((errno = nanosleep(&req, &rem)) != 0) {
+    while (nanosleep(&req, &rem) != 0) {
 #endif
-        if (likely(errno == EINTR)) {
-            req.tv_sec = rem.tv_sec;
-            req.tv_nsec = rem.tv_nsec;
-        } else {
+        if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
+            req = rem;
+            rem = (struct timespec){ 0, 0 };
+        }
+        else {
 #ifdef __linux__
             error("Cannot clock_nanosleep(CLOCK_REALTIME) for %llu microseconds.", usec);
 #else

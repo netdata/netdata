@@ -76,6 +76,7 @@ int rrdset2value_api_v1(
         , NETDATA_DOUBLE *anomaly_rate
         , time_t timeout
         , size_t tier
+        , QUERY_SOURCE query_source
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -92,7 +93,8 @@ int rrdset2value_api_v1(
             dimensions,
             group_options,
             timeout,
-            tier);
+            tier,
+            query_source);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;

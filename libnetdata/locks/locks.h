@@ -9,6 +9,14 @@
 typedef pthread_mutex_t netdata_mutex_t;
 #define NETDATA_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER
 
+typedef struct netdata_spinlock {
+    bool locked;
+} SPINLOCK;
+#define NETDATA_SPINLOCK_INITIALIZER (SPINLOCK){ .locked = false }
+void netdata_spinlock_init(SPINLOCK *spinlock);
+void netdata_spinlock_lock(SPINLOCK *spinlock);
+void netdata_spinlock_unlock(SPINLOCK *spinlock);
+
 #ifdef NETDATA_TRACE_RWLOCKS
 typedef struct netdata_rwlock_locker {
     pid_t pid;

@@ -14,42 +14,66 @@
 #define WORKER_JOB_MALLOC_TRACE       7
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
 #endif
 
 bool global_statistics_enabled = true;
 
 static struct global_statistics {
-    volatile uint16_t connected_clients;
+    uint16_t connected_clients;
 
-    volatile uint64_t web_requests;
-    volatile uint64_t web_usec;
-    volatile uint64_t web_usec_max;
-    volatile uint64_t bytes_received;
-    volatile uint64_t bytes_sent;
-    volatile uint64_t content_size;
-    volatile uint64_t compressed_content_size;
+    uint64_t web_requests;
+    uint64_t web_usec;
+    uint64_t web_usec_max;
+    uint64_t bytes_received;
+    uint64_t bytes_sent;
+    uint64_t content_size;
+    uint64_t compressed_content_size;
 
-    volatile uint64_t web_client_count;
+    uint64_t web_client_count;
 
-    volatile uint64_t rrdr_queries_made;
-    volatile uint64_t rrdr_db_points_read;
-    volatile uint64_t rrdr_result_points_generated;
+    uint64_t api_data_queries_made;
+    uint64_t api_data_db_points_read;
+    uint64_t api_data_result_points_generated;
 
-    volatile uint64_t sqlite3_queries_made;
-    volatile uint64_t sqlite3_queries_ok;
-    volatile uint64_t sqlite3_queries_failed;
-    volatile uint64_t sqlite3_queries_failed_busy;
-    volatile uint64_t sqlite3_queries_failed_locked;
-    volatile uint64_t sqlite3_rows;
-    volatile uint64_t sqlite3_metadata_cache_hit;
-    volatile uint64_t sqlite3_context_cache_hit;
-    volatile uint64_t sqlite3_metadata_cache_miss;
-    volatile uint64_t sqlite3_context_cache_miss;
-    volatile uint64_t sqlite3_metadata_cache_spill;
-    volatile uint64_t sqlite3_context_cache_spill;
-    volatile uint64_t sqlite3_metadata_cache_write;
-    volatile uint64_t sqlite3_context_cache_write;
+    uint64_t api_weights_queries_made;
+    uint64_t api_weights_db_points_read;
+    uint64_t api_weights_result_points_generated;
+
+    uint64_t api_badges_queries_made;
+    uint64_t api_badges_db_points_read;
+    uint64_t api_badges_result_points_generated;
+
+    uint64_t health_queries_made;
+    uint64_t health_db_points_read;
+    uint64_t health_result_points_generated;
+
+    uint64_t ml_queries_made;
+    uint64_t ml_db_points_read;
+    uint64_t ml_result_points_generated;
+
+    uint64_t exporters_queries_made;
+    uint64_t exporters_db_points_read;
+
+    uint64_t backfill_queries_made;
+    uint64_t backfill_db_points_read;
+
+    uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
+
+    uint64_t sqlite3_queries_made;
+    uint64_t sqlite3_queries_ok;
+    uint64_t sqlite3_queries_failed;
+    uint64_t sqlite3_queries_failed_busy;
+    uint64_t sqlite3_queries_failed_locked;
+    uint64_t sqlite3_rows;
+    uint64_t sqlite3_metadata_cache_hit;
+    uint64_t sqlite3_context_cache_hit;
+    uint64_t sqlite3_metadata_cache_miss;
+    uint64_t sqlite3_context_cache_miss;
+    uint64_t sqlite3_metadata_cache_spill;
+    uint64_t sqlite3_context_cache_spill;
+    uint64_t sqlite3_metadata_cache_write;
+    uint64_t sqlite3_context_cache_write;
 
 } global_statistics = {
         .connected_clients = 0,
@@ -61,12 +85,34 @@ static struct global_statistics {
         .compressed_content_size = 0,
         .web_client_count = 1,
 
-        .rrdr_queries_made = 0,
-        .rrdr_db_points_read = 0,
-        .rrdr_result_points_generated = 0,
+        .api_data_queries_made = 0,
+        .api_data_db_points_read = 0,
+        .api_data_result_points_generated = 0,
 };
 
-void sqlite3_query_completed(bool success, bool busy, bool locked) {
+void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        __atomic_fetch_add(&global_statistics.db_points_stored_per_tier[tier], points_read_per_tier_array[tier], __ATOMIC_RELAXED);
+        points_read_per_tier_array[tier] = 0;
+    }
+}
+
+void global_statistics_ml_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.ml_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.ml_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_exporters_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.exporters_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.exporters_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_backfill_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.backfill_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.backfill_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_sqlite3_query_completed(bool success, bool busy, bool locked) {
     __atomic_fetch_add(&global_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
 
     if(success) {
@@ -83,21 +129,54 @@ void sqlite3_query_completed(bool success, bool busy, bool locked) {
     }
 }
 
-void sqlite3_row_completed(void) {
+void global_statistics_sqlite3_row_completed(void) {
     __atomic_fetch_add(&global_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
 }
 
-void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
-    __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
+    switch(query_source) {
+        case QUERY_SOURCE_API_DATA:
+            __atomic_fetch_add(&global_statistics.api_data_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_data_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_data_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_ML:
+            __atomic_fetch_add(&global_statistics.ml_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.ml_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.ml_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_API_WEIGHTS:
+            __atomic_fetch_add(&global_statistics.api_weights_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_weights_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_weights_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_API_BADGE:
+            __atomic_fetch_add(&global_statistics.api_badges_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_badges_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_badges_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_HEALTH:
+            __atomic_fetch_add(&global_statistics.health_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.health_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.health_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        default:
+        case QUERY_SOURCE_UNITTEST:
+        case QUERY_SOURCE_UNKNOWN:
+            break;
+    }
 }
 
-void finished_web_request_statistics(uint64_t dt,
-                                     uint64_t bytes_received,
-                                     uint64_t bytes_sent,
-                                     uint64_t content_size,
-                                     uint64_t compressed_content_size) {
+void global_statistics_web_request_completed(uint64_t dt,
+                                             uint64_t bytes_received,
+                                             uint64_t bytes_sent,
+                                             uint64_t content_size,
+                                             uint64_t compressed_content_size) {
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
@@ -110,15 +189,14 @@ void finished_web_request_statistics(uint64_t dt,
     __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_RELAXED);
 }
 
-uint64_t web_client_connected(void) {
+uint64_t global_statistics_web_client_connected(void) {
     __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
     return __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_RELAXED);
 }
 
-void web_client_disconnected(void) {
+void global_statistics_web_client_disconnected(void) {
     __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
 }
-
 
 static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
     gs->connected_clients            = __atomic_load_n(&global_statistics.connected_clients, __ATOMIC_RELAXED);
@@ -131,9 +209,33 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->compressed_content_size      = __atomic_load_n(&global_statistics.compressed_content_size, __ATOMIC_RELAXED);
     gs->web_client_count             = __atomic_load_n(&global_statistics.web_client_count, __ATOMIC_RELAXED);
 
-    gs->rrdr_queries_made            = __atomic_load_n(&global_statistics.rrdr_queries_made, __ATOMIC_RELAXED);
-    gs->rrdr_db_points_read          = __atomic_load_n(&global_statistics.rrdr_db_points_read, __ATOMIC_RELAXED);
-    gs->rrdr_result_points_generated = __atomic_load_n(&global_statistics.rrdr_result_points_generated, __ATOMIC_RELAXED);
+    gs->api_data_queries_made            = __atomic_load_n(&global_statistics.api_data_queries_made, __ATOMIC_RELAXED);
+    gs->api_data_db_points_read          = __atomic_load_n(&global_statistics.api_data_db_points_read, __ATOMIC_RELAXED);
+    gs->api_data_result_points_generated = __atomic_load_n(&global_statistics.api_data_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->api_weights_queries_made            = __atomic_load_n(&global_statistics.api_weights_queries_made, __ATOMIC_RELAXED);
+    gs->api_weights_db_points_read          = __atomic_load_n(&global_statistics.api_weights_db_points_read, __ATOMIC_RELAXED);
+    gs->api_weights_result_points_generated = __atomic_load_n(&global_statistics.api_weights_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->api_badges_queries_made            = __atomic_load_n(&global_statistics.api_badges_queries_made, __ATOMIC_RELAXED);
+    gs->api_badges_db_points_read          = __atomic_load_n(&global_statistics.api_badges_db_points_read, __ATOMIC_RELAXED);
+    gs->api_badges_result_points_generated = __atomic_load_n(&global_statistics.api_badges_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->health_queries_made            = __atomic_load_n(&global_statistics.health_queries_made, __ATOMIC_RELAXED);
+    gs->health_db_points_read          = __atomic_load_n(&global_statistics.health_db_points_read, __ATOMIC_RELAXED);
+    gs->health_result_points_generated = __atomic_load_n(&global_statistics.health_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->ml_queries_made              = __atomic_load_n(&global_statistics.ml_queries_made, __ATOMIC_RELAXED);
+    gs->ml_db_points_read            = __atomic_load_n(&global_statistics.ml_db_points_read, __ATOMIC_RELAXED);
+    gs->ml_result_points_generated   = __atomic_load_n(&global_statistics.ml_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->exporters_queries_made       = __atomic_load_n(&global_statistics.exporters_queries_made, __ATOMIC_RELAXED);
+    gs->exporters_db_points_read     = __atomic_load_n(&global_statistics.exporters_db_points_read, __ATOMIC_RELAXED);
+    gs->backfill_queries_made       = __atomic_load_n(&global_statistics.backfill_queries_made, __ATOMIC_RELAXED);
+    gs->backfill_db_points_read     = __atomic_load_n(&global_statistics.backfill_db_points_read, __ATOMIC_RELAXED);
+
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
@@ -177,6 +279,7 @@ static void global_statistics_charts(void) {
     struct global_statistics gs;
     struct rusage me;
 
+    struct replication_query_statistics replication = replication_get_query_statistics();
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
     getrusage(RUSAGE_SELF, &me);
 
@@ -425,65 +528,184 @@ static void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if(gs.rrdr_queries_made) {
-        static RRDSET *st_rrdr_queries = NULL;
-        static RRDDIM *rd_queries = NULL;
+    {
+        static RRDSET *st_queries = NULL;
+        static RRDDIM *rd_api_data_queries = NULL;
+        static RRDDIM *rd_api_weights_queries = NULL;
+        static RRDDIM *rd_api_badges_queries = NULL;
+        static RRDDIM *rd_health_queries = NULL;
+        static RRDDIM *rd_ml_queries = NULL;
+        static RRDDIM *rd_exporters_queries = NULL;
+        static RRDDIM *rd_backfill_queries = NULL;
+        static RRDDIM *rd_replication_queries = NULL;
 
-        if (unlikely(!st_rrdr_queries)) {
-            st_rrdr_queries = rrdset_create_localhost(
+        if (unlikely(!st_queries)) {
+            st_queries = rrdset_create_localhost(
                     "netdata"
                     , "queries"
                     , NULL
                     , "queries"
                     , NULL
-                    , "Netdata API Queries"
+                    , "Netdata DB Queries"
                     , "queries/s"
                     , "netdata"
                     , "stats"
                     , 131000
                     , localhost->rrd_update_every
-                    , RRDSET_TYPE_LINE
+                    , RRDSET_TYPE_STACKED
             );
 
-            rd_queries = rrddim_add(st_rrdr_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_data_queries = rrddim_add(st_queries, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_queries = rrddim_add(st_queries, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_queries = rrddim_add(st_queries, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_queries = rrddim_add(st_queries, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_queries = rrddim_add(st_queries, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_exporters_queries = rrddim_add(st_queries, "exporters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_backfill_queries = rrddim_add(st_queries, "backfill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_queries = rrddim_add(st_queries, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_rrdr_queries, rd_queries, (collected_number)gs.rrdr_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_data_queries, (collected_number)gs.api_data_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_weights_queries, (collected_number)gs.api_weights_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_badges_queries, (collected_number)gs.api_badges_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_health_queries, (collected_number)gs.health_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_ml_queries, (collected_number)gs.ml_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_exporters_queries, (collected_number)gs.exporters_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_backfill_queries, (collected_number)gs.backfill_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_replication_queries, (collected_number)replication.queries_finished);
 
-        rrdset_done(st_rrdr_queries);
+        rrdset_done(st_queries);
     }
 
     // ----------------------------------------------------------------
 
-    if(gs.rrdr_db_points_read || gs.rrdr_result_points_generated) {
-        static RRDSET *st_rrdr_points = NULL;
-        static RRDDIM *rd_points_read = NULL;
-        static RRDDIM *rd_points_generated = NULL;
+    {
+        static RRDSET *st_points_read = NULL;
+        static RRDDIM *rd_api_data_points_read = NULL;
+        static RRDDIM *rd_api_weights_points_read = NULL;
+        static RRDDIM *rd_api_badges_points_read = NULL;
+        static RRDDIM *rd_health_points_read = NULL;
+        static RRDDIM *rd_ml_points_read = NULL;
+        static RRDDIM *rd_exporters_points_read = NULL;
+        static RRDDIM *rd_backfill_points_read = NULL;
+        static RRDDIM *rd_replication_points_read = NULL;
 
-        if (unlikely(!st_rrdr_points)) {
-            st_rrdr_points = rrdset_create_localhost(
+        if (unlikely(!st_points_read)) {
+            st_points_read = rrdset_create_localhost(
                     "netdata"
-                    , "db_points"
+                    , "db_points_read"
                     , NULL
                     , "queries"
                     , NULL
-                    , "Netdata API Points"
+                    , "Netdata DB Points Query Read"
                     , "points/s"
                     , "netdata"
                     , "stats"
                     , 131001
                     , localhost->rrd_update_every
-                    , RRDSET_TYPE_AREA
+                    , RRDSET_TYPE_STACKED
             );
 
-            rd_points_read = rrddim_add(st_rrdr_points, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_points_generated = rrddim_add(st_rrdr_points, "generated", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_data_points_read = rrddim_add(st_points_read, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_points_read = rrddim_add(st_points_read, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_points_read = rrddim_add(st_points_read, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_points_read = rrddim_add(st_points_read, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_points_read = rrddim_add(st_points_read, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_exporters_points_read = rrddim_add(st_points_read, "exporters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_backfill_points_read = rrddim_add(st_points_read, "backfill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_points_read = rrddim_add(st_points_read, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_rrdr_points, rd_points_read, (collected_number)gs.rrdr_db_points_read);
-        rrddim_set_by_pointer(st_rrdr_points, rd_points_generated, (collected_number)gs.rrdr_result_points_generated);
+        rrddim_set_by_pointer(st_points_read, rd_api_data_points_read, (collected_number)gs.api_data_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_api_weights_points_read, (collected_number)gs.api_weights_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_api_badges_points_read, (collected_number)gs.api_badges_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_health_points_read, (collected_number)gs.health_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_ml_points_read, (collected_number)gs.ml_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_exporters_points_read, (collected_number)gs.exporters_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_backfill_points_read, (collected_number)gs.backfill_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_replication_points_read, (collected_number)replication.points_read);
 
-        rrdset_done(st_rrdr_points);
+        rrdset_done(st_points_read);
+    }
+
+    // ----------------------------------------------------------------
+
+    if(gs.api_data_result_points_generated || replication.points_generated) {
+        static RRDSET *st_points_generated = NULL;
+        static RRDDIM *rd_api_data_points_generated = NULL;
+        static RRDDIM *rd_api_weights_points_generated = NULL;
+        static RRDDIM *rd_api_badges_points_generated = NULL;
+        static RRDDIM *rd_health_points_generated = NULL;
+        static RRDDIM *rd_ml_points_generated = NULL;
+        static RRDDIM *rd_replication_points_generated = NULL;
+
+        if (unlikely(!st_points_generated)) {
+            st_points_generated = rrdset_create_localhost(
+                    "netdata"
+                    , "db_points_results"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "Netdata Points in Query Results"
+                    , "points/s"
+                    , "netdata"
+                    , "stats"
+                    , 131002
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_api_data_points_generated = rrddim_add(st_points_generated, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_points_generated = rrddim_add(st_points_generated, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_points_generated = rrddim_add(st_points_generated, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_points_generated = rrddim_add(st_points_generated, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_points_generated = rrddim_add(st_points_generated, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_points_generated = rrddim_add(st_points_generated, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_points_generated, rd_api_data_points_generated, (collected_number)gs.api_data_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_api_weights_points_generated, (collected_number)gs.api_weights_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_api_badges_points_generated, (collected_number)gs.api_badges_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_health_points_generated, (collected_number)gs.health_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_ml_points_generated, (collected_number)gs.ml_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_replication_points_generated, (collected_number)replication.points_generated);
+
+        rrdset_done(st_points_generated);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_points_stored = NULL;
+        static RRDDIM *rds[RRD_STORAGE_TIERS] = {};
+
+        if (unlikely(!st_points_stored)) {
+            st_points_stored = rrdset_create_localhost(
+                    "netdata"
+                    , "db_points_stored"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "Netdata DB Points Stored"
+                    , "points/s"
+                    , "netdata"
+                    , "stats"
+                    , 131003
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                char buf[30 + 1];
+                snprintfz(buf, 30, "tier%zu", tier);
+                rds[tier] = rrddim_add(st_points_stored, buf, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+        }
+
+        for(size_t tier = 0; tier < storage_tiers ;tier++)
+            rrddim_set_by_pointer(st_points_stored, rds[tier], (collected_number)gs.db_points_stored_per_tier[tier]);
+
+        rrdset_done(st_points_stored);
     }
 
     // ----------------------------------------------------------------
@@ -2440,6 +2662,19 @@ static void worker_utilization_finish(void) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// global statistics thread
+
+
+static void global_statistics_register_workers(void) {
+    worker_register("STATS");
+    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
+    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
+    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
+    worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
+    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+}
 
 static void global_statistics_cleanup(void *ptr)
 {
@@ -2457,14 +2692,7 @@ static void global_statistics_cleanup(void *ptr)
 
 void *global_statistics_main(void *ptr)
 {
-    worker_register("STATS");
-    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
-    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
-    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
-    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
-    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
-    worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
-    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    global_statistics_register_workers();
 
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
@@ -2484,9 +2712,6 @@ void *global_statistics_main(void *ptr)
     while (!netdata_exit) {
         worker_is_idle();
         heartbeat_next(&hb, step);
-
-        worker_is_busy(WORKER_JOB_WORKERS);
-        worker_utilization_charts();
 
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
@@ -2517,3 +2742,49 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
+
+
+// ---------------------------------------------------------------------------------------------------------------------
+// workers thread
+
+static void global_statistics_workers_cleanup(void *ptr)
+{
+    worker_unregister();
+
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    worker_utilization_finish();
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_workers_main(void *ptr)
+{
+    global_statistics_register_workers();
+
+    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr);
+
+            int update_every =
+                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+            if (update_every < localhost->rrd_update_every)
+                update_every = localhost->rrd_update_every;
+
+            usec_t step = update_every * USEC_PER_SEC;
+            heartbeat_t hb;
+            heartbeat_init(&hb);
+
+            while (!netdata_exit) {
+                worker_is_idle();
+                heartbeat_next(&hb, step);
+
+                worker_is_busy(WORKER_JOB_WORKERS);
+                worker_utilization_charts();
+            }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+

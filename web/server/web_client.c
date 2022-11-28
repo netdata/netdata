@@ -85,11 +85,11 @@ void web_client_request_done(struct web_client *w) {
         // --------------------------------------------------------------------
         // global statistics
 
-        finished_web_request_statistics(dt_usec(&tv, &w->tv_in),
-                                        w->stats_received_bytes,
-                                        w->stats_sent_bytes,
-                                        size,
-                                        sent);
+        global_statistics_web_request_completed(dt_usec(&tv, &w->tv_in),
+                                                w->stats_received_bytes,
+                                                w->stats_sent_bytes,
+                                                size,
+                                                sent);
 
         w->stats_received_bytes = 0;
         w->stats_sent_bytes = 0;

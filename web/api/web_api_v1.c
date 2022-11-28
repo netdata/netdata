@@ -751,6 +751,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .tier = tier,
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
+            .query_source = QUERY_SOURCE_API_DATA,
     };
     qt = query_target_create(&qtr);
 
