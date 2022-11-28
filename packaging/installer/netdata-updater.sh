@@ -663,7 +663,7 @@ update_static() {
 
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
+    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
       rm -r "${ndtmpdir}"
     else
       info "NOTE: did not remove: ${ndtmpdir}"
