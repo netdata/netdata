@@ -626,7 +626,7 @@ static struct replication_thread {
             Pvoid_t JudyL_array;
         } queue;
 
-    } protected;                        // protected from replication_recursive_lock()
+    } unsafe;                           // protected from replication_recursive_lock()
 
     struct {
         size_t executed;                // the number of replication requests executed
@@ -643,7 +643,7 @@ static struct replication_thread {
 
 } replication_globals = {
         .mutex = NETDATA_MUTEX_INITIALIZER,
-        .protected = {
+        .unsafe = {
                 .pending = 0,
                 .unique_id = 0,
 
@@ -714,8 +714,8 @@ static inline bool replication_recursive_lock_mode(char mode) {
 
 void replication_set_next_point_in_time(time_t after, size_t unique_id) {
     replication_recursive_lock();
-    replication_globals.protected.queue.after = after;
-    replication_globals.protected.queue.unique_id = unique_id;
+    replication_globals.unsafe.queue.after = after;
+    replication_globals.unsafe.queue.unique_id = unique_id;
     replication_recursive_unlock();
 }
 
@@ -731,7 +731,7 @@ static struct replication_sort_entry *replication_sort_entry_create_unsafe(struc
 
     // copy the request
     rse->rq = rq;
-    rse->unique_id = ++replication_globals.protected.unique_id;
+    rse->unique_id = ++replication_globals.unsafe.unique_id;
 
     // save the unique id into the request, to be able to delete it later
     rq->unique_id = rse->unique_id;
@@ -756,23 +756,23 @@ static struct replication_sort_entry *replication_sort_entry_add(struct replicat
 //        replication_set_next_point_in_time(rq->after, rq->unique_id);
 //    }
 
-    replication_globals.protected.added++;
-    replication_globals.protected.pending++;
+    replication_globals.unsafe.added++;
+    replication_globals.unsafe.pending++;
 
     Pvoid_t *inner_judy_ptr;
 
     // find the outer judy entry, using after as key
-    inner_judy_ptr = JudyLGet(replication_globals.protected.queue.JudyL_array, (Word_t) rq->after, PJE0);
+    inner_judy_ptr = JudyLGet(replication_globals.unsafe.queue.JudyL_array, (Word_t) rq->after, PJE0);
     if(!inner_judy_ptr)
-        inner_judy_ptr = JudyLIns(&replication_globals.protected.queue.JudyL_array, (Word_t) rq->after, PJE0);
+        inner_judy_ptr = JudyLIns(&replication_globals.unsafe.queue.JudyL_array, (Word_t) rq->after, PJE0);
 
     // add it to the inner judy, using unique_id as key
     Pvoid_t *item = JudyLIns(inner_judy_ptr, rq->unique_id, PJE0);
     *item = rse;
     rq->indexed_in_judy = true;
 
-    if(!replication_globals.protected.first_time_t || rq->after < replication_globals.protected.first_time_t)
-        replication_globals.protected.first_time_t = rq->after;
+    if(!replication_globals.unsafe.first_time_t || rq->after < replication_globals.unsafe.first_time_t)
+        replication_globals.unsafe.first_time_t = rq->after;
 
     replication_recursive_unlock();
 
@@ -784,8 +784,8 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
 
     bool inner_judy_deleted = false;
 
-    replication_globals.protected.removed++;
-    replication_globals.protected.pending--;
+    replication_globals.unsafe.removed++;
+    replication_globals.unsafe.pending--;
 
     rrdpush_sender_pending_replication_requests_minus_one(rse->rq->sender);
 
@@ -796,7 +796,7 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
 
     // if no items left, delete it from the outer judy
     if(**inner_judy_ppptr == NULL) {
-        JudyLDel(&replication_globals.protected.queue.JudyL_array, rse->rq->after, PJE0);
+        JudyLDel(&replication_globals.unsafe.queue.JudyL_array, rse->rq->after, PJE0);
         inner_judy_deleted = true;
     }
 
@@ -813,7 +813,7 @@ static void replication_sort_entry_del(struct replication_request *rq) {
     replication_recursive_lock();
     if(rq->indexed_in_judy) {
 
-        inner_judy_pptr = JudyLGet(replication_globals.protected.queue.JudyL_array, rq->after, PJE0);
+        inner_judy_pptr = JudyLGet(replication_globals.unsafe.queue.JudyL_array, rq->after, PJE0);
         if (inner_judy_pptr) {
             Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_pptr, rq->unique_id, PJE0);
             if (our_item_pptr) {
@@ -845,12 +845,12 @@ static struct replication_request replication_request_get_first_available() {
 
     struct replication_request rq_to_return = (struct replication_request){ .found = false };
 
-    if(unlikely(!replication_globals.protected.queue.after || !replication_globals.protected.queue.unique_id)) {
-        replication_globals.protected.queue.after = 0;
-        replication_globals.protected.queue.unique_id = 0;
+    if(unlikely(!replication_globals.unsafe.queue.after || !replication_globals.unsafe.queue.unique_id)) {
+        replication_globals.unsafe.queue.after = 0;
+        replication_globals.unsafe.queue.unique_id = 0;
     }
 
-    Word_t started_after = replication_globals.protected.queue.after;
+    Word_t started_after = replication_globals.unsafe.queue.after;
 
     size_t round = 0;
     while(!rq_to_return.found) {
@@ -862,24 +862,24 @@ static struct replication_request replication_request_get_first_available() {
         if(round == 2) {
             if(started_after == 0)
                 break;
-            
-            replication_globals.protected.queue.after = 0;
-            replication_globals.protected.queue.unique_id = 0;
+
+            replication_globals.unsafe.queue.after = 0;
+            replication_globals.unsafe.queue.unique_id = 0;
         }
 
         bool find_same_after = true;
-        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstOrNext(replication_globals.protected.queue.JudyL_array, &replication_globals.protected.queue.after, find_same_after))) {
+        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstOrNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, find_same_after))) {
             Pvoid_t *our_item_pptr;
 
-            if(unlikely(round == 2 && replication_globals.protected.queue.after > started_after))
+            if(unlikely(round == 2 && replication_globals.unsafe.queue.after > started_after))
                 break;
 
-            while (!rq_to_return.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &replication_globals.protected.queue.unique_id, PJE0))) {
+            while (!rq_to_return.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &replication_globals.unsafe.queue.unique_id, PJE0))) {
                 struct replication_sort_entry *rse = *our_item_pptr;
                 struct replication_request *rq = rse->rq;
                 struct sender_state *s = rq->sender;
 
-                if (likely(__atomic_load_n(&s->buffer_used_percentage, __ATOMIC_RELAXED) <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)) {
+                if (likely(rrdpush_sender_get_buffer_used_percent(s) <= MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)) {
                     // there is room for this request in the sender buffer
 
                     bool sender_is_connected =
@@ -891,7 +891,7 @@ static struct replication_request replication_request_get_first_available() {
                     if (unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
                         // skip this request, the sender is not connected, or it has reconnected
 
-                        replication_globals.protected.skipped_not_connected++;
+                        replication_globals.unsafe.skipped_not_connected++;
                         if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
                             // we removed the item from the outer JudyL
                             break;
@@ -912,7 +912,7 @@ static struct replication_request replication_request_get_first_available() {
                     }
                 }
                 else {
-                    replication_globals.protected.skipped_no_room++;
+                    replication_globals.unsafe.skipped_no_room++;
 //                replication_globals.protected.skipped_no_room_since_last_reset++;
                 }
             }
@@ -921,7 +921,7 @@ static struct replication_request replication_request_get_first_available() {
             find_same_after = false;
 
             // prepare for the next iteration on the outer loop
-            replication_globals.protected.queue.unique_id = 0;
+            replication_globals.unsafe.queue.unique_id = 0;
         }
     }
 
@@ -1013,13 +1013,6 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     if(likely(workers))
         worker_is_busy(WORKER_JOB_QUERYING);
 
-    // FIXME turn to atomics
-    if(rq->after < rq->sender->replication_first_time || !rq->sender->replication_first_time)
-        rq->sender->replication_first_time = rq->after;
-
-    if(rq->before < rq->sender->replication_current_time || !rq->sender->replication_current_time)
-        rq->sender->replication_current_time = rq->before;
-
     netdata_thread_disable_cancelability();
 
     // send the replication data
@@ -1069,31 +1062,31 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
     };
 
-    if(start_streaming && __atomic_load_n(&sender->buffer_used_percentage, __ATOMIC_RELAXED) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
+    if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
         replication_execute_request(&rq, false);
 
     else
-        dictionary_set(sender->replication_requests, chart_id, &rq, sizeof(struct replication_request));
+        dictionary_set(sender->replication.requests, chart_id, &rq, sizeof(struct replication_request));
 }
 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
     replication_recursive_lock();
-    dictionary_flush(sender->replication_requests);
+    dictionary_flush(sender->replication.requests);
     replication_recursive_unlock();
 }
 
 void replication_init_sender(struct sender_state *sender) {
-    sender->replication_requests = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
-    dictionary_register_react_callback(sender->replication_requests, replication_request_react_callback, sender);
-    dictionary_register_conflict_callback(sender->replication_requests, replication_request_conflict_callback, sender);
-    dictionary_register_delete_callback(sender->replication_requests, replication_request_delete_callback, sender);
+    sender->replication.requests = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    dictionary_register_react_callback(sender->replication.requests, replication_request_react_callback, sender);
+    dictionary_register_conflict_callback(sender->replication.requests, replication_request_conflict_callback, sender);
+    dictionary_register_delete_callback(sender->replication.requests, replication_request_delete_callback, sender);
 }
 
 void replication_cleanup_sender(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
     replication_recursive_lock();
-    dictionary_destroy(sender->replication_requests);
+    dictionary_destroy(sender->replication.requests);
     replication_recursive_unlock();
 }
 
@@ -1102,18 +1095,18 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
     size_t percentage = (s->buffer->max_size - available) * 100 / s->buffer->max_size;
 
     if(percentage > MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
-        s->replication_reached_max = true;
+        s->replication.unsafe.reached_max = true;
 
-    if(s->replication_reached_max &&
+    if(s->replication.unsafe.reached_max &&
         percentage <= MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED) {
-        s->replication_reached_max = false;
+        s->replication.unsafe.reached_max = false;
         replication_recursive_lock();
 //        replication_set_next_point_in_time(0, 0);
-        replication_globals.protected.sender_resets++;
+        replication_globals.unsafe.sender_resets++;
         replication_recursive_unlock();
     }
 
-    __atomic_store_n(&s->buffer_used_percentage, percentage, __ATOMIC_RELAXED);
+    rrdpush_sender_set_buffer_used_percent(s, percentage);
 }
 
 // ----------------------------------------------------------------------------
@@ -1122,12 +1115,12 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 static size_t verify_host_charts_are_streaming_now(RRDHOST *host) {
     internal_error(
             host->sender &&
-            !host->sender->replication_pending_requests &&
-            dictionary_entries(host->sender->replication_requests) != 0,
+            !rrdpush_sender_pending_replication_requests(host->sender) &&
+            dictionary_entries(host->sender->replication.requests) != 0,
             "REPLICATION SUMMARY: 'host:%s' reports %zu pending replication requests, but its chart replication index says there are %zu charts pending replication",
             rrdhost_hostname(host),
-            host->sender->replication_pending_requests,
-            dictionary_entries(host->sender->replication_requests)
+            rrdpush_sender_pending_replication_requests(host->sender),
+            dictionary_entries(host->sender->replication.requests)
             );
 
     size_t ok = 0;
@@ -1222,7 +1215,7 @@ static int replication_execute_next_pending_request(void) {
 
     // delete the request from the dictionary
     worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-    if(!dictionary_del(rq.sender->replication_requests, string2str(rq.chart_id)))
+    if(!dictionary_del(rq.sender->replication.requests, string2str(rq.chart_id)))
         error("REPLAY ERROR: 'host:%s/chart:%s' failed to be deleted from sender pending charts index",
               rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
 
@@ -1328,9 +1321,9 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 replication_reset_next_point_in_time_countdown = SECONDS_TO_RESET_POINT_IN_TIME;
             }
 
-            if(!replication_globals.protected.pending && --run_verification_countdown == 0) {
+            if(!replication_globals.unsafe.pending && --run_verification_countdown == 0) {
                 // reset the statistics about completion percentage
-                replication_globals.protected.first_time_t = 0;
+                replication_globals.unsafe.first_time_t = 0;
                 replication_set_latest_first_time(0);
 
                 verify_all_hosts_charts_are_streaming_now();
@@ -1342,23 +1335,23 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_is_busy(WORKER_JOB_STATISTICS);
 
             time_t latest_first_time_t = replication_get_latest_first_time();
-            if(latest_first_time_t && replication_globals.protected.pending) {
+            if(latest_first_time_t && replication_globals.unsafe.pending) {
                 // completion percentage statistics
                 time_t now = now_realtime_sec();
-                time_t total = now - replication_globals.protected.first_time_t;
-                time_t done = latest_first_time_t - replication_globals.protected.first_time_t;
+                time_t total = now - replication_globals.unsafe.first_time_t;
+                time_t done = latest_first_time_t - replication_globals.unsafe.first_time_t;
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION,
                                   (NETDATA_DOUBLE) done * 100.0 / (NETDATA_DOUBLE) total);
             }
             else
                 worker_set_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, 100.0);
 
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)replication_globals.protected.pending);
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)replication_globals.protected.added);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)replication_globals.unsafe.pending);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)replication_globals.unsafe.added);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)__atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED));
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)replication_globals.protected.skipped_not_connected);
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.protected.skipped_no_room);
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.protected.sender_resets);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_not_connected);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_no_room);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.unsafe.sender_resets);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, (NETDATA_DOUBLE)replication_globals.main_thread.waits);
 
             replication_recursive_unlock();
@@ -1374,8 +1367,8 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 // no work to be done, wait for a request to come in
                 timeout = 1000 * USEC_PER_MS;
 
-            else if(replication_globals.protected.pending > 0) {
-                if(replication_globals.protected.sender_resets == last_sender_resets) {
+            else if(replication_globals.unsafe.pending > 0) {
+                if(replication_globals.unsafe.sender_resets == last_sender_resets) {
                     timeout = 1000 * USEC_PER_MS;
                 }
                 else {
@@ -1385,14 +1378,14 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                     timeout = 100 * USEC_PER_MS;
                 }
 
-                last_sender_resets = replication_globals.protected.sender_resets;
+                last_sender_resets = replication_globals.unsafe.sender_resets;
             }
             else {
                 // no requests pending, but there were requests recently (run_verification_countdown)
                 // so, try in a short time.
                 // if this is big, one chart replicating will be slow to finish (ping - pong just one chart)
                 timeout = 10 * USEC_PER_MS;
-                last_sender_resets = replication_globals.protected.sender_resets;
+                last_sender_resets = replication_globals.unsafe.sender_resets;
             }
 
             replication_globals.main_thread.waits++;
