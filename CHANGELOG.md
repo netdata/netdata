@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Sanitize command arguments. [\#14064](https://github.com/netdata/netdata/pull/14064) ([vkalintiris](https://github.com/vkalintiris))
+- Strict control of streaming API keys and MACHINE GUIDs in stream.conf [\#14063](https://github.com/netdata/netdata/pull/14063) ([ktsaou](https://github.com/ktsaou))
+- replication fixes No 8 [\#14061](https://github.com/netdata/netdata/pull/14061) ([ktsaou](https://github.com/ktsaou))
 - fix\(updater\): don't produce any output if static update completed successfully [\#14058](https://github.com/netdata/netdata/pull/14058) ([ilyam8](https://github.com/ilyam8))
 - Add Alpine 3.17 to supported distros. [\#14056](https://github.com/netdata/netdata/pull/14056) ([Ferroin](https://github.com/Ferroin))
 - replication fixes No 7 [\#14053](https://github.com/netdata/netdata/pull/14053) ([ktsaou](https://github.com/ktsaou))
@@ -351,9 +354,6 @@
 - Add missing comma \(handle coverity warning CID 379360\) [\#13413](https://github.com/netdata/netdata/pull/13413) ([stelfrag](https://github.com/stelfrag))
 - codacy/lgtm ignore judy sources [\#13411](https://github.com/netdata/netdata/pull/13411) ([underhood](https://github.com/underhood))
 - Send chart context with alert events to the cloud [\#13409](https://github.com/netdata/netdata/pull/13409) ([MrZammler](https://github.com/MrZammler))
-- Remove SIGSEGV and SIGABRT \(ebpf.plugin\) [\#13407](https://github.com/netdata/netdata/pull/13407) ([thiagoftsm](https://github.com/thiagoftsm))
-- minor fixes on metadata fields  [\#13406](https://github.com/netdata/netdata/pull/13406) ([tkatsoulas](https://github.com/tkatsoulas))
-- chore\(health\): remove py web\_log alarms [\#13404](https://github.com/netdata/netdata/pull/13404) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
