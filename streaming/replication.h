@@ -6,6 +6,7 @@
 #include "daemon/common.h"
 
 struct replication_query_statistics {
+    SPINLOCK spinlock;
     size_t queries_started;
     size_t queries_finished;
     size_t points_read;

@@ -1345,7 +1345,7 @@ void *rrdpush_sender_thread(void *ptr) {
             rrdpush_sender_thread_close_socket(s->host);
         }
 
-        worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE) dictionary_entries(s->replication_requests));
+        worker_set_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, (NETDATA_DOUBLE) dictionary_entries(s->replication.requests));
     }
 
     netdata_thread_cleanup_pop(1);
