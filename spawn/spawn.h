@@ -84,7 +84,7 @@ void spawn_init(void);
 void spawn_server(void);
 void spawn_client(void *arg);
 void destroy_spawn_cmd(struct spawn_cmd_info *cmdinfo);
-uint64_t spawn_enq_cmd(char *command_to_run);
+uint64_t spawn_enq_cmd(const char *command_to_run);
 void spawn_wait_cmd(uint64_t serial, int *exit_status, time_t *exec_run_timestamp);
 void spawn_deq_cmd(struct spawn_cmd_info *cmdinfo);
 struct spawn_cmd_info *spawn_get_unprocessed_cmd(void);

@@ -181,6 +181,42 @@ static inline void sanitize_json_string(char *dst, const char *src, size_t dst_s
     *dst = '\0';
 }
 
+static inline bool sanitize_command_argument_string(char *dst, const char *src, size_t dst_size) {
+    // skip leading dashes
+    while (src[0] == '-')
+        src++;
+
+    // escape single quotes
+    while (src[0] != '\0') {
+        if (src[0] == '\'') {
+            if (dst_size < 4)
+                return false;
+
+            dst[0] = '\''; dst[1] = '\\'; dst[2] = '\''; dst[3] = '\'';
+
+            dst += 4;
+            dst_size -= 4;
+        } else {
+            if (dst_size < 1)
+                return false;
+
+            dst[0] = src[0];
+
+            dst += 1;
+            dst_size -= 1;
+        }
+
+        src++;
+    }
+
+    // make sure we have space to terminate the string
+    if (dst_size == 0)
+        return false;
+    *dst = '\0';
+
+    return true;
+}
+
 static inline int read_file(const char *filename, char *buffer, size_t size) {
     if(unlikely(!size)) return 3;
 

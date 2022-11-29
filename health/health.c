@@ -17,6 +17,145 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
+static bool prepare_command(BUFFER *wb,
+                            const char *exec,
+                            const char *recipient,
+                            const char *registry_hostname,
+                            uint32_t unique_id,
+                            uint32_t alarm_id,
+                            uint32_t alarm_event_id,
+                            uint32_t when,
+                            const char *alert_name,
+                            const char *alert_chart_name,
+                            const char *alert_family,
+                            const char *new_status,
+                            const char *old_status,
+                            NETDATA_DOUBLE new_value,
+                            NETDATA_DOUBLE old_value,
+                            const char *alert_source,
+                            uint32_t duration,
+                            uint32_t non_clear_duration,
+                            const char *alert_units,
+                            const char *alert_info,
+                            const char *new_value_string,
+                            const char *old_value_string,
+                            const char *source,
+                            const char *error_msg,
+                            int n_warn,
+                            int n_crit,
+                            const char *warn_alarms,
+                            const char *crit_alarms,
+                            const char *classification,
+                            const char *edit_command,
+                            const char *machine_guid)
+{
+    char buf[8192];
+    size_t n = 8192 - 1;
+
+    buffer_strcat(wb, "exec");
+
+    if (!sanitize_command_argument_string(buf, exec, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, recipient, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, registry_hostname, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%u'", unique_id);
+
+    buffer_sprintf(wb, " '%u'", alarm_id);
+
+    buffer_sprintf(wb, " '%u'", alarm_event_id);
+
+    buffer_sprintf(wb, " '%u'", when);
+
+    if (!sanitize_command_argument_string(buf, alert_name, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_chart_name, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_family, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, new_status, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, old_status, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '" NETDATA_DOUBLE_FORMAT_ZERO "'", new_value);
+
+    buffer_sprintf(wb, " '" NETDATA_DOUBLE_FORMAT_ZERO "'", old_value);
+
+    if (!sanitize_command_argument_string(buf, alert_source, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%u'", duration);
+
+    buffer_sprintf(wb, " '%u'", non_clear_duration);
+
+    if (!sanitize_command_argument_string(buf, alert_units, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_info, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, new_value_string, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, old_value_string, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, source, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, error_msg, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%d'", n_warn);
+
+    buffer_sprintf(wb, " '%d'", n_crit);
+
+    if (!sanitize_command_argument_string(buf, warn_alarms, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, crit_alarms, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, classification, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, edit_command, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, machine_guid, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    return true;
+}
 
 unsigned int default_health_enabled = 1;
 char *silencers_filename;
@@ -235,7 +374,6 @@ static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
     return RRDCALC_STATUS_CLEAR;
 }
 
-#define ALARM_EXEC_COMMAND_LENGTH 8192
 #define ACTIVE_ALARMS_LIST_EXAMINE 500
 #define ACTIVE_ALARMS_LIST 15
 
@@ -306,8 +444,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
-    static char command_to_run[ALARM_EXEC_COMMAND_LENGTH + 1];
-
     const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health_default_exec);
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health_default_recipient);
 
@@ -375,49 +511,53 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" NETDATA_DOUBLE_FORMAT_ZERO
-        "' '" NETDATA_DOUBLE_FORMAT_ZERO
-        "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
-              exec,
-              recipient,
-              rrdhost_registry_hostname(host),
-              ae->unique_id,
-              ae->alarm_id,
-              ae->alarm_event_id,
-              (unsigned long)ae->when,
-              ae_name(ae),
-              ae->chart?ae_chart_name(ae):"NOCHART",
-              ae->family?ae_family(ae):"NOFAMILY",
-              rrdcalc_status2string(ae->new_status),
-              rrdcalc_status2string(ae->old_status),
-              ae->new_value,
-              ae->old_value,
-              ae->source?ae_source(ae):"UNKNOWN",
-              (uint32_t)ae->duration,
-              (uint32_t)ae->non_clear_duration,
-              ae_units(ae),
-              ae_info(ae),
-              ae_new_value_string(ae),
-              ae_old_value_string(ae),
-              (expr && expr->source)?expr->source:"NOSOURCE",
-              (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
-              n_warn,
-              n_crit,
-              buffer_tostring(warn_alarms),
-              buffer_tostring(crit_alarms),
-              ae->classification?ae_classification(ae):"Unknown",
-              edit_command,
-              host != localhost ? host->machine_guid:""
-    );
+    BUFFER *wb = buffer_create(8192);
+    bool ok = prepare_command(wb,
+                              exec,
+                              recipient,
+                              rrdhost_registry_hostname(host),
+                              ae->unique_id,
+                              ae->alarm_id,
+                              ae->alarm_event_id,
+                              (unsigned long)ae->when,
+                              ae_name(ae),
+                              ae->chart?ae_chart_name(ae):"NOCHART",
+                              ae->family?ae_family(ae):"NOFAMILY",
+                              rrdcalc_status2string(ae->new_status),
+                              rrdcalc_status2string(ae->old_status),
+                              ae->new_value,
+                              ae->old_value,
+                              ae->source?ae_source(ae):"UNKNOWN",
+                              (uint32_t)ae->duration,
+                              (uint32_t)ae->non_clear_duration,
+                              ae_units(ae),
+                              ae_info(ae),
+                              ae_new_value_string(ae),
+                              ae_old_value_string(ae),
+                              (expr && expr->source)?expr->source:"NOSOURCE",
+                              (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
+                              n_warn,
+                              n_crit,
+                              buffer_tostring(warn_alarms),
+                              buffer_tostring(crit_alarms),
+                              ae->classification?ae_classification(ae):"Unknown",
+                              edit_command,
+                              host != localhost ? host->machine_guid:"");
 
-    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-    ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
+    const char *command_to_run = buffer_tostring(wb);
+    if (ok) {
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
+        ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
-    debug(D_HEALTH, "executing command '%s'", command_to_run);
-    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
-    ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
-    enqueue_alarm_notify_in_progress(ae);
+        debug(D_HEALTH, "executing command '%s'", command_to_run);
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+        ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
+        enqueue_alarm_notify_in_progress(ae);
+    } else {
+        error("Failed to format command arguments");
+    }
 
+    buffer_free(wb);
     freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
