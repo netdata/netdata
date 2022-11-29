@@ -856,10 +856,13 @@ static struct replication_request replication_request_get_first_available() {
     while(!rq_to_return.found) {
         round++;
 
-        if(unlikely(round > 2 || started_after == 0))
+        if(round > 2)
             break;
 
         if(round == 2) {
+            if(started_after == 0)
+                break;
+            
             replication_globals.protected.queue.after = 0;
             replication_globals.protected.queue.unique_id = 0;
         }
