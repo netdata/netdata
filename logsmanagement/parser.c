@@ -4,16 +4,26 @@
  *  @author Dimitris Pantazis
  */
 
-#define _XOPEN_SOURCE 700 // required by strptime (POSIX 2004) and strndup (POSIX 2008)
 
-#include <stdio.h>
-#include <string.h>
-#include "helper.h"
 #include "parser.h"
-#include <time.h>
-#include <sys/time.h>
+#include "helper.h"
+#include <stdio.h>
 #include <sys/resource.h>
 #include <math.h>
+
+#if SKIP_WEB_LOG_TIME_PARSING == 0
+#if !defined(_XOPEN_SOURCE) && !defined(__DARWIN__) && !defined(__APPLE__)
+/* _XOPEN_SOURCE 700 required by strptime (POSIX 2004) and strndup (POSIX 2008)
+ * Will need to find a cleaner way of doing this, as currently defining
+ * _XOPEN_SOURCE 700 causes issues on Centos 7 and most probably MacOS and 
+ * FreeBSD as well */
+#define _XOPEN_SOURCE 700 
+#include <time.h>
+#include <sys/time.h>
+#endif
+#endif // SKIP_WEB_LOG_TIME_PARSING
+
+#include <string.h>
 
 static regex_t vhost_regex, req_client_regex, cipher_suite_regex;
 
@@ -1196,8 +1206,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             i++;
             offset++;
             goto next_item;
-#endif // SKIP_WEB_LOG_TIME_PARSING
-
+#else
             #if ENABLE_PARSE_WEB_LOG_LINE_DEBUG
             debug(D_LOGS_MANAG, "Item %d (type: TIME - 1st of 2 fields):%.*s", i, (int)field_size, field);
             #endif
@@ -1262,6 +1271,7 @@ static void parse_web_log_line( const Web_log_parser_config_t *wblp_config,
             ++i; // TIME takes up 2 fields_format[] spaces, so skip the next one
 
             goto next_item;
+#endif // SKIP_WEB_LOG_TIME_PARSING
         }
 
 next_item:
