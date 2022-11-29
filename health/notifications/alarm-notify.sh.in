@@ -250,7 +250,7 @@ fi
 # -----------------------------------------------------------------------------
 # find a suitable hostname to use, if netdata did not supply a hostname
 
-if [ -z ${args_host} ]; then
+if [ -z "${args_host}" ]; then
   this_host=$(hostname -s 2>/dev/null)
   host="${this_host}"
   args_host="${this_host}"
