@@ -21,10 +21,40 @@
 #define LOGS_TABLE "Logs"
 #define BLOBS_TABLE "Blobs"
 
+#define LOGS_MANAG_DB_VERSION 1
+
 static uv_loop_t *db_loop;
 static sqlite3 *main_db;
 static char *main_db_dir;  /**< Directory where all the log management databases and log blobs are stored in **/
 static char *main_db_path; /**< Path of MAIN_DB **/
+
+/* -------------------------------------------------------------------------- */
+/*                            Database migrations                             */
+/* -------------------------------------------------------------------------- */
+
+static int do_migration_noop(sqlite3 *database, const char *name){
+    UNUSED(database);
+    UNUSED(name);
+    info("Running database migration %s", name);
+    return 0;
+}
+
+typedef struct database_func_migration_list{
+    char *name;
+    int (*func)(sqlite3 *database, const char *name);
+} DATABASE_FUNC_MIGRATION_LIST;
+
+DATABASE_FUNC_MIGRATION_LIST migration_list_main_db[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
+
+DATABASE_FUNC_MIGRATION_LIST migration_list_metadata_db[] = {
+    {.name = "v0 to v1",  .func = do_migration_noop},
+    // the terminator of this array
+    {.name = NULL, .func = NULL}
+};
 
 
 /**
@@ -56,8 +86,7 @@ static inline void fatal_libuv_err(int rc, int line_no){
 char *db_get_sqlite_version() {
     int rc = 0;
     sqlite3_stmt *stmt_get_sqlite_version;
-    rc = sqlite3_prepare_v2(main_db,
-                            "SELECT sqlite_version();", -1, &stmt_get_sqlite_version, NULL);
+    rc = sqlite3_prepare_v2(main_db, "SELECT sqlite_version();", -1, &stmt_get_sqlite_version, NULL);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
     rc = sqlite3_step(stmt_get_sqlite_version);
     if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
@@ -66,6 +95,34 @@ char *db_get_sqlite_version() {
     rc = sqlite3_finalize(stmt_get_sqlite_version);
     if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
     return text;
+}
+
+/**
+ * @brief Get or set user_version of database.
+ * @param db SQLite database to act upon.
+ * @param set_user_version If <= 0, just get user_version. Otherwise, set
+ * user_version first, before returning it.
+ * @return Database user_version.
+ */
+static int db_user_version(sqlite3 *db, const int set_user_version){
+    int rc = 0;
+    if(set_user_version <= 0){
+        sqlite3_stmt *stmt_get_user_version;
+        rc = sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt_get_user_version, NULL);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        rc = sqlite3_step(stmt_get_user_version);
+        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+        int current_user_version = sqlite3_column_int(stmt_get_user_version, 0);
+        rc = sqlite3_finalize(stmt_get_user_version);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        return current_user_version;
+    } else {
+        char buf[25];
+        snprintfz(buf, 25, "PRAGMA user_version=%d;", set_user_version);
+        rc = sqlite3_exec(db, buf, NULL, NULL, NULL);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        return set_user_version;
+    }
 }
 
 static void db_writer(void *arg){
@@ -372,7 +429,19 @@ void db_init() {
         sqlite3_free(err_msg);
         fatal_sqlite3_err(rc, __LINE__);
     } 
-    // else debug(D_LOGS_MANAG, "Table %s created successfully", MAIN_COLLECTIONS_TABLE);
+
+    /* Execute pending main database migrations */
+    int main_db_ver = db_user_version(main_db, -1);
+    if (likely(LOGS_MANAG_DB_VERSION == main_db_ver)) {
+        info("Logs management %s database version is %d (no migration needed)", MAIN_DB, main_db_ver);
+    } else {
+        for(int ver = main_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_main_db[ver].func; ver++){
+            rc = (migration_list_main_db[ver].func)(main_db, migration_list_main_db[ver].name);
+            if (unlikely(rc)) fatal("Logs management %s database migration from version %d to version %d failed", MAIN_DB, ver, ver + 1);
+            // TODO: Do not fatal but return error value, so logs management can be disable and agent can continue
+            db_user_version(main_db, ver + 1);
+        }
+    }
     
     sqlite3_stmt *stmt_search_if_log_source_exists;
     rc = sqlite3_prepare_v2(main_db,
