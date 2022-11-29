@@ -777,6 +777,17 @@ static void delete_descriptors(void *arg)
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
+static void after_evict_pages(struct rrdengine_worker_config* wc)
+{
+    int error = uv_thread_join(wc->now_evicting_pages);
+    if (error)
+        error("uv_thread_join(): %s", uv_strerror(error));
+    freez(wc->now_evicting_pages);
+    wc->now_evicting_pages = NULL;
+    wc->cleanup_evicting_pages = 0;
+    /* interrupt event loop */
+    uv_stop(wc->loop);
+}
 
 // Runs in event loop
 static void flush_pages_worker_cb(uv_work_t *req, int status __maybe_unused)
@@ -1268,6 +1279,9 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
     if (unlikely(wc->cleanup_deleting_descriptors))
         after_delete_descriptors(wc);
 
+    if (unlikely(wc->cleanup_evicting_pages))
+        after_evict_pages(wc);
+
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
         ctx->quiesce = QUIESCED;
         completion_mark_complete(&ctx->rrdengine_completion);
@@ -1497,6 +1511,21 @@ void timer_cb(uv_timer_t* handle)
             wc->now_deleting_descriptors = NULL;
         }
     }
+
+    if (!wc->now_evicting_pages && __atomic_load_n(&ctx->pg_cache.populated_pages, __ATOMIC_SEQ_CST) > pg_cache_soft_limit(ctx) &&
+        NO_QUIESCE == ctx->quiesce) {
+
+        wc->now_evicting_pages = mallocz(sizeof(*wc->now_evicting_pages));
+        wc->cleanup_evicting_pages= 0;
+        int error = uv_thread_create(wc->now_evicting_pages, evict_pages, ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_evicting_pages);
+            wc->now_evicting_pages = NULL;
+        }
+    }
+
+
 
     load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS

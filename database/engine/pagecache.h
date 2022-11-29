@@ -247,6 +247,7 @@ bool rrdeng_page_descr_is_mmap(void);
 struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
 void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
 void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index);
+void evict_pages(void *arg);
 
 static inline void
     pg_cache_atomic_get_pg_info(struct rrdeng_page_descr *descr, usec_t *end_time_ut_p, uint32_t *page_lengthp)

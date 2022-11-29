@@ -325,16 +325,17 @@ static void pg_cache_release_pages_unsafe(struct rrdengine_instance *ctx, unsign
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    pg_cache->populated_pages -= number;
+//    pg_cache->populated_pages -= number;
+    __atomic_fetch_sub(&pg_cache->populated_pages, number, __ATOMIC_RELAXED);
 }
 
 static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
 
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+//    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     pg_cache_release_pages_unsafe(ctx, number);
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+//    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
 
 /*
@@ -376,52 +377,8 @@ unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx)
 static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    unsigned failures = 0;
-    const unsigned FAILURES_CEILING = 10; /* truncates exponential backoff to (2^FAILURES_CEILING x slot) */
-    unsigned long exp_backoff_slot_usec = USEC_PER_MS * 10;
-
     assert(number < ctx->max_cache_pages);
-
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1)
-        debug(D_RRDENGINE, "==Page cache full. Reserving %u pages.==",
-                number);
-
-    while (pg_cache->populated_pages + number >= pg_cache_hard_limit(ctx) + 1) {
-
-        if (!(pg_cache_try_evict_one_page_unsafe(ctx))) {
-            /* failed to evict */
-            struct completion compl;
-            struct rrdeng_cmd cmd;
-
-            ++failures;
-            uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-
-            completion_init(&compl);
-            cmd.opcode = RRDENG_FLUSH_PAGES;
-            cmd.completion = &compl;
-            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-            /* wait for some pages to be flushed */
-            debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
-            completion_wait_for(&compl);
-            completion_destroy(&compl);
-
-            if (unlikely(failures > 1)) {
-                unsigned long slots, usecs_to_sleep;
-                /* exponential backoff */
-                slots = random() % (2LU << MIN(failures, FAILURES_CEILING));
-                usecs_to_sleep = slots * exp_backoff_slot_usec;
-
-                if (usecs_to_sleep >= USEC_PER_SEC)
-                    error("Page cache is full. Sleeping for %llu second(s).", usecs_to_sleep / USEC_PER_SEC);
-
-                (void)sleep_usec(usecs_to_sleep);
-            }
-            uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-        }
-    }
-    pg_cache->populated_pages += number;
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    __atomic_fetch_add(&pg_cache->populated_pages, number, __ATOMIC_RELAXED);
 }
 
 /*
@@ -432,30 +389,9 @@ static void pg_cache_reserve_pages(struct rrdengine_instance *ctx, unsigned numb
 static int pg_cache_try_reserve_pages(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    unsigned count = 0;
-    int ret = 0;
-
     assert(number < ctx->max_cache_pages);
-
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    if (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1) {
-        debug(D_RRDENGINE,
-              "==Page cache full. Trying to reserve %u pages.==",
-              number);
-        do {
-            if (!pg_cache_try_evict_one_page_unsafe(ctx))
-                break;
-            ++count;
-        } while (pg_cache->populated_pages + number >= pg_cache_soft_limit(ctx) + 1);
-        debug(D_RRDENGINE, "Evicted %u pages.", count);
-    }
-
-    if (pg_cache->populated_pages + number < pg_cache_hard_limit(ctx) + 1) {
-        pg_cache->populated_pages += number;
-        ret = 1; /* success */
-    }
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
-    return ret;
+    __atomic_fetch_add(&pg_cache->populated_pages, number, __ATOMIC_RELAXED);
+    return 1;
 }
 
 /* The caller must hold the page cache and the page descriptor locks in that order */
@@ -511,6 +447,39 @@ static int pg_cache_try_evict_one_page_unsafe(struct rrdengine_instance *ctx)
 
     /* failed to evict */
     return 0;
+}
+
+void evict_pages(void *arg)
+{
+    struct rrdengine_instance *ctx = arg;
+    struct page_cache *pg_cache = &ctx->pg_cache;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
+
+    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+    while (NO_QUIESCE == ctx->quiesce && pg_cache->populated_pages >= pg_cache_soft_limit(ctx)) {
+        if (!(pg_cache_try_evict_one_page_unsafe(ctx))) {
+            /* failed to evict */
+            struct completion compl;
+            struct rrdeng_cmd cmd;
+
+            uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+
+            completion_init(&compl);
+            cmd.opcode = RRDENG_FLUSH_PAGES;
+            cmd.completion = &compl;
+            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+            /* wait for some pages to be flushed */
+            debug(D_RRDENGINE, "%s: waiting for pages to be written to disk before evicting.", __func__);
+            completion_wait_for(&compl);
+            completion_destroy(&compl);
+
+            uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
+        }
+    }
+    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
+    wc->cleanup_evicting_pages = 1;
+    fatal_assert(0 == uv_async_send(&wc->async));
 }
 
 /**
