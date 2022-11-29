@@ -677,7 +677,10 @@ declare -A pkg_flex=(
 
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
-  ['alpine']="fts-dev"
+  ['alpine']="musl-fts-dev"
+  ['alpine-3.16']="fts-dev"
+  ['alpine-3.15']="fts-dev"
+  ['alpine-3.14']="fts-dev"
 )
 
 declare -A pkg_json_c_dev=(
