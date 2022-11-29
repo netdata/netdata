@@ -1220,19 +1220,6 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (db_engine_journal_indexing && !wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration && !out_of_space &&
-        NO_QUIESCE == ctx->quiesce && wc->next_descriptor_cleanup < now_realtime_sec()) {
-
-        wc->now_deleting_descriptors = mallocz(sizeof(*wc->now_deleting_descriptors));
-        wc->cleanup_deleting_descriptors = 0;
-        error = uv_thread_create(wc->now_deleting_descriptors, delete_descriptors, ctx);
-        if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_deleting_descriptors);
-            wc->now_deleting_descriptors = NULL;
-        }
-    }
-
     if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == ctx->journal_initialization)) {
         /* delete old data */
         if (wc->now_deleting_files) {
@@ -1460,7 +1447,7 @@ void timer_cb(uv_timer_t* handle)
     rrdeng_test_quota(wc);
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
-    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages && !wc->now_deleting_descriptors && !wc->running_journal_migration)) {
+    if (likely(!wc->now_deleting_files && !wc->now_invalidating_dirty_pages)) {
         /* There is free space so we can write to disk and we are not actively deleting dirty buffers */
         struct page_cache *pg_cache = &ctx->pg_cache;
         unsigned long total_bytes, bytes_written, nr_committed_pages, bytes_to_write = 0, producers, low_watermark,
@@ -1496,6 +1483,19 @@ void timer_cb(uv_timer_t* handle)
     if (true == wc->run_indexing) {
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
+    }
+
+    if (db_engine_journal_indexing && !wc->now_deleting_files && !wc->now_deleting_descriptors && !wc->running_journal_migration &&
+        NO_QUIESCE == ctx->quiesce && wc->next_descriptor_cleanup < now_realtime_sec()) {
+
+        wc->now_deleting_descriptors = mallocz(sizeof(*wc->now_deleting_descriptors));
+        wc->cleanup_deleting_descriptors = 0;
+        int error = uv_thread_create(wc->now_deleting_descriptors, delete_descriptors, ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_deleting_descriptors);
+            wc->now_deleting_descriptors = NULL;
+        }
     }
 
     load_configuration_dynamic();
