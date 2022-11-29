@@ -911,8 +911,17 @@ build_fluentbit() {
   cd fluent-bit/build > /dev/null || return 1
   
   rm CMakeCache.txt
-  run eval "${env_cmd} $1 -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../" || return 1
-  run eval "${env_cmd} ${make} ${MAKEOPTS}" || return 1
+
+  if ! run eval "${env_cmd} $1 -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
+    cd - > /dev/null || return 1
+    return 1
+  fi
+
+  if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
+    cd - > /dev/null || return 1
+    return 1
+  fi
+  
   cd - > /dev/null || return 1
 }
 
