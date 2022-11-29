@@ -324,18 +324,12 @@ void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *desc
 static void pg_cache_release_pages_unsafe(struct rrdengine_instance *ctx, unsigned number)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-
-//    pg_cache->populated_pages -= number;
     __atomic_fetch_sub(&pg_cache->populated_pages, number, __ATOMIC_RELAXED);
 }
 
 static void pg_cache_release_pages(struct rrdengine_instance *ctx, unsigned number)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
-//    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
     pg_cache_release_pages_unsafe(ctx, number);
-//    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
 
 /*
