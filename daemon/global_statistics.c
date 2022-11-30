@@ -1158,7 +1158,7 @@ static void dbengine_statistics_charts(void) {
                     rd_descr_failed_to_populated_check = rrddim_add(st_pg_cache_page_next, "populated check fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_descr_failed_to_queue = rrddim_add(st_pg_cache_page_next, "queue failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_descr_queued = rrddim_add(st_pg_cache_page_next, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_descr_queued_pending = rrddim_add(st_pg_cache_page_next, "queued pending", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_queued_pending = rrddim_add(st_pg_cache_page_next, "already queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_descr_extent_fill_fail = rrddim_add(st_pg_cache_page_next, "extent rest fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 } else

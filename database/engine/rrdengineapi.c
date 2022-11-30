@@ -1000,7 +1000,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[50] = (uint64_t)ctx->stats.pg_next_descr_queued;
     array[51] = (uint64_t)ctx->stats.pg_next_descr_fail_cache_check;
     array[52] = (uint64_t)ctx->stats.pg_next_descr_fail_to_queue;
-    array[53] = (uint64_t)ctx->stats.pg_next_descr_queued_pending;
+    array[53] = (uint64_t)ctx->stats.pg_next_descr_already_queued;
     array[54] = (uint64_t)ctx->stats.pg_cache_extent_populate_rest_failed;
 
 

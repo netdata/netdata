@@ -228,7 +228,7 @@ struct rrdengine_statistics {
     rrdeng_stats_t pg_preload_descr_fail_to_queue;
     rrdeng_stats_t pg_next_descr_populated;
     rrdeng_stats_t pg_next_descr_queued;
-    rrdeng_stats_t pg_next_descr_queued_pending;
+    rrdeng_stats_t pg_next_descr_already_queued;
     rrdeng_stats_t pg_cache_extent_populate_rest_failed;
     rrdeng_stats_t pg_next_descr_fail_cache_check;
     rrdeng_stats_t pg_next_descr_fail_to_queue;
