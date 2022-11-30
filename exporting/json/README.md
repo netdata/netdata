@@ -3,6 +3,9 @@ title: "Export metrics to JSON document databases"
 description: "Archive your Agent's metrics to a JSON document database for long-term storage, further analysis, or correlation with data from other sources."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/json/README.md
 sidebar_label: JSON Document Databases
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Exporting references"
 -->
 
 # Export metrics to JSON document databases

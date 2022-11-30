@@ -3,6 +3,9 @@ title: "Export metrics to Google Cloud Pub/Sub Service"
 description: "Export Netdata metrics to the Google Cloud Pub/Sub Service for long-term archiving or analytical processing."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/pubsub/README.md
 sidebar_label: Google Cloud Pub/Sub Service
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Exporting references"
 -->
 
 # Export metrics to Google Cloud Pub/Sub Service
