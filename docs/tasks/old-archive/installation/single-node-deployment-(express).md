@@ -1,16 +1,23 @@
 <!--
-title: "Linux/Unix based deployments-(manual)"
-sidebar_label: "Linux/unix based deployments-(manual)"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-deployment-(manual).md"
-sidebar_position: "4"
-learn_status: "Published"
+title: "Linux/Unix based deployments-(express/recommended)"
+sidebar_label: "Linux/unix based deployments-(express/recommended)"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/installation/single-node-deployment-(express).md"
+sidebar_position: "1"
+learn_status: "Unpublished"
 learn_topic_type: "Getting started"
 learn_rel_path: "Getting started/Installation"
-learn_docs_purpose: "Instructions on deploying Netdata in core supported platforms+static builds."
+learn_docs_purpose: "Instructions on running the kickstart script on Linux/Unix systems."
 -->
 
-:::WIP
+import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import Admonition from '@theme/Admonition';
 
+This page will guide you through installation using the automatic one-line installation script named `kickstart.sh`.
+
+:::info
+The kickstart script works on all Linux distributions and, by default, automatic nightly updates are enabled.
 :::
 
 ## Prerequisites

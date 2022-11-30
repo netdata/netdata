@@ -6,7 +6,7 @@ learn_status: "Published"
 learn_topic_type: "Tasks"
 sidebar_position: "7"
 learn_rel_path: "Operations"
-learn_docs_purpose: "Instructions on how to use metric correlations to find correlated charts "
+learn_docs_purpose: "Instructions on how to use metric correlations to find correlated charts"
 learn_repo_doc: "True"
 -->
 
