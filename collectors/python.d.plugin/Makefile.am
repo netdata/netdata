@@ -48,7 +48,6 @@ include bind_rndc/Makefile.inc
 include boinc/Makefile.inc
 include ceph/Makefile.inc
 include changefinder/Makefile.inc
-include dockerd/Makefile.inc
 include dovecot/Makefile.inc
 include example/Makefile.inc
 include exim/Makefile.inc
@@ -61,7 +60,6 @@ include hpssa/Makefile.inc
 include icecast/Makefile.inc
 include ipfs/Makefile.inc
 include litespeed/Makefile.inc
-include logind/Makefile.inc
 include megacli/Makefile.inc
 include memcached/Makefile.inc
 include mongodb/Makefile.inc
