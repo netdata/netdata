@@ -984,15 +984,27 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
     array[37] = (uint64_t)pg_cache->active_descriptors;
 
-    array[38] = (uint64_t)ctx->stats.pg_cache_preload;              // preload descriptors queued to dbengine
-    array[39] = (uint64_t)ctx->stats.pg_index_lookup_hit;           // page look cache hit ( in page index)
-    array[40] = (uint64_t)ctx->stats.pg_index_lookup_miss;          // page look cache miss ( not in page index)
-    array[41] = (uint64_t)ctx->stats.pg_index_lookup_v2_preload;    // v2 descriptors added in page index
-    array[42] = (uint64_t)ctx->stats.pg_index_lookup_v2_hit;        // v2 descriptors cache hit (after populate page index attempt)
-    array[43] = (uint64_t)ctx->stats.pg_index_lookup_v2_miss;       // v2 descriptors cache miss (after populate page index attempt)
-    array[44] = (uint64_t)ctx->stats.pg_index_lookup_notfound;      // descriptor not found (unknown)
+    array[38] = (uint64_t)ctx->stats.pg_cache_preload;                   // preload descriptors queued to dbengine
+    array[39] = (uint64_t)ctx->stats.pg_index_lookup_hit_last;           // page look cache hit ( in page index)
+    array[40] = (uint64_t)ctx->stats.pg_index_lookup_miss;               // page look cache miss ( not in page index)
+    array[41] = (uint64_t)ctx->stats.pg_index_lookup_v2_preload;         // v2 descriptors added in page index
+    array[42] = (uint64_t)ctx->stats.pg_index_lookup_v2_hit;             // v2 descriptors cache hit (after populate page index attempt)
+    array[43] = (uint64_t)ctx->stats.pg_index_lookup_v2_miss;            // v2 descriptors cache miss (after populate page index attempt)
+    array[44] = (uint64_t)ctx->stats.pg_index_lookup_hit_first;          // descriptor not found (unknown)
+    array[45] = (uint64_t)ctx->stats.pg_preload_descr_populated;         // Descriptor was populated with data during pg cache preload
+    array[46] = (uint64_t)ctx->stats.pg_preload_descr_queued;            // Descriptor not populated and will be scheduled for preload
+    array[47] = (uint64_t)ctx->stats.pg_preload_descr_fail_cache_check;  // Failed to check descriptor if it is populated
+    array[48] = (uint64_t)ctx->stats.pg_preload_descr_fail_to_queue;     // Failed to check and lock descriptor if needs to be queued
 
-    fatal_assert(RRDENG_NR_STATS == 45);
+    array[49] = (uint64_t)ctx->stats.pg_next_descr_populated;
+    array[50] = (uint64_t)ctx->stats.pg_next_descr_queued;
+    array[51] = (uint64_t)ctx->stats.pg_next_descr_fail_cache_check;
+    array[52] = (uint64_t)ctx->stats.pg_next_descr_fail_to_queue;
+    array[53] = (uint64_t)ctx->stats.pg_next_descr_queued_pending;
+    array[54] = (uint64_t)ctx->stats.pg_cache_extent_populate_rest_failed;
+
+
+    fatal_assert(RRDENG_NR_STATS == 55);
 }
 
 /* Releases reference to page */

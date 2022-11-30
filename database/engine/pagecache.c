@@ -848,7 +848,7 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
-            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit, 1);
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit_last, 1);
             update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
@@ -869,7 +869,7 @@ static inline struct rrdeng_page_descr *find_first_page_in_time_range(
     if (likely(NULL != PValue)) {
         descr = *PValue;
         if (is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
-            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit, 1);
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_hit_last, 1);
             update_journal_access_time(NULL, page_index, descr);
             return descr;
         }
@@ -1082,6 +1082,7 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(
         uv_rwlock_rdunlock(&page_index->lock);
 
         pg_cache_release_pages(ctx, 1);
+        rrd_stat_atomic_add(&ctx->stats.pg_cache_extent_populate_rest_failed, 1);
         return NULL;
     }
 
@@ -1121,7 +1122,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
     unsigned long flags;
     Pvoid_t *PValue;
     Word_t Index;
-    uint8_t failed_to_reserve;
+//    uint8_t failed_to_reserve;
 
     if (unlikely(NULL == page_index))
         return 0;
@@ -1131,25 +1132,23 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
     if (unlikely(NULL == descr)) {
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-
-        rrd_stat_atomic_add(&page_index->ctx->stats.pg_index_lookup_notfound, 1);
         return 0;
     }
 
     Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
 
     netdata_thread_disable_cancelability();
-    struct rrdeng_page_descr *last_descr = NULL;
+//    struct rrdeng_page_descr *last_descr = NULL;
     for (count = 0, preload_count = 0 ;
          descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
          PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         /* Iterate all pages in range */
 
-        if (last_descr == descr)
-            break;
-
-        last_descr = descr;
+//        if (last_descr == descr)
+//            break;
+//
+//        last_descr = descr;
 
         if (unlikely(0 == descr->page_length))
             continue;
@@ -1161,51 +1160,56 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
         if (pg_cache_can_get_unsafe(descr, 0)) {
             if (flags & RRD_PAGE_POPULATED) {
                 /* success */
-                rrdeng_page_descr_mutex_unlock(ctx, descr);
+//                rrdeng_page_descr_mutex_unlock(ctx, descr);
                 debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-                continue;
+                rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_populated, 1);
+//                continue;
+            }
+            else {
+                if  (pg_cache_try_get_unsafe(descr, 1)) {
+                    preload_array[preload_count++] = descr;
+                    rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_queued, 1);
+                }
+                else
+                    rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_fail_to_queue, 1);
             }
         }
-        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
-            preload_array[preload_count++] = descr;
-            if (PAGE_CACHE_MAX_PRELOAD_PAGES == preload_count) {
-                rrdeng_page_descr_mutex_unlock(ctx, descr);
-                break;
-            }
+        else {
+            rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_fail_cache_check, 1);
         }
+
         rrdeng_page_descr_mutex_unlock(ctx, descr);
+
+        if (unlikely(PAGE_CACHE_MAX_PRELOAD_PAGES == preload_count))
+            break;
     }
     uv_rwlock_rdunlock(&page_index->lock);
 
-    failed_to_reserve = 0;
-    for (i = 0 ; i < preload_count && !failed_to_reserve ; ++i) {
+//    failed_to_reserve = 0;
+    k = 0;
+    for (i = 0 ; i < preload_count; ++i) {
         struct rrdeng_cmd cmd;
         struct rrdeng_page_descr *next;
 
         descr = preload_array[i];
-        if (NULL == descr) {
+        if (NULL == descr)
             continue;
-        }
-        if (!pg_cache_try_reserve_pages(ctx, 1)) {
-            failed_to_reserve = 1;
-            break;
-        }
+
+        pg_cache_try_reserve_pages(ctx, 1);
+
         cmd.opcode = RRDENG_READ_EXTENT;
         cmd.read_extent.page_cache_descr[0] = descr;
         /* don't use this page again */
         preload_array[i] = NULL;
         for (j = 0, k = 1 ; j < preload_count ; ++j) {
             next = preload_array[j];
-            if (NULL == next) {
+            if (NULL == next)
                 continue;
-            }
+
             if ((descr->extent && descr->extent == next->extent) ||
                 ((descr->extent_entry && descr->extent_entry == next->extent_entry))) {
                 /* same extent, consolidate */
-                if (!pg_cache_try_reserve_pages(ctx, 1)) {
-                    failed_to_reserve = 1;
-                    break;
-                }
+                (void ) pg_cache_try_reserve_pages(ctx, 1);
                 cmd.read_extent.page_cache_descr[k++] = next;
                 /* don't use this page again */
                 preload_array[j] = NULL;
@@ -1213,16 +1217,6 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
         }
         cmd.read_extent.page_count = k;
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-    }
-    if (failed_to_reserve) {
-        debug(D_RRDENGINE, "%s: Failed to reserve enough memory, canceling I/O.", __func__);
-        for (i = 0 ; i < preload_count ; ++i) {
-            descr = preload_array[i];
-            if (NULL == descr) {
-                continue;
-            }
-            pg_cache_put(ctx, descr);
-        }
     }
     if (!preload_count) {
         /* no such page */
@@ -1280,44 +1274,60 @@ struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, s
             pg_cache_release_pages(ctx, 1);
 
             if (likely(can_drop_page)) {
-                info("Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
-                      descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
+                info(
+                    "Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u",
+                    descr->pg_cache_descr_state,
+                    descr->pg_cache_descr->flags,
+                    descr->pg_cache_descr->refcnt);
                 pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
             }
             netdata_thread_enable_cancelability();
             return NULL;
         }
 
-        if ((flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 0)) {
-            /* success */
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-            break;
+        if ((flags & RRD_PAGE_POPULATED)) {
+            if (pg_cache_try_get_unsafe(descr, 0)) {
+                /* success */
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
+                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_populated, 1);
+                break;
+            } else
+                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_fail_cache_check, 1);
+        } else {
+            if (pg_cache_try_get_unsafe(descr, 1)) {
+                struct rrdeng_cmd cmd;
+
+                uv_rwlock_rdunlock(&page_index->lock);
+
+                if (flags & RRD_PAGE_READ_PENDING)
+                    rrd_stat_atomic_add(&ctx->stats.pg_next_descr_queued_pending, 1);
+                else
+                    rrd_stat_atomic_add(&ctx->stats.pg_next_descr_queued, 1);
+
+                cmd.opcode = RRDENG_READ_PAGE;
+                cmd.read_page.page_cache_descr = descr;
+                rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+                debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
+                if (unlikely(debug_flags & D_RRDENGINE))
+                    print_page_cache_descr(descr, "", true);
+                while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
+                    pg_cache_wait_event_unsafe(descr);
+                    rrd_stat_atomic_add(&ctx->stats.pg_next_descr_queued_pending, 1);
+                }
+                /* success */
+                /* Downgrade exclusive reference to allow other readers */
+                pg_cache_descr->flags &= ~RRD_PAGE_LOCKED;
+                pg_cache_wake_up_waiters_unsafe(descr);
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
+                netdata_thread_enable_cancelability();
+                return descr;
+            } else
+                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_fail_to_queue, 1);
         }
-        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
-            struct rrdeng_cmd cmd;
 
-            uv_rwlock_rdunlock(&page_index->lock);
-
-            cmd.opcode = RRDENG_READ_PAGE;
-            cmd.read_page.page_cache_descr = descr;
-            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-
-            debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
-            if(unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr, "", true);
-            while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
-                pg_cache_wait_event_unsafe(descr);
-            }
-            /* success */
-            /* Downgrade exclusive reference to allow other readers */
-            pg_cache_descr->flags &= ~RRD_PAGE_LOCKED;
-            pg_cache_wake_up_waiters_unsafe(descr);
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
-            netdata_thread_enable_cancelability();
-            return descr;
-        }
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
         if(unlikely(debug_flags & D_RRDENGINE))
@@ -1340,11 +1350,18 @@ struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, s
     pg_cache_release_pages(ctx, 1);
     if (page_not_in_cache)
         rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
-    else
+    else {
         rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
+    }
     netdata_thread_enable_cancelability();
+//    (void) pg_cache_preload(ctx, page_index, end_time_ut, end_time_ut);
     return descr;
 }
+
+//array[49] = (uint64_t)ctx->stats.pg_next_descr_populated;
+//array[50] = (uint64_t)ctx->stats.pg_next_descr_queued;
+//array[51] = (uint64_t)ctx->stats.pg_next_descr_fail_cache_check;
+//array[52] = (uint64_t)ctx->stats.pg_next_descr_fail_to_queue;
 
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx)
 {
