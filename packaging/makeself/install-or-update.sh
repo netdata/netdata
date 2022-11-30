@@ -218,12 +218,6 @@ if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ] && command -v setcap 1>/de
   run setcap "cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 fi
 
-# fix the fping binary
-if [ -f bin/fping ]; then
-  run chown root:${NETDATA_GROUP} bin/fping
-  run chmod 4750 bin/fping
-fi
-
 # -----------------------------------------------------------------------------
 
 echo "Configure TLS certificate paths"

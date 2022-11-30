@@ -42,7 +42,6 @@ dist_healthconfig_DATA = \
     health.d/dockerd.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
-    health.d/fping.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
     health.d/gearman.conf \
