@@ -1141,17 +1141,17 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
     Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
 
     netdata_thread_disable_cancelability();
-//    struct rrdeng_page_descr *last_descr = NULL;
+    struct rrdeng_page_descr *last_descr = NULL;
     for (count = 0, preload_count = 0 ;
          descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
          PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         /* Iterate all pages in range */
 
-//        if (last_descr == descr)
-//            break;
-//
-//        last_descr = descr;
+        if (last_descr == descr)
+            break;
+
+        last_descr = descr;
 
         if (unlikely(0 == descr->page_length))
             continue;
@@ -1163,28 +1163,19 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
         if (pg_cache_can_get_unsafe(descr, 0)) {
             if (flags & RRD_PAGE_POPULATED) {
                 /* success */
-//                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
                 debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-                rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_populated, 1);
-//                continue;
-            }
-            else {
-                if  (pg_cache_try_get_unsafe(descr, 1)) {
-                    preload_array[preload_count++] = descr;
-                    rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_queued, 1);
-                }
-                else
-                    rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_fail_to_queue, 1);
+                continue;
             }
         }
-        else {
-            rrd_stat_atomic_add(&page_index->ctx->stats.pg_preload_descr_fail_cache_check, 1);
+        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
+            preload_array[preload_count++] = descr;
+            if (PAGE_CACHE_MAX_PRELOAD_PAGES == preload_count) {
+                rrdeng_page_descr_mutex_unlock(ctx, descr);
+                break;
+            }
         }
-
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-
-        if (unlikely(PAGE_CACHE_MAX_PRELOAD_PAGES == preload_count))
-            break;
     }
     uv_rwlock_rdunlock(&page_index->lock);
 
@@ -1278,28 +1269,21 @@ struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, s
             pg_cache_release_pages(ctx, 1);
 
             if (likely(can_drop_page)) {
-                info(
-                    "Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u",
-                    descr->pg_cache_descr_state,
-                    descr->pg_cache_descr->flags,
-                    descr->pg_cache_descr->refcnt);
+                info("Dropping invalid page descr=%lu - pg_cache=%lu - Ref=%u", descr->pg_cache_descr_state,
+                      descr->pg_cache_descr->flags, descr->pg_cache_descr->refcnt);
                 pg_cache_punch_hole(ctx, descr, 0, 1, NULL, false);
             }
             netdata_thread_enable_cancelability();
             return NULL;
         }
 
-        if ((flags & RRD_PAGE_POPULATED)) {
-            if (pg_cache_try_get_unsafe(descr, 0)) {
+        if ((flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 0)) {
                 /* success */
                 rrdeng_page_descr_mutex_unlock(ctx, descr);
                 debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_populated, 1);
                 break;
-            } else
-                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_fail_cache_check, 1);
-        } else {
-            if (pg_cache_try_get_unsafe(descr, 1)) {
+        }
+        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
                 struct rrdeng_cmd cmd;
 
                 uv_rwlock_rdunlock(&page_index->lock);
@@ -1328,8 +1312,6 @@ struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, s
                 rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
                 netdata_thread_enable_cancelability();
                 return descr;
-            } else
-                rrd_stat_atomic_add(&ctx->stats.pg_next_descr_fail_to_queue, 1);
         }
 
         uv_rwlock_rdunlock(&page_index->lock);
