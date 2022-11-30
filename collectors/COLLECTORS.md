@@ -84,7 +84,7 @@ configure any of these collectors according to your setup and infrastructure.
 - [Go applications](/collectors/python.d.plugin/go_expvar/README.md): Monitor any Go application that exposes its
   metrics with the  `expvar` package from the Go standard library.
 - [Java Spring Boot 2
-applications](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/) (Go version):
+  applications](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/) (Go version):
   Monitor running Java Spring Boot 2 applications that expose their metrics with the use of the Spring Boot Actuator.
 - [statsd](/collectors/statsd.plugin/README.md): Implement a high performance `statsd` server for Netdata.
 - [phpDaemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpdaemon/): Collect worker
