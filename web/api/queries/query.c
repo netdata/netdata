@@ -1496,15 +1496,15 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
     struct storage_engine_query_handle handle;
 
     // for each lower tier
-    for(int tr = (int)tier - 1; tr >= 0 ;tr--){
-        time_t smaller_tier_first_time = rd->tiers[tr]->query_ops->oldest_time(rd->tiers[tr]->db_metric_handle);
-        time_t smaller_tier_last_time = rd->tiers[tr]->query_ops->latest_time(rd->tiers[tr]->db_metric_handle);
+    for(int read_tier = (int)tier - 1; read_tier >= 0 ; read_tier--){
+        time_t smaller_tier_first_time = rd->tiers[read_tier]->query_ops->oldest_time(rd->tiers[read_tier]->db_metric_handle);
+        time_t smaller_tier_last_time = rd->tiers[read_tier]->query_ops->latest_time(rd->tiers[read_tier]->db_metric_handle);
         if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
 
         long after_wanted = (latest_time_t < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_t;
         long before_wanted = smaller_tier_last_time;
 
-        struct rrddim_tier *tmp = rd->tiers[tr];
+        struct rrddim_tier *tmp = rd->tiers[read_tier];
         tmp->query_ops->init(tmp->db_metric_handle, &handle, after_wanted, before_wanted);
 
         size_t points_read = 0;
@@ -1516,7 +1516,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
 
             if(sp.end_time > latest_time_t) {
                 latest_time_t = sp.end_time;
-                store_metric_at_tier(rd, tr, t, sp, sp.end_time * USEC_PER_SEC);
+                store_metric_at_tier(rd, tier, t, sp, sp.end_time * USEC_PER_SEC);
             }
         }
 
