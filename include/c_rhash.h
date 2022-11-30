@@ -8,7 +8,8 @@
 #define ITEMTYPE_UNSET      (0x0)
 #define ITEMTYPE_STRING     (0x1)
 #define ITEMTYPE_UINT8      (0x2)
-#define ITEMTYPE_OPAQUE_PTR (0x3)
+#define ITEMTYPE_UINT64     (0x3)
+#define ITEMTYPE_OPAQUE_PTR (0x4)
 
 typedef struct c_rhash_s *c_rhash;
 
@@ -16,11 +17,19 @@ c_rhash c_rhash_new(size_t bin_count);
 
 void c_rhash_destroy(c_rhash hash);
 
+// # Insert
+// ## Insert where key is string
 int c_rhash_insert_str_ptr(c_rhash hash, const char *key, void *value);
 int c_rhash_insert_str_uint8(c_rhash hash, const char *key, uint8_t value);
+// ## Insert where key is uint64
+int c_rhash_insert_uint64_ptr(c_rhash hash, uint64_t key, void *value);
 
+// # Get
+// ## Get where key is string
 int c_rhash_get_ptr_by_str(c_rhash hash, const char *key, void **ret_val);
 int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val);
+// ## Get where key is uint64
+int c_rhash_get_ptr_by_uint64(c_rhash hash, uint64_t key, void **ret_val);
 
 typedef struct {
     size_t bin;

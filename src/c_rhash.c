@@ -39,6 +39,8 @@ static size_t get_itemtype_len(uint8_t item_type, const void* item_data) {
     switch (item_type) {
         case ITEMTYPE_STRING:
             return strlen(item_data) + 1;
+        case ITEMTYPE_UINT64:
+            return sizeof(uint64_t);
         case ITEMTYPE_UINT8:
             return 1;
         case ITEMTYPE_OPAQUE_PTR:
@@ -136,6 +138,17 @@ int c_rhash_insert_str_uint8(c_rhash hash, const char *key, uint8_t value) {
     return insert_into_bin(bin, ITEMTYPE_STRING, key, ITEMTYPE_UINT8, &value);
 }
 
+int c_rhash_insert_uint64_ptr(c_rhash hash, uint64_t key, void *value) {
+    c_rhash_bin *bin = &hash->bins[key % hash->bin_count];
+
+#ifdef DEBUG_VERBOSE
+    if (bin != NULL)
+        printf("COLLISION. There will be more than one item in bin idx=%d\n", nhash);
+#endif
+
+    return insert_into_bin(bin, ITEMTYPE_UINT64, &key, ITEMTYPE_OPAQUE_PTR, &value);
+}
+
 int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
     uint32_t nhash = get_bin_idx_str(hash, key);
 
@@ -167,6 +180,25 @@ int c_rhash_get_ptr_by_str(c_rhash hash, const char *key, void **ret_val) {
         }
         bin = bin->next;
     }
+    *ret_val = NULL;
+    return 1;
+}
+
+int c_rhash_get_ptr_by_uint64(c_rhash hash, uint64_t key, void **ret_val) {
+    uint32_t nhash = key % hash->bin_count;
+
+    struct bin_item *bin = hash->bins[nhash];
+
+    while (bin) {
+        if (bin->key_type == ITEMTYPE_UINT64) {
+            if (*((uint64_t *)bin->key) == key) {
+                *ret_val = *((void**)bin->value);
+                return 0;
+            }
+        }
+        bin = bin->next;
+    }
+    *ret_val = NULL;
     return 1;
 }
 
