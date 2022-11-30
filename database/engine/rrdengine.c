@@ -115,20 +115,6 @@ unsigned int getdatafile_fileno(struct rrdengine_instance *ctx, struct rrdeng_pa
     return datafile ? datafile->fileno : 0;
 }
 
-// Register workers
-static void register_libuv_worker_jobs()
-{
-    worker_register("LIBUV");
-    worker_register_job_name(RRDENG_READ_PAGE_CB,                   "read page cb");
-    worker_register_job_name(RRDENG_READ_EXTENT_CB,                 "read extent cb");
-    worker_register_job_name(RRDENG_COMMIT_PAGE_CB,                 "commit cb");
-    worker_register_job_name(RRDENG_FLUSH_PAGES_CB ,                "flush cb");
-    worker_register_job_name(RRDENG_PAGE_POPULATION ,                "populate cache");
-    worker_register_job_name(RRDENG_EXT_DECOMPRESSION ,              "extent decompression");
-    worker_register_job_name(RRDENG_READ_MMAP_EXTENT ,              "read extent (mmap)");
-    worker_register_job_name(RRDENG_EXTENT_PROCESSING ,              "extent processing");
-}
-
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
@@ -182,7 +168,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     }
 
 after_crc_check:
-    worker_is_busy(RRDENG_EXT_DECOMPRESSION);
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
         for (i = 0 ; i < count ; ++i) {
@@ -202,7 +188,7 @@ after_crc_check:
     struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
-    worker_is_busy(RRDENG_PAGE_POPULATION);
+    worker_is_busy(UV_EVENT_PAGE_POPULATION);
     struct pg_alignment *alignment = likely(NULL != page_index) ? page_index->alignment : NULL;
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
@@ -292,7 +278,7 @@ static void do_mmap_extent_processing_work(uv_work_t *req_worker)
     if (unlikely(worker == -1))
         register_libuv_worker_jobs();
 
-    worker_is_busy(RRDENG_EXTENT_PROCESSING);
+    worker_is_busy(UV_EVENT_EXTENT_PROCESSING);
     struct extent_io_descriptor *xt_io_descr = (struct extent_io_descriptor * )req_worker->data;
     struct rrdengine_worker_config *wc = req_worker->loop->data;
 
@@ -319,7 +305,7 @@ static void do_fs_read_extent_processing_work(uv_work_t *req_worker)
     if (unlikely(worker == -1))
         register_libuv_worker_jobs();
 
-    worker_is_busy(RRDENG_EXTENT_PROCESSING);
+    worker_is_busy(UV_EVENT_EXTENT_PROCESSING);
 
     uv_fs_t *req = req_worker->data;
     struct extent_io_descriptor *xt_io_descr = req->data;
@@ -338,9 +324,9 @@ static void do_fs_read_extent_cb(uv_fs_t *req)
     xt_io_descr = req->data;
 
     if (xt_io_descr->release_descr)
-        worker_is_busy(RRDENG_READ_EXTENT_CB);
+        worker_is_busy(UV_EVENT_READ_EXTENT_CB);
     else
-        worker_is_busy(RRDENG_READ_PAGE_CB);
+        worker_is_busy(UV_EVENT_READ_PAGE_CB);
     xt_io_descr = req->data;
     xt_io_descr->req_worker.data = req;
 
@@ -362,9 +348,9 @@ static void read_mmap_extent_cb(uv_work_t *req_worker, int status __maybe_unused
     xt_io_descr = req_worker->data;
 
     if (xt_io_descr->release_descr)
-        worker_is_busy(RRDENG_READ_EXTENT_CB);
+        worker_is_busy(UV_EVENT_READ_EXTENT_CB);
     else
-        worker_is_busy(RRDENG_READ_PAGE_CB);
+        worker_is_busy(UV_EVENT_READ_PAGE_CB);
     if (likely(xt_io_descr->map_base)) {
         int ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_extent_processing_work, do_mmap_extent_processing_work_cb);
         if (!ret) {
@@ -399,7 +385,7 @@ static void do_mmap_read_extent(uv_work_t *req)
     struct rrdengine_worker_config *wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
 
-    worker_is_busy(RRDENG_READ_MMAP_EXTENT);
+    worker_is_busy(UV_EVENT_READ_MMAP_EXTENT);
 
     off_t map_start =  ALIGN_BYTES_FLOOR(xt_io_descr->pos);
     size_t length = ALIGN_BYTES_CEILING(xt_io_descr->pos + xt_io_descr->bytes) - map_start;
@@ -815,7 +801,7 @@ static void flush_pages_worker(uv_work_t *req_work)
     struct rrdeng_work  *work_request = req_work->data;
     uv_fs_t *req = work_request->data;
 
-    worker_is_busy(RRDENG_FLUSH_PAGES_CB);
+    worker_is_busy(UV_EVENT_FLUSH_PAGES_CB);
     xt_io_descr = req->data;
     if (req->result < 0) {
         ++ctx->stats.io_errors;
@@ -865,12 +851,13 @@ static void flush_pages_queue_cb(uv_fs_t *req)
     work_request->req.data = work_request;
     work_request->wc = wc;
 
-    worker_is_busy(RRDENG_QUEUE_FLASH_CALLBACK);
+    worker_is_busy(UV_EVENT_QUEUE_FLASH_CALLBACK);
     // req.data contains the xt_io_descr
     work_request->data = req;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, flush_pages_worker, flush_pages_worker_cb))) {
         freez(work_request);
     }
+    worker_is_idle();
 }
 
 /*
@@ -1525,8 +1512,6 @@ void timer_cb(uv_timer_t* handle)
         }
     }
 
-
-
     load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
@@ -1552,13 +1537,6 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
     worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
     worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
-    worker_register_job_name(RRDENG_READ_PAGE_CB,                   "read page cb");
-    worker_register_job_name(RRDENG_READ_EXTENT_CB,                 "read extent cb");
-    worker_register_job_name(RRDENG_COMMIT_PAGE_CB,                 "commit cb");
-    worker_register_job_name(RRDENG_FLUSH_PAGES_CB ,                "flush cb");
-    worker_register_job_name(RRDENG_PAGE_POPULATION ,               "populate cache");
-    worker_register_job_name(RRDENG_EXT_DECOMPRESSION ,             "extent decompression");
-    worker_register_job_name(RRDENG_QUEUE_FLASH_CALLBACK ,          "queue flush cb");
 
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1649,9 +1627,16 @@ void rrdeng_worker(void* arg)
                 ctx->quiesce = SET_QUIESCE;
                 fatal_assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
-                while (do_flush_pages(wc, 1, NULL)) {
-                    ; /* Force flushing of all committed pages. */
+                info("Shutdown command received. Flushing all pages to disk");
+                usec_t start_flush = now_realtime_usec();
+
+                unsigned long total_bytes, bytes_written;
+                total_bytes = 0;
+                while ((bytes_written = do_flush_pages(wc, 1, NULL))) {
+                    total_bytes += bytes_written;
+                    /* Force flushing of all committed pages. */
                 }
+                info("Pages flushed to disk in %llu usecs (%lu bytes written)", now_realtime_usec() - start_flush, total_bytes);
                 wal_flush_transaction_buffer(wc);
                 if (!rrdeng_threads_alive(wc)) {
                     ctx->quiesce = QUIESCED;

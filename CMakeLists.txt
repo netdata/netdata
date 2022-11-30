@@ -510,6 +510,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
+		libnetdata/event_loop/event_loop.c
+        libnetdata/event_loop/event_loop.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)
@@ -523,7 +525,7 @@ add_library(libnetdata OBJECT ${LIBNETDATA_FILES})
 target_include_directories(libnetdata BEFORE PUBLIC ${GENERATED_CONFIG_H_DIR})
 
 set(APPS_PLUGIN_FILES
-        collectors/apps.plugin/apps_plugin.c)
+        collectors/apps.plugin/apps_plugin.c libnetdata/event_loop/event_loop.c libnetdata/event_loop/event_loop.h)
 
 set(FREEBSD_PLUGIN_FILES
         collectors/freebsd.plugin/plugin_freebsd.c

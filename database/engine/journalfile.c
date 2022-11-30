@@ -1661,19 +1661,26 @@ void after_journal_indexing(uv_work_t *req, int status)
 #define MAX_RETRIES_TO_START_INDEX (100)
 void start_journal_indexing(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
 
     unsigned count = 0;
+    worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
     while ((wc->now_deleting_files || wc->now_deleting_descriptors) && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
 
-    if (count == MAX_RETRIES_TO_START_INDEX)
+    if (count == MAX_RETRIES_TO_START_INDEX) {
+        worker_is_idle();
         return;
+    }
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
-
+    worker_is_busy(UV_EVENT_JOURNAL_INDEX);
     while (datafile && datafile->fileno != ctx->last_fileno) {
         if (unlikely(!datafile->journalfile->journal_data)) {
             bool ready_to_index = journalfile_ready_to_index(datafile);
@@ -1692,6 +1699,7 @@ void start_journal_indexing(uv_work_t *req)
         if (unlikely(NO_QUIESCE != ctx->quiesce))
             break;
     }
+    worker_is_idle();
 }
 
 void init_commit_log(struct rrdengine_instance *ctx)
