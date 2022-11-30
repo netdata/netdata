@@ -284,6 +284,7 @@ telemetry_event() {
     "selected_install_method": "${SELECTED_INSTALL_METHOD}",
     "netdata_release_channel": "${RELEASE_CHANNEL:-null}",
     "netdata_install_type": "${INSTALL_TYPE}",
+    "netdata_version": "${INSTALL_VERSION}",
     "host_os_name": "${HOST_NAME:-unknown}",
     "host_os_id": "${HOST_ID:-unknown}",
     "host_os_id_like": "${HOST_ID_LIKE:-unknown}",
