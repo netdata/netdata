@@ -1,11 +1,12 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.37.0](https://github.com/netdata/netdata/tree/v1.37.0) (2022-11-30)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.36.1...v1.37.0)
 
 **Merged pull requests:**
 
+- fix spinlock [\#14068](https://github.com/netdata/netdata/pull/14068) ([ktsaou](https://github.com/ktsaou))
 - Sanitize command arguments. [\#14064](https://github.com/netdata/netdata/pull/14064) ([vkalintiris](https://github.com/vkalintiris))
 - Strict control of streaming API keys and MACHINE GUIDs in stream.conf [\#14063](https://github.com/netdata/netdata/pull/14063) ([ktsaou](https://github.com/ktsaou))
 - replication fixes No 8 [\#14061](https://github.com/netdata/netdata/pull/14061) ([ktsaou](https://github.com/ktsaou))
@@ -353,7 +354,6 @@
 - Set value to SN\_EMPTY\_SLOT if flags is SN\_EMPTY\_SLOT [\#13417](https://github.com/netdata/netdata/pull/13417) ([MrZammler](https://github.com/MrZammler))
 - Add missing comma \(handle coverity warning CID 379360\) [\#13413](https://github.com/netdata/netdata/pull/13413) ([stelfrag](https://github.com/stelfrag))
 - codacy/lgtm ignore judy sources [\#13411](https://github.com/netdata/netdata/pull/13411) ([underhood](https://github.com/underhood))
-- Send chart context with alert events to the cloud [\#13409](https://github.com/netdata/netdata/pull/13409) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
