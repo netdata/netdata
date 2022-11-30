@@ -6,15 +6,18 @@
 
 #define WORKER_JOB_GLOBAL             0
 #define WORKER_JOB_REGISTRY           1
-#define WORKER_JOB_WORKERS            2
-#define WORKER_JOB_DBENGINE           3
-#define WORKER_JOB_HEARTBEAT          4
-#define WORKER_JOB_STRINGS            5
-#define WORKER_JOB_DICTIONARIES       6
-#define WORKER_JOB_MALLOC_TRACE       7
+#define WORKER_JOB_DBENGINE           2
+#define WORKER_JOB_HEARTBEAT          3
+#define WORKER_JOB_STRINGS            4
+#define WORKER_JOB_DICTIONARIES       5
+#define WORKER_JOB_MALLOC_TRACE       6
+#define WORKER_JOB_WORKERS_COLLECT    7
+#define WORKER_JOB_WORKERS_CHART      8
+#define WORKER_JOB_WORKERS_CLEANUP    9
+#define WORKER_JOB_WORKERS_CPU        10
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 11
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 11
 #endif
 
 bool global_statistics_enabled = true;
@@ -2621,18 +2624,25 @@ static void worker_utilization_charts(void) {
     static size_t iterations = 0;
     iterations++;
 
-    int i;
-    for(i = 0; all_workers_utilization[i].name ;i++) {
+    worker_is_busy(WORKER_JOB_WORKERS_COLLECT);
+    for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
+    }
 
+    worker_is_busy(WORKER_JOB_WORKERS_CHART);
+    for(int i = 0; all_workers_utilization[i].name ;i++) {
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
+    }
 
+    worker_is_busy(WORKER_JOB_WORKERS_CLEANUP);
+    for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_threads_cleanup(&all_workers_utilization[i]);
     }
 
+    worker_is_busy(WORKER_JOB_WORKERS_CPU);
     workers_total_cpu_utilization_chart();
 }
 
@@ -2672,11 +2682,14 @@ static void global_statistics_register_workers(void) {
     worker_register("STATS");
     worker_register_job_name(WORKER_JOB_GLOBAL, "global");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
-    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    worker_register_job_name(WORKER_JOB_WORKERS_COLLECT, "workers collect");
+    worker_register_job_name(WORKER_JOB_WORKERS_CHART, "workers chart");
+    worker_register_job_name(WORKER_JOB_WORKERS_CLEANUP, "workers cleanup");
+    worker_register_job_name(WORKER_JOB_WORKERS_CPU, "workers cpu");
 }
 
 static void global_statistics_cleanup(void *ptr)
@@ -2782,8 +2795,6 @@ void *global_statistics_workers_main(void *ptr)
             while (!netdata_exit) {
                 worker_is_idle();
                 heartbeat_next(&hb, step);
-
-                worker_is_busy(WORKER_JOB_WORKERS);
                 worker_utilization_charts();
             }
 
