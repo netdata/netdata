@@ -1205,7 +1205,6 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
                 /* same extent, consolidate */
                 (void ) pg_cache_try_reserve_pages(ctx, 1);
                 cmd.read_extent.page_cache_descr[k++] = next;
-                next->pg_cache_descr->flags |= RRD_PAGE_QUEUED;
                 /* don't use this page again */
                 preload_array[j] = NULL;
             }
@@ -1287,16 +1286,9 @@ struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, s
                 struct rrdeng_cmd cmd;
 
                 uv_rwlock_rdunlock(&page_index->lock);
-
-                if (flags & (RRD_PAGE_READ_PENDING | RRD_PAGE_QUEUED))
-                    rrd_stat_atomic_add(&ctx->stats.pg_next_descr_already_queued, 1);
-                else {
-                    rrd_stat_atomic_add(&ctx->stats.pg_next_descr_queued, 1);
-
-                    cmd.opcode = RRDENG_READ_PAGE;
-                    cmd.read_page.page_cache_descr = descr;
-                    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-                }
+                cmd.opcode = RRDENG_READ_PAGE;
+                cmd.read_page.page_cache_descr = descr;
+                rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
                 debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
                 if (unlikely(debug_flags & D_RRDENGINE))

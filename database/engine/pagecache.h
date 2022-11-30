@@ -21,7 +21,6 @@ struct rrdeng_page_descr;
 #define RRD_PAGE_WRITE_PENDING  (1LU << 3)
 #define RRD_PAGE_POPULATED      (1LU << 4)
 #define RRD_PAGE_INVALID        (1LU << 5)
-#define RRD_PAGE_QUEUED         (1LU << 6)
 
 #ifdef NETDATA_INTERNAL_CHECKS
 struct pg_cache_waiter {

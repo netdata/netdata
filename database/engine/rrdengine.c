@@ -437,7 +437,6 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         rrdeng_page_descr_mutex_lock(ctx, descr[i]);
         pg_cache_descr = descr[i]->pg_cache_descr;
         pg_cache_descr->flags |= RRD_PAGE_READ_PENDING;
-        pg_cache_descr->flags &= ~RRD_PAGE_QUEUED;
         rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
         // TODO: Add extent information here for this descriptor (datafile, POS , SIZE)
         xt_io_descr->descr_array[i] = descr[i];
