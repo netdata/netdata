@@ -115,6 +115,44 @@ unsigned int getdatafile_fileno(struct rrdengine_instance *ctx, struct rrdeng_pa
     return datafile ? datafile->fileno : 0;
 }
 
+static void create_descriptor_from_extent(struct rrdengine_instance *ctx, struct rrdeng_extent_page_descr *xdescr,  struct rrdeng_page_descr *base_descr)
+{
+    if (!base_descr->extent_entry)
+        return;
+
+    struct page_cache *pg_cache = &ctx->pg_cache;
+
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xdescr->uuid, sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = likely(NULL != PValue) ? *PValue : NULL;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+    if (unlikely(!page_index))
+        return;
+
+    struct rrdeng_page_descr *descr = get_descriptor(page_index, (time_t)(xdescr->start_time_ut / USEC_PER_SEC));
+    if (descr)
+        return;
+
+    uv_rwlock_wrlock(&page_index->lock);
+    struct rrdeng_page_descr *new_descr = pg_cache_create_descr();
+    new_descr->page_length = xdescr->page_length;
+    new_descr->start_time_ut = xdescr->start_time_ut;
+    new_descr->end_time_ut = xdescr->end_time_ut;
+    new_descr->id = &page_index->id;
+    new_descr->extent = base_descr->extent;
+    new_descr->extent_entry = base_descr->extent_entry;
+    new_descr->type = xdescr->type;
+    new_descr->update_every_s = page_index->latest_update_every_s;
+    new_descr->file = base_descr->file;
+
+    struct rrdeng_page_descr *added_descr = pg_cache_insert(ctx, page_index, new_descr, false);
+    if (new_descr != added_descr)
+        rrdeng_page_descr_freez(new_descr);
+
+    uv_rwlock_rdunlock(&page_index->lock);
+}
+
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
@@ -184,7 +222,7 @@ after_crc_check:
     }
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0]->id, sizeof(uuid_t));
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_read_array[0].id, sizeof(uuid_t));
     struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 
@@ -194,17 +232,23 @@ after_crc_check:
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
         descr = NULL;
+
+        // Check and populate if needed
+        if (xt_io_descr->descr_read_array[0].extent_entry)
+            create_descriptor_from_extent(ctx, &header->descr[i], &xt_io_descr->descr_read_array[0]);
+
         for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
             struct rrdeng_page_descr descrj;
 
             descrj = xt_io_descr->descr_read_array[j];
+
             /* care, we don't hold the descriptor mutex */
             if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj.id) &&
                 header->descr[i].page_length == descrj.page_length &&
                 header->descr[i].start_time_ut == descrj.start_time_ut &&
                 header->descr[i].end_time_ut == descrj.end_time_ut) {
                 //descr = descrj;
-                descr = get_descriptor(page_index, (time_t) (descrj.start_time_ut / USEC_PER_SEC));
+                descr = get_descriptor(get_page_index(pg_cache, descrj.id), (time_t) (descrj.start_time_ut / USEC_PER_SEC));
                 if (likely(descr))
                     bitmap256_set_bit(&xt_io_descr->descr_array_wakeup, j, 0);
                 else {
@@ -627,6 +671,9 @@ struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *
 
 struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
 {
+    if (unlikely(!page_index))
+        return NULL;
+
     uv_rwlock_rdlock(&page_index->lock);
     Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
     struct rrdeng_page_descr *descr = unlikely(NULL == PValue) ? NULL : *PValue;
