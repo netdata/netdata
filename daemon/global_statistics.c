@@ -2691,7 +2691,7 @@ static void global_statistics_register_workers(void) {
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
-    worker_register_job_name(WORKER_JOB_WORKERS, "workers collect");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
 }
 
 static void global_statistics_cleanup(void *ptr)
