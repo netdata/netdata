@@ -3,6 +3,10 @@ title: "Send notifications to Google Hangouts"
 description: "Send alerts to Send notifications to Google Hangouts any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "Google Hangouts"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/hangouts/README.md
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Notification references"
+learn_autogeneration_metadata: "[(part_of_cloud,false), (part_of_agent,true)]"
 -->
 
 # Send notifications to Google Hangouts

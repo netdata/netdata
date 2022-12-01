@@ -1,6 +1,11 @@
 <!--
 title: "Rocket.Chat"
+sidebar_label: "Rocket Chat"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/rocketchat/README.md
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Notification references"
+learn_autogeneration_metadata: "[(part_of_cloud,false), (part_of_agent,true)]"
 -->
 
 # Rocket.Chat

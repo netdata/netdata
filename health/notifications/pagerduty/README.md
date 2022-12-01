@@ -3,6 +3,10 @@ title: "Send alert notifications to PagerDuty"
 description: "Send alerts to your PagerDuty dashboard any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "PagerDuty"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/pagerduty/README.md
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Notification references"
+learn_autogeneration_metadata: "[(part_of_cloud,false), (part_of_agent,true)]"
 -->
 
 # Send alert notifications to PagerDuty
