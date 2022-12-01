@@ -4427,9 +4427,6 @@ netdataDashboard.context = {
         info: 'The current number of client connections. A connection is considered <b>idle</b> if there are currently no active requests.'
     },
     'nginxplus.ssl_handshakes_rate': {
-        info: 'Successful SSL handshakes.'
-    },
-    'nginxplus.ssl_handshakes_rate': {
         info: 'Successful and failed SSL handshakes.'
     },
     'nginxplus.ssl_session_reuses_rate': {
