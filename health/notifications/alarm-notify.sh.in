@@ -2409,7 +2409,11 @@ status_message="status unknown"
 color="grey"
 
 # the alarm value
-alarm="${name//_/ } = ${value_string}"
+if [ -n "${custom_title}" ]; then
+    alarm="${custom_title//_/ } = ${value_string}"
+else
+    alarm="${name//_/ } = ${value_string}"
+fi
 
 # the image of the alarm
 image="${images_base_url}/images/banner-icon-144x144.png"
@@ -2460,7 +2464,11 @@ CLEAR)
 esac
 
 # the html email subject
-html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
+if [ -n "${custom_title}" ]; then
+    html_email_subject="${status_email_subject}, ${custom_title} = ${value_string}, on ${host}"
+else
+    html_email_subject="${status_email_subject}, ${name} = ${value_string}, on ${host}"
+fi
 
 if [ "${status}" = "CLEAR" ]; then
   severity="Recovered from ${old_status}"
@@ -2471,8 +2479,12 @@ if [ "${status}" = "CLEAR" ]; then
 
   # don't show the value when the status is CLEAR
   # for certain alarms, this value might not have any meaning
-  alarm="${name//_/ } ${raised_for}"
-  html_email_subject="${status_email_subject}, ${name} ${raised_for}, on ${host}"
+  if [ -n "${custom_title}" ]; then
+      alarm="${custom_title//_/ } ${raised_for}"
+  else
+      alarm="${name//_/ } ${raised_for}"
+  fi
+  html_email_subject="${status_email_subject}, ${alarm} ${raised_for}, on ${host}"
 
 elif { [ "${old_status}" = "WARNING" ] && [ "${status}" = "CRITICAL" ]; }; then
   severity="Escalated to ${status}"
@@ -2490,10 +2502,6 @@ elif { [ "${old_status}" = "CRITICAL" ] && [ "${status}" = "WARNING" ]; }; then
 
 else
   raised_for=
-fi
-
-if [ -n "${custom_title}" ]; then
-    html_email_subject="${custom_title}"
 fi
 
 # prepare HTML versions of elements
