@@ -52,6 +52,32 @@ struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
 
+// ----------------------------------------------------------------------------
+// memory mode
+
+typedef enum rrd_memory_mode {
+    RRD_MEMORY_MODE_NONE = 0,
+    RRD_MEMORY_MODE_RAM  = 1,
+    RRD_MEMORY_MODE_MAP  = 2,
+    RRD_MEMORY_MODE_SAVE = 3,
+    RRD_MEMORY_MODE_ALLOC = 4,
+    RRD_MEMORY_MODE_DBENGINE = 5,
+
+    // this is 8-bit
+} RRD_MEMORY_MODE;
+
+#define RRD_MEMORY_MODE_NONE_NAME "none"
+#define RRD_MEMORY_MODE_RAM_NAME "ram"
+#define RRD_MEMORY_MODE_MAP_NAME "map"
+#define RRD_MEMORY_MODE_SAVE_NAME "save"
+#define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
+#define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
+
+extern RRD_MEMORY_MODE default_rrd_memory_mode;
+
+const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
+RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
@@ -122,34 +148,6 @@ typedef enum rrdset_type {
 
 RRDSET_TYPE rrdset_type_id(const char *name);
 const char *rrdset_type_name(RRDSET_TYPE chart_type);
-
-
-// ----------------------------------------------------------------------------
-// memory mode
-
-typedef enum rrd_memory_mode {
-    RRD_MEMORY_MODE_NONE = 0,
-    RRD_MEMORY_MODE_RAM  = 1,
-    RRD_MEMORY_MODE_MAP  = 2,
-    RRD_MEMORY_MODE_SAVE = 3,
-    RRD_MEMORY_MODE_ALLOC = 4,
-    RRD_MEMORY_MODE_DBENGINE = 5,
-
-    // this is 8-bit
-} RRD_MEMORY_MODE;
-
-#define RRD_MEMORY_MODE_NONE_NAME "none"
-#define RRD_MEMORY_MODE_RAM_NAME "ram"
-#define RRD_MEMORY_MODE_MAP_NAME "map"
-#define RRD_MEMORY_MODE_SAVE_NAME "save"
-#define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
-#define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
-
-extern RRD_MEMORY_MODE default_rrd_memory_mode;
-
-const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
-RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
-
 
 // ----------------------------------------------------------------------------
 // algorithms types
@@ -405,29 +403,6 @@ typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
 // engine-specific iterator state for dimension data queries
 typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
-// ------------------------------------------------------------------------
-// function pointers that handle data collection
-struct storage_engine_collect_ops {
-    // an initialization function to run before starting collection
-    STORAGE_COLLECT_HANDLE *(*init)(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every);
-
-    // run this to store each metric into the database
-    void (*store_metric)(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number, NETDATA_DOUBLE min_value,
-                         NETDATA_DOUBLE max_value, uint16_t count, uint16_t anomaly_count, SN_FLAGS flags);
-
-    // run this to flush / reset the current data collection sequence
-    void (*flush)(STORAGE_COLLECT_HANDLE *collection_handle);
-
-    // a finalization function to run after collection is over
-    // returns 1 if it's safe to delete the dimension
-    int (*finalize)(STORAGE_COLLECT_HANDLE *collection_handle);
-
-    void (*change_collection_frequency)(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-
-    STORAGE_METRICS_GROUP *(*metrics_group_get)(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-    void (*metrics_group_release)(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *sa);
-};
-
 // ----------------------------------------------------------------------------
 // iterator state for RRD dimension data queries
 struct storage_engine_query_handle {
@@ -437,63 +412,16 @@ struct storage_engine_query_handle {
     STORAGE_QUERY_HANDLE* handle;
 };
 
-// function pointers that handle database queries
-struct storage_engine_query_ops {
-    // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time);
-
-    // run this to load each metric number from the database
-    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
-
-    // run this to test if the series of next_metric() database queries is finished
-    int (*is_finished)(struct storage_engine_query_handle *handle);
-
-    // run this after finishing a series of load_metric() database queries
-    void (*finalize)(struct storage_engine_query_handle *handle);
-
-    // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
-
-    // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
-};
-
-typedef struct storage_engine STORAGE_ENGINE;
-
-// ------------------------------------------------------------------------
-// function pointers for all APIs provided by a storage engine
-typedef struct storage_engine_api {
-    // metric management
-    STORAGE_METRIC_HANDLE *(*metric_get)(STORAGE_INSTANCE *instance, uuid_t *uuid, STORAGE_METRICS_GROUP *smg);
-    STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *instance, STORAGE_METRICS_GROUP *smg);
-    void (*metric_release)(STORAGE_METRIC_HANDLE *);
-    STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
-
-    // operations
-    struct storage_engine_collect_ops collect_ops;
-    struct storage_engine_query_ops query_ops;
-} STORAGE_ENGINE_API;
-
-struct storage_engine {
-    RRD_MEMORY_MODE id;
-    const char* name;
-    STORAGE_ENGINE_API api;
-};
-
-STORAGE_ENGINE* storage_engine_get(RRD_MEMORY_MODE mmode);
-STORAGE_ENGINE* storage_engine_find(const char* name);
-
 // ----------------------------------------------------------------------------
 // Storage tier data for every dimension
 
 struct rrddim_tier {
     size_t tier_grouping;
+    RRD_MEMORY_MODE mode;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     STORAGE_POINT virtual_point;
     time_t next_point_time;
-    struct storage_engine_collect_ops *collect_ops;
-    struct storage_engine_query_ops *query_ops;
 };
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now);
@@ -954,7 +882,6 @@ struct rrdhost {
 
     struct {
         RRD_MEMORY_MODE mode;                       // the db mode for this tier
-        STORAGE_ENGINE *eng;                        // the storage engine API for this tier
         STORAGE_INSTANCE *instance;                 // the db instance for this tier
         size_t tier_grouping;                       // tier 0 iterations aggregated on this tier
     } db[RRD_STORAGE_TIERS];
@@ -1398,6 +1325,9 @@ size_t get_tier_grouping(size_t tier);
 #ifdef ENABLE_DBENGINE
 #include "database/engine/rrdengineapi.h"
 #endif
+
+#include "storage_engine.h"
+
 #include "sqlite/sqlite_functions.h"
 #include "sqlite/sqlite_context.h"
 #include "sqlite/sqlite_metadata.h"

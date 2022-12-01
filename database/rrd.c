@@ -28,43 +28,40 @@ int gap_when_lost_iterations_above = 1;
 // RRD - memory modes
 
 inline const char *rrd_memory_mode_name(RRD_MEMORY_MODE id) {
-    switch(id) {
+    switch (id) {
         case RRD_MEMORY_MODE_RAM:
             return RRD_MEMORY_MODE_RAM_NAME;
-
         case RRD_MEMORY_MODE_MAP:
             return RRD_MEMORY_MODE_MAP_NAME;
-
         case RRD_MEMORY_MODE_NONE:
             return RRD_MEMORY_MODE_NONE_NAME;
-
         case RRD_MEMORY_MODE_SAVE:
             return RRD_MEMORY_MODE_SAVE_NAME;
-
         case RRD_MEMORY_MODE_ALLOC:
             return RRD_MEMORY_MODE_ALLOC_NAME;
-
         case RRD_MEMORY_MODE_DBENGINE:
             return RRD_MEMORY_MODE_DBENGINE_NAME;
+        default:
+            fatal("Invalid memory mode id: %d", id);
     }
-
-    STORAGE_ENGINE* eng = storage_engine_get(id);
-    if (eng) {
-        return eng->name;
-    }
-
-    return RRD_MEMORY_MODE_SAVE_NAME;
 }
 
 RRD_MEMORY_MODE rrd_memory_mode_id(const char *name) {
-    STORAGE_ENGINE* eng = storage_engine_find(name);
-    if (eng) {
-        return eng->id;
-    }
+    if (!strcmp(name, RRD_MEMORY_MODE_RAM_NAME))
+        return RRD_MEMORY_MODE_RAM;
+    if (!strcmp(name, RRD_MEMORY_MODE_MAP_NAME))
+        return RRD_MEMORY_MODE_MAP;
+    if (!strcmp(name, RRD_MEMORY_MODE_NONE_NAME))
+        return RRD_MEMORY_MODE_NONE;
+    if (!strcmp(name, RRD_MEMORY_MODE_SAVE_NAME))
+        return RRD_MEMORY_MODE_SAVE;
+    if (!strcmp(name, RRD_MEMORY_MODE_ALLOC_NAME))
+        return RRD_MEMORY_MODE_ALLOC;
+    if (!strcmp(name, RRD_MEMORY_MODE_DBENGINE_NAME))
+        return RRD_MEMORY_MODE_DBENGINE;
 
     return RRD_MEMORY_MODE_SAVE;
 }
-
 
 // ----------------------------------------------------------------------------
 // RRD - algorithms types

@@ -152,11 +152,12 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // initialize the db tiers
     {
-        for(size_t tier = 0; tier < storage_tiers ; tier++) {
-            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-            if(!eng) continue;
+        for (size_t tier = 0; tier < storage_tiers ; tier++) {
+            STORAGE_INSTANCE *si = st->rrdhost->db[tier].instance;
+            if(!si)
+                continue;
 
-            st->storage_metrics_groups[tier] = eng->api.collect_ops.metrics_group_get(host->db[tier].instance, &st->chart_uuid);
+            st->storage_metrics_groups[tier] = se_metrics_group_get(st->rrdhost->db[tier].mode, si, &st->chart_uuid);
         }
     }
 
@@ -190,10 +191,10 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // cleanup storage engines
     {
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
-            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-            if(!eng) continue;
+            STORAGE_INSTANCE *si = st->rrdhost->db[tier].instance;
+            if(!si) continue;
 
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            se_metrics_group_release(st->rrdhost->db[tier].mode, si, st->storage_metrics_groups[tier]);
         }
     }
 
@@ -674,7 +675,8 @@ void rrdset_reset(RRDSET *st) {
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             for(size_t tier = 0; tier < storage_tiers ;tier++) {
                 if(rd->tiers[tier])
-                    rd->tiers[tier]->collect_ops->flush(rd->tiers[tier]->db_collection_handle);
+                    se_store_metric_flush_current_page(rd->tiers[tier]->mode,
+                                                       rd->tiers[tier]->db_collection_handle);
             }
         }
     }
@@ -1060,7 +1062,8 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
     if(unlikely(sp.start_time > t->next_point_time)) {
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
-            t->collect_ops->store_metric(
+            se_store_metric_next(
+                t->mode,
                 t->db_collection_handle,
                 t->next_point_time * USEC_PER_SEC,
                 t->virtual_point.sum,
@@ -1071,7 +1074,8 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
                 t->virtual_point.flags);
         }
         else {
-            t->collect_ops->store_metric(
+            se_store_metric_next(
+                t->mode,
                 t->db_collection_handle,
                 t->next_point_time * USEC_PER_SEC,
                 NAN,
@@ -1143,7 +1147,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    se_store_metric_next(rd->tiers[0]->mode, rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
@@ -1959,7 +1963,11 @@ time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+                se_store_metric_change_collection_frequency(
+                    rd->tiers[tier]->mode,
+                    rd->tiers[tier]->db_collection_handle,
+                    (int)(st->rrdhost->db[tier].tier_grouping * st->update_every)
+                );
         }
 
         assert(rd->update_every == prev_update_every &&

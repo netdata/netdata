@@ -77,8 +77,8 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->tiers[0]->query_ops->oldest_time(rd->tiers[0]->db_metric_handle);
-    time_t last_t = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
+    time_t first_t = se_metric_oldest_time(rd->tiers[0]->mode, rd->tiers[0]->db_metric_handle);
+    time_t last_t = se_metric_latest_time(rd->tiers[0]->mode, rd->tiers[0]->db_metric_handle);
     time_t update_every = st->update_every;
     struct storage_engine_query_handle handle;
 
@@ -126,8 +126,9 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, after, before); !rd->tiers[0]->query_ops->is_finished(&handle);) {
-        STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
+    se_query_init(rd->tiers[0]->mode, rd->tiers[0]->db_metric_handle, &handle, after, before);
+    while (!se_query_is_finished(rd->tiers[0]->mode, &handle)) {
+        STORAGE_POINT sp = se_query_next_metric(rd->tiers[0]->mode, &handle);
         points_read++;
 
         if (unlikely(storage_point_is_empty(sp))) {
@@ -138,7 +139,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         sum += sp.sum;
         counter += sp.count;
     }
-    rd->tiers[0]->query_ops->finalize(&handle);
+    se_query_finalize(rd->tiers[0]->mode, &handle);
     global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {

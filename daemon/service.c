@@ -51,7 +51,7 @@ static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
             if(rd->tiers[tier]) {
                 tiers_available++;
 
-                if(rd->tiers[tier]->collect_ops->finalize(rd->tiers[tier]->db_collection_handle))
+                if(se_collect_finalize(rd->tiers[tier]->mode, rd->tiers[tier]->db_collection_handle))
                     tiers_said_yes++;
 
                 rd->tiers[tier]->db_collection_handle = NULL;

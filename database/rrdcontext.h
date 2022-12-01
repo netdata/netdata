@@ -120,7 +120,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 
 typedef struct query_metric {
     struct query_metric_tier {
-        struct storage_engine *eng;
+        RRD_MEMORY_MODE mode;
         STORAGE_METRIC_HANDLE *db_metric_handle;
         time_t db_first_time_t;         // the oldest timestamp available for this tier
         time_t db_last_time_t;          // the latest timestamp available for this tier

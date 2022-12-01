@@ -61,7 +61,6 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
     size_t dimensions = rrdset_number_of_dimensions(st);
     size_t points_read = 0, points_generated = 0;
 
-    struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
     struct replication_dimension data[dimensions];
     memset(data, 0, sizeof(data));
 
@@ -93,7 +92,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
             d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
             d->rd = rd;
 
-            ops->init(rd->tiers[0]->db_metric_handle, &d->handle, after, before);
+            se_query_init(rd->tiers[0]->mode, rd->tiers[0]->db_metric_handle, &d->handle, after, before);
             d->enabled = true;
         }
         rrddim_foreach_done(rd);
@@ -108,8 +107,8 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
 
             // fetch the first valid point for the dimension
             int max_skip = 100;
-            while(d->sp.end_time < now && !ops->is_finished(&d->handle) && max_skip-- > 0) {
-                d->sp = ops->next_metric(&d->handle);
+            while(d->sp.end_time < now && !se_query_is_finished(d->rd->tiers[0]->mode, &d->handle) && max_skip-- > 0) {
+                d->sp = se_query_next_metric(d->rd->tiers[0]->mode, &d->handle);
                 points_read++;
             }
 
@@ -209,7 +208,7 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         struct replication_dimension *d = &data[i];
         if(unlikely(!d->enabled)) continue;
 
-        ops->finalize(&d->handle);
+        se_query_finalize(d->rd->tiers[0]->mode, &d->handle);
 
         dictionary_acquired_item_release(d->dict, d->rda);
 

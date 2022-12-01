@@ -2328,10 +2328,11 @@ void query_target_release(QUERY_TARGET *qt) {
         qt->query.array[i].chart.name = NULL;
 
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            if(qt->query.array[i].tiers[tier].db_metric_handle) {
-                STORAGE_ENGINE *eng = qt->query.array[i].tiers[tier].eng;
-                eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
-                qt->query.array[i].tiers[tier].db_metric_handle = NULL;
+            struct query_metric_tier *qmt = &qt->query.array[i].tiers[tier];
+
+            if(qmt->db_metric_handle) {
+                se_metric_release(qmt->mode, qmt->db_metric_handle);
+                qmt->db_metric_handle = NULL;
             }
         }
     }
@@ -2420,7 +2421,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     time_t common_update_every = 0;
     size_t tiers_added = 0;
     struct {
-        STORAGE_ENGINE *eng;
+        RRD_MEMORY_MODE mode;
         STORAGE_METRIC_HANDLE *db_metric_handle;
         time_t db_first_time_t;
         time_t db_last_time_t;
@@ -2428,18 +2429,19 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     } tier_retention[storage_tiers];
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
-        STORAGE_ENGINE *eng = qtl->host->db[tier].eng;
-        tier_retention[tier].eng = eng;
+        RRD_MEMORY_MODE mode = qtl->host->db[tier].mode;
+
+        tier_retention[tier].mode = mode;
         tier_retention[tier].db_update_every = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every);
 
         if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
-            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
+            tier_retention[tier].db_metric_handle = se_metric_dup(mode, rm->rrddim->tiers[tier]->db_metric_handle);
         else
-            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid, NULL);
+            tier_retention[tier].db_metric_handle = se_metric_get(mode, qtl->host->db[tier].instance, &rm->uuid, NULL);
 
         if(tier_retention[tier].db_metric_handle) {
-            tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);
-            tier_retention[tier].db_last_time_t = tier_retention[tier].eng->api.query_ops.latest_time(tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_first_time_t = se_metric_oldest_time(mode, tier_retention[tier].db_metric_handle);
+            tier_retention[tier].db_last_time_t = se_metric_latest_time(mode, tier_retention[tier].db_metric_handle);
 
             if(!common_first_time_t)
                 common_first_time_t = tier_retention[tier].db_first_time_t;
@@ -2542,7 +2544,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 qt->db.last_time_t = common_last_time_t;
 
             for (size_t tier = 0; tier < storage_tiers; tier++) {
-                qm->tiers[tier].eng = tier_retention[tier].eng;
+                qm->tiers[tier].mode = tier_retention[tier].mode;
                 qm->tiers[tier].db_metric_handle = tier_retention[tier].db_metric_handle;
                 qm->tiers[tier].db_first_time_t = tier_retention[tier].db_first_time_t;
                 qm->tiers[tier].db_last_time_t = tier_retention[tier].db_last_time_t;
@@ -2558,7 +2560,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         // cleanup anything we allocated to the retention we will not use
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if (tier_retention[tier].db_metric_handle)
-                tier_retention[tier].eng->api.metric_release(tier_retention[tier].db_metric_handle);
+                se_metric_release(tier_retention[tier].mode, tier_retention[tier].db_metric_handle);
         }
     }
 }
