@@ -470,56 +470,6 @@ inline const char *ae_status2prettystring(RRDCALC_STATUS status) {
     }
 }
 
-static STRING *alarm_entry_replace_variables(const char *line, ALARM_ENTRY *ae, RRDHOST *host) {
-    if (!line || !*line)
-        return NULL;
-
-    size_t pos = 0;
-    char *temp = strdupz(line);
-    char var[ALARM_ENTRY_VAR_MAX];
-    char *m;
-
-    while ((m = strchr(temp + pos, '$'))) {
-        int i = 0;
-        char *e = m;
-        while (*e) {
-
-            if (*e == ' ' || ( *e != '$' && *e != ':' && *e != '_' && ispunct(*e) ) || i == ALARM_ENTRY_VAR_MAX - 1)
-                break;
-            else
-                var[i] = *e;
-
-            e++;
-            i++;
-        }
-
-        var[i] = '\0';
-        pos = m - temp + 1;
-
-        if (!strcmp(var, ALARM_ENTRY_VAR_STATUS)) {
-            char *buf = find_and_replace(temp, var, ae_status2prettystring(ae->new_status), m);
-            freez(temp);
-            temp = buf;
-        }
-        else if (!strcmp(var, ALARM_ENTRY_VAR_VALUE)) {
-            char *buf = find_and_replace(temp, var, ae_new_value_string(ae), m);
-            freez(temp);
-            temp = buf;
-        }
-        else if (!strcmp(var, ALARM_ENTRY_VAR_HOSTNAME)) {
-            char *buf = find_and_replace(temp, var, rrdhost_hostname(host), m);
-            freez(temp);
-            temp = buf;
-        }
-    }
-
-    STRING *ret = string_strdupz(temp);
-    freez(temp);
-
-    return ret;
-}
-
-
 // ----------------------------------------------------------------------------
 // health alarm log management
 
@@ -592,7 +542,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     if(ae->old_status == RRDCALC_STATUS_WARNING || ae->old_status == RRDCALC_STATUS_CRITICAL)
         ae->non_clear_duration += ae->duration;
 
-    ae->title = alarm_entry_replace_variables(string2str(title), ae, host);
+    ae->title = string_dup(title);
 
     return ae;
 }
