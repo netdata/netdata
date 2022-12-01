@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/REFE
 sidebar_label: "REFERENCE.md"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Uncategorized"
+learn_rel_path: "References/Configuration"
 -->
 
 # Collectors configuration reference

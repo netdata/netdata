@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/database/engine
 sidebar_label: "Database"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/General references/Configuration references"
+learn_rel_path: "References/Configuration"
 -->
 
 # DBENGINE

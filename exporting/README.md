@@ -5,7 +5,7 @@ sidebar_label: "Exporting reference"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/README.md"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/General references/Configuration references"
+learn_rel_path: "References/Configuration"
 learn_doc_purpose: "Explain the exporting engine options and all of our the exporting connectors options"
 -->
 

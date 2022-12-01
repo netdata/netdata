@@ -6,6 +6,7 @@ sidebar_label: Writing metrics to TimescaleDB
 learn_status: "Published"
 learn_topic_type: "References"
 learn_rel_path: "References/Exporting references"
+learn_autogeneration_metadata: "[(part_of_cloud,false), (part_of_agent,true)]"
 -->
 
 # Writing metrics to TimescaleDB
