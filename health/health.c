@@ -47,7 +47,8 @@ static bool prepare_command(BUFFER *wb,
                             const char *crit_alarms,
                             const char *classification,
                             const char *edit_command,
-                            const char *machine_guid)
+                            const char *machine_guid,
+                            const char *title)
 {
     char buf[8192];
     size_t n = 8192 - 1;
@@ -151,6 +152,10 @@ static bool prepare_command(BUFFER *wb,
     buffer_sprintf(wb, " '%s'", buf);
 
     if (!sanitize_command_argument_string(buf, machine_guid, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, title, n))
         return false;
     buffer_sprintf(wb, " '%s'", buf);
 
@@ -544,7 +549,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
                               ae->classification?ae_classification(ae):"Unknown",
                               edit_command,
                               host != localhost ? host->machine_guid:"",
-                              ae->title ? ae_title(ae):"");
+                              host->health_use_title_for_notifications && ae->title?ae_title(ae):ae_name(ae));
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
@@ -772,7 +777,7 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
         host->health_log.max = (unsigned int)n;
 
     conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
-    host->health_use_title_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use title for notifications", CONFIG_BOOLEAN_NO);
+    host->health_use_title_for_notifications = config_get_boolean(CONFIG_SECTION_HEALTH, "use title for notifications", CONFIG_BOOLEAN_YES);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
