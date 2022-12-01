@@ -204,31 +204,43 @@ static SSL_CTX * security_initialize_openssl_server() {
  *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
 void security_start_ssl(int selector) {
+    static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+    netdata_spinlock_lock(&sp);
+
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
-            struct stat statbuf;
-            if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf)) {
-                info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
-                return;
+            if(!netdata_ssl_srv_ctx) {
+                struct stat statbuf;
+                if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
+                    info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+                else {
+                    netdata_ssl_srv_ctx = security_initialize_openssl_server();
+                    SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+                }
             }
+            break;
+        }
 
-            netdata_ssl_srv_ctx =  security_initialize_openssl_server();
-            SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
-            break;
-        }
         case NETDATA_SSL_CONTEXT_STREAMING: {
-            netdata_ssl_client_ctx = security_initialize_openssl_client();
-            //This is necessary for the stream, because it is working sometimes with nonblock socket.
-            //It returns the bitmask after to change, there is not any description of errors in the documentation
-            SSL_CTX_set_mode(
-                netdata_ssl_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
+            if(!netdata_ssl_client_ctx) {
+                netdata_ssl_client_ctx = security_initialize_openssl_client();
+                //This is necessary for the stream, because it is working sometimes with nonblock socket.
+                //It returns the bitmask after to change, there is not any description of errors in the documentation
+                SSL_CTX_set_mode(netdata_ssl_client_ctx,
+                                 SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                                 SSL_MODE_AUTO_RETRY);
+            }
             break;
         }
+
         case NETDATA_SSL_CONTEXT_EXPORTING: {
-            netdata_ssl_exporting_ctx = security_initialize_openssl_client();
+            if(!netdata_ssl_exporting_ctx)
+                netdata_ssl_exporting_ctx = security_initialize_openssl_client();
             break;
         }
     }
+
+    netdata_spinlock_unlock(&sp);
 }
 
 /**
