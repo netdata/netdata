@@ -23,7 +23,7 @@
 #define WORKER_JOB_CUSTOM_METRIC_DONE                   12
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  13
 #define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        14
-#define WORKER_JOB_CUSTOM_METRIC_WAITS                  15
+#define WORKER_JOB_WAIT                                 15
 #define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          16
 #define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            17
 
@@ -637,7 +637,6 @@ static struct replication_thread {
     } atomic;                           // access should be with atomic operations
 
     struct {
-        size_t waits;
         size_t last_executed;           // caching of the atomic.executed to report number of requests executed since last time
 
         netdata_thread_t **threads_ptrs;
@@ -671,7 +670,6 @@ static struct replication_thread {
                 .latest_first_time = 0,
         },
         .main_thread = {
-                .waits = 0,
                 .last_executed = 0,
                 .threads = 0,
                 .threads_ptrs = NULL,
@@ -1077,6 +1075,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
 
 cleanup:
     string_freez(rq->chart_id);
+    worker_is_idle();
     return ret;
 }
 
@@ -1242,6 +1241,7 @@ static void replication_initialize_workers(bool master) {
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
     worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
+    worker_register_job_name(WORKER_JOB_WAIT, "wait");
 
     if(master) {
         worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
@@ -1253,7 +1253,6 @@ static void replication_initialize_workers(bool master) {
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, "senders full", "senders", WORKER_METRIC_ABSOLUTE);
-        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
     }
 }
 
@@ -1265,8 +1264,10 @@ static int replication_execute_next_pending_request(void) {
     worker_is_busy(WORKER_JOB_FIND_NEXT);
     struct replication_request rq = replication_request_get_first_available();
 
-    if(unlikely(!rq.found))
+    if(unlikely(!rq.found)) {
+        worker_is_idle();
         return REQUEST_QUEUE_EMPTY;
+    }
 
     // delete the request from the dictionary
     worker_is_busy(WORKER_JOB_DELETE_ENTRY);
@@ -1276,9 +1277,12 @@ static int replication_execute_next_pending_request(void) {
 
     replication_set_latest_first_time(rq.after);
 
-    if(unlikely(!replication_execute_request(&rq, true)))
+    if(unlikely(!replication_execute_request(&rq, true))) {
+        worker_is_idle();
         return REQUEST_CHART_NOT_FOUND;
+    }
 
+    worker_is_idle();
     return REQUEST_OK;
 }
 
@@ -1293,6 +1297,7 @@ static void *replication_worker_thread(void *ptr) {
 
     while(!netdata_exit) {
         if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+            worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
             sleep_usec(1 * USEC_PER_SEC);
         }
@@ -1360,6 +1365,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         if(unlikely(now_mono_ut - last_now_mono_ut > default_rrd_update_every * USEC_PER_SEC)) {
             last_now_mono_ut = now_mono_ut;
 
+            worker_is_busy(WORKER_JOB_STATISTICS);
             replication_recursive_lock();
 
             size_t current_executed = __atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED);
@@ -1387,8 +1393,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 slow = true;
             }
 
-            worker_is_busy(WORKER_JOB_STATISTICS);
-
             time_t latest_first_time_t = replication_get_latest_first_time();
             if(latest_first_time_t && replication_globals.unsafe.pending) {
                 // completion percentage statistics
@@ -1408,12 +1412,14 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_no_room);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.unsafe.sender_resets);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, (NETDATA_DOUBLE)replication_globals.unsafe.senders_full);
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, (NETDATA_DOUBLE)replication_globals.main_thread.waits);
 
             replication_recursive_unlock();
+            worker_is_idle();
         }
 
         if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+
+            worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();
 
             // the timeout also defines now frequently we will traverse all the pending requests
@@ -1444,7 +1450,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 last_sender_resets = replication_globals.unsafe.sender_resets;
             }
 
-            replication_globals.main_thread.waits++;
             replication_recursive_unlock();
 
             worker_is_idle();
