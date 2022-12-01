@@ -27,6 +27,6 @@ struct Chart_data_generic {
 
 void generic_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void generic_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update);
+void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif // PLUGIN_LOGSMANAGEMENT_GENERIC_H_

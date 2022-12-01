@@ -68,7 +68,7 @@ void docker_ev_chart_collect(struct File_info *p_file_info, struct Chart_meta *c
     }
 }
 
-void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update){
+void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     chart_data_docker_ev_t *chart_data = chart_meta->chart_data_docker_ev;
 
     /* Number of lines - update chart */

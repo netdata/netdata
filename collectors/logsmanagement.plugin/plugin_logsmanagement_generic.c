@@ -38,7 +38,7 @@ void generic_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 
 }
 
-void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update){
+void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta){
     UNUSED(p_file_info);
     chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
 

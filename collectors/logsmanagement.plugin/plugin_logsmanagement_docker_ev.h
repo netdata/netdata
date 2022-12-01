@@ -32,6 +32,6 @@ struct Chart_data_docker_ev {
 
 void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void docker_ev_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update);
+void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif // PLUGIN_LOGSMANAGEMENT_DOCKER_EV_H_

@@ -41,6 +41,6 @@ struct Chart_data_systemd {
 
 void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *chart_meta);
-void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update);
+void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta);
 
 #endif // PLUGIN_LOGSMANAGEMENT_SYSTEMD_H_

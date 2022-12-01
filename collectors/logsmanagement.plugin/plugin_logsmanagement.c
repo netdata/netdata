@@ -237,79 +237,8 @@ void *logsmanagement_plugin_main(void *ptr){
                             1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        /* Circular buffer total memory stats - collect first time 
-         * (no need to be within p_file_info->parser_metrics_mut lock) */
-        stats_chart_data->num_circ_buff_mem_total_arr[i] = __atomic_load_n(&p_file_info->circ_buff->total_cached_mem, __ATOMIC_RELAXED);
-
-        /* Circular buffer compressed & uncompressed buffered items memory stats - collect first time */
-        stats_chart_data->num_circ_buff_mem_uncompressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_size_total, __ATOMIC_RELAXED);
-        stats_chart_data->num_circ_buff_mem_compressed_arr[i] = __atomic_load_n(&p_file_info->circ_buff->text_compressed_size_total, __ATOMIC_RELAXED);
-
-        /* Compression - collect first time */
-        stats_chart_data->num_compression_ratio_arr[i] = __atomic_load_n(&p_file_info->circ_buff->compression_ratio, __ATOMIC_RELAXED);
-
-        /* DB disk usage - collect first time */
-        stats_chart_data->num_disk_usage_arr[i] = __atomic_load_n(&p_file_info->blob_total_size, __ATOMIC_RELAXED);
-
-
-        uv_mutex_lock(p_file_info->parser_metrics_mut);
-
-        chart_data_arr[i]->collect(p_file_info, chart_data_arr[i]);
-
-        /* Custom charts - collect first time */
-        for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-            chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count += 
-                p_file_info->parser_metrics->parser_cus[cus_off]->count;
-            p_file_info->parser_metrics->parser_cus[cus_off]->count = 0;
-        }
-
-        uv_mutex_unlock(p_file_info->parser_metrics_mut);
-
-
-        /* Circular buffer total memory stats - update chart first time */
-        rrddim_set_by_pointer(  stats_chart_data->st_circ_buff_mem_total, 
-                                stats_chart_data->dim_circ_buff_mem_total_arr[i], 
-                                stats_chart_data->num_circ_buff_mem_total_arr[i]);
-        
-        /* Circular buffer compressed & uncompressed buffered items memory stats - update chart first time */
-        rrddim_set_by_pointer(  stats_chart_data->st_circ_buff_mem_uncompressed, 
-                                stats_chart_data->dim_circ_buff_mem_uncompressed_arr[i], 
-                                stats_chart_data->num_circ_buff_mem_uncompressed_arr[i]);
-        rrddim_set_by_pointer(  stats_chart_data->st_circ_buff_mem_compressed, 
-                                stats_chart_data->dim_circ_buff_mem_compressed_arr[i], 
-                                stats_chart_data->num_circ_buff_mem_compressed_arr[i]);
-        
-        /* Compression stats - update chart first time */
-        rrddim_set_by_pointer(  stats_chart_data->st_compression_ratio, 
-                                stats_chart_data->dim_compression_ratio[i], 
-                                stats_chart_data->num_compression_ratio_arr[i]);
-
-        /* DB disk usage stats - update chart first time */
-        rrddim_set_by_pointer(  stats_chart_data->st_disk_usage, 
-                                stats_chart_data->dim_disk_usage[i], 
-                                stats_chart_data->num_disk_usage_arr[i]);
-
-        chart_data_arr[i]->update(p_file_info, chart_data_arr[i], 1);
-
-        /* Custom charts - update chart first time */
-        for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-            rrddim_set_by_pointer(  chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus,
-                                    chart_data_arr[i]->chart_data_cus_arr[cus_off]->dim_cus_count,
-                                    chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count);
-        }
-        for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-            if(chart_data_arr[i]->chart_data_cus_arr[cus_off]->need_rrdset_done){
-                rrdset_done(chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus);
-            }
-        }
     }
 
-    // outside for loop as dimensions updated across different loop iterations, unlike chart_data_arr metrics.
-    rrdset_done(stats_chart_data->st_circ_buff_mem_total);
-    rrdset_done(stats_chart_data->st_circ_buff_mem_uncompressed);
-    rrdset_done(stats_chart_data->st_circ_buff_mem_compressed);
-    rrdset_done(stats_chart_data->st_compression_ratio);
-    rrdset_done(stats_chart_data->st_disk_usage);
 
     usec_t step = g_logs_manag_update_every * USEC_PER_SEC;
     heartbeat_t hb;
@@ -385,7 +314,7 @@ void *logsmanagement_plugin_main(void *ptr){
                                   stats_chart_data->dim_disk_usage[i], 
                                   stats_chart_data->num_disk_usage_arr[i]);
 
-            chart_data_arr[i]->update(p_file_info, chart_data_arr[i], 0);
+            chart_data_arr[i]->update(p_file_info, chart_data_arr[i]);
 
             /* Custom charts - update chart */
             for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
