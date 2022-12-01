@@ -11,15 +11,10 @@
 #define WORKER_JOB_STRINGS              4
 #define WORKER_JOB_DICTIONARIES         5
 #define WORKER_JOB_MALLOC_TRACE         6
-#define WORKER_JOB_WORKERS_COLLECT      7
-#define WORKER_JOB_WORKERS_COLLECTED    8
-#define WORKER_JOB_WORKERS_COLLECT_CPU  9
-#define WORKER_JOB_WORKERS_CHART        10
-#define WORKER_JOB_WORKERS_CLEANUP      11
-#define WORKER_JOB_WORKERS_TOTAL_CPU    12
+#define WORKER_JOB_WORKERS              7
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 13
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 13
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
 #endif
 
 bool global_statistics_enabled = true;
@@ -2560,8 +2555,6 @@ static void worker_utilization_charts_callback(void *ptr
                                                , usec_t *job_types_busy_time __maybe_unused
                                                , NETDATA_DOUBLE *job_types_custom_metrics __maybe_unused
                                                ) {
-    worker_is_busy(WORKER_JOB_WORKERS_COLLECTED);
-
     struct worker_utilization *wu = (struct worker_utilization *)ptr;
 
     // find the worker_thread in the list
@@ -2623,7 +2616,6 @@ static void worker_utilization_charts_callback(void *ptr
     }
 
     // find its CPU utilization
-    worker_is_busy(WORKER_JOB_WORKERS_COLLECT_CPU);
     if((!read_thread_cpu_time_from_proc_stat(pid, &wt->utime, &wt->stime))) {
         wt->collected_time = now_realtime_usec();
         usec_t delta = wt->collected_time - wt->collected_time_old;
@@ -2639,33 +2631,23 @@ static void worker_utilization_charts_callback(void *ptr
         if(cpu > wu->workers_cpu_max) wu->workers_cpu_max = cpu;
     }
     wu->workers_cpu_registered += (wt->cpu_enabled) ? 1 : 0;
-
-    worker_is_busy(WORKER_JOB_WORKERS_COLLECT);
 }
 
 static void worker_utilization_charts(void) {
     static size_t iterations = 0;
     iterations++;
 
-    worker_is_busy(WORKER_JOB_WORKERS_COLLECT);
     for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
-    }
 
-    worker_is_busy(WORKER_JOB_WORKERS_CHART);
-    for(int i = 0; all_workers_utilization[i].name ;i++) {
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
-    }
 
-    worker_is_busy(WORKER_JOB_WORKERS_CLEANUP);
-    for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_threads_cleanup(&all_workers_utilization[i]);
     }
 
-    worker_is_busy(WORKER_JOB_WORKERS_TOTAL_CPU);
     workers_total_cpu_utilization_chart();
 }
 
@@ -2709,12 +2691,7 @@ static void global_statistics_register_workers(void) {
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
-    worker_register_job_name(WORKER_JOB_WORKERS_COLLECT, "workers collect");
-    worker_register_job_name(WORKER_JOB_WORKERS_COLLECTED, "workers collected");
-    worker_register_job_name(WORKER_JOB_WORKERS_COLLECT_CPU, "workers collect cpu");
-    worker_register_job_name(WORKER_JOB_WORKERS_CHART, "workers chart");
-    worker_register_job_name(WORKER_JOB_WORKERS_CLEANUP, "workers cleanup");
-    worker_register_job_name(WORKER_JOB_WORKERS_TOTAL_CPU, "workers total cpu");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers collect");
 }
 
 static void global_statistics_cleanup(void *ptr)
@@ -2820,6 +2797,8 @@ void *global_statistics_workers_main(void *ptr)
             while (!netdata_exit) {
                 worker_is_idle();
                 heartbeat_next(&hb, step);
+
+                worker_is_busy(WORKER_JOB_WORKERS);
                 worker_utilization_charts();
             }
 
