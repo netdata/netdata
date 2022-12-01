@@ -2452,21 +2452,37 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
     }
 }
 
+#define TASK_STAT_PREFIX "/proc/self/task/"
+#define TASK_STAT_SUFFIX "/stat"
+
 static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_uint_t *utime __maybe_unused, kernel_uint_t *stime __maybe_unused) {
 #ifdef __linux__
-    char filename[200 + 1];
-    snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
+    static char filename[sizeof(TASK_STAT_PREFIX) + sizeof(TASK_STAT_SUFFIX) + 20] = TASK_STAT_PREFIX;
+    static size_t start_pos = sizeof(TASK_STAT_PREFIX) - 1;
+    static procfile *ff = NULL;
 
-    procfile *ff = procfile_open(filename, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(!ff) return -1;
+    // construct the filename
+    size_t end_pos = snprintfz(&filename[start_pos], 20, "%d", pid);
+    strcpy(&filename[start_pos + end_pos], TASK_STAT_SUFFIX);
 
+    // (re)open the procfile to the new filename
+    bool set_quotes = (ff == NULL) ? true : false;
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) return -1;
+
+    if(set_quotes)
+        procfile_set_open_close(ff, "(", ")");
+
+    // read the entire file and split it to lines and words
     ff = procfile_readall(ff);
-    if(!ff) return -1;
+    if(unlikely(!ff)) return -1;
 
+    // parse the numbers we are interested
     *utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
     *stime = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
 
-    procfile_close(ff);
+    // leave the file open for the next iteration
+
     return 0;
 #else
     // TODO: add here cpu time detection per thread, for FreeBSD and MacOS
