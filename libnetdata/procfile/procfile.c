@@ -22,16 +22,21 @@ size_t procfile_max_allocation = PROCFILE_INCREMENT_BUFFER;
 // ----------------------------------------------------------------------------
 
 char *procfile_filename(procfile *ff) {
-    if(ff->filename[0]) return ff->filename;
+    if(ff->filename)
+        return ff->filename;
 
+    char filename[FILENAME_MAX + 1];
     char buffer[FILENAME_MAX + 1];
     snprintfz(buffer, FILENAME_MAX, "/proc/self/fd/%d", ff->fd);
 
-    ssize_t l = readlink(buffer, ff->filename, FILENAME_MAX);
+    ssize_t l = readlink(buffer, filename, FILENAME_MAX);
     if(unlikely(l == -1))
-        snprintfz(ff->filename, FILENAME_MAX, "unknown filename for fd %d", ff->fd);
+        snprintfz(filename, FILENAME_MAX, "unknown filename for fd %d", ff->fd);
     else
-        ff->filename[l] = '\0';
+        filename[l] = '\0';
+
+
+    ff->filename = strdupz(filename);
 
     // on non-linux systems, something like this will be needed
     // fcntl(ff->fd, F_GETPATH, ff->filename)
@@ -141,8 +146,9 @@ void procfile_close(procfile *ff) {
 
     debug(D_PROCFILE, PF_PREFIX ": Closing file '%s'", procfile_filename(ff));
 
-    if(likely(ff->lines)) procfile_lines_free(ff->lines);
-    if(likely(ff->words)) procfile_words_free(ff->words);
+    freez(ff->filename);
+    procfile_lines_free(ff->lines);
+    procfile_words_free(ff->words);
 
     if(likely(ff->fd != -1)) close(ff->fd);
     freez(ff);
@@ -319,40 +325,31 @@ procfile *procfile_readall(procfile *ff) {
     return ff;
 }
 
+static PF_CHAR_TYPE procfile_default_separators[256];
+__attribute__((constructor)) void procfile_initialize_default_separators(void) {
+    int i = 256;
+    while(i--) {
+        if(unlikely(i == '\n' || i == '\r'))
+            procfile_default_separators[i] = PF_CHAR_IS_NEWLINE;
+
+        else if(unlikely(isspace(i) || !isprint(i)))
+            procfile_default_separators[i] = PF_CHAR_IS_SEPARATOR;
+
+        else
+            procfile_default_separators[i] = PF_CHAR_IS_WORD;
+    }
+}
+
 NOINLINE
 static void procfile_set_separators(procfile *ff, const char *separators) {
-    static PF_CHAR_TYPE def[256];
-    static char initialized = 0;
-
-    if(unlikely(!initialized)) {
-        // this is thread safe
-        // if initialized is zero, multiple threads may be executing
-        // this code at the same time, setting in def[] the exact same values
-        int i = 256;
-        while(i--) {
-            if(unlikely(i == '\n' || i == '\r'))
-                def[i] = PF_CHAR_IS_NEWLINE;
-
-            else if(unlikely(isspace(i) || !isprint(i)))
-                def[i] = PF_CHAR_IS_SEPARATOR;
-
-            else
-                def[i] = PF_CHAR_IS_WORD;
-        }
-
-        initialized = 1;
-    }
-
-    // copy the default
-    PF_CHAR_TYPE *ffs = ff->separators, *ffd = def, *ffe = &def[256];
-    while(ffd != ffe)
-        *ffs++ = *ffd++;
-
     // set the separators
     if(unlikely(!separators))
         separators = " \t=|";
 
-    ffs = ff->separators;
+    // copy the default
+    memcpy(ff->separators, procfile_default_separators, 256 * sizeof(PF_CHAR_TYPE));
+
+    PF_CHAR_TYPE *ffs = ff->separators;
     const char *s = separators;
     while(*s)
         ffs[(int)*s++] = PF_CHAR_IS_SEPARATOR;
@@ -416,8 +413,7 @@ procfile *procfile_open(const char *filename, const char *separators, uint32_t f
     procfile *ff = mallocz(sizeof(procfile) + size);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
-    ff->filename[0] = '\0';
-
+    ff->filename = NULL;
     ff->fd = fd;
     ff->size = size;
     ff->len = 0;
@@ -449,7 +445,8 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
     // info("PROCFILE: opened '%s' on fd %d", filename, ff->fd);
 
     //strncpyz(ff->filename, filename, FILENAME_MAX);
-    ff->filename[0] = '\0';
+    freez(ff->filename);
+    ff->filename = NULL;
     ff->flags = flags;
 
     // do not do the separators again if NULL is given
