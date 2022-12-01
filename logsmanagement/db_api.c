@@ -14,17 +14,17 @@
 #include "lz4.h"
 #include "parser.h"
 
-#define MAIN_DB "main.db" /**< Primary DB with just 1 table - MAIN_COLLECTIONS_TABLE **/
-#define MAIN_COLLECTIONS_TABLE "LogCollections"
-#define BLOB_STORE_FILENAME "logs.bin"
-#define METADATA_DB_FILENAME "metadata.db"
-#define LOGS_TABLE "Logs"
-#define BLOBS_TABLE "Blobs"
+#define MAIN_DB "main.db" /**< Primary DB with metadata for all the logs managemt collections **/
+#define MAIN_COLLECTIONS_TABLE "LogCollections" /*< Table name where logs collections metadata is stored in MAIN_DB **/
+#define BLOB_STORE_FILENAME "logs.bin" /*< Filename of BLOBs where logs are stored in **/
+#define METADATA_DB_FILENAME "metadata.db" /**< Metadata DB for each log collection **/
+#define LOGS_TABLE "Logs" /*< Table name where logs metadata is stored in METADATA_DB_FILENAME **/
+#define BLOBS_TABLE "Blobs" /*< Table name where BLOBs metadata is stored in METADATA_DB_FILENAME **/
 
 #define LOGS_MANAG_DB_VERSION 1
 
 static uv_loop_t *db_loop;
-static sqlite3 *main_db;
+static sqlite3 *main_db;   /**< SQLite DB handler for MAIN_DB **/
 static char *main_db_dir;  /**< Directory where all the log management databases and log blobs are stored in **/
 static char *main_db_path; /**< Path of MAIN_DB **/
 
@@ -32,6 +32,12 @@ static char *main_db_path; /**< Path of MAIN_DB **/
 /*                            Database migrations                             */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief No-op database migration, just to bump up starting version.
+ * @param database Unused
+ * @param name Unused
+ * @return Always 0.
+ */
 static int do_migration_noop(sqlite3 *database, const char *name){
     UNUSED(database);
     UNUSED(name);
@@ -45,13 +51,13 @@ typedef struct database_func_migration_list{
 } DATABASE_FUNC_MIGRATION_LIST;
 
 DATABASE_FUNC_MIGRATION_LIST migration_list_main_db[] = {
-    {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = MAIN_DB" v0 to v1",  .func = do_migration_noop},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
 
 DATABASE_FUNC_MIGRATION_LIST migration_list_metadata_db[] = {
-    {.name = "v0 to v1",  .func = do_migration_noop},
+    {.name = METADATA_DB_FILENAME " v0 to v1",  .func = do_migration_noop},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };
@@ -412,6 +418,19 @@ void db_init() {
     } else {
         info("%s configured successfully", MAIN_DB);
     }
+
+    /* Execute pending main database migrations */
+    int main_db_ver = db_user_version(main_db, -1);
+    if (likely(LOGS_MANAG_DB_VERSION == main_db_ver)) {
+        info("Logs management %s database version is %d (no migration needed)", MAIN_DB, main_db_ver);
+    } else {
+        for(int ver = main_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_main_db[ver].func; ver++){
+            rc = (migration_list_main_db[ver].func)(main_db, migration_list_main_db[ver].name);
+            if (unlikely(rc)) fatal("Logs management %s database migration from version %d to version %d failed", MAIN_DB, ver, ver + 1);
+            // TODO: Do not fatal but return error value, so logs management can be disable and agent can continue
+            db_user_version(main_db, ver + 1);
+        }
+    }
     
     /* Create new main DB LogCollections table if it doesn't exist */
     rc = sqlite3_exec(main_db,
@@ -428,19 +447,6 @@ void db_init() {
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
         fatal_sqlite3_err(rc, __LINE__);
-    } 
-
-    /* Execute pending main database migrations */
-    int main_db_ver = db_user_version(main_db, -1);
-    if (likely(LOGS_MANAG_DB_VERSION == main_db_ver)) {
-        info("Logs management %s database version is %d (no migration needed)", MAIN_DB, main_db_ver);
-    } else {
-        for(int ver = main_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_main_db[ver].func; ver++){
-            rc = (migration_list_main_db[ver].func)(main_db, migration_list_main_db[ver].name);
-            if (unlikely(rc)) fatal("Logs management %s database migration from version %d to version %d failed", MAIN_DB, ver, ver + 1);
-            // TODO: Do not fatal but return error value, so logs management can be disable and agent can continue
-            db_user_version(main_db, ver + 1);
-        }
     }
     
     sqlite3_stmt *stmt_search_if_log_source_exists;
@@ -550,6 +556,24 @@ void db_init() {
             error("SQL error: %s", err_msg);
             sqlite3_free(err_msg);
             fatal("Failed to configure database for %s\n, SQL error: %s\n", p_file_infos_arr->data[i]->filename, err_msg);
+        }
+
+        /* Execute pending metadata database migrations */
+        info("About to execute %s migrations for %s", METADATA_DB_FILENAME, p_file_infos_arr->data[i]->file_basename);
+        int metadata_db_ver = db_user_version(p_file_infos_arr->data[i]->db, -1);
+        if (likely(LOGS_MANAG_DB_VERSION == metadata_db_ver)) {
+            info( "Logs management %s database for %s version is %d (no migration needed)", 
+                   METADATA_DB_FILENAME, p_file_infos_arr->data[i]->file_basename, metadata_db_ver);
+        } else {
+            for(int ver = metadata_db_ver; ver < LOGS_MANAG_DB_VERSION && migration_list_metadata_db[ver].func; ver++){
+                rc = (migration_list_metadata_db[ver].func)(p_file_infos_arr->data[i]->db, migration_list_metadata_db[ver].name);
+                if (unlikely(rc)){
+                    fatal( "Logs management %s database migration for %s from version %d to version %d failed", 
+                            METADATA_DB_FILENAME, p_file_infos_arr->data[i]->file_basename, ver, ver + 1);
+                }
+                // TODO: Do not fatal but return error value, so logs management can be disable and agent can continue
+                db_user_version(p_file_infos_arr->data[i]->db, ver + 1);
+            }
         }
         
         /* Check if BLOBS_TABLE exists or not */
