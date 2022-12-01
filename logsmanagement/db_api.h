@@ -15,6 +15,7 @@
 #define LOGS_MANAG_DB_SUBPATH "/logs_management_db"
 
 char *db_get_sqlite_version(void);
+int db_user_version(sqlite3 *db, const int set_user_version);
 void db_set_main_dir(char *dir);
 void db_init(void);
 void db_search(logs_query_params_t *const p_query_params, struct File_info *const p_file_info);

@@ -53,6 +53,7 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
                             "\t\t\t\"filename\": \"%s\",\n"
                             "\t\t\t\"log type\": \"%s\",\n"
                             "\t\t\t\"DB dir\": \"%s\",\n"
+                            "\t\t\t\"DB version\": %d,\n"
                             "\t\t\t\"DB flush interval\": %d,\n"
                             "\t\t\t\"DB disk space limit\": %" PRId64 "\n"
                             "\t\t},\n", 
@@ -61,6 +62,7 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
                         p_file_infos_arr->data[i]->filename,
                         log_source_t_str[p_file_infos_arr->data[i]->log_type],
                         p_file_infos_arr->data[i]->db_dir,
+                        db_user_version(p_file_infos_arr->data[i]->db, -1),
                         p_file_infos_arr->data[i]->buff_flush_to_db_interval,
                         p_file_infos_arr->data[i]->blob_max_size * BLOB_MAX_FILES
                         );
@@ -72,7 +74,7 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
     return OK;
 }
 
-LOGS_QUERY_RESULT_TYPE execute_query(logs_query_params_t *p_query_params) {
+LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_params) {
     struct File_info *p_file_infos[MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
     if(unlikely(p_query_params->quota > MAX_LOG_MSG_SIZE)) p_query_params->quota = MAX_LOG_MSG_SIZE;
@@ -122,9 +124,10 @@ LOGS_QUERY_RESULT_TYPE execute_query(logs_query_params_t *p_query_params) {
     }
     
 
-    /* Secure DB lock to ensure no data will be transferred from the buffers to the DB 
-    * during the query execution and also no other execute_query will try to access the DB
-    * at the same time. The operations happen atomically and the DB searches in series. */
+    /* Secure DB lock to ensure no data will be transferred from the buffers to 
+     * the DB during the query execution and also no other execute_logs_manag_query 
+     * will try to access the DB at the same time. The operations happen 
+     * atomically and the DB searches in series. */
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
         uv_mutex_lock(p_file_infos[pfi_off]->db_mut);
     }

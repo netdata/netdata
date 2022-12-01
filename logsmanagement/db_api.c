@@ -108,9 +108,10 @@ char *db_get_sqlite_version() {
  * @param db SQLite database to act upon.
  * @param set_user_version If <= 0, just get user_version. Otherwise, set
  * user_version first, before returning it.
- * @return Database user_version.
+ * @return Database user_version or -1 in case of error.
  */
-static int db_user_version(sqlite3 *db, const int set_user_version){
+int db_user_version(sqlite3 *db, const int set_user_version){
+    if(unlikely(!db)) return -1;
     int rc = 0;
     if(set_user_version <= 0){
         sqlite3_stmt *stmt_get_user_version;

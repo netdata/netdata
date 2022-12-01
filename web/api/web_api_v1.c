@@ -1603,7 +1603,7 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
     w->response.data->contenttype = CT_APPLICATION_JSON;
 
     buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"version\": %s,\n", QUERY_VERSION);
+    buffer_sprintf(w->response.data, "\t\"api version\": %s,\n", QUERY_VERSION);
     buffer_strcat(w->response.data, "\t\"log sources\": {\n");
     LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(w->response.data);
     buffer_strcat(w->response.data, "\n\t},\n");
@@ -1681,11 +1681,11 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     query_params.results_buff = buffer_create(query_params.quota);
     
     buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"version\": %s,\n", QUERY_VERSION);
+    buffer_sprintf(w->response.data, "\t\"api version\": %s,\n", QUERY_VERSION);
     buffer_sprintf(w->response.data, "\t\"requested from\": %" PRIu64 ",\n", query_params.start_timestamp);
     buffer_sprintf(w->response.data, "\t\"requested until\": %" PRIu64 ",\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"requested keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
-    LOGS_QUERY_RESULT_TYPE err_code = execute_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
+    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
     buffer_sprintf(w->response.data, "\t\"actual from\": %" PRIu64 ",\n", query_params.start_timestamp);
     buffer_sprintf(w->response.data, "\t\"actual until\": %" PRIu64 ",\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"quota\": %zu,\n", query_params.quota);

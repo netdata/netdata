@@ -112,7 +112,7 @@ void test_execute_query_thread(void *args) {
     uint64_t query_start_time, query_total_time = 0;
     while (1) {
         query_start_time = get_unix_time_ms();
-        (void) execute_query(&query_params);
+        (void) execute_logs_manag_query(&query_params);
         query_total_time += (get_unix_time_ms() - query_start_time);
         if (query_params.results_buff->len == 0)
             break;

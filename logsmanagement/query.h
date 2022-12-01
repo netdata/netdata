@@ -73,7 +73,7 @@ typedef struct logs_query_params {
  * @return enum of LOGS_QUERY_RESULT_TYPE with result of query
  * @todo Cornercase if filename not found in DB? Return specific message?
  */
-LOGS_QUERY_RESULT_TYPE execute_query(logs_query_params_t *p_query_params);
+LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_params);
 
 #ifdef ENABLE_LOGSMANAGEMENT_TESTS
 /* Used as public only for unit testing, normally defined as static */
