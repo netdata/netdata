@@ -615,7 +615,7 @@ static struct replication_thread {
         // statistics
         size_t added;                   // number of requests added to the queue
         size_t removed;                 // number of requests removed from the queue
-        size_t skipped_no_room;         // number of requests skipped, because the sender has no room for responses
+        size_t pending_no_room;         // number of requests skipped, because the sender has no room for responses
         size_t senders_full;             // number of times a sender reset our last position in the queue
         size_t sender_resets;           // number of times a sender reset our last position in the queue
         time_t first_time_t;            // the minimum 'after' we encountered
@@ -648,7 +648,7 @@ static struct replication_thread {
 
                 .added = 0,
                 .removed = 0,
-                .skipped_no_room = 0,
+                .pending_no_room = 0,
                 .sender_resets = 0,
                 .senders_full = 0,
 
@@ -747,13 +747,13 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
-        replication_globals.unsafe.skipped_no_room++;
+        replication_globals.unsafe.pending_no_room++;
         replication_recursive_unlock();
         return;
     }
 
     if(rq->not_indexed_buffer_full)
-        replication_globals.unsafe.skipped_no_room--;
+        replication_globals.unsafe.pending_no_room--;
 
     struct replication_sort_entry *rse = replication_sort_entry_create_unsafe(rq);
 
@@ -829,7 +829,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
                 replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr);
 
                 if(buffer_full) {
-                    replication_globals.unsafe.skipped_no_room++;
+                    replication_globals.unsafe.pending_no_room++;
                     rq->not_indexed_buffer_full = true;
                 }
             }
@@ -994,7 +994,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 
     else if(rq->not_indexed_buffer_full) {
         replication_recursive_lock();
-        replication_globals.unsafe.skipped_no_room--;
+        replication_globals.unsafe.pending_no_room--;
         replication_recursive_unlock();
     }
 
@@ -1357,15 +1357,19 @@ void *replication_thread_main(void *ptr __maybe_unused) {
                 replication_reset_next_point_in_time_countdown = SECONDS_TO_RESET_POINT_IN_TIME;
             }
 
-            if(!replication_globals.unsafe.pending && --run_verification_countdown == 0) {
-                // reset the statistics about completion percentage
-                replication_globals.unsafe.first_time_t = 0;
-                replication_set_latest_first_time(0);
+            if(--run_verification_countdown == 0) {
+                if (!replication_globals.unsafe.pending && !replication_globals.unsafe.pending_no_room) {
+                    // reset the statistics about completion percentage
+                    replication_globals.unsafe.first_time_t = 0;
+                    replication_set_latest_first_time(0);
 
-                verify_all_hosts_charts_are_streaming_now();
+                    verify_all_hosts_charts_are_streaming_now();
 
-                run_verification_countdown = LONG_MAX;
-                slow = true;
+                    run_verification_countdown = LONG_MAX;
+                    slow = true;
+                }
+                else
+                    run_verification_countdown = ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION;
             }
 
             time_t latest_first_time_t = replication_get_latest_first_time();
@@ -1383,7 +1387,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)replication_globals.unsafe.pending);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)replication_globals.unsafe.added);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)__atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED));
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_no_room);
+            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.unsafe.pending_no_room);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.unsafe.sender_resets);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, (NETDATA_DOUBLE)replication_globals.unsafe.senders_full);
 
