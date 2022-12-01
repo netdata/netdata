@@ -83,7 +83,6 @@ include samba/Makefile.inc
 include sensors/Makefile.inc
 include smartd_log/Makefile.inc
 include spigotmc/Makefile.inc
-include springboot/Makefile.inc
 include squid/Makefile.inc
 include tomcat/Makefile.inc
 include tor/Makefile.inc
