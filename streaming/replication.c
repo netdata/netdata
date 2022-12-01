@@ -14,18 +14,17 @@
 #define WORKER_JOB_CHECK_CONSISTENCY                    5
 #define WORKER_JOB_BUFFER_COMMIT                        6
 #define WORKER_JOB_CLEANUP                              7
+#define WORKER_JOB_WAIT                                 8
 
 // master thread worker jobs
-#define WORKER_JOB_STATISTICS                           8
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       9
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             10
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  11
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   12
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED  13
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        14
-#define WORKER_JOB_WAIT                                 15
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          16
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            17
+#define WORKER_JOB_STATISTICS                           9
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       10
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        11
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             12
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  13
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   14
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          15
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            16
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -616,9 +615,7 @@ static struct replication_thread {
         // statistics
         size_t added;                   // number of requests added to the queue
         size_t removed;                 // number of requests removed from the queue
-        size_t skipped_not_connected;   // number of requests skipped, because the sender is not connected to a parent
         size_t skipped_no_room;         // number of requests skipped, because the sender has no room for responses
-//        size_t skipped_no_room_since_last_reset;
         size_t senders_full;             // number of times a sender reset our last position in the queue
         size_t sender_resets;           // number of times a sender reset our last position in the queue
         time_t first_time_t;            // the minimum 'after' we encountered
@@ -651,9 +648,7 @@ static struct replication_thread {
 
                 .added = 0,
                 .removed = 0,
-                .skipped_not_connected = 0,
                 .skipped_no_room = 0,
-//                .skipped_no_room_since_last_reset = 0,
                 .sender_resets = 0,
                 .senders_full = 0,
 
@@ -895,36 +890,17 @@ static struct replication_request replication_request_get_first_available() {
             while (!rq_to_return.found && (our_item_pptr = JudyLNext(*inner_judy_pptr, &replication_globals.unsafe.queue.unique_id, PJE0))) {
                 struct replication_sort_entry *rse = *our_item_pptr;
                 struct replication_request *rq = rse->rq;
-                struct sender_state *s = rq->sender;
 
-                bool sender_is_connected =
-                        rrdhost_flag_check(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+                // copy the request to return it
+                rq_to_return = *rq;
+                rq_to_return.chart_id = string_dup(rq_to_return.chart_id);
 
-                bool sender_has_been_flushed_since_this_request =
-                        rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(s);
+                // set the return result to found
+                rq_to_return.found = true;
 
-                if (unlikely(!sender_is_connected || sender_has_been_flushed_since_this_request)) {
-                    // skip this request, the sender is not connected, or it has reconnected
-
-                    replication_globals.unsafe.skipped_not_connected++;
-                    if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
-                        // we removed the item from the outer JudyL
-                        break;
-                }
-                else {
-                    // this request is good to execute
-
-                    // copy the request to return it
-                    rq_to_return = *rq;
-                    rq_to_return.chart_id = string_dup(rq_to_return.chart_id);
-
-                    // set the return result to found
-                    rq_to_return.found = true;
-
-                    if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
-                        // we removed the item from the outer JudyL
-                        break;
-                }
+                if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
+                    // we removed the item from the outer JudyL
+                    break;
             }
 
             // call JudyLNext from now on
@@ -1246,11 +1222,10 @@ static void replication_initialize_workers(bool master) {
     if(master) {
         worker_register_job_name(WORKER_JOB_STATISTICS, "statistics");
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, "pending requests", "requests", WORKER_METRIC_ABSOLUTE);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_COMPLETION, "completion", "%", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, "added requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, "senders full", "senders", WORKER_METRIC_ABSOLUTE);
     }
@@ -1408,7 +1383,6 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS, (NETDATA_DOUBLE)replication_globals.unsafe.pending);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, (NETDATA_DOUBLE)replication_globals.unsafe.added);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_DONE, (NETDATA_DOUBLE)__atomic_load_n(&replication_globals.atomic.executed, __ATOMIC_RELAXED));
-            worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_not_connected);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, (NETDATA_DOUBLE)replication_globals.unsafe.skipped_no_room);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, (NETDATA_DOUBLE)replication_globals.unsafe.sender_resets);
             worker_set_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, (NETDATA_DOUBLE)replication_globals.unsafe.senders_full);
