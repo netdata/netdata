@@ -1114,9 +1114,14 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 
 #ifdef ENABLE_HTTPS
-    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ){
-        security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
-        ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+    if (netdata_use_ssl_on_stream & NETDATA_SSL_FORCE ) {
+        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+        netdata_spinlock_lock(&sp);
+        if(!netdata_ssl_client_ctx) {
+            security_start_ssl(NETDATA_SSL_CONTEXT_STREAMING);
+            ssl_security_location_for_context(netdata_ssl_client_ctx, netdata_ssl_ca_file, netdata_ssl_ca_path);
+        }
+        netdata_spinlock_unlock(&sp);
     }
 #endif
 
