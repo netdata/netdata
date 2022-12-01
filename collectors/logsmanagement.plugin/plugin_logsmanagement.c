@@ -228,7 +228,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         , p_file_info->update_every
                         , RRDSET_TYPE_AREA
                 );
-                // rrdset_next() and rrdset_done() need to be run for this
+                // rrdset_done() need to be run for this
                 chart_data_arr[i]->chart_data_cus_arr[cus_off]->need_rrdset_done = 1; 
             }  
             chart_data_arr[i]->chart_data_cus_arr[cus_off]->dim_cus_count = 
@@ -322,12 +322,6 @@ void *logsmanagement_plugin_main(void *ptr){
 
         if(unlikely(netdata_exit)) break;
 
-        rrdset_next(stats_chart_data->st_circ_buff_mem_total);
-        rrdset_next(stats_chart_data->st_circ_buff_mem_uncompressed);
-        rrdset_next(stats_chart_data->st_circ_buff_mem_compressed);
-        rrdset_next(stats_chart_data->st_compression_ratio);
-        rrdset_next(stats_chart_data->st_disk_usage);
-
         for(int i = 0; i < p_file_infos_arr->count; i++){
             struct File_info *p_file_info = p_file_infos_arr->data[i];
             
@@ -354,7 +348,7 @@ void *logsmanagement_plugin_main(void *ptr){
 
             chart_data_arr[i]->collect(p_file_info, chart_data_arr[i]);
 
-            /* Custom charts -collect */
+            /* Custom charts - collect */
             for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
                 chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count += 
                     p_file_info->parser_metrics->parser_cus[cus_off]->count;
@@ -395,9 +389,6 @@ void *logsmanagement_plugin_main(void *ptr){
 
             /* Custom charts - update chart */
             for(int cus_off = 0; p_file_info->parser_cus_config[cus_off]; cus_off++){
-                if(chart_data_arr[i]->chart_data_cus_arr[cus_off]->need_rrdset_done){
-                    rrdset_next(chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus);
-                }
                 rrddim_set_by_pointer(  chart_data_arr[i]->chart_data_cus_arr[cus_off]->st_cus,
                                         chart_data_arr[i]->chart_data_cus_arr[cus_off]->dim_cus_count,
                                         chart_data_arr[i]->chart_data_cus_arr[cus_off]->num_cus_count);

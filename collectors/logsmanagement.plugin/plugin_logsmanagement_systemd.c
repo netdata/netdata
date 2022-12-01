@@ -160,8 +160,7 @@ void systemd_chart_collect(struct File_info *p_file_info, struct Chart_meta *cha
 void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update){
     chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
 
-    /* Number of lines - update chart first time */
-    if(likely(!first_update)) rrdset_next(chart_data->st_lines);
+    /* Number of lines - update chart */
     rrddim_set_by_pointer(  chart_data->st_lines, 
                             chart_data->dim_lines_total, 
                             chart_data->num_lines_total);
@@ -172,7 +171,6 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Syslog priority value - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        if(likely(!first_update)) rrdset_next(chart_data->st_prior);
         for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_prior, 
                                     chart_data->dim_prior[j], 
@@ -183,7 +181,6 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Syslog severity level (== Systemd priority) - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_SEVER){
-        if(likely(!first_update)) rrdset_next(chart_data->st_sever);
         for(int j = 0; j < SYSLOG_SEVER_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_sever, 
                                     chart_data->dim_sever[j], 
@@ -194,7 +191,6 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Syslog facility value - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_FACIL){
-        if(likely(!first_update)) rrdset_next(chart_data->st_facil);
         for(int j = 0; j < SYSLOG_FACIL_ARR_SIZE; j++){
             rrddim_set_by_pointer(  chart_data->st_facil, 
                                     chart_data->dim_facil[j], 

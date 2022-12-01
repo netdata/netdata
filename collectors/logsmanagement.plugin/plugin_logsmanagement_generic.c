@@ -42,8 +42,7 @@ void generic_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     UNUSED(p_file_info);
     chart_data_generic_t *chart_data = chart_meta->chart_data_generic;
 
-    /* Number of lines - update chart first time */
-    if(likely(!first_update)) rrdset_next(chart_data->st_lines);
+    /* Number of lines - update chart */
     rrddim_set_by_pointer(  chart_data->st_lines, 
                             chart_data->dim_lines_total, 
                             chart_data->num_lines_total);

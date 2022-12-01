@@ -71,8 +71,7 @@ void docker_ev_chart_collect(struct File_info *p_file_info, struct Chart_meta *c
 void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *chart_meta, int first_update){
     chart_data_docker_ev_t *chart_data = chart_meta->chart_data_docker_ev;
 
-    /* Number of lines - update chart first time */
-    if(likely(!first_update)) rrdset_next(chart_data->st_lines);
+    /* Number of lines - update chart */
     rrddim_set_by_pointer(  chart_data->st_lines, 
                             chart_data->dim_lines_total, 
                             chart_data->num_lines_total);
@@ -83,7 +82,6 @@ void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *ch
 
     /* Docker events type - update chart */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
-        if(likely(!first_update)) rrdset_next(chart_data->st_dock_ev_type);
         for(int j = 0; j < NUM_OF_DOCKER_EV_TYPES; j++){
             rrddim_set_by_pointer(  chart_data->st_dock_ev_type, 
                                     chart_data->dim_dock_ev_type[j], 

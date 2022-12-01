@@ -321,7 +321,7 @@ static void logs_manag_config_init(){
                     log_path = strdupz(DOCKER_EV_DEFAULT_PATH);
                     break;
                 default:
-                    error("%s type requires a path.", log_source_t_str[log_type]);
+                    error("%s type requires a valid path.", log_source_t_str[log_type]);
                     goto next_section;
             }
         } 

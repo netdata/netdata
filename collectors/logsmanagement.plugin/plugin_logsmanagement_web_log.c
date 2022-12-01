@@ -667,7 +667,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
 
     /* Number of lines - update chart */
-    if(likely(!first_update)) rrdset_next(chart_data->st_lines);
     rrddim_set_by_pointer(  chart_data->st_lines, 
                             chart_data->dim_lines_total, 
                             chart_data->num_lines_total);
@@ -678,7 +677,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Vhost - update chart */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
-        if(likely(!first_update)) rrdset_next(chart_data->st_vhost);
         for(int j = 0; j < chart_data->vhost_size; j++){
             rrddim_set_by_pointer(  chart_data->st_vhost, 
                                     chart_data->dim_vhosts[j], 
@@ -689,7 +687,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Port - update chart */
     if(p_file_info->parser_config->chart_config & CHART_PORT){
-        if(likely(!first_update)) rrdset_next(chart_data->st_port);
         for(int j = 0; j < chart_data->port_size; j++){
             rrddim_set_by_pointer(  chart_data->st_port, 
                                     chart_data->dim_ports[j], 
@@ -700,7 +697,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* IP Version - update chart */
     if(p_file_info->parser_config->chart_config & CHART_IP_VERSION){
-        if(likely(!first_update)) rrdset_next(chart_data->st_ip_ver);
         rrddim_set_by_pointer(  chart_data->st_ip_ver, 
                                 chart_data->dim_ip_ver_4, 
                                 chart_data->num_ip_ver_4);
@@ -715,7 +711,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request client current poll - update chart */
     if(p_file_info->parser_config->chart_config & CHART_REQ_CLIENT_CURRENT){
-        if(likely(!first_update)) rrdset_next(chart_data->st_req_client_current);
         rrddim_set_by_pointer(  chart_data->st_req_client_current, 
                                 chart_data->dim_req_client_current_ipv4, 
                                 chart_data->num_req_client_current_ipv4);
@@ -727,7 +722,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request client all-time - update chart */
     if(p_file_info->parser_config->chart_config & CHART_REQ_CLIENT_ALL_TIME){
-        if(likely(!first_update)) rrdset_next(chart_data->st_req_client_all_time);
         rrddim_set_by_pointer(  chart_data->st_req_client_all_time, 
                                 chart_data->dim_req_client_all_time_ipv4, 
                                 chart_data->num_req_client_all_time_ipv4);
@@ -739,7 +733,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request methods - update chart */
     if(p_file_info->parser_config->chart_config & CHART_REQ_METHODS){
-        if(likely(!first_update)) rrdset_next(chart_data->st_req_methods);
         rrddim_set_by_pointer(  chart_data->st_req_methods, 
                                 chart_data->dim_req_method_acl, 
                                 chart_data->num_req_method_acl);
@@ -859,7 +852,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request protocol - update chart */
     if(p_file_info->parser_config->chart_config & CHART_REQ_PROTO){
-        if(likely(!first_update)) rrdset_next(chart_data->st_req_proto);
         rrddim_set_by_pointer(  chart_data->st_req_proto, 
                                 chart_data->dim_req_proto_http_1, 
                                 chart_data->num_req_proto_http_1);
@@ -877,7 +869,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request bandwidth - update chart */
     if(p_file_info->parser_config->chart_config & CHART_BANDWIDTH){
-        if(likely(!first_update)) rrdset_next(chart_data->st_bandwidth);
         rrddim_set_by_pointer(  chart_data->st_bandwidth, 
                                 chart_data->dim_bandwidth_req_size, 
                                 chart_data->num_bandwidth_req_size);
@@ -889,7 +880,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Request proc time - update chart */
     if(p_file_info->parser_config->chart_config & CHART_REQ_PROC_TIME){
-        if(likely(!first_update)) rrdset_next(chart_data->st_req_proc_time);
         rrddim_set_by_pointer(  chart_data->st_req_proc_time, 
                                 chart_data->dim_req_proc_time_min, 
                                 chart_data->num_req_proc_time_min);
@@ -904,7 +894,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Response code family - update chart */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE_FAMILY){
-        if(likely(!first_update)) rrdset_next(chart_data->st_resp_code_family);
         rrddim_set_by_pointer(  chart_data->st_resp_code_family, 
                                 chart_data->dim_resp_code_family_1xx, 
                                 chart_data->num_resp_code_family_1xx);
@@ -928,7 +917,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Response code - update chart */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE){
-        if(likely(!first_update)) rrdset_next(chart_data->st_resp_code);
         for(int j = 0; j < RESP_CODE_ARR_SIZE; j++) rrddim_set_by_pointer( chart_data->st_resp_code, 
                                                             chart_data->dim_resp_code[j], 
                                                             chart_data->num_resp_code[j]);
@@ -937,7 +925,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
     
     /* Response code family - update chart */
     if(p_file_info->parser_config->chart_config & CHART_RESP_CODE_TYPE){
-        if(likely(!first_update)) rrdset_next(chart_data->st_resp_code_type);
         rrddim_set_by_pointer(  chart_data->st_resp_code_type, 
                                 chart_data->dim_resp_code_type_success, 
                                 chart_data->num_resp_code_type_success);
@@ -958,7 +945,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* SSL protocol - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SSL_PROTO){
-        if(likely(!first_update)) rrdset_next(chart_data->st_ssl_proto);
         rrddim_set_by_pointer(  chart_data->st_ssl_proto, 
                                 chart_data->dim_ssl_proto_tlsv1, 
                                 chart_data->num_ssl_proto_tlsv1);
@@ -985,7 +971,6 @@ void web_log_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* SSL cipher suite - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SSL_CIPHER){
-        if(likely(!first_update)) rrdset_next(chart_data->st_ssl_cipher);
         for(int j = 0; j < chart_data->ssl_cipher_size; j++){
             rrddim_set_by_pointer(  chart_data->st_ssl_cipher, 
                                     chart_data->dim_ssl_ciphers[j], 
