@@ -255,6 +255,11 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     rrdcalc_update_info_and_title_variables(rc);
 
+    if(!rc->title) {
+        rc->title = string_dup(rc->name);
+        rc->original_title = string_dup(rc->name);
+    }
+
     time_t now = now_realtime_sec();
 
     ALARM_ENTRY *ae = health_create_alarm_entry(
@@ -439,6 +444,8 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
 
         rc->next_event_id = 1;
         rc->name = (ctr->overwrite_alert_name) ? string_strdupz(ctr->overwrite_alert_name) : string_dup(rt->name);
+        if (!rt->title)
+            rt->title = string_dup(rc->name);
         rc->title = string_dup(rt->title);
         rc->original_title = string_dup(rt->title);
         rc->chart = string_dup(st->id);
