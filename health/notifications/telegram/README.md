@@ -1,6 +1,6 @@
 <!--
 title: "Telegram"
-sidebar_labels: "Telegram"
+sidebar_label: "Telegram"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/telegram/README.md
 learn_status: "Published"
 learn_topic_type: "References"

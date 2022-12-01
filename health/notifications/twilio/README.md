@@ -1,6 +1,6 @@
 <!--
 title: "Twilio"
-sidebar_labels: "Twilio"
+sidebar_label: "Twilio"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/twilio/README.md
 learn_status: "Published"
 learn_topic_type: "References"

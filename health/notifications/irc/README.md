@@ -1,6 +1,6 @@
 <!--
 title: "IRC"
-siebar_label: "IRC"
+sidebar_label: "IRC"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/irc/README.md
 learn_status: "Published"
 learn_topic_type: "References"
