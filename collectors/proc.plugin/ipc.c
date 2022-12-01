@@ -195,7 +195,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     size_t words = 0;
 
     if(unlikely(lines < 2)) {
-        error("Cannot read %s. Expected 2 or more lines, read %zu.", ff->filename, lines);
+        error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
         return 1;
     }
 
@@ -205,7 +205,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
         words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
         if(unlikely(words < 14)) {
-            error("Cannot read %s line. Expected 14 params, read %zu.", ff->filename, words);
+            error("Cannot read %s line. Expected 14 params, read %zu.", procfile_filename(ff), words);
             continue;
         }
 
@@ -250,7 +250,7 @@ int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
     size_t words = 0;
 
     if(unlikely(lines < 2)) {
-        error("Cannot read %s. Expected 2 or more lines, read %zu.", ff->filename, lines);
+        error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
         return 1;
     }
 
@@ -263,7 +263,7 @@ int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
         words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
         if(unlikely(words < 16)) {
-            error("Cannot read %s line. Expected 16 params, read %zu.", ff->filename, words);
+            error("Cannot read %s line. Expected 16 params, read %zu.", procfile_filename(ff), words);
             continue;
         }
 

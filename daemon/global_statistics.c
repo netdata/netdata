@@ -4,14 +4,14 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
-#define WORKER_JOB_GLOBAL             0
-#define WORKER_JOB_REGISTRY           1
-#define WORKER_JOB_WORKERS            2
-#define WORKER_JOB_DBENGINE           3
-#define WORKER_JOB_HEARTBEAT          4
-#define WORKER_JOB_STRINGS            5
-#define WORKER_JOB_DICTIONARIES       6
-#define WORKER_JOB_MALLOC_TRACE       7
+#define WORKER_JOB_GLOBAL               0
+#define WORKER_JOB_REGISTRY             1
+#define WORKER_JOB_DBENGINE             2
+#define WORKER_JOB_HEARTBEAT            3
+#define WORKER_JOB_STRINGS              4
+#define WORKER_JOB_DICTIONARIES         5
+#define WORKER_JOB_MALLOC_TRACE         6
+#define WORKER_JOB_WORKERS              7
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
@@ -2447,21 +2447,37 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
     }
 }
 
+#define TASK_STAT_PREFIX "/proc/self/task/"
+#define TASK_STAT_SUFFIX "/stat"
+
 static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_uint_t *utime __maybe_unused, kernel_uint_t *stime __maybe_unused) {
 #ifdef __linux__
-    char filename[200 + 1];
-    snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
+    static char filename[sizeof(TASK_STAT_PREFIX) + sizeof(TASK_STAT_SUFFIX) + 20] = TASK_STAT_PREFIX;
+    static size_t start_pos = sizeof(TASK_STAT_PREFIX) - 1;
+    static procfile *ff = NULL;
 
-    procfile *ff = procfile_open(filename, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(!ff) return -1;
+    // construct the filename
+    size_t end_pos = snprintfz(&filename[start_pos], 20, "%d", pid);
+    strcpy(&filename[start_pos + end_pos], TASK_STAT_SUFFIX);
 
+    // (re)open the procfile to the new filename
+    bool set_quotes = (ff == NULL) ? true : false;
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) return -1;
+
+    if(set_quotes)
+        procfile_set_open_close(ff, "(", ")");
+
+    // read the entire file and split it to lines and words
     ff = procfile_readall(ff);
-    if(!ff) return -1;
+    if(unlikely(!ff)) return -1;
 
+    // parse the numbers we are interested
     *utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
     *stime = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
 
-    procfile_close(ff);
+    // leave the file open for the next iteration
+
     return 0;
 #else
     // TODO: add here cpu time detection per thread, for FreeBSD and MacOS
@@ -2621,8 +2637,7 @@ static void worker_utilization_charts(void) {
     static size_t iterations = 0;
     iterations++;
 
-    int i;
-    for(i = 0; all_workers_utilization[i].name ;i++) {
+    for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
 
@@ -2672,11 +2687,11 @@ static void global_statistics_register_workers(void) {
     worker_register("STATS");
     worker_register_job_name(WORKER_JOB_GLOBAL, "global");
     worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
-    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
     worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
     worker_register_job_name(WORKER_JOB_STRINGS, "strings");
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
 }
 
 static void global_statistics_cleanup(void *ptr)
