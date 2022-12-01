@@ -1132,8 +1132,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
-                replication_sort_entry_add(rq);
+            if(rq->indexed_in_judy && !rq->not_indexed_buffer_full) {
+                replication_sort_entry_del(rq, true);
             }
         }
         dfe_done(rq);
@@ -1147,13 +1147,14 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(rq->indexed_in_judy && !rq->not_indexed_buffer_full) {
-                replication_sort_entry_del(rq, true);
+            if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+                replication_sort_entry_add(rq);
             }
         }
         dfe_done(rq);
 
         replication_recursive_lock();
+        replication_globals.unsafe.senders_full--;
         replication_globals.unsafe.sender_resets++;
         // replication_set_next_point_in_time(0, 0);
         replication_recursive_unlock();
