@@ -147,13 +147,6 @@ include:
         - aarch64
     test:
       ebpf-core: true
-  - <<: *opensuse
-    version: "15.3"
-    packages:
-      <<: *opensuse_packages
-      repo_distro: opensuse/15.3
-    test:
-      ebpf-core: false
 
   - &oracle
     distro: oraclelinux
