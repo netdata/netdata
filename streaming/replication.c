@@ -1015,14 +1015,14 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     // this request is about a unique chart for this sender
     rrdpush_sender_replicating_charts_minus_one(rq->sender);
 
-    if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+    if(rq->indexed_in_judy)
+        replication_sort_entry_del(rq, false);
+
+    else if(rq->not_indexed_buffer_full) {
         replication_recursive_lock();
         replication_globals.unsafe.skipped_no_room--;
         replication_recursive_unlock();
     }
-
-    if(rq->indexed_in_judy)
-        replication_sort_entry_del(rq, false);
 
     string_freez(rq->chart_id);
 }
@@ -1249,7 +1249,7 @@ static void replication_initialize_workers(bool master) {
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_ADDED, "added requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_DONE, "finished requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NOT_CONNECTED, "not connected requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
-        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests/s", WORKER_METRIC_INCREMENTAL_TOTAL);
+        worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM, "no room requests", "requests", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS, "sender resets", "resets/s", WORKER_METRIC_INCREMENTAL_TOTAL);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_SENDER_FULL, "senders full", "senders", WORKER_METRIC_ABSOLUTE);
         worker_register_job_custom_metric(WORKER_JOB_CUSTOM_METRIC_WAITS, "waits", "waits/s", WORKER_METRIC_INCREMENTAL_TOTAL);
