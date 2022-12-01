@@ -34,7 +34,7 @@ wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/
 ```
 Please respond in the affirmative for any relevant prompts during the installation process. 
 
-Once the installation is completed you should be able to start monitoring the FreeBSD server using Netdata. 
+Once the installation is completed, you should be able to start monitoring the FreeBSD server using Netdata. 
 
 ![image](https://user-images.githubusercontent.com/24860547/202489210-3c5a3346-8f53-4b7b-9832-f9383b34d864.png)
 
@@ -42,7 +42,7 @@ Netdata can also be installed via [FreeBSD ports](https://www.freshports.org/net
 
 ## Manual installation
 
-If you would prefer to manually install Netdata the following steps can help you do this.
+If you would prefer to manually install Netdata, the following steps can help you do this.
 
 Download Netdata:
 
