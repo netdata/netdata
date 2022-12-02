@@ -41,7 +41,7 @@ Agent to the Netdata Cloud dashboard. The data passes through our systems, but i
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a
 limited number of _metadata_.
 
-Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the
+Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy) in the
 documentation.
 
 ## Enable and configure the ACLK
