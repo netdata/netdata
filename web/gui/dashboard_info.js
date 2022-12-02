@@ -4419,6 +4419,150 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // NGINX Plus
+    'nginxplus.client_connections_rate': {
+        info: 'Accepted and dropped (not handled) connections. A connection is considered <b>dropped</b> if the worker process is unable to get a connection for the request by establishing a new connection or reusing an open one.'
+    },
+    'nginxplus.client_connections_count': {
+        info: 'The current number of client connections. A connection is considered <b>idle</b> if there are currently no active requests.'
+    },
+    'nginxplus.ssl_handshakes_rate': {
+        info: 'Successful and failed SSL handshakes.'
+    },
+    'nginxplus.ssl_session_reuses_rate': {
+        info: 'The number of session reuses during SSL handshake.'
+    },
+    'nginxplus.ssl_handshakes_failures_rate': {
+        info: '<p>SSL handshake failures.</p><p><b>NoCommonProtocol</b> - failed because of no common protocol. <b>NoCommonCipher</b> - failed because of no shared cipher. <b>Timeout</b> - failed because of a timeout. <b>PeerRejectedCert</b> - failed because a client rejected the certificate.</p>'
+    },
+    'nginxplus.ssl_verification_errors_rate': {
+        info: '<p>SSL verification errors.</p><p><b>NoCert</b> - a client did not provide the required certificate. <b>ExpiredCert</b> - an expired or not yet valid certificate was presented by a client. <b>RevokedCert</b> - a revoked certificate was presented by a client. <b>HostnameMismatch</b> - server\'s certificate does not match the hostname. <b>Other</b> - other SSL certificate verification errors.</p>'
+    },
+    'nginxplus.http_requests_rate': {
+        info: 'The number of HTTP requests received from clients.'
+    },
+    'nginxplus.http_requests_count': {
+        info: 'The current number of client requests.'
+    },
+    'nginxplus.uptime': {
+        info: 'The time elapsed since the NGINX process was started.'
+    },
+    'nginxplus.http_server_zone_requests_rate': {
+        info: 'The number of requests to the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_responses_per_code_class_rate': {
+        info: 'The number of responses from the HTTP Server Zone. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_server_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_requests_processing_count': {
+        info: 'The number of client requests that are currently being processed by the HTTP Server Zone.'
+    },
+    'nginxplus.http_server_zone_requests_discarded_rate': {
+        info: 'The number of requests to the HTTP Server Zone completed without sending a response.'
+    },
+    'nginxplus.http_location_zone_requests_rate': {
+        info: 'The number of requests to the HTTP Location Zone.'
+    },
+    'nginxplus.http_location_zone_responses_per_code_class_rate': {
+        info: 'The number of responses from the HTTP Location Zone. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_location_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the HTTP Location Zone.'
+    },
+    'nginxplus.http_location_zone_requests_discarded_rate': {
+        info: 'The number of requests to the HTTP Location Zone completed without sending a response.'
+    },
+    'nginxplus.http_upstream_peers_count': {
+        info: 'The number of HTTP Upstream servers.'
+    },
+    'nginxplus.http_upstream_zombies_count': {
+        info: 'The current number of HTTP Upstream servers removed from the group but still processing active client requests.'
+    },
+    'nginxplus.http_upstream_keepalive_count': {
+        info: 'The current number of idle keepalive connections to the HTTP Upstream.'
+    },
+    'nginxplus.http_upstream_server_requests_rate': {
+        info: 'The number of client requests forwarded to the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_responses_per_code_class_rate': {
+        info: 'The number of responses received from the HTTP Upstream Server. Responses grouped by HTTP status code class.'
+    },
+    'nginxplus.http_upstream_server_response_time': {
+        info: 'The average time to get a complete response from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_response_header_time': {
+        info: 'The average time to get a response header from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_traffic_rate': {
+        info: 'The amount of traffic transferred to and from the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_state': {
+        info: 'The current state of the HTTP Upstream Server. Status active if set to 1.'
+    },
+    'nginxplus.http_upstream_server_connections_count': {
+        info: 'The current number of active connections to the HTTP Upstream Server.'
+    },
+    'nginxplus.http_upstream_server_downtime': {
+        info: 'The time the HTTP Upstream Server has spent in the <b>unavail</b>, <b>checking</b>, and <b>unhealthy</b> states.'
+    },
+    'nginxplus.http_cache_state': {
+        info: 'HTTP cache current state. <b>Cold</b> means that the cache loader process is still loading data from disk into the cache.'
+    },
+    'nginxplus.http_cache_iops': {
+        info: '<p>HTTP cache IOPS.</p><p><b>Served</b> - valid, expired, and revalidated responses read from the cache. <b>Written</b> - miss, expired, and bypassed responses written to the cache. <b>Bypassed</b> - miss, expired, and bypass responses.</p>'
+    },
+    'nginxplus.http_cache_io': {
+        info: '<p>HTTP cache IO.</p><p><b>Served</b> - valid, expired, and revalidated responses read from the cache. <b>Written</b> - miss, expired, and bypassed responses written to the cache. <b>Bypassed</b> - miss, expired, and bypass responses.</p>'
+    },
+    'nginxplus.http_cache_size': {
+        info: 'The current size of the cache.'
+    },
+    'nginxplus.stream_server_zone_connections_rate': {
+        info: 'The number of accepted connections to the Stream Server Zone.'
+    },
+    'nginxplus.stream_server_zone_sessions_per_code_class_rate': {
+        info: 'The number of completed sessions for the Stream Server Zone. Sessions grouped by status code class.'
+    },
+    'nginxplus.stream_server_zone_traffic_rate': {
+        info: 'The amount of data transferred to and from the Stream Server Zone.'
+    },
+    'nginxplus.stream_server_zone_connections_processing_count': {
+        info: 'The number of client connections to the Stream Server Zone that are currently being processed.'
+    },
+    'nginxplus.stream_server_zone_connections_discarded_rate': {
+        info: 'The number of connections to the Stream Server Zone completed without creating a session.'
+    },
+    'nginxplus.stream_upstream_peers_count': {
+        info: 'The number of Stream Upstream servers.'
+    },
+    'nginxplus.stream_upstream_zombies_count': {
+        info: 'The current number of HTTP Upstream servers removed from the group but still processing active client connections.'
+    },
+    'nginxplus.stream_upstream_server_connections_rate': {
+        info: 'The number of connections forwarded to the Stream Upstream Server.'
+    },
+    'nginxplus.stream_upstream_server_traffic_rate': {
+        info: 'The amount of traffic transferred to and from the Stream Upstream Server.'
+    },
+    'nginxplus.stream_upstream_server_state': {
+        info: 'The current state of the Stream Upstream Server. Status active if set to 1.'
+    },
+    'nginxplus.stream_upstream_server_downtime': {
+        info: 'The time the Stream Upstream Server has spent in the <b>unavail</b>, <b>checking</b>, and <b>unhealthy</b> states.'
+    },
+    'nginxplus.stream_upstream_server_connections_count': {
+        info: 'The current number of connections to the Stream Upstream Server.'
+    },
+    'nginxplus.resolver_zone_requests_rate': {
+        info: '<p>Resolver zone DNS requests.</p><p><b>Name</b> - requests to resolve names to addresses. <b>Srv</b> - requests to resolve SRV records. <b>Addr</b> - requests to resolve addresses to names.</p>'
+    },
+    'nginxplus.resolver_zone_responses_rate': {
+        info: '<p>Resolver zone DNS responses.</p><p><b>NoError</b> - successful responses. <b>FormErr</b> - format error responses. <b>ServFail</b> - server failure responses. <b>NXDomain</b> - host not found responses. <b>NotImp</b> - unimplemented responses. <b>Refused</b> - operation refused responses. <b>TimedOut</b> - timed out requests. <b>Unknown</b> - requests completed with an unknown error.</p>'
+    },
+
+    // ------------------------------------------------------------------------
     // HTTP check
 
     'httpcheck.responsetime': {
