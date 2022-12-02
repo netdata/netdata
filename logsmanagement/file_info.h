@@ -26,9 +26,9 @@ struct Circ_buff_item_ptrs;
 
 struct File_info {
     /* Struct members core to any log source type */
-    char *filename;                                 /**< Full path of log source **/
-    char *file_basename;                            /**< Basename of log source **/
     const char *chart_name;                         /**< Top level chart name for this log source on web dashboard **/ 
+    char *filename;                                 /**< Full path of log source **/
+    const char *file_basename;                      /**< Basename of log source **/
     enum log_source_t log_type;                     /**< Defines type of log source - see enum log_source_t options **/
     struct Circ_buff *circ_buff;                    /**< Associated circular buffer - only one should exist per log source. **/
     int compression_accel;                          /**< LZ4 compression acceleration factor for collected logs, see also: https://github.com/lz4/lz4/blob/90d68e37093d815e7ea06b0ee3c168cccffc84b8/lib/lz4.h#L195 **/
@@ -43,9 +43,9 @@ struct File_info {
     int blob_write_handle_offset;                   /**< File offset denoting HEAD of currently open database BLOB file **/
     int buff_flush_to_db_interval;                  /**< Frequency at which RAM buffers of this log source will be flushed to the database **/
     int64_t blob_max_size;                          /**< When the size of a BLOB exceeds this value, the BLOB gets rotated. **/
-    int64_t blob_total_size;                   /**< This is the total disk space that all BLOBs occupy (for this log source) **/
+    int64_t blob_total_size;                        /**< This is the total disk space that all BLOBs occupy (for this log source) **/
 
-    /* Struct members used only by log file sources */
+    /* Struct members used only by log file sources using the tail_plugin */
     uv_file file_handle;                            /**< Log source file handle **/
     uint64_t filesize;                              /**< Offset of where the next log source read operation needs to start from **/
     uv_fs_event_t *fs_event_req;
@@ -73,6 +73,7 @@ struct File_info {
     int flb_output;                                 /**< Fluent-but output interface property for this log source **/
     uv_mutex_t flb_tmp_buff_mut;
     uv_timer_t flb_tmp_buff_cpy_timer;
+    // TODO: The following structs need to be converted to pointers, to reduce memory consumption when not used
     Systemd_metrics_t flb_tmp_systemd_metrics;      /**< Temporarily store Systemd metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->systemd **/
     Docker_ev_metrics_t flb_tmp_docker_ev_metrics;  /**< Temporarily store Docker Events metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->docker_ev **/
 

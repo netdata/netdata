@@ -29,6 +29,8 @@
 
 #define BLOB_MAX_FILES 10	                        /**< Maximum allowed number of BLOB files (per collection) that are used to store compressed logs. When exceeded, the olderst one will be overwritten. **/
 
+#define DISK_SPACE_LIMIT_DEFAULT 500                /**< Default maximum database disk space limit per log source */
+
 /* -------------------------------------------------------------------------- */
 
 

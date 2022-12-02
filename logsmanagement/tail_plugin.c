@@ -319,7 +319,7 @@ static void file_changed_cb(uv_fs_event_t *handle, const char *file_basename, in
     if(unlikely(p_file_info->rotated)){
         p_file_info->rotated = 0;
         p_file_info->filename[strlen(p_file_info->filename) - 2] = '\0';
-        freez(p_file_info->file_basename);
+        freez((void *) p_file_info->file_basename);
         p_file_info->file_basename = get_basename(p_file_info->filename);
         // p_file_info->file_basename[strlen(p_file_info->file_basename - 2)] = '\0';
         p_file_info->filesize = 0;
