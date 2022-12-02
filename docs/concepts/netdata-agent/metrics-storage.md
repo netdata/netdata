@@ -9,8 +9,8 @@ learn_rel_path: "Concepts/Netdata agent"
 learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it collects, where it stores them, how it stores them and deletion policies (innovations like the tiering mechanism)"
 -->
 
-Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The
-Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
+Upon collection, collected metrics need to be either forwarded, exported, or just stored for further treatment. The
+Agent is capable of storing metrics both short and long-term, with or without the usage of non-volatile storage.
 
 ## Agent database modes and their cases
 
