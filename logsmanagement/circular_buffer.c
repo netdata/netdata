@@ -347,4 +347,14 @@ Circ_buff_t *circ_buff_init(const int num_of_items,
     return buff;
 }
 
-void circ_buff_destroy(void){/* TODO */};
+/**
+ * @brief Destroy a circular buffer.
+ * @param buff Circular buffer to be destroyed.
+ */
+void circ_buff_destroy(Circ_buff_t *buff){
+    for (int i = 0; i < buff->num_of_items; i++) freez(buff->items[i].data);
+    freez(buff->items);
+    freez(buff->in->data);
+    freez(buff->in);
+    freez(buff);
+};

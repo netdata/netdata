@@ -36,7 +36,6 @@ typedef struct Circ_buff {
     int num_of_items;
     Circ_buff_item_t *items;
     Circ_buff_item_t *in;
-    // atomic_int size;                            
     int head;							        /**< Position of next item insertion **/
     int read;							        /**< Index between tail and head, used to read items out of Circ_buff **/
     int tail;							        /**< Last valid item in Circ_buff **/
@@ -56,6 +55,6 @@ size_t circ_buff_prepare_write(Circ_buff_t *const buff, size_t const requested_t
 int circ_buff_insert(Circ_buff_t *const buff);
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff);
 Circ_buff_t *circ_buff_init(const int num_of_items, const size_t max_size, const int allow_dropped_logs);
-void circ_buff_destroy(void);
+void circ_buff_destroy(Circ_buff_t *buff);
 
 #endif  // CIRCULAR_BUFFER_H_
