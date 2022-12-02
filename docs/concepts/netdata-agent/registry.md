@@ -115,7 +115,7 @@ Note that we have not enabled the registry on the other servers. Only one Netdat
 
 This is it. You have your registry now.
 
-You may also want to give your server different names under the node menu (i.e. to have them sorted / grouped). You can
+You may also want to give your server different names under the node menu (i.e. to have them sorted0/grouped). You can
 change its registry name, by setting on each Netdata server:
 
 ```conf
