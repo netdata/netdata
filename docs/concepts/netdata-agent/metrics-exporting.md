@@ -75,13 +75,6 @@ Can't find your preferred external time-series database? Ask our [community](htt
 solutions, or file an [issue on
 GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 
-<!--## What's next?
-
-We recommend you read our document on [enabling a connector](/docs/export/enable-connector.md) to learn about the
-process and discover important configuration options. If you would rather skip ahead, click on any of the above links to
-connectors for their reference documentation, which outline any prerequisites to install for that connector, along with
-connector-specific configuration options.
--->
 
 ## Related documentation
 
