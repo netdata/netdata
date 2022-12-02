@@ -67,6 +67,7 @@ include memcached/Makefile.inc
 include mongodb/Makefile.inc
 include monit/Makefile.inc
 include nvidia_smi/Makefile.inc
+include nvidia_smi_csv/Makefile.inc
 include nsd/Makefile.inc
 include ntpd/Makefile.inc
 include openldap/Makefile.inc
