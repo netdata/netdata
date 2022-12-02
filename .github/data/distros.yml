@@ -104,7 +104,7 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/36
+      repo_distro: fedora/37
       arches:
         - x86_64
         - aarch64
