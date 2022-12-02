@@ -44,9 +44,7 @@ void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *char
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
 
-int health_alarm_log_open(RRDHOST *host);
 void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
-void health_alarm_log_load(RRDHOST *host);
 
 void health_thread_spawn(RRDHOST *host);
 void health_thread_stop(RRDHOST *host);
@@ -92,8 +90,6 @@ void health_alarm_log_free(RRDHOST *host);
 void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae);
 
 void *health_cmdapi_thread(void *ptr);
-
-void health_label_log_save(RRDHOST *host);
 
 char *health_edit_command_from_source(const char *source);
 void sql_refresh_hashes(void);

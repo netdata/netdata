@@ -746,7 +746,7 @@ static void health_thread_cleanup(void *ptr) {
     debug(D_HEALTH, "HEALTH %s: Health thread ended.", rrdhost_hostname(h->host));
 }
 
-static void initialize_health(RRDHOST *host, int is_localhost) {
+static void initialize_health(RRDHOST *host) {
     if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
@@ -773,42 +773,14 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
 
     char filename[FILENAME_MAX + 1];
 
-    if(!is_localhost) {
-        int r = mkdir(host->varlib_dir, 0775);
-        if (r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), host->varlib_dir);
-    }
-
-    {
-        snprintfz(filename, FILENAME_MAX, "%s/health", host->varlib_dir);
-        int r = mkdir(filename, 0775);
-        if(r != 0 && errno != EEXIST)
-            error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
-    }
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
-
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health_default_recipient = string_strdupz("root");
 
-    if (!file_is_migrated(host->health_log_filename)) {
-        int rc = sql_create_health_log_table(host);
-        if (unlikely(rc)) {
-            log_health("[%s]: Failed to create health log table in the database", rrdhost_hostname(host));
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
-        }
-        else {
-            health_alarm_log_load(host);
-            add_migrated_file(host->health_log_filename, 0);
-        }
-    } else {
-        // TODO: This needs to go to the metadata thread
-        // Health should wait before accessing the table (needs to be created by the metadata thread)
-        sql_create_health_log_table(host);
-        sql_health_alarm_log_load(host);
-    }
+    // TODO: This needs to go to the metadata thread
+    // Health should wait before accessing the table (needs to be created by the metadata thread)
+    sql_create_health_log_table(host);
+    sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
     // load health configuration
@@ -999,7 +971,7 @@ void *health_main(void *ptr) {
     netdata_thread_cleanup_push(health_thread_cleanup, ptr);
 
     RRDHOST *host = h->host;
-    initialize_health(host, host == localhost);
+    initialize_health(host);
 
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
@@ -1089,7 +1061,7 @@ void *health_main(void *ptr) {
             health_running_logged = true;
         }
 
-        if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
+        if(loop == 1 || loop % cleanup_sql_every_loop == 0)
             sql_health_alarm_log_cleanup(host);
 
         health_execute_delayed_initializations(host);

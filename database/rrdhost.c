@@ -487,7 +487,6 @@ int is_legacy = 1;
                  ", health %s"
                  ", cache_dir '%s'"
                  ", varlib_dir '%s'"
-                 ", health_log '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
@@ -507,7 +506,6 @@ int is_legacy = 1;
          , host->health_enabled?"enabled":"disabled"
          , host->cache_dir
          , host->varlib_dir
-         , host->health_log_filename
          , string2str(host->health_default_exec)
          , string2str(host->health_default_recipient)
     );
@@ -1193,7 +1191,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
     rrdpush_destinations_free(host);
     string_freez(host->health_default_exec);
     string_freez(host->health_default_recipient);
-    freez(host->health_log_filename);
     string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     rrdhost_unlock(host);
@@ -1393,8 +1390,6 @@ void reload_host_labels(void) {
 
     rrdlabels_remove_all_unmarked(localhost->rrdlabels);
     metaqueue_store_host_labels(localhost->machine_guid);
-
-    health_label_log_save(localhost);
 
     rrdpush_send_host_labels(localhost);
     health_reload();
