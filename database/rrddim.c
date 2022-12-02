@@ -195,19 +195,19 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    size_t tiers_available = 0, tiers_said_yes = 0;
+    size_t tiers_available = 0, tiers_said_no_retention = 0;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(rd->tiers[tier] && rd->tiers[tier]->db_collection_handle) {
             tiers_available++;
 
             if(rd->tiers[tier]->collect_ops->finalize(rd->tiers[tier]->db_collection_handle))
-                tiers_said_yes++;
+                tiers_said_no_retention++;
 
             rd->tiers[tier]->db_collection_handle = NULL;
         }
     }
 
-    if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (tiers_available == tiers_said_no_retention && tiers_said_no_retention && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* This metric has no data and no references */
         metaqueue_delete_dimension_uuid(&rd->metric_uuid);
     }

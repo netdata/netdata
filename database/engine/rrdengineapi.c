@@ -39,20 +39,39 @@ uint8_t rrdeng_drop_metrics_under_page_cache_pressure = 1;
 // ----------------------------------------------------------------------------
 // metrics groups
 
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
-    return callocz(1, sizeof(struct pg_alignment));
+static inline void rrdeng_page_alignment_acquire(struct pg_alignment *pa) {
+    if(unlikely(!pa)) return;
+    __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
 }
 
+static inline bool rrdeng_page_alignment_release(struct pg_alignment *pa) {
+    if(unlikely(!pa)) return true;
+
+    if(__atomic_sub_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
+        freez(pa);
+        return true;
+    }
+
+    return false;
+}
+
+// charts call this
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid __maybe_unused) {
+    struct pg_alignment *pa = callocz(1, sizeof(struct pg_alignment));
+    rrdeng_page_alignment_acquire(pa);
+    return (STORAGE_METRICS_GROUP *)pa;
+}
+
+// charts call this
 void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg) {
-    if(!smg) return;
+    if(unlikely(!smg)) return;
 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     struct pg_alignment *pa = (struct pg_alignment *)smg;
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    if(pa->refcount == 0)
-        freez(pa);
+    rrdeng_page_alignment_release(pa);
     uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
 }
 
@@ -134,12 +153,13 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
         __atomic_add_fetch(&page_index->refcount, 1, __ATOMIC_SEQ_CST);
 
         if(pa) {
-            if(page_index->alignment && page_index->alignment != pa && page_index->writers > 0)
-                fatal("DBENGINE: page_index has a different alignment (page_index refcount is %u, writers is %u).",
-                        page_index->refcount, page_index->writers);
+            if(page_index->alignment != pa) {
+                if(!rrdeng_page_alignment_release(page_index->alignment)) // NULL is ok
+                    error("DBENGINE: metric switched alignment, but the previous is still used.");
 
-            page_index->alignment = pa;
-            __atomic_add_fetch(&pa->refcount, 1, __ATOMIC_SEQ_CST);
+                rrdeng_page_alignment_acquire(pa);
+                page_index->alignment = pa;
+            }
         }
     }
 
@@ -162,8 +182,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_
     pg_cache->metrics_index.last_page_index = page_index;
     page_index->alignment = pa;
     page_index->refcount = 1;
-    if(pa)
-        pa->refcount++;
+    rrdeng_page_alignment_acquire(pa);
     uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
 
     return (STORAGE_METRIC_HANDLE *)page_index;
@@ -532,6 +551,9 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     uv_rwlock_wrlock(&page_index->lock);
     if (!--page_index->writers && !page_index->page_count) {
         can_delete_metric = 1;
+
+        rrdeng_page_alignment_release(page_index->alignment);
+        page_index->alignment = NULL;
     }
     uv_rwlock_wrunlock(&page_index->lock);
     freez(handle);
