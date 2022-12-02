@@ -707,10 +707,14 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    usec_t timeout = default_rrd_update_every * USEC_PER_SEC / 3;
-    bool query_sqlite3 = true;
+    usec_t timeout = default_rrd_update_every * USEC_PER_SEC + default_rrd_update_every * USEC_PER_SEC / 3;
+    usec_t now = now_monotonic_usec();
+    if(!last_run)
+        last_run = now;
+    usec_t delta = now - last_run;
+    bool query_sqlite3 = delta < timeout;
 
-    if(now_monotonic_usec() - last_run < timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_metadata_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
     else {
         gs->sqlite3_metadata_cache_hit = UINT64_MAX;
