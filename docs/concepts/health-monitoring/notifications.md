@@ -78,7 +78,7 @@ the local Agent dashboard at `http://NODE:19999`.
 
 Email alert notifications show the following information:
 
-- The Space's name
+- The space's name
 - The node's name
 - Alarm status: critical, warning, cleared
 - Previous alarm status
@@ -177,7 +177,7 @@ want to see alarm notifications from Netdata. Click the green **Add to Slack** b
 
 On the following page, you'll receive a **Webhook URL**. That's what you'll need to configure Netdata, so keep it handy.
 
-Navigate to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config`
+Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config`
 to open the `health_alarm_notify.conf` file:
 
 ```bash
