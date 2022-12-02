@@ -174,7 +174,6 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
     {
         std::lock_guard<std::mutex> Lock(Mutex);
 
-        Models[0] = KM;
         if (Models.size() < Cfg.NumModelsToUse) {
             Models.push_back(std::move(KM));
         } else {
