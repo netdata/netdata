@@ -69,7 +69,7 @@ Here are a few example streaming configurations:
 Parent nodes feature a **Replicated Nodes** section in the left-hand panel, which opens with the hamburger icon
 ![Hamburger icon](https://raw.githubusercontent.com/netdata/netdata-ui/master/src/components/icon/assets/hamburger.svg)
 in the top navigation. The parent node, plus any child nodes, appear here. Click on any of the hostnames to switch
-between parent and child dashboards, all served by the parent's [web server](/web/server/README.md).
+between parent and child dashboards, all served by the parent's [web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
 
 ![Switching between
 ](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
