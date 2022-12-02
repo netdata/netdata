@@ -710,56 +710,56 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     usec_t timeout = default_rrd_update_every * USEC_PER_SEC / 3;
     bool query_sqlite3 = true;
 
-    if(now_monotonic_usec() - last_run > timeout)
+    if(now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_metadata_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
     else {
         gs->sqlite3_metadata_cache_hit = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_context_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
     else {
         gs->sqlite3_context_cache_hit = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
     else {
         gs->sqlite3_metadata_cache_miss = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_context_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
     else {
         gs->sqlite3_context_cache_miss = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
     else {
         gs->sqlite3_metadata_cache_spill = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_context_cache_spill = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
     else {
         gs->sqlite3_context_cache_spill = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
     else {
         gs->sqlite3_metadata_cache_write = UINT64_MAX;
         query_sqlite3 = false;
     }
 
-    if(query_sqlite3 && now_monotonic_usec() - last_run > timeout)
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
         gs->sqlite3_context_cache_write = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
     else {
         gs->sqlite3_context_cache_write = UINT64_MAX;
