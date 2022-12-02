@@ -51,10 +51,10 @@ less significant manner.
 If you find something else interesting in the results, you can select another window and press **Find Correlations**
 again to kick the process off again.
 
-## Metric Correlations on the agent
+## Metric Correlations on the Agent
 
 As of `v1.35.0` Netdata is able to run the Metric Correlations
-algoritihim ([Two Sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test))
+algoritihm ([Two Sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test))
 on the agent itself. This avoids sending the underlying raw data to the original Netdata Cloud based microservice and so
 typically will be much much faster as no data moves around and the computation happens instead on the agent.
 
@@ -63,15 +63,15 @@ be routed to the node instance with the highest hops (e.g. a parent node if one 
 no node instances have MC enabled then the request will be routed to the original Netdata Cloud based service which will
 request input data from the nodes and run the computation within the Netdata Cloud backend.
 
-#### Enabling/Disabling Metric Correlations on the agent
-
 As of `v1.35.0-22-nightly` metric correlations has been enabled by default on all agents. After further optimizations to
 the implementation, the impact of running the metric correlations algorithim on the agent was less than the impact of
 preparing all the data to send to cloud for MC to run in the cloud, as such running MC on the agent is less impactful on
 local resources than running via cloud.
 
+:::Note 
 Should you still want to, disabling nodes for Metric Corrleation on the agent is a simple one line config change. Just
 set `enable metric correlations = no` in the `[global]` section of `netdata.conf`
+:::
 
 ## Metric Correlations Options
 
@@ -80,7 +80,7 @@ their data in different ways. As is usually the case in Machine Learning (ML), t
 algorithm. What approach works best will typically depend on the type of data (which can be very different from one
 metric to the next) and even the nature of the event or incident you might be exploring in Netdata.
 
-So by when you first run MC,it will use the most sensible and general defaults. But you can also then vary any of the
+So when you first run MC, it will use the most sensible and general defaults. But you can also then vary any of the
 following options to explore further what MC can do for your troubleshooting scenario.
 
 ### Method
@@ -131,27 +131,7 @@ anomaly detection features within netdata.
 > **Note:** - You can use the `Volume` method type with `Anomaly Rate` to ask what metrics have turned most anomalous from baseline to highlighted window. You can expand the embedded anomaly rate chart once you have results to see this more clearly.
 ![example where Volume and Anomaly Rate together help show what dimensions where most anomalous](https://user-images.githubusercontent.com/2178292/182338666-6d19fa92-89d3-4d61-804c-8f10982114f5.png)
 
-### Metric Correlations on the agent
 
-As of `v1.35.0` Netdata is able to run the Metric Correlations algoritihim
-([Two Sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test))
-on the agent itself. This avoids sending the underlying raw data to the original Netdata Cloud based microservice and so
-typically will be much much faster as no data moves around and the computation happens instead on the agent.
-
-When a Metric Correlations request is made to Netdata Cloud, if any node instances have MC enabled then the request will
-be routed to the node instance with the highest hops (e.g. a parent node if one is found or the node itself if not). If
-no node instances have MC enabled then the request will be routed to the original Netdata Cloud based service which will
-request input data from the nodes and run the computation within the Netdata Cloud backend.
-
-#### Enabling/Disabling Metric Correlations on the agent
-
-As of `v1.35.0-22-nightly` metric correlations has been enabled by default on all agents. After further optimizations to
-the implementation, the impact of running the metric correlations algorithim on the agent was less than the impact of
-preparing all the data to send to cloud for MC to run in the cloud, as such running MC on the agent is less impactful on
-local resources than running via cloud.
-
-Should you still want to, disabling nodes for Metric Corrleation on the agent is a simple one line config change. Just
-set `enable metric correlations = no` in the `[global]` section of `netdata.conf`
 
 ## Related Documents
 
