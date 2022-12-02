@@ -3253,8 +3253,6 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                     "RRDCONTEXT: context '%s' of host '%s', deleted from rrdmetrics dictionary.",
                     string2str(rc->id),
                     rrdhost_hostname(host));
-
-            fprintf(stderr, "RRDCONTEXT: deleted context '%s'", string2str(rc->id));
         }
 
         // the item is referenced in the dictionary

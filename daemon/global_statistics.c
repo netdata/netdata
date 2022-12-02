@@ -2322,7 +2322,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.value.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+                snprintf(title, 1000, "Netdata Workers %s value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -2334,7 +2334,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"value"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5
+                    , wu->priority + 5 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                     );
@@ -2378,7 +2378,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.rate.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+                snprintf(title, 1000, "Netdata Workers %s rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -2390,7 +2390,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"rate"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5
+                    , wu->priority + 5 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                 );
