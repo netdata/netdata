@@ -272,9 +272,19 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    uv_rwlock_rdlock(&page_index->lock);
+    Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
+    struct rrdeng_page_descr *descr = unlikely(NULL == PValue) ? NULL : *PValue;
+    uv_rwlock_rdunlock(&page_index->lock);
+    return descr;
+};
+
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
+    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr;
     struct page_cache_descr *pg_cache_descr;
     int ret;
@@ -365,19 +375,30 @@ after_crc_check:
         }
     }
 
+    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
+    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_array[0]->id, sizeof(uuid_t));
+    struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
+    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+
+
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
         descr = NULL;
         for (j = 0 ; j < xt_io_descr->descr_count; ++j) {
-            struct rrdeng_page_descr *descrj;
+            struct rrdeng_page_descr descrj;
 
-            descrj = xt_io_descr->descr_array[j];
+            descrj = xt_io_descr->descr_read_array[j];
             /* care, we don't hold the descriptor mutex */
-            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj->id) &&
-                header->descr[i].page_length == descrj->page_length &&
-                header->descr[i].start_time_ut == descrj->start_time_ut &&
-                header->descr[i].end_time_ut == descrj->end_time_ut) {
-                descr = descrj;
+            if (!uuid_compare(*(uuid_t *) header->descr[i].uuid, *descrj.id) &&
+                header->descr[i].page_length == descrj.page_length &&
+                header->descr[i].start_time_ut == descrj.start_time_ut &&
+                header->descr[i].end_time_ut == descrj.end_time_ut) {
+                //descr = descrj;
+                descr = get_descriptor(page_index, (time_t) (descrj.start_time_ut / USEC_PER_SEC));
+                if (unlikely(!descr)) {
+                    error_limit_static_thread_var(erl, 1, 0);
+                    error_limit(&erl, "%s: Required descriptor is not in the page index anymore", __FUNCTION__);
+                }
                 break;
             }
         }
@@ -506,6 +527,7 @@ static void do_read_extent(struct rrdengine_worker_config* wc,
         pg_cache_descr->flags |= RRD_PAGE_READ_PENDING;
         rrdeng_page_descr_mutex_unlock(ctx, descr[i]);
         xt_io_descr->descr_array[i] = descr[i];
+        xt_io_descr->descr_read_array[i] = *(descr[i]);
     }
     xt_io_descr->descr_count = count;
     xt_io_descr->file = datafile->file;
