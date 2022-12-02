@@ -705,19 +705,50 @@ static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
     gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
     gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
 
-    netdata_thread_disable_cancelability();
+    usec_t started = now_monotonic_usec();
+    for(int i = 0; i < 100 ; i++) {
+        switch(i) {
+            case 0:
+                gs->sqlite3_metadata_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+                break;
 
-    gs->sqlite3_metadata_cache_hit  = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_context_cache_hit   = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+            case 1:
+                gs->sqlite3_context_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+                break;
 
-    gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-    gs->sqlite3_context_cache_miss  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+            case 2:
+                gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+                break;
 
-    gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
-    gs->sqlite3_context_cache_spill  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+            case 3:
+                gs->sqlite3_context_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+                break;
 
-    gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
-    gs->sqlite3_context_cache_write  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+            case 4:
+                gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+                break;
+
+            case 5:
+                gs->sqlite3_context_cache_spill = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+                break;
+
+            case 6:
+                gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+                break;
+
+            case 7:
+                gs->sqlite3_context_cache_write = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+                break;
+
+            default:
+                i = INT_MAX;
+                break;
+        }
+
+        usec_t now = now_monotonic_usec();
+        if(now - started > default_rrd_update_every * USEC_PER_SEC / 3)
+            break;
+    }
 
     netdata_thread_enable_cancelability();
 }
