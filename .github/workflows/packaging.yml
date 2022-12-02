@@ -44,41 +44,15 @@ jobs:
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
-        shell: python3 {0}
         run: |
-          from ruamel.yaml import YAML
-          import json
-          import re
-          import os
-          ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
-          yaml = YAML(typ='safe')
-          entries = list()
-          run_limited = False
-
-          with open('.github/data/distros.yml') as f:
-              data = yaml.load(f)
-
-          if "${{ github.event_name }}" == "pull_request" and "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}":
-              run_limited = True
-
-          for i, v in enumerate(data['include']):
-              if 'packages' in data['include'][i]:
-                  for arch in data['include'][i]['packages']['arches']:
-                      if arch in ALWAYS_RUN_ARCHES or not run_limited:
-                          entries.append({
-                              'distro': data['include'][i]['distro'],
-                              'version': data['include'][i]['version'],
-                              'repo_distro': data['include'][i]['packages']['repo_distro'],
-                              'format': data['include'][i]['packages']['type'],
-                              'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
-                              'platform': data['platform_map'][arch],
-                              'arch': arch
-                          })
-
-          entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
-          matrix = json.dumps({'include': entries}, sort_keys=True)
-          print('Generated Matrix: ' + matrix)
-          print('::set-output name=matrix::' + matrix)
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
+            matrix="$(.github/scripts/gen-matrix-packaging.py 1)"
+          else
+            matrix="$(.github/scripts/gen-matrix-packaging.py 0)"
+          fi
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -117,24 +91,24 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
               "release")
-                echo "::set-output name=repo::${REPO_PREFIX}"
-                echo "::set-output name=version::${{ github.event.inputs.version }}"
-                echo "::set-output name=retention::365"
+                echo "repo=${REPO_PREFIX}" >> "${GITHUB_OUTPUT}"
+                echo "version=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+                echo "retention=365" >> "${GITHUB_OUTPUT}"
                 ;;
               "nightly")
-                echo "::set-output name=repo::${REPO_PREFIX}-edge"
-                echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
-                echo "::set-output name=retention::30"
+                echo "repo=${REPO_PREFIX}-edge" >> "${GITHUB_OUTPUT}"
+                echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+                echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
               *)
-                echo "::set-output name=repo::${REPO_PREFIX}-devel"
-                echo "::set-output name=version::0.${GITHUB_SHA}"
-                echo "::set-output name=retention::30"
+                echo "repo=${REPO_PREFIX}-devel" >> "${GITHUB_OUTPUT}"
+                echo "version=0.${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+                echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
             esac
           else
-            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | tr -d 'v')"
-            echo "::set-output name=retention::0"
+            echo "version=$(cut -d'-' -f 1 packaging/version | tr -d 'v')" >> "${GITHUB_OUTPUT}"
+            echo "retention=0" >> "${GITHUB_OUTPUT}"
           fi
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
