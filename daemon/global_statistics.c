@@ -4,17 +4,18 @@
 
 #define GLOBAL_STATS_RESET_WEB_USEC_MAX 0x01
 
-#define WORKER_JOB_GLOBAL               0
-#define WORKER_JOB_REGISTRY             1
-#define WORKER_JOB_DBENGINE             2
-#define WORKER_JOB_HEARTBEAT            3
-#define WORKER_JOB_STRINGS              4
-#define WORKER_JOB_DICTIONARIES         5
-#define WORKER_JOB_MALLOC_TRACE         6
-#define WORKER_JOB_WORKERS              7
+#define WORKER_JOB_GLOBAL             0
+#define WORKER_JOB_REGISTRY           1
+#define WORKER_JOB_WORKERS            2
+#define WORKER_JOB_DBENGINE           3
+#define WORKER_JOB_HEARTBEAT          4
+#define WORKER_JOB_STRINGS            5
+#define WORKER_JOB_DICTIONARIES       6
+#define WORKER_JOB_MALLOC_TRACE       7
+#define WORKER_JOB_SQLITE3            8
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 8
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 9
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 9
 #endif
 
 bool global_statistics_enabled = true;
@@ -60,21 +61,6 @@ static struct global_statistics {
 
     uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 
-    uint64_t sqlite3_queries_made;
-    uint64_t sqlite3_queries_ok;
-    uint64_t sqlite3_queries_failed;
-    uint64_t sqlite3_queries_failed_busy;
-    uint64_t sqlite3_queries_failed_locked;
-    uint64_t sqlite3_rows;
-    uint64_t sqlite3_metadata_cache_hit;
-    uint64_t sqlite3_context_cache_hit;
-    uint64_t sqlite3_metadata_cache_miss;
-    uint64_t sqlite3_context_cache_miss;
-    uint64_t sqlite3_metadata_cache_spill;
-    uint64_t sqlite3_context_cache_spill;
-    uint64_t sqlite3_metadata_cache_write;
-    uint64_t sqlite3_context_cache_write;
-
 } global_statistics = {
         .connected_clients = 0,
         .web_requests = 0,
@@ -110,27 +96,6 @@ void global_statistics_exporters_query_completed(size_t points_read) {
 void global_statistics_backfill_query_completed(size_t points_read) {
     __atomic_fetch_add(&global_statistics.backfill_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.backfill_db_points_read, points_read, __ATOMIC_RELAXED);
-}
-
-void global_statistics_sqlite3_query_completed(bool success, bool busy, bool locked) {
-    __atomic_fetch_add(&global_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
-
-    if(success) {
-        __atomic_fetch_add(&global_statistics.sqlite3_queries_ok, 1, __ATOMIC_RELAXED);
-    }
-    else {
-        __atomic_fetch_add(&global_statistics.sqlite3_queries_failed, 1, __ATOMIC_RELAXED);
-
-        if(busy)
-            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_busy, 1, __ATOMIC_RELAXED);
-
-        if(locked)
-            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_locked, 1, __ATOMIC_RELAXED);
-    }
-}
-
-void global_statistics_sqlite3_row_completed(void) {
-    __atomic_fetch_add(&global_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
 }
 
 void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
@@ -241,25 +206,6 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
         uint64_t n = 0;
         __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
     }
-
-    gs->sqlite3_queries_made          = __atomic_load_n(&global_statistics.sqlite3_queries_made, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_ok            = __atomic_load_n(&global_statistics.sqlite3_queries_ok, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed        = __atomic_load_n(&global_statistics.sqlite3_queries_failed, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed_busy   = __atomic_load_n(&global_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
-    gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
-
-    gs->sqlite3_metadata_cache_hit  = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_context_cache_hit   = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-
-    gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-    gs->sqlite3_context_cache_miss  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-
-    gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
-    gs->sqlite3_context_cache_spill  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
-
-    gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
-    gs->sqlite3_context_cache_write  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
 }
 
 static void global_statistics_charts(void) {
@@ -707,8 +653,129 @@ static void global_statistics_charts(void) {
 
         rrdset_done(st_points_stored);
     }
+}
 
-    // ----------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// sqlite3 statistics
+
+struct sqlite3_statistics {
+    uint64_t sqlite3_queries_made;
+    uint64_t sqlite3_queries_ok;
+    uint64_t sqlite3_queries_failed;
+    uint64_t sqlite3_queries_failed_busy;
+    uint64_t sqlite3_queries_failed_locked;
+    uint64_t sqlite3_rows;
+    uint64_t sqlite3_metadata_cache_hit;
+    uint64_t sqlite3_context_cache_hit;
+    uint64_t sqlite3_metadata_cache_miss;
+    uint64_t sqlite3_context_cache_miss;
+    uint64_t sqlite3_metadata_cache_spill;
+    uint64_t sqlite3_context_cache_spill;
+    uint64_t sqlite3_metadata_cache_write;
+    uint64_t sqlite3_context_cache_write;
+
+} sqlite3_statistics = { };
+
+void global_statistics_sqlite3_query_completed(bool success, bool busy, bool locked) {
+    __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
+
+    if(success) {
+        __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_ok, 1, __ATOMIC_RELAXED);
+    }
+    else {
+        __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed, 1, __ATOMIC_RELAXED);
+
+        if(busy)
+            __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed_busy, 1, __ATOMIC_RELAXED);
+
+        if(locked)
+            __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed_locked, 1, __ATOMIC_RELAXED);
+    }
+}
+
+void global_statistics_sqlite3_row_completed(void) {
+    __atomic_fetch_add(&sqlite3_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
+}
+
+static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
+    static usec_t last_run = 0;
+
+    gs->sqlite3_queries_made          = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_made, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_ok            = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_ok, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed        = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_busy   = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
+    gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
+
+    usec_t timeout = default_rrd_update_every * USEC_PER_SEC + default_rrd_update_every * USEC_PER_SEC / 3;
+    usec_t now = now_monotonic_usec();
+    if(!last_run)
+        last_run = now;
+    usec_t delta = now - last_run;
+    bool query_sqlite3 = delta < timeout;
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    else {
+        gs->sqlite3_metadata_cache_hit = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    else {
+        gs->sqlite3_context_cache_hit = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    else {
+        gs->sqlite3_metadata_cache_miss = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    else {
+        gs->sqlite3_context_cache_miss = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+    else {
+        gs->sqlite3_metadata_cache_spill = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_spill = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+    else {
+        gs->sqlite3_context_cache_spill = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+    else {
+        gs->sqlite3_metadata_cache_write = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_write = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+    else {
+        gs->sqlite3_context_cache_write = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    last_run = now_monotonic_usec();
+}
+
+static void sqlite3_statistics_charts(void) {
+    struct sqlite3_statistics gs;
+    sqlite3_statistics_copy(&gs);
 
     if(gs.sqlite3_queries_made) {
         static RRDSET *st_sqlite3_queries = NULL;
@@ -833,10 +900,17 @@ static void global_statistics_charts(void) {
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_metadata_cache_spill);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_metadata_cache_write);
+        if(gs.sqlite3_metadata_cache_hit != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
+
+        if(gs.sqlite3_metadata_cache_miss != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
+
+        if(gs.sqlite3_metadata_cache_spill != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_metadata_cache_spill);
+
+        if(gs.sqlite3_metadata_cache_write != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_metadata_cache_write);
 
         rrdset_done(st_sqlite3_cache);
     }
@@ -870,10 +944,17 @@ static void global_statistics_charts(void) {
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_context_cache_spill);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_context_cache_write);
+        if(gs.sqlite3_context_cache_hit != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
+
+        if(gs.sqlite3_context_cache_miss != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
+
+        if(gs.sqlite3_context_cache_spill != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_context_cache_spill);
+
+        if(gs.sqlite3_context_cache_write != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_context_cache_write);
 
         rrdset_done(st_sqlite3_cache);
     }
@@ -2490,8 +2571,6 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 static Pvoid_t workers_by_pid_JudyL_array = NULL;
 
 static void workers_threads_cleanup(struct worker_utilization *wu) {
-    netdata_thread_disable_cancelability();
-
     struct worker_thread *t = wu->threads;
     while(t) {
         struct worker_thread *next = t->next;
@@ -2503,8 +2582,6 @@ static void workers_threads_cleanup(struct worker_utilization *wu) {
         }
         t = next;
     }
-
-    netdata_thread_enable_cancelability();
  }
 
 static struct worker_thread *worker_thread_find(struct worker_utilization *wu __maybe_unused, pid_t pid) {
@@ -2639,13 +2716,18 @@ static void worker_utilization_charts(void) {
 
     for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
+
+        netdata_thread_disable_cancelability();
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
+        netdata_thread_enable_cancelability();
 
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
 
+        netdata_thread_disable_cancelability();
         workers_threads_cleanup(&all_workers_utilization[i]);
+        netdata_thread_enable_cancelability();
     }
 
     workers_total_cpu_utilization_chart();
@@ -2692,6 +2774,7 @@ static void global_statistics_register_workers(void) {
     worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
     worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
     worker_register_job_name(WORKER_JOB_WORKERS, "workers");
+    worker_register_job_name(WORKER_JOB_SQLITE3, "sqlite3");
 }
 
 static void global_statistics_cleanup(void *ptr)
@@ -2733,6 +2816,9 @@ void *global_statistics_main(void *ptr)
 
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
+
+        worker_is_busy(WORKER_JOB_SQLITE3);
+        sqlite3_statistics_charts();
 
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
