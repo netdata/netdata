@@ -12,17 +12,13 @@ import copy
 
 NVIDIA_SMI_COMMAND = 'nvidia-smi --query-gpu=name,temperature.gpu,power.draw,utilization.gpu,utilization.memory --format=csv'
 
-# Do NOT keep this as a global:
-product_name = "Tesla K80"
-
+# ORDER values are dynamically added
+# They will look similar to this but with indexes attached
 ORDER = [
-#    'timestamp',
-#    'index',
-#    'product_name',
 #    'temperature.gpu',
 #    'utilization.gpu',
 #    'utilization.memory',
-#    'power.draw',
+#    'power.draw', 
 ]
 
 CHARTS_TEMPLATE = {
@@ -103,19 +99,16 @@ def create_charts(data_dict):
             gpu_index += 1
             continue
         ORDER.append(key_name)
+        # Grabbing an independent copy that does not link to the main TEMPLATE to modify 
         template_copy = copy.deepcopy(CHARTS_TEMPLATE)
         for template_key, template_value in CHARTS_TEMPLATE.items():
             if template_key.replace('__INDEX__', str(gpu_index)) == key_name:
                 CHARTS[key_name] = template_copy.pop(template_key)
                 break
-            #else:
-            #    # This is not useful for now, but there was the potential of a usecase later, and we didn't want to disregard that. 
-            #    # Actually, this just breaks everything. Don't include it until we find a better solution.
-            #    print("I don't think it should be in here")
-            #    CHARTS[template_key] = template_copy.pop(template_key)
 
         replace_product = functools.partial(replace_chars, old='__PRODUCT__', new=current_product)
         replace_index = functools.partial(replace_chars, old='__INDEX__', new=str(gpu_index))
+        # Searching the dictionary values recursively for strings to change to corrected value
         for key, value in CHARTS[key_name].items():
             recursively_apply(value, replace_product)
             recursively_apply(value, replace_index)
