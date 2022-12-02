@@ -28,9 +28,9 @@ meaningfully](https://github.com/netdata/netdata/blob/master/docs/concepts/visua
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
 
-For example, the [Nginx collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) searches
-at `http://127.0.0.1/stub_status`, which is the default endpoint for exposing Nginx metrics. The [web log collector for
-Nginx or Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) searches at
+For example, the Nginx collector searches
+at `http://127.0.0.1/stub_status`, which is the default endpoint for exposing Nginx metrics. The web log collector for
+Nginx or Apache searches at
 `/var/log/nginx/access.log` and `/var/log/apache2/access.log`, respectively, both of which are standard locations for
 access log files on Linux systems.
 
@@ -59,7 +59,7 @@ terms related to collecting metrics.
 -   **Modules** are a type of collector.
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
     The Go orchestrator is in active development.
-    -   [go.d.plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/): An orchestrator for data
+    -   go.d.plugin: An orchestrator for data
         collection modules written in `go`.
     -   python.d.plugin: An orchestrator for data collection modules written in
         `python` v2/v3.
