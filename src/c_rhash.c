@@ -213,6 +213,26 @@ static void c_rhash_destroy_bin(c_rhash_bin bin) {
     } while (bin != NULL);
 }
 
+int c_rhash_iter_uint64_keys(c_rhash hash, c_rhash_iter_t *iter, uint64_t *key) {
+    while (iter->bin < hash->bin_count) {
+        if (iter->item != NULL)
+            iter->item = iter->item->next;
+        if (iter->item == NULL) {
+            if (iter->initialized)
+                iter->bin++;
+            else
+                iter->initialized = 1;
+            if (iter->bin < hash->bin_count)
+                iter->item = hash->bins[iter->bin];
+        }
+        if (iter->item != NULL && iter->item->key_type == ITEMTYPE_UINT64) {
+            *key = *(uint64_t*)iter->item->key;
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void c_rhash_destroy(c_rhash hash) {
     for (size_t i = 0; i < hash->bin_count; i++) {
         if (hash->bins[i] != NULL)
