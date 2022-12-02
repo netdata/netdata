@@ -20,18 +20,6 @@ typedef enum { LOGS_MANAG_ERROR,
                LOGS_MANAG_INFO,
                LOGS_MANAG_DEBUG } Log_level;
 
-#ifdef LOGS_MANAG_DEBUG_LEV
-#define fprintf_log(log_level, ...)                          \
-    do {                                                     \
-        if (1) fprintf_log_internal(log_level, __VA_ARGS__); \
-    } while (0)
-#else
-#define fprintf_log(log_level, ...)                          \
-    do {                                                     \
-        if (0) fprintf_log_internal(log_level, __VA_ARGS__); \
-    } while (0)
-#endif  // LOGS_MANAG_DEBUG_LEV
-
 #ifndef m_assert
 #if LOGS_MANAG_DEBUG_LEV                                             // Disable m_assert if production release
 #define m_assert(expr, msg) assert(((void)(msg), (expr))) /**< Custom assert function that prints out failure message */
@@ -122,51 +110,6 @@ static inline char *get_basename(const char *const path) {
         return strdupz(s + 1);
 }
 
-#ifdef LOGS_MANAG_DEBUG_LEV
-/**
- * @brief Custom formatted print implementation
- */
-static inline void fprintf_log_internal(Log_level log_level, FILE *stream, const char *format, ...) {
-    if (log_level > LOGS_MANAG_DEBUG_LEV) 
-        return; 
-
-    const char info_msg_prefix[] = "LOGS_MANAG_INFO: ";
-    const char warn_msg_prefix[] = "LOGS_MANAG_WARN: ";
-    const char error_msg_prefix[] = "LOGS_MANAG_ERROR: ";
-
-    const int msg_len = MAX_LOGS_MANAG_LOG_MSG_LEN;
-    char msg[msg_len];
-
-    va_list args;
-    va_start(args, format);
-
-    switch (log_level) {
-        case LOGS_MANAG_DEBUG:
-            fprintf(stream, "LOGS_MANAG_DEBUG: ");
-            vfprintf(stream, format, args);
-            break;
-        case LOGS_MANAG_INFO:
-            sprintf(msg, info_msg_prefix);
-            vsnprintf(&msg[sizeof(info_msg_prefix) - 1], msg_len - (sizeof(info_msg_prefix) - 1), format, args);
-            info("%s", msg);
-            break;
-        case LOGS_MANAG_WARNING:
-            sprintf(msg, warn_msg_prefix);
-            vsnprintf(&msg[sizeof(warn_msg_prefix) - 1], msg_len - (sizeof(warn_msg_prefix) - 1), format, args);
-            info("%s", msg);
-            break;
-        case LOGS_MANAG_ERROR:
-            sprintf(msg, error_msg_prefix);
-            vsnprintf(&msg[sizeof(error_msg_prefix) - 1], msg_len - (sizeof(error_msg_prefix) - 1), format, args);
-            error("%s", msg);
-            break;
-        default:
-            break;
-    }
-
-    va_end(args);
-}
-#endif  // LOGS_MANAG_DEBUG_LEV
 
 typedef enum {
     STR2XX_SUCCESS = 0,
