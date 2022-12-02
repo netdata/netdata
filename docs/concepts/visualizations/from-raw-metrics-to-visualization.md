@@ -15,14 +15,14 @@ learn_docs_purpose: "Beginners corner, explain the terminology of Netdata's metr
 We know you're here for the visualizations; really, we do. But before we can dive in fully, there's a few things we have to make sure you undersand before 
 you get started. 
 
-While Netdata's charts require no configuration and are [easy to interact with](/docs/dashboard/interact-charts.mdx),
+While Netdata's charts require no configuration and are [easy to interact with](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx),
 they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in
 your nodes, Netdata uses the concepts of **dimensions**, **contexts**, and **families**. 
 
 Understanding how these work will help you more easily navigate the dashboard, [write new
 alarms](/docs/monitor/configure-alarms.md), or play around with the [API](/web/api/README.md).
 
-For a refresher on the anatomy of a chart, see [dashboards and charts](/docs/dashboard/how-dashboard-works.mdx).
+For a refresher on the anatomy of a chart, see [dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.mdx).
 
 ## Dimension
 
