@@ -221,13 +221,7 @@ after_crc_check:
         /* care, we don't hold the descriptor mutex */
     }
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, xt_io_descr->descr_read_array[0].id, sizeof(uuid_t));
-    struct pg_cache_page_index *page_index = likely( NULL != PValue) ? *PValue : NULL;
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-
     worker_is_busy(UV_EVENT_PAGE_POPULATION);
-    struct pg_alignment *alignment = likely(NULL != page_index) ? page_index->alignment : NULL;
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i++].page_length) {
         uint8_t is_prefetched_page;
@@ -260,7 +254,7 @@ after_crc_check:
         }
         is_prefetched_page = 0;
         if (!descr) { /* This extent page has not been requested. Try populating it for locality (best effort). */
-            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid, header->descr[i].start_time_ut, alignment);
+            descr = pg_cache_lookup_unpopulated_and_lock(ctx, (uuid_t *)header->descr[i].uuid, header->descr[i].start_time_ut);
             if (!descr)
                 continue; /* Failed to reserve a suitable page */
             is_prefetched_page = 1;
