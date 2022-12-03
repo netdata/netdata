@@ -29,7 +29,7 @@
 #define WORKER_JOB_PP_QUEUE_SIZE   13
 
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_NONE           = 0,
     RRD_FLAG_DELETED        = (1 << 0), // this is a deleted object (metrics, instances, contexts)
     RRD_FLAG_COLLECTED      = (1 << 1), // this object is currently being collected
@@ -115,6 +115,7 @@ typedef enum {
 static inline void
 rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditionally_add, RRD_FLAGS always_remove) {
     RRD_FLAGS expected, desired;
+
     do {
         expected = *flags;
 

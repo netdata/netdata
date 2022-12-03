@@ -3,10 +3,9 @@
 #define DICTIONARY_INTERNALS
 
 #include "../libnetdata.h"
-#include <Judy.h>
 
 // runtime flags of the dictionary - must be checked with atomics
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     DICT_FLAG_NONE                  = 0,
     DICT_FLAG_DESTROYED             = (1 << 0), // this dictionary has been destroyed
 } DICT_FLAGS;
@@ -23,14 +22,14 @@ typedef enum {
 #define is_view_dictionary(dict) ((dict)->master)
 #define is_master_dictionary(dict) (!is_view_dictionary(dict))
 
-typedef enum item_options {
+typedef enum __attribute__ ((__packed__)) item_options {
     ITEM_OPTION_NONE            = 0,
     ITEM_OPTION_ALLOCATED_NAME  = (1 << 0), // the name pointer is a STRING
 
     // IMPORTANT: This is 1-bit - to add more change ITEM_OPTIONS_BITS
 } ITEM_OPTIONS;
 
-typedef enum item_flags {
+typedef enum __attribute__ ((__packed__)) item_flags {
     ITEM_FLAG_NONE              = 0,
     ITEM_FLAG_DELETED           = (1 << 0), // this item is marked deleted, so it is not available for traversal (deleted from the index too)
     ITEM_FLAG_BEING_CREATED     = (1 << 1), // this item is currently being created - this flag is removed when construction finishes
@@ -623,7 +622,7 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
     if(likely(!dict->hooks || !dict->hooks->del_callback))
         return;
 
-    // We may execute the delete callback on items deleted from a view,
+    // We may execute delete callback on items deleted from a view,
     // because we may have references to it, after the master is gone
     // so, the shared structure will remain until the last reference is released.
 
@@ -782,7 +781,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
     while(item) {
         examined++;
 
-        // this will cleanup
+        // this will clean up
         item_next = item->next;
         int rc = item_check_and_acquire_advanced(dict, item, is_view);
 
@@ -882,7 +881,7 @@ static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
 static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     // this function may be called without any lock on the dictionary
-    // or even when someone else has write lock on the dictionary
+    // or even when someone else has 'write' lock on the dictionary
 
     bool is_deleted;
     REFCOUNT refcount;
@@ -934,10 +933,10 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
     int ret = RC_ITEM_OK;
 
+    refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+
     do {
         spins++;
-
-        refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
 
         if(refcount < 0) {
             // we can't use this item
@@ -953,8 +952,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
         desired = refcount + 1;
 
-    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
-                                          false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
     // if ret == ITEM_OK, we acquired the item
 
@@ -971,7 +969,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
                 else
                     pointer_del(dict, item);
 
-                // mark it in our dictionary as deleted too
+                // mark it in our dictionary as deleted too,
                 // this is safe to be done here, because we have got
                 // a reference counter on item
                 dict_item_set_deleted(dict, item);
@@ -1013,10 +1011,10 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 
     int ret = RC_ITEM_OK;
 
+    refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+
     do {
         spins++;
-
-        refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
 
         if(refcount < 0) {
             // we can't use this item
@@ -1035,8 +1033,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
             ret = RC_ITEM_IS_CURRENTLY_BEING_CREATED;
             break;
         }
-    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired,
-                                                         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(ret == RC_ITEM_OK)
@@ -1055,8 +1052,7 @@ static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
     REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST);
-    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING,
-                                                     false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
 
         // we can delete it
         return true;
@@ -1430,16 +1426,16 @@ static void dict_item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item
 static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ITEM_FLAGS expected, desired;
 
+    expected = __atomic_load_n(&item->flags, __ATOMIC_SEQ_CST);
+
     do {
-        expected = __atomic_load_n(&item->flags, __ATOMIC_SEQ_CST);
 
         if (expected & ITEM_FLAG_DELETED)
             return false;
 
         desired = expected | ITEM_FLAG_DELETED;
 
-    } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired,
-                                         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
     DICTIONARY_ENTRIES_MINUS1(dict);
     return true;
@@ -1474,7 +1470,7 @@ static inline void dict_item_free_or_mark_deleted(DICTIONARY *dict, DICTIONARY_I
 }
 
 // this is used by traversal functions to remove the current item
-// if it is deleted and it has zero references. This will eliminate
+// if it is deleted, and it has zero references. This will eliminate
 // the need for the garbage collector to kick-in later.
 // Most deletions happen during traversal, so this is a nice hack
 // to speed up everything!
@@ -1601,7 +1597,7 @@ static DICTIONARY_ITEM *dict_item_add_or_reset_value_and_acquire(DICTIONARY *dic
             hashtable_inserted_item_unsafe(dict, item);
 
             // unlock the index lock, before we add it to the linked list
-            // DONT DO IT THE OTHER WAY AROUND - DO NOT CROSS THE LOCKS!
+            // DON'T DO IT THE OTHER WAY AROUND - DO NOT CROSS THE LOCKS!
             dictionary_index_wrlock_unlock(dict);
 
             item_linked_list_add(dict, item);
