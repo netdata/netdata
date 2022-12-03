@@ -551,6 +551,8 @@ if ENABLE_DBENGINE
         database/engine/pagecache.h \
         database/engine/rrdenglocking.c \
         database/engine/rrdenglocking.h \
+        database/engine2/cache.c \
+        database/engine2/cache.h \
         $(NULL)
 endif
 
