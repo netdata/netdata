@@ -41,6 +41,7 @@ struct rrdeng_collect_handle {
     unsigned long page_correlation_id;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
     uint8_t unaligned_page;
+    struct pg_alignment *alignment;
 };
 
 struct rrdeng_query_handle {

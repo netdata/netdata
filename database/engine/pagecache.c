@@ -1204,7 +1204,6 @@ struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_insta
     page_index->refcount = 0;
     page_index->writers = 0;
     page_index->ctx = ctx;
-    page_index->alignment = NULL;
     page_index->latest_update_every_s = default_rrd_update_every;
 
     return page_index;
