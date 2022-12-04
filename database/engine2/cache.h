@@ -20,7 +20,7 @@ typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *array, size_t entries);
 
 // create a cache
-PGC *pgc_create(size_t max_size, free_clean_page_callback pgc_free_clean_cb,
+PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_clean_cb,
                 size_t max_dirty_pages_to_save_at_once, save_dirty_page_callback pgc_save_dirty_cb);
 
 // destroy the cache
@@ -42,8 +42,9 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
 Word_t pgc_page_section(PGC_PAGE *page);
 Word_t pgc_page_metric(PGC_PAGE *page);
 Word_t pgc_page_start_time_t(PGC_PAGE *page);
-void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t);
+void *pgc_page_data(PGC_PAGE *page);
 
-int pgc_unittest(void);
+// resetting the end time of a hot page
+void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t);
 
 #endif // DBENGINE_CACHE_H

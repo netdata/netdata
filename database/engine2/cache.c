@@ -53,7 +53,7 @@ struct pgc_linked_list {
 
 struct pgc {
     struct {
-        size_t max_size;
+        size_t max_clean_size;
         size_t max_dirty_pages_to_save_at_once;
         free_clean_page_callback pgc_free_clean_cb;
         save_dirty_page_callback pgc_save_dirty_cb;
@@ -114,7 +114,7 @@ static size_t page_size_from_assumed_size(size_t assumed_size) {
 }
 
 // ----------------------------------------------------------------------------
-// LRU
+// Linked list management
 
 static void dbengine_page_cache_ll_add(struct pgc_linked_list *ll, PGC_PAGE *page) {
     netdata_spinlock_lock(&ll->spinlock);
@@ -307,11 +307,13 @@ static inline size_t CACHE_CURRENT_CLEAN_SIZE(PGC *cache) {
 }
 
 static void evict_pages(PGC *cache, bool all) {
-    while(all || CACHE_CURRENT_CLEAN_SIZE(cache) > cache->config.max_size) {
+    while(all || CACHE_CURRENT_CLEAN_SIZE(cache) > cache->config.max_clean_size) {
         netdata_spinlock_lock(&cache->clean.spinlock);
 
         // find one to delete
         PGC_PAGE *page = cache->clean.base;
+        if(!page) break;
+
         while(page && !page_get_for_deletion(cache, page))
             page = page->link.next;
 
@@ -344,15 +346,15 @@ static void evict_pages(PGC *cache, bool all) {
                 fatal("DBENGINE CACHE: page with start time '%lu' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
                       page->start_time_t, page->metric_id, page->section);
 
-            if(unlikely(JudyLDel(pages_judy_pptr, page->start_time_t, PJE0)))
+            if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_t, PJE0)))
                 fatal("DBENGINE CACHE: page with start time '%lu' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
                       page->start_time_t, page->metric_id, page->section);
 
-            if(!*pages_judy_pptr && JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
+            if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
                 fatal("DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
                       page->metric_id, page->section);
 
-            if(!*metrics_judy_pptr && JudyLDel(&cache->index.sections_judy, page->section, PJE0))
+            if(!*metrics_judy_pptr && !JudyLDel(&cache->index.sections_judy, page->section, PJE0))
                 fatal("DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.", page->section);
 
             dbengine_cache_index_write_unlock(cache);
@@ -365,7 +367,6 @@ static void evict_pages(PGC *cache, bool all) {
                 .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_SEQ_CST),
                 .size = page_size_from_assumed_size(page->assumed_size),
                 .hot = (is_page_hot(page)) ? true : false,
-
             });
 
             page_flag_clear(page, DBENGINE_PGC_PAGE_IS_BEING_DELETED);
@@ -391,7 +392,7 @@ static void evict_pages(PGC *cache, bool all) {
                 error_limit_static_global_var(erl, 1, 0);
                 error_limit(&erl,
                             "DBENGINE CACHE: cache size %zu, exceeds max size %zu, but all the data in it are currently referenced and cannot be evicted",
-                            CACHE_CURRENT_CLEAN_SIZE(cache), cache->config.max_size);
+                            CACHE_CURRENT_CLEAN_SIZE(cache), cache->config.max_clean_size);
             }
 
             break;
@@ -436,6 +437,8 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
 
             page_flag_clear(page, DBENGINE_PGC_PAGE_IS_BEING_CREATED);
 
+            PGC_REFERENCED_PAGES_PLUS1(cache, page);
+
             // update statistics
             __atomic_add_fetch(&cache->stats.added_entries, 1, __ATOMIC_RELAXED);
             __atomic_add_fetch(&cache->stats.added_size, page->assumed_size, __ATOMIC_RELAXED);
@@ -460,7 +463,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
 PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t) {
     PGC_PAGE *page = NULL;
 
-    while(!page) {
+    do {
         dbengine_cache_index_read_lock(cache);
 
         Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index.sections_judy, section, PJE0);
@@ -493,7 +496,7 @@ PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Wo
                 // found a page starting before our timestamp
                 // check if our timestamp is included
                 page = *page_ptr;
-                if(start_time_t < page->start_time_t || start_time_t > page->end_time_t)
+                if(start_time_t > page->end_time_t)
                     // it is not good for us
                     page = NULL;
             }
@@ -516,7 +519,8 @@ PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Wo
         if(!page_acquire(cache, page))
             // retry, this page is not good for us...
             page = NULL;
-    }
+
+    } while(!page);
 
     return page;
 }
@@ -548,7 +552,7 @@ static void flush_dirty_pages(PGC *cache, bool all_of_them) {
         netdata_spinlock_lock(&cache->dirty.spinlock);
 
         PGC_PAGE *page = cache->dirty.base;
-        while(page) {
+        while(page && used < cache->config.max_dirty_pages_to_save_at_once) {
             PGC_PAGE *next = page->link.next;
 
             if(page_acquire(cache, page)) {
@@ -596,10 +600,10 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // ----------------------------------------------------------------------------
 // public API
 
-PGC *pgc_create(size_t max_size, free_clean_page_callback pgc_free_cb,
+PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_to_save_at_once, save_dirty_page_callback pgc_save_dirty_cb) {
     PGC *cache = callocz(1, sizeof(PGC));
-    cache->config.max_size = max_size;
+    cache->config.max_clean_size = max_clean_size;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_to_save_at_once = max_dirty_pages_to_save_at_once,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
@@ -656,8 +660,13 @@ Word_t pgc_page_start_time_t(PGC_PAGE *page) {
     return page->start_time_t;
 }
 
+void *pgc_page_data(PGC_PAGE *page) {
+    return page->data;
+}
+
 void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t) {
-    __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_SEQ_CST);
+    if(is_page_hot(page))
+        __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_SEQ_CST);
 }
 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t) {
@@ -667,6 +676,95 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
 // ----------------------------------------------------------------------------
 // unittest
 
+struct {
+    PGC_PAGE **metrics;
+    Word_t clean_metrics;
+    Word_t hot_metrics;
+    time_t first_time_t;
+    time_t last_time_t;
+} pgc_uts = {
+        .metrics        = NULL,
+        .clean_metrics  =    9000000,
+        .hot_metrics    =    1000000,
+        .first_time_t   =  100000000,
+        .last_time_t    = 1000000000,
+};
+
+void unittest_stress_test(void) {
+    pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
+
+}
+
+static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) {
+    // info("FREE clean page section %lu, metric %lu, start_time %lu, end_time %lu", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
+    ;
+}
+
+static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
+    // info("Called to save %zu pages", entries);
+    ;
+}
+
 int pgc_unittest(void) {
+    PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback, 64, unittest_save_dirty_page_callback);
+
+    // FIXME - unit tests
+    // - add clean page
+    // - add clean page again (should not add it)
+    // - release page (should decrement counters)
+    // - add hot page
+    // - add hot page again (should not add it)
+    // - turn hot page to dirty, with and without a reference counter to it
+    // - dirty pages are saved once there are enough of them
+    // - find page exact
+    // - find page (should return last)
+    // - find page (should return next)
+    // - page cache full (should evict)
+    // - on destroy, turn hot pages to dirty and save them
+
+    PGC_PAGE *page1 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+        .section = 1,
+        .metric_id = 10,
+        .start_time_t = 100,
+        .end_time_t = 1000,
+        .size = 4096,
+        .data = NULL,
+        .hot = false,
+    });
+
+    pgc_page_release(cache, page1);
+
+    PGC_PAGE *page2 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+            .section = 1,
+            .metric_id = 10,
+            .start_time_t = 1001,
+            .end_time_t = 2000,
+            .size = 4096,
+            .data = NULL,
+            .hot = true,
+    });
+
+    pgc_page_hot_set_end_time_t(page2, 2001);
+    pgc_page_hot_to_dirty_and_release(cache, page2);
+
+    usec_t start_ut = now_monotonic_usec();
+    for(int i = 0; i < 1000000; i++) {
+        PGC_PAGE *p = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+                .section = 1,
+                .metric_id = 10,
+                .start_time_t = 100 * (i + 1),
+                .end_time_t = 1000 + 100 * (i + 1),
+                .size = 4096,
+                .data = NULL,
+                .hot = false,
+        });
+
+        pgc_page_release(cache, p);
+    }
+    usec_t end_ut = now_monotonic_usec();
+
+    info("Created 1M pages in %llu", end_ut - start_ut);
+
+    pgc_destroy(cache);
     return 0;
 }
