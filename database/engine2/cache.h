@@ -11,6 +11,7 @@ typedef struct pgc_entry {
     Word_t section;             // the section this belongs to
     Word_t metric_id;           // the metric this belongs to
     Word_t start_time_t;        // the start time of the page
+    Word_t end_time_t;          // the end time of the page
     size_t size;                // the size in bytes of the allocation, outside the cache
     void *data;                 // a pointer to data outside the cache
 } PGC_ENTRY;
@@ -33,5 +34,16 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page);
 
 // mark a hot page dirty, and release it
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page);
+
+// find a page from the cache
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t);
+
+// get information from an acquired page
+Word_t pgc_page_section(PGC_PAGE *page);
+Word_t pgc_page_metric(PGC_PAGE *page);
+Word_t pgc_page_start_time_t(PGC_PAGE *page);
+void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t);
+
+int pgc_unittest(void);
 
 #endif // DBENGINE_CACHE_H

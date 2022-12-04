@@ -874,6 +874,8 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
+int pgc_unittest(void);
+
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
@@ -1060,6 +1062,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "metatest") == 0) {
                             unittest_running = true;
                             return metadata_unittest();
+                        }
+                        else if(strcmp(optarg, "pgctest") == 0) {
+                            unittest_running = true;
+                            return pgc_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
