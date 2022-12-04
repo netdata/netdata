@@ -15,11 +15,23 @@ typedef struct pgc_entry {
     void *data;                 // a pointer to data outside the cache
 } PGC_ENTRY;
 
-// create a cache
-PGC *pgc_create(size_t max_size);
+typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
+typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *array, size_t entries);
 
-// add a page to the cache
+// create a cache
+PGC *pgc_create(size_t max_size, free_clean_page_callback pgc_free_clean_cb,
+                size_t max_dirty_pages_to_save_at_once, save_dirty_page_callback pgc_save_dirty_cb);
+
+// destroy the cache
+void pgc_destroy(PGC *cache);
+
+// add a page to the cache and return a pointer to it
 PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry);
 
+// release a page (all pointers to it are now invalid)
+void pgc_page_release(PGC *cache, PGC_PAGE *page);
+
+// mark a hot page dirty, and release it
+void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page);
 
 #endif // DBENGINE_CACHE_H
