@@ -46,9 +46,14 @@ struct pgc_page {
 
 struct pgc_linked_list {
     SPINLOCK spinlock;
-    PGC_PAGE *base;
     size_t entries;
     size_t size;
+    union {
+        PGC_PAGE *base;
+        Pvoid_t sections_judy;
+    };
+    uint32_t version;
+    bool linked_list_in_sections_judy; // when true, we use 'sections_judy', otherwise we use 'base'
 };
 
 struct pgc {
@@ -116,21 +121,63 @@ static size_t page_size_from_assumed_size(size_t assumed_size) {
 // ----------------------------------------------------------------------------
 // Linked list management
 
-static void dbengine_page_cache_ll_add(struct pgc_linked_list *ll, PGC_PAGE *page) {
+struct section_dirty_pages {
+    size_t entries;
+    size_t size;
+    PGC_PAGE *base;
+};
+
+static void dbengine_page_cache_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page) {
     netdata_spinlock_lock(&ll->spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
     __atomic_add_fetch(&ll->entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
+
+    if(ll->linked_list_in_sections_judy) {
+        Pvoid_t *dirty_pages_pptr = JudyLIns(&ll->sections_judy, page->section, PJE0);
+        struct section_dirty_pages *sdp = *dirty_pages_pptr;
+
+        if(!sdp) {
+            sdp = callocz(1, sizeof(struct section_dirty_pages));
+            *dirty_pages_pptr = sdp;
+        }
+
+        sdp->entries++;
+        sdp->size += page->assumed_size;
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(sdp->base, page, link.prev, link.next);
+    }
+    else {
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
+    }
+
+    ll->version++;
+
     netdata_spinlock_unlock(&ll->spinlock);
 }
 
-static void dbengine_page_cache_ll_del(struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
+static void dbengine_page_cache_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
     if(!having_lock)
         netdata_spinlock_lock(&ll->spinlock);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ll->base, page, link.prev, link.next);
     __atomic_sub_fetch(&ll->entries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
+
+    if(ll->linked_list_in_sections_judy) {
+        Pvoid_t *dirty_pages_pptr = JudyLGet(ll->sections_judy, page->section, PJE0);
+        struct section_dirty_pages *sdp = *dirty_pages_pptr;
+        sdp->entries--;
+        sdp->size -= page->assumed_size;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sdp->base, page, link.prev, link.next);
+
+        if(!sdp->base) {
+            JudyLDel(&ll->sections_judy, page->section, PJE0);
+            freez(sdp);
+        }
+    }
+    else {
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ll->base, page, link.prev, link.next);
+    }
+
+    ll->version++;
 
     if(!having_lock)
         netdata_spinlock_unlock(&ll->spinlock);
@@ -154,7 +201,7 @@ static inline void page_clear_clean(PGC *cache, PGC_PAGE *page) {
 
     // first clear the flag, then remove from the list (required for move_page_last())
     page_flag_clear(page, DBENGINE_PGC_PAGE_CLEAN);
-    dbengine_page_cache_ll_del(&cache->clean, page, false);
+    dbengine_page_cache_ll_del(cache, &cache->clean, page, false);
 }
 
 static void page_clear_dirty(PGC *cache, PGC_PAGE *page, bool having_dirty_lock) {
@@ -162,7 +209,7 @@ static void page_clear_dirty(PGC *cache, PGC_PAGE *page, bool having_dirty_lock)
 
     // first clear the flag, then remove from the list (required for move_page_last())
     page_flag_clear(page, DBENGINE_PGC_PAGE_DIRTY);
-    dbengine_page_cache_ll_del(&cache->dirty, page, having_dirty_lock);
+    dbengine_page_cache_ll_del(cache, &cache->dirty, page, having_dirty_lock);
 }
 
 static inline void page_clear_hot(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
@@ -170,7 +217,7 @@ static inline void page_clear_hot(PGC *cache, PGC_PAGE *page, bool having_hot_lo
 
     // first clear the flag, then remove from the list (required for move_page_last())
     page_flag_clear(page, DBENGINE_PGC_PAGE_HOT);
-    dbengine_page_cache_ll_del(&cache->hot, page, having_hot_lock);
+    dbengine_page_cache_ll_del(cache, &cache->hot, page, having_hot_lock);
 }
 
 static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_dirty_lock) {
@@ -185,7 +232,7 @@ static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_dirty_
     page_clear_dirty(cache, page, having_dirty_lock);
 
     // first add to linked list, the set the flag (required for move_page_last())
-    dbengine_page_cache_ll_add(&cache->clean, page);
+    dbengine_page_cache_ll_add(cache, &cache->clean, page);
     page_flag_set(page, DBENGINE_PGC_PAGE_CLEAN);
 
     netdata_spinlock_unlock(&page->transition_spinlock);
@@ -203,7 +250,7 @@ static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
     page_clear_clean(cache, page);
 
     // first add to linked list, the set the flag (required for move_page_last())
-    dbengine_page_cache_ll_add(&cache->dirty, page);
+    dbengine_page_cache_ll_add(cache, &cache->dirty, page);
     page_flag_set(page, DBENGINE_PGC_PAGE_DIRTY);
 
     netdata_spinlock_unlock(&page->transition_spinlock);
@@ -221,7 +268,7 @@ static inline void page_set_hot(PGC *cache, PGC_PAGE *page) {
     page_clear_clean(cache, page);
 
     // first add to linked list, the set the flag (required for move_page_last())
-    dbengine_page_cache_ll_add(&cache->hot, page);
+    dbengine_page_cache_ll_add(cache, &cache->hot, page);
     page_flag_set(page, DBENGINE_PGC_PAGE_HOT);
 
     netdata_spinlock_unlock(&page->transition_spinlock);
@@ -307,6 +354,11 @@ static inline size_t CACHE_CURRENT_CLEAN_SIZE(PGC *cache) {
 }
 
 static void evict_pages(PGC *cache, bool all) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_fatal(cache->clean.linked_list_in_sections_judy,
+                   "wrong clean pages configuration - clean pages need to have a linked list, not a judy array");
+#endif
+
     while(all || CACHE_CURRENT_CLEAN_SIZE(cache) > cache->config.max_clean_size) {
         netdata_spinlock_lock(&cache->clean.spinlock);
 
@@ -321,7 +373,7 @@ static void evict_pages(PGC *cache, bool all) {
             page_flag_set(page, DBENGINE_PGC_PAGE_IS_BEING_DELETED);
 
             // remove it from the linked list
-            dbengine_page_cache_ll_del(&cache->clean, page, true);
+            dbengine_page_cache_ll_del(cache, &cache->clean, page, true);
 
             netdata_spinlock_unlock(&cache->clean.spinlock);
 
@@ -543,54 +595,87 @@ static void all_hot_pages_to_dirty(PGC *cache) {
     netdata_spinlock_unlock(&cache->hot.spinlock);
 }
 
-static void flush_dirty_pages(PGC *cache, bool all_of_them) {
-    while(all_of_them || __atomic_load_n(&cache->dirty.entries, __ATOMIC_RELAXED) >= cache->config.max_dirty_pages_to_save_at_once) {
-        PGC_ENTRY array[cache->config.max_dirty_pages_to_save_at_once];
-        PGC_PAGE *pages[cache->config.max_dirty_pages_to_save_at_once];
-        size_t used = 0;
-
-        netdata_spinlock_lock(&cache->dirty.spinlock);
-
-        PGC_PAGE *page = cache->dirty.base;
-        while(page && used < cache->config.max_dirty_pages_to_save_at_once) {
-            PGC_PAGE *next = page->link.next;
-
-            if(page_acquire(cache, page)) {
-                netdata_spinlock_lock(&page->transition_spinlock);
-                page_flag_set(page, DBENGINE_PGC_PAGE_IS_BEING_SAVED);
-
-                pages[used] = page;
-                array[used] = (PGC_ENTRY){
-                    .section = page->section,
-                    .metric_id = page->metric_id,
-                    .start_time_t = page->start_time_t,
-                    .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_SEQ_CST),
-                    .size = page_size_from_assumed_size(page->assumed_size),
-                    .data = page->data,
-                    .hot = (is_page_hot(page)) ? true : false,
-                };
-                used++;
-            }
-
-            page = next;
-        }
-
-        netdata_spinlock_unlock(&cache->dirty.spinlock);
-
-        if(used) {
-            cache->config.pgc_save_dirty_cb(cache, array, used);
-
-            for (size_t i = 0; i < used; i++) {
-                page = pages[i];
-                page_flag_clear(page, DBENGINE_PGC_PAGE_IS_BEING_SAVED);
-                netdata_spinlock_unlock(&page->transition_spinlock);
-                page_set_clean(cache, page, false);
-                page_release(cache, page);
-            }
-        }
-        else
-            break;
+static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
+        return JudyLFirst(PArray, PIndex, PJE0);
     }
+
+    return JudyLNext(PArray, PIndex, PJE0);
+}
+
+static void flush_dirty_pages(PGC *cache, bool all_of_them) {
+    netdata_spinlock_lock(&cache->dirty.spinlock);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_fatal(!cache->dirty.linked_list_in_sections_judy,
+                   "wrong dirty pages configuration - dirty pages need to have a judy array, not a linked list");
+#endif
+
+    Word_t last_section = 0;
+    Pvoid_t *dirty_pages_pptr;
+    bool first = true;
+    while ((dirty_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
+
+        struct section_dirty_pages *sdp = *dirty_pages_pptr;
+        PGC_PAGE *page = sdp->base;
+        while (page && (all_of_them || sdp->entries >= cache->config.max_dirty_pages_to_save_at_once)) {
+            PGC_ENTRY array[cache->config.max_dirty_pages_to_save_at_once];
+            PGC_PAGE *pages[cache->config.max_dirty_pages_to_save_at_once];
+            size_t used = 0;
+
+            while (page && used < cache->config.max_dirty_pages_to_save_at_once) {
+                PGC_PAGE *next = page->link.next;
+
+                if (page_acquire(cache, page)) {
+                    netdata_spinlock_lock(&page->transition_spinlock);
+                    page_flag_set(page, DBENGINE_PGC_PAGE_IS_BEING_SAVED);
+
+                    pages[used] = page;
+                    array[used] = (PGC_ENTRY) {
+                            .section = page->section,
+                            .metric_id = page->metric_id,
+                            .start_time_t = page->start_time_t,
+                            .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_SEQ_CST),
+                            .size = page_size_from_assumed_size(page->assumed_size),
+                            .data = page->data,
+                            .hot = (is_page_hot(page)) ? true : false,
+                    };
+                    used++;
+                }
+
+                page = next;
+            }
+
+            if (used) {
+                bool clean_them = false;
+
+                if (all_of_them || used == cache->config.max_dirty_pages_to_save_at_once) {
+                    // call the callback to save them
+                    // it may take some time, so let's release the lock
+                    netdata_spinlock_unlock(&cache->dirty.spinlock);
+                    cache->config.pgc_save_dirty_cb(cache, array, used);
+                    netdata_spinlock_lock(&cache->dirty.spinlock);
+
+                    clean_them = true;
+                }
+
+                for (size_t i = 0; i < used; i++) {
+                    PGC_PAGE *tpg = pages[i];
+                    page_flag_clear(tpg, DBENGINE_PGC_PAGE_IS_BEING_SAVED);
+                    netdata_spinlock_unlock(&tpg->transition_spinlock);
+
+                    if (clean_them)
+                        page_set_clean(cache, tpg, true);
+
+                    page_release(cache, tpg);
+                }
+            }
+
+        }
+    }
+
+    netdata_spinlock_unlock(&cache->dirty.spinlock);
 }
 
 void free_all_unreferenced_clean_pages(PGC *cache) {
@@ -611,6 +696,8 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
     netdata_spinlock_init(&cache->hot.spinlock);
     netdata_spinlock_init(&cache->dirty.spinlock);
     netdata_spinlock_init(&cache->clean.spinlock);
+
+    cache->dirty.linked_list_in_sections_judy = true;
 
     return cache;
 }
@@ -701,7 +788,7 @@ static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENT
 }
 
 static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
-    // info("Called to save %zu pages", entries);
+    info("SAVE %zu pages", entries);
     ;
 }
 
@@ -735,7 +822,7 @@ int pgc_unittest(void) {
     pgc_page_release(cache, page1);
 
     PGC_PAGE *page2 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
-            .section = 1,
+            .section = 2,
             .metric_id = 10,
             .start_time_t = 1001,
             .end_time_t = 2000,
@@ -746,6 +833,19 @@ int pgc_unittest(void) {
 
     pgc_page_hot_set_end_time_t(page2, 2001);
     pgc_page_hot_to_dirty_and_release(cache, page2);
+
+    PGC_PAGE *page3 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
+            .section = 3,
+            .metric_id = 10,
+            .start_time_t = 1001,
+            .end_time_t = 2000,
+            .size = 4096,
+            .data = NULL,
+            .hot = true,
+    });
+
+    pgc_page_hot_set_end_time_t(page3, 2001);
+    pgc_page_hot_to_dirty_and_release(cache, page3);
 
     usec_t start_ut = now_monotonic_usec();
     for(int i = 0; i < 1000000; i++) {

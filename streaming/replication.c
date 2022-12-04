@@ -844,9 +844,11 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
     replication_recursive_unlock();
 }
 
-static inline PPvoid_t JudyLFirstOrNext(Pcvoid_t PArray, Word_t * PIndex, bool first) {
-    if(unlikely(first))
+static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
         return JudyLFirst(PArray, PIndex, PJE0);
+    }
 
     return JudyLNext(PArray, PIndex, PJE0);
 }
@@ -881,7 +883,7 @@ static struct replication_request replication_request_get_first_available() {
         }
 
         bool find_same_after = true;
-        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstOrNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, find_same_after))) {
+        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstThenNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, &find_same_after))) {
             Pvoid_t *our_item_pptr;
 
             if(unlikely(round == 2 && replication_globals.unsafe.queue.after > started_after))
@@ -902,9 +904,6 @@ static struct replication_request replication_request_get_first_available() {
                     // we removed the item from the outer JudyL
                     break;
             }
-
-            // call JudyLNext from now on
-            find_same_after = false;
 
             // prepare for the next iteration on the outer loop
             replication_globals.unsafe.queue.unique_id = 0;
