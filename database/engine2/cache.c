@@ -52,7 +52,8 @@ struct pgc_linked_list {
         PGC_PAGE *base;
         Pvoid_t sections_judy;
     };
-    uint32_t version;
+    size_t version;
+    size_t last_version_checked;
     bool linked_list_in_sections_judy; // when true, we use 'sections_judy', otherwise we use 'base'
 };
 
@@ -353,13 +354,13 @@ static inline size_t CACHE_CURRENT_CLEAN_SIZE(PGC *cache) {
     return __atomic_load_n(&cache->clean.size, __ATOMIC_SEQ_CST);
 }
 
-static void evict_pages(PGC *cache, bool all) {
+static void evict_pages(PGC *cache, bool all_of_them) {
 #ifdef NETDATA_INTERNAL_CHECKS
     internal_fatal(cache->clean.linked_list_in_sections_judy,
                    "wrong clean pages configuration - clean pages need to have a linked list, not a judy array");
 #endif
 
-    while(all || CACHE_CURRENT_CLEAN_SIZE(cache) > cache->config.max_clean_size) {
+    while(all_of_them || CACHE_CURRENT_CLEAN_SIZE(cache) > cache->config.max_clean_size) {
         netdata_spinlock_lock(&cache->clean.spinlock);
 
         // find one to delete
@@ -436,7 +437,7 @@ static void evict_pages(PGC *cache, bool all) {
         else {
             netdata_spinlock_unlock(&cache->clean.spinlock);
 
-            if(all) {
+            if(all_of_them) {
                 error_limit_static_global_var(erl, 1, 0);
                 error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, some are still referenced");
             }
@@ -612,6 +613,11 @@ static void flush_dirty_pages(PGC *cache, bool all_of_them) {
                    "wrong dirty pages configuration - dirty pages need to have a judy array, not a linked list");
 #endif
 
+    if(!all_of_them && (cache->dirty.entries < cache->config.max_dirty_pages_to_save_at_once || cache->dirty.last_version_checked == cache->dirty.version)) {
+        netdata_spinlock_unlock(&cache->dirty.spinlock);
+        return;
+    }
+
     Word_t last_section = 0;
     Pvoid_t *dirty_pages_pptr;
     bool first = true;
@@ -675,6 +681,7 @@ static void flush_dirty_pages(PGC *cache, bool all_of_them) {
         }
     }
 
+    cache->dirty.last_version_checked = cache->dirty.version;
     netdata_spinlock_unlock(&cache->dirty.spinlock);
 }
 
