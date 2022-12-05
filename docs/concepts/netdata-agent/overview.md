@@ -17,7 +17,19 @@ devices.
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container/microservice
 platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with no sudo required.
 
-## Related topics
+## Learn More
 
-list of related topics
+<Grid columns="4">
+  <Box
+    title="Guided troubleshooting tools">
+    <BoxList>
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md" title="ACLK" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-collection.md" title="Metrics collection" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-exporting.md" title="Metrics exporting" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-storage.md" title="Metrics storage" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md" title="Metrics streming replication" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/registry.md" title="Registry" />
+    </BoxList>
+  </Box>
+</Grid>
 
