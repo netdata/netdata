@@ -1,5 +1,22 @@
 # Changelog
 
+## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.37.0...v1.37.1)
+
+**Merged pull requests:**
+
+- fix v1.37 dbengine page alignment crashes [\#14086](https://github.com/netdata/netdata/pull/14086) ([ktsaou](https://github.com/ktsaou))
+- Fix \_\_atomic\_compare\_exchange\_n\(\) atomics [\#14085](https://github.com/netdata/netdata/pull/14085) ([ktsaou](https://github.com/ktsaou))
+- Fix 1.37 crashes [\#14081](https://github.com/netdata/netdata/pull/14081) ([stelfrag](https://github.com/stelfrag))
+- add basic dashboard info for NGINX Plus [\#14080](https://github.com/netdata/netdata/pull/14080) ([ilyam8](https://github.com/ilyam8))
+- replication fixes 9 [\#14079](https://github.com/netdata/netdata/pull/14079) ([ktsaou](https://github.com/ktsaou))
+- optimize workers statistics performance [\#14077](https://github.com/netdata/netdata/pull/14077) ([ktsaou](https://github.com/ktsaou))
+- fix SSL related crashes [\#14076](https://github.com/netdata/netdata/pull/14076) ([ktsaou](https://github.com/ktsaou))
+- remove python.d/springboot [\#14075](https://github.com/netdata/netdata/pull/14075) ([ilyam8](https://github.com/ilyam8))
+- fix backfilling statistics [\#14074](https://github.com/netdata/netdata/pull/14074) ([ktsaou](https://github.com/ktsaou))
+- Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
+
 ## [v1.37.0](https://github.com/netdata/netdata/tree/v1.37.0) (2022-11-30)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.36.1...v1.37.0)
@@ -298,7 +315,6 @@
 - Add Fedora 37 to CI and package builds. [\#13489](https://github.com/netdata/netdata/pull/13489) ([Ferroin](https://github.com/Ferroin))
 - Overhaul handling of installation of Netdata as a system service. [\#13451](https://github.com/netdata/netdata/pull/13451) ([Ferroin](https://github.com/Ferroin))
 - reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
-- Remove Alpine 3.13 from CI and official support. [\#13415](https://github.com/netdata/netdata/pull/13415) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -347,13 +363,6 @@
 - Dont duplicate buffered bytes [\#13435](https://github.com/netdata/netdata/pull/13435) ([vlvkobal](https://github.com/vlvkobal))
 - Show last 15 alerts in notification [\#13434](https://github.com/netdata/netdata/pull/13434) ([MrZammler](https://github.com/MrZammler))
 - Query queue only for queries [\#13431](https://github.com/netdata/netdata/pull/13431) ([underhood](https://github.com/underhood))
-- Remove octopus from demo-sites [\#13423](https://github.com/netdata/netdata/pull/13423) ([cakrit](https://github.com/cakrit))
-- Tiering statistics API endpoint [\#13420](https://github.com/netdata/netdata/pull/13420) ([ktsaou](https://github.com/ktsaou))
-- add discord, youtube, linkedin links to README [\#13419](https://github.com/netdata/netdata/pull/13419) ([andrewm4894](https://github.com/andrewm4894))
-- add ML bullet point to features section on README [\#13418](https://github.com/netdata/netdata/pull/13418) ([andrewm4894](https://github.com/andrewm4894))
-- Set value to SN\_EMPTY\_SLOT if flags is SN\_EMPTY\_SLOT [\#13417](https://github.com/netdata/netdata/pull/13417) ([MrZammler](https://github.com/MrZammler))
-- Add missing comma \(handle coverity warning CID 379360\) [\#13413](https://github.com/netdata/netdata/pull/13413) ([stelfrag](https://github.com/stelfrag))
-- codacy/lgtm ignore judy sources [\#13411](https://github.com/netdata/netdata/pull/13411) ([underhood](https://github.com/underhood))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
