@@ -134,6 +134,9 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->pg_cache_descr_state = 0;
     descr->pg_cache_descr = NULL;
     descr->update_every_s = 0;
+    descr->extent_entry = NULL;
+    descr->type = 0;
+    descr->file = -1;
 
     return descr;
 }
@@ -569,6 +572,192 @@ static inline int is_point_in_time_in_page(struct rrdeng_page_descr *descr, usec
     return (point_in_time >= descr->start_time_ut && point_in_time <= descr->end_time_ut);
 }
 
+bool descr_exists_unsafe( struct pg_cache_page_index *page_index, time_t start_time_s)
+{
+    return (NULL != JudyLGet(page_index->JudyL_array, start_time_s, PJE0));
+}
+
+void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index)
+{
+    Pvoid_t *PValue;
+
+    uv_rwlock_wrlock(&pg_cache->v2_lock);
+    PValue = JudyLIns(&journalfile->JudyL_array, (Word_t)page_offset, PJE0);
+    *(uint32_t *)PValue = (Index + 1);
+    journalfile->last_access = now_realtime_sec();
+    uv_rwlock_wrunlock(&pg_cache->v2_lock);
+}
+
+static void update_journal_access_time(struct rrdengine_journalfile *journalfile, struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
+{
+    if (journalfile && journalfile->is_valid) {
+        journalfile->last_access = now_realtime_sec();
+        return;
+    }
+
+    if (unlikely(!page_index || !descr))
+        return;
+
+    if (!is_descr_journal_v2(descr))
+        return;
+
+    struct rrdengine_instance *ctx = page_index->ctx;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile) {
+        journalfile = datafile->journalfile;
+        if (!journalfile->journal_data || !journalfile->is_valid) {
+            datafile = datafile->next;
+            continue;
+        }
+        if (datafile->file == descr->file) {
+            journalfile->last_access = now_realtime_sec();
+            break;
+        }
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+}
+
+static int journal_metric_uuid_compare(const void *key, const void *metric)
+{
+    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
+}
+
+//
+// Steps
+// 1. Find which journal has the start time within its range
+// 2. Find the UUID in that journal
+// 3. Find the array of times for that UUID (convert from the journal header to the offset needed)
+// Note: We have page_index lock
+// cache pages is the maximum pages to fetch (create metadata for)
+// This will be limited by the end_time or if we run out of pages in the matching journal
+// pages that could be precached but exist in another journal will not be precached
+static struct rrdeng_page_descr *populate_page_index(
+    struct pg_cache_page_index *page_index,
+    usec_t start_time_ut,
+    usec_t end_time_ut,
+    uint32_t cache_pages)
+{
+    struct rrdengine_instance *ctx = page_index->ctx;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    while (datafile) {
+        struct journal_v2_header *journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
+        if (!journal_header || !datafile->journalfile->is_valid) {
+            datafile = datafile->next;
+            continue;
+        }
+
+        if (start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  {
+
+            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+
+            struct journal_metric_list *uuid_entry = bsearch(
+                &page_index->id,
+                uuid_list,
+                (size_t)journal_header->metric_count,
+                sizeof(struct journal_metric_list),
+                journal_metric_uuid_compare);
+
+            uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            uint32_t delta_end_time = (end_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+
+            if (uuid_entry /*&& ((delta_start_time >= uuid_entry->delta_start && delta_start_time <= uuid_entry->delta_end))*/) {
+
+                struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
+//                struct rrdeng_page_descr *descr = add_pages_from_timerange(
+//                    page_list_header,
+//                    delta_start_time,
+//                    delta_end_time,
+//                    journal_header->start_time_ut,
+//                    page_index,
+//                    (void *)((uint8_t *)journal_header + journal_header->extent_offset),
+//                    datafile,
+//                    cache_pages);
+
+//                if (descr) {
+//                    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+////                    char uuid_str[UUID_STR_LEN];
+//                    uuid_unparse_lower(page_index->id, uuid_str);
+//                    if (strcmp(uuid_str, "2c790085-39d6-4c51-8d94-2f836b1554c9") == 0) {
+//                        if (descr)
+//                            info("%s: BIG: %s %llu %llu FOUND IN JOURNAL RETURNING",__FUNCTION__ , uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
+//                        else
+//                            info("%s: BIG: %s %llu %llu NOT FOUND IN PAGE LIST  - %llu %llu",__FUNCTION__ , uuid_str, start_time_ut / USEC_PER_SEC, end_time_ut / USEC_PER_SEC,
+//                                 uuid_entry->delta_start + journal_header->start_time_ut / USEC_PER_SEC, uuid_entry->delta_end + journal_header->start_time_ut / USEC_PER_SEC);
+//                    }
+//                    return descr;
+//                }
+            }
+        }
+        datafile = datafile->next;
+    }
+
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    return NULL;
+}
+
+
+//
+// Return a judyL will all pages that have start_time_ut and end_time_ut
+// Pvalue of the judy will be the end time for that page
+// DBENGINE2:
+Pvoid_t *get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start_time_ut, usec_t end_time_ut)
+{
+    Pvoid_t JudyL_array = (Pvoid_t) NULL;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+    bool lookup_continue = true;
+    while (lookup_continue && datafile) {
+        struct journal_v2_header *journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
+        if (!journal_header || !datafile->journalfile->is_valid) {
+            datafile = datafile->next;
+            continue;
+        }
+
+        if (start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  {
+            size_t journal_metric_count = (size_t)journal_header->metric_count;
+            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+            struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
+
+            if (unlikely(!uuid_entry))
+                    continue;
+
+            uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            uint32_t delta_end_time = (end_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            Word_t journal_start_time_t = journal_header->start_time_ut / USEC_PER_SEC;
+
+            struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
+            struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
+
+            uint32_t entries = page_list_header->entries;
+            for (uint32_t index = 0; index < entries; index++) {
+
+                if (delta_start_time > page_list[index].delta_end_s)
+                    continue;
+
+                if (delta_end_time < page_list[index].delta_start_s) {
+                    lookup_continue = false;
+                    break;
+                }
+
+                Word_t Index = page_list[index].delta_start_s + journal_start_time_t;
+                Pvoid_t *PValue = JudyLIns(&JudyL_array, Index, PJE0);
+                *(Word_t *) *PValue = page_list[index].delta_end_s + journal_start_time_t;
+            }
+        }
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    return JudyL_array;
+}
+
+
 /* The caller must hold the page index lock */
 static inline struct rrdeng_page_descr *
         find_first_page_in_time_range(struct pg_cache_page_index *page_index, usec_t start_time, usec_t end_time)
@@ -647,8 +836,7 @@ void pg_cache_update_metric_times(struct pg_cache_page_index *page_index)
 }
 
 /* If index is NULL lookup by UUID (descr->id) */
-void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index,
-                     struct rrdeng_page_descr *descr)
+void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
     Pvoid_t *PValue;
@@ -826,77 +1014,49 @@ struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
  * Does not get a reference.
  * @param ctx DB context
- * @param id UUID
+ * @param page_index the page index that we are trying to preload
  * @param start_time_ut inclusive starting time in usec
  * @param end_time_ut inclusive ending time in usec
- * @param page_info_arrayp It allocates (*page_arrayp) and populates it with information of pages that overlap
- *        with the time range [start_time,end_time]. The caller must free (*page_info_arrayp) with freez().
- *        If page_info_arrayp is set to NULL nothing was allocated.
- * @param ret_page_indexp Sets the page index pointer (*ret_page_indexp) for the given UUID.
  * @return the number of pages that overlap with the time range [start_time,end_time].
  */
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
-                          struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp)
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL, *preload_array[PAGE_CACHE_MAX_PRELOAD_PAGES];
     struct page_cache_descr *pg_cache_descr = NULL;
-    unsigned i, j, k, preload_count, count, page_info_array_max_size;
+    unsigned i, j, k, preload_count, count;
     unsigned long flags;
     Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
     Word_t Index;
-    uint8_t failed_to_reserve;
-
-    fatal_assert(NULL != ret_page_indexp);
-
-    // DBENGINE2:
-
-
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-    if (likely(NULL != PValue)) {
-        *ret_page_indexp = page_index = *PValue;
-    }
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    if (NULL == PValue) {
-        debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-        *ret_page_indexp = NULL;
+//    uint8_t failed_to_reserve;
+    //DBENGINE2:
+    if (unlikely(NULL == page_index))
         return 0;
-    }
 
     uv_rwlock_rdlock(&page_index->lock);
     descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
-    if (NULL == descr) {
+    if (unlikely(NULL == descr)) {
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-        *ret_page_indexp = NULL;
         return 0;
-    } else {
-        Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
-    }
-    if (page_info_arrayp) {
-        page_info_array_max_size = PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
-        *page_info_arrayp = mallocz(page_info_array_max_size);
     }
 
+        Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
+
+    netdata_thread_disable_cancelability();
+    struct rrdeng_page_descr *last_descr = NULL;
     for (count = 0, preload_count = 0 ;
          descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
          PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
          descr = unlikely(NULL == PValue) ? NULL : *PValue) {
         /* Iterate all pages in range */
 
+        if (last_descr == descr)
+            break;
+
+        last_descr = descr;
+
         if (unlikely(0 == descr->page_length))
             continue;
-        if (page_info_arrayp) {
-            if (unlikely(count >= page_info_array_max_size / sizeof(struct rrdeng_page_info))) {
-                page_info_array_max_size += PAGE_CACHE_MAX_PRELOAD_PAGES * sizeof(struct rrdeng_page_info);
-                *page_info_arrayp = reallocz(*page_info_arrayp, page_info_array_max_size);
-            }
-            (*page_info_arrayp)[count].start_time_ut = descr->start_time_ut;
-            (*page_info_arrayp)[count].end_time_ut = descr->end_time_ut;
-            (*page_info_arrayp)[count].page_length = descr->page_length;
-        }
         ++count;
 
         rrdeng_page_descr_mutex_lock(ctx, descr);
@@ -918,38 +1078,34 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
             }
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-
     }
     uv_rwlock_rdunlock(&page_index->lock);
 
-    failed_to_reserve = 0;
-    for (i = 0 ; i < preload_count && !failed_to_reserve ; ++i) {
+//    failed_to_reserve = 0;
+    k = 0;
+    for (i = 0 ; i < preload_count; ++i) {
         struct rrdeng_cmd cmd;
         struct rrdeng_page_descr *next;
 
         descr = preload_array[i];
-        if (NULL == descr) {
+        if (NULL == descr)
             continue;
-        }
-        if (!pg_cache_try_reserve_pages(ctx, 1)) {
-            failed_to_reserve = 1;
-            break;
-        }
+
+        pg_cache_try_reserve_pages(ctx, 1);
+
         cmd.opcode = RRDENG_READ_EXTENT;
         cmd.read_extent.page_cache_descr[0] = descr;
         /* don't use this page again */
         preload_array[i] = NULL;
         for (j = 0, k = 1 ; j < preload_count ; ++j) {
             next = preload_array[j];
-            if (NULL == next) {
+            if (NULL == next)
                 continue;
-            }
-            if (descr->extent == next->extent) {
+
+            if ((descr->extent && descr->extent == next->extent) ||
+                ((descr->extent_entry && descr->extent_entry == next->extent_entry))) {
                 /* same extent, consolidate */
-                if (!pg_cache_try_reserve_pages(ctx, 1)) {
-                    failed_to_reserve = 1;
-                    break;
-                }
+                (void ) pg_cache_try_reserve_pages(ctx, 1);
                 cmd.read_extent.page_cache_descr[k++] = next;
                 /* don't use this page again */
                 preload_array[j] = NULL;
@@ -958,132 +1114,13 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t sta
         cmd.read_extent.page_count = k;
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
     }
-    if (failed_to_reserve) {
-        debug(D_RRDENGINE, "%s: Failed to reserve enough memory, canceling I/O.", __func__);
-        for (i = 0 ; i < preload_count ; ++i) {
-            descr = preload_array[i];
-            if (NULL == descr) {
-                continue;
-            }
-            pg_cache_put(ctx, descr);
-        }
-    }
     if (!preload_count) {
         /* no such page */
         debug(D_RRDENGINE, "%s: No page was eligible to attempt preload.", __func__);
     }
-    if (unlikely(0 == count && page_info_arrayp)) {
-        freez(*page_info_arrayp);
-        *page_info_arrayp = NULL;
-    }
+//    rrd_stat_atomic_add(&ctx->stats.pg_cache_preload, preload_count);
+    netdata_thread_enable_cancelability();
     return count;
-}
-
-/*
- * Searches for a page and gets a reference.
- * When point_in_time is INVALID_TIME get any page.
- * If index is NULL lookup by UUID (id).
- */
-struct rrdeng_page_descr *
-        pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                        usec_t point_in_time_ut)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-    struct rrdeng_page_descr *descr = NULL;
-    struct page_cache_descr *pg_cache_descr = NULL;
-    unsigned long flags;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
-    Word_t Index;
-    uint8_t page_not_in_cache;
-
-    if (unlikely(NULL == index)) {
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (NULL == PValue) {
-            return NULL;
-        }
-    } else {
-        page_index = index;
-    }
-    pg_cache_reserve_pages(ctx, 1);
-
-    page_not_in_cache = 0;
-    uv_rwlock_rdlock(&page_index->lock);
-    while (1) {
-        Index = (Word_t)(point_in_time_ut / USEC_PER_SEC);
-        PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
-        if (likely(NULL != PValue)) {
-            descr = *PValue;
-        }
-        if (NULL == PValue ||
-            0 == descr->page_length ||
-            (INVALID_TIME != point_in_time_ut &&
-             !is_point_in_time_in_page(descr, point_in_time_ut))) {
-            /* non-empty page not found */
-            uv_rwlock_rdunlock(&page_index->lock);
-
-            pg_cache_release_pages(ctx, 1);
-            return NULL;
-        }
-        rrdeng_page_descr_mutex_lock(ctx, descr);
-        pg_cache_descr = descr->pg_cache_descr;
-        flags = pg_cache_descr->flags;
-        if ((flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 0)) {
-            /* success */
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-            break;
-        }
-        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
-            struct rrdeng_cmd cmd;
-
-            uv_rwlock_rdunlock(&page_index->lock);
-
-            cmd.opcode = RRDENG_READ_PAGE;
-            cmd.read_page.page_cache_descr = descr;
-            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-
-            debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
-            if(unlikely(debug_flags & D_RRDENGINE))
-                print_page_cache_descr(descr, "", true);
-            while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
-                pg_cache_wait_event_unsafe(descr);
-            }
-            /* success */
-            /* Downgrade exclusive reference to allow other readers */
-            pg_cache_descr->flags &= ~RRD_PAGE_LOCKED;
-            pg_cache_wake_up_waiters_unsafe(descr);
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
-            rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
-            return descr;
-        }
-        uv_rwlock_rdunlock(&page_index->lock);
-        debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
-        if(unlikely(debug_flags & D_RRDENGINE))
-            print_page_cache_descr(descr, "", true);
-        if (!(flags & RRD_PAGE_POPULATED))
-            page_not_in_cache = 1;
-        pg_cache_wait_event_unsafe(descr);
-        rrdeng_page_descr_mutex_unlock(ctx, descr);
-
-        /* reset scan to find again */
-        uv_rwlock_rdlock(&page_index->lock);
-    }
-    uv_rwlock_rdunlock(&page_index->lock);
-
-    if (!(flags & RRD_PAGE_DIRTY))
-        pg_cache_replaceQ_set_hot(ctx, descr);
-    pg_cache_release_pages(ctx, 1);
-    if (page_not_in_cache)
-        rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
-    else
-        rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
-    return descr;
 }
 
 /*
@@ -1091,36 +1128,24 @@ struct rrdeng_page_descr *
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-struct rrdeng_page_descr *
-pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                     usec_t start_time_ut, usec_t end_time_ut)
+struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut)
 {
-    struct page_cache *pg_cache = &ctx->pg_cache;
     struct rrdeng_page_descr *descr = NULL;
     struct page_cache_descr *pg_cache_descr = NULL;
     unsigned long flags;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index = NULL;
     uint8_t page_not_in_cache;
 
-    if (unlikely(NULL == index)) {
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, id, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-        if (NULL == PValue) {
+    if (unlikely(!page_index))
             return NULL;
-        }
-    } else {
-        page_index = index;
-    }
+
     pg_cache_reserve_pages(ctx, 1);
 
     page_not_in_cache = 0;
     uv_rwlock_rdlock(&page_index->lock);
     int retry_count = 0;
+
+    netdata_thread_disable_cancelability();
+
     while (1) {
         descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
         if (NULL == descr || 0 == descr->page_length || retry_count == default_rrdeng_page_fetch_retries) {
@@ -1130,11 +1155,13 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             uv_rwlock_rdunlock(&page_index->lock);
 
             pg_cache_release_pages(ctx, 1);
+            netdata_thread_enable_cancelability();
             return NULL;
         }
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
         flags = pg_cache_descr->flags;
+
         if ((flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 0)) {
             /* success */
             rrdeng_page_descr_mutex_unlock(ctx, descr);
@@ -1145,13 +1172,12 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             struct rrdeng_cmd cmd;
 
             uv_rwlock_rdunlock(&page_index->lock);
-
             cmd.opcode = RRDENG_READ_PAGE;
             cmd.read_page.page_cache_descr = descr;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
             debug(D_RRDENGINE, "%s: Waiting for page to be asynchronously read from disk:", __func__);
-            if(unlikely(debug_flags & D_RRDENGINE))
+                if (unlikely(debug_flags & D_RRDENGINE))
                 print_page_cache_descr(descr, "", true);
             while (!(pg_cache_descr->flags & RRD_PAGE_POPULATED)) {
                 pg_cache_wait_event_unsafe(descr);
@@ -1162,8 +1188,10 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             pg_cache_wake_up_waiters_unsafe(descr);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
             rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
+                netdata_thread_enable_cancelability();
             return descr;
         }
+
         uv_rwlock_rdunlock(&page_index->lock);
         debug(D_RRDENGINE, "%s: Waiting for page to be unlocked:", __func__);
         if(unlikely(debug_flags & D_RRDENGINE))
@@ -1176,7 +1204,6 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
             ++retry_count;
         }
         rrdeng_page_descr_mutex_unlock(ctx, descr);
-
         /* reset scan to find again */
         uv_rwlock_rdlock(&page_index->lock);
     }
@@ -1187,8 +1214,11 @@ pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     pg_cache_release_pages(ctx, 1);
     if (page_not_in_cache)
         rrd_stat_atomic_add(&ctx->stats.pg_cache_misses, 1);
-    else
+    else {
         rrd_stat_atomic_add(&ctx->stats.pg_cache_hits, 1);
+    }
+    netdata_thread_enable_cancelability();
+//    (void) pg_cache_preload(ctx, page_index, end_time_ut, end_time_ut);
     return descr;
 }
 
@@ -1197,9 +1227,9 @@ struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_insta
     struct pg_cache_page_index *page_index;
 
     page_index = mallocz(sizeof(*page_index));
+    fatal_assert(0 == uv_rwlock_init(&page_index->lock));
     page_index->JudyL_array = (Pvoid_t) NULL;
     uuid_copy(page_index->id, *id);
-    fatal_assert(0 == uv_rwlock_init(&page_index->lock));
     page_index->oldest_time_ut = INVALID_TIME;
     page_index->latest_time_ut = INVALID_TIME;
     page_index->prev = NULL;
@@ -1245,12 +1275,15 @@ void init_page_cache(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->page_descriptors = 0;
+    pg_cache->active_descriptors = 0;
     pg_cache->populated_pages = 0;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);
     init_committed_page_index(ctx);
+
+    fatal_assert(0 == uv_rwlock_init(&pg_cache->v2_lock));
 }
 
 void free_page_cache(struct rrdengine_instance *ctx)
@@ -1314,3 +1347,4 @@ void free_page_cache(struct rrdengine_instance *ctx)
     fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
     info("Freed %lu bytes of memory from page cache.", pages_dirty_index_bytes + pages_index_bytes + metrics_index_bytes);
 }
+

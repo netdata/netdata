@@ -1046,6 +1046,135 @@ static void dbengine_statistics_charts(void) {
             // ----------------------------------------------------------------
 
             {
+                static RRDSET *st_pg_cache_lookup = NULL;
+                static RRDDIM *rd_pg_cache_preload = NULL;
+                static RRDDIM *rd_pg_index_lookup_hit_last = NULL;
+                static RRDDIM *rd_pg_index_lookup_hit_first = NULL;
+                static RRDDIM *rd_pg_index_lookup_miss = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_preload = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_hit = NULL;
+                static RRDDIM *rd_pg_index_lookup_v2_miss = NULL;
+
+                if (unlikely(!st_pg_cache_lookup)) {
+                    st_pg_cache_lookup = rrdset_create_localhost(
+                        "netdata",
+                        "descriptors_lookup",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "DBENGINE Page Descriptors Lookup",
+                        "descriptors/s",
+                        "netdata",
+                        "stats",
+                        132001,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_STACKED);
+
+                    rd_pg_cache_preload = rrddim_add(st_pg_cache_lookup, "preload", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_hit_last = rrddim_add(st_pg_cache_lookup, "hit last", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_hit_first = rrddim_add(st_pg_cache_lookup, "hit first", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_miss = rrddim_add(st_pg_cache_lookup, "not found", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_preload = rrddim_add(st_pg_cache_lookup, "v2 preload", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_hit = rrddim_add(st_pg_cache_lookup, "v2 loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_pg_index_lookup_v2_miss = rrddim_add(st_pg_cache_lookup, "v2 not found", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                } else
+                    rrdset_next(st_pg_cache_lookup);
+
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_cache_preload, stats_array[38]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_hit_last, stats_array[39]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_hit_first, stats_array[44]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_miss, stats_array[40]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_preload, stats_array[41]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_hit, stats_array[42]);
+                rrddim_set_by_pointer(st_pg_cache_lookup, rd_pg_index_lookup_v2_miss, stats_array[43]);
+
+                rrdset_done(st_pg_cache_lookup);
+            }
+
+            {
+                static RRDSET *st_pg_cache_preload = NULL;
+                static RRDDIM *rd_descr_hit = NULL;
+                static RRDDIM *rd_descr_failed_to_populated_check = NULL;
+                static RRDDIM *rd_descr_failed_to_queue = NULL;
+                static RRDDIM *rd_descr_queued = NULL;
+
+                if (unlikely(!st_pg_cache_preload)) {
+                    st_pg_cache_preload = rrdset_create_localhost(
+                        "netdata",
+                        "page_cache_preload_lookup",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "DBENGINE: Page Preload Cache Lookup",
+                        "pages/s",
+                        "netdata",
+                        "stats",
+                        132002,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_STACKED);
+
+                    rd_descr_hit = rrddim_add(st_pg_cache_preload, "hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_failed_to_populated_check = rrddim_add(st_pg_cache_preload, "populated check fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_failed_to_queue = rrddim_add(st_pg_cache_preload, "queue failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_queued = rrddim_add(st_pg_cache_preload, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                } else
+                    rrdset_next(st_pg_cache_preload);
+
+                rrddim_set_by_pointer(st_pg_cache_preload, rd_descr_hit, stats_array[45]);
+                rrddim_set_by_pointer(st_pg_cache_preload, rd_descr_queued, stats_array[46]);
+                rrddim_set_by_pointer(st_pg_cache_preload, rd_descr_failed_to_populated_check, stats_array[47]);
+                rrddim_set_by_pointer(st_pg_cache_preload, rd_descr_failed_to_queue, stats_array[48]);
+
+                rrdset_done(st_pg_cache_preload);
+            }
+
+            {
+                static RRDSET *st_pg_cache_page_next = NULL;
+                static RRDDIM *rd_descr_hit = NULL;
+                static RRDDIM *rd_descr_failed_to_populated_check = NULL;
+                static RRDDIM *rd_descr_failed_to_queue = NULL;
+                static RRDDIM *rd_descr_queued = NULL;
+                static RRDDIM *rd_descr_queued_pending = NULL;
+                static RRDDIM *rd_descr_extent_fill_fail = NULL;
+
+                if (unlikely(!st_pg_cache_page_next)) {
+                    st_pg_cache_page_next = rrdset_create_localhost(
+                        "netdata",
+                        "page_cache_next_lookup",
+                        NULL,
+                        "dbengine",
+                        NULL,
+                        "DBENGINE: Page Next Cache Lookup",
+                        "pages/s",
+                        "netdata",
+                        "stats",
+                        132003,
+                        localhost->rrd_update_every,
+                        RRDSET_TYPE_STACKED);
+
+                    rd_descr_hit = rrddim_add(st_pg_cache_page_next, "hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_failed_to_populated_check = rrddim_add(st_pg_cache_page_next, "populated check fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_failed_to_queue = rrddim_add(st_pg_cache_page_next, "queue failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_queued = rrddim_add(st_pg_cache_page_next, "queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_queued_pending = rrddim_add(st_pg_cache_page_next, "already queued", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_descr_extent_fill_fail = rrddim_add(st_pg_cache_page_next, "extent rest fail", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+                } else
+                    rrdset_next(st_pg_cache_page_next);
+
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_hit, stats_array[49]);
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_queued, stats_array[50]);
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_queued_pending, stats_array[53]);
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_failed_to_populated_check, stats_array[51]);
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_failed_to_queue, stats_array[52]);
+                rrddim_set_by_pointer(st_pg_cache_page_next, rd_descr_extent_fill_fail, stats_array[53]);
+                rrdset_done(st_pg_cache_page_next);
+            }
+
+
+            {
                 static RRDSET *st_pg_cache_hit_ratio = NULL;
                 static RRDDIM *rd_hit_ratio = NULL;
 
@@ -1060,7 +1189,7 @@ static void dbengine_statistics_charts(void) {
                         "percentage",
                         "netdata",
                         "stats",
-                        132003,
+                        132004,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1112,7 +1241,7 @@ static void dbengine_statistics_charts(void) {
                         "pages",
                         "netdata",
                         "stats",
-                        132004,
+                        132005,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1138,6 +1267,7 @@ static void dbengine_statistics_charts(void) {
 
             {
                 static RRDSET *st_long_term_pages = NULL;
+                static RRDDIM *rd_memory = NULL;
                 static RRDDIM *rd_total = NULL;
                 static RRDDIM *rd_insertions = NULL;
                 static RRDDIM *rd_deletions = NULL;
@@ -1154,10 +1284,11 @@ static void dbengine_statistics_charts(void) {
                         "pages",
                         "netdata",
                         "stats",
-                        132005,
+                        132006,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
+                    rd_memory = rrddim_add(st_long_term_pages, "journal v2 descriptors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_total = rrddim_add(st_long_term_pages, "total", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_insertions = rrddim_add(st_long_term_pages, "insertions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1165,6 +1296,7 @@ static void dbengine_statistics_charts(void) {
                         st_long_term_pages, "flushing_pressure_deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
 
+                rrddim_set_by_pointer(st_long_term_pages, rd_memory, (collected_number)stats_array[37]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_deletions, (collected_number)stats_array[6]);
@@ -1191,7 +1323,7 @@ static void dbengine_statistics_charts(void) {
                         "MiB/s",
                         "netdata",
                         "stats",
-                        132006,
+                        132007,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1222,7 +1354,7 @@ static void dbengine_statistics_charts(void) {
                         "operations/s",
                         "netdata",
                         "stats",
-                        132007,
+                        132008,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1254,7 +1386,7 @@ static void dbengine_statistics_charts(void) {
                         "errors/s",
                         "netdata",
                         "stats",
-                        132008,
+                        132009,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1288,7 +1420,7 @@ static void dbengine_statistics_charts(void) {
                         "descriptors",
                         "netdata",
                         "stats",
-                        132009,
+                        132010,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_LINE);
 
@@ -1326,7 +1458,7 @@ static void dbengine_statistics_charts(void) {
                         "MiB",
                         "netdata",
                         "stats",
-                        132010,
+                        132011,
                         localhost->rrd_update_every,
                         RRDSET_TYPE_STACKED);
 
@@ -2079,6 +2211,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "STREAMRCV",   .family = "workers streaming receive",       .priority = 1000000 },
     { .name = "STREAMSND",   .family = "workers streaming send",          .priority = 1000000 },
     { .name = "DBENGINE",    .family = "workers dbengine instances",      .priority = 1000000 },
+    { .name = "LIBUV",       .family = "workers libuv threadpool",        .priority = 1000000 },
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
     { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "workers aclk host sync",          .priority = 1000000 },

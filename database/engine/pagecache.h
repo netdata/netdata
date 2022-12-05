@@ -65,6 +65,8 @@ struct rrdeng_page_descr {
     uint32_t update_every_s:24;
     uint8_t type;
     uint32_t page_length;
+    uv_file file;               // This is the datafile this descriptor belongs
+    void *extent_entry;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)
@@ -153,12 +155,14 @@ struct pg_cache_replaceQ {
 
 struct page_cache { /* TODO: add statistics */
     uv_rwlock_t pg_cache_rwlock; /* page cache lock */
+    uv_rwlock_t v2_lock;
 
     struct pg_cache_metrics_index metrics_index;
     struct pg_cache_committed_page_index committed_page_index;
     struct pg_cache_replaceQ replaceQ;
 
     unsigned page_descriptors;
+    unsigned active_descriptors;
     unsigned populated_pages;
 };
 
@@ -185,17 +189,10 @@ usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
 void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
                                             usec_t point_in_time_ut, pg_cache_page_info_filter_t *filter,
                                             struct rrdeng_page_info *page_info);
-struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t *id,
-                                                                      usec_t start_time_ut);
-unsigned
-        pg_cache_preload(struct rrdengine_instance *ctx, uuid_t *id, usec_t start_time_ut, usec_t end_time_ut,
-                         struct rrdeng_page_info **page_info_arrayp, struct pg_cache_page_index **ret_page_indexp);
-struct rrdeng_page_descr *
-        pg_cache_lookup(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                        usec_t point_in_time_ut);
-struct rrdeng_page_descr *
-        pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, uuid_t *id,
-                     usec_t start_time_ut, usec_t end_time_ut);
+
+struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t(*id), usec_t start_time_ut);
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, usec_t start_time_ut, usec_t end_time_ut);
+struct rrdeng_page_descr *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, usec_t start_time_ut, usec_t end_time_ut);
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
 void free_page_cache(struct rrdengine_instance *ctx);

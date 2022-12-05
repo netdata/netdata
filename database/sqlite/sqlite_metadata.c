@@ -894,8 +894,14 @@ static void after_metadata_cleanup(uv_work_t *req, int status)
 }
 static void start_metadata_cleanup(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_METADATA_CLEANUP);
     struct metadata_wc *wc = req->data;
     check_dimension_metadata(wc);
+    worker_is_idle();
 }
 
 struct scan_metadata_payload {
@@ -990,12 +996,17 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
     RRDHOST *host;
 
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
     bool run_again = false;
+    worker_is_busy(UV_EVENT_METADATA_STORE);
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
@@ -1012,6 +1023,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
     else
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_INTERVAL;
+    worker_is_idle();
 }
 
 static void metadata_event_loop(void *arg)

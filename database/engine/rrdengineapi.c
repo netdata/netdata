@@ -31,6 +31,8 @@ int db_engine_use_malloc = 0;
 int default_rrdeng_page_fetch_timeout = 3;
 int default_rrdeng_page_fetch_retries = 3;
 int default_rrdeng_page_cache_mb = 32;
+int db_engine_journal_indexing = 1;
+int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
 /* Default behaviour is to unblock data collection if the page cache is full of dirty pages by dropping metrics */
@@ -278,9 +280,12 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 
         page_is_empty = page_has_only_empty_metrics(descr);
         if (page_is_empty) {
+            size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
             print_page_cache_descr(descr, "Page has empty metrics only, deleting", true);
             pg_cache_put(ctx, descr);
             pg_cache_punch_hole(ctx, descr, 1, 0, NULL);
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "%s: Deleting page with %lu empty points", __func__, points);
         } else
             rrdeng_commit_page(ctx, descr, handle->page_correlation_id);
     } else {
@@ -549,16 +554,6 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
 // ----------------------------------------------------------------------------
 // query ops
 
-//static inline uint32_t *pginfo_to_dt(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[0];
-//}
-//
-//static inline uint32_t *pginfo_to_points(struct rrdeng_page_info *page_info)
-//{
-//    return (uint32_t *)&page_info->scratch[sizeof(uint32_t)];
-//}
-//
 /*
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
@@ -586,10 +581,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle->ctx = ctx;
     handle->descr = NULL;
     handle->dt_s = page_index->latest_update_every_s;
+    handle->page_index = page_index;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    pages_nr = pg_cache_preload(ctx, &page_index->id, start_time_s * USEC_PER_SEC, end_time_s * USEC_PER_SEC,
-                                NULL, &handle->page_index);
-    if (unlikely(NULL == handle->page_index || 0 == pages_nr))
+    pages_nr = pg_cache_preload(ctx, page_index, start_time_s * USEC_PER_SEC, end_time_s * USEC_PER_SEC);
+    if (unlikely(0 == pages_nr))
         // there are no metrics to load
         handle->wanted_start_time_s = INVALID_TIME;
 }
@@ -620,8 +615,8 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
     }
 
     usec_t wanted_start_time_ut = handle->wanted_start_time_s * USEC_PER_SEC;
-    descr = pg_cache_lookup_next(ctx, handle->page_index, &handle->page_index->id,
-        wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
+    descr = pg_cache_lookup_next(ctx, handle->page_index, wanted_start_time_ut, rrdimm_handle->end_time_s * USEC_PER_SEC);
+
     if (NULL == descr)
         return 1;
 
@@ -928,44 +923,6 @@ void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr
     pg_cache_put(ctx, descr);
 }
 
-/* Gets a reference for the page */
-void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, INVALID_TIME);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
-}
-
-/* Gets a reference for the page */
-void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle)
-{
-    struct rrdeng_page_descr *descr;
-    struct page_cache_descr *pg_cache_descr;
-
-    debug(D_RRDENGINE, "Reading existing page:");
-    descr = pg_cache_lookup(ctx, NULL, id, point_in_time_ut);
-    if (NULL == descr) {
-        *handle = NULL;
-
-        return NULL;
-    }
-    *handle = descr;
-    pg_cache_descr = descr->pg_cache_descr;
-
-    return pg_cache_descr->page;
-}
-
 /*
  * Gathers Database Engine statistics.
  * Careful when modifying this function.
@@ -1016,7 +973,9 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
     array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
-    fatal_assert(RRDENG_NR_STATS == 37);
+    array[37] = (uint64_t)pg_cache->active_descriptors;
+
+    fatal_assert(RRDENG_NR_STATS == 38);
 }
 
 /* Releases reference to page */
@@ -1098,11 +1057,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     if (ctx->worker_config.error) {
         goto error_after_rrdeng_worker;
     }
-//    error = metalog_init(ctx);
-//    if (error) {
-//        error("Failed to initialize metadata log file event loop.");
-//        goto error_after_rrdeng_worker;
-//    }
 
     return 0;
 
@@ -1162,8 +1116,70 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
     /* wait for dbengine to quiesce */
     completion_wait_for(&ctx->rrdengine_completion);
     completion_destroy(&ctx->rrdengine_completion);
+}
 
-    //metalog_prepare_exit(ctx->metalog_ctx);
+static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
+{
+    void *data_start = datafile->journalfile->journal_data;
+    if (unlikely(!data_start))
+        return;
+
+    struct journal_v2_header *j2_header = (void *) data_start;
+
+    stats->extents += j2_header->extent_count;
+
+    unsigned entries;
+    struct journal_extent_list *extent_list = (void *) (data_start + j2_header->extent_offset);
+    for (entries = 0; entries < j2_header->extent_count; entries++) {
+        stats->extents_compressed_bytes += extent_list->datafile_size;
+        stats->extents_pages += extent_list->pages;
+        extent_list++;
+    }
+
+    struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
+    usec_t journal_start_time_ut = j2_header->start_time_ut;
+
+    for (entries = 0; entries < j2_header->metric_count; entries++) {
+
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
+        for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
+
+            usec_t update_every_usec;
+
+            size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
+
+            usec_t start_time_ut = journal_start_time_ut + ((usec_t) descr->delta_start_s * USEC_PER_SEC);
+            usec_t end_time_ut = journal_start_time_ut + ((usec_t) descr->delta_end_s * USEC_PER_SEC);
+
+            if(likely(points > 1))
+                update_every_usec = (end_time_ut - start_time_ut) / (points - 1);
+            else {
+                update_every_usec = default_rrd_update_every * get_tier_grouping(datafile->ctx->tier) * USEC_PER_SEC;
+                stats->single_point_pages++;
+            }
+
+            time_t duration_secs = (time_t)((end_time_ut - start_time_ut + update_every_usec)/USEC_PER_SEC);
+
+            stats->pages_uncompressed_bytes += descr->page_length;
+            stats->pages_duration_secs += duration_secs;
+            stats->points += points;
+
+            stats->page_types[descr->type].pages++;
+            stats->page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
+            stats->page_types[descr->type].pages_duration_secs += duration_secs;
+            stats->page_types[descr->type].points += points;
+
+            if(!stats->first_t || (start_time_ut - update_every_usec) < stats->first_t)
+                stats->first_t = (start_time_ut - update_every_usec) / USEC_PER_SEC;
+
+            if(!stats->last_t || end_time_ut > stats->last_t)
+                stats->last_t = end_time_ut / USEC_PER_SEC;
+
+            descr++;
+        }
+        metric++;
+    }
 }
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
@@ -1175,15 +1191,23 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         stats.metrics_pages += page_index->page_count;
     }
 
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
 
+        if (df->journalfile->journal_data) {
+            populate_v2_statistics(df, &stats);
+        }
+        else
         for(struct extent_info *ei = df->extents.first; ei ; ei = ei->next) {
             stats.extents++;
             stats.extents_compressed_bytes += ei->size;
 
             for(int p = 0; p < ei->number_of_pages ;p++) {
                 struct rrdeng_page_descr *descr = ei->pages[p];
+
+                if (unlikely(!descr))
+                    continue;
 
                 usec_t update_every_usec;
 
@@ -1216,7 +1240,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
             }
         }
     }
-
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     stats.currently_collected_metrics = ctx->stats.metric_API_producers;
     stats.max_concurrently_collected_metrics = ctx->metric_API_max_producers;

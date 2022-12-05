@@ -109,7 +109,16 @@ struct rrdeng_cmd {
     };
 };
 
-#define RRDENG_CMD_Q_MAX_SIZE (2048)
+#define RRDENG_CMD_Q_MAX_SIZE (8192)
+
+struct rrdeng_work {
+    uv_work_t req;
+    struct rrdengine_worker_config *wc;
+    void *data;
+    uint32_t count;
+    bool rerun;
+    struct completion *completion;
+};
 
 struct rrdeng_cmdqueue {
     unsigned head, tail;
@@ -132,6 +141,7 @@ struct extent_io_descriptor {
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
     struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
+    BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
@@ -140,6 +150,7 @@ struct generic_io_descriptor {
     uv_fs_t req;
     uv_buf_t iov;
     void *buf;
+    void *data;
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
@@ -148,8 +159,8 @@ struct generic_io_descriptor {
 struct extent_cache_element {
     struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
     unsigned fileno;
-    struct extent_cache_element *prev; /* LRU */
-    struct extent_cache_element *next; /* LRU */
+    struct extent_cache_element *prev;              /* LRU */
+    struct extent_cache_element *next;              /* LRU */
     struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
     uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
 };
@@ -160,28 +171,40 @@ struct extent_cache_element {
 struct extent_cache {
     struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
     unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
-    unsigned inflight_bitmap; /* 1 if the corresponding position in the extent_array is waiting for I/O */
+    unsigned inflight_bitmap;   /* 1 if the corresponding position in the extent_array is waiting for I/O */
 
     struct extent_cache_element *replaceQ_head; /* LRU */
     struct extent_cache_element *replaceQ_tail; /* MRU */
 };
 
+#define DESCRIPTOR_INITIAL_CLEANUP    (60)
+#ifndef DESCRIPTOR_INTERVAL_CLEANUP
+#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
+#endif
+
 struct rrdengine_worker_config {
     struct rrdengine_instance *ctx;
 
     uv_thread_t thread;
-    uv_loop_t* loop;
+    uv_loop_t *loop;
     uv_async_t async;
 
     /* file deletion thread */
     uv_thread_t *now_deleting_files;
+    uv_thread_t *now_deleting_descriptors;
+    uv_thread_t *now_evicting_pages;
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
+    unsigned long cleanup_deleting_descriptors;  /* set to 0 when now_deleting_descriptors is still running */
+    unsigned long cleanup_evicting_pages;        /* set to 0 when now_evicting_pages is still running */
 
+    unsigned long running_journal_migration;
+    time_t next_descriptor_cleanup;
     /* dirty page deletion thread */
     uv_thread_t *now_invalidating_dirty_pages;
     /* set to 0 when now_invalidating_dirty_pages is still running */
     unsigned long cleanup_thread_invalidating_dirty_pages;
     unsigned inflight_dirty_pages;
+    bool run_indexing;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -251,12 +274,14 @@ typedef enum {
     LOAD_ERRORS_PAGE_UPDATE_ZERO = 3,
     LOAD_ERRORS_PAGE_FLEXY_TIME = 4,
     LOAD_ERRORS_DROPPED_EXTENT = 5,
+    LOAD_ERRORS_PAGE_FUTURE_TIME = 6,
 } INVALID_PAGE_ID;
 
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
+    bool journal_initialization;
     uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
@@ -272,7 +297,7 @@ struct rrdengine_instance {
     unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
-    uint8_t quiesce; /* set to SET_QUIESCE before shutdown of the engine */
+    uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
     uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
@@ -280,7 +305,7 @@ struct rrdengine_instance {
     struct {
         size_t counter;
         usec_t latest_end_time_ut;
-    } load_errors[6];
+    } load_errors[7];
 };
 
 void *dbengine_page_alloc(void);
@@ -288,9 +313,12 @@ void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
-void rrdeng_test_quota(struct rrdengine_worker_config* wc);
-void rrdeng_worker(void* arg);
-void rrdeng_enq_cmd(struct rrdengine_worker_config* wc, struct rrdeng_cmd *cmd);
-struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc);
-
+void rrdeng_test_quota(struct rrdengine_worker_config *wc);
+void rrdeng_worker(void *arg);
+void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
+struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
+void after_journal_indexing(uv_work_t *req, int status);
+void start_journal_indexing(uv_work_t *req);
+struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
+struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
 #endif /* NETDATA_RRDENGINE_H */

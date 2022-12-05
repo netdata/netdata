@@ -470,9 +470,15 @@ static void after_schedule_command(uv_work_t *req, int status)
 
 static void schedule_command(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
     struct command_context *cmd_ctx = req->data;
 
+    worker_is_busy(UV_EVENT_SCHEDULE_CMD);
     cmd_ctx->status = execute_command(cmd_ctx->idx, cmd_ctx->args, &cmd_ctx->message);
+    worker_is_idle();
 }
 
 /* This will alter the state of the command_info_array.cmd_str

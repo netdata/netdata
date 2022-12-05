@@ -335,7 +335,7 @@ void posix_memfree(void *ptr);
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only);
 int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
@@ -456,6 +456,7 @@ extern char *netdata_configured_host_prefix;
 #include "arrayalloc/arrayalloc.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
+#include "event_loop/event_loop.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
