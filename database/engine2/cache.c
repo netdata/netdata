@@ -29,8 +29,9 @@ struct pgc_page {
     // indexing data
     Word_t section;
     Word_t metric_id;
-    Word_t start_time_t;
-    Word_t end_time_t;
+    time_t start_time_t;
+    time_t end_time_t;
+    time_t update_every;
 
     void *data;
     size_t assumed_size;
@@ -398,15 +399,15 @@ static void evict_pages(PGC *cache, bool all_of_them) {
 
             Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_t, PJE0);
             if(unlikely(!page_ptr))
-                fatal("DBENGINE CACHE: page with start time '%lu' of metric '%lu' in section '%lu' should exist, but it does not.",
+                fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but it does not.",
                       page->start_time_t, page->metric_id, page->section);
 
             if(unlikely(*page_ptr != page))
-                fatal("DBENGINE CACHE: page with start time '%lu' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
+                fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
                       page->start_time_t, page->metric_id, page->section);
 
             if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_t, PJE0)))
-                fatal("DBENGINE CACHE: page with start time '%lu' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
+                fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
                       page->start_time_t, page->metric_id, page->section);
 
             if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
@@ -424,6 +425,7 @@ static void evict_pages(PGC *cache, bool all_of_them) {
                 .metric_id = page->metric_id,
                 .start_time_t = page->start_time_t,
                 .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_SEQ_CST),
+                .update_every = page->update_every,
                 .size = page_size_from_assumed_size(page->assumed_size),
                 .hot = (is_page_hot(page)) ? true : false,
             });
@@ -480,6 +482,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
             page->metric_id = entry->metric_id;
             page->start_time_t = entry->start_time_t;
             page->end_time_t = entry->end_time_t,
+            page->update_every = entry->update_every,
             page->data = entry->data;
             page->assumed_size = page_assumed_size(entry->size);
             netdata_spinlock_init(&page->transition_spinlock);
@@ -519,7 +522,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
     return page;
 }
 
-PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t, bool exact) {
+static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact) {
     PGC_PAGE *page = NULL;
 
     do {
@@ -614,10 +617,8 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
 static void flush_dirty_pages(PGC *cache, bool all_of_them) {
     netdata_spinlock_lock(&cache->dirty.spinlock);
 
-#ifdef NETDATA_INTERNAL_CHECKS
     internal_fatal(!cache->dirty.linked_list_in_sections_judy,
                    "wrong dirty pages configuration - dirty pages need to have a judy array, not a linked list");
-#endif
 
     if(!all_of_them && (cache->dirty.entries < cache->config.max_dirty_pages_to_save_at_once || cache->dirty.last_version_checked == cache->dirty.version)) {
         netdata_spinlock_unlock(&cache->dirty.spinlock);
@@ -652,6 +653,7 @@ static void flush_dirty_pages(PGC *cache, bool all_of_them) {
                             .metric_id = page->metric_id,
                             .start_time_t = page->start_time_t,
                             .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_SEQ_CST),
+                            .update_every = page->update_every,
                             .size = page_size_from_assumed_size(page->assumed_size),
                             .data = page->data,
                             .hot = (is_page_hot(page)) ? true : false,
@@ -763,24 +765,28 @@ Word_t pgc_page_metric(PGC_PAGE *page) {
     return page->metric_id;
 }
 
-Word_t pgc_page_start_time_t(PGC_PAGE *page) {
+time_t pgc_page_start_time_t(PGC_PAGE *page) {
     return page->start_time_t;
 }
 
-Word_t pgc_page_end_time_t(PGC_PAGE *page) {
+time_t pgc_page_end_time_t(PGC_PAGE *page) {
     return page->end_time_t;
+}
+
+time_t pgc_page_update_every(PGC_PAGE *page) {
+    return page->update_every;
 }
 
 void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
 
-void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t) {
+void pgc_page_hot_set_end_time_t(PGC_PAGE *page, time_t end_time_t) {
     if(is_page_hot(page))
         __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_SEQ_CST);
 }
 
-PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t, bool exact) {
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact) {
     return page_find_and_acquire(cache, section, metric_id, start_time_t, exact);
 }
 
@@ -806,7 +812,7 @@ struct {
         .first_time_t   =  100000000,
         .last_time_t    = 0,
         .cache_size     = 32,
-        .query_threads  = 1,
+        .query_threads  = 5,
         .rand_statebufs = {},
 };
 
@@ -863,6 +869,8 @@ void *unittest_stress_test_queries(void *ptr) {
         size_t metric_id = random_number % (end - start);
         time_t start_time_t = pgc_uts.first_time_t;
         time_t end_time_t = __atomic_load_n(&pgc_uts.last_time_t, __ATOMIC_RELAXED);
+        if(end_time_t <= start_time_t)
+            end_time_t = start_time_t + 1;
         size_t pages = (end_time_t - start_time_t) / 1024 + 1;
 
         PGC_PAGE *array[pages];

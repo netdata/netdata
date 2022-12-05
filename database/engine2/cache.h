@@ -10,8 +10,9 @@ typedef struct pgc_entry {
     bool hot;                   // true if this entry is currently being collected
     Word_t section;             // the section this belongs to
     Word_t metric_id;           // the metric this belongs to
-    Word_t start_time_t;        // the start time of the page
-    Word_t end_time_t;          // the end time of the page
+    time_t start_time_t;        // the start time of the page
+    time_t end_time_t;          // the end time of the page
+    time_t update_every;        // the update every of the page
     size_t size;                // the size in bytes of the allocation, outside the cache
     void *data;                 // a pointer to data outside the cache
 } PGC_ENTRY;
@@ -36,16 +37,17 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page);
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page);
 
 // find a page from the cache
-PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, Word_t start_time_t, bool exact);
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact);
 
 // get information from an acquired page
 Word_t pgc_page_section(PGC_PAGE *page);
 Word_t pgc_page_metric(PGC_PAGE *page);
-Word_t pgc_page_start_time_t(PGC_PAGE *page);
-Word_t pgc_page_end_time_t(PGC_PAGE *page);
+time_t pgc_page_start_time_t(PGC_PAGE *page);
+time_t pgc_page_end_time_t(PGC_PAGE *page);
+time_t pgc_page_update_every(PGC_PAGE *page);
 void *pgc_page_data(PGC_PAGE *page);
 
 // resetting the end time of a hot page
-void pgc_page_hot_set_end_time_t(PGC_PAGE *page, Word_t end_time_t);
+void pgc_page_hot_set_end_time_t(PGC_PAGE *page, time_t end_time_t);
 
 #endif // DBENGINE_CACHE_H
