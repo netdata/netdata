@@ -19,8 +19,8 @@ While Netdata's charts require no configuration and are [easy to interact with](
 they have a lot of underlying complexity. To meaningfully organize charts out of the box based on what's happening in
 your nodes, Netdata uses the concepts of **dimensions**, **contexts**, and **families**. 
 
-Understanding how these work will help you more easily navigate the dashboard, [write new
-alarms](/docs/monitor/configure-alarms.md), or play around with the [API](/web/api/README.md).
+Understanding how these work will help you more easily navigate the dashboard, write new
+alarms, or play around with the [API](https://github.com/netdata/netdata/blob/master/web/api/README.md).
 
 For a refresher on the anatomy of a chart, see [dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.mdx).
 
@@ -44,7 +44,7 @@ dimensions](https://user-images.githubusercontent.com/1153921/114207816-a5cb7400
 The chart shows 13 unique dimensions, such as `httpd` for the CPU utilization for web servers, `kernel` for anything
 related to the Linux kernel, and so on. In your dashboard, these specific dimensions will almost certainly be different.
 
-Dimensions can be [hidden](/docs/dashboard/interact-charts.mdx#show-and-hide-dimensions) to help you focus your
+Dimensions can be [hidden](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md) to help you focus your
 attention.
 
 ## Context
@@ -58,7 +58,7 @@ whereas anything after the `.` is specified either by the chart's developer or b
 
 By default, a chart's type affects where it fits in the menu, while its family creates submenus.
 
-Netdata also relies on contexts for [alarm configuration](/docs/monitor/configure-alarms.md) (the [`on`
+Netdata also relies on contexts for [alarm configuration](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) (the [`on`
 line](/health/REFERENCE.md#alarm-line-on)).
 
 ## Family
@@ -90,10 +90,10 @@ names:
 ### **Related Concepts**
 - [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
 - [Charts](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
-- [Rooms](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/rooms.md)
+- [Rooms](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md)
 - [Dashboards](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/dashboards.md)
-- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 ### Related Tasks
-- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/rework-learn/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Interact with charts](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/interact-with-the-charts.md)
+- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Interact with charts](https://github.com/netdata/learn/blob/master/docs/tasks/interact-with-the-charts.md)
