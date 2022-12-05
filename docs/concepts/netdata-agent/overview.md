@@ -19,7 +19,7 @@ platforms (Kubernetes clusters, Docker), and many other operating systems (FreeB
 
 ## Learn More
 
-<Grid columns="4">
+<Grid columns="3">
   <Box
     title="Guided troubleshooting tools">
     <BoxList>
