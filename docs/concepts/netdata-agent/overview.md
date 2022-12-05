@@ -24,11 +24,11 @@ platforms (Kubernetes clusters, Docker), and many other operating systems (FreeB
     title="Guided troubleshooting tools">
     <BoxList>
       <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md" title="ACLK" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-collection.md" title="Metrics collection" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-exporting.md" title="Metrics exporting" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-storage.md" title="Metrics storage" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/metrics-streaming-replication.md" title="Metrics streming replication" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-agent/registry.md" title="Registry" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md" title="Metrics collection" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md" title="Metrics exporting" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md" title="Metrics storage" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md" title="Metrics streming replication" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md" title="Registry" />
     </BoxList>
   </Box>
 </Grid>
