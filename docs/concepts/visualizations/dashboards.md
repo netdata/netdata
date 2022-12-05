@@ -24,7 +24,7 @@ These charts provide a lot of useful information, so that you can:
 -   View information about the chart, its plugin, context, and type
 -   Get the chart status and possible errors. On top, reload functionality
 
-These charts will available on [Overview tab](/docs/cloud/visualize/overview), Single Node view and on your [Custom Dashboards](/docs/cloud/visualize/dashboards). 
+These charts will available on [Overview tab](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#overview), [Single Node view](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#jump-to-single-node-dashboards-1) and on your [Custom Dashboards](https://github.com/netdata/netdata/blob/rework-learn/docs/concepts/netdata-cloud/netdata-views.md#add-and-customize-metrics-columns). 
 
 Now that you're fully connected within your Cloud and Agent, and you understand how Netdata drives raw metrics to useful data, we can break down the basics of how you can employ Netdata's industry-leading visualizations to your monitoring and troubleshooting plan. 
 
@@ -37,19 +37,6 @@ Now that you're fully connected within your Cloud and Agent, and you understand 
 Netdata excels in collecting, storing, and organizing metrics in out-of-the-box dashboards. 
 To make sense of all the metrics, Netdata offers an enhanced version of charts that update every second. 
 
-These charts provide a lot of useful information, so that you can:
-
--   Enjoy the high-resolution, granular metrics collected by Netdata
--   Explore visualization with more options such as _line_, _stacked_ and _area_ types (other types like _bar_, _pie_ and _gauges_ are to be added shortly)
--   Examine all the metrics by hovering over them with your cursor
--   Use intuitive tooling and shortcuts to pan, zoom or highlight your charts
--   On highlight, ease access to [Metric Correlations](/docs/cloud/insights/metric-correlations) to see other metrics with similar patterns
--   Have the dimensions sorted based on name or value
--   View information about the chart, its plugin, context, and type
--   Get the chart status and possible errors. On top, reload functionality
-
-These charts will available on [Overview tab](/docs/cloud/visualize/overview), Single Node view, and on your [Custom Dashboards](/docs/cloud/visualize/dashboards). 
-
 With a quick glance at any composite chart, you have immediate information available at your disposal:
 
 -   Chart title and units
@@ -61,7 +48,7 @@ The following sections explain how you can interact with these composite charts 
 
 ### Play, Pause and Reset
 
-Your charts are controlled using the available [Time controls](/docs/dashboard/visualization-date-and-time-controls#time-controls). Besides these, when interacting with the chart you can also activate these controls by:
+Your charts are controlled using the available Time controls. Besides these, when interacting with the chart you can also activate these controls by:
 
 -   hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can hover over a specific timeframe. When moving out of the chart time control will go back to Play (if it was it's previous state)
 -   clicking on the chart to lock it - this enables the Pause option on the time controls, to the current timeframe. This is if you want to jump to a different chart to look for possible correlations. 
@@ -82,7 +69,7 @@ When you start interacting with a chart, you'll notice valuable information on t
 
 The elements that you can find on this top bar are:
 
--   Netdata icon: this indicates that data is continuously being updated, this happens if [Time controls](/docs/dashboard/visualization-date-and-time-controls#time-controls) are in Play or Force Play mode
+-   Netdata icon: this indicates that data is continuously being updated, this happens if time controls are in **Play** or **Force Play** mode
 -   Chart status icon: indicates the status of the chart. Possible values are: Loading, Timeout, Error or No data
 -   Chart title: on the chart title you can see the title together with the metric being displayed, as well as the unit of measurement
 -   Chart action bar: here you'll have access to chart info, change chart types, enables fullscreen mode, and the ability to add the chart to a custom dashboard
@@ -124,10 +111,10 @@ Drag your mouse/finger to the right to pan backward through time, or drag to the
 Selecting timeframes is useful when you see an interesting spike or change in a chart and want to investigate further, from looking at the same period of time on other charts/sections or triggering actions to help you troubleshoot with an in-context action bar to help you troubleshoot (currently only available on
  Single Node view). The available actions:
 
--   run [Metric Correlations](/docs/cloud/insights/metric-correlations)
+-   run [Metric Correlations](https://github.com/netdata/learn/blob/master/docs/concepts/machine-learning/metric-correlations.md)
 -   zoom in on the selected timeframe
 
-[Metric Correlations](/docs/cloud/insights/metric-correlations) will only be available if you respect the timeframe selection limitations. The selected duration pill together with the button state helps visualize this.
+[Metric Correlations](https://github.com/netdata/learn/blob/master/docs/concepts/machine-learning/metric-correlations.md) will only be available if you respect the timeframe selection limitations. The selected duration pill together with the button state helps visualize this.
 
 <img src="https://images.zenhubusercontent.com/60b4ebb03f4163193ec31819/2ffc157d-0f0f-402e-80bb-5ffa8a2091d5" width="50%" height="50%" />
 
@@ -189,7 +176,7 @@ double-click the same icon.
 ## Kubernetes Dashboard
 
 Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in
-the default [Overview](/docs/cloud/visualize/overview/) dashboard.
+the default Overview dashboard.
 
 These visualizations include a health map for viewing the status of k8s pods/containers, in addition to composite charts
 for viewing per-second CPU, memory, disk, and networking metrics from k8s nodes.
@@ -204,7 +191,7 @@ In order to use the Kubernetes visualizations in Netdata Cloud, you need:
 - To connect your Kubernetes cluster to Netdata Cloud.
 - To enable the feature flag described below.
 
-See our [Kubernetes deployment instructions](/docs/agent/packaging/installer/methods/kubernetes/) for details on
+See our [Kubernetes deployment instructions](https://github.com/netdata/learn/blob/master/docs/agent/packaging/installer/methods/kubernetes/) for details on
 installation and connecting to Netdata Cloud.
 
 ### Available Kubernetes metrics
@@ -267,7 +254,7 @@ and `k8s_node_name`. The default is `k8s_controller_name`.
 
 #### Filtering
 
-Filtering behaves identically to the [node filter in War Rooms](/docs/cloud/war-rooms#node-filter), with the ability to
+Filtering behaves identically to the [node filter in War Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md#node-filter), with the ability to
 filter pods/containers by `container_id` and `namespace`.
 
 #### Detailed information
@@ -300,7 +287,7 @@ problematic behavior to investigate further, troubleshoot, and remediate with `k
 The Kubernetes composite charts show real-time and historical resource utilization metrics from nodes, pods, or
 containers within your Kubernetes deployment.
 
-See the [Overview](/docs/cloud/visualize/overview#definition-bar) doc for details on how composite charts work. These
+See the [Overview](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md#definition-bar) doc for details on how composite charts work. These
 work similarly, but in addition to visualizing _by dimension_ and _by node_, Kubernetes composite charts can also be
 grouped by the following labels:
 
@@ -358,7 +345,7 @@ submenus](https://user-images.githubusercontent.com/1153921/80832425-7c528600-8b
 
 ## Charts
 
-Every **chart** in the Netdata dashboard is [fully interactive](/docs/dashboard/interact-charts.mdx). Netdata
+Every **chart** in the Netdata dashboard is [fully interactive]([/docs/dashboard/interact-charts.mdx](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md#interactive-composite-charts-on-cloud)). Netdata
 synchronizes your interactions to help you understand exactly how a node behaved in any timeframe, whether that's
 seconds or days.
 
@@ -380,7 +367,7 @@ like pushing the current timeframe off the screen to see what came before or aft
 
 To zoom, press and hold `Shift`, then use your mouse's scroll wheel, or a two-finger pinch if you're using a touchpad.
 
-See [interact with charts](/docs/dashboard/interact-charts.mdx) for all the possible ways to interact with the charts on
+See [interact with charts](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md#interactive-composite-charts-on-cloud) for all the possible ways to interact with the charts on
 your dashboard.
 
 ## Custom Dashboards
@@ -621,7 +608,7 @@ Each chart can get data from a different Netdata server. You can specify the Net
  ></div>
 ```
 
-If you have ephemeral monitoring setup ([More info here](/streaming/README.md#monitoring-ephemeral-nodes)) and have no
+If you have ephemeral monitoring setup ([More info here](https://github.com/netdata/netdata/blob/rework-learn/docs/streaming/README.md#monitoring-ephemeral-nodes)) and have no
 direct access to the nodes dashboards, you can use the following:
 
 ```html
@@ -744,8 +731,8 @@ select specific dimensions using this:
  ></div>
 ```
 
-Netdata supports coma (`,`) or pipe (`|`) separated [simple
-patterns](/libnetdata/simple_pattern/README.md) for dimensions. By default it
+Netdata supports coma (`,`) or pipe (`|`) separated simple
+patterns for dimensions. By default it
 searches for both dimension IDs and dimension NAMEs. You can control the target
 of the match with: `data-append-options="match-ids"` or
 `data-append-options="match-names"`. Spaces in `data-dimensions=""` are matched
@@ -989,9 +976,9 @@ chart](https://user-images.githubusercontent.com/12159026/28666665-a7d68ad2-72c8
 - [Spaces](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
 - [Charts](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/spaces.md)
 - [Netdata Views](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
-- [Rooms](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/netdata-cloud/rooms.md)
-- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/rework-learn/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
+- [Rooms](https://github.com/netdata/learn/blob/master/docs/concepts/netdata-cloud/rooms.md)
+- [From raw metrics to visualizations](https://github.com/netdata/learn/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 ### Related Tasks
-- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/rework-learn/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-- [Interact with charts](https://github.com/netdata/learn/blob/rework-learn/docs/tasks/interact-with-the-charts.md)
+- [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
+- [Interact with charts](https://github.com/netdata/learn/blob/master/docs/tasks/interact-with-the-charts.md)
