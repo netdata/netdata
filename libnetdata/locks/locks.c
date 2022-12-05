@@ -309,6 +309,18 @@ void netdata_spinlock_unlock(SPINLOCK *spinlock) {
     netdata_thread_enable_cancelability();
 }
 
+bool netdata_spinlock_trylock(SPINLOCK *spinlock) {
+    netdata_thread_disable_cancelability();
+
+    if(!__atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) &&
+        !__atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE))
+        // we got the lock
+        return true;
+
+    // we didn't get the lock
+    return false;
+}
+
 #ifdef NETDATA_TRACE_RWLOCKS
 
 // ----------------------------------------------------------------------------

@@ -16,6 +16,7 @@ typedef struct netdata_spinlock {
 void netdata_spinlock_init(SPINLOCK *spinlock);
 void netdata_spinlock_lock(SPINLOCK *spinlock);
 void netdata_spinlock_unlock(SPINLOCK *spinlock);
+bool netdata_spinlock_trylock(SPINLOCK *spinlock);
 
 #ifdef NETDATA_TRACE_RWLOCKS
 typedef struct netdata_rwlock_locker {

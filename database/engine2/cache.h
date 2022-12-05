@@ -6,6 +6,14 @@
 typedef struct pgc PGC;
 typedef struct pgc_page PGC_PAGE;
 
+typedef enum __attribute__ ((__packed__)) {
+    PGC_OPTIONS_NONE       = 0,
+    PGC_OPTIONS_EVICT_PAGES_INLINE = (1 << 0),
+    PGC_OPTIONS_FLUSH_PAGES_INLINE = (1 << 1),
+} PGC_OPTIONS;
+
+#define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE)
+
 typedef struct pgc_entry {
     bool hot;                   // true if this entry is currently being collected
     Word_t section;             // the section this belongs to
@@ -22,7 +30,8 @@ typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *array, size_t en
 
 // create a cache
 PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_clean_cb,
-                size_t max_dirty_pages_to_save_at_once, save_dirty_page_callback pgc_save_dirty_cb);
+                size_t max_dirty_pages_to_save_at_once, save_dirty_page_callback pgc_save_dirty_cb,
+                PGC_OPTIONS options);
 
 // destroy the cache
 void pgc_destroy(PGC *cache);
@@ -48,6 +57,9 @@ time_t pgc_page_update_every(PGC_PAGE *page);
 void *pgc_page_data(PGC_PAGE *page);
 
 // resetting the end time of a hot page
-void pgc_page_hot_set_end_time_t(PGC_PAGE *page, time_t end_time_t);
+void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
+
+void pgc_evict_pages(PGC *cache);
+void pgc_flush_pages(PGC *cache);
 
 #endif // DBENGINE_CACHE_H
