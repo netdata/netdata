@@ -35,7 +35,7 @@ receive via centralized alert notifications, you must configure each node's aler
 
 ## Alert notifications for a Cloud Space
 
-To enable notifications for a Space, click **Manage Space** in the [Space](/docs/cloud/spaces) management area.
+To enable notifications for a Space, click **Manage Space** in the [Space](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/spaces.md) management area.
 
 ![The Manage Space button](https://user-images.githubusercontent.com/1153921/108530321-b6a52500-7292-11eb-9599-a5ba77a25094.png)
 
@@ -128,7 +128,7 @@ So, for example, the `sysadmin` role may send:
 
 ## Netdata Agent alert notifications
 
-The Netdata Agent's [notification system](/health/notifications/README.md) runs on every node and dispatches
+The Netdata Agent's [notification system](https://github.com/netdata/netdata/blob/health/notifications/README.md) runs on every node and dispatches
 notifications based on configured endpoints and roles. You can enable multiple endpoints on any one node _and_ use Agent
 notifications in parallel with centralized alarm notifications in Netdata Cloud.
 
@@ -141,33 +141,33 @@ as an illustration of the process of enabling any notification platform.
 
 ### Supported notification endpoints
 
-- [**alerta.io**](/health/notifications/alerta/README.md)
-- [**Amazon SNS**](/health/notifications/awssns/README.md)
-- [**Custom endpoint**](/health/notifications/custom/README.md)
-- [**Discord**](/health/notifications/discord/README.md)
-- [**Dynatrace**](/health/notifications/dynatrace/README.md)
-- [**Email**](/health/notifications/email/README.md)
-- [**Flock**](/health/notifications/flock/README.md)
-- [**Google Hangouts**](/health/notifications/hangouts/README.md)
-- [**Gotify**](/health/notifications/gotify/README.md)
-- [**IRC**](/health/notifications/irc/README.md)
-- [**Kavenegar**](/health/notifications/kavenegar/README.md)
-- [**Matrix**](/health/notifications/matrix/README.md)
-- [**Messagebird**](/health/notifications/messagebird/README.md)
-- [**Microsoft Teams**](/health/notifications/msteams/README.md)
-- [**Netdata Agent dashboard**](/health/notifications/web/README.md)
-- [**Opsgenie**](/health/notifications/opsgenie/README.md)
-- [**PagerDuty**](/health/notifications/pagerduty/README.md)
-- [**Prowl**](/health/notifications/prowl/README.md)
-- [**PushBullet**](/health/notifications/pushbullet/README.md)
-- [**PushOver**](/health/notifications/pushover/README.md)
-- [**Rocket.Chat**](/health/notifications/rocketchat/README.md)
-- [**Slack**](/health/notifications/slack/README.md)
-- [**SMS Server Tools 3**](/health/notifications/smstools3/README.md)
-- [**StackPulse**](/health/notifications/stackpulse/README.md)
-- [**Syslog**](/health/notifications/syslog/README.md)
-- [**Telegram**](/health/notifications/telegram/README.md)
-- [**Twilio**](/health/notifications/twilio/README.md)
+- [**alerta.io**](https://github.com/netdata/netdata/blob/health/notifications/alerta/README.md)
+- [**Amazon SNS**](https://github.com/netdata/netdata/blob/health/notifications/awssns/README.md)
+- [**Custom endpoint**](https://github.com/netdata/netdata/blob/health/notifications/custom/README.md)
+- [**Discord**](https://github.com/netdata/netdata/blob/health/notifications/discord/README.md)
+- [**Dynatrace**](https://github.com/netdata/netdata/blob/health/notifications/dynatrace/README.md)
+- [**Email**](https://github.com/netdata/netdata/blob/health/notifications/email/README.md)
+- [**Flock**](https://github.com/netdata/netdata/blob/health/notifications/flock/README.md)
+- [**Google Hangouts**](https://github.com/netdata/netdata/blob/health/notifications/hangouts/README.md)
+- [**Gotify**](https://github.com/netdata/netdata/blob/health/notifications/gotify/README.md)
+- [**IRC**](https://github.com/netdata/netdata/blob/health/notifications/irc/README.md)
+- [**Kavenegar**](https://github.com/netdata/netdata/blob/health/notifications/kavenegar/README.md)
+- [**Matrix**](https://github.com/netdata/netdata/blob/health/notifications/matrix/README.md)
+- [**Messagebird**](https://github.com/netdata/netdata/blob/health/notifications/messagebird/README.md)
+- [**Microsoft Teams**](https://github.com/netdata/netdata/blob/health/notifications/msteams/README.md)
+- [**Netdata Agent dashboard**](https://github.com/netdata/netdata/blob/health/notifications/web/README.md)
+- [**Opsgenie**](https://github.com/netdata/netdata/blob/health/notifications/opsgenie/README.md)
+- [**PagerDuty**](https://github.com/netdata/netdata/blob/health/notifications/pagerduty/README.md)
+- [**Prowl**](https://github.com/netdata/netdata/blob/health/notifications/prowl/README.md)
+- [**PushBullet**](https://github.com/netdata/netdata/blob/health/notifications/pushbullet/README.md)
+- [**PushOver**](https://github.com/netdata/netdata/blob/health/notifications/pushover/README.md)
+- [**Rocket.Chat**](https://github.com/netdata/netdata/blob/health/notifications/rocketchat/README.md)
+- [**Slack**](https://github.com/netdata/netdata/blob/health/notifications/slack/README.md)
+- [**SMS Server Tools 3**](https://github.com/netdata/netdata/blob/health/notifications/smstools3/README.md)
+- [**StackPulse**](https://github.com/netdata/netdata/blob/health/notifications/stackpulse/README.md)
+- [**Syslog**](https://github.com/netdata/netdata/blob/health/notifications/syslog/README.md)
+- [**Telegram**](https://github.com/netdata/netdata/blob/health/notifications/telegram/README.md)
+- [**Twilio**](https://github.com/netdata/netdata/blob/health/notifications/twilio/README.md)
 
 ### Example: Enable Slack notifications
 
