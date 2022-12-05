@@ -75,6 +75,7 @@ enum rrdeng_opcode {
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
+    RRDENG_READ_EXTENT2,
 
     RRDENG_MAX_OPCODE
 };
@@ -83,8 +84,19 @@ struct rrdeng_read_page {
     struct rrdeng_page_descr *page_cache_descr;
 };
 
+struct uuid_list_s {
+    uuid_t uuid;
+    time_t start_time_t;
+};
+
 struct rrdeng_read_extent {
+    size_t entries;
+    uv_file file;
+    uint64_t pos;
+    uint64_t size;
+    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
     struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
+    struct completion *completion;
     int page_count;
 };
 
@@ -119,6 +131,7 @@ struct extent_io_descriptor {
     int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
+    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };

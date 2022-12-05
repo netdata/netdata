@@ -11,6 +11,10 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
+// DBENGINE 2
+static void do_read_extent2(struct rrdengine_worker_config *wc, struct rrdeng_read_extent *extent);
+//
+
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
@@ -1443,6 +1447,13 @@ void rrdeng_worker(void* arg)
                 rrdeng_invalidate_oldest_committed(wc);
                 break;
             }
+            case RRDENG_READ_EXTENT2:
+            do_read_extent2(wc, &cmd.read_extent);
+            if (unlikely(!set_name)) {
+                set_name = 1;
+                uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+            }
+            break;
             default:
                 debug(D_RRDENGINE, "%s: default.", __func__);
                 break;
@@ -1505,4 +1516,29 @@ void rrdengine_main(void)
     rrdeng_exit(ctx);
     fprintf(stderr, "Hello world!");
     exit(0);
+}
+
+
+// DBENGINE 2
+// New version of READ EXTENT
+static void do_read_extent2(struct rrdengine_worker_config *wc, struct rrdeng_read_extent *extent)
+{
+    int ret;
+    unsigned i;
+    struct extent_io_descriptor *xt_io_descr;
+
+    xt_io_descr = callocz(1, sizeof(*xt_io_descr));
+    for (i = 0 ; i < extent->entries; ++i) {
+        xt_io_descr->uuid_list[i] = extent->uuid_list[i];
+    }
+    xt_io_descr->file = extent->file;
+    xt_io_descr->bytes = extent->size;
+    xt_io_descr->pos = extent->pos;
+
+    ret = uv_queue_work(wc->loop, &xt_io_descr->req_worker, do_mmap_read_extent, read_mmap_extent_cb);
+    fatal_assert(-1 != ret);
+
+//    ++ctx->stats.io_read_requests;
+//    ++ctx->stats.io_read_extents;
+//    ctx->stats.pg_cache_backfills += count;
 }
