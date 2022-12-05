@@ -16,7 +16,7 @@ learn_docs_purpose: "Introductions to visualizations and what we will cover to t
 Because Netdata is a monitoring and _troubleshooting_ platform, dashboards with real-time, meaningful, and context-aware
 charts are pivotal in the service we provide to strengthen your monitoring and troubleshooting ability.
 
-As soon as you [install Netdata](/docs/get-started.mdx), it autodetects hardware, OS, containers, services, and
+As soon as you install Netdata\, it autodetects hardware, OS, containers, services, and
 applications running on your node and builds a dashboard on a single, scrollable webpage. This page features hundreds of
 charts, which are preconfigured to save you time from learning a query language, all stacked on top of one another. This
 vertical rhythm is designed to encourage exploration and help you visually identify connections between the metrics
