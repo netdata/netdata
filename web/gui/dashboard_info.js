@@ -4294,7 +4294,7 @@ netdataDashboard.context = {
     // WMI (Service)
 
     'wmi.service_status': {
-        info: 'Actual <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of a service.'
+        info: 'The current <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of the service.'
     },
 
     // ------------------------------------------------------------------------
