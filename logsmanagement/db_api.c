@@ -4,7 +4,7 @@
  *  @author Dimitris Pantazis
  */
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "db_api.h"
 #include <inttypes.h>
 #include <stdio.h>

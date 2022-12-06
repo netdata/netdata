@@ -7,9 +7,9 @@
 #ifndef PLUGIN_LOGSMANAGEMENT_GENERIC_H_
 #define PLUGIN_LOGSMANAGEMENT_GENERIC_H_
 
-#include "../../daemon/common.h"
-#include "../../logsmanagement/file_info.h"
-#include "../../logsmanagement/circular_buffer.h"
+#include "daemon/common.h"
+#include "logsmanagement/file_info.h"
+#include "logsmanagement/circular_buffer.h"
 
 typedef struct Chart_data_generic chart_data_generic_t;
 

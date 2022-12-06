@@ -1243,11 +1243,16 @@ AM_CONDITIONAL([ENABLE_LOGSMANAGEMENT], [test "${build_logsmanagement}" = "yes"]
 if test "${build_logsmanagement}" = "yes"; then
     AC_DEFINE([ENABLE_LOGSMANAGEMENT], [1], [enable logs management functionality])
     OPTIONAL_LOGSMANAGEMENT_CFLAGS=" \
-    -I \$(abs_top_srcdir)/fluent-bit/build/lib/c-ares-809d5e84/ -I \$(abs_top_srcdir)/fluent-bit/lib/c-ares-809d5e84/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/mbedtls-2.28.0/include/ -I \$(abs_top_srcdir)/fluent-bit/lib/cmetrics/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/mpack-amalgamation-1.0/src/ -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/ \
-    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/mk_core/ -I \$(abs_top_srcdir)/fluent-bit/lib/monkey/include/ \
-    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/msgpack/ -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/ "
+    -I \$(abs_top_srcdir)/fluent-bit/build/lib/c-ares-809d5e84/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/c-ares-809d5e84/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/mbedtls-2.28.0/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/cmetrics/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/mpack-amalgamation-1.0/src/ \
+    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/ \
+    -I \$(abs_top_srcdir)/fluent-bit/build/lib/monkey/include/monkey/mk_core/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/monkey/include/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/msgpack/ \
+    -I \$(abs_top_srcdir)/fluent-bit/lib/msgpack-c/include/ "
 fi
 
 # Decide if we should build Logs Management tests.

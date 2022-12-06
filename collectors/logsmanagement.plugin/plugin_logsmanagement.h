@@ -6,9 +6,9 @@
 #ifndef PLUGIN_LOGSMANAGEMENT_H_
 #define PLUGIN_LOGSMANAGEMENT_H_
 
-#include "../../daemon/common.h"
-#include "../../logsmanagement/file_info.h"
-#include "../../logsmanagement/circular_buffer.h"
+#include "daemon/common.h"
+#include "logsmanagement/file_info.h"
+#include "logsmanagement/circular_buffer.h"
 
 struct Chart_meta;
 

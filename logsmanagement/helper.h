@@ -7,7 +7,7 @@
 #ifndef HELPER_H_
 #define HELPER_H_
 
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <string.h>

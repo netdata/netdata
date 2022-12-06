@@ -5,8 +5,8 @@
  */
 
 #include "tail_plugin.h"
-#include "../daemon/common.h"
-#include "../libnetdata/libnetdata.h"
+#include "daemon/common.h"
+#include "libnetdata/libnetdata.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <lz4.h>

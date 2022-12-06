@@ -9,7 +9,7 @@
 
 #include <inttypes.h>
 #include <stdlib.h>
-#include "../libnetdata/libnetdata.h"
+#include "libnetdata/libnetdata.h"
 #include "logsmanagement_conf.h"
 
 #define QUERY_VERSION "1"

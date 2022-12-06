@@ -9,7 +9,7 @@
  *  @author Dimitris Pantazis
  */
 
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <lz4.h>

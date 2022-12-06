@@ -8,7 +8,7 @@
 #include <lz4.h>
 #include "helper.h"
 #include "circular_buffer.h"
-#include "../daemon/common.h"
+#include "daemon/common.h"
 #include "../fluent-bit/lib/msgpack-c/include/msgpack/unpack.h"
 #include "../fluent-bit/lib/monkey/include/monkey/mk_core/mk_list.h"
 #include "../fluent-bit/include/fluent-bit/flb_macros.h"
