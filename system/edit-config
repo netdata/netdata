@@ -9,7 +9,7 @@ script_dir="$(CDPATH="" cd -- "$(dirname -- "$0")" && pwd -P)"
 
 usage() {
   check_directories
-  cat << EOF
+  cat <<EOF
 USAGE:
   ${0} [options] FILENAME
 
@@ -37,7 +37,7 @@ abspath() {
   if [ -d "${1}" ]; then
     echo "$(cd "${1}" && /usr/bin/env PWD= pwd -P)/"
   else
-    echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P )/$(basename "${1}")"
+    echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P)/$(basename "${1}")"
   fi
 }
 
@@ -96,16 +96,16 @@ check_editor() {
 running_in_container() {
   [ -e /.dockerenv ] && return 0
   [ -e /.dockerinit ] && return 0
-  [ -r /proc/1/environ ] && tr '\000' '\n' < /proc/1/environ | grep -Eiq '^container=podman' && return 0
+  [ -r /proc/1/environ ] && tr '\000' '\n' </proc/1/environ | grep -Eiq '^container=podman' && return 0
   grep -qF -e /docker/ -e /libpod- /proc/self/cgroup 2>/dev/null && return 0
 }
 
 get_docker_command() {
   if [ -x "${docker}" ]; then
     return 0
-  elif command -v docker >/dev/null 2>&1 ; then
+  elif command -v docker >/dev/null 2>&1; then
     docker="$(command -v docker)"
-  elif command -v podman >/dev/null 2>&1 ; then
+  elif command -v podman >/dev/null 2>&1; then
     docker="$(command -v podman)"
   else
     error "Unable to find a usable container tool stack. I support Docker and Podman."
@@ -131,9 +131,9 @@ handle_container() {
   elif [ -z "${container}" ] && [ -f "${script_dir}/.container-hostname" ]; then
     echo >&2 "Autodetected containerized Netdata instance. Attempting to autodetect container ID."
     possible_container="$(cat "${script_dir}/.container-hostname")"
-    if check_for_container "${possible_container}" ; then
+    if check_for_container "${possible_container}"; then
       container="${possible_container}"
-    elif check_for_container netdata ; then
+    elif check_for_container netdata; then
       container="netdata"
     else
       error "Could not autodetect container ID. It must be supplied on the command line with the --container option."
@@ -142,7 +142,7 @@ handle_container() {
 
     echo >&2 "Found Netdata container with ID or name ${container}"
   elif [ -n "${container}" ]; then
-    if ! check_for_container "${container}" ; then
+    if ! check_for_container "${container}"; then
       error "No container with ID or name ${container} exists."
       exit 1
     fi
@@ -181,7 +181,7 @@ list_files() {
     exit 1
   fi
 
-  cat << EOF
+  cat <<EOF
 The following configuration files are known to this script:
 
 ${files}
@@ -296,7 +296,6 @@ edit() {
   "${editor}" "${1}"
   exit $?
 }
-
 
 main() {
   parse_args "${@}"
