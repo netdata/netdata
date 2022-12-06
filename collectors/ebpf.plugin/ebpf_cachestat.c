@@ -1254,7 +1254,7 @@ static int ebpf_cachestat_set_internal_value()
     }
 
     if (!address.addr) {
-        error("Cannot find the necessary functions to monitor cachestat");
+        error("%s cachestat.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
         return -1;
     }
 

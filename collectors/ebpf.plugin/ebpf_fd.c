@@ -217,21 +217,50 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
 }
 
 /**
+ * FD Fill Address
+ *
+ * Fill address value used to load probes/trampoline.
+ */
+static inline void ebpf_fd_fill_address(ebpf_addresses_t *address, char **targets)
+{
+    int i;
+    for (i = 0; i < NETDATA_EBPF_MAX_FD_TARGETS; i++) {
+        address->function = targets[i];
+        ebpf_load_addresses(address, -1);
+        if (address->addr)
+            break;
+    }
+}
+
+/**
  * Set target values
  *
  * Set pointers used to laod data.
+ *
+ * @return It returns 0 on success and -1 otherwise.
  */
-static void ebpf_fd_set_target_values()
+static int ebpf_fd_set_target_values()
 {
-    static char *close_targets[] = {"close_fd", "__close_fd"};
-    static char *open_targets[] = {"do_sys_openat2", "do_sys_open"};
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
-        fd_targets[NETDATA_FD_SYSCALL_OPEN].name = open_targets[0];
-        fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = close_targets[0];
-    } else {
-        fd_targets[NETDATA_FD_SYSCALL_OPEN].name = open_targets[1];
-        fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = close_targets[1];
-    }
+    static char *close_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"close_fd", "__close_fd"};
+    static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_sys_open"};
+
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    ebpf_fd_fill_address(&address, close_targets);
+
+    if (!address.addr)
+        return -1;
+
+    fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = address.function;
+
+    address.addr = 0;
+    ebpf_fd_fill_address(&address, open_targets);
+
+    if (!address.addr)
+        return -1;
+
+    fd_targets[NETDATA_FD_SYSCALL_OPEN].name = address.function;
+
+    return 0;
 }
 
 /**
@@ -290,7 +319,11 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
     netdata_ebpf_targets_t *mt = em->targets;
     netdata_ebpf_program_loaded_t test = mt[NETDATA_FD_SYSCALL_OPEN].mode;
 
-    ebpf_fd_set_target_values();
+    if (ebpf_fd_set_target_values()) {
+        error("%s file descriptor.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        return -1;
+    }
+
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_fd_disable_probes(obj);
         ebpf_disable_specific_trampoline(obj);
