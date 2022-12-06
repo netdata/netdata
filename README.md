@@ -122,7 +122,7 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 Due to the distributed nature of the Netdata ecosystem, it is recommended to setup not only not only Netdata Agent on your production system, but also an additional Netdata Agent acting as a [Parent](https://learn.netdata.cloud/docs/agent/streaming). A local Netdata Agent (child), without any database or alarms, collects metrics and sends them to another Netdata node (parent). The same parent can collect data for any number of child nodes and serves alerts for each child.
 
-IMAGE
+![Netdata Cloud](https://user-images.githubusercontent.com/423236/205926887-43024984-6d38-46ad-96cb-d0c388117c6d.png)
 
 Get started by [signing in](https://app.netdata.cloud/?utm_source=website&utm_content=top_navigation_sign_up) to Netdata.cloud and follow the setup guide.
 
