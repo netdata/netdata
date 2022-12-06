@@ -633,7 +633,7 @@ void *logsmanagement_main(void *ptr) {
     #pragma GCC diagnostic pop
 
     /* Initialize array of File_Info pointers. */
-    p_file_infos_arr = mallocz(sizeof(struct File_infos_arr));
+    p_file_infos_arr = callocz(1, sizeof(struct File_infos_arr));
     *p_file_infos_arr = (struct File_infos_arr){0};
 
     tail_plugin_init(p_file_infos_arr);
@@ -646,8 +646,9 @@ void *logsmanagement_main(void *ptr) {
         logs_management_init(config_section);
         config_section = config_section->next;
     } while(config_section);
+    if(p_file_infos_arr->count == 0) goto cleanup; // No log sources - nothing to do
 
-    db_init();
+    db_init(); // TODO: Check if db initialised correctly.
 
     debug(D_LOGS_MANAG, "File monitoring setup completed. Running db_init().");
     
@@ -676,10 +677,11 @@ void *logsmanagement_main(void *ptr) {
 
     p_file_infos_arr_ready = 1;
 
-    info("Logs management main() setup completed successfully");
+    info("logsmanagement_main() setup completed successfully");
 
     /* Run uvlib loop. */
     uv_run(main_loop, UV_RUN_DEFAULT);
+    error("uv_run(main_loop, ...); - no handles or requests - exiting");
 
 cleanup:
     netdata_thread_cleanup_pop(1);
