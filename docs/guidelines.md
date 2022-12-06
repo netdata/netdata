@@ -1,3 +1,14 @@
+<!--
+title: "Guidelines"
+sidebar_label: "Guidelines"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/guidelines.md"
+sidebar_position: "10000"
+learn_status: "Unpublished"
+learn_topic_type: "Reference"
+learn_rel_path: "Reference"
+learn_docs_purpose: "TBD"
+-->
+
 Welcome to our docs developer guidelines!
 
 We store documentation related to Netdata inside of the [`netdata/netdata` repository](https://github.com/netdata/netdata) on GitHub.
