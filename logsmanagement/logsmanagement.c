@@ -593,6 +593,13 @@ static void logsmanagement_main_cleanup(void *ptr) {
 
     info("cleaning up...");
 
+    if(p_file_infos_arr){
+        for(int i = 0; i < p_file_infos_arr->count; i++){
+            p_file_info_destroy(p_file_infos_arr->data[i]);
+        }
+        freez(p_file_infos_arr);
+    }
+
     // TODO: Additional work to do here on exit? Maybe flush buffers to DB?
 
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
@@ -619,7 +626,9 @@ void *logsmanagement_main(void *ptr) {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wunused-local-typedefs" 
     /* Ensure VALIDATE_COMPRESSION is disabled in release versions. */
-    COMPILE_TIME_ASSERT(LOGS_MANAG_DEBUG ? 1 : !VALIDATE_COMPRESSION);                                         
+    COMPILE_TIME_ASSERT(LOGS_MANAG_DEBUG ? 1 : !VALIDATE_COMPRESSION);
+    COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE >= CIRCULAR_BUFF_MAX_SIZE_RANGE_MIN); 
+    COMPILE_TIME_ASSERT(CIRCULAR_BUFF_DEFAULT_MAX_SIZE <= CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX);
     #pragma GCC diagnostic pop
 
     /* Initialize array of File_Info pointers. */
