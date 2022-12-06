@@ -182,6 +182,49 @@ static void pgc_index_write_unlock(PGC *cache, size_t partition) {
     netdata_rwlock_unlock(&cache->index[partition].rwlock);
 }
 
+static inline bool pgc_ll_trylock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
+    return netdata_spinlock_trylock(&ll->spinlock);
+}
+
+static inline void pgc_ll_lock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
+    netdata_spinlock_lock(&ll->spinlock);
+}
+
+static inline void pgc_ll_unlock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
+    netdata_spinlock_unlock(&ll->spinlock);
+}
+
+static inline void page_transition_lock(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    netdata_spinlock_lock(&page->transition_spinlock);
+}
+
+static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    netdata_spinlock_unlock(&page->transition_spinlock);
+}
+
+static inline bool pgc_evictions_trylock(PGC *cache) {
+    return netdata_spinlock_trylock(&cache->evictions_lock);
+}
+
+static inline void pgc_evictions_lock(PGC *cache) {
+    netdata_spinlock_lock(&cache->evictions_lock);
+}
+
+static inline void pgc_evictions_unlock(PGC *cache) {
+    netdata_spinlock_unlock(&cache->evictions_lock);
+}
+
+static inline bool pgc_flushing_trylock(PGC *cache) {
+    return netdata_spinlock_trylock(&cache->flushing_lock);
+}
+
+static inline void pgc_flushing_lock(PGC *cache) {
+    netdata_spinlock_lock(&cache->flushing_lock);
+}
+
+static inline void pgc_flushing_unlock(PGC *cache) {
+    netdata_spinlock_unlock(&cache->flushing_lock);
+}
 
 // ----------------------------------------------------------------------------
 // helpers
@@ -213,7 +256,7 @@ struct section_dirty_pages {
 
 static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
     if(!having_lock)
-        netdata_spinlock_lock(&ll->spinlock);
+        pgc_ll_lock(cache, ll);
 
     internal_fatal(page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) != 0,
                    "DBENGINE CACHE: invalid page flags, the page has %d, but it is should be %d",
@@ -242,7 +285,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     page_flag_set(page, ll->flags);
 
     if(!having_lock)
-        netdata_spinlock_unlock(&ll->spinlock);
+        pgc_ll_unlock(cache, ll);
 
     __atomic_add_fetch(&ll->entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
@@ -257,7 +300,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     __atomic_add_fetch(&ll->removed_size, page->assumed_size, __ATOMIC_RELAXED);
 
     if(!having_lock)
-        netdata_spinlock_lock(&ll->spinlock);
+        pgc_ll_lock(cache, ll);
 
     internal_fatal(page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) != ll->flags,
                    "DBENGINE CACHE: invalid page flags, the page has %d, but it is should be %d",
@@ -289,18 +332,18 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     ll->version++;
 
     if(!having_lock)
-        netdata_spinlock_unlock(&ll->spinlock);
+        pgc_ll_unlock(cache, ll);
 }
 
 static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
     if(is_page_clean(page)) {
-        if(!netdata_spinlock_trylock(&cache->clean.spinlock))
+        if(!pgc_ll_trylock(cache, &cache->clean))
             // it is locked, don't bother...
             return;
 
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
-        netdata_spinlock_unlock(&cache->clean.spinlock);
+        pgc_ll_unlock(cache, &cache->clean);
     }
 }
 
@@ -325,11 +368,11 @@ static inline void page_clear_hot(PGC *cache, PGC_PAGE *page, bool having_hot_lo
 
 static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transition_lock, bool having_clean_lock) {
     if(!having_transition_lock)
-        netdata_spinlock_lock(&page->transition_spinlock);
+        page_transition_lock(cache, page);
 
     if(is_page_clean(page)) {
         if(!having_transition_lock)
-            netdata_spinlock_unlock(&page->transition_spinlock);
+            page_transition_unlock(cache, page);
         return;
     }
 
@@ -340,14 +383,14 @@ static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transi
     pgc_ll_add(cache, &cache->clean, page, having_clean_lock);
 
     if(!having_transition_lock)
-        netdata_spinlock_unlock(&page->transition_spinlock);
+        page_transition_unlock(cache, page);
 }
 
 static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
-    netdata_spinlock_lock(&page->transition_spinlock);
+    page_transition_lock(cache, page);
 
     if(is_page_dirty(page)) {
-        netdata_spinlock_unlock(&page->transition_spinlock);
+        page_transition_unlock(cache, page);
         return;
     }
 
@@ -357,14 +400,14 @@ static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->dirty, page, false);
 
-    netdata_spinlock_unlock(&page->transition_spinlock);
+    page_transition_unlock(cache, page);
 }
 
 static inline void page_set_hot(PGC *cache, PGC_PAGE *page) {
-    netdata_spinlock_lock(&page->transition_spinlock);
+    page_transition_lock(cache, page);
 
     if(is_page_hot(page)) {
-        netdata_spinlock_unlock(&page->transition_spinlock);
+        page_transition_unlock(cache, page);
         return;
     }
 
@@ -374,7 +417,7 @@ static inline void page_set_hot(PGC *cache, PGC_PAGE *page) {
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->hot, page, false);
 
-    netdata_spinlock_unlock(&page->transition_spinlock);
+    page_transition_unlock(cache, page);
 }
 
 
@@ -479,7 +522,7 @@ static bool evict_this_page(PGC *cache, PGC_PAGE *page, bool having_clean_lock_t
     pgc_ll_del(cache, &cache->clean, page, having_clean_lock_to_unlock_on_success);
 
     if(having_clean_lock_to_unlock_on_success)
-        netdata_spinlock_unlock(&cache->clean.spinlock);
+        pgc_ll_unlock(cache, &cache->clean);
 
     // remove it from the Judy arrays
     size_t partition = indexing_partition(cache, page->metric_id);
@@ -542,37 +585,44 @@ static bool evict_this_page(PGC *cache, PGC_PAGE *page, bool having_clean_lock_t
     return true;
 }
 
-static void evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool all_of_them) {
+// returns true, when there is more work to do
+static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them) {
     if(!all_of_them && !is_pgc_full(cache))
         // don't bother - not enough to do anything
-        return;
+        return false;
 
     internal_fatal(cache->clean.linked_list_in_sections_judy,
                    "wrong clean pages configuration - clean pages need to have a linked list, not a judy array");
 
-    if(all_of_them) {
-        // we really need the lock
-        netdata_spinlock_lock(&cache->evictions_lock);
+    if(unlikely(!max_skip))
         max_skip = SIZE_MAX;
-        max_evict = SIZE_MAX;
-    }
 
-    else if(!netdata_spinlock_trylock(&cache->evictions_lock))
+    if(unlikely(!max_evict))
+        max_evict = SIZE_MAX;
+
+    if(all_of_them || wait)
+        // we really need the lock
+        pgc_evictions_lock(cache);
+
+    else if(!pgc_evictions_trylock(cache))
         // another thread is evicting pages currently
-        return;
+        return true;
 
     size_t spins = 0;
     size_t skips = 0;
     size_t total_evicted = 0;
     size_t last_round_evicted;
+    bool stopped_before_finishing = false;
 
     do {
-        if(!all_of_them && total_evicted > max_evict)
+        if(!all_of_them && total_evicted > max_evict) {
+            stopped_before_finishing = true;
             break;
+        }
 
         spins++;
         last_round_evicted = 0;
-        netdata_spinlock_lock(&cache->clean.spinlock);
+        pgc_ll_lock(cache, &cache->clean);
 
         // find one to delete
         PGC_PAGE *page = cache->clean.base;
@@ -590,6 +640,9 @@ static void evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool all_
             skips++;
 
             if(page == started_page || (!all_of_them && skips > max_skip)) {
+                if(page != started_page && !last_round_evicted)
+                    stopped_before_finishing = true;
+
                 page = NULL;
                 break;
             }
@@ -597,7 +650,7 @@ static void evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool all_
 
         if(!page) {
             // it went through all of them without evicting any
-            netdata_spinlock_unlock(&cache->clean.spinlock);
+            pgc_ll_unlock(cache, &cache->clean);
         }
         else {
             last_round_evicted++;
@@ -623,7 +676,9 @@ static void evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool all_
     if(unlikely(spins > 1))
         __atomic_add_fetch(&cache->stats.evict_spins, spins - 1, __ATOMIC_RELAXED);
 
-    netdata_spinlock_unlock(&cache->evictions_lock);
+    pgc_evictions_unlock(cache);
+
+    return stopped_before_finishing;
 }
 
 static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
@@ -690,11 +745,11 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
     if(unlikely(spins > 1))
         __atomic_add_fetch(&cache->stats.insert_spins, spins - 1, __ATOMIC_RELAXED);
 
-    if(cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE || is_pgc_full(cache))
+    if(!entry->hot && (cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE || is_pgc_full(cache)))
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
-                    false);
+                    false, false);
 
     return page;
 }
@@ -791,7 +846,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
 }
 
 static void all_hot_pages_to_dirty(PGC *cache) {
-    netdata_spinlock_lock(&cache->hot.spinlock);
+    pgc_ll_lock(cache, &cache->hot);
 
     PGC_PAGE *page = cache->hot.base;
     while(page) {
@@ -805,7 +860,7 @@ static void all_hot_pages_to_dirty(PGC *cache) {
         page = next;
     }
 
-    netdata_spinlock_unlock(&cache->hot.spinlock);
+    pgc_ll_unlock(cache, &cache->hot);
 }
 
 static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
@@ -817,22 +872,27 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
     return JudyLNext(PArray, PIndex, PJE0);
 }
 
-static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
-    if(!netdata_spinlock_trylock(&cache->flushing_lock))
+// returns true when there is more work to do
+static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_them) {
+
+    if(all_of_them || wait)
+        pgc_flushing_lock(cache);
+
+    else if(!pgc_flushing_trylock(cache))
         // another thread is flushing pages currently
-        return;
+        return true;
 
     internal_fatal(!cache->dirty.linked_list_in_sections_judy,
                    "wrong dirty pages configuration - dirty pages need to have a judy array, not a linked list");
 
-    netdata_spinlock_lock(&cache->dirty.spinlock);
+    pgc_ll_lock(cache, &cache->dirty);
     if(!all_of_them && (cache->dirty.entries < cache->config.max_dirty_pages_per_call || cache->dirty.last_version_checked == cache->dirty.version)) {
-        netdata_spinlock_unlock(&cache->dirty.spinlock);
-        netdata_spinlock_unlock(&cache->flushing_lock);
-        return;
+        pgc_ll_unlock(cache, &cache->dirty);
+        pgc_flushing_unlock(cache);
+        return false;
     }
 
-    if(all_of_them)
+    if(all_of_them || !max_flushes)
         max_flushes = SIZE_MAX;
 
     Word_t last_section = 0;
@@ -861,7 +921,7 @@ static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
                     internal_fatal(page->section != last_section,
                                    "DBENGINE CACHE: dirty page is not in the right section");
 
-                    netdata_spinlock_lock(&page->transition_spinlock);
+                    page_transition_lock(cache, page);
                     page_flag_set(page, PGC_PAGE_IS_BEING_SAVED);
 
                     pages[used] = page;
@@ -884,7 +944,7 @@ static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
 
                 page = next;
             }
-            netdata_spinlock_unlock(&cache->dirty.spinlock);
+            pgc_ll_unlock(cache, &cache->dirty);
 
             if (used) {
                 bool clean_them = false;
@@ -898,7 +958,7 @@ static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
                 }
 
                 if(clean_them)
-                    netdata_spinlock_lock(&cache->clean.spinlock);
+                    pgc_ll_lock(cache, &cache->clean);
 
                 for (size_t i = 0; i < used; i++) {
                     PGC_PAGE *tpg = pages[i];
@@ -906,13 +966,13 @@ static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
                     if (clean_them)
                         page_set_clean(cache, tpg, true, true);
 
-                    netdata_spinlock_unlock(&tpg->transition_spinlock);
+                    page_transition_unlock(cache, tpg);
                     page_release(cache, tpg, false);
                     page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
                 }
 
                 if(clean_them) {
-                    netdata_spinlock_unlock(&cache->clean.spinlock);
+                    pgc_ll_unlock(cache, &cache->clean);
                     __atomic_add_fetch(&cache->stats.flushes_completed, total_count, __ATOMIC_RELAXED);
                     __atomic_add_fetch(&cache->stats.flushes_completed_size, total_size, __ATOMIC_RELAXED);
                 }
@@ -922,19 +982,21 @@ static void flush_pages(PGC *cache, size_t max_flushes, bool all_of_them) {
                 }
             }
 
-            netdata_spinlock_lock(&cache->dirty.spinlock);
+            pgc_ll_lock(cache, &cache->dirty);
         }
     }
 
     if(!stopped_before_finishing)
         cache->dirty.last_version_checked = cache->dirty.version;
 
-    netdata_spinlock_unlock(&cache->dirty.spinlock);
-    netdata_spinlock_unlock(&cache->flushing_lock);
+    pgc_ll_unlock(cache, &cache->dirty);
+    pgc_flushing_unlock(cache);
+
+    return stopped_before_finishing;
 }
 
 void free_all_unreferenced_clean_pages(PGC *cache) {
-    evict_pages(cache, 0, 0, true);
+    evict_pages(cache, 0, 0, true, true);
 }
 
 // ----------------------------------------------------------------------------
@@ -967,6 +1029,9 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
     netdata_spinlock_init(&cache->dirty.spinlock);
     netdata_spinlock_init(&cache->clean.spinlock);
 
+    netdata_spinlock_init(&cache->evictions_lock);
+    netdata_spinlock_init(&cache->flushing_lock);
+
     cache->dirty.linked_list_in_sections_judy = true;
 
     cache->hot.flags = PGC_PAGE_HOT;
@@ -981,7 +1046,7 @@ void pgc_destroy(PGC *cache) {
     all_hot_pages_to_dirty(cache);
 
     // save all dirty pages to make them clean
-    flush_pages(cache, 0, true);
+    flush_pages(cache, 0, true, true);
 
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);
@@ -1005,7 +1070,7 @@ void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
         page_set_dirty(cache, page, false);
 
         if(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE)
-            flush_pages(cache, cache->config.max_flushes_inline, false);
+            flush_pages(cache, cache->config.max_flushes_inline, false, false);
     }
 
     page_release(cache, page, true);
@@ -1035,12 +1100,12 @@ void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
 
-void pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
-    evict_pages(cache, max_skip, max_evict, false);
+bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
+    return evict_pages(cache, max_skip, max_evict, true, false);
 }
 
-void pgc_flush_pages(PGC *cache, size_t max_flushes) {
-    flush_pages(cache, max_flushes, false);
+bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
+    return flush_pages(cache, max_flushes, true, false);
 }
 
 void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t) {
@@ -1074,6 +1139,8 @@ struct {
     size_t collect_threads;
     size_t partitions;
     size_t points_per_page;
+    time_t time_per_collection_ut;
+    time_t time_per_query_ut;
     PGC_OPTIONS options;
     char rand_statebufs[1024];
     struct random_data *random_data;
@@ -1084,12 +1151,14 @@ struct {
         .hot_metrics     =   1000000,
         .first_time_t    = 100000000,
         .last_time_t     = 0,
-        .cache_size      = 32,
-        .collect_threads = 200,
-        .query_threads   = 1,
+        .cache_size      = 1024,
+        .collect_threads = 10,
+        .query_threads   = 10,
         .partitions      = 1000,
-        .options         = PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,
+        .options         = PGC_OPTIONS_NONE, // PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,
         .points_per_page = 50,
+        .time_per_collection_ut = 100000,
+        .time_per_query_ut = 100,
         .rand_statebufs  = {},
         .random_data     = NULL,
 };
@@ -1097,20 +1166,24 @@ struct {
 void *unittest_stress_test_collector(void *ptr) {
     size_t id = *((size_t *)ptr);
 
-    size_t start = pgc_uts.clean_metrics;
-    size_t end = pgc_uts.clean_metrics + pgc_uts.hot_metrics;
-    size_t all_metrics = end - start;
-    size_t per_collector_metrics = all_metrics / pgc_uts.collect_threads;
-    start = start + per_collector_metrics * id + 1;
-    end = start + per_collector_metrics - 1;
+    size_t metric_start = pgc_uts.clean_metrics;
+    size_t metric_end = pgc_uts.clean_metrics + pgc_uts.hot_metrics;
+    size_t number_of_metrics = metric_end - metric_start;
+    size_t per_collector_metrics = number_of_metrics / pgc_uts.collect_threads;
+    metric_start = metric_start + per_collector_metrics * id + 1;
+    metric_end = metric_start + per_collector_metrics - 1;
 
     time_t start_time_t = pgc_uts.first_time_t + 1;
 
+    heartbeat_t hb;
+    heartbeat_init(&hb);
+
     while(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-        time_t end_time_t = start_time_t + pgc_uts.points_per_page;
+        // info("COLLECTOR %zu: collecting metrics %zu to %zu, from %ld to %lu", id, metric_start, metric_end, start_time_t, start_time_t + pgc_uts.points_per_page);
+
         netdata_thread_disable_cancelability();
 
-        for (size_t i = start; i < end; i++) {
+        for (size_t i = metric_start; i < metric_end; i++)
             pgc_uts.metrics[i] = pgc_page_add_and_acquire(pgc_uts.cache, (PGC_ENTRY) {
                     .section = 1,
                     .metric_id = i,
@@ -1120,25 +1193,19 @@ void *unittest_stress_test_collector(void *ptr) {
                     .data = NULL,
                     .hot = true,
             });
-        }
 
-        for (++start_time_t; start_time_t < end_time_t; start_time_t++) {
-            for (size_t i = start; i < end; i++) {
+        time_t end_time_t = start_time_t + (time_t)pgc_uts.points_per_page;
+        while(++start_time_t <= end_time_t) {
+            heartbeat_next(&hb, pgc_uts.time_per_collection_ut);
+
+            for (size_t i = metric_start; i < metric_end; i++)
                 pgc_page_hot_set_end_time_t(pgc_uts.cache, pgc_uts.metrics[i], start_time_t);
-            }
+
             __atomic_store_n(&pgc_uts.last_time_t, start_time_t, __ATOMIC_RELAXED);
-
-            if(!__atomic_load_n(&pgc_uts.stop, __ATOMIC_RELAXED)) {
-                static const struct timespec wait_duration = {.tv_sec = 0, .tv_nsec = 50000000};
-                nanosleep(&wait_duration, NULL);
-            }
-            else
-                break;
         }
 
-        for (size_t i = start; i < end; i++) {
+        for (size_t i = metric_start; i < metric_end; i++)
             pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
-        }
 
         netdata_thread_enable_cancelability();
     }
@@ -1173,7 +1240,7 @@ void *unittest_stress_test_queries(void *ptr) {
         for(size_t i = 0; i < pages ;i++) {
             time_t page_start_time = start_time_t + (time_t)(i * pgc_uts.points_per_page);
             array[i] = pgc_page_get_and_acquire(pgc_uts.cache, 1, metric_id,
-                                                page_start_time, i == pages - 1);
+                                                page_start_time, i < pages - 1);
         }
 
         // load the rest of the pages
@@ -1194,6 +1261,8 @@ void *unittest_stress_test_queries(void *ptr) {
 
         // do the query
         // ...
+        struct timespec work_duration = {.tv_sec = 0, .tv_nsec = pgc_uts.time_per_query_ut * NSEC_PER_USEC };
+        nanosleep(&work_duration, NULL);
 
         // release the pages
         for(size_t i = 0; i < pages ;i++) {
@@ -1216,17 +1285,18 @@ static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENT
 
 static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
     // info("SAVE %zu pages", entries);
-    if(!pgc_uts.stop) {
-        static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 100000};
-        nanosleep(&work_duration, NULL);
-    }
+//    if(!pgc_uts.stop) {
+//        static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 10000};
+//        nanosleep(&work_duration, NULL);
+//    }
+    ;
 }
 
 void unittest_stress_test(void) {
     pgc_uts.cache = pgc_create(pgc_uts.cache_size * 1024 * 1024,
                                unittest_free_clean_page_callback,
                                64, unittest_save_dirty_page_callback,
-                               10, 1000, 10,
+                               10, 100, 2,
                                pgc_uts.options, pgc_uts.partitions);
 
     pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
@@ -1287,6 +1357,9 @@ void unittest_stress_test(void) {
     for(int i = 0; i < 86400 ;i++) {
         heartbeat_next(&hb, 1 * USEC_PER_SEC);
 
+        pgc_evict_pages(pgc_uts.cache, 1000000, 1000000);
+        pgc_flush_pages(pgc_uts.cache, 100000);
+
         old_stats = stats;
         stats.entries       = __atomic_load_n(&pgc_uts.cache->stats.entries, __ATOMIC_RELAXED);
         stats.added         = __atomic_load_n(&pgc_uts.cache->stats.added_entries, __ATOMIC_RELAXED);
@@ -1322,13 +1395,13 @@ void unittest_stress_test(void) {
 
         stats.collections = __atomic_load_n(&pgc_uts.cache->stats.points_collected, __ATOMIC_RELAXED);
 
-        info("PAGES %6zu k [+%5zu k/-%5zu k] "
+        info("PAGES %6zu k %s [+%5zu k/-%5zu k] "
              "| REF %6zu k "
              "| HOT %6zu k [+%5zu k/-%5zu k] "
              "| DIRTY %6zu k [+%5zu k/-%5zu k] "
              "| CLEAN %6zu k [+%5zu k/-%5zu k] "
              "| SEARCH %6zu k / %6zu k, HIT %5.1f %% %5.1f %%, COLL %5.1f M points"
-             , stats.entries / 1000, (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
+             , stats.entries / 1000, is_pgc_full(pgc_uts.cache) ? "F" : "N", (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
              , stats.referenced / 1000
              , stats.hot_entries / 1000, (stats.hot_added - old_stats.hot_added) / 1000, (stats.hot_deleted - old_stats.hot_deleted) / 1000
              , stats.dirty_entries / 1000, (stats.dirty_added - old_stats.dirty_added) / 1000, (stats.dirty_deleted - old_stats.dirty_deleted) / 1000

@@ -61,7 +61,8 @@ void *pgc_page_data(PGC_PAGE *page);
 // resetting the end time of a hot page
 void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
 
-void pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
-void pgc_flush_pages(PGC *cache, size_t max_flushes);
+// return true when there is more work to do
+bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
+bool pgc_flush_pages(PGC *cache, size_t max_flushes);
 
 #endif // DBENGINE_CACHE_H
