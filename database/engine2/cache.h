@@ -57,6 +57,9 @@ time_t pgc_page_start_time_t(PGC_PAGE *page);
 time_t pgc_page_end_time_t(PGC_PAGE *page);
 time_t pgc_page_update_every(PGC_PAGE *page);
 void *pgc_page_data(PGC_PAGE *page);
+bool pgc_is_page_hot(PGC_PAGE *page);
+bool pgc_is_page_dirty(PGC_PAGE *page);
+bool pgc_is_page_clean(PGC_PAGE *page);
 
 // resetting the end time of a hot page
 void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
