@@ -1270,6 +1270,10 @@ void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
 
+size_t pgc_page_data_size(PGC_PAGE *page) {
+    return page_size_from_assumed_size(page->assumed_size);
+}
+
 bool pgc_is_page_hot(PGC_PAGE *page) {
     return is_page_hot(page);
 }
@@ -1371,6 +1375,7 @@ void *unittest_stress_test_collector(void *ptr) {
                     .metric_id = i,
                     .start_time_t = start_time_t,
                     .end_time_t = start_time_t,
+                    .update_every = 1,
                     .size = 4096,
                     .data = NULL,
                     .hot = true,
@@ -1445,7 +1450,8 @@ void *unittest_stress_test_queries(void *ptr) {
                     .section = 1,
                     .metric_id = metric_id,
                     .start_time_t = page_start_time,
-                    .end_time_t = page_start_time + pgc_uts.points_per_page,
+                    .end_time_t = page_start_time + (time_t)pgc_uts.points_per_page,
+                    .update_every = 1,
                     .size = 4096,
                     .data = NULL,
                     .hot = false,

@@ -57,6 +57,7 @@ time_t pgc_page_start_time_t(PGC_PAGE *page);
 time_t pgc_page_end_time_t(PGC_PAGE *page);
 time_t pgc_page_update_every(PGC_PAGE *page);
 void *pgc_page_data(PGC_PAGE *page);
+size_t pgc_page_data_size(PGC_PAGE *page);
 bool pgc_is_page_hot(PGC_PAGE *page);
 bool pgc_is_page_dirty(PGC_PAGE *page);
 bool pgc_is_page_clean(PGC_PAGE *page);
