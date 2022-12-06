@@ -1237,16 +1237,30 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  * Update Internal value
  *
  * Update values used during runtime.
+ *
+ * @return It returns 0 when one of the functions is present and -1 otherwise.
  */
-static void ebpf_cachestat_set_internal_value()
+static int ebpf_cachestat_set_internal_value()
 {
-    static char *account_page[] = { "account_page_dirtied", "__set_page_dirty", "__folio_mark_dirty"  };
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_FOLIO_DIRTY];
-    else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY];
-    else
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY];
+    static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
+                                                                      "__set_page_dirty", "__folio_mark_dirty"  };
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    int i;
+    for (i = 0; i < NETDATA_CACHESTAT_ACCOUNT_DIRTY_END ; i++) {
+        address.function = account_page[i];
+        ebpf_load_addresses(&address, -1);
+        if (address.addr)
+            break;
+    }
+
+    if (!address.addr) {
+        error("Cannot find the necessary functions to monitor cachestat");
+        return -1;
+    }
+
+    cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = address.function;
+
+    return 0;
 }
 
 /*
@@ -1300,7 +1314,10 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
-    ebpf_cachestat_set_internal_value();
+    if (ebpf_cachestat_set_internal_value()) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        goto endcachestat;
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
