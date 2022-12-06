@@ -44,7 +44,7 @@ There is a known issue with [Docker Engine on Fedora](https://docs.docker.com/en
 into a container hangs and consumes 100% of the CPU core. The issue is not Netdata specific. When setting the `nofile`
 ulimit, the task performs normally.
 
-Add the following to the `/etc/docker/daemon.json` file and restart `docker.service`:
+To fix the issue, add the following to the `/etc/docker/daemon.json` file and restart `docker.service`:
 
 ```json
 {
