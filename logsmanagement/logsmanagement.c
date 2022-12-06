@@ -198,16 +198,17 @@ static void logs_management_init(struct section *config_section){
         !strcmp(p_file_info->filename, "auto") /* Only valid for FLB_SYSTEMD or FLB_DOCKER_EV */ || 
         access(p_file_info->filename, F_OK)){ 
             
-        freez(p_file_info->filename);
         switch(p_file_info->log_type){
             case FLB_SYSTEMD:
+                freez(p_file_info->filename);
                 p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
                 break;
             case FLB_DOCKER_EV:
+                freez(p_file_info->filename);
                 p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
                 break;
             default:
-                error(  "[%s]: log type = %s", p_file_info->chart_name, 
+                error(  "[%s]: log path = %s", p_file_info->chart_name, 
                         p_file_info->filename ? p_file_info->filename : "NULL!");
                 return p_file_info_destroy(p_file_info);
         }
