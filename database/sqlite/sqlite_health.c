@@ -605,7 +605,7 @@ void sql_check_removed_alerts_state(char *uuid_str)
 /* Health related SQL queries
    Load from the health log table
 */
-#define SQL_LOAD_HEALTH_LOG(guid,limit) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM (SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type, chart_context FROM health_log_%s order by unique_id desc limit %u) order by unique_id asc;", guid, limit
+#define SQL_LOAD_HEALTH_LOG(guid) "SELECT hostname, unique_id, alarm_id, alarm_event_id, config_hash_id, updated_by_id, updates_id, when_key, duration, non_clear_duration, flags, exec_run_timestamp, delay_up_to_timestamp, name, chart, family, exec, recipient, source, units, info, exec_code, new_status, old_status, delay, new_value, old_value, last_repeat, class, component, type FROM health_log_%s group by alarm_id having max(alarm_event_id);", guid
 void sql_health_alarm_log_load(RRDHOST *host) {
     sqlite3_stmt *res = NULL;
     int ret;
@@ -625,7 +625,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
 
     sql_check_removed_alerts_state(uuid_str);
 
-    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str, host->health_log.max));
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, SQL_LOAD_HEALTH_LOG(uuid_str));
 
     ret = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(ret != SQLITE_OK)) {
@@ -1122,4 +1122,35 @@ int alert_hash_and_store_config(
 #endif
 
     return 1;
+}
+
+int sql_health_get_last_executed_event(RRDHOST *host, ALARM_ENTRY *ae, RRDCALC_STATUS *last_executed_status)
+{
+    int rc = 0, ret = -1;
+    char command[MAX_HEALTH_SQL_SIZE + 1];
+
+    char uuid_str[GUID_LEN + 1];
+    uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
+
+    sqlite3_stmt *res = NULL;
+
+    snprintfz(command, MAX_HEALTH_SQL_SIZE, "select new_status from health_log_%s where alarm_id = %u and unique_id != %u and flags & %d order by unique_id desc LIMIT 1", uuid_str, ae->alarm_id, ae->unique_id, HEALTH_ENTRY_FLAG_EXEC_RUN);
+
+    rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to get last executed status");
+        return ret;
+    }
+
+    ret = 0;
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+        *last_executed_status  = (RRDCALC_STATUS) sqlite3_column_int(res, 0);
+        ret = 1;
+    }
+
+     rc = sqlite3_finalize(res);
+     if (unlikely(rc != SQLITE_OK))
+         error_report("Failed to finalize the statement.");
+
+     return ret;
 }

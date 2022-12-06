@@ -404,17 +404,12 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     // find the previous notification for the same alarm
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
+    RRDCALC_STATUS last_executed_status = -3;
     if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
-        uint32_t id = ae->alarm_id;
-        ALARM_ENTRY *t;
-        for(t = ae->next; t ; t = t->next) {
-            if(t->alarm_id == id && t->flags & HEALTH_ENTRY_FLAG_EXEC_RUN)
-                break;
-        }
+        int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status);
 
-        if(likely(t)) {
-            // we have executed this alarm notification in the past
-            if(t && t->new_status == ae->new_status) {
+        if (likely(ret == 1)) {
+            if(last_executed_status == ae->new_status) {
                 // don't send the notification for the same status again
                 debug(D_HEALTH, "Health not sending again notification for alarm '%s.%s' status %s", ae_chart_name(ae), ae_name(ae)
                       , rrdcalc_status2string(ae->new_status));
@@ -429,7 +424,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
                 if((!(ae->flags & HEALTH_ENTRY_RUN_ONCE)) || (ae->flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
                     debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
-                    , ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
+                          , ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
                     goto done;
                 }
             }
@@ -553,6 +548,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
         ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
         ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
         enqueue_alarm_notify_in_progress(ae);
+        health_alarm_log_save(host, ae);
     } else {
         error("Failed to format command arguments");
     }
@@ -574,6 +570,7 @@ static inline void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 
     spawn_wait_cmd(ae->exec_spawn_serial, &ae->exec_code, &ae->exec_run_timestamp);
     debug(D_HEALTH, "done executing command - returned with code %d", ae->exec_code);
+
     ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
 
     if(ae->exec_code != 0)
@@ -620,35 +617,29 @@ static inline void health_alarm_log_process(RRDHOST *host) {
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
 
-    bool cleanup_excess_log_entries = host->health_log.count > host->health_log.max;
-
-    if (!cleanup_excess_log_entries)
-        return;
-
-    // cleanup excess entries in the log
+    //delete those that are updated, wait for execution ok, and is not repeating
     netdata_rwlock_wrlock(&host->health_log.alarm_log_rwlock);
 
-    ALARM_ENTRY *last = NULL;
-    unsigned int count = host->health_log.max * 2 / 3;
-    for(ae = host->health_log.alarms; ae && count ; count--, last = ae, ae = ae->next) ;
+    ALARM_ENTRY *prev = host->health_log.alarms;
+    for(ae = host->health_log.alarms; ae ; ae = ae->next) {
 
-    if(ae && last && last->next == ae)
-        last->next = NULL;
-    else
-        ae = NULL;
+        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
+           (ae->flags & HEALTH_ENTRY_FLAG_SAVED)) {
 
-    while(ae) {
-        debug(D_HEALTH, "Health removing alarm log entry with id: %u", ae->unique_id);
+            if (ae == host->health_log.alarms) {
+                host->health_log.alarms = ae->next;
+                prev = ae->next;
+            } else {
+                prev->next = ae->next;
+            }
 
-        ALARM_ENTRY *t = ae->next;
-
-        if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING))) {
             health_alarm_wait_for_execution(ae);
             health_alarm_log_free_one_nochecks_nounlink(ae);
-            host->health_log.count--;
+            ae = prev;
         }
-
-        ae = t;
+        else
+            prev = ae;
     }
 
     netdata_rwlock_unlock(&host->health_log.alarm_log_rwlock);
