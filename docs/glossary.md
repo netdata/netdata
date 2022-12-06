@@ -87,7 +87,7 @@ Use the alphabatized list below to find the answer to your single-term questions
 - [**Health Configuration Files**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
 - [**Health Entity Reference**](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md#health-entity-reference):
--
+
 - [**High Fidelity** or **High Fidelity Architecture**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/high-fidelity-monitoring.md): We consider Netdata's monitoring solution "high fidelity" because it provides real time metrics so you can view metrics/changes in seconds since their occur, the highest resolution of metrics to allow you to observe changes occur between seconds, gixed step metric collection to allow you to quantify your observation windows, and unlimited data to search for patterns in data that you don't even believe they are correlated.
 
 - [**Home** tab](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md#home): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the War Room.
