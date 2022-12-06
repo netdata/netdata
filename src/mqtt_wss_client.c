@@ -144,6 +144,10 @@ struct mqtt_wss_client_struct {
 
     pthread_mutex_t stat_lock;
     struct mqtt_wss_stats stats;
+
+#ifdef MQTT_WSS_DEBUG
+    void (*ssl_ctx_keylog_cb)(const SSL *ssl, const char *line);
+#endif
 };
 
 static void mws_connack_callback(struct mqtt_client* client, enum MQTTConnackReturnCode code)
@@ -796,6 +800,11 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
     } else
         mws_error(client->log, "SSL Certificate checking completely disabled!!!");
+
+#ifdef MQTT_WSS_DEBUG
+    if(client->ssl_ctx_keylog_cb)
+        SSL_CTX_set_keylog_callback(client->ssl_ctx, client->ssl_ctx_keylog_cb);
+#endif
 
     client->ssl = SSL_new(client->ssl_ctx);
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
@@ -1497,3 +1506,10 @@ struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
     pthread_mutex_unlock(&client->stat_lock);
     return current;
 }
+
+#ifdef MQTT_WSS_DEBUG
+void mqtt_wss_set_SSL_CTX_keylog_cb(mqtt_wss_client client, void (*ssl_ctx_keylog_cb)(const SSL *ssl, const char *line))
+{
+    client->ssl_ctx_keylog_cb = ssl_ctx_keylog_cb;
+}
+#endif
