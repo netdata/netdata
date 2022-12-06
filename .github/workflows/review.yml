@@ -152,7 +152,7 @@ jobs:
           reporter: github-pr-check
           path: "."
           pattern: "*.sh*"
-          exclude: "./.git/*"
+          exclude: "./.git/* ./fluent-bit/*"
 
   yamllint:
     name: yamllint
