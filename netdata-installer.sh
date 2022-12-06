@@ -910,15 +910,17 @@ build_fluentbit() {
   mkdir -p fluent-bit/build || return 1
   cd fluent-bit/build > /dev/null || return 1
   
-  rm CMakeCache.txt
+  rm CMakeCache.txt > /dev/null 2>&1
 
   if ! run eval "${env_cmd} $1 -DCMAKE_INSTALL_PREFIX=/usr -C ../../logsmanagement/fluent_bit_build/config.cmake -B./ -S../"; then
     cd - > /dev/null || return 1
+    rm -rf fluent-bit/build > /dev/null 2>&1
     return 1
   fi
 
   if ! run eval "${env_cmd} ${make} ${MAKEOPTS}"; then
     cd - > /dev/null || return 1
+    rm -rf fluent-bit/build > /dev/null 2>&1
     return 1
   fi
   
