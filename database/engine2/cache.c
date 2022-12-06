@@ -134,6 +134,8 @@ struct pgc {
         size_t search_spins;
         size_t insert_spins;
         size_t evict_spins;
+        size_t release_spins;
+        size_t acquire_spins;
 
         size_t evict_skipped;
         size_t *pages_added_per_partition;
@@ -397,14 +399,20 @@ static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_SEQ_CST);
+    size_t spins = 0;
 
     do {
+        spins++;
+
         if(expected < 0)
             return false;
 
         desired = expected + 1;
 
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED));
+    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    if(spins > 1)
+        __atomic_add_fetch(&cache->stats.acquire_spins, spins - 1, __ATOMIC_RELAXED);
 
     if(desired == 1)
         PGC_REFERENCED_PAGES_PLUS1(cache, page);
@@ -415,17 +423,24 @@ static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
 }
 
 static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necessary) {
+
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_SEQ_CST);
 
+    size_t spins = 0;
     do {
+        spins++;
+
         if(expected <= 0)
             fatal("DBENGINE CACHE: trying to release a page with reference counter %d", expected);
 
         desired = expected - 1;
 
-    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED));
+    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    if(spins > 1)
+        __atomic_add_fetch(&cache->stats.release_spins, spins - 1, __ATOMIC_RELAXED);
 
     if(desired == 0) {
         PGC_REFERENCED_PAGES_MINUS1(cache, page);
@@ -445,7 +460,7 @@ static inline bool page_get_for_deletion(PGC *cache __maybe_unused, PGC_PAGE *pa
 
     desired = REFCOUNT_DELETING;
 
-    bool ret = __atomic_compare_exchange_n(&page->refcount, &expected, desired, true, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    bool ret = __atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
 
     return ret;
 }
@@ -606,7 +621,7 @@ static void evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool all_
         __atomic_add_fetch(&cache->stats.evict_skipped, skips, __ATOMIC_RELAXED);
 
     if(unlikely(spins > 1))
-        __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.evict_spins, spins - 1, __ATOMIC_RELAXED);
 
     netdata_spinlock_unlock(&cache->evictions_lock);
 }
@@ -673,7 +688,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
     } while(!page);
 
     if(unlikely(spins > 1))
-        __atomic_add_fetch(&cache->stats.insert_spins, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.insert_spins, spins - 1, __ATOMIC_RELAXED);
 
     if(cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE || is_pgc_full(cache))
         evict_pages(cache,
@@ -770,7 +785,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
 
     if(unlikely(spins > 1))
-        __atomic_add_fetch(&cache->stats.search_spins, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
 
     return page;
 }
@@ -1059,6 +1074,7 @@ struct {
     size_t collect_threads;
     size_t partitions;
     size_t points_per_page;
+    PGC_OPTIONS options;
     char rand_statebufs[1024];
     struct random_data *random_data;
 } pgc_uts = {
@@ -1069,9 +1085,10 @@ struct {
         .first_time_t    = 100000000,
         .last_time_t     = 0,
         .cache_size      = 32,
-        .collect_threads = 1,
+        .collect_threads = 200,
         .query_threads   = 1,
-        .partitions      = 1,
+        .partitions      = 1000,
+        .options         = PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,
         .points_per_page = 50,
         .rand_statebufs  = {},
         .random_data     = NULL,
@@ -1200,7 +1217,7 @@ static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENT
 static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
     // info("SAVE %zu pages", entries);
     if(!pgc_uts.stop) {
-        static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 1000000};
+        static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 100000};
         nanosleep(&work_duration, NULL);
     }
 }
@@ -1210,7 +1227,7 @@ void unittest_stress_test(void) {
                                unittest_free_clean_page_callback,
                                64, unittest_save_dirty_page_callback,
                                10, 1000, 10,
-                               PGC_OPTIONS_DEFAULT, 1);
+                               pgc_uts.options, pgc_uts.partitions);
 
     pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
 
@@ -1267,7 +1284,7 @@ void unittest_stress_test(void) {
         size_t collections;
     } stats = {}, old_stats = {};
 
-    for(int i = 0; i < 60 ;i++) {
+    for(int i = 0; i < 86400 ;i++) {
         heartbeat_next(&hb, 1 * USEC_PER_SEC);
 
         old_stats = stats;
@@ -1340,7 +1357,7 @@ int pgc_unittest(void) {
     PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, unittest_save_dirty_page_callback,
                             10, 1000, 10,
-                            PGC_OPTIONS_DEFAULT, pgc_uts.partitions);
+                            PGC_OPTIONS_DEFAULT, 1);
 
     // FIXME - unit tests
     // - add clean page
