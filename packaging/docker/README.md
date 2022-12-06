@@ -40,9 +40,9 @@ and unfortunately not something we can realistically work around.
 <details>
 <summary>Prerequisite steps for Fedora users</summary>
 
-There is a known issue with [Docker Engine on Fedora](https://docs.docker.com/engine/install/fedora/) where a task ran
-into a container hangs and consumes 100% of the CPU core. The issue is not Netdata specific. When setting the `nofile`
-ulimit, the task performs normally.
+There is a known issue with [Docker Engine on Fedora](https://docs.docker.com/engine/install/fedora/) where a task
+running in a container hangs and consumes 100% of the CPU core. The issue is not Netdata specific. When setting
+the `nofile` ulimit, the task performs normally.
 
 To fix the issue, add the following to the `/etc/docker/daemon.json` file and restart `docker.service`:
 
