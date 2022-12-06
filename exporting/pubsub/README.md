@@ -6,7 +6,7 @@ sidebar_label: Google Cloud Pub/Sub Service
 learn_status: "Published"
 learn_topic_type: "References"
 learn_rel_path: "References/Exporting references"
-learn_autogeneration_metadata: "[(part_of_cloud,false), (part_of_agent,true)]"
+learn_autogeneration_metadata: "{part_of_cloud: False, part_of_agent: True}"
 -->
 
 # Export metrics to Google Cloud Pub/Sub Service
