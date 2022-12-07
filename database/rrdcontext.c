@@ -29,7 +29,7 @@
 #define WORKER_JOB_PP_QUEUE_SIZE   13
 
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_NONE           = 0,
     RRD_FLAG_DELETED        = (1 << 0), // this is a deleted object (metrics, instances, contexts)
     RRD_FLAG_COLLECTED      = (1 << 1), // this object is currently being collected
@@ -115,6 +115,7 @@ typedef enum {
 static inline void
 rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditionally_add, RRD_FLAGS always_remove) {
     RRD_FLAGS expected, desired;
+
     do {
         expected = *flags;
 
@@ -2435,7 +2436,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
         else
-            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid, NULL);
+            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid);
 
         if(tier_retention[tier].db_metric_handle) {
             tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);

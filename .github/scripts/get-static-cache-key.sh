@@ -12,4 +12,4 @@ docker run -it --rm --platform "${platform}" netdata/static-builder sh -c 'apk l
 
 h="$(sha256sum /tmp/static-cache-key-data | cut -f 1 -d ' ')"
 
-echo "::set-output name=key::static-${arch}-${h}"
+echo "key=static-${arch}-${h}" >> "${GITHUB_OUTPUT}"
