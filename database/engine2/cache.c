@@ -1691,17 +1691,21 @@ void unittest_stress_test(void) {
 
         stats.collections = __atomic_load_n(&pgc_uts.cache->stats.points_collected, __ATOMIC_RELAXED);
 
-        info("PAGES %6zu k %s [+%5zu k/-%5zu k] "
-             "| REF %6zu k "
-             "| HOT %6zu k [+%5zu k/-%5zu k] "
-             "| DIRTY %6zu k [+%5zu k/-%5zu k] "
-             "| CLEAN %6zu k [+%5zu k/-%5zu k] "
-             "| SEARCH %6zu k / %6zu k, HIT %5.1f %% %5.1f %%, COLL %5.1f M points"
-             , stats.entries / 1000, is_pgc_full(pgc_uts.cache) ? "F" : is_pgc_90full(pgc_uts.cache) ? "f" : "N", (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
+        info("PGS %5zuk +%4zuk/-%4zuk "
+             "| RF %5zuk "
+             "| HOT %5zuk +%4zuk -%4zuk "
+             "| DRT %5zuk +%4zuk -%4zuk "
+             "| CLN %5zuk %s +%4zuk -%4zuk "
+             "| SRCH %4zuk %4zuk, HIT %4.1f%% %4.1f%% "
+             "| CLCT %4.1f Mps"
+             , stats.entries / 1000
+             , (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
              , stats.referenced / 1000
              , stats.hot_entries / 1000, (stats.hot_added - old_stats.hot_added) / 1000, (stats.hot_deleted - old_stats.hot_deleted) / 1000
              , stats.dirty_entries / 1000, (stats.dirty_added - old_stats.dirty_added) / 1000, (stats.dirty_deleted - old_stats.dirty_deleted) / 1000
-             , stats.clean_entries / 1000, (stats.clean_added - old_stats.clean_added) / 1000, (stats.clean_deleted - old_stats.clean_deleted) / 1000
+             , stats.clean_entries / 1000
+             , is_pgc_full(pgc_uts.cache) ? "F" : is_pgc_90full(pgc_uts.cache) ? "f" : "N"
+             , (stats.clean_added - old_stats.clean_added) / 1000, (stats.clean_deleted - old_stats.clean_deleted) / 1000
              , searches_exact / 1000, searches_closest / 1000
              , hit_exact_pc, hit_closest_pc
              , (double)(stats.collections - old_stats.collections) / 1000.0 / 1000.0
