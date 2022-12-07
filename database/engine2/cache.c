@@ -1083,15 +1083,6 @@ static void all_hot_pages_to_dirty(PGC *cache) {
     pgc_ll_unlock(cache, &cache->hot);
 }
 
-static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
-        *first = false;
-        return JudyLFirst(PArray, PIndex, PJE0);
-    }
-
-    return JudyLNext(PArray, PIndex, PJE0);
-}
-
 // returns true when there is more work to do
 static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_them) {
     if(all_of_them || wait)

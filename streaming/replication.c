@@ -844,15 +844,6 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
     replication_recursive_unlock();
 }
 
-static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
-    if(unlikely(*first)) {
-        *first = false;
-        return JudyLFirst(PArray, PIndex, PJE0);
-    }
-
-    return JudyLNext(PArray, PIndex, PJE0);
-}
-
 static struct replication_request replication_request_get_first_available() {
     Pvoid_t *inner_judy_pptr;
 

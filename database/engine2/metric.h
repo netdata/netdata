@@ -14,6 +14,9 @@ typedef struct mrg_entry {
     time_t latest_update_every;
 } MRG_ENTRY;
 
+MRG *mrg_create(void);
+void mrg_destroy(MRG *mrg);
+
 METRIC *mrg_metric_add(MRG *mrg, MRG_ENTRY entry, bool *ret);
 METRIC *mrg_metric_get(MRG *mrg, uuid_t *uuid, Word_t section);
 bool mrg_metric_del(MRG *mrg, METRIC *metric);

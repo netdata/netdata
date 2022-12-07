@@ -17,7 +17,46 @@ struct mrg {
         Pvoid_t uuid_judy;          // each UUID has a JudyL of sections (tiers)
         Pvoid_t ptr_judy;           // reverse pointer lookup
     } index;
+
+    struct {
+        size_t entries;
+        size_t size;                // memory without indexing
+        size_t additions;
+        size_t additions_duplicate;
+        size_t deletions;
+        size_t delete_misses;
+        size_t search_hits;
+        size_t search_misses;
+    } stats;
 };
+
+static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.additions_duplicate, 1, __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_ADDED_METRIC(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->stats.additions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->stats.size, sizeof(METRIC), __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_DELETED_METRIC(MRG *mrg) {
+    __atomic_sub_fetch(&mrg->stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->stats.size, sizeof(METRIC), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->stats.deletions, 1, __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_SEARCH_HIT(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.search_hits, 1, __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_SEARCH_MISS(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.search_misses, 1, __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_DELETE_MISS(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.delete_misses, 1, __ATOMIC_RELAXED);
+}
 
 static void mrg_index_read_lock(MRG *mrg) {
     netdata_rwlock_rdlock(&mrg->index.rwlock);
@@ -63,6 +102,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         if(ret)
             *ret = false;
 
+        MRG_STATS_DUPLICATE_ADD(mrg);
         return metric;
     }
 
@@ -89,6 +129,8 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     if(ret)
         *ret = true;
 
+    MRG_STATS_ADDED_METRIC(mrg);
+
     return metric;
 }
 
@@ -98,12 +140,14 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, uuid, sizeof(uuid_t));
     if(!sections_judy_pptr) {
         mrg_index_read_unlock(mrg);
+        MRG_STATS_SEARCH_MISS(mrg);
         return NULL;
     }
 
     Pvoid_t *PValue = JudyLGet(*sections_judy_pptr, section, PJE0);
     if(!PValue) {
         mrg_index_read_unlock(mrg);
+        MRG_STATS_SEARCH_MISS(mrg);
         return NULL;
     }
 
@@ -114,14 +158,19 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
 
     mrg_index_read_unlock(mrg);
 
+    MRG_STATS_SEARCH_HIT(mrg);
     return metric;
 }
 
-static bool metric_del(MRG *mrg, METRIC *metric) {
-    mrg_index_write_lock(mrg);
+static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
+    if(!having_write_lock)
+        mrg_index_write_lock(mrg);
 
     if(!JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0)) {
-        mrg_index_write_unlock(mrg);
+        if(!having_write_lock)
+            mrg_index_write_unlock(mrg);
+
+        MRG_STATS_DELETE_MISS(mrg);
         return false;
     }
 
@@ -133,19 +182,52 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
         fatal("DBENGINE METRIC: metric not found in sections judy");
 
     if(!*sections_judy_pptr) {
-        if(!JudyHSDel(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0))
+        if(!JudyHSDel(&mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0))
             fatal("DBENGINE METRIC: cannot delete UUID from judy");
     }
 
-    mrg_index_write_unlock(mrg);
+    if(!having_write_lock)
+        mrg_index_write_unlock(mrg);
 
     freez(metric);
 
+    MRG_STATS_DELETED_METRIC(mrg);
     return true;
 }
 
 // ----------------------------------------------------------------------------
 // public API
+
+MRG *mrg_create(void) {
+    MRG *mrg = callocz(1, sizeof(MRG));
+    netdata_rwlock_init(&mrg->index.rwlock);
+    mrg->stats.size = sizeof(MRG);
+    return mrg;
+}
+
+void mrg_destroy(MRG *mrg) {
+    bool first = true;
+    Pvoid_t *PValue;
+    Word_t index = 0;
+
+    mrg_index_write_lock(mrg);
+
+    while((PValue = JudyLFirstThenNext(mrg->index.ptr_judy, &index, &first))) {
+        METRIC *metric = *PValue;
+        if(!metric_del(mrg, metric, true))
+            fatal("DBENGINE METRIC: failed to delete metric");
+    }
+
+    if(mrg->index.ptr_judy)
+        fatal("DBENGINE METRIC: pointer judy should be empty, but it is not.");
+
+    if(mrg->index.uuid_judy)
+        fatal("DBENGINE METRIC: uuid judy array should be empty, but it is not.");
+
+    mrg_index_write_unlock(mrg);
+
+    freez(mrg);
+}
 
 METRIC *mrg_metric_add(MRG *mrg, MRG_ENTRY entry, bool *ret) {
     return metric_add(mrg, &entry, ret);
@@ -156,7 +238,7 @@ METRIC *mrg_metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
 }
 
 bool mrg_metric_del(MRG *mrg, METRIC *metric) {
-    return metric_del(mrg, metric);
+    return metric_del(mrg, metric, false);
 }
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
@@ -216,4 +298,233 @@ time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric) {
         return 0;
 
     return __atomic_load_n(&metric->latest_update_every, __ATOMIC_ACQUIRE);
+}
+
+// ----------------------------------------------------------------------------
+// unit test
+
+static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
+    bool ret;
+
+    info("DBENGINE METRIC: stress testing %zu entries on %zu sections...", entries, sections);
+
+    METRIC *array[entries][sections];
+    for(size_t i = 0; i < entries ; i++) {
+        MRG_ENTRY e = {
+                .first_time_t = (time_t)i,
+                .latest_time_t = (time_t)(i + 1),
+                .latest_update_every = (time_t)(i + 2),
+        };
+        uuid_generate_random(e.uuid);
+
+        for(size_t section = 0; section < sections ;section++) {
+            e.section = section;
+            array[i][section] = mrg_metric_add(mrg, e, &ret);
+            if(!ret)
+                fatal("DBENGINE METRIC: failed to add metric %zu, section %zu", i, section);
+
+            if(mrg_metric_add(mrg, e, &ret) != array[i][section])
+                fatal("DBENGINE METRIC: adding the same metric twice, returns a different metric");
+
+            if(ret)
+                fatal("DBENGINE METRIC: adding the same metric twice, returns success");
+
+            if(mrg_metric_get(mrg, &e.uuid, e.section) != array[i][section])
+                fatal("DBENGINE METRIC: cannot get back the same metric");
+
+            if(uuid_compare(*mrg_metric_uuid(mrg, array[i][section]), e.uuid) != 0)
+                fatal("DBENGINE METRIC: uuids do not match");
+        }
+    }
+
+    for(size_t i = 0; i < entries ; i++) {
+        for (size_t section = 0; section < sections; section++) {
+            if(mrg_metric_id(mrg, array[i][section]) != (Word_t)array[i][section])
+                fatal("DBENGINE METRIC: metric id does not match");
+
+            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)i)
+                fatal("DBENGINE METRIC: wrong first time returned");
+            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i + 1))
+                fatal("DBENGINE METRIC: wrong latest time returned");
+            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i + 2))
+                fatal("DBENGINE METRIC: wrong latest time returned");
+
+            if(!mrg_metric_set_first_time_t(mrg, array[i][section], (time_t)(i * 2)))
+                fatal("DBENGINE METRIC: cannot set first time");
+            if(!mrg_metric_set_latest_time_t(mrg, array[i][section], (time_t)(i * 3)))
+                fatal("DBENGINE METRIC: cannot set latest time");
+            if(!mrg_metric_set_update_every(mrg, array[i][section], (time_t)(i * 4)))
+                fatal("DBENGINE METRIC: cannot set update every");
+
+            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)(i * 2))
+                fatal("DBENGINE METRIC: wrong first time returned");
+            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i * 3))
+                fatal("DBENGINE METRIC: wrong latest time returned");
+            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i * 4))
+                fatal("DBENGINE METRIC: wrong latest time returned");
+        }
+    }
+
+    for(size_t i = 0; i < entries ; i++) {
+        for (size_t section = 0; section < sections; section++) {
+            if(!mrg_metric_del(mrg, array[i][section]))
+                fatal("DBENGINE METRIC: failed to delete metric");
+            if(mrg_metric_del(mrg, array[i][section]))
+                fatal("DBENGINE METRIC: managed to delete the same metric twice");
+            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != 0)
+                fatal("DBENGINE METRIC: got first time on deleted metric");
+            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != 0)
+                fatal("DBENGINE METRIC: got latest time on deleted metric");
+            if(mrg_metric_get_update_every(mrg, array[i][section]) != 0)
+                fatal("DBENGINE METRIC: got updated every on deleted metric");
+            if(mrg_metric_set_first_time_t(mrg, array[i][section], 1))
+                fatal("DBENGINE METRIC: set first time on deleted metric");
+            if(mrg_metric_set_latest_time_t(mrg, array[i][section], 1))
+                fatal("DBENGINE METRIC: set latest time on deleted metric");
+            if(mrg_metric_set_update_every(mrg, array[i][section], 1))
+                fatal("DBENGINE METRIC: set update every on deleted metric");
+        }
+    }
+}
+
+static void *mrg_stress_test_thread1(void *ptr) {
+    MRG *mrg = ptr;
+
+    for(int i = 0; i < 5 ; i++)
+        mrg_stress(mrg, 10000, 5);
+
+    return ptr;
+}
+
+static void *mrg_stress_test_thread2(void *ptr) {
+    MRG *mrg = ptr;
+
+    for(int i = 0; i < 10 ; i++)
+        mrg_stress(mrg, 500, 50);
+
+    return ptr;
+}
+
+static void *mrg_stress_test_thread3(void *ptr) {
+    MRG *mrg = ptr;
+
+    for(int i = 0; i < 50 ; i++)
+        mrg_stress(mrg, 5000, 1);
+
+    return ptr;
+}
+
+int mrg_unittest(void) {
+    MRG *mrg = mrg_create();
+    METRIC *metric1, *metric2;
+    bool ret;
+
+    MRG_ENTRY entry = {
+            .section = 1,
+            .first_time_t = 2,
+            .latest_time_t = 3,
+            .latest_update_every = 4,
+    };
+    uuid_generate(entry.uuid);
+    metric1 = mrg_metric_add(mrg, entry, &ret);
+    if(!ret)
+        fatal("DBENGINE METRIC: failed to add metric");
+
+    // add the same metric again
+    if(mrg_metric_add(mrg, entry, &ret) != metric1)
+        fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
+    if(ret)
+        fatal("DBENGINE METRIC: managed to add the same metric twice");
+
+    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric1)
+        fatal("DBENGINE METRIC: cannot find the metric added");
+
+    // add the same metric again
+    if(mrg_metric_add(mrg, entry, &ret) != metric1)
+        fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
+    if(ret)
+        fatal("DBENGINE METRIC: managed to add the same metric twice");
+
+    // add the same metric in another section
+    entry.section = 0;
+    metric2 = mrg_metric_add(mrg, entry, &ret);
+    if(!ret)
+        fatal("DBENGINE METRIC: failed to add metric in different section");
+
+    // add the same metric again
+    if(mrg_metric_add(mrg, entry, &ret) != metric2)
+        fatal("DBENGINE METRIC: adding the same metric twice (section 0), does not return the same pointer");
+    if(ret)
+        fatal("DBENGINE METRIC: managed to add the same metric twice in (section 0)");
+
+    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+        fatal("DBENGINE METRIC: cannot find the metric added (section 0)");
+
+    // delete the first metric
+    if(!mrg_metric_del(mrg, metric1))
+        fatal("DBENGINE METRIC: cannot delete the first metric");
+
+    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+        fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one");
+
+    // delete the first metric again - metric1 pointer is invalid now
+    if(mrg_metric_del(mrg, metric1))
+        fatal("DBENGINE METRIC: deleted again an already deleted metric");
+
+    // find the section 0 metric again
+    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+        fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one twice");
+
+    // delete the second metric
+    if(!mrg_metric_del(mrg, metric2))
+        fatal("DBENGINE METRIC: cannot delete the second metric");
+
+    // delete the second metric again
+    if(mrg_metric_del(mrg, metric2))
+        fatal("DBENGINE METRIC: managed to delete an already deleted metric");
+
+    if(mrg->stats.entries != 0)
+        fatal("DBENGINE METRIC: invalid entries counter");
+
+    if(mrg->index.uuid_judy != NULL || mrg->index.ptr_judy != NULL)
+        fatal("DBENGINE METRIC: judy arrays should be empty but they are not");
+
+    usec_t started_ut = now_realtime_usec();
+    pthread_t thread1;
+    netdata_thread_create(&thread1, "TH1",
+                          NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                          mrg_stress_test_thread1, mrg);
+
+    pthread_t thread2;
+    netdata_thread_create(&thread2, "TH2",
+                          NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                          mrg_stress_test_thread2, mrg);
+
+    pthread_t thread3;
+    netdata_thread_create(&thread3, "TH3",
+                          NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                          mrg_stress_test_thread3, mrg);
+
+
+    sleep_usec(5 * USEC_PER_SEC);
+
+    netdata_thread_join(thread1, NULL);
+    netdata_thread_join(thread2, NULL);
+    netdata_thread_join(thread3, NULL);
+    usec_t ended_ut = now_realtime_usec();
+
+    info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
+         "%zu deletions, %zu wrong deletions, "
+         "%zu successful searches, %zu wrong searches, "
+         "in %llu usecs",
+        mrg->stats.additions, mrg->stats.additions_duplicate,
+        mrg->stats.deletions, mrg->stats.delete_misses,
+        mrg->stats.search_hits, mrg->stats.search_misses,
+        ended_ut - started_ut);
+
+    mrg_destroy(mrg);
+
+    info("DBENGINE METRIC: all tests passed!");
+
+    return 0;
 }

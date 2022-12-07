@@ -500,6 +500,15 @@ struct malloc_trace {
 };
 #endif // NETDATA_TRACE_ALLOCATIONS
 
+static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
+        return JudyLFirst(PArray, PIndex, PJE0);
+    }
+
+    return JudyLNext(PArray, PIndex, PJE0);
+}
+
 # ifdef __cplusplus
 }
 # endif
