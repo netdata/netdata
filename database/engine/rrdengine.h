@@ -35,6 +35,17 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
+struct page_details {
+    uv_file file;
+    uint64_t pos;
+    uint32_t size;
+    unsigned fileno;
+    uuid_t uuid;
+    Word_t start_time_t;
+    Word_t end_time_t;
+    struct rrdengine_datafile *datafile;
+};
+
 struct rrdeng_collect_handle {
     struct pg_cache_page_index *page_index;
     struct rrdeng_page_descr *descr;
@@ -75,7 +86,9 @@ enum rrdeng_opcode {
     RRDENG_SHUTDOWN,
     RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
+    RRDENG_READ_DF_EXTENT_LIST,
     RRDENG_READ_EXTENT2,
+    RRDENG_READ_PAGE_LIST,
 
     RRDENG_MAX_OPCODE
 };
@@ -103,6 +116,7 @@ struct rrdeng_read_extent {
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
     union {
+        void *data;
         struct rrdeng_read_page read_page;
         struct rrdeng_read_extent read_extent;
         struct completion *completion;
@@ -321,4 +335,5 @@ void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
 struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
 struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
+void dbengine_load_page_list(struct rrdengine_instance *ctx, Pvoid_t Judy_page_list);
 #endif /* NETDATA_RRDENGINE_H */

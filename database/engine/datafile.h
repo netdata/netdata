@@ -49,10 +49,12 @@ struct rrdengine_datafile {
     uv_file file;
     uint64_t pos;
     uv_rwlock_t extent_rwlock;
+    uv_rwlock_t JudyL_extent_rwlock;
     struct rrdengine_instance *ctx;
     struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *next;
+    Pvoid_t JudyL_extent_array;
 };
 
 struct rrdengine_datafile_list {

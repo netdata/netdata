@@ -510,6 +510,8 @@ set(LIBNETDATA_FILES
         libnetdata/string/utf8.h
         libnetdata/worker_utilization/worker_utilization.c
         libnetdata/worker_utilization/worker_utilization.h
+		libnetdata/event_loop/event_loop.c
+        libnetdata/event_loop/event_loop.h
         )
 
 IF(ENABLE_PLUGIN_EBPF)

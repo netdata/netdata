@@ -887,62 +887,62 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     if (rc)
         error("MADV_DONTDUMP: setting failed");
 
-    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-
-    uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+//    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+//
+//    uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
 
     // Initialize the journal file to be able to access the data
     journalfile->journal_data = data_start;
     journalfile->journal_data_size = file_size;
 
-    usec_t header_start_time = j2_header->start_time_ut;
-    usec_t now_usec_t = now_realtime_usec();
-    for (size_t i=0; i < entries; i++) {
-        Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t));
-        if (likely(NULL != PValue)) {
-            page_index = *PValue;
-        }
-        else {
-            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t), PJE0);
-            fatal_assert(NULL == *PValue);
-            *PValue = page_index = create_page_index(&metric->uuid, ctx);
-            page_index->oldest_time_ut = LLONG_MAX;
-            page_index->latest_time_ut = 0;
-            page_index->prev = pg_cache->metrics_index.last_page_index;
-            pg_cache->metrics_index.last_page_index = page_index;
-        }
-
-        usec_t metric_start_ut = header_start_time + (usec_t ) metric->delta_start * USEC_PER_SEC;
-        usec_t metric_end_ut = header_start_time + (usec_t ) metric->delta_end * USEC_PER_SEC;
-
-        if (page_index->oldest_time_ut > metric_start_ut)
-            page_index->oldest_time_ut = metric_start_ut;
-
-        if (page_index->latest_time_ut < metric_end_ut)
-            page_index->latest_time_ut = metric_end_ut;
-
-        if (page_index->latest_time_ut > now_usec_t) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "DBENGINE: Ignoring page index latest time as it is in the future(now=%llu, page=%llu)", now_usec_t, page_index->latest_time_ut);
-            page_index->latest_time_ut = now_usec_t;
-        }
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
-        fatal_assert(metric->entries == metric_list_header->entries);
-#endif
-
-        page_index->page_count += metric_list_header->entries;
-        pg_cache->page_descriptors += metric_list_header->entries;
-        metric++;
-    }
-    uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
+//    usec_t header_start_time = j2_header->start_time_ut;
+//    usec_t now_usec_t = now_realtime_usec();
+//    for (size_t i=0; i < entries; i++) {
+//        Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t));
+//        if (likely(NULL != PValue)) {
+//            page_index = *PValue;
+//        }
+//        else {
+//            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t), PJE0);
+//            fatal_assert(NULL == *PValue);
+//            *PValue = page_index = create_page_index(&metric->uuid, ctx);
+//            page_index->oldest_time_ut = LLONG_MAX;
+//            page_index->latest_time_ut = 0;
+//            page_index->prev = pg_cache->metrics_index.last_page_index;
+//            pg_cache->metrics_index.last_page_index = page_index;
+//        }
+//
+//        usec_t metric_start_ut = header_start_time + (usec_t ) metric->delta_start * USEC_PER_SEC;
+//        usec_t metric_end_ut = header_start_time + (usec_t ) metric->delta_end * USEC_PER_SEC;
+//
+//        if (page_index->oldest_time_ut > metric_start_ut)
+//            page_index->oldest_time_ut = metric_start_ut;
+//
+//        if (page_index->latest_time_ut < metric_end_ut)
+//            page_index->latest_time_ut = metric_end_ut;
+//
+//        if (page_index->latest_time_ut > now_usec_t) {
+//            error_limit_static_global_var(erl, 1, 0);
+//            error_limit(&erl, "DBENGINE: Ignoring page index latest time as it is in the future(now=%llu, page=%llu)", now_usec_t, page_index->latest_time_ut);
+//            page_index->latest_time_ut = now_usec_t;
+//        }
+//        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+//
+//#ifdef NETDATA_INTERNAL_CHECKS
+//        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
+//        fatal_assert(metric->entries == metric_list_header->entries);
+//#endif
+//
+//        page_index->page_count += metric_list_header->entries;
+//        pg_cache->page_descriptors += metric_list_header->entries;
+//        metric++;
+//    }
+//    uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
 
     info("Journal file \"%s\" loaded (size:%"PRIu64") with %lu metrics in %d ms",
          path, file_size, entries,
          (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
-    return 0;
+    return 9;
 }
 
 
@@ -1619,6 +1619,11 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
     if (likely(journalfile->data))
         netdata_munmap(journalfile->data, file_size);
+
+    // FIXME: Remove this -- this iwll activate journal v2 AND the old structures at the same time
+    if (should_try_migration == 9) {
+        return 0;
+    }
 
     // Don't Index the last file
     if (ctx->last_fileno == journalfile->datafile->fileno || !db_engine_journal_indexing)
