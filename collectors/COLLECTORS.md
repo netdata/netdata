@@ -499,6 +499,41 @@ the `go.d.plugin`.
 These collectors are developed and maintained by third parties and, unlike the other collectors, are not installed by
 default. To use a third-party collector, visit their GitHub/documentation page and follow their installation procedures.
 
+<details>
+<summary>Typical third party Python collector installation instructions</summary>
+<br>
+In general the below steps should be sufficient to use a third party collector.
+
+1. Download collector code file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
+2. Download default collector configuration file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
+3. [Edit configuration file](/docs/collect/enable-configure#configure-a-collector) from step 2 if required.
+4. [Enable collector](/docs/collect/enable-configure#enable-a-collector-or-its-orchestrator).
+5. [Restart Netdata](/docs/configure/start-stop-restart.md) 
+
+For example below are the steps to enable the [Python ClickHouse collector](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse).
+
+```bash
+# download python collector script to /usr/libexec/netdata/python.d/
+$ sudo wget https://raw.githubusercontent.com/netdata/community/main/collectors/python.d.plugin/clickhouse/clickhouse.chart.py -O /usr/libexec/netdata/python.d/clickhouse.chart.py
+
+# (optional) download default .conf to /etc/netdata/python.d/
+$ sudo wget https://raw.githubusercontent.com/netdata/community/main/collectors/python.d.plugin/clickhouse/clickhouse.conf -O /etc/netdata/python.d/clickhouse.conf
+
+# enable collector by adding line a new line with "clickhouse: yes" to /etc/netdata/python.d.conf file
+# this will apend to the file if it already exists or create it if not
+$ sudo echo "clickhouse: yes" >> /etc/netdata/python.d.conf
+
+# (optional) edit clickhouse.conf if needed
+$ sudo vi /etc/netdata/python.d/clickhouse.conf
+
+# restart netdata 
+# see docs for more information: https://learn.netdata.cloud/docs/configure/start-stop-restart
+$ sudo systemctl restart netdata
+```
+
+</details>
+<br>
+
 - [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls CyberPower UPS data using
   PowerPanel® Personal Linux.
 - [Logged-in users](https://github.com/veksh/netdata-numsessions): Collect the number of currently logged-on users.
@@ -509,6 +544,7 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 - [Teamspeak 3](https://github.com/coraxx/netdata_ts3_plugin): Pulls active users and bandwidth from TeamSpeak 3
   servers.
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
+- [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse): Monitor [ClickHouse](https://clickhouse.com/) database.
 
 ## Etc
 
