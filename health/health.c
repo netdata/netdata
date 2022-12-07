@@ -1563,7 +1563,7 @@ void health_add_host_labels(void) {
     src = appconfig_exists(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection") ? RRDLABEL_SRC_CONFIG :
                                                                                                 RRDLABEL_SRC_AUTO;
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", lbl_src);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", src);
 }
 
 void health_thread_spawn(RRDHOST * host) {
