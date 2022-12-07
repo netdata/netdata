@@ -221,16 +221,18 @@ static size_t indexing_partition(PGC *cache, Word_t metric_id) {
     if(metric_id == last_metric_id || cache->config.partitions == 1)
         return last_partition;
 
-    uint8_t bytes[sizeof(Word_t)];
-    Word_t *p = (Word_t *)bytes;
-    *p = metric_id;
-
-    uint8_t *s = bytes;
-    uint8_t *e = &bytes[sizeof(Word_t) - 1];
-
     size_t total = 0;
-    while(s <= e)
-        total += *s++;
+    total += (metric_id & 0xff) >> 0;
+    total += (metric_id & 0xff00) >> 8;
+    total += (metric_id & 0xff0000) >> 16;
+    total += (metric_id & 0xff000000) >> 24;
+
+    if(sizeof(Word_t) > 4) {
+        total += (metric_id & 0xff00000000) >> 32;
+        total += (metric_id & 0xff0000000000) >> 40;
+        total += (metric_id & 0xff000000000000) >> 48;
+        total += (metric_id & 0xff00000000000000) >> 56;
+    }
 
     last_metric_id = metric_id;
     last_partition = total % cache->config.partitions;
@@ -1426,7 +1428,7 @@ struct {
         .options         = PGC_OPTIONS_NONE,/* PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,*/
         .points_per_page = 10,
         .time_per_collection_ut = 1000000,
-        .time_per_query_ut = 500,
+        .time_per_query_ut = 250,
         .rand_statebufs  = {},
         .random_data     = NULL,
 };

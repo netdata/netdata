@@ -553,6 +553,8 @@ if ENABLE_DBENGINE
         database/engine/rrdenglocking.h \
         database/engine2/cache.c \
         database/engine2/cache.h \
+        database/engine2/metric.c \
+        database/engine2/metric.h \
         $(NULL)
 endif
 
