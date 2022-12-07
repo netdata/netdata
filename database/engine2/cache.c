@@ -346,6 +346,12 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(sdp->base, page, link.prev, link.next);
     }
     else {
+        // HOT and CLEAN pages end up here.
+        // HOT pages never have accesses when they are created, so they are always prepended.
+        // CLEAN pages may or may not have accesses, depending on how they have been created:
+        // - New pages created as CLEAN, always have 1 access.
+        // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
+
         if(!page->accesses)
             DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
         else
