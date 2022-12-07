@@ -663,6 +663,7 @@ static void aclk_database_worker(void *arg)
                         cmd.completion = NULL;
                         wc->node_collectors_send = aclk_database_enq_cmd_noblock(wc, &cmd);
                     }
+#ifdef ENABLE_ACLK
                     if (wc->node_instance_connection_time && aclk_connected) {
                         if (wc->node_instance_connection_time + ACLK_NODE_INSTANCE_UPDATE_MSG_INTERVAL < now_realtime_sec()) {
                             if (wc->node_instance_connection_cmd != -1) {
@@ -673,6 +674,7 @@ static void aclk_database_worker(void *arg)
                             wc->node_instance_connection_time = 0;
                         }
                     }
+#endif
                     if (localhost == wc->host)
                         (void) sqlite3_wal_checkpoint(db_meta, NULL);
                     break;
