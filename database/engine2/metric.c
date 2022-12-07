@@ -352,6 +352,12 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
 
     for(size_t i = 0; i < entries ; i++) {
         for (size_t section = 0; section < sections; section++) {
+            uuid_t uuid;
+            uuid_generate_random(uuid);
+
+            if(mrg_metric_get(mrg, &uuid, section))
+                fatal("DBENGINE METRIC: found non-existing uuid");
+
             if(mrg_metric_id(mrg, array[i][section]) != (Word_t)array[i][section])
                 fatal("DBENGINE METRIC: metric id does not match");
 
