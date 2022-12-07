@@ -27,6 +27,8 @@ struct mrg {
         size_t delete_misses;
         size_t search_hits;
         size_t search_misses;
+        size_t pointer_validation_hits;
+        size_t pointer_validation_misses;
     } stats;
 };
 
@@ -58,6 +60,14 @@ static inline void MRG_STATS_DELETE_MISS(MRG *mrg) {
     __atomic_add_fetch(&mrg->stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
+static inline void MRG_STATS_POINTER_VALIDATION_HIT(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.pointer_validation_hits, 1, __ATOMIC_RELAXED);
+}
+
+static inline void MRG_STATS_POINTER_VALIDATION_MISS(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.pointer_validation_misses, 1, __ATOMIC_RELAXED);
+}
+
 static void mrg_index_read_lock(MRG *mrg) {
     netdata_rwlock_rdlock(&mrg->index.rwlock);
 }
@@ -84,9 +94,12 @@ static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     if(!having_lock)
         mrg_index_read_unlock(mrg);
 
-    if(found != metric)
+    if(found != metric) {
+        MRG_STATS_POINTER_VALIDATION_MISS(mrg);
         return false;
+    }
 
+    MRG_STATS_POINTER_VALIDATION_HIT(mrg);
     return true;
 }
 
@@ -516,10 +529,12 @@ int mrg_unittest(void) {
     info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
          "%zu deletions, %zu wrong deletions, "
          "%zu successful searches, %zu wrong searches, "
+         "%zu successful pointer validations, %zu wrong pointer validations "
          "in %llu usecs",
         mrg->stats.additions, mrg->stats.additions_duplicate,
         mrg->stats.deletions, mrg->stats.delete_misses,
         mrg->stats.search_hits, mrg->stats.search_misses,
+        mrg->stats.pointer_validation_hits, mrg->stats.pointer_validation_misses,
         ended_ut - started_ut);
 
     mrg_destroy(mrg);
