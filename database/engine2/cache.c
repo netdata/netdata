@@ -64,6 +64,8 @@ struct pgc_linked_list {
     SPINLOCK spinlock;
     size_t entries;
     size_t size;
+    size_t max_entries;
+    size_t max_size;
     size_t added_entries;
     size_t added_size;
     size_t removed_entries;
@@ -294,17 +296,80 @@ static inline void pgc_flushing_unlock(PGC *cache) {
 }
 
 // ----------------------------------------------------------------------------
-// helpers
+// evictions control
 
-static inline size_t CACHE_CURRENT_CLEAN_SIZE(PGC *cache) {
-    return __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
+static inline size_t cache_usage_percent(PGC *cache) {
+    if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
+        size_t clean   = __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
+        size_t dirty   = __atomic_load_n(&cache->dirty.size, __ATOMIC_RELAXED);
+        size_t hot     = __atomic_load_n(&cache->hot.size, __ATOMIC_RELAXED);
+        size_t hot_max = __atomic_load_n(&cache->hot.max_size, __ATOMIC_RELAXED);
+
+        size_t wanted_cache_size = hot_max * 10 / 4; // 2.5 times
+
+        size_t max_for_clean;
+        if(wanted_cache_size < hot + dirty + cache->config.max_clean_size)
+            max_for_clean = cache->config.max_clean_size;
+        else
+            max_for_clean = wanted_cache_size - hot - dirty;
+
+        size_t percent = clean * 100 / max_for_clean;
+        return percent;
+    }
+    else {
+        size_t clean = __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
+        size_t max = cache->config.max_clean_size;
+        size_t percent = clean * 100 / max;
+        return percent;
+    }
 }
 
-#define is_pgc_full(cache) (CACHE_CURRENT_CLEAN_SIZE(cache) > (cache)->config.max_clean_size)
-#define is_pgc_90full(cache) (CACHE_CURRENT_CLEAN_SIZE(cache) > ((cache)->config.max_clean_size * 9 / 10))
+#define cache_under_severe_pressure(cache)  (cache_usage_percent(cache) >= 95)
+#define cache_needs_space_90(cache)         (cache_usage_percent(cache) >= 90)
+#define cache_above_healthy_limit_85(cache) (cache_usage_percent(cache) >= 85)
 
 static bool evict_this_page(PGC *cache, PGC_PAGE *page);
 static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them);
+
+static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
+    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_90(cache)) {
+        bool under_pressure = cache_under_severe_pressure(cache);
+        evict_pages(cache,
+                    under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
+                    under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
+                    under_pressure, false);
+    }
+}
+
+static void evict_on_hot_page_added(PGC *cache __maybe_unused) {
+    ;
+}
+
+static void evict_on_page_searched_and_found(PGC *cache __maybe_unused) {
+    ;
+}
+
+static void evict_on_page_searched_and_not_found(PGC *cache __maybe_unused) {
+    ;
+}
+
+static void evict_on_page_release_with_no_references_when_permitted(PGC *cache __maybe_unused, PGC_PAGE *page __maybe_unused) {
+    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_90(cache))) {
+        bool under_pressure = cache_under_severe_pressure(cache);
+        evict_pages(cache,
+                    under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
+                    under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
+                    under_pressure, false);
+
+        if (cache_under_severe_pressure(cache))
+            // we are still under pressure
+            // lose this page too (it checks if it is not referenced before releasing it)
+            evict_this_page(cache, page);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// helpers
 
 static size_t page_assumed_size(size_t size) {
     return size + sizeof(PGC_PAGE) + sizeof(Word_t) * 3;
@@ -362,6 +427,12 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
     page_flag_set(page, ll->flags);
 
+    if(ll->entries > ll->max_entries + 1)
+        __atomic_store_n(&ll->max_entries, ll->entries + 1, __ATOMIC_RELAXED);
+
+    if(ll->size > ll->max_size + page->assumed_size)
+        __atomic_store_n(&ll->max_size, ll->max_size + page->assumed_size, __ATOMIC_RELAXED);
+
     if(!having_lock)
         pgc_ll_unlock(cache, ll);
 
@@ -369,6 +440,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     __atomic_add_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->added_entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->added_size, page->assumed_size, __ATOMIC_RELAXED);
+
 }
 
 static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
@@ -565,18 +637,8 @@ static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necess
     if(desired == 0) {
         PGC_REFERENCED_PAGES_MINUS1(cache, page);
 
-        if(unlikely(evict_if_necessary && ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || is_pgc_90full(cache)))) {
-            bool under_pressure = is_pgc_full(cache);
-            evict_pages(cache,
-                        under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
-                        under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
-                        under_pressure, false);
-
-            if(is_pgc_full(cache))
-                // we are still under pressure
-                // lose this page too
-                evict_this_page(cache, page);
-        }
+        if(evict_if_necessary)
+            evict_on_page_release_with_no_references_when_permitted(cache, page);
     }
 }
 
@@ -711,7 +773,7 @@ static bool evict_this_page(PGC *cache, PGC_PAGE *page) {
 
 // returns true, when there is more work to do
 static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them) {
-    if(!all_of_them && !is_pgc_90full(cache))
+    if(!all_of_them && !cache_above_healthy_limit_85(cache))
         // don't bother - not enough to do anything
         return false;
 
@@ -859,17 +921,17 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
         }
 
-    } while(pages_to_evict && (all_of_them || (is_pgc_90full(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while(pages_to_evict && (all_of_them || (cache_above_healthy_limit_85(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && PGC_REFERENCED_PAGES(cache)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, some are still referenced");
     }
-    else if(!total_pages_evicted && is_pgc_full(cache)) {
+    else if(!total_pages_evicted && cache_under_severe_pressure(cache)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
-                    "DBENGINE CACHE: cache size %zu, exceeds max size %zu, but all the data in it are currently referenced and cannot be evicted",
-                    CACHE_CURRENT_CLEAN_SIZE(cache), cache->config.max_clean_size);
+                    "DBENGINE CACHE: cache is %zu %% full, but all the data in it are currently referenced and cannot be evicted",
+                    cache_usage_percent(cache));
     }
 
 premature_exit:
@@ -960,13 +1022,10 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
     if(unlikely(spins > 1))
         __atomic_add_fetch(&cache->stats.insert_spins, spins - 1, __ATOMIC_RELAXED);
 
-    if(!entry->hot && ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || is_pgc_90full(cache))) {
-        bool under_pressure = is_pgc_full(cache);
-        evict_pages(cache,
-                    under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
-                    under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
-                    under_pressure, false);
-    }
+    if(entry->hot)
+        evict_on_hot_page_added(cache);
+    else
+        evict_on_clean_page_added(cache);
 
     return page;
 }
@@ -1065,16 +1124,18 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
 
     } while(!page && try_again);
 
+    if(unlikely(spins > 1))
+        __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
+
     if(page) {
         __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
         __atomic_add_fetch(stats_hit_ptr, 1, __ATOMIC_RELAXED);
+        evict_on_page_searched_and_found(cache);
     }
     else {
         __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
+        evict_on_page_searched_and_not_found(cache);
     }
-
-    if(unlikely(spins > 1))
-        __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
 
     return page;
 }
@@ -1371,7 +1432,7 @@ bool pgc_is_page_clean(PGC_PAGE *page) {
 }
 
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
-    bool under_pressure = is_pgc_full(cache);
+    bool under_pressure = cache_under_severe_pressure(cache);
     return evict_pages(cache,
                        under_pressure ? 0 : max_skip,
                        under_pressure ? 0 : max_evict,
@@ -1430,7 +1491,7 @@ struct {
         .collect_threads = 16,
         .query_threads   = 5,
         .partitions      = 10,
-        .options         = PGC_OPTIONS_NONE,/* PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,*/
+        .options         = PGC_OPTIONS_AUTOSCALE,/* PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,*/
         .points_per_page = 10,
         .time_per_collection_ut = 1000000,
         .time_per_query_ut = 250,
@@ -1709,7 +1770,7 @@ void unittest_stress_test(void) {
              , stats.hot_entries / 1000, (stats.hot_added - old_stats.hot_added) / 1000, (stats.hot_deleted - old_stats.hot_deleted) / 1000
              , stats.dirty_entries / 1000, (stats.dirty_added - old_stats.dirty_added) / 1000, (stats.dirty_deleted - old_stats.dirty_deleted) / 1000
              , stats.clean_entries / 1000
-             , is_pgc_full(pgc_uts.cache) ? "F" : is_pgc_90full(pgc_uts.cache) ? "f" : "N"
+             , cache_under_severe_pressure(pgc_uts.cache) ? "F" : cache_needs_space_90(pgc_uts.cache) ? "f" : "N"
              , (stats.clean_added - old_stats.clean_added) / 1000, (stats.clean_deleted - old_stats.clean_deleted) / 1000
              , searches_exact / 1000, searches_closest / 1000
              , hit_exact_pc, hit_closest_pc

@@ -10,9 +10,10 @@ typedef enum __attribute__ ((__packed__)) {
     PGC_OPTIONS_NONE       = 0,
     PGC_OPTIONS_EVICT_PAGES_INLINE = (1 << 0),
     PGC_OPTIONS_FLUSH_PAGES_INLINE = (1 << 1),
+    PGC_OPTIONS_AUTOSCALE          = (1 << 2),
 } PGC_OPTIONS;
 
-#define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE)
+#define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_AUTOSCALE)
 
 typedef struct pgc_entry {
     Word_t section;             // the section this belongs to
