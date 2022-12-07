@@ -649,6 +649,7 @@ static void aclk_database_worker(void *arg)
                                     wc->hostname = strdupz(rrdhost_hostname(wc->host));
                                 aclk_del_worker_thread(wc);
                                 wc->node_info_send = 1;
+                                wc->node_instance_connection_cmd = -1;
                             }
                         }
                     }
@@ -661,6 +662,17 @@ static void aclk_database_worker(void *arg)
                         cmd.opcode = ACLK_DATABASE_NODE_COLLECTORS;
                         cmd.completion = NULL;
                         wc->node_collectors_send = aclk_database_enq_cmd_noblock(wc, &cmd);
+                    }
+                    if (wc->node_instance_connection_time && aclk_connected) {
+                        if (wc->node_instance_connection_time + ACLK_NODE_INSTANCE_UPDATE_MSG_INTERVAL < now_realtime_sec()) {
+                            if (wc->node_instance_connection_cmd != -1) {
+                                aclk_host_state_update(wc->host, wc->node_instance_connection_cmd);
+                                wc->node_instance_connection_time = 0;
+                                wc->node_instance_connection_cmd = -1;
+                            } else {
+                                wc->node_instance_connection_time = 0;
+                            }
+                        }
                     }
                     if (localhost == wc->host)
                         (void) sqlite3_wal_checkpoint(db_meta, NULL);

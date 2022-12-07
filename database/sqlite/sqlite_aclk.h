@@ -17,6 +17,7 @@
 #define ACLK_DATABASE_CLEANUP_INTERVAL (3600)
 #define ACLK_DELETE_ACK_ALERTS_INTERNAL (86400)
 #define ACLK_SYNC_QUERY_SIZE 512
+#define ACLK_NODE_INSTANCE_UPDATE_MSG_INTERVAL (10)
 
 struct aclk_completion {
     uv_mutex_t mutex;
@@ -121,6 +122,8 @@ struct aclk_database_worker_config {
     uint32_t chart_payload_count;
     uint64_t alerts_snapshot_id; //will contain the snapshot_id value if snapshot was requested
     uint64_t alerts_ack_sequence_id; //last sequence_id ack'ed from cloud via sendsnapshot message
+    time_t node_instance_connection_time;
+    int node_instance_connection_cmd;
     uv_loop_t *loop;
     RRDHOST *host;
     uv_async_t async;

@@ -806,7 +806,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     // in case we have cloud connection we inform cloud
     // new child connected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, 1);
+        register_update_node_instance_connection_msg(rpt->host, 1);
 #endif
 
     rrdhost_set_is_parent_label(++localhost->connected_children_count);
@@ -837,7 +837,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     // in case we have cloud connection we inform cloud
     // a child disconnected
     if (netdata_cloud_setting)
-        aclk_host_state_update(rpt->host, 0);
+        register_update_node_instance_connection_msg(rpt->host, 0);
 #endif
 
     rrdhost_set_is_parent_label(--localhost->connected_children_count);
