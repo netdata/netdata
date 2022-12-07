@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F050D
+# Next unused error code: F050F
 
 # ======================================================================
 # Constants
@@ -46,6 +46,7 @@ NETDATA_CLAIM_ONLY=0
 NETDATA_CLAIM_URL="api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
+NETDATA_INSTALLER_OPTIONS=""
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
@@ -63,7 +64,6 @@ else
 fi
 
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
-NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:-""}"
 TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
 
 if echo "${0}" | grep -q 'kickstart-static64'; then
@@ -2088,10 +2088,6 @@ validate_args() {
 }
 
 parse_args() {
-  if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
-      warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
-  fi
-
   while [ -n "${1}" ]; do
     case "${1}" in
       "--help")
@@ -2249,8 +2245,7 @@ parse_args() {
         fi
         ;;
       *)
-        warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
-        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+        fatal "Unrecognized option '${1}'. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead." F050E
         ;;
     esac
     shift 1
