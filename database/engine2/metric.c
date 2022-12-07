@@ -527,6 +527,10 @@ int mrg_unittest(void) {
 
     sleep_usec(5 * USEC_PER_SEC);
 
+    netdata_thread_cancel(thread1);
+    netdata_thread_cancel(thread2);
+    netdata_thread_cancel(thread3);
+
     netdata_thread_join(thread1, NULL);
     netdata_thread_join(thread2, NULL);
     netdata_thread_join(thread3, NULL);
