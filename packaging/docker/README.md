@@ -196,12 +196,12 @@ docker rm -f netdata_tmp
 ```
 
 **`docker run`**: Use the `docker run` command, along with the following options, to start a new container. Note the
-changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \` line from the recommended example above.
+changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata \` line from the recommended example above.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
-  -v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \
+  -v $(pwd)/netdataconfig/netdata:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \

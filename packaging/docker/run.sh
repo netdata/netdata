@@ -49,7 +49,7 @@ if mountpoint -q /etc/netdata && [ -z "$(ls -A /etc/netdata)" ]; then
   cp -a /etc/netdata.stock/. /etc/netdata
 fi
 
-if mountpoint -q /etc/netdata; then
+if mountpoint -q /etc/netdata && [ -w "/etc/netdata" ]; then
   hostname > /etc/netdata/.container-hostname
 else
   rm -f /etc/netdata/.container-hostname
