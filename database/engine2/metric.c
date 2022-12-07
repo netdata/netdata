@@ -6,17 +6,16 @@ typedef int32_t REFCOUNT;
 struct metric {
     uuid_t uuid;
     Word_t section;
-    size_t pages;
     time_t first_time_t;
-    time_t last_time_t;
+    time_t latest_time_t;
     time_t latest_update_every;
 };
 
 struct mrg {
     struct pgc_index {
         netdata_rwlock_t rwlock;
-        Pvoid_t uuid_judy;          // each UUID has a JudyL of sections
-        Pvoid_t ptr_judy;
+        Pvoid_t uuid_judy;          // each UUID has a JudyL of sections (tiers)
+        Pvoid_t ptr_judy;           // reverse pointer lookup
     } index;
 };
 
@@ -25,9 +24,6 @@ static void mrg_index_read_lock(MRG *mrg) {
 }
 static void mrg_index_read_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
-}
-static bool mrg_index_write_trylock(MRG *mrg) {
-    return !netdata_rwlock_trywrlock(&mrg->index.rwlock);
 }
 static void mrg_index_write_lock(MRG *mrg) {
     netdata_rwlock_wrlock(&mrg->index.rwlock);
@@ -55,23 +51,26 @@ static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     return true;
 }
 
-static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry) {
+static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     mrg_index_write_lock(mrg);
 
     Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index.uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
     Pvoid_t *PValue = JudyLIns(sections_judy_pptr, entry->section, PJE0);
     if(*PValue != NULL) {
-        METRIC *mtrc = *PValue;
+        METRIC *metric = *PValue;
         mrg_index_write_unlock(mrg);
-        return mtrc;
+
+        if(ret)
+            *ret = false;
+
+        return metric;
     }
 
     METRIC *metric = callocz(1, sizeof(METRIC));
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
-    metric->pages = entry->pages;
     metric->first_time_t = entry->first_time_t;
-    metric->last_time_t = entry->last_time_t;
+    metric->latest_time_t = entry->latest_time_t;
     metric->latest_update_every = entry->latest_update_every;
 
     *PValue = metric;
@@ -87,6 +86,9 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry) {
 
     mrg_index_write_unlock(mrg);
 
+    if(ret)
+        *ret = true;
+
     return metric;
 }
 
@@ -99,7 +101,7 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
         return NULL;
     }
 
-    Pvoid_t *PValue = JudyLGet(sections_judy_pptr, section, PJE0);
+    Pvoid_t *PValue = JudyLGet(*sections_judy_pptr, section, PJE0);
     if(!PValue) {
         mrg_index_read_unlock(mrg);
         return NULL;
@@ -130,7 +132,7 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
     if(!JudyLDel(sections_judy_pptr, metric->section, PJE0))
         fatal("DBENGINE METRIC: metric not found in sections judy");
 
-    if(!sections_judy_pptr) {
+    if(!*sections_judy_pptr) {
         if(!JudyHSDel(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0))
             fatal("DBENGINE METRIC: cannot delete UUID from judy");
     }
@@ -145,10 +147,16 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
 // ----------------------------------------------------------------------------
 // public API
 
-bool mrg_metric_del_by_ptr(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
+METRIC *mrg_metric_add(MRG *mrg, MRG_ENTRY entry, bool *ret) {
+    return metric_add(mrg, &entry, ret);
+}
 
+METRIC *mrg_metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
+    return metric_get(mrg, uuid, section);
+}
+
+bool mrg_metric_del(MRG *mrg, METRIC *metric) {
+    return metric_del(mrg, metric);
 }
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
@@ -165,3 +173,47 @@ uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric) {
     return &metric->uuid;
 }
 
+bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    __atomic_store_n(&metric->first_time_t, first_time_t, __ATOMIC_RELEASE);
+    return true;
+}
+
+time_t mrg_metric_get_first_time_t(MRG *mrg, METRIC *metric) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return 0;
+
+    return __atomic_load_n(&metric->first_time_t, __ATOMIC_ACQUIRE);
+}
+
+bool mrg_metric_set_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    __atomic_store_n(&metric->latest_time_t, latest_time_t, __ATOMIC_RELEASE);
+    return true;
+}
+
+time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return 0;
+
+    return __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
+}
+
+bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    __atomic_store_n(&metric->latest_update_every, update_every, __ATOMIC_RELEASE);
+    return true;
+}
+
+time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return 0;
+
+    return __atomic_load_n(&metric->latest_update_every, __ATOMIC_ACQUIRE);
+}
