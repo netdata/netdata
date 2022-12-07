@@ -667,11 +667,10 @@ static void aclk_database_worker(void *arg)
                         if (wc->node_instance_connection_time + ACLK_NODE_INSTANCE_UPDATE_MSG_INTERVAL < now_realtime_sec()) {
                             if (wc->node_instance_connection_cmd != -1) {
                                 aclk_host_state_update(wc->host, wc->node_instance_connection_cmd);
-                                wc->node_instance_connection_time = 0;
                                 wc->node_instance_connection_cmd = -1;
-                            } else {
-                                wc->node_instance_connection_time = 0;
                             }
+
+                            wc->node_instance_connection_time = 0;
                         }
                     }
                     if (localhost == wc->host)
