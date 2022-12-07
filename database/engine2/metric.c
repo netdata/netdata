@@ -36,9 +36,7 @@ static void mrg_index_write_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
 }
 
-bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
-    // FIXME - validate 'metric' is a valid, active metric
-
+static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     if(!having_lock)
         mrg_index_read_lock(mrg);
 
@@ -57,7 +55,7 @@ bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     return true;
 }
 
-METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry) {
+static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry) {
     mrg_index_write_lock(mrg);
 
     Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index.uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
@@ -68,47 +66,102 @@ METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry) {
         return mtrc;
     }
 
-    METRIC *mtrc = callocz(1, sizeof(METRIC));
-    uuid_copy(mtrc->uuid, entry->uuid);
-    mtrc->section = entry->section;
-    mtrc->pages = entry->pages;
-    mtrc->first_time_t = entry->first_time_t;
-    mtrc->last_time_t = entry->last_time_t;
-    mtrc->latest_update_every = entry->latest_update_every;
+    METRIC *metric = callocz(1, sizeof(METRIC));
+    uuid_copy(metric->uuid, entry->uuid);
+    metric->section = entry->section;
+    metric->pages = entry->pages;
+    metric->first_time_t = entry->first_time_t;
+    metric->last_time_t = entry->last_time_t;
+    metric->latest_update_every = entry->latest_update_every;
 
-    *PValue = mtrc;
+    *PValue = metric;
 
-    PValue = JudyLIns(&mrg->index.ptr_judy, (Word_t)mtrc, PJE0);
+    PValue = JudyLIns(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
     if(*PValue != NULL)
         fatal("DBENGINE METRIC: pointer already exists in registry.");
 
-    *PValue = mtrc;
+    *PValue = metric;
+
+    internal_fatal(!metric_validate(mrg, metric, true),
+                   "DBENGINE CACHE: metric validation on insertion fails");
 
     mrg_index_write_unlock(mrg);
 
-    return mtrc;
+    return metric;
 }
 
-METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
+static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
+    mrg_index_read_lock(mrg);
 
+    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, uuid, sizeof(uuid_t));
+    if(!sections_judy_pptr) {
+        mrg_index_read_unlock(mrg);
+        return NULL;
+    }
+
+    Pvoid_t *PValue = JudyLGet(sections_judy_pptr, section, PJE0);
+    if(!PValue) {
+        mrg_index_read_unlock(mrg);
+        return NULL;
+    }
+
+    METRIC *metric = *PValue;
+
+    internal_fatal(!metric_validate(mrg, metric, true),
+                   "DBENGINE CACHE: metric validation on lookup fails");
+
+    mrg_index_read_unlock(mrg);
+
+    return metric;
 }
 
-bool metric_del_by_ptr(MRG *mrg, METRIC *metric) {
+static bool metric_del(MRG *mrg, METRIC *metric) {
+    mrg_index_write_lock(mrg);
+
+    if(!JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0)) {
+        mrg_index_write_unlock(mrg);
+        return false;
+    }
+
+    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t));
+    if(!sections_judy_pptr || !*sections_judy_pptr)
+        fatal("DBENGINE METRIC: uuid should be in judy but it is not.");
+
+    if(!JudyLDel(sections_judy_pptr, metric->section, PJE0))
+        fatal("DBENGINE METRIC: metric not found in sections judy");
+
+    if(!sections_judy_pptr) {
+        if(!JudyHSDel(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0))
+            fatal("DBENGINE METRIC: cannot delete UUID from judy");
+    }
+
+    mrg_index_write_unlock(mrg);
+
+    freez(metric);
+
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+// public API
+
+bool mrg_metric_del_by_ptr(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
 }
 
-Word_t metric_id(MRG *mrg, METRIC *metric) {
+Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
     return (Word_t)metric;
 }
 
-uuid_t *metric_uuid(MRG *mrg, METRIC *metric) {
+uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return NULL;
 
     return &metric->uuid;
 }
+
