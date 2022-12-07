@@ -405,7 +405,8 @@ static void ebpf_fd_free(ebpf_module_t *em)
 static void ebpf_fd_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*fd_thread.thread);
+    if (fd_thread.thread)
+        netdata_thread_cancel(*fd_thread.thread);
     ebpf_fd_free(em);
 }
 
