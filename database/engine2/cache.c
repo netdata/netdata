@@ -45,7 +45,8 @@ struct pgc_page {
     Word_t metric_id;
     time_t start_time_t;
     time_t end_time_t;
-    time_t update_every;
+    uint32_t update_every;
+    uint32_t accesses;              // counts the number of accesses on this page
 
     void *data;
     size_t assumed_size;
@@ -345,7 +346,10 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(sdp->base, page, link.prev, link.next);
     }
     else {
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
+        if(!page->accesses)
+            DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
+        else
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
     }
 
     ll->version++;
@@ -903,6 +907,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
             page = callocz(1, sizeof(PGC_PAGE));
 #endif
             page->refcount = 1;
+            page->accesses = (entry->hot) ? 0 : 1;
             page->flags = PGC_PAGE_IS_BEING_CREATED;
             page->section = entry->section;
             page->metric_id = entry->metric_id;
@@ -1054,10 +1059,13 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
 
     } while(!page && try_again);
 
-    if(page)
+    if(page) {
+        __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
         __atomic_add_fetch(stats_hit_ptr, 1, __ATOMIC_RELAXED);
-    else
+    }
+    else {
         __atomic_add_fetch(stats_miss_ptr, 1, __ATOMIC_RELAXED);
+    }
 
     if(unlikely(spins > 1))
         __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
@@ -1239,14 +1247,14 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
-    cache->config.max_clean_size = max_clean_size;
+    cache->config.max_clean_size = (max_clean_size < 1) ? 1 : max_clean_size;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_call,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
-    cache->config.max_pages_per_inline_eviction = max_pages_per_inline_eviction;
-    cache->config.max_skip_pages_per_inline_eviction = max_skip_pages_per_inline_eviction;
-    cache->config.max_flushes_inline = max_flushes_inline;
-    cache->config.partitions = partitions;
+    cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 1) ? 1 : max_pages_per_inline_eviction;
+    cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 1) ? 1 : max_skip_pages_per_inline_eviction;
+    cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
+    cache->config.partitions = partitions < 1 ? 1 : partitions;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
     cache->stats.pages_added_per_partition = callocz(cache->config.partitions, sizeof(size_t));

@@ -15,14 +15,14 @@ typedef enum __attribute__ ((__packed__)) {
 #define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE)
 
 typedef struct pgc_entry {
-    bool hot;                   // true if this entry is currently being collected
     Word_t section;             // the section this belongs to
     Word_t metric_id;           // the metric this belongs to
     time_t start_time_t;        // the start time of the page
     time_t end_time_t;          // the end time of the page
-    time_t update_every;        // the update every of the page
     size_t size;                // the size in bytes of the allocation, outside the cache
     void *data;                 // a pointer to data outside the cache
+    uint32_t update_every;      // the update every of the page
+    bool hot;                   // true if this entry is currently being collected
 } PGC_ENTRY;
 
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
