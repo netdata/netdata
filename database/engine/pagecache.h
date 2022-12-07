@@ -5,6 +5,9 @@
 
 #include "rrdengine.h"
 
+extern void *main_mrg;
+extern void *main_cache;
+
 /* Forward declarations */
 struct rrdengine_instance;
 struct extent_info;

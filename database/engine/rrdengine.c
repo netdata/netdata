@@ -210,7 +210,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
     }
 
 after_crc_check:
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);// SPDX-License-Identifier: GPL-3.0-or-later
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
         for (i = 0 ; i < count ; ++i) {
@@ -863,7 +863,7 @@ static void flush_pages_worker(uv_work_t *req_work)
         /* care, we don't hold the descriptor mutex */
         descr = xt_io_descr->descr_array[i];
         if (NO_QUIESCE == ctx->quiesce)
-        pg_cache_replaceQ_insert(ctx, descr);
+            pg_cache_replaceQ_insert(ctx, descr);
         rrdeng_page_descr_mutex_lock(ctx, descr);
         pg_cache_descr = descr->pg_cache_descr;
         pg_cache_descr->flags &= ~(RRD_PAGE_DIRTY | RRD_PAGE_WRITE_PENDING);
@@ -1825,20 +1825,20 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
     struct datafile_extent_list_s *datafile_extent_list = work_request->data;
     Pvoid_t *PValue;
-    Pvoid_t *PValue1;
-    Pvoid_t *PValue2;
-    Pvoid_t *PValue3;
-    Word_t time_index = 0;
-    Word_t end_time_t;
-    unsigned entries = 0;
-    struct page_details *pd = NULL;
+//    Pvoid_t *PValue1;
+//    Pvoid_t *PValue2;
+//    Pvoid_t *PValue3;
+//    Word_t time_index = 0;
+//    Word_t end_time_t;
+//    unsigned entries = 0;
+//    struct page_details *pd = NULL;
 
     // We have one extent to read
     struct extent_page_list_s *extent_page_list;
 
     Word_t pos = 0;
-    entries = 0;
-    info("DEBUG: %d Reading %d extents from datafile %ld", gettid(), datafile_extent_list->count, datafile_extent_list->fileno);
+//    entries = 0;
+    info("DEBUG: %d Reading %u extents from datafile %u", gettid(), datafile_extent_list->count, datafile_extent_list->fileno);
     for (PValue = JudyLFirst(datafile_extent_list->JudyL_datafile_extent_list, &pos, PJE0),
         extent_page_list = unlikely(NULL == PValue) ? NULL : *PValue;
          extent_page_list != NULL;
@@ -1885,8 +1885,8 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 // New version of READ EXTENT
 static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, void *data)
 {
-    int ret;
-    unsigned i;
+//    int ret;
+//    unsigned i;
 
     struct rrdeng_work *work_request;
 
@@ -1916,22 +1916,22 @@ void after_do_read_extent2_work(uv_work_t *req, int status)
 static void do_read_extent2_work(uv_work_t *req)
 {
     struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-    struct rrdengine_instance *ctx = wc->ctx;
+//    struct rrdengine_worker_config *wc = work_request->wc;
+//    struct rrdengine_instance *ctx = wc->ctx;
 
     struct extent_page_list_s *extent_page_list = work_request->data;
     Pvoid_t *PValue;
-    Pvoid_t *PValue1;
-    Pvoid_t *PValue2;
-    Pvoid_t *PValue3;
-    Word_t time_index = 0;
-    Word_t end_time_t;
+//    Pvoid_t *PValue1;
+//    Pvoid_t *PValue2;
+//    Pvoid_t *PValue3;
+//    Word_t time_index = 0;
+//    Word_t end_time_t;
     unsigned entries = 0;
     struct page_details *pd = NULL;
 
     // We have one extent to read
 
-    info("DEBUG: %d Reading %d pages from extent pos %llu, size = %u", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size);
+    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size);
     Word_t start_time_t = 0;
 
     // We know the following here:
@@ -1972,7 +1972,7 @@ static void do_read_extent2_work(uv_work_t *req)
          PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
         pd = unlikely(NULL == PValue) ? NULL : *PValue) {
 
-        info("  %d Page %d -- %ld - %ld (extent %llu, size %u at file %d) ", gettid(), entries, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
+        info("  %d Page %u -- %lu - %lu (extent %lu, size %u at file %u) ", gettid(), entries, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
 
         entries++;
     }
@@ -1985,8 +1985,8 @@ static void do_read_extent2_work(uv_work_t *req)
 // New version of READ EXTENT
 static void do_read_extent2(struct rrdengine_worker_config *wc, void *data)
 {
-    int ret;
-    unsigned i;
+//    int ret;
+//    unsigned i;
 
     struct rrdeng_work *work_request;
 
@@ -2024,8 +2024,8 @@ static void do_read_page_list_work(uv_work_t *req)
     Pvoid_t *PValue2;
     Pvoid_t *PValue3;
     Word_t time_index = 0;
-    Word_t end_time_t;
-    unsigned entries = 0;
+//    Word_t end_time_t;
+//    unsigned entries = 0;
     struct page_details *pd = NULL;
 
     // this is the entire page list
@@ -2075,7 +2075,7 @@ static void do_read_page_list_work(uv_work_t *req)
 
             PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, extent_page_list->count, PJE0);
             *PValue3 = pd;
-            entries++;
+//            entries++;
         }
 
         info("DEBUG: --------------------------");
@@ -2090,7 +2090,7 @@ static void do_read_page_list_work(uv_work_t *req)
 
             // List of datafiles
 
-            info("DEBUG: Reading extents from datafile %d (%d entries)",  datafile_no, datafile_extent_list->count);
+            info("DEBUG: Reading extents from datafile %lu (%u entries)",  datafile_no, datafile_extent_list->count);
 
             // Now submit each datafile_extent_list back to the engine
             struct rrdeng_cmd cmd;

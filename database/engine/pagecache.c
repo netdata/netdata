@@ -3,6 +3,20 @@
 
 #include "rrdengine.h"
 
+void *main_mrg;
+void *main_cache;
+
+static void page_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) {
+    info("FREE clean page section %lu, metric %lu, start_time %lu, end_time %lu", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
+}
+static void page_cache_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
+     info("SAVE %zu pages", entries);
+//        if(!pgc_uts.stop) {
+//            static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 10000};
+//            nanosleep(&work_duration, NULL);
+//        }
+}
+
 ARAL page_descr_aral = {
     .requested_element_size = sizeof(struct rrdeng_page_descr),
     .initial_elements = 20000,
@@ -99,6 +113,33 @@ void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx,
     uv_rwlock_wrlock(&pg_cache->replaceQ.lock);
     pg_cache_replaceQ_insert_unsafe(ctx, descr);
     uv_rwlock_wrunlock(&pg_cache->replaceQ.lock);
+
+    // FIXME: DBENGINE2
+    // Adding to the new page cache
+
+    // Find metric id associated with uuid
+    METRIC *this_metric = mrg_metric_get(main_mrg, descr->id, (Word_t) ctx);
+    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+
+    // Get the data
+    // We copy for now because we will add in both caches
+    void *data = dbengine_page_alloc();
+    memcpy(data, descr->pg_cache_descr->page, RRDENG_BLOCK_SIZE);
+
+    PGC_ENTRY page_entry = {
+        .hot = false,
+        .section = (Word_t) ctx,
+        .metric_id = metric_id,
+        .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
+        .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
+        .update_every = descr->update_every_s,
+        .size = RRDENG_BLOCK_SIZE,
+        .data = data
+    };
+
+    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry);
+    pgc_page_release(main_cache, page);
+    info("DEBUG: DBENGINE2 --> Adding new page in page cache");
 }
 
 void pg_cache_replaceQ_delete(struct rrdengine_instance *ctx,
@@ -577,48 +618,48 @@ bool descr_exists_unsafe( struct pg_cache_page_index *page_index, time_t start_t
     return (NULL != JudyLGet(page_index->JudyL_array, start_time_s, PJE0));
 }
 
-void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index)
-{
-    Pvoid_t *PValue;
+//void mark_journalfile_descriptor( struct page_cache *pg_cache, struct rrdengine_journalfile *journalfile, uint32_t page_offset, uint32_t Index)
+//{
+//    Pvoid_t *PValue;
+//
+//    uv_rwlock_wrlock(&pg_cache->v2_lock);
+//    PValue = JudyLIns(&journalfile->JudyL_array, (Word_t)page_offset, PJE0);
+//    *(uint32_t *)PValue = (Index + 1);
+//    journalfile->last_access = now_realtime_sec();
+//    uv_rwlock_wrunlock(&pg_cache->v2_lock);
+//}
 
-    uv_rwlock_wrlock(&pg_cache->v2_lock);
-    PValue = JudyLIns(&journalfile->JudyL_array, (Word_t)page_offset, PJE0);
-    *(uint32_t *)PValue = (Index + 1);
-    journalfile->last_access = now_realtime_sec();
-    uv_rwlock_wrunlock(&pg_cache->v2_lock);
-}
-
-static void update_journal_access_time(struct rrdengine_journalfile *journalfile, struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
-{
-    if (journalfile && journalfile->is_valid) {
-        journalfile->last_access = now_realtime_sec();
-        return;
-    }
-
-    if (unlikely(!page_index || !descr))
-        return;
-
-    if (!is_descr_journal_v2(descr))
-        return;
-
-    struct rrdengine_instance *ctx = page_index->ctx;
-
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    while (datafile) {
-        journalfile = datafile->journalfile;
-        if (!journalfile->journal_data || !journalfile->is_valid) {
-            datafile = datafile->next;
-            continue;
-        }
-        if (datafile->file == descr->file) {
-            journalfile->last_access = now_realtime_sec();
-            break;
-        }
-        datafile = datafile->next;
-    }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-}
+//static void update_journal_access_time(struct rrdengine_journalfile *journalfile, struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
+//{
+//    if (journalfile && journalfile->is_valid) {
+//        journalfile->last_access = now_realtime_sec();
+//        return;
+//    }
+//
+//    if (unlikely(!page_index || !descr))
+//        return;
+//
+//    if (!is_descr_journal_v2(descr))
+//        return;
+//
+//    struct rrdengine_instance *ctx = page_index->ctx;
+//
+//    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+//    struct rrdengine_datafile *datafile = ctx->datafiles.first;
+//    while (datafile) {
+//        journalfile = datafile->journalfile;
+//        if (!journalfile->journal_data || !journalfile->is_valid) {
+//            datafile = datafile->next;
+//            continue;
+//        }
+//        if (datafile->file == descr->file) {
+//            journalfile->last_access = now_realtime_sec();
+//            break;
+//        }
+//        datafile = datafile->next;
+//    }
+//    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+//}
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
 {
@@ -815,6 +856,13 @@ void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct
     if (likely(descr->end_time_ut > latest_time || latest_time == INVALID_TIME)) {
         page_index->latest_time_ut = descr->end_time_ut;
     }
+
+    // FIXME: DBENGINE2
+    // This will update the metric
+    update_uuid_first_last_update_every(page_index->ctx, &page_index->id,
+                                        page_index->oldest_time_ut / USEC_PER_SEC,
+                                        page_index->latest_time_ut / USEC_PER_SEC, (time_t)
+                                            page_index->latest_update_every_s, false);
 }
 
 /* Update metric oldest and latest timestamps when removing old values */
@@ -1049,6 +1097,16 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
         return 0;
 
     // FIXME: Lets call DBENGINE2 and see whats happening
+    METRIC *this_metric = mrg_metric_get(main_mrg, &page_index->id, (Word_t) ctx);
+    char uuid_str[UUID_STR_LEN];
+    uuid_unparse_lower(*mrg_metric_uuid(main_mrg, this_metric), uuid_str);
+    info("DEBUG: Metric info %s : %ld - %ld", uuid_str,
+         mrg_metric_get_first_time_t(main_mrg, this_metric),
+         mrg_metric_get_latest_time_t(main_mrg, this_metric));
+
+    info("DEBUG: Page info %s : %llu - %llu", uuid_str,
+         page_index->oldest_time_ut / USEC_PER_SEC,
+         page_index->latest_time_ut / USEC_PER_SEC);
 
     Pvoid_t  *pl_judyL = get_page_list(ctx, &page_index->id, start_time_ut, end_time_ut);
 //    Word_t time_index;
@@ -1311,12 +1369,29 @@ static void init_committed_page_index(struct rrdengine_instance *ctx)
 
 void init_page_cache(struct rrdengine_instance *ctx)
 {
+    static int mrg_init = 0;
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->page_descriptors = 0;
     pg_cache->active_descriptors = 0;
     pg_cache->populated_pages = 0;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
+
+    if (!mrg_init) {
+        main_mrg = mrg_create();
+        mrg_init = 1;
+
+        main_cache = pgc_create(
+            default_rrdeng_page_cache_mb * 1024 * 1024,
+            page_cache_free_clean_page_callback,
+            64,
+            page_cache_save_dirty_page_callback,
+            1000,
+            10000,
+            1,
+            PGC_OPTIONS_NONE,
+            16);
+    }
 
     init_metrics_index(ctx);
     init_replaceQ(ctx);

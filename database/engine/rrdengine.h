@@ -20,6 +20,8 @@
 #include "rrdengineapi.h"
 #include "pagecache.h"
 #include "rrdenglocking.h"
+#include "../engine2/metric.h"
+#include "../engine2/cache.h"
 
 #ifdef NETDATA_RRD_INTERNALS
 

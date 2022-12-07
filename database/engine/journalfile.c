@@ -1,6 +1,40 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+
+// DBENGINE2: Helper
+
+void update_uuid_first_last_update_every(struct rrdengine_instance *ctx, uuid_t *uuid,
+                            time_t first_time, time_t last_time, time_t update_every, bool update_every_only)
+{
+    MRG_ENTRY entry;
+    METRIC *one_metric;
+
+    uuid_copy(entry.uuid, *uuid);
+    entry.section = (Word_t)ctx;
+    entry.first_time_t = first_time;
+    entry.latest_time_t = last_time;
+    entry.latest_update_every = update_every;
+
+    bool just_added;
+    one_metric = mrg_metric_add(main_mrg, entry, &just_added);
+    mrg_metric_set_update_every(main_mrg, one_metric, update_every);
+
+    if (update_every_only)
+        return;
+
+    if (likely(!just_added)) {
+        time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, one_metric);
+        time_t latest_time_t = mrg_metric_get_latest_time_t(main_mrg, one_metric);
+
+        if (oldest_time_t > first_time)
+            mrg_metric_set_first_time_t(main_mrg, one_metric, first_time);
+
+        if (latest_time_t < last_time)
+            mrg_metric_set_latest_time_t(main_mrg, one_metric, last_time);
+    }
+}
+
 void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
 {
     struct rrdeng_work *work_request;
@@ -524,6 +558,13 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         if (page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
 
+        {
+            time_t start_time_t = (time_t) (start_time_ut / USEC_PER_SEC);
+            time_t end_time_t = (time_t) (end_time_ut / USEC_PER_SEC);
+            time_t update_every_s = (update_every_s > 0) ? update_every_s : (time_t) (page_index->latest_update_every_s);
+            update_uuid_first_last_update_every(ctx, temp_id, start_time_t, end_time_t, update_every_s, false);
+        }
+
         if(descr->update_every_s == 0)
             fatal("DBENGINE: page descriptor update every is zero, end_time_ut = %llu, start_time_ut = %llu, entries = %zu",
                 (unsigned long long)end_time_ut, (unsigned long long)start_time_ut, entries);
@@ -808,7 +849,6 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
 int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
-    struct pg_cache_page_index *page_index;
     int ret, fd;
     uint64_t file_size;
     char path[RRDENG_PATH_MAX];
@@ -871,7 +911,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     struct journal_v2_header *j2_header = (void *) data_start;
 
-    size_t entries = j2_header->metric_count;
+    uint32_t entries = j2_header->metric_count;
 
     if (!entries) {
         if (unlikely(munmap(data_start, file_size)))
@@ -887,57 +927,30 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     if (rc)
         error("MADV_DONTDUMP: setting failed");
 
-//    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-//
-//    uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
+    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+
+    uv_rwlock_wrlock(&pg_cache->metrics_index.lock);
 
     // Initialize the journal file to be able to access the data
     journalfile->journal_data = data_start;
     journalfile->journal_data_size = file_size;
 
-//    usec_t header_start_time = j2_header->start_time_ut;
-//    usec_t now_usec_t = now_realtime_usec();
-//    for (size_t i=0; i < entries; i++) {
-//        Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t));
-//        if (likely(NULL != PValue)) {
-//            page_index = *PValue;
-//        }
-//        else {
-//            PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, metric->uuid, sizeof(uuid_t), PJE0);
-//            fatal_assert(NULL == *PValue);
-//            *PValue = page_index = create_page_index(&metric->uuid, ctx);
-//            page_index->oldest_time_ut = LLONG_MAX;
-//            page_index->latest_time_ut = 0;
-//            page_index->prev = pg_cache->metrics_index.last_page_index;
-//            pg_cache->metrics_index.last_page_index = page_index;
-//        }
-//
-//        usec_t metric_start_ut = header_start_time + (usec_t ) metric->delta_start * USEC_PER_SEC;
-//        usec_t metric_end_ut = header_start_time + (usec_t ) metric->delta_end * USEC_PER_SEC;
-//
-//        if (page_index->oldest_time_ut > metric_start_ut)
-//            page_index->oldest_time_ut = metric_start_ut;
-//
-//        if (page_index->latest_time_ut < metric_end_ut)
-//            page_index->latest_time_ut = metric_end_ut;
-//
-//        if (page_index->latest_time_ut > now_usec_t) {
-//            error_limit_static_global_var(erl, 1, 0);
-//            error_limit(&erl, "DBENGINE: Ignoring page index latest time as it is in the future(now=%llu, page=%llu)", now_usec_t, page_index->latest_time_ut);
-//            page_index->latest_time_ut = now_usec_t;
-//        }
-//        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-//
-//#ifdef NETDATA_INTERNAL_CHECKS
-//        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
-//        fatal_assert(metric->entries == metric_list_header->entries);
-//#endif
-//
-//        page_index->page_count += metric_list_header->entries;
-//        pg_cache->page_descriptors += metric_list_header->entries;
-//        metric++;
-//    }
-//    uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
+    time_t header_start_time_t  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+
+    for (size_t i=0; i < entries; i++) {
+        time_t start_time_t = header_start_time_t + metric->delta_start;
+        time_t end_time_t = header_start_time_t + metric->delta_end;
+        time_t update_every_s = (metric->entries > 1) ? ((end_time_t - start_time_t) / (entries - 1)) : 0;
+        update_uuid_first_last_update_every(ctx, &metric->uuid, start_time_t, end_time_t,update_every_s, false);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
+        fatal_assert(metric->entries == metric_list_header->entries);
+#endif
+        metric++;
+    }
+    uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
 
     info("Journal file \"%s\" loaded (size:%"PRIu64") with %lu metrics in %d ms",
          path, file_size, entries,
@@ -1181,8 +1194,8 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
             rrdeng_page_descr_mutex_unlock(ctx, descr);
         }
-        uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
-        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
+//        uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
+//        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
         uv_rwlock_rdunlock(&page_index->lock);
     }
 }

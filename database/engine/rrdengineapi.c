@@ -420,6 +420,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             }
         }
 
+        // FIXME: DBENGINE2 -- add hot page
         pg_cache_insert(ctx, page_index, descr);
     } else {
         pg_cache_add_new_metric_time(page_index, descr);
