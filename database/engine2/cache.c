@@ -141,7 +141,6 @@ struct pgc {
 
         size_t points_collected;
 
-        size_t search_spins;
         size_t insert_spins;
         size_t evict_spins;
         size_t release_spins;
@@ -1038,92 +1037,73 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
     }
 
     PGC_PAGE *page = NULL;
-    size_t spins = 0;
     size_t partition = indexing_partition(cache, metric_id);
-    bool try_again = false;
 
-    do {
-        spins++;
+    pgc_index_read_lock(cache, partition);
 
-        pgc_index_read_lock(cache, partition);
+    Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, section, PJE0);
+    if(unlikely(metrics_judy_pptr == PJERR))
+        fatal("DBENGINE CACHE: corrupted sections judy array");
 
-        Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, section, PJE0);
-        if(unlikely(metrics_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted sections judy array");
+    if(unlikely(!metrics_judy_pptr)) {
+        // section does not exist
+        goto cleanup;
+    }
 
-        if(unlikely(!metrics_judy_pptr)) {
-            // section does not exist
-            pgc_index_read_unlock(cache, partition);
-            break;
-        }
+    Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, metric_id, PJE0);
+    if(unlikely(pages_judy_pptr == PJERR))
+        fatal("DBENGINE CACHE: corrupted pages judy array");
 
-        Pvoid_t *pages_judy_pptr = JudyLGet(*metrics_judy_pptr, metric_id, PJE0);
-        if(unlikely(pages_judy_pptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted pages judy array");
+    if(unlikely(!pages_judy_pptr)) {
+        // metric does not exist
+        goto cleanup;
+    }
 
-        if(unlikely(!pages_judy_pptr)) {
-            // metric does not exist
-            pgc_index_read_unlock(cache, partition);
-            break;
-        }
+    Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_t, PJE0);
+    if(unlikely(page_ptr == PJERR))
+        fatal("DBENGINE CACHE: corrupted page in pages judy array");
 
-        Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_t, PJE0);
+    if(page_ptr) {
+        // exact match on the timestamp
+        page = *page_ptr;
+    }
+    else if(!exact) {
+        Word_t time = start_time_t;
+
+        // find the previous page
+        page_ptr = JudyLLast(*pages_judy_pptr, &time, PJE0);
         if(unlikely(page_ptr == PJERR))
-            fatal("DBENGINE CACHE: corrupted page in pages judy array");
+            fatal("DBENGINE CACHE: corrupted page in pages judy array #2");
 
         if(page_ptr) {
-            // exact match on the timestamp
+            // found a page starting before our timestamp
+            // check if our timestamp is included
             page = *page_ptr;
-        }
-        else if(!exact) {
-            Word_t time = start_time_t;
-
-            // find the previous page
-            page_ptr = JudyLLast(*pages_judy_pptr, &time, PJE0);
-            if(unlikely(page_ptr == PJERR))
-                fatal("DBENGINE CACHE: corrupted page in pages judy array #2");
-
-            if(page_ptr) {
-                // found a page starting before our timestamp
-                // check if our timestamp is included
-                page = *page_ptr;
-                if(start_time_t > page->end_time_t)
-                    // it is not good for us
-                    page = NULL;
-            }
-
-            if(!page) {
-                // find the next page then...
-                time = start_time_t;
-                page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0);
-                if(page_ptr)
-                    page = *page_ptr;
-            }
-        }
-
-        try_again = false;
-
-        if(page) {
-            pointer_check(cache, page);
-
-            if(!page_acquire(cache, page)) {
-                // this page is not good to use
+            if(start_time_t > page->end_time_t)
+                // it is not good for us
                 page = NULL;
-                try_again = true;
-
-                // give it some time to be deleted
-                // and then spin...
-                static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-                nanosleep(&ns, NULL);
-            }
         }
 
-        pgc_index_read_unlock(cache, partition);
+        if(!page) {
+            // find the next page then...
+            time = start_time_t;
+            page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0);
+            if(page_ptr)
+                page = *page_ptr;
+        }
+    }
 
-    } while(!page && try_again);
+    if(page) {
+        pointer_check(cache, page);
 
-    if(unlikely(spins > 1))
-        __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
+        if(!page_acquire(cache, page)) {
+            // this page is not good to use
+            page = NULL;
+        }
+    }
+
+cleanup:
+    pgc_index_read_unlock(cache, partition);
 
     if(page) {
         page_has_been_accessed(cache, page);
@@ -1517,9 +1497,9 @@ struct {
         .hot_metrics     =   1000000,
         .first_time_t    = 100000000,
         .last_time_t     = 0,
-        .cache_size      = 1024,
+        .cache_size      = 32,
         .collect_threads = 16,
-        .query_threads   = 5,
+        .query_threads   = 16,
         .partitions      = 10,
         .options         = PGC_OPTIONS_AUTOSCALE,/* PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,*/
         .points_per_page = 10,
