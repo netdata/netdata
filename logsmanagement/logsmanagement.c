@@ -480,10 +480,15 @@ static void logs_management_init(struct section *config_section){
 
         int regex_flags = cus_ignore_case_v ?   REG_EXTENDED | REG_NEWLINE | REG_ICASE : 
                                                 REG_EXTENDED | REG_NEWLINE;
-        if (unlikely(regcomp( &p_file_info->parser_cus_config[cus_off - 1]->regex, 
+        int rc;
+        if (unlikely((rc = regcomp( &p_file_info->parser_cus_config[cus_off - 1]->regex, 
                                 p_file_info->parser_cus_config[cus_off - 1]->regex_str, 
-                                regex_flags))){
-            fatal("Could not compile regular expression:%s", p_file_info->parser_cus_config[cus_off - 1]->regex_str);
+                                regex_flags)))){
+            size_t regcomp_err_str_size = regerror(rc, &p_file_info->parser_cus_config[cus_off - 1]->regex, 0, 0);
+            char *regcomp_err_str = mallocz(regcomp_err_str_size);
+            regerror(rc, &p_file_info->parser_cus_config[cus_off - 1]->regex, regcomp_err_str, regcomp_err_str_size);
+            fatal("Could not compile regular expression:%s, error: %s", 
+                    p_file_info->parser_cus_config[cus_off - 1]->regex_str, regcomp_err_str);
         };
 
         /* Initialise custom log parser metrics struct array */

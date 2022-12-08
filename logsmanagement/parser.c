@@ -280,8 +280,12 @@ int search_keyword( char *src, size_t src_sz,
         char regexString[MAX_REGEX_SIZE];
         const int regex_flags = ignore_case ? REG_EXTENDED | REG_NEWLINE | REG_ICASE : REG_EXTENDED | REG_NEWLINE;
         snprintf(regexString, MAX_REGEX_SIZE, ".*(%s).*", keyword);
-        if (unlikely(regcomp(&regex_compiled, regexString, regex_flags))){
-            fatal("Could not compile regular expression:%.*s", (int) MAX_REGEX_SIZE, regexString);
+        int rc;
+        if (unlikely((rc = regcomp(&regex_compiled, regexString, regex_flags)))){
+            size_t regcomp_err_str_size = regerror(rc, &regex_compiled, 0, 0);
+            char *regcomp_err_str = mallocz(regcomp_err_str_size);
+            regerror(rc, &regex_compiled, regcomp_err_str, regcomp_err_str_size);
+            fatal("Could not compile regular expression:%.*s, error: %s", (int) MAX_REGEX_SIZE, regexString, regcomp_err_str);
         };
     }
 
