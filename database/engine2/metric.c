@@ -8,7 +8,8 @@ struct metric {
     Word_t section;
     time_t first_time_t;
     time_t latest_time_t;
-    time_t latest_update_every;
+    time_t hot_latest_time_t;
+    uint32_t latest_update_every;
 };
 
 struct mrg {
@@ -291,11 +292,22 @@ bool mrg_metric_set_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t
     return true;
 }
 
+bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    __atomic_store_n(&metric->hot_latest_time_t, latest_time_t, __ATOMIC_RELEASE);
+    return true;
+}
+
 time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
-    return __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
+    time_t clean = __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
+    time_t hot = __atomic_load_n(&metric->hot_latest_time_t, __ATOMIC_ACQUIRE);
+
+    return MAX(clean, hot);
 }
 
 bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) {
