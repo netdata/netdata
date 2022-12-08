@@ -809,8 +809,6 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
 
         pages_to_evict = 0;
 
-        PGC_PAGE *first_skipped = NULL;
-
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
                 stopped_before_finishing = true;
@@ -824,10 +822,6 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
 
         for(PGC_PAGE *page = cache->clean.base; page ; ) {
             PGC_PAGE *next = page->link.next;
-
-            if(unlikely(page == first_skipped))
-                // we looped through all the ones to be skipped
-                break;
 
             if(page_get_for_deletion(cache, page)) {
                 // we can delete this page
@@ -850,14 +844,6 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
             else {
                 // we can't delete this page
-
-                if(unlikely(!first_skipped))
-                    // remember this page, to stop iterating forever
-                    first_skipped = page;
-
-                // put it at the end of the clean list
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
                 // check if we have to stop
                 if(++total_pages_skipped >= max_skip && !all_of_them) {
@@ -891,10 +877,11 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
 
             // repeat until all partitions have been cleaned up
+            size_t repeats = cache->config.partitions * 2;
             size_t waiting = cache->config.partitions;
             bool force = false;
             while(waiting) {
-                if(waiting == 1) force = true;
+                if(--repeats == 0 || waiting == 1) force = true;
                 waiting = 0;
 
                 for (size_t partition = 0; partition < cache->config.partitions; partition++) {
