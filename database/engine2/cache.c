@@ -310,7 +310,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
         size_t hot     = __atomic_load_n(&cache->hot.size, __ATOMIC_RELAXED);
         size_t hot_max = __atomic_load_n(&cache->hot.max_size, __ATOMIC_RELAXED);
 
-        size_t wanted_cache_size = hot_max * 10 / 4; // 2.5 times
+        size_t wanted_cache_size = hot_max * 2;
 
         size_t max_for_clean;
         if(wanted_cache_size < hot + dirty + cache->config.max_clean_size)
@@ -1313,7 +1313,7 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
-    cache->config.max_clean_size = (max_clean_size < 1) ? 1 : max_clean_size;
+    cache->config.max_clean_size = (max_clean_size < 8 * 1024 * 1024) ? 8 * 1024 * 1024 : max_clean_size;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_call,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
@@ -1470,7 +1470,7 @@ bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
 }
 
 bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
-    bool under_pressure = __atomic_load_n(&cache->dirty.size, __ATOMIC_RELAXED) > __atomic_load_n(&cache->hot.size, __ATOMIC_RELAXED);
+    bool under_pressure = __atomic_load_n(&cache->dirty.size, __ATOMIC_RELAXED) > __atomic_load_n(&cache->hot.max_size, __ATOMIC_RELAXED);
     return flush_pages(cache, under_pressure ? 0 : max_flushes, true, false);
 }
 
