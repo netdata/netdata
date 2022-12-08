@@ -23,10 +23,10 @@
 
 #define LOGS_MANAG_DB_VERSION 1
 
-static uv_loop_t *db_loop;
-static sqlite3 *main_db;   /**< SQLite DB handler for MAIN_DB **/
-static char *main_db_dir;  /**< Directory where all the log management databases and log blobs are stored in **/
-static char *main_db_path; /**< Path of MAIN_DB **/
+static uv_loop_t *db_loop = NULL; /**< uv_loop_t to run certain callbacks of this source file in **/
+static sqlite3 *main_db = NULL;   /**< SQLite DB handler for MAIN_DB **/
+static char *main_db_dir = NULL;  /**< Directory where all the log management databases and log blobs are stored in **/
+static char *main_db_path = NULL; /**< Path of MAIN_DB **/
 
 /* -------------------------------------------------------------------------- */
 /*                            Database migrations                             */
@@ -373,31 +373,27 @@ inline void db_set_main_dir(char *dir){
     main_db_dir = dir;
 }
 
-void db_init() {
+int db_init() {
     int rc = 0;
     char *err_msg = 0;
     uv_fs_t mkdir_req;
     
     db_loop = mallocz(sizeof(uv_loop_t));
     rc = uv_loop_init(db_loop);
-    if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
+    if (unlikely(rc)) goto return_error;
 
     main_db_path = mallocz(strlen(main_db_dir) + sizeof(MAIN_DB) + 1);
     sprintf(main_db_path, "%s/" MAIN_DB, main_db_dir);
 
     /* Create databases directory if it doesn't exist. */
     rc = uv_fs_mkdir(db_loop, &mkdir_req, main_db_dir, 0775, NULL);
-    if(rc == 0) {
-        info("DB directory created: %s", main_db_dir);
-    }
-    else if (rc == UV_EEXIST) {
-        info("DB directory %s found", main_db_dir);
-    }
+    uv_fs_req_cleanup(&mkdir_req);
+    if(rc == 0) info("DB directory created: %s", main_db_dir);
+    else if (rc == UV_EEXIST) info("DB directory %s found", main_db_dir);
     else {
         error("DB mkdir() %s/ error: %s", main_db_dir, uv_strerror(rc));
-        fatal_sqlite3_err(rc, __LINE__);
+        goto return_error;
     }
-    uv_fs_req_cleanup(&mkdir_req);
 
     /* Create or open main db */
     rc = sqlite3_open(main_db_path, &main_db);
@@ -890,6 +886,18 @@ void db_init() {
 
     uv_thread_t *db_loop_run_thread = mallocz(sizeof(uv_thread_t));
     if(unlikely(uv_thread_create(db_loop_run_thread, db_loop_run, NULL))) fatal("uv_thread_create() error");
+
+    return 0;
+
+return_error:
+    freez(db_loop);
+    db_loop = NULL;
+    
+    freez(main_db_path);
+    main_db_path = NULL;
+
+    m_assert(rc != 0, "rc should not be == 0 in case of error");
+    return rc == 0 ? -1 : rc;
 }
 
 /**
