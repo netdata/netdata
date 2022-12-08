@@ -740,6 +740,10 @@ libmqttwebsockets_a_SOURCES = \
 
 libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
+if MQTT_WSS_DEBUG
+libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG
+endif
+
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
 ACLK_PROTO_DEFINITIONS = \
