@@ -31,7 +31,7 @@ void Config::readMLConfig(void) {
     unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 900);
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
-    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1 * 24);
+    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1);
 
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -88,7 +88,7 @@ void Config::readMLConfig(void) {
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
-    Cfg.NumModelsToUse = 1;
+    Cfg.NumModelsToUse = NumModelsToUse;
  #else
     Cfg.MaxTrainSamples = 30;
     Cfg.MinTrainSamples = 15;
