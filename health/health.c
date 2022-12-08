@@ -1555,15 +1555,14 @@ void health_add_host_labels(void) {
     DICTIONARY *labels = localhost->rrdlabels;
     enum rrdlabel_source src;
 
-    src = appconfig_exists(&netdata_config, CONFIG_SECTION_HEALTH, "is ephemeral") ? RRDLABEL_SRC_CONFIG :
-                                                                                     RRDLABEL_SRC_AUTO;
-    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "is ephemeral", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", src);
+    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
+    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
 
-    src = appconfig_exists(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection") ? RRDLABEL_SRC_CONFIG :
-                                                                                                RRDLABEL_SRC_AUTO;
+    int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "is ephemeral", CONFIG_BOOLEAN_NO);
+    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
+
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", src);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 }
 
 void health_thread_spawn(RRDHOST * host) {
