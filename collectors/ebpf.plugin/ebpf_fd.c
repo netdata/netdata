@@ -6,6 +6,9 @@
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
 
+static char *close_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"close_fd", "__close_fd"};
+static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_sys_open"};
+
 static netdata_syscall_stat_t fd_aggregated_data[NETDATA_FD_SYSCALL_END];
 static netdata_publish_syscall_t fd_publish_aggregated[NETDATA_FD_SYSCALL_END];
 
@@ -65,7 +68,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kretprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_close_fd_kprobe, false);
@@ -85,7 +88,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_probes(struct fd_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
     } else {
@@ -121,7 +124,7 @@ static inline void ebpf_disable_trampoline(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_trampoline(struct fd_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fexit, false);
     } else {
@@ -143,7 +146,7 @@ static void ebpf_set_trampoline_target(struct fd_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     bpf_program__set_attach_target(obj->progs.netdata_release_task_fd_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_attach_target(
             obj->progs.netdata_close_fd_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         bpf_program__set_attach_target(obj->progs.netdata_close_fd_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
@@ -185,7 +188,7 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
     if (ret)
         return -1;
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         obj->links.netdata_close_fd_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_close_fd_kretprobe, true,
                                                                            fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         ret = libbpf_get_error(obj->links.netdata_close_fd_kretprobe);
@@ -241,9 +244,6 @@ static inline void ebpf_fd_fill_address(ebpf_addresses_t *address, char **target
  */
 static int ebpf_fd_set_target_values()
 {
-    static char *close_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"close_fd", "__close_fd"};
-    static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_sys_open"};
-
     ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
     ebpf_fd_fill_address(&address, close_targets);
 
