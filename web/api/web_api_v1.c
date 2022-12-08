@@ -345,7 +345,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
 
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    health_alarm_log2json(host, w->response.data, after, chart);
+    sql_health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
 

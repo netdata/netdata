@@ -39,7 +39,6 @@ void health_reload(void);
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* context, RRDCALC_STATUS status);
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all);
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all);
-void health_alarm_log2json(RRDHOST *host, BUFFER *wb, uint32_t after, char *chart);
 
 void health_api_v1_chart_variables2json(RRDSET *st, BUFFER *buf);
 void health_api_v1_chart_custom_variables2json(RRDSET *st, BUFFER *buf);
@@ -95,5 +94,6 @@ char *health_edit_command_from_source(const char *source);
 void sql_refresh_hashes(void);
 
 void health_add_host_labels(void);
+void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix);
 
 #endif //NETDATA_HEALTH_H
