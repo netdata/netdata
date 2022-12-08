@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "LiteSpeed"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Apm"
+learn_rel_path: "References/Collectors references/Application Performance Monitoring"
 -->
 
 # LiteSpeed monitoring with Netdata

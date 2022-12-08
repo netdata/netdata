@@ -2,7 +2,7 @@
 title: "charts.d.plugin"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/README.md"
 sidebar_label: "charts.d.plugin"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "References"
 learn_rel_path: "References/Collectors references/Uncategorized"
 -->

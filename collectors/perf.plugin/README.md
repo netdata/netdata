@@ -1,7 +1,7 @@
 <!--
-title: "perf.plugin"
+title: "Monitor CPU performance statistics (perf.plugin)"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/perf.plugin/README.md"
-sidebar_label: "perf.plugin"
+sidebar_label: "CPU performance statistics (perf.plugin)"
 learn_status: "Published"
 learn_topic_type: "References"
 learn_rel_path: "References/Collectors references/System metrics"

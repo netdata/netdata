@@ -2,10 +2,7 @@
 title: "Supported collectors list"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "COLLECTORS.md"
-learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Uncategorized"
+sidebar_label: "Supported collectors list"
 -->
 
 # Supported collectors list

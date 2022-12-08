@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/plug
 sidebar_label: "plugins.d"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Uncategorized"
+learn_rel_path: "References/Collectors references/plugins.d"
 -->
 
 # External plugins overview
