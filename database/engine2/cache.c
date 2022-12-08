@@ -1003,10 +1003,10 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
             __atomic_add_fetch(&cache->stats.size, page->assumed_size, __ATOMIC_RELAXED);
         }
         else {
-            pgc_index_write_unlock(cache, partition);
-
             if (!page_acquire(cache, page))
                 page = NULL;
+
+            pgc_index_write_unlock(cache, partition);
         }
 
     } while(!page);
