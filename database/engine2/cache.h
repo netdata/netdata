@@ -65,6 +65,7 @@ bool pgc_is_page_clean(PGC_PAGE *page);
 
 // resetting the end time of a hot page
 void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
+void pgc_page_hot_to_clean_empty_and_release(PGC *cache, PGC_PAGE *page);
 
 // return true when there is more work to do
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);

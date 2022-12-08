@@ -29,15 +29,18 @@ typedef enum __attribute__ ((__packed__)) {
     PGC_PAGE_IS_BEING_CREATED = (1 << 3),
     PGC_PAGE_IS_BEING_DELETED = (1 << 4),
     PGC_PAGE_IS_BEING_SAVED   = (1 << 5),
+
+    PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 6),
 } PGC_PAGE_FLAGS;
 
-#define page_flag_check(page, flag) (__atomic_load_n(&((page)->flags), __ATOMIC_RELAXED) & (flag))
-#define page_flag_set(page, flag)   __atomic_or_fetch(&((page)->flags), flag, __ATOMIC_RELAXED)
-#define page_flag_clear(page, flag) __atomic_and_fetch(&((page)->flags), ~(flag), __ATOMIC_RELAXED)
+#define page_flag_check(page, flag) (__atomic_load_n(&((page)->flags), __ATOMIC_ACQUIRE) & (flag))
+#define page_flag_set(page, flag)   __atomic_or_fetch(&((page)->flags), flag, __ATOMIC_RELEASE)
+#define page_flag_clear(page, flag) __atomic_and_fetch(&((page)->flags), ~(flag), __ATOMIC_RELEASE)
 
-#define is_page_hot(page) (page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) == PGC_PAGE_HOT)
-#define is_page_dirty(page) (page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) == PGC_PAGE_DIRTY)
-#define is_page_clean(page) (page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) == PGC_PAGE_CLEAN)
+#define page_get_status(page) page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN)
+#define is_page_hot(page) (page_get_status(page) == PGC_PAGE_HOT)
+#define is_page_dirty(page) (page_get_status(page) == PGC_PAGE_DIRTY)
+#define is_page_clean(page) (page_get_status(page) == PGC_PAGE_CLEAN)
 
 struct pgc_page {
     // indexing data
@@ -146,6 +149,8 @@ struct pgc {
         size_t delete_spins;
 
         size_t evict_skipped;
+        size_t hot_empty_pages_evicted_immediately;
+        size_t hot_empty_pages_evicted_later;
         size_t *pages_added_per_partition;
     } stats;
 
@@ -392,9 +397,9 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     if(!having_lock)
         pgc_ll_lock(cache, ll);
 
-    internal_fatal(page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) != 0,
+    internal_fatal(page_get_status(page) != 0,
                    "DBENGINE CACHE: invalid page flags, the page has %d, but it is should be %d",
-                   page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN),
+                   page_get_status(page),
                    0);
 
     if(ll->linked_list_in_sections_judy) {
@@ -452,9 +457,9 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     if(!having_lock)
         pgc_ll_lock(cache, ll);
 
-    internal_fatal(page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN) != ll->flags,
+    internal_fatal(page_get_status(page) != ll->flags,
                    "DBENGINE CACHE: invalid page flags, the page has %d, but it is should be %d",
-                   page_flag_check(page, PGC_PAGE_HOT | PGC_PAGE_DIRTY | PGC_PAGE_CLEAN),
+                   page_get_status(page),
                    ll->flags);
 
     page_flag_clear(page, ll->flags);
@@ -486,14 +491,20 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 }
 
 static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
-    if(is_page_clean(page)) {
-        if(!pgc_ll_trylock(cache, &cache->clean))
-            // it is locked, don't bother...
-            return;
+    PGC_PAGE_FLAGS flags = page_flag_check(page, PGC_PAGE_CLEAN | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
 
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
-        pgc_ll_unlock(cache, &cache->clean);
+    if (!(flags & PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES)) {
+        __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
+
+        if (flags & PGC_PAGE_CLEAN) {
+            if (!pgc_ll_trylock(cache, &cache->clean))
+                // it is locked, don't bother...
+                return;
+
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+            pgc_ll_unlock(cache, &cache->clean);
+        }
     }
 }
 
@@ -501,33 +512,23 @@ static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
 // ----------------------------------------------------------------------------
 // state transitions
 
-static inline void page_clear_clean(PGC *cache, PGC_PAGE *page) {
-    if(!is_page_clean(page)) return;
-    pgc_ll_del(cache, &cache->clean, page, false);
-}
-
-static void page_clear_dirty(PGC *cache, PGC_PAGE *page) {
-    if(!is_page_dirty(page)) return;
-    pgc_ll_del(cache, &cache->dirty, page, false);
-}
-
-static inline void page_clear_hot(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
-    if(!is_page_hot(page)) return;
-    pgc_ll_del(cache, &cache->hot, page, having_hot_lock);
-}
-
 static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transition_lock, bool having_clean_lock) {
     if(!having_transition_lock)
         page_transition_lock(cache, page);
 
-    if(is_page_clean(page)) {
+    PGC_PAGE_FLAGS flags = page_get_status(page);
+
+    if(flags & PGC_PAGE_CLEAN) {
         if(!having_transition_lock)
             page_transition_unlock(cache, page);
         return;
     }
 
-    page_clear_hot(cache, page, false);
-    page_clear_dirty(cache, page);
+    if(flags & PGC_PAGE_HOT)
+        pgc_ll_del(cache, &cache->hot, page, false);
+
+    if(flags & PGC_PAGE_DIRTY)
+        pgc_ll_del(cache, &cache->dirty, page, false);
 
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->clean, page, having_clean_lock);
@@ -539,13 +540,18 @@ static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transi
 static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
     page_transition_lock(cache, page);
 
-    if(is_page_dirty(page)) {
+    PGC_PAGE_FLAGS flags = page_get_status(page);
+
+    if(flags & PGC_PAGE_DIRTY) {
         page_transition_unlock(cache, page);
         return;
     }
 
-    page_clear_hot(cache, page, having_hot_lock);
-    page_clear_clean(cache, page);
+    if(flags & PGC_PAGE_HOT)
+        pgc_ll_del(cache, &cache->hot, page, having_hot_lock);
+
+    if(flags & PGC_PAGE_CLEAN)
+        pgc_ll_del(cache, &cache->clean, page, false);
 
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->dirty, page, false);
@@ -556,13 +562,18 @@ static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
 static inline void page_set_hot(PGC *cache, PGC_PAGE *page) {
     page_transition_lock(cache, page);
 
-    if(is_page_hot(page)) {
+    PGC_PAGE_FLAGS flags = page_get_status(page);
+
+    if(flags & PGC_PAGE_HOT) {
         page_transition_unlock(cache, page);
         return;
     }
 
-    page_clear_dirty(cache, page);
-    page_clear_clean(cache, page);
+    if(flags & PGC_PAGE_DIRTY)
+        pgc_ll_del(cache, &cache->dirty, page, false);
+
+    if(flags & PGC_PAGE_CLEAN)
+        pgc_ll_del(cache, &cache->clean, page, false);
 
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->hot, page, false);
@@ -609,8 +620,6 @@ static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
 
     if(desired == 1)
         PGC_REFERENCED_PAGES_PLUS1(cache, page);
-
-    page_has_been_accessed(cache, page);
 
     return true;
 }
@@ -1128,7 +1137,8 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         __atomic_add_fetch(&cache->stats.search_spins, spins - 1, __ATOMIC_RELAXED);
 
     if(page) {
-        __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
+        page_has_been_accessed(cache, page);
+
         __atomic_add_fetch(stats_hit_ptr, 1, __ATOMIC_RELAXED);
         evict_on_page_searched_and_found(cache);
     }
@@ -1384,9 +1394,40 @@ void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
     if(!is_page_hot(page))
         fatal("DBENGINE CACHE: called %s() but page is not hot", __FUNCTION__ );
 
+    // make page dirty
     page_set_dirty(cache, page, false);
+
+    // release the page
     page_release(cache, page, true);
 
+    // flush, if we have to
+    if(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE)
+        flush_pages(cache, cache->config.max_flushes_inline, false, false);
+}
+
+void pgc_page_hot_to_clean_empty_and_release(PGC *cache, PGC_PAGE *page) {
+    if(!is_page_hot(page))
+        fatal("DBENGINE CACHE: set empty on non-hot page");
+
+    // prevent accesses from increasing the accesses counter
+    page_flag_set(page, PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
+
+    // zero the accesses counter
+    __atomic_store_n(&page->accesses, 0, __ATOMIC_RELEASE);
+
+    // make it clean - it does not have any accesses, so it will be prepended
+    page_set_clean(cache, page, false, false);
+
+    // release it
+    page_release(cache, page, false);
+
+    // if there are no other references to it, evict it immediately
+    if(evict_this_page(cache, page))
+        __atomic_add_fetch(&cache->stats.hot_empty_pages_evicted_immediately, 1, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&cache->stats.hot_empty_pages_evicted_later, 1, __ATOMIC_RELAXED);
+
+    // flush, if we have to
     if(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE)
         flush_pages(cache, cache->config.max_flushes_inline, false, false);
 }
@@ -1550,8 +1591,12 @@ void *unittest_stress_test_collector(void *ptr) {
         }
 
         for (size_t i = metric_start; i < metric_end; i++) {
-            if (pgc_uts.metrics[i])
-                pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
+            if (pgc_uts.metrics[i]) {
+                if(i % 10 == 0)
+                    pgc_page_hot_to_clean_empty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
+                else
+                    pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
+            }
         }
 
         netdata_thread_enable_cancelability();
