@@ -131,9 +131,9 @@ void sql_build_node_info(struct aclk_database_worker_config *wc, struct aclk_dat
     return;
 }
 
+#ifdef ENABLE_ACLK
 void register_update_node_instance_connection_msg(RRDHOST *host, int cmd)
 {
-#ifdef ENABLE_ACLK
     struct aclk_database_worker_config *wc  = (struct aclk_database_worker_config *)host->dbsync_worker;
     if (!wc || netdata_exit) {
         aclk_host_state_update(host, cmd);
@@ -147,8 +147,5 @@ void register_update_node_instance_connection_msg(RRDHOST *host, int cmd)
         wc->node_instance_connection_cmd = cmd;
 
     wc->node_instance_connection_time = now_realtime_sec();
-#else
-    UNUSED(host);
-    UNUSED(cmd);
-#endif
 }
+#endif
