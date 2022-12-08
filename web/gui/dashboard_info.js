@@ -4281,6 +4281,23 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (IIS)
+
+    'wmi.iis_website_isapi_extension_requests_count': {
+        info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are processed concurrently by the web service.'
+    },
+    'wmi.iis_website_errors_rate': {
+        info: '<p>The number of requests that cannot be satisfied by the server.</p><p><b>DocumentLocked</b> - the requested document was locked. Usually reported as HTTP error 423. <b>DocumentNotFound</b> - the requested document was not found. Usually reported as HTTP error 404.</p>'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (Service)
+
+    'wmi.service_status': {
+        info: 'The current <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of the service.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {

@@ -715,6 +715,7 @@ declare -A pkg_tar=(
   ['gentoo']="app-arch/tar"
   ['clearlinux']="os-core-update"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
   ['default']="tar"
 )
 

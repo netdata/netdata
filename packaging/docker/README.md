@@ -37,6 +37,33 @@ and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
+<details>
+<summary>Prerequisite steps for Fedora users</summary>
+
+There is a known issue with [Docker Engine on Fedora](https://docs.docker.com/engine/install/fedora/) where a task
+running in a container hangs and consumes 100% of the CPU core. The issue is not Netdata specific. When setting
+the `nofile` ulimit, the task performs normally.
+
+To fix the issue, add the following to the `/etc/docker/daemon.json` file and restart `docker.service`:
+
+```json
+{
+  "default-ulimits": {
+    "nofile": {
+      "Hard": 4096,
+      "Name": "nofile",
+      "Soft": 4096
+    }
+  }
+}
+```
+
+An alternative solution is to set ulimit `nofile` when creating a Netdata container
+with [docker run](https://docs.docker.com/engine/reference/commandline/run/#set-ulimits-in-container---ulimit)
+or [docker-compose](https://docs.docker.com/compose/compose-file/compose-file-v3/#ulimits).
+
+</details>
+
 You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
 
@@ -169,12 +196,12 @@ docker rm -f netdata_tmp
 ```
 
 **`docker run`**: Use the `docker run` command, along with the following options, to start a new container. Note the
-changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \` line from the recommended example above.
+changed `-v $(pwd)/netdataconfig/netdata:/etc/netdata \` line from the recommended example above.
 
 ```bash
 docker run -d --name=netdata \
   -p 19999:19999 \
-  -v $(pwd)/netdataconfig/netdata:/etc/netdata:ro \
+  -v $(pwd)/netdataconfig/netdata:/etc/netdata \
   -v netdatalib:/var/lib/netdata \
   -v netdatacache:/var/cache/netdata \
   -v /etc/passwd:/host/etc/passwd:ro \
