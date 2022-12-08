@@ -497,10 +497,7 @@ static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
         __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
 
         if (flags & PGC_PAGE_CLEAN) {
-            if (!pgc_ll_trylock(cache, &cache->clean))
-                // it is locked, don't bother...
-                return;
-
+            pgc_ll_lock(cache, &cache->clean);
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
             pgc_ll_unlock(cache, &cache->clean);
@@ -828,6 +825,10 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
         for(PGC_PAGE *page = cache->clean.base; page ; ) {
             PGC_PAGE *next = page->link.next;
 
+            if(unlikely(page == first_skipped))
+                // we looped through all the ones to be skipped
+                break;
+
             if(page_get_for_deletion(cache, page)) {
                 // we can delete this page
 
@@ -849,10 +850,6 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
             else {
                 // we can't delete this page
-
-                if(unlikely(page == first_skipped))
-                    // we looped through all the ones to be skipped
-                    break;
 
                 if(unlikely(!first_skipped))
                     // remember this page, to stop iterating forever
@@ -1126,6 +1123,11 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
                 // this page is not good to use
                 page = NULL;
                 try_again = true;
+
+                // give it some time to be deleted
+                // and then spin...
+                static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+                nanosleep(&ns, NULL);
             }
         }
 
