@@ -334,10 +334,7 @@ while [ -n "${1}" ]; do
       NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-ml)}" | sed 's/$/ --disable-ml/g')"
       NETDATA_ENABLE_ML=0
       ;;
-    "--enable-logsmanagement")
-      NETDATA_ENABLE_LOGS_MANAGEMENT=1
-      NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
-      ;;
+    "--enable-logsmanagement") NETDATA_ENABLE_LOGS_MANAGEMENT=1;;
     "--enable-logsmanagement-tests") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement-tests)}" | sed 's/$/ --enable-logsmanagement-tests/g')" ;;
     "--disable-lto") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-lto)}" | sed 's/$/ --disable-lto/g')" ;;
     "--disable-x86-sse") NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--disable-x86-sse)}" | sed 's/$/ --disable-x86-sse/g')" ;;
@@ -961,6 +958,7 @@ bundle_fluentbit() {
 
   if build_fluentbit "$cmake"; then
     FLUENT_BIT_BUILD_SUCCESS=1
+    NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
     run_ok "Fluent-Bit built successfully."
   else
     run_failed "Failed to build Fluent-Bit, Netdata Logs Management support will be disabled in this build."
