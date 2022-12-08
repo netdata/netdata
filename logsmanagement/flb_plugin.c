@@ -78,6 +78,8 @@ static flb_ctx_t *ctx;
 static flb_ctx_t *(*flb_create)(void);
 static int (*flb_service_set)(flb_ctx_t *ctx, ...);
 static int (*flb_start)(flb_ctx_t *ctx);
+static int (*flb_stop)(flb_ctx_t *ctx);
+static void (*flb_destroy)(flb_ctx_t *ctx);
 static int (*flb_time_pop_from_msgpack)(struct flb_time *time, msgpack_unpacked *upk, msgpack_object **map);
 static int (*flb_lib_free)(void *data);
 static struct flb_parser *(*flb_parser_create)(const char *name, const char *format, const char *p_regex,int skip_empty,
@@ -123,7 +125,17 @@ int flb_init(void){
     if ((dl_error = dlerror()) != NULL) {
         error("dlerror loading flb_start: %s", dl_error);
         return -1;
-    }    
+    }
+    *(void **) (&flb_stop) = dlsym(handle, "flb_stop");
+    if ((dl_error = dlerror()) != NULL) {
+        error("dlerror loading flb_stop: %s", dl_error);
+        return -1;
+    }
+    *(void **) (&flb_destroy) = dlsym(handle, "flb_destroy");
+    if ((dl_error = dlerror()) != NULL) {
+        error("dlerror loading flb_destroy: %s", dl_error);
+        return -1;
+    }   
     *(void **) (&flb_time_pop_from_msgpack) = dlsym(handle, "flb_time_pop_from_msgpack");
     if ((dl_error = dlerror()) != NULL) {
         error("dlerror loading flb_time_pop_from_msgpack: %s", dl_error);
@@ -185,6 +197,11 @@ int flb_init(void){
 int flb_run(void){
     if (likely(flb_start(ctx)) == 0) return 0;
     else return -1;
+}
+
+void flb_stop_and_cleanup(void){
+    flb_stop(ctx);
+    flb_destroy(ctx);
 }
 
 void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {

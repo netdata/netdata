@@ -45,13 +45,15 @@ static struct config log_management_config = {
 };
 
 struct File_infos_arr *p_file_infos_arr = NULL;
-uv_loop_t *main_loop; 
+uv_loop_t *main_loop = NULL; 
 
 volatile sig_atomic_t p_file_infos_arr_ready = 0;
 int g_logs_manag_update_every = 1;
 
 
 static void p_file_info_destroy(struct File_info *p_file_info){
+
+    info("[%s]: p_file_info_destroy() cleanup", p_file_info->chart_name ? p_file_info->chart_name : "Unknown");
 
     freez((void *) p_file_info->chart_name);
     freez(p_file_info->filename);
@@ -100,6 +102,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     // freez(p_file_info->log_parser_thread); // not yet allocated
     
     freez(p_file_info);
+    p_file_info = NULL;
 }
 
 /**
@@ -586,6 +589,7 @@ static void logs_management_init(struct section *config_section){
     p_file_infos_arr->data = reallocz(p_file_infos_arr->data, (++p_file_infos_arr->count) * (sizeof p_file_info));
     p_file_infos_arr->data[p_file_infos_arr->count - 1] = p_file_info;
 
+    info("[%s]: initialization completed", p_file_info->chart_name);
 }
 
 static void logsmanagement_main_cleanup(void *ptr) {
@@ -599,6 +603,7 @@ static void logsmanagement_main_cleanup(void *ptr) {
             p_file_info_destroy(p_file_infos_arr->data[i]);
         }
         freez(p_file_infos_arr);
+        p_file_infos_arr = NULL;
     }
 
     // TODO: Additional work to do here on exit? Maybe flush buffers to DB?
@@ -615,8 +620,6 @@ static void logsmanagement_main_cleanup(void *ptr) {
 void *logsmanagement_main(void *ptr) {
     UNUSED(ptr);
     netdata_thread_cleanup_push(logsmanagement_main_cleanup, ptr);
-
-    // putenv("UV_THREADPOOL_SIZE=16");
 
     if(logs_manag_config_load()) goto cleanup;
 
@@ -648,9 +651,17 @@ void *logsmanagement_main(void *ptr) {
     } while(config_section);
     if(p_file_infos_arr->count == 0) goto cleanup; // No log sources - nothing to do
 
-    db_init(); // TODO: Check if db initialised correctly.
+    /* Run Fluent Bit engine
+     * NOTE: flb_run() ideally would be executed after db_init(), but in case of
+     * a db_init() failure, it is easier to call flb_stop_and_cleanup() rather 
+     * than the other way round (i.e. cleaning up after db_init(), if flb_run() 
+     * fails). */
+    if(flb_run()) goto cleanup;
 
-    debug(D_LOGS_MANAG, "File monitoring setup completed. Running db_init().");
+    if(db_init()){
+        flb_stop_and_cleanup();
+        goto cleanup;
+    }
     
 #if defined(__STDC_VERSION__)
     debug(D_LOGS_MANAG, "__STDC_VERSION__: %ld", __STDC_VERSION__);
@@ -669,18 +680,14 @@ void *logsmanagement_main(void *ptr) {
     uv_thread_create(&run_stress_test_queries_thread_id, run_stress_test_queries_thread, NULL);
 #endif  // LOGS_MANAGEMENT_STRESS_TEST
 
-    /* Run Fluent Bit engine 
-     * TODO: If flb_run() fails, some memory will be leaked due to above 
-     * *_init() functions and threads by db_init() will need to be terminated.
-     * All this should be handled in logsmanagement_main_cleanup() ideally. */
-    if(flb_run()) goto cleanup;
-
-    p_file_infos_arr_ready = 1;
+    p_file_infos_arr_ready = 1; // All good, inform other threads of ready state
 
     info("logsmanagement_main() setup completed successfully");
 
     /* Run uvlib loop. */
     uv_run(main_loop, UV_RUN_DEFAULT);
+
+    /* If there are valid log sources, there should always be valid handles */
     error("uv_run(main_loop, ...); - no handles or requests - exiting");
 
 cleanup:

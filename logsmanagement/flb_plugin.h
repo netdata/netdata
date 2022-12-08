@@ -12,6 +12,7 @@
 
 int flb_init(void);
 int flb_run(void);
+void flb_stop_and_cleanup(void);
 void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle);
 int flb_add_input(struct File_info *const p_file_info);
 
