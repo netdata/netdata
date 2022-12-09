@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix minor typo. [\#14111](https://github.com/netdata/netdata/pull/14111) ([tkatsoulas](https://github.com/tkatsoulas))
+- fix health emphemerality labels src [\#14105](https://github.com/netdata/netdata/pull/14105) ([ilyam8](https://github.com/ilyam8))
+- fix docker host editable config [\#14104](https://github.com/netdata/netdata/pull/14104) ([ilyam8](https://github.com/ilyam8))
 - Fix missing required package install of tar on FreeBSD [\#14095](https://github.com/netdata/netdata/pull/14095) ([Dim-P](https://github.com/Dim-P))
 - Add version to netdatacli [\#14094](https://github.com/netdata/netdata/pull/14094) ([MrZammler](https://github.com/MrZammler))
 - docs: add a note to set container nofile ulimit for Fedora users [\#14092](https://github.com/netdata/netdata/pull/14092) ([ilyam8](https://github.com/ilyam8))
@@ -19,6 +22,7 @@
 - remove python.d/springboot [\#14075](https://github.com/netdata/netdata/pull/14075) ([ilyam8](https://github.com/ilyam8))
 - fix backfilling statistics [\#14074](https://github.com/netdata/netdata/pull/14074) ([ktsaou](https://github.com/ktsaou))
 - Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
+- add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
 - Cleanly reimplement system/edit-config.in. [\#13702](https://github.com/netdata/netdata/pull/13702) ([Ferroin](https://github.com/Ferroin))
 
@@ -323,7 +327,6 @@
 - chore\(python.d\): remove python.d/\* announced in v1.36.0 deprecation notice [\#13503](https://github.com/netdata/netdata/pull/13503) ([ilyam8](https://github.com/ilyam8))
 - Add Fedora 37 to CI and package builds. [\#13489](https://github.com/netdata/netdata/pull/13489) ([Ferroin](https://github.com/Ferroin))
 - Overhaul handling of installation of Netdata as a system service. [\#13451](https://github.com/netdata/netdata/pull/13451) ([Ferroin](https://github.com/Ferroin))
-- reduce memcpy and memory usage on mqtt5 [\#13450](https://github.com/netdata/netdata/pull/13450) ([underhood](https://github.com/underhood))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
@@ -361,11 +364,6 @@
 - docs: add a note about network interface monitoring when running in a Docker container [\#13458](https://github.com/netdata/netdata/pull/13458) ([ilyam8](https://github.com/ilyam8))
 - fix a guide so we can reference it's subsections [\#13455](https://github.com/netdata/netdata/pull/13455) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "Query queue only for queries" [\#13452](https://github.com/netdata/netdata/pull/13452) ([stelfrag](https://github.com/stelfrag))
-- /api/v1/weights endpoint [\#13449](https://github.com/netdata/netdata/pull/13449) ([ktsaou](https://github.com/ktsaou))
-- Get last\_entry\_t only when st changes [\#13448](https://github.com/netdata/netdata/pull/13448) ([MrZammler](https://github.com/MrZammler))
-- additional stats [\#13445](https://github.com/netdata/netdata/pull/13445) ([ktsaou](https://github.com/ktsaou))
-- Store host label information in the metadata database [\#13441](https://github.com/netdata/netdata/pull/13441) ([stelfrag](https://github.com/stelfrag))
-- Fix typo in PostgreSQL section header [\#13440](https://github.com/netdata/netdata/pull/13440) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
