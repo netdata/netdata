@@ -74,7 +74,9 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->next = NULL;
     datafile->ctx = ctx;
     fatal_assert(0 == uv_rwlock_init(&datafile->JudyL_extent_rwlock));
-    datafile->JudyL_extent_array = NULL;
+    datafile->JudyL_extent_offset_array = NULL;
+    datafile->JudyL_extent_size_array = NULL;
+    datafile->JudyL_extent_expire_array = NULL;
 }
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)

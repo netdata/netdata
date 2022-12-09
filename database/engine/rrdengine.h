@@ -40,6 +40,10 @@ struct page_details {
     uuid_t uuid;
     Word_t start_time_t;
     Word_t end_time_t;
+    uint16_t page_length;
+    uint32_t update_every_s;
+    uint8_t type;
+    void *page_entry;
     struct rrdengine_datafile *datafile;
 };
 

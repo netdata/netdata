@@ -54,7 +54,9 @@ struct rrdengine_datafile {
     struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *next;
-    Pvoid_t JudyL_extent_array;
+    Pvoid_t JudyL_extent_offset_array;
+    Pvoid_t JudyL_extent_size_array;
+    Pvoid_t JudyL_extent_expire_array;
 };
 
 struct rrdengine_datafile_list {

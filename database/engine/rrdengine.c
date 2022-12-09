@@ -12,9 +12,28 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
 // DBENGINE 2
+struct datafile_extent_list_s
+{
+    uv_file file;
+    unsigned count;
+    unsigned fileno;
+    Pvoid_t JudyL_datafile_extent_list;
+};
+
+struct extent_page_list_s
+{
+    uv_file file;
+    uint64_t pos;
+    uint32_t size;
+    unsigned count;
+    Pvoid_t JudyL_page_list;
+    struct rrdengine_datafile *datafile;
+};
+
 static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, void *data);
 static void do_read_page_list(struct rrdengine_worker_config *wc, Pvoid_t JudyL_page_list);
 static void do_read_extent2(struct rrdengine_worker_config *wc, void *data);
+
 //
 
 #if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
@@ -121,6 +140,173 @@ unsigned int getdatafile_fileno(struct rrdengine_instance *ctx, struct rrdeng_pa
     return datafile ? datafile->fileno : 0;
 }
 
+// FIXME: This is DBENGINE2 extent decoding
+static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
+{
+    struct rrdengine_instance *ctx = wc->ctx;
+//    struct page_cache *pg_cache = &ctx->pg_cache;
+    int ret;
+    unsigned i, count;
+    void *uncompressed_buf = NULL;
+    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length = 0;
+    uint8_t have_read_error = 0;
+    /* persistent structures */
+    struct rrdeng_df_extent_header *header;
+    struct rrdeng_df_extent_trailer *trailer;
+    uLong crc;
+
+    header = data;
+    payload_length = header->payload_length;
+    count = header->number_of_pages;
+    payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
+    trailer = data + extent_page_list->size - sizeof(*trailer);
+
+    crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, data, extent_page_list->size  - sizeof(*trailer));
+    ret = crc32cmp(trailer->checksum, crc);
+    if (unlikely(ret)) {
+        ++ctx->stats.io_errors;
+        rrd_stat_atomic_add(&global_io_errors, 1);
+        have_read_error = 1;
+
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
+                    extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno);
+    }
+
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);// SPDX-License-Identifier: GPL-3.0-or-later
+    if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
+        uncompressed_payload_length = 0;
+        for (i = 0 ; i < count ; ++i) {
+                uncompressed_payload_length += header->descr[i].page_length;
+        }
+        uncompressed_buf = mallocz(uncompressed_payload_length);
+        ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
+                                  payload_length, uncompressed_payload_length);
+        ctx->stats.before_decompress_bytes += payload_length;
+        ctx->stats.after_decompress_bytes += ret;
+        debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
+        /* care, we don't hold the descriptor mutex */
+    }
+
+    worker_is_busy(UV_EVENT_PAGE_POPULATION);
+    char uuid_str[UUID_STR_LEN];
+//    {
+//        struct page_details *pd;
+//        Pvoid_t *PValue;
+//        Word_t start_time_t = 0;
+//        for (PValue = JudyLFirst(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
+//            pd = unlikely(NULL == PValue) ? NULL : *PValue;
+//             pd != NULL;
+//             PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
+//            pd = unlikely(NULL == PValue) ? NULL : *PValue) {
+//                uuid_unparse_lower(pd->uuid, uuid_str);
+//                info(
+//                    "%s PD Page %s INDEX=%lu %lu - %lu (extent %lu, size %u at file %u) ",
+//                    __FUNCTION__,
+//                    uuid_str,
+//                    start_time_t,
+//                    pd->start_time_t,
+//                    pd->end_time_t,
+//                    pd->pos,
+//                    pd->size,
+//                    pd->fileno);
+//        }
+//
+//        for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
+//                uuid_unparse_lower(header->descr[i].uuid, uuid_str);
+//                info("%s HEADER Page %s %lu - %lu (size %u) ",
+//                     __FUNCTION__, uuid_str,
+//                     header->descr[i].start_time_ut / USEC_PER_SEC, header->descr[i].end_time_ut / USEC_PER_SEC, header->descr[i].page_length);
+//        }
+//    }
+
+    unsigned hit = 0, miss = 0;
+    for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
+        // FIXME: This should be the exact bytes
+        void *page_data = mallocz(header->descr[i].page_length);
+
+        uuid_unparse_lower(header->descr[i].uuid, uuid_str);
+        uuid_unparse_lower(header->descr[i].uuid, uuid_str);
+
+        Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, header->descr[i].start_time_ut / USEC_PER_SEC, PJE0);
+        struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
+
+//        if (pd)
+//            info("DEBUG: LOOKUP %d  %s @ %llu   FOUND", i, uuid_str, header->descr[i].start_time_ut / USEC_PER_SEC);
+//        else
+//            info("DEBUG: LOOKUP %d  %s @ %llu   NOT FOUND", i, uuid_str, header->descr[i].start_time_ut / USEC_PER_SEC);
+
+
+        // Check if we have match
+        if (pd) {
+                char uuid_str1[UUID_STR_LEN];
+                char uuid_str2[UUID_STR_LEN];
+                uuid_unparse_lower(pd->uuid, uuid_str1);
+                uuid_unparse_lower(header->descr[i].uuid, uuid_str2);
+//                info("DEBUG: PD UUID = %s -- header uuid = %s", uuid_str1, uuid_str2);
+                if (uuid_compare(pd->uuid, header->descr[i].uuid) == 0)
+                    hit++;
+                else {
+                    pd = NULL;
+                    miss++;
+                }
+        } else
+                miss++;
+
+        // Find metric id
+        METRIC *this_metric = mrg_metric_get(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
+        Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+
+        if (have_read_error) {
+            fill_page_with_nulls(page_data, header->descr[i].page_length, header->descr[i].type);
+        } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+            memcpy(page_data, data + payload_offset + page_offset, header->descr[i].page_length);
+        } else {
+            memcpy(page_data, uncompressed_buf + page_offset, header->descr[i].page_length);
+        }
+
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC), true);
+        if (!page) {
+
+            time_t update_every_s = 0;
+            if (pd)
+                update_every_s = pd->update_every_s;
+            else {
+                uint64_t start_time_ut = header->descr[i].start_time_ut;
+                uint64_t end_time_ut = header->descr[i].end_time_ut;
+                size_t entries = header->descr[i].page_length / page_type_size[header->descr[i].type];
+                update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
+            }
+
+            PGC_ENTRY page_entry = {
+                .hot = false,
+                .section = (Word_t)ctx,
+                .metric_id = metric_id,
+                .start_time_t = (time_t)(header->descr[i].start_time_ut / USEC_PER_SEC),
+                .end_time_t = (time_t)(header->descr[i].end_time_ut / USEC_PER_SEC),
+                .update_every = update_every_s,
+                .size = header->descr[i].page_length,
+                .data = page_data
+            };
+            bool added = true;
+            page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+            if (false == added)
+                freez(page_data);
+        }
+        if (pd) {
+            pd->page_entry = page;
+            pd->page_length = header->descr[i].page_length;
+        }
+        else
+            pgc_page_release(main_cache, page);
+    }
+    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u (HIT = %u, MISS = %u)", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size,
+         hit, miss);
+    if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)
+        freez(uncompressed_buf);
+}
+
 static void do_extent_processing (struct rrdengine_worker_config *wc, struct extent_io_descriptor *xt_io_descr, bool read_failed)
 {
     struct rrdengine_instance *ctx = wc->ctx;
@@ -150,7 +336,7 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
 
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "%s: uv_fs_read - extent at offset %"PRIu64"(%u) in datafile %u.", __func__, xt_io_descr->pos,
-                  xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
+                    xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
         goto after_crc_check;
     }
     crc = crc32(0L, Z_NULL, 0);
@@ -170,10 +356,10 @@ static void do_extent_processing (struct rrdengine_worker_config *wc, struct ext
 
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. CRC32 check: FAILED", __func__,
-               xt_io_descr->pos, xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
+                    xt_io_descr->pos, xt_io_descr->bytes, getdatafile_fileno(ctx, xt_io_descr->descr_array[0]));
     }
 
-after_crc_check:
+    after_crc_check:
     worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);// SPDX-License-Identifier: GPL-3.0-or-later
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
@@ -239,7 +425,7 @@ after_crc_check:
         }
 
         // FIXME: Add this page to page cache DBENGINE2
-        pg_cache_replaceQ_insert(ctx, descr);
+//        pg_cache_replaceQ_insert(ctx, descr);
 
 //        rrdeng_page_descr_mutex_lock(ctx, descr);
 //        pg_cache_descr = descr->pg_cache_descr;
@@ -907,6 +1093,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     if (force) {
         debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
     }
+    return 0;
 
     // FIXME: DBENGINE2
     // Here we will get a bunch of pages and we will write them
@@ -1756,26 +1943,6 @@ void rrdengine_main(void)
 }
 
 
-// DBENGINE 2
-
-
-struct datafile_extent_list_s
-{
-    uv_file file;
-    unsigned count;
-    unsigned fileno;
-    Pvoid_t JudyL_datafile_extent_list;
-};
-
-struct extent_page_list_s
-{
-    uv_file file;
-    uint64_t pos;
-    uint32_t size;
-    unsigned count;
-    Pvoid_t JudyL_page_list;
-    struct rrdengine_datafile *datafile;
-};
 
 void after_do_read_datafile_extent_list_work(uv_work_t *req, int status)
 {
@@ -1796,19 +1963,10 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
     struct datafile_extent_list_s *datafile_extent_list = work_request->data;
     Pvoid_t *PValue;
-//    Pvoid_t *PValue1;
-//    Pvoid_t *PValue2;
-//    Pvoid_t *PValue3;
-//    Word_t time_index = 0;
-//    Word_t end_time_t;
-//    unsigned entries = 0;
-//    struct page_details *pd = NULL;
 
-    // We have one extent to read
     struct extent_page_list_s *extent_page_list;
 
     Word_t pos = 0;
-//    entries = 0;
     info("DEBUG: %d Reading %u extents from datafile %u", gettid(), datafile_extent_list->count, datafile_extent_list->fileno);
     for (PValue = JudyLFirst(datafile_extent_list->JudyL_datafile_extent_list, &pos, PJE0),
         extent_page_list = unlikely(NULL == PValue) ? NULL : *PValue;
@@ -1826,39 +1984,13 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
         cmd.opcode = RRDENG_READ_EXTENT2;
         cmd.data = extent_page_list;
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-
-//        Word_t start_time_t = 0;
-//        for (PValue = JudyLFirst(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-//            pd = unlikely(NULL == PValue) ? NULL : *PValue;
-//             pd != NULL;
-//             PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-//            pd = unlikely(NULL == PValue) ? NULL : *PValue) {
-//
-//            info("  %d Page %d -- %ld - %ld (extent %llu, size %u at file %d) ", gettid(), entries, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
-//
-//            struct rrdeng_cmd cmd;
-//            cmd.opcode = RRDENG_READ_EXTENT2;
-//            cmd.data = datafile_extent_list;
-//            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-//
-//
-//            entries++;
-//        }
-//        // Free the Judy that holds the requested pagelist
-//        JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
-//        // Free the page list
-//        freez(extent_page_list);
     }
-    // Free Judy array
     JudyLFreeArray(&datafile_extent_list->JudyL_datafile_extent_list, PJE0);
 }
 
 // New version of READ EXTENT
 static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, void *data)
 {
-//    int ret;
-//    unsigned i;
-
     struct rrdeng_work *work_request;
 
     work_request = mallocz(sizeof(*work_request));
@@ -1887,16 +2019,11 @@ void after_do_read_extent2_work(uv_work_t *req, int status)
 static void do_read_extent2_work(uv_work_t *req)
 {
     struct rrdeng_work *work_request = req->data;
-//    struct rrdengine_worker_config *wc = work_request->wc;
-//    struct rrdengine_instance *ctx = wc->ctx;
+    struct rrdengine_worker_config *wc = work_request->wc;
+    struct rrdengine_instance *ctx = wc->ctx;
 
     struct extent_page_list_s *extent_page_list = work_request->data;
     Pvoid_t *PValue;
-//    Pvoid_t *PValue1;
-//    Pvoid_t *PValue2;
-//    Pvoid_t *PValue3;
-//    Word_t time_index = 0;
-//    Word_t end_time_t;
     unsigned entries = 0;
     struct page_details *pd = NULL;
 
@@ -1919,8 +2046,9 @@ static void do_read_extent2_work(uv_work_t *req)
 
     // Map the extent
     void *data;
+    // FIXME: DBENGINE2 add an extent cache cleanup
     uv_rwlock_wrlock(&extent_page_list->datafile->JudyL_extent_rwlock);
-    PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_array, extent_page_list->pos, PJE0);
+    PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_offset_array, extent_page_list->pos, PJE0);
     if (NULL == *PValue) {
         data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
         fatal_assert(MAP_FAILED != data);
@@ -1931,24 +2059,36 @@ static void do_read_extent2_work(uv_work_t *req)
         info("Extent is cached, size %u", extent_page_list->size);
         data = *PValue;
     }
+    PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_size_array, extent_page_list->pos, PJE0);
+    *(Word_t *) PValue = (Word_t) length;
+    // Store an "expire after" timestamp in this JudyL
+    // When checking for extents to expire, get the lock and check if the entry needs to be deleted
+    PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_expire_array, extent_page_list->pos, PJE0);
+    *(Word_t *) PValue = now_realtime_sec() + 60;
+
     uv_rwlock_rdunlock(&extent_page_list->datafile->JudyL_extent_rwlock);
 
     // Extent is now cached and *data contains the compressed extent
     // Need to decompress and then process the pagelist
+    do_extent_processing2(wc, data, extent_page_list);
 
-
-    for (PValue = JudyLFirst(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-        pd = unlikely(NULL == PValue) ? NULL : *PValue;
-         pd != NULL;
-         PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-        pd = unlikely(NULL == PValue) ? NULL : *PValue) {
-
-        info("  %d Page %u -- %lu - %lu (extent %lu, size %u at file %u) ", gettid(), entries, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
-
-        entries++;
-    }
+    // This is debugging
+//    start_time_t = 0;
+//    for (PValue = JudyLFirst(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
+//        pd = unlikely(NULL == PValue) ? NULL : *PValue;
+//         pd != NULL;
+//         PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
+//        pd = unlikely(NULL == PValue) ? NULL : *PValue) {
+//
+//        char uuid_str[UUID_STR_LEN];
+//        uuid_unparse_lower(pd->uuid, uuid_str);
+//        info("  %d Page %u %s -- %lu - %lu (extent %lu, size %u at file %u) ", gettid(), entries, uuid_str, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
+//
+//        entries++;
+//    }
     // Free the Judy that holds the requested pagelist
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
+
     // Free the page list
     freez(extent_page_list);
 }
@@ -1970,6 +2110,7 @@ static void do_read_extent2(struct rrdengine_worker_config *wc, void *data)
         freez(work_request);
         // FIXME: queue failed
     }
+    // FIXME: Do work sync
 }
 
 void after_do_read_page_list_work(uv_work_t *req, int status)
@@ -2044,14 +2185,14 @@ static void do_read_page_list_work(uv_work_t *req)
                 extent_page_list = *PValue2;
             extent_page_list->count++;
 
-            PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, extent_page_list->count, PJE0);
+            PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->start_time_t, PJE0);
             *PValue3 = pd;
 //            entries++;
         }
 
-        info("DEBUG: --------------------------");
-        info("DEBUG: Analyzed page read request");
-        info("DEBUG: --------------------------");
+//        info("DEBUG: --------------------------");
+//        info("DEBUG: Analyzed page read request");
+//        info("DEBUG: --------------------------");
         Word_t datafile_no = 0;
         for (PValue = JudyLFirst(JudyL_datafile_list, &datafile_no, PJE0),
             datafile_extent_list = unlikely(NULL == PValue) ? NULL : *PValue;
@@ -2060,9 +2201,7 @@ static void do_read_page_list_work(uv_work_t *req)
             datafile_extent_list = unlikely(NULL == PValue) ? NULL : *PValue) {
 
             // List of datafiles
-
             info("DEBUG: Reading extents from datafile %lu (%u entries)",  datafile_no, datafile_extent_list->count);
-
             // Now submit each datafile_extent_list back to the engine
             struct rrdeng_cmd cmd;
             cmd.opcode = RRDENG_READ_DF_EXTENT_LIST;

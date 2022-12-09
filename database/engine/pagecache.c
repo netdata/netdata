@@ -87,35 +87,35 @@ bool rrdeng_page_descr_is_mmap(void) {
     return page_descr_aral.use_mmap;
 }
 
-// FIXME: This will not take descr
-void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
-{
-    // FIXME: DBENGINE2
-    // Adding to the new page cache
-    // Find metric id associated with uuid
-    METRIC *this_metric = mrg_metric_get(main_mrg, descr->id, (Word_t) ctx);
-    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
-
-    // Get the data
-    // We copy for now because we will add in both caches
-//    void *data = dbengine_page_alloc();
-//    memcpy(data, descr->page, RRDENG_BLOCK_SIZE);
-
-    PGC_ENTRY page_entry = {
-        .hot = false,
-        .section = (Word_t) ctx,
-        .metric_id = metric_id,
-        .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
-        .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
-        .update_every = descr->update_every_s,
-        .size = RRDENG_BLOCK_SIZE,
-        .data = descr->page
-    };
-
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry);
-    pgc_page_release(main_cache, page);
-    info("DEBUG: DBENGINE2 --> Adding new page in page cache");
-}
+//// FIXME: This will not take descr
+//void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
+//{
+//    // FIXME: DBENGINE2
+//    // Adding to the new page cache
+//    // Find metric id associated with uuid
+//    METRIC *this_metric = mrg_metric_get(main_mrg, descr->id, (Word_t) ctx);
+//    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+//
+//    // Get the data
+//    // We copy for now because we will add in both caches
+////    void *data = dbengine_page_alloc();
+////    memcpy(data, descr->page, RRDENG_BLOCK_SIZE);
+//
+//    PGC_ENTRY page_entry = {
+//        .hot = false,
+//        .section = (Word_t) ctx,
+//        .metric_id = metric_id,
+//        .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
+//        .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
+//        .update_every = descr->update_every_s,
+//        .size = RRDENG_BLOCK_SIZE,
+//        .data = descr->page
+//    };
+//
+//    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry);
+//    pgc_page_release(main_cache, page);
+//    info("DEBUG: DBENGINE2 --> Adding new page in page cache");
+//}
 
 struct rrdeng_page_descr *pg_cache_create_descr(void)
 {
@@ -222,6 +222,10 @@ Pvoid_t *get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t star
                 pd->start_time_t = Index;
                 pd->end_time_t = page_list[index].delta_end_s + journal_start_time_t;
                 pd->datafile = datafile;
+                pd->page_length =  page_list[index].page_length;
+                pd->update_every_s =  page_list[index].update_every_s;
+                pd->type =  page_list[index].type;
+                pd->page_entry = NULL;          // acquired page from cache
                 uuid_copy(pd->uuid, *uuid);
                 *PValue = pd;
             }
@@ -230,7 +234,7 @@ Pvoid_t *get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t star
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    // FIXME: Scan page index and add matching entries for the query TEMP
+    // FIXME: Scan page index and add matching entries for the query (TEMP)
 
     struct pg_cache_page_index *page_index;
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -255,9 +259,12 @@ Pvoid_t *get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t star
         pd->size = descr->extent->size;
         pd->file = descr->extent->datafile->file;
         pd->fileno = descr->extent->datafile->fileno;
-        pd->start_time_t = Index;
+        pd->start_time_t = descr->start_time_ut / USEC_PER_SEC;
         pd->end_time_t = descr->end_time_ut / USEC_PER_SEC;
         pd->datafile = datafile;
+        pd->page_length =  descr->page_length;
+        pd->update_every_s =  descr->update_every_s;
+        pd->type =  descr->type;
         uuid_copy(pd->uuid, *uuid);
         *PValue = pd;
 
@@ -396,6 +403,7 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
 
     // FIXME: Lets call DBENGINE2 and see whats happening
     METRIC *this_metric = mrg_metric_get(main_mrg, &page_index->id, (Word_t) ctx);
+
     char uuid_str[UUID_STR_LEN];
     uuid_unparse_lower(*mrg_metric_uuid(main_mrg, this_metric), uuid_str);
     info("DEBUG: Metric info %s : %ld - %ld", uuid_str,
@@ -407,117 +415,48 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_i
          page_index->latest_time_ut / USEC_PER_SEC);
 
     Pvoid_t  *pl_judyL = get_page_list(ctx, &page_index->id, start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC);
-//    int ret = pthread_setspecific(query_key, pl_judyL);
+    int ret = pthread_setspecific(query_key, pl_judyL);
 //    fatal_assert(0 == ret);
-    Word_t time_index;
-    unsigned entries = 0;
-    struct page_details *pd = NULL;
-    if (pl_judyL) {
-        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? 0 : *PValue;
-             pd != NULL;
-             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
-
-            info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-
-            entries++;
-        }
-    }
-    // Queue JudyL to the dbengine
-    // FIXME: Add a free function for dbengine
-    dbengine_load_page_list(ctx, pl_judyL);
-//    return 1;
-
-//    uv_rwlock_rdlock(&page_index->lock);
-//    descr = find_first_page_in_time_range(page_index, start_time_ut, end_time_ut);
-//    if (unlikely(NULL == descr)) {
-//        uv_rwlock_rdunlock(&page_index->lock);
-//        debug(D_RRDENGINE, "%s: No page was found to attempt preload.", __func__);
-//        return 0;
-//    }
+//    Word_t time_index;
+//    unsigned entries = 0;
+//    struct page_details *pd = NULL;
+//    if (pl_judyL) {
+//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
+//             pd != NULL;
+//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
 //
-//    Index = (Word_t)(descr->start_time_ut / USEC_PER_SEC);
+//            info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
 //
-//    netdata_thread_disable_cancelability();
-//    struct rrdeng_page_descr *last_descr = NULL;
-//    for (count = 0, preload_count = 0 ;
-//         descr != NULL && is_page_in_time_range(descr, start_time_ut, end_time_ut) ;
-//         PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0),
-//         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
-//        /* Iterate all pages in range */
-//
-//        if (last_descr == descr)
-//            break;
-//
-//        last_descr = descr;
-//
-//        if (unlikely(0 == descr->page_length))
-//            continue;
-//        ++count;
-//
-//        rrdeng_page_descr_mutex_lock(ctx, descr);
-//        pg_cache_descr = descr->pg_cache_descr;
-//        flags = pg_cache_descr->flags;
-//        if (pg_cache_can_get_unsafe(descr, 0)) {
-//            if (flags & RRD_PAGE_POPULATED) {
-//                /* success */
-//                rrdeng_page_descr_mutex_unlock(ctx, descr);
-//                debug(D_RRDENGINE, "%s: Page was found in memory.", __func__);
-//                continue;
-//            }
+//            entries++;
 //        }
-//        if (!(flags & RRD_PAGE_POPULATED) && pg_cache_try_get_unsafe(descr, 1)) {
-//            preload_array[preload_count++] = descr;
-//            if (PAGE_CACHE_MAX_PRELOAD_PAGES == preload_count) {
-//                rrdeng_page_descr_mutex_unlock(ctx, descr);
-//                break;
-//            }
+//    }
+
+    if (pl_judyL)
+        dbengine_load_page_list(ctx, pl_judyL);
+
+    return pl_judyL != NULL;
+
+    // **** DEBUG ***
+    // SHOW THE JUDYL
+
+//    time_index = 0;
+//    if (pl_judyL) {
+//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
+//             pd != NULL;
+//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
+//
+//            if (pd->page_entry)
+//                info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) (PAGE ACQUIRED)", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
+//            else
+//                info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) (PAGE MISSING)", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
+//
+//            entries++;
 //        }
-//        rrdeng_page_descr_mutex_unlock(ctx, descr);
 //    }
-//    uv_rwlock_rdunlock(&page_index->lock);
-//
-////    failed_to_reserve = 0;
-//    k = 0;
-//    for (i = 0 ; i < preload_count; ++i) {
-//        struct rrdeng_cmd cmd;
-//        struct rrdeng_page_descr *next;
-//
-//        descr = preload_array[i];
-//        if (NULL == descr)
-//            continue;
-//
-//        pg_cache_try_reserve_pages(ctx, 1);
-//
-//        cmd.opcode = RRDENG_READ_EXTENT;
-//        cmd.read_extent.page_cache_descr[0] = descr;
-//        /* don't use this page again */
-//        preload_array[i] = NULL;
-//        for (j = 0, k = 1 ; j < preload_count ; ++j) {
-//            next = preload_array[j];
-//            if (NULL == next)
-//                continue;
-//
-//            if ((descr->extent && descr->extent == next->extent) ||
-//                ((descr->extent_entry && descr->extent_entry == next->extent_entry))) {
-//                /* same extent, consolidate */
-//                (void ) pg_cache_try_reserve_pages(ctx, 1);
-//                cmd.read_extent.page_cache_descr[k++] = next;
-//                /* don't use this page again */
-//                preload_array[j] = NULL;
-//            }
-//        }
-//        cmd.read_extent.page_count = k;
-//        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-//    }
-//    if (!preload_count) {
-//        /* no such page */
-//        debug(D_RRDENGINE, "%s: No page was eligible to attempt preload.", __func__);
-//    }
-////    rrd_stat_atomic_add(&ctx->stats.pg_cache_preload, preload_count);
-//    netdata_thread_enable_cancelability();
-//    return count;
 }
 
 /*
@@ -537,8 +476,32 @@ void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,
     if (unlikely(!page_index))
             return NULL;
 
+    Pvoid_t  *pl_judyL = pthread_getspecific(query_key);
+    Pvoid_t *Pvalue = JudyLGet(pl_judyL, (Word_t) start_time_t, PJE0);
+    if (!Pvalue || !*Pvalue) {
+            Word_t Index = start_time_t;
+            Pvalue = JudyLLast(pl_judyL, &Index, PJE0);
+            if (!Pvalue || !*Pvalue) {
+                Index = start_time_t;
+                Pvalue = JudyLFirst(pl_judyL, &Index, PJE0);
+                if (!Pvalue || !*Pvalue)
+                    return NULL;
+            }
+    }
+    struct page_details *pd = *Pvalue;
+
+    sleep_usec(100000);
+//    bool breakit = false;
+//    while (!pd->page_entry && !breakit) {
+//            sleep_usec(10000);
+//
+//    }
+
+    return pd->page_entry;
+
     // FIXME: DBENGINE 2
     // Check local thread storage for info
+
 
 //    pg_cache_reserve_pages(ctx, 1);
 //

@@ -365,21 +365,6 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
 
     if (handle->page_entry) {
         /* Make alignment decisions */
-
-//#ifdef NETDATA_INTERNAL_CHECKS
-//        if(descr->end_time_ut + page_index->latest_update_every_s * USEC_PER_SEC != point_in_time_ut) {
-//            char buffer[200 + 1];
-//            snprintfz(buffer, 200,
-//                      "metrics collected are %s, end_time_ut = %llu, point_in_time_ut = %llu, update_every = %u, delta = %llu",
-//                      (point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC > page_index->latest_update_every_s)?"far apart":"not aligned",
-//                      descr->end_time_ut / USEC_PER_SEC,
-//                      point_in_time_ut / USEC_PER_SEC,
-//                      page_index->latest_update_every_s,
-//                      point_in_time_ut / USEC_PER_SEC - descr->end_time_ut / USEC_PER_SEC);
-//            print_page_cache_descr(descr, buffer, false);
-//        }
-//#endif
-
         if (handle->page_length == handle->alignment->page_length) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = 1;
@@ -428,7 +413,11 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
                 .update_every = page_index->latest_update_every_s,
                 .hot = true
             };
-            handle->page_entry = (struct PGC_PAGE *)pgc_page_add_and_acquire(main_cache, page_entry);
+            bool added = true;
+            handle->page_entry = (struct PGC_PAGE *)pgc_page_add_and_acquire(main_cache, page_entry, &added);
+            if (false == added)
+                dbengine_page_free(page_entry.data);
+            // FIXME: Page added in parallel -- check the page data
         }
 
 //        handle->page_correlation_id = rrd_atomic_fetch_add(&pg_cache->committed_page_index.latest_corr_id, 1);
@@ -655,7 +644,6 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle->position = 0;
     handle->ctx = ctx;
     handle->page_entry = NULL;
-//    handle->descr = NULL;
     handle->dt_s = page_index->latest_update_every_s;
     handle->page_index = page_index;
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
@@ -685,9 +673,12 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
 
     time_t wanted_start_time_t = handle->wanted_start_time_s;
     handle->page_entry = pg_cache_lookup_next(ctx, handle->page_index, wanted_start_time_t, rrdimm_handle->end_time_s);
+    handle->page_length = pgc_page_data_size(handle->page_entry);
 
     if (NULL == handle->page_entry)
         return 1;
+
+    handle->page_length = pgc_page_data_size(handle->page_entry);
 //
 //#ifdef NETDATA_INTERNAL_CHECKS
 //    rrd_stat_atomic_add(&ctx->stats.metric_API_consumers, 1);
@@ -729,26 +720,8 @@ static int rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_hand
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     // struct rrdeng_metric_handle *metric_handle = handle->metric_handle;
-
 //    struct rrdeng_page_descr *descr = handle->descr;
     time_t now = handle->now_s + handle->dt_s;
-
-//    bool debug_this = false;
-//    {
-//        unsigned char u[16] = { 0x0C, 0x0A, 0x40, 0xD6, 0x2A, 0x43, 0x4A, 0x7C, 0x95, 0xF7, 0xD1, 0x1E, 0x0C, 0x9E, 0x8A, 0xE7 };
-//        if(uuid_compare(u, handle->page_index->id) == 0) {
-//            char buffer[100];
-//            snprintfz(buffer, 100, "load system.cpu, now:%u, dt:%u, position:%u page_index first:%u, last:%u",
-//                      (uint32_t)(now),
-//                      (uint32_t)(handle->dt_s),
-//                      (uint32_t)(handle->position),
-//                      (uint32_t)(handle->page_index->oldest_time / USEC_PER_SEC),
-//                      (uint32_t)(handle->page_index->latest_time / USEC_PER_SEC));
-//
-//            print_page_cache_descr(descr, buffer, false);
-//            debug_this = true;
-//        }
-//    }
 
     STORAGE_POINT sp;
     unsigned position = handle->position + 1;
