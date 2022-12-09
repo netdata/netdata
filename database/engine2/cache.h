@@ -40,7 +40,7 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_clean_c
 void pgc_destroy(PGC *cache);
 
 // add a page to the cache and return a pointer to it
-PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry);
+PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added);
 
 // release a page (all pointers to it are now invalid)
 void pgc_page_release(PGC *cache, PGC_PAGE *page);

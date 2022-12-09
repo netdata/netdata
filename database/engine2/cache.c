@@ -936,7 +936,7 @@ premature_exit:
     return stopped_before_finishing;
 }
 
-static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
+static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     PGC_PAGE *page;
     size_t spins = 0;
 
@@ -1001,12 +1001,19 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry) {
 
             __atomic_add_fetch(&cache->stats.entries, 1, __ATOMIC_RELAXED);
             __atomic_add_fetch(&cache->stats.size, page->assumed_size, __ATOMIC_RELAXED);
+
+            if(added)
+                *added = true;
         }
         else {
             if (!page_acquire(cache, page))
                 page = NULL;
 
+            else if(added)
+                *added = false;
+
             pgc_index_write_unlock(cache, partition);
+
         }
 
     } while(!page);
@@ -1351,8 +1358,8 @@ void pgc_destroy(PGC *cache) {
     }
 }
 
-PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry) {
-    return page_add(cache, &entry);
+PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
+    return page_add(cache, &entry, added);
 }
 
 void pgc_page_release(PGC *cache, PGC_PAGE *page) {
@@ -1530,6 +1537,8 @@ void *unittest_stress_test_collector(void *ptr) {
         netdata_thread_disable_cancelability();
 
         for (size_t i = metric_start; i < metric_end; i++) {
+            bool added;
+
             pgc_uts.metrics[i] = pgc_page_add_and_acquire(pgc_uts.cache, (PGC_ENTRY) {
                     .section = 1,
                     .metric_id = i,
@@ -1539,9 +1548,9 @@ void *unittest_stress_test_collector(void *ptr) {
                     .size = 4096,
                     .data = NULL,
                     .hot = true,
-            });
+            }, &added);
 
-            if(!pgc_is_page_hot(pgc_uts.metrics[i])) {
+            if(!pgc_is_page_hot(pgc_uts.metrics[i]) || !added) {
                 pgc_page_release(pgc_uts.cache, pgc_uts.metrics[i]);
                 pgc_uts.metrics[i] = NULL;
             }
@@ -1619,7 +1628,7 @@ void *unittest_stress_test_queries(void *ptr) {
                     .size = 4096,
                     .data = NULL,
                     .hot = false,
-            });
+            }, NULL);
         }
 
         // do the query
@@ -1836,7 +1845,7 @@ int pgc_unittest(void) {
         .size = 4096,
         .data = NULL,
         .hot = false,
-    });
+    }, NULL);
 
     pgc_page_release(cache, page1);
 
@@ -1848,7 +1857,7 @@ int pgc_unittest(void) {
             .size = 4096,
             .data = NULL,
             .hot = true,
-    });
+    }, NULL);
 
     pgc_page_hot_set_end_time_t(cache, page2, 2001);
     pgc_page_hot_to_dirty_and_release(cache, page2);
@@ -1861,7 +1870,7 @@ int pgc_unittest(void) {
             .size = 4096,
             .data = NULL,
             .hot = true,
-    });
+    }, NULL);
 
     pgc_page_hot_set_end_time_t(cache, page3, 2001);
     pgc_page_hot_to_dirty_and_release(cache, page3);
