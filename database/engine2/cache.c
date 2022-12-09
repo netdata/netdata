@@ -86,7 +86,7 @@ struct pgc_linked_list {
 struct pgc {
     struct {
         size_t partitions;
-        size_t max_clean_size;
+        size_t clean_size;
         size_t max_dirty_pages_per_call;
         size_t max_pages_per_inline_eviction;
         size_t max_skip_pages_per_inline_eviction;
@@ -312,8 +312,8 @@ static inline size_t cache_usage_percent(PGC *cache) {
         size_t wanted_cache_size = hot_max * 2;
 
         size_t max_for_clean;
-        if(wanted_cache_size < hot + dirty + cache->config.max_clean_size)
-            max_for_clean = cache->config.max_clean_size;
+        if(wanted_cache_size < hot + dirty + cache->config.clean_size)
+            max_for_clean = cache->config.clean_size;
         else
             max_for_clean = wanted_cache_size - hot - dirty;
 
@@ -322,7 +322,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
     }
     else {
         size_t clean = __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
-        size_t max = cache->config.max_clean_size;
+        size_t max = cache->config.clean_size;
         size_t percent = clean * 100 / max;
         return percent;
     }
@@ -1292,7 +1292,7 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // ----------------------------------------------------------------------------
 // public API
 
-PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
+PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_call, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
@@ -1300,7 +1300,7 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
-    cache->config.max_clean_size = (max_clean_size < 8 * 1024 * 1024) ? 8 * 1024 * 1024 : max_clean_size;
+    cache->config.clean_size = (clean_size_bytes < 8 * 1024 * 1024) ? 8 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_call,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;

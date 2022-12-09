@@ -30,7 +30,7 @@ typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *array, size_t entries);
 
 // create a cache
-PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_clean_cb,
+PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_clean_cb,
                 size_t max_dirty_pages_per_call, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
