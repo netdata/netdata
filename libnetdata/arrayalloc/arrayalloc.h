@@ -22,26 +22,33 @@ typedef struct arrayalloc {
         size_t natural_page_size;
         size_t allocation_multiplier;
         size_t max_alloc_size;
-        netdata_mutex_t mutex;
+        SPINLOCK spinlock;
         struct arrayalloc_page *pages;
     } internal;
 } ARAL;
 
-ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap);
+ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
 int aral_unittest(size_t elements);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 
-#define arrayalloc_mallocz(ar) arrayalloc_mallocz_int(ar, __FILE__, __FUNCTION__, __LINE__)
-#define arrayalloc_freez(ar, ptr) arrayalloc_freez_int(ar, ptr, __FILE__, __FUNCTION__, __LINE__)
+#define arrayalloc_mallocz(ar) arrayalloc_mallocz_internal(ar, __FILE__, __FUNCTION__, __LINE__)
+#define arrayalloc_freez(ar, ptr) arrayalloc_freez_internal(ar, ptr, __FILE__, __FUNCTION__, __LINE__)
+#define arrayalloc_destroy(ar) arrayalloc_destroy_internal(ar, __FILE__, __FUNCTION__, __LINE__)
 
-void *arrayalloc_mallocz_int(ARAL *ar, const char *file, const char *function, size_t line);
-void arrayalloc_freez_int(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
+void *arrayalloc_mallocz_internal(ARAL *ar, const char *file, const char *function, size_t line);
+void arrayalloc_freez_internal(ARAL *ar, void *ptr, const char *file, const char *function, size_t line);
+void arrayalloc_destroy_internal(ARAL *ar, const char *file, const char *function, size_t line);
 
 #else // NETDATA_TRACE_ALLOCATIONS
 
-void *arrayalloc_mallocz(ARAL *ar);
-void arrayalloc_freez(ARAL *ar, void *ptr);
+#define arrayalloc_mallocz(ar) arrayalloc_mallocz_internal(ar)
+#define arrayalloc_freez(ar, ptr) arrayalloc_freez_internal(ar, ptr)
+#define arrayalloc_destroy(ar) arrayalloc_destroy_internal(ar)
+
+void *arrayalloc_mallocz_internal(ARAL *ar);
+void arrayalloc_freez_internal(ARAL *ar, void *ptr);
+void arrayalloc_destroy_internal(ARAL *ar);
 
 #endif // NETDATA_TRACE_ALLOCATIONS
 
