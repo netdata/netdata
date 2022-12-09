@@ -648,7 +648,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 #endif
 
-    info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+    // info("STREAM %s [receive from [%s]:%s]: initializing communication...", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
     char initial_response[HTTP_HEADER_SIZE];
     if (stream_has_capability(rpt, STREAM_CAP_VCAPS)) {
         log_receiver_capabilities(rpt);
