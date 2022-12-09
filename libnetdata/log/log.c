@@ -880,7 +880,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     log_unlock();
 }
 
-void error_int(const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void error_int(const char *prefix, int p_errno, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
 
@@ -912,7 +912,7 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
     vfprintf( stderr, fmt, args );
     va_end( args );
 
-    if(__errno) {
+    if(p_errno && __errno) {
         char buf[1024];
         fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
