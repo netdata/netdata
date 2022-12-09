@@ -958,6 +958,9 @@ bundle_fluentbit() {
 
   if build_fluentbit "$cmake"; then
     FLUENT_BIT_BUILD_SUCCESS=1
+    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" -eq 1 ]; then
+      CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
+    fi
     NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
     run_ok "Fluent-Bit built successfully."
   else
