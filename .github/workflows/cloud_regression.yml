@@ -51,7 +51,7 @@ jobs:
           echo "netdata_commit_hash=${NETDATA_CUSTOM_COMMIT_HASH}" >> $GITHUB_OUTPUT
 
       - name: Trigger Full Cloud Regression
-        if: github.event_name == 'push' || (github.event.issue.pull_request && steps.is_organization_member.outputs.result == 'true')
+        if: github.event_name == 'push'
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
           repo: netdata/test-automation
