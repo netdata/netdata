@@ -160,7 +160,7 @@ jobs:
         id: docker-config
         shell: bash
         run: |
-          echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
+          echo '{"cgroup-parent": "actions-job.slice", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
       - name: Fetch images
         id: fetch-images
