@@ -4271,7 +4271,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     pluginsd_function_result_end_to_stdout();
 }
 
-#define add_table_field(wb, key, name, visible, type, units, max, sort, sortable, sticky, unique_key, pointer_to, summary) do { \
+#define add_table_field(wb, key, name, visible, type, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range) do { \
     if(fields_added) buffer_strcat(wb, ",");                                                                    \
     buffer_sprintf(wb, "\n      \"%s\": {", key);                                                               \
     buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                                               \
@@ -4288,7 +4288,8 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     buffer_sprintf(wb, "\n         \"sort\":\"%s\",", sort);                                                    \
     buffer_sprintf(wb, "\n         \"sortable\":%s,", (sortable)?"true":"false");                               \
     buffer_sprintf(wb, "\n         \"sticky\":%s,", (sticky)?"true":"false");                                   \
-    buffer_sprintf(wb, "\n         \"summary\":\"%s\"", summary);                                               \
+    buffer_sprintf(wb, "\n         \"summary\":\"%s\",", summary);                                              \
+    buffer_sprintf(wb, "\n         \"filter\":\"%s\"", (range)?"range":"multiselect");                          \
     buffer_sprintf(wb, "\n      }");                                                                            \
     fields_added++;                                                                                             \
 } while(0)
@@ -4590,75 +4591,75 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
-        add_table_field(wb, "Pid", "Process ID", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "count_unique");
-        add_table_field(wb, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
+        add_table_field(wb, "Pid", "Process ID", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
+        add_table_field(wb, "Cmd", "Process Name", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
 
 #ifdef NETDATA_DEV_MODE
-        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
+        add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
 #endif
-        add_table_field(wb, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "Pid", "count_unique");
-        add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique");
-        add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
-        add_table_field(wb, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
-        add_table_field(wb, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
-        add_table_field(wb, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique");
-        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "processes", Processes_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "threads", Threads_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "seconds", Uptime_max, "descending", true, false, false, NULL, "max");
+        add_table_field(wb, "PPid", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "Pid", "count_unique", false);
+        add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
+        add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
 
         // minor page faults
-        add_table_field(wb, "MinFlt", "Minor Page Faults/s", false, "bar", "pgflts/s", MinFlt_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "pgflts/s", CMinFlt_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "pgflts/s", TMinFlt_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "MinFlt", "Minor Page Faults/s", false, "bar", "pgflts/s", MinFlt_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CMinFlt", "Children Minor Page Faults/s", false, "bar", "pgflts/s", CMinFlt_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "TMinFlt", "Total Minor Page Faults/s", false, "bar", "pgflts/s", TMinFlt_max, "descending", true, false, false, NULL, "sum", true);
 
         // major page faults
-        add_table_field(wb, "MajFlt", "Major Page Faults/s", false, "bar", "pgflts/s", MajFlt_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CMajFlt", "Children Major Page Faults/s", false, "bar", "pgflts/s", CMajFlt_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "TMajFlt", "Total Major Page Faults/s", true, "bar", "pgflts/s", TMajFlt_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "MajFlt", "Major Page Faults/s", false, "bar", "pgflts/s", MajFlt_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CMajFlt", "Children Major Page Faults/s", false, "bar", "pgflts/s", CMajFlt_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "TMajFlt", "Total Major Page Faults/s", true, "bar", "pgflts/s", TMajFlt_max, "descending", true, false, false, NULL, "sum", true);
 
         // CPU utilization
-        add_table_field(wb, "UserCPU", "User CPU time", false, "bar", "%", UserCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "SysCPU", "System CPU Time", false, "bar", "%", SysCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "GuestCPU", "Guest CPU Time", false, "bar", "%", GuestCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CUserCPU", "Children User CPU Time", false, "bar", "%", CUserCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CSysCPU", "Children System CPU Time", false, "bar", "%", CSysCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time", false, "bar", "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "CPU", "Total CPU Time", true, "bar", "%", CPU_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "UserCPU", "User CPU time", false, "bar", "%", UserCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "SysCPU", "System CPU Time", false, "bar", "%", SysCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "GuestCPU", "Guest CPU Time", false, "bar", "%", GuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CUserCPU", "Children User CPU Time", false, "bar", "%", CUserCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CSysCPU", "Children System CPU Time", false, "bar", "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time", false, "bar", "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CPU", "Total CPU Time", true, "bar", "%", CPU_max, "descending", true, false, false, NULL, "sum", true);
 
         // memory
-        add_table_field(wb, "VMSize", "Virtual Memory Size", false, "bar", "MiB", VMSize_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "RSS", "Resident Set Size", MemTotal ? false : true, "bar", "MiB", RSS_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Shared", "Shared Pages", false, "bar", "MiB", Shared_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Swap", "Swap Memory", false, "bar", "MiB", Swap_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "VMSize", "Virtual Memory Size", false, "bar", "MiB", VMSize_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "RSS", "Resident Set Size", MemTotal ? false : true, "bar", "MiB", RSS_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Shared", "Shared Pages", false, "bar", "MiB", Shared_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Swap", "Swap Memory", false, "bar", "MiB", Swap_max, "descending", true, false, false, NULL, "sum", true);
 
         if(MemTotal)
-            add_table_field(wb, "MemPcnt", "Memory Percentage", true, "bar", "%", 100.0, "descending", true, false, false, NULL, "sum");
+            add_table_field(wb, "MemPcnt", "Memory Percentage", true, "bar", "%", 100.0, "descending", true, false, false, NULL, "sum", true);
 
             // Logical I/O
 #ifndef __FreeBSD__
-        add_table_field(wb, "LReads", "Logical I/O Reads", false, "bar", "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "LWrites", "Logical I/O Writes", false, "bar", "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "LReads", "Logical I/O Reads", false, "bar", "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "LWrites", "Logical I/O Writes", false, "bar", "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum", true);
 #endif
 
         // Physical I/O
-        add_table_field(wb, "PReads", "Physical I/O Reads", true, "bar", "KiB/s", PReads_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "PWrites", "Physical I/O Writes", true, "bar", "KiB/s", PWrites_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "PReads", "Physical I/O Reads", true, "bar", "KiB/s", PReads_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "PWrites", "Physical I/O Writes", true, "bar", "KiB/s", PWrites_max, "descending", true, false, false, NULL, "sum", true);
 
         // I/O calls
-        add_table_field(wb, "RCalls", "I/O Read Calls", false, "bar", "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "WCalls", "I/O Write Calls", false, "bar", "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "RCalls", "I/O Read Calls", false, "bar", "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "WCalls", "I/O Write Calls", false, "bar", "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum", true);
 
         // open file descriptors
-        add_table_field(wb, "Files", "Open Files", false, "bar", "fds", Files_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Pipes", "Open Pipes", false, "bar", "fds", Pipes_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "Sockets", "Open Sockets", false, "bar", "fds", Sockets_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "fds", iNotiFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "EventFDs", "Open Event Descriptors", false, "bar", "fds", EventFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "TimerFDs", "Open Timer Descriptors", false, "bar", "fds", TimerFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "SigFDs", "Open Signal Descriptors", false, "bar", "fds", SigFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "fds", EvPollFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "OtherFDs", "Other Open Descriptors", false, "bar", "fds", OtherFDs_max, "descending", true, false, false, NULL, "sum");
-        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar", "fds", FDs_max, "descending", true, false, false, NULL, "sum");
+        add_table_field(wb, "Files", "Open Files", false, "bar", "fds", Files_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Pipes", "Open Pipes", false, "bar", "fds", Pipes_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Sockets", "Open Sockets", false, "bar", "fds", Sockets_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "iNotiFDs", "Open iNotify Descriptors", false, "bar", "fds", iNotiFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "EventFDs", "Open Event Descriptors", false, "bar", "fds", EventFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "TimerFDs", "Open Timer Descriptors", false, "bar", "fds", TimerFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "SigFDs", "Open Signal Descriptors", false, "bar", "fds", SigFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "EvPollFDs", "Open Event Poll Descriptors", false, "bar", "fds", EvPollFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "OtherFDs", "Other Open Descriptors", false, "bar", "fds", OtherFDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar", "fds", FDs_max, "descending", true, false, false, NULL, "sum", true);
 
         buffer_strcat(
                 wb,
