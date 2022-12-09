@@ -947,10 +947,7 @@ bundle_fluentbit() {
 
   # If musl is used, we need to patch chunkio, providing fts has been previously installed.
   local libc=$(detect_libc)
-  if [ -z "$libc" ]; then
-    run_failed "Cannot detect a supported libc on your system, Logs Management support will be disabled."
-    return 0
-  elif [ "${libc}" = "musl" ]; then
+  if [ "${libc}" = "musl" ]; then
     patch -N -p1 fluent-bit/lib/chunkio/src/CMakeLists.txt -i logsmanagement/fluent_bit_build/chunkio-static-lib-fts.patch
   fi
   
