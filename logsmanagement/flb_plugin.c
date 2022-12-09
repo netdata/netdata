@@ -898,11 +898,9 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Refresh_Interval", update_every_str,
                 "Skip_Long_Lines", "On",
                 "Skip_Empty_Lines", "On",
-                "Inotify_Watcher", /* TODO: Add configuration option for user, to either use inotify or stat. */
 #if defined(FLB_HAVE_INOTIFY)
-                "true", 
-#else
-                "false",
+                // TODO: Add configuration option for user, to either use inotify or stat.
+                "Inotify_Watcher", "true", 
 #endif
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
 

@@ -954,10 +954,11 @@ bundle_fluentbit() {
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling Fluent-Bit."
 
   if build_fluentbit "$cmake"; then
-    FLUENT_BIT_BUILD_SUCCESS=1
-    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" -eq 1 ]; then
+    # If Fluent-Bit built with inotify support, use it.
+    if [ "$(grep -o '^FLB_HAVE_INOTIFY:INTERNAL=.*' fluent-bit/build/CMakeCache.txt | cut -d '=' -f 2)" ]; then 
       CFLAGS="${CFLAGS} -DFLB_HAVE_INOTIFY"
     fi
+    FLUENT_BIT_BUILD_SUCCESS=1
     NETDATA_CONFIGURE_OPTIONS="$(echo "${NETDATA_CONFIGURE_OPTIONS%--enable-logsmanagement)}" | sed 's/$/ --enable-logsmanagement/g')"
     run_ok "Fluent-Bit built successfully."
   else
