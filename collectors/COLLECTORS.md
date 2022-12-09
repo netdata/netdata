@@ -96,7 +96,7 @@ configure any of these collectors according to your setup and infrastructure.
 
 - [Docker containers](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual Docker
   containers using the cgroups collector plugin.
-- [DockerD](/collectors/python.d.plugin/dockerd/README.md): Collect container health statistics.
+- [DockerD](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker/): Collect container health statistics.
 - [Docker Engine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine/): Collect
   runtime statistics from the `docker` daemon using the `metrics-address` feature.
 - [Docker Hub](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dockerhub/): Collect statistics
@@ -460,7 +460,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 
 ### Users
 
-- [systemd-logind](/collectors/python.d.plugin/logind/README.md): Monitor active sessions, users, and seats tracked
+- [systemd-logind](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logind/): Monitor active sessions, users, and seats tracked
   by `systemd-logind` or `elogind`.
 - [User/group usage](/collectors/apps.plugin/README.md): Gather CPU, disk, memory, network, and other metrics per user
   and user group using the `apps.plugin` collector.
