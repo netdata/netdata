@@ -22,7 +22,7 @@ services running inside of pods in your k8s cluster. Read more about [Kubernetes
 monitoring](#collect-kubernetes-metrics) below.
 
 A handful of additional collectors gather metrics from container-related services, such as
-[dockerd](/collectors/python.d.plugin/dockerd/README.md) or [Docker
+[dockerd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker/) or [Docker
 Engine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine/). You can find all
 container collectors in our supported collectors list under the
 [containers/VMs](/collectors/COLLECTORS.md#containers-and-vms) and

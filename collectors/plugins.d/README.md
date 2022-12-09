@@ -15,7 +15,6 @@ from external processes, thus allowing Netdata to use **external plugins**.
 |[apps.plugin](/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
 |[charts.d.plugin](/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
 |[cups.plugin](/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
-|[fping.plugin](/collectors/fping.plugin/README.md)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.|
 |[ioping.plugin](/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
 |[freeipmi.plugin](/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
 |[nfacct.plugin](/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
@@ -71,7 +70,6 @@ Example:
 	# check for new plugins every = 60
 
 	# charts.d = yes
-	# fping = yes
 	# ioping = yes
 	# python.d = yes
 ```

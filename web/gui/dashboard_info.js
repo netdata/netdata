@@ -297,12 +297,6 @@ netdataDashboard.menu = {
         info: 'Docker containers state and disk usage.'
     },
 
-    'fping': {
-        title: 'fping',
-        icon: '<i class="fas fa-exchange-alt"></i>',
-        info: 'Network latency statistics, via <b>fping</b>. <b>fping</b> is a program to send ICMP echo probes to network hosts, similar to <code>ping</code>, but much better performing when pinging multiple hosts. fping versions after 3.15 can be directly used as netdata plugins.'
-    },
-
     'ping': {
         title: 'Ping',
         icon: '<i class="fas fa-exchange-alt"></i>',
@@ -4647,19 +4641,6 @@ netdataDashboard.context = {
     'retroshare.dht': {
         info: 'Statistics about RetroShare\'s DHT. These values are estimated!'
     },
-
-    // ------------------------------------------------------------------------
-    // fping
-
-    'fping.quality': {
-        colors: NETDATA.colors[10],
-        height: 0.5
-    },
-
-    'fping.packets': {
-        height: 0.5
-    },
-
 
     // ------------------------------------------------------------------------
     // containers

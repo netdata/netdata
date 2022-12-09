@@ -137,7 +137,6 @@ claim/netdata-claim.sh
 collectors/tc.plugin/tc-qos-helper.sh
 collectors/charts.d.plugin/charts.d.plugin
 collectors/python.d.plugin/python.d.plugin
-collectors/fping.plugin/fping.plugin
 collectors/ioping.plugin/ioping.plugin
 collectors/go.d.plugin
 web/netdata-switch-dashboard.sh

@@ -52,7 +52,7 @@ CapabilityBoundingSet=CAP_SYS_ADMIN CAP_PERFMON
 CapabilityBoundingSet=CAP_SYS_PTRACE
 # is required for ebpf plugin
 CapabilityBoundingSet=CAP_SYS_RESOURCE
-# is required for fping app
+# is required for go.d/ping app
 CapabilityBoundingSet=CAP_NET_RAW
 # is required for cgroups plugin
 CapabilityBoundingSet=CAP_SYS_CHROOT
