@@ -93,7 +93,6 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# enable running new plugins = yes
 	# check for new plugins every = 60
 	# slabinfo = no
-	# fping = yes
 	# ioping = yes
 	# python.d = yes
 	# go.d = yes

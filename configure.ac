@@ -1702,7 +1702,6 @@ AC_CONFIG_FILES([
     collectors/charts.d.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/timex.plugin/Makefile
-    collectors/fping.plugin/Makefile
     collectors/ioping.plugin/Makefile
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile

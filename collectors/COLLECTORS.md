@@ -410,7 +410,7 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 ### Networks
 
 - [Access points](/collectors/charts.d.plugin/ap/README.md): Visualizes data related to access points.
-- [fping.plugin](fping.plugin/README.md): Measure network latency, jitter and packet loss between the monitored node
+- [Ping](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ping/): Measure network latency, jitter and packet loss between the monitored node
   and any number of remote network end points.
 - [Netfilter](/collectors/nfacct.plugin/README.md): Collect netfilter firewall, connection tracker, and accounting
   metrics using `libmnl` and `libnetfilter_acct`.
