@@ -1,9 +1,9 @@
 name: Trigger Cloud Regression E2E Tests
 on:
   issue_comment:
-    types: [ created, edited ]
+    types: [created, edited]
   push:
-    branches: [ master ]
+    branches: [master]
     paths:
       - 'CMakeLists.txt'
       - '**.c'
