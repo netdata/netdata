@@ -925,11 +925,11 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
 
     int bytes, err, retries = 0;
 
-    //do {
+    do {
         bytes = SSL_read(ssl, buf, (int)num);
         err = SSL_get_error(ssl, bytes);
         retries++;
-    //} while (bytes <= 0 && (err == SSL_ERROR_WANT_READ));
+    } while (err == SSL_ERROR_WANT_READ);
 
     if(unlikely(bytes <= 0))
         error("SSL_read() returned %d bytes, SSL error %d", bytes, err);
