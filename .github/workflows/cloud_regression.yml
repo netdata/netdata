@@ -20,7 +20,7 @@ jobs:
       - name: Check comment body matches pattern and user issued it is member of Netdata Org
         id: is_organization_member
         if: github.event_name == 'issue_comment' && github.event.comment.body == '/testit'
-        uses: jamesSingleton/is-organization-member@main
+        uses: jamesSingleton/is-organization-member@1.0.1
         with:
           organization: ${{ github.repository_owner }}
           username: ${{ github.event.comment.user.login }}
