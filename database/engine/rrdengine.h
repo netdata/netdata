@@ -19,13 +19,8 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
-#include "rrdenglocking.h"
 #include "../engine2/metric.h"
 #include "../engine2/cache.h"
-
-#ifdef NETDATA_RRD_INTERNALS
-
-#endif /* NETDATA_RRD_INTERNALS */
 
 extern unsigned rrdeng_pages_per_extent;
 
@@ -50,7 +45,13 @@ struct page_details {
 
 struct rrdeng_collect_handle {
     struct pg_cache_page_index *page_index;
+    struct rrdengine_instance *ctx;
     struct rrdeng_page_descr *descr;
+    uint32_t page_length;
+    void *page_entry;
+    uint8_t type;
+    usec_t end_time_ut;
+    usec_t start_time_ut;
     unsigned long page_correlation_id;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
     uint8_t unaligned_page;
@@ -58,15 +59,16 @@ struct rrdeng_collect_handle {
 };
 
 struct rrdeng_query_handle {
-    struct rrdeng_page_descr *descr;
+//    struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
+    void *page_entry;
     time_t wanted_start_time_s;
     time_t now_s;
     unsigned position;
     unsigned entries;
     storage_number *page;
-    usec_t page_end_time_ut;
+    time_t page_end_time_t;
     uint32_t page_length;
     time_t dt_s;
 };
@@ -86,7 +88,6 @@ enum rrdeng_opcode {
     RRDENG_COMMIT_PAGE,
     RRDENG_FLUSH_PAGES,
     RRDENG_SHUTDOWN,
-    RRDENG_INVALIDATE_OLDEST_MEMORY_PAGE,
     RRDENG_QUIESCE,
     RRDENG_READ_DF_EXTENT_LIST,
     RRDENG_READ_EXTENT2,
@@ -172,32 +173,6 @@ struct generic_io_descriptor {
     struct completion *completion;
 };
 
-struct extent_cache_element {
-    struct extent_info *extent; /* The ABA problem is avoided with the help of fileno below */
-    unsigned fileno;
-    struct extent_cache_element *prev;              /* LRU */
-    struct extent_cache_element *next;              /* LRU */
-    struct extent_io_descriptor *inflight_io_descr; /* I/O descriptor for in-flight extent */
-    uint8_t pages[MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE];
-};
-
-#define MAX_CACHED_EXTENTS 16 /* cannot be over 32 to fit in 32-bit architectures */
-
-/* Initialize by setting the structure to zero */
-struct extent_cache {
-    struct extent_cache_element extent_array[MAX_CACHED_EXTENTS];
-    unsigned allocation_bitmap; /* 1 if the corresponding position in the extent_array is allocated */
-    unsigned inflight_bitmap;   /* 1 if the corresponding position in the extent_array is waiting for I/O */
-
-    struct extent_cache_element *replaceQ_head; /* LRU */
-    struct extent_cache_element *replaceQ_tail; /* MRU */
-};
-
-#define DESCRIPTOR_INITIAL_CLEANUP    (60)
-#ifndef DESCRIPTOR_INTERVAL_CLEANUP
-#define DESCRIPTOR_INTERVAL_CLEANUP    (1)
-#endif
-
 struct rrdengine_worker_config {
     struct rrdengine_instance *ctx;
 
@@ -207,19 +182,10 @@ struct rrdengine_worker_config {
 
     /* file deletion thread */
     uv_thread_t *now_deleting_files;
-    uv_thread_t *now_deleting_descriptors;
-    uv_thread_t *now_evicting_pages;
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
-    unsigned long cleanup_deleting_descriptors;  /* set to 0 when now_deleting_descriptors is still running */
-    unsigned long cleanup_evicting_pages;        /* set to 0 when now_evicting_pages is still running */
 
     unsigned long running_journal_migration;
-    time_t next_descriptor_cleanup;
-    /* dirty page deletion thread */
     uv_thread_t *now_invalidating_dirty_pages;
-    /* set to 0 when now_invalidating_dirty_pages is still running */
-    unsigned long cleanup_thread_invalidating_dirty_pages;
-    unsigned inflight_dirty_pages;
     bool run_indexing;
 
     /* FIFO command queue */
@@ -227,9 +193,6 @@ struct rrdengine_worker_config {
     uv_cond_t cmd_cond;
     volatile unsigned queue_size;
     struct rrdeng_cmdqueue cmd_queue;
-
-    struct extent_cache xt_cache;
-
     int error;
 };
 
@@ -298,7 +261,6 @@ struct rrdengine_instance {
     struct completion rrdengine_completion;
     struct page_cache pg_cache;
     bool journal_initialization;
-    uint8_t drop_metrics_under_page_cache_pressure; /* boolean */
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
     struct rrdengine_datafile_list datafiles;
@@ -310,7 +272,6 @@ struct rrdengine_instance {
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long max_cache_pages;
-    unsigned long cache_pages_low_watermark;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */

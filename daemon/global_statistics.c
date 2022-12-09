@@ -1474,7 +1474,7 @@ static void dbengine_statistics_charts(void) {
                 populated_pages = (collected_number)stats_array[3];
                 page_cache_descriptors = (collected_number)stats_array[27];
 
-                cache_metadata = page_cache_descriptors * sizeof(struct page_cache_descr);
+                cache_metadata = page_cache_descriptors *  0 ; //sizeof(struct page_cache_descr);
 
                 pages_metadata = pages_on_disk * sizeof(struct rrdeng_page_descr);
 

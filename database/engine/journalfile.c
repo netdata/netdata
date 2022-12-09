@@ -4,6 +4,15 @@
 
 // DBENGINE2: Helper
 
+void update_uuid_last_time(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time)
+{
+    METRIC *one_metric = mrg_metric_get(main_mrg, uuid, (Word_t) ctx);
+    if (!one_metric)
+        return;
+
+    mrg_metric_set_latest_time_t(main_mrg, one_metric, last_time);
+}
+
 void update_uuid_first_last_update_every(struct rrdengine_instance *ctx, uuid_t *uuid,
                             time_t first_time, time_t last_time, time_t update_every, bool update_every_only)
 {
@@ -114,7 +123,7 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
     ++ctx->stats.io_write_requests;
 }
 
-void * wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size)
+void *wal_get_transaction_buffer(struct rrdengine_worker_config *wc, unsigned size)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
@@ -504,8 +513,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, temp_id, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
             *PValue = page_index = create_page_index(temp_id, ctx);
-            page_index->prev = pg_cache->metrics_index.last_page_index;
-            pg_cache->metrics_index.last_page_index = page_index;
+//            page_index->prev = pg_cache->metrics_index.last_page_index;
+//            pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
         }
 
@@ -537,7 +546,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             internal_error(true, "REMOVING UUID %s with %lu %s (extent %d)", uuid_str, start_time_ut, ret ? "OK" : "FAIL", ret);
         }
         else {
-        descr = pg_cache_create_descr();
+            descr = pg_cache_create_descr();
             descr->id = &page_index->id;
         }
 
@@ -550,10 +559,13 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         descr->type = page_type;
         extent->pages[valid_pages++] = descr;
         extent->number_of_pages = valid_pages;
+
+        // FIXME: DBENGINE2 add this
+
         if (likely(!descr_found))
             (void)pg_cache_insert(ctx, page_index, descr);
-        else
-            pg_cache_add_new_metric_time(page_index, descr);
+
+        pg_cache_add_new_metric_time(page_index, descr);
 
         if (page_index->latest_time_ut == descr->end_time_ut)
             page_index->latest_update_every_s = descr->update_every_s;
@@ -952,8 +964,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     }
     uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
 
-    info("Journal file \"%s\" loaded (size:%"PRIu64") with %lu metrics in %d ms",
-         path, file_size, entries,
+    info("Journal file \"%s\" loaded (size:%"PRIu64") with %u metrics in %d ms", path, file_size, entries,
          (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
     return 9;
 }
@@ -1150,8 +1161,8 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         struct rrdeng_page_descr *descr;
         Pvoid_t *PValue;
         struct pg_cache_page_index *page_index = metric_info->page_index;
-        struct page_cache *pg_cache = &page_index->ctx->pg_cache;
-        struct rrdengine_instance *ctx = page_index->ctx;
+//        struct page_cache *pg_cache = &page_index->ctx->pg_cache;
+//        struct rrdengine_instance *ctx = page_index->ctx;
 
         Word_t  index_time = metric_info->min_index_time_s;
         uint32_t metric_info_offset = metric_info->page_list_header;
@@ -1168,7 +1179,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         uint32_t entries = page_list_header->entries;
 
         uv_rwlock_rdlock(&page_index->lock);
-        uv_file file = journalfile->datafile->file;
+//        uv_file file = journalfile->datafile->file;
 
         for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
@@ -1187,12 +1198,12 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
             fatal_assert(descr->extent->size == extent_list[page_entry->extent_index].datafile_size);
 
-            rrdeng_page_descr_mutex_lock(ctx, descr);
-            __atomic_store_n(&descr->extent_entry, &extent_list[page_entry->extent_index], __ATOMIC_SEQ_CST);
-            __atomic_store_n(&descr->extent, NULL, __ATOMIC_SEQ_CST);
-            __atomic_store_n(&descr->file, file, __ATOMIC_SEQ_CST);
-            rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
-            rrdeng_page_descr_mutex_unlock(ctx, descr);
+//            rrdeng_page_descr_mutex_lock(ctx, descr);
+//            __atomic_store_n(&descr->extent_entry, &extent_list[page_entry->extent_index], __ATOMIC_SEQ_CST);
+//            __atomic_store_n(&descr->extent, NULL, __ATOMIC_SEQ_CST);
+//            __atomic_store_n(&descr->file, file, __ATOMIC_SEQ_CST);
+//            rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
+//            rrdeng_page_descr_mutex_unlock(ctx, descr);
         }
 //        uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
 //        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
@@ -1689,7 +1700,7 @@ void start_journal_indexing(uv_work_t *req)
 
     unsigned count = 0;
     worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
-    while ((wc->now_deleting_files || wc->now_deleting_descriptors) && count++ < MAX_RETRIES_TO_START_INDEX)
+    while (wc->now_deleting_files && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
 
     if (count == MAX_RETRIES_TO_START_INDEX) {
