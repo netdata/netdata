@@ -6,60 +6,71 @@
 // system functions
 // to retrieve settings of the system
 
-int processors = 1;
-long get_system_cpus(void) {
-    processors = 1;
+long get_system_cpus_with_cache(bool cache) {
+    static long processors = 0;
+
+    if(likely(cache && processors > 0))
+        return processors;
 
 #ifdef __APPLE__
     int32_t tmp_processors;
 
-        if (unlikely(GETSYSCTL_BY_NAME("hw.logicalcpu", tmp_processors))) {
-            error("Assuming system has %d processors.", processors);
-        } else {
-            processors = tmp_processors;
-        }
+    if (unlikely(GETSYSCTL_BY_NAME("hw.logicalcpu", tmp_processors)))
+        error("Assuming system has %d processors.", processors);
+    else
+        processors = tmp_processors;
 
-        return processors;
+    if(processors < 1)
+        processors = 1;
+
+    return processors;
 #elif __FreeBSD__
     int32_t tmp_processors;
 
-        if (unlikely(GETSYSCTL_BY_NAME("hw.ncpu", tmp_processors))) {
-            error("Assuming system has %d processors.", processors);
-        } else {
-            processors = tmp_processors;
-        }
+    if (unlikely(GETSYSCTL_BY_NAME("hw.ncpu", tmp_processors)))
+        error("Assuming system has %d processors.", processors);
+    else
+        processors = tmp_processors;
 
-        return processors;
+    if(processors < 1)
+        processors = 1;
+
+    return processors;
 #else
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix?netdata_configured_host_prefix:"");
 
     procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
     if(!ff) {
-        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        processors = 1;
+        error("Cannot open file '%s'. Assuming system has %ld processors.", filename, processors);
         return processors;
     }
 
     ff = procfile_readall(ff);
     if(!ff) {
-        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
+        processors = 1;
+        error("Cannot open file '%s'. Assuming system has %ld processors.", filename, processors);
         return processors;
     }
 
-    processors = 0;
+    long tmp_processors = 0;
     unsigned int i;
     for(i = 0; i < procfile_lines(ff); i++) {
         if(!procfile_linewords(ff, i)) continue;
 
-        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
+        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0)
+            tmp_processors++;
     }
-    processors--;
-    if(processors < 1) processors = 1;
-
     procfile_close(ff);
 
-    debug(D_SYSTEM, "System has %d processors.", processors);
+    processors = --tmp_processors;
+
+    if(processors < 1)
+        processors = 1;
+
+    debug(D_SYSTEM, "System has %ld processors.", processors);
     return processors;
 
 #endif /* __APPLE__, __FreeBSD__ */
@@ -90,7 +101,7 @@ pid_t get_system_pid_max(void) {
     read = 1;
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", netdata_configured_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", netdata_configured_host_prefix?netdata_configured_host_prefix:"");
 
     unsigned long long max = 0;
     if(read_single_number_file(filename, &max) != 0) {

@@ -48,8 +48,9 @@ int getsysctl_by_name(const char *name, void *ptr, size_t len);
 
 extern const char *os_type;
 
-extern int processors;
-long get_system_cpus(void);
+#define get_system_cpus() get_system_cpus_with_cache(true)
+#define get_system_cpus_uncached() get_system_cpus_with_cache(false)
+long get_system_cpus_with_cache(bool cache);
 
 extern pid_t pid_max;
 pid_t get_system_pid_max(void);
