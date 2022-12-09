@@ -222,8 +222,6 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
 // resets all the chart, so that their definitions
 // will be resent to the central netdata
 static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
-    error("Clearing stream_collected_metrics flag in charts of host %s", rrdhost_hostname(host));
-
     RRDSET *st;
     rrdset_foreach_read(st, host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED | RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
@@ -418,13 +416,17 @@ static inline bool rrdpush_sender_validate_response(RRDHOST *host, struct sender
         return true;
     }
 
-    error("STREAM %s [send to %s]: %s.", rrdhost_hostname(host), s->connected_to, error);
-
     worker_is_busy(worker_job_id);
     rrdpush_sender_thread_close_socket(host);
     host->destination->last_error = error;
     host->destination->last_handshake = version;
     host->destination->postpone_reconnection_until = now_realtime_sec() + delay;
+
+    char buf[LOG_DATE_LENGTH];
+    log_date(buf, LOG_DATE_LENGTH, host->destination->postpone_reconnection_until);
+    error("STREAM %s [send to %s]: %s - will retry in %ld secs, at %s",
+          rrdhost_hostname(host), s->connected_to, error, delay, buf);
+
     return false;
 }
 
@@ -449,11 +451,11 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     );
 
     if(unlikely(s->rrdpush_sender_socket == -1)) {
-        error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
+        // error("STREAM %s [send to %s]: could not connect to parent node at this time.", rrdhost_hostname(host), host->rrdpush_send_destination);
         return false;
     }
 
-    info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
+    // info("STREAM %s [send to %s]: initializing communication...", rrdhost_hostname(host), s->connected_to);
 
 #ifdef ENABLE_HTTPS
     if(netdata_ssl_client_ctx){
@@ -657,7 +659,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
         return false;
     }
 
-    info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
+    // info("STREAM %s [send to %s]: waiting response from remote netdata...", rrdhost_hostname(host), s->connected_to);
 
     bytes = recv_timeout(
 #ifdef ENABLE_HTTPS

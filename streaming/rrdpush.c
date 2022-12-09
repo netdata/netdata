@@ -496,20 +496,11 @@ int connect_to_one_of_destinations(
     for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
         time_t now = now_realtime_sec();
 
-        if(d->postpone_reconnection_until > now) {
-            info(
-                "STREAM %s: skipping destination '%s' (default port: %d) due to last error (code: %d, %s), will retry it in %d seconds",
-                rrdhost_hostname(host),
-                string2str(d->destination),
-                default_port,
-                d->last_handshake, d->last_error?d->last_error:"unset reason description",
-                (int)(d->postpone_reconnection_until - now));
-
+        if(d->postpone_reconnection_until > now)
             continue;
-        }
 
         info(
-            "STREAM %s: attempting to connect to '%s' (default port: %d)...",
+            "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
             default_port);
@@ -667,7 +658,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 
 void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
-    info("clients wants to STREAM metrics.");
+    // info("clients wants to STREAM metrics.");
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *abbrev_timezone = "UTC", *tags = NULL;
     int32_t utc_offset = 0;
