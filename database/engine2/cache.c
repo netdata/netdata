@@ -1300,7 +1300,7 @@ PGC *pgc_create(size_t max_clean_size, free_clean_page_callback pgc_free_cb,
     cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 1) ? 1 : max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 1) ? 1 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
-    cache->config.partitions = partitions < 1 ? 1 : partitions;
+    cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
     cache->stats.pages_added_per_partition = callocz(cache->config.partitions, sizeof(size_t));
@@ -1493,14 +1493,14 @@ struct {
 } pgc_uts = {
         .stop            = false,
         .metrics         = NULL,
-        .clean_metrics   =   1000000,
+        .clean_metrics   =    100000,
         .hot_metrics     =   1000000,
         .first_time_t    = 100000000,
         .last_time_t     = 0,
-        .cache_size      = 32,
+        .cache_size      = 0, // get the default (8MB)
         .collect_threads = 16,
         .query_threads   = 16,
-        .partitions      = 10,
+        .partitions      = 0, // get the default (system cpus)
         .options         = PGC_OPTIONS_AUTOSCALE,/* PGC_OPTIONS_FLUSH_PAGES_INLINE | PGC_OPTIONS_EVICT_PAGES_INLINE,*/
         .points_per_page = 10,
         .time_per_collection_ut = 1000000,
@@ -1777,7 +1777,7 @@ void unittest_stress_test(void) {
              "| DRT %5zuk +%4zuk -%4zuk "
              "| CLN %5zuk %s +%4zuk -%4zuk "
              "| SRCH %4zuk %4zuk, HIT %4.1f%% %4.1f%% "
-             "| CLCT %4.1f Mps"
+             "| CLCT %8.4f Mps"
              , stats.entries / 1000
              , (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
              , stats.referenced / 1000
