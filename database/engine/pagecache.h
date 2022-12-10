@@ -5,8 +5,8 @@
 
 #include "rrdengine.h"
 
-extern void *main_mrg;
-extern void *main_cache;
+extern struct mrg *main_mrg;
+extern struct pgc *main_cache;
 extern pthread_key_t query_key;
 void query_key_release(void *data);
 

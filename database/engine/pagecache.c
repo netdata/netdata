@@ -3,8 +3,9 @@
 
 #include "rrdengine.h"
 
-void *main_mrg;
-void *main_cache;
+struct mrg *main_mrg = NULL;
+struct pgc *main_cache = NULL;
+
 pthread_key_t query_key;
 
 // FIXME: Check if it can of use to automatically release reserved pages
@@ -378,7 +379,9 @@ static void init_metrics_index(struct rrdengine_instance *ctx)
 
 void init_page_cache(struct rrdengine_instance *ctx)
 {
-    static int mrg_init = 0;
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    static bool initialized = false;
+
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->page_descriptors = 0;
@@ -386,24 +389,28 @@ void init_page_cache(struct rrdengine_instance *ctx)
     pg_cache->populated_pages = 0;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
-    if (!mrg_init) {
+    netdata_spinlock_lock(&spinlock);
+    if (!initialized) {
+        initialized = true;
+
         // FIXME: Check if it can be of use
         // (void)pthread_key_create(&query_key, NULL /*query_key_release*/);
 
         main_mrg = mrg_create();
-        mrg_init = 1;
 
         main_cache = pgc_create(
             default_rrdeng_page_cache_mb * 1024 * 1024,
             dbengine_clean_page_callback,
             rrdeng_pages_per_extent,
             dbengine_flush_callback,
-            1000,
-            10000,
-            1,
-            PGC_OPTIONS_NONE,
-            16);
+            100,                                //
+            1000,                           //
+            1,                                          // don't delay too much other threads
+            PGC_OPTIONS_AUTOSCALE,                              // AUTOSCALE = 2x max hot pages
+            0                                                 // 0 = as many as the system cpus
+            );
     }
+    netdata_spinlock_unlock(&spinlock);
 
     init_metrics_index(ctx);
 }
