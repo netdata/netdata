@@ -20,25 +20,11 @@ extern int db_engine_journal_indexing;
 extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
-extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 
 #define PAGE_POINT_SIZE_BYTES(x) page_type_size[(x)->type]
 #define PAGE_POINT_CTX_SIZE_BYTES(x) page_type_size[(x)->page_type]
-
-//struct rrdeng_region_info {
-//    time_t start_time_s;
-//    int update_every;
-//    unsigned points;
-//};
-
-void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
-//void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
-//                               Word_t page_correlation_id);
-//void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle);
-//void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle);
-//void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle);
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,

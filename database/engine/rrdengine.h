@@ -50,20 +50,17 @@ struct page_details {
 struct rrdeng_collect_handle {
     struct pg_cache_page_index *page_index;
     struct rrdengine_instance *ctx;
-    struct rrdeng_page_descr *descr;
     uint32_t page_length;
     void *page_entry;
     uint8_t type;
     usec_t end_time_ut;
     usec_t start_time_ut;
-    unsigned long page_correlation_id;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
     uint8_t unaligned_page;
     struct pg_alignment *alignment;
 };
 
 struct rrdeng_query_handle {
-//    struct rrdeng_page_descr *descr;
     struct rrdengine_instance *ctx;
     struct pg_cache_page_index *page_index;
     void *page_entry;
@@ -88,14 +85,12 @@ enum rrdeng_opcode {
     /* can be used to return empty status or flush the command queue */
     RRDENG_NOOP = 0,
 
-    RRDENG_READ_PAGE,
     RRDENG_READ_EXTENT,
     RRDENG_COMMIT_PAGE,
     RRDENG_FLUSH_PAGES,
     RRDENG_SHUTDOWN,
     RRDENG_QUIESCE,
     RRDENG_READ_DF_EXTENT_LIST,
-    RRDENG_READ_EXTENT2,
     RRDENG_READ_PAGE_LIST,
 
     RRDENG_MAX_OPCODE
@@ -115,16 +110,16 @@ struct rrdeng_read_extent {
     uv_file file;
     uint64_t pos;
     uint64_t size;
-    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
-    struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
+//    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
+//    struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
     struct completion *completion;
-    int page_count;
+//    int page_count;
 };
 
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
+    void *data;
     union {
-        void *data;
         struct rrdeng_read_page read_page;
         struct rrdeng_read_extent read_extent;
         struct completion *completion;
@@ -149,21 +144,17 @@ struct rrdeng_cmdqueue {
 
 struct extent_io_descriptor {
     uv_fs_t req;
-    uv_work_t req_worker;
     uv_buf_t iov;
     uv_file file;
     void *buf;
-    void *map_base;
-    size_t map_length;
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
     unsigned descr_count;
-    int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
-    struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
-    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
-    BITMAP256 descr_array_wakeup;
+//    struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
+//    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
+//    BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
@@ -190,7 +181,6 @@ struct rrdengine_worker_config {
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
 
     unsigned long running_journal_migration;
-    uv_thread_t *now_invalidating_dirty_pages;
     bool run_indexing;
 
     /* FIFO command queue */

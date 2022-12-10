@@ -56,6 +56,7 @@ void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
     work_request->wc = wc;
     work_request->count = 0;
     work_request->rerun = false;
+    work_request->completion = NULL;
     wc->running_journal_migration = 1;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
         freez(work_request);
@@ -513,8 +514,6 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             PValue = JudyHSIns(&pg_cache->metrics_index.JudyHS_array, temp_id, sizeof(uuid_t), PJE0);
             fatal_assert(NULL == *PValue); /* TODO: figure out concurrency model */
             *PValue = page_index = create_page_index(temp_id, ctx);
-//            page_index->prev = pg_cache->metrics_index.last_page_index;
-//            pg_cache->metrics_index.last_page_index = page_index;
             uv_rwlock_wrunlock(&pg_cache->metrics_index.lock);
         }
 

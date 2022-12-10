@@ -7,42 +7,48 @@ void *main_mrg;
 void *main_cache;
 pthread_key_t query_key;
 
-void query_key_release(void *data)
-{
-    Pvoid_t pl_judyL = data;
-    Pvoid_t *PValue;
-    info("Thread %d: Cleaning query data", gettid());
-    Word_t time_index;
-//    Word_t end_time_t;
-    unsigned entries = 0;
-
-    struct page_details *pd = NULL;
-    if (pl_judyL) {
-        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? 0 : *PValue;
-             pd != NULL;
-             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
-
-            info("DEBUG: Page %u -- %lu - %lu (extent %lu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-            freez(pd);
-
-            entries++;
-        }
-    }
-    JudyLFreeArray(&pl_judyL, PJE0);
-    pthread_setspecific(query_key, NULL);
-}
-
-static void page_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) {
-    info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
-}
-static void page_cache_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
-     info("SAVE %zu pages", entries);
-//        if(!pgc_uts.stop) {
-//            static const struct timespec work_duration = {.tv_sec = 0, .tv_nsec = 10000};
-//            nanosleep(&work_duration, NULL);
+// FIXME: Check if it can of use to automatically release reserved pages
+//void query_key_release(void *data)
+//{
+//    Pvoid_t pl_judyL = data;
+//    Pvoid_t *PValue;
+//    info("Thread %d: Cleaning query data", gettid());
+//    Word_t time_index;
+////    Word_t end_time_t;
+//    unsigned entries = 0;
+//
+//    struct page_details *pd = NULL;
+//    if (pl_judyL) {
+//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
+//             pd != NULL;
+//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
+//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
+//
+//            info("DEBUG: Page %u -- %lu - %lu (extent %lu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
+//            freez(pd);
+//
+//            entries++;
 //        }
+//    }
+//    JudyLFreeArray(&pl_judyL, PJE0);
+//    pthread_setspecific(query_key, NULL);
+//}
+
+static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
+{
+    // Release storage associated with the page
+    //info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
+    freez(entry.data);
+}
+
+static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
+{
+    // FIXME: Todo flush pages
+    // Need to grab pages and save them
+    // Schedule a call to DBENGINE
+
+     info("SAVE %zu pages", entries);
 }
 
 ARAL page_descr_aral = {
@@ -89,36 +95,6 @@ bool rrdeng_page_descr_is_mmap(void) {
     return page_descr_aral.use_mmap;
 }
 
-//// FIXME: This will not take descr
-//void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
-//{
-//    // FIXME: DBENGINE2
-//    // Adding to the new page cache
-//    // Find metric id associated with uuid
-//    METRIC *this_metric = mrg_metric_get(main_mrg, descr->id, (Word_t) ctx);
-//    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
-//
-//    // Get the data
-//    // We copy for now because we will add in both caches
-////    void *data = dbengine_page_alloc();
-////    memcpy(data, descr->page, RRDENG_BLOCK_SIZE);
-//
-//    PGC_ENTRY page_entry = {
-//        .hot = false,
-//        .section = (Word_t) ctx,
-//        .metric_id = metric_id,
-//        .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
-//        .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
-//        .update_every = descr->update_every_s,
-//        .size = RRDENG_BLOCK_SIZE,
-//        .data = descr->page
-//    };
-//
-//    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry);
-//    pgc_page_release(main_cache, page);
-//    info("DEBUG: DBENGINE2 --> Adding new page in page cache");
-//}
-
 struct rrdeng_page_descr *pg_cache_create_descr(void)
 {
     struct rrdeng_page_descr *descr;
@@ -138,26 +114,11 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     return descr;
 }
 
-static inline int is_page_in_time_range(struct rrdeng_page_descr *descr, usec_t start_time, usec_t end_time)
+static inline int is_page_in_time_range(time_t pg_start_t, time_t pg_end_t, time_t start_time_t, time_t end_time_t)
 {
-    usec_t pg_start, pg_end;
-
-    pg_start = descr->start_time_ut;
-    pg_end = descr->end_time_ut;
-
-    return (pg_start < start_time && pg_end >= start_time) ||
-           (pg_start >= start_time && pg_start <= end_time);
+    return (pg_start_t < start_time_t && pg_end_t >= start_time_t) ||
+           (pg_start_t >= start_time_t && pg_start_t <= end_time_t);
 }
-
-//static inline int is_point_in_time_in_page(struct rrdeng_page_descr *descr, usec_t point_in_time)
-//{
-//    return (point_in_time >= descr->start_time_ut && point_in_time <= descr->end_time_ut);
-//}
-//
-//bool descr_exists_unsafe( struct pg_cache_page_index *page_index, time_t start_time_s)
-//{
-//    return (NULL != JudyLGet(page_index->JudyL_array, start_time_s, PJE0));
-//}
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
 {
@@ -227,7 +188,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start
                 pd->page_length =  page_list[index].page_length;
                 pd->update_every_s =  page_list[index].update_every_s;
                 pd->type =  page_list[index].type;
-                pd->page_entry = NULL;          // acquired page from cache
+                pd->page_entry = NULL;          // acquired page from cache FIXME: Check page cache
                 uuid_copy(pd->uuid, *uuid);
                 *PValue = pd;
             }
@@ -236,75 +197,50 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    // FIXME: Scan page index and add matching entries for the query (TEMP)
+    // FIXME: Improve this to avoid scan of V2 if not needed
 
-    struct pg_cache_page_index *page_index;
-    struct page_cache *pg_cache = &ctx->pg_cache;
 
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
-    page_index = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
+    // Try To add additional pages in the list
+    // Pages will be acquired -- should be ignored by the dbengine reader
 
-    if (NULL == page_index)
-        return JudyL_page_array;
+    METRIC *this_metric = mrg_metric_get(main_mrg, uuid, (Word_t)ctx);
+    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
-    Word_t Index = (Word_t) (start_time_ut / USEC_PER_SEC);
-    uv_rwlock_rdlock(&page_index->lock);
-    PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
-    struct rrdeng_page_descr *descr = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
-    while (descr && is_page_in_time_range(descr, start_time_ut, end_time_ut)) {
-        PValue = JudyLIns(&JudyL_page_array, Index, PJE0);
-        fatal_assert(NULL != PValue);
-        struct page_details *pd = mallocz(sizeof(*pd));
-        pd->pos = descr->extent->offset;
-        pd->size = descr->extent->size;
-        pd->file = descr->extent->datafile->file;
-        pd->fileno = descr->extent->datafile->fileno;
-        pd->start_time_t = descr->start_time_ut / USEC_PER_SEC;
-        pd->end_time_t = descr->end_time_ut / USEC_PER_SEC;
-        pd->datafile = descr->extent->datafile;
-        pd->page_length =  descr->page_length;
-        pd->update_every_s =  descr->update_every_s;
-        pd->type =  descr->type;
-        uuid_copy(pd->uuid, *uuid);
-        *PValue = pd;
+    time_t start_time_t = (time_t)  (start_time_ut / USEC_PER_SEC);
 
-        PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
-        descr = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
+    PGC_PAGE *page;
+    time_t pg_start_t;
+    time_t pg_end_t;
+    Pvoid_t *PValue;
+
+    while ((page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_t, false))) {
+
+        pg_start_t = pgc_page_start_time_t(page);
+        pg_end_t = pgc_page_end_time_t(page);
+        if (is_page_in_time_range(pg_start_t, pg_end_t, (time_t) (start_time_ut / USEC_PER_SEC), (time_t) (end_time_ut/ USEC_PER_SEC))) {
+            PValue = JudyLIns(&JudyL_page_array, (Word_t)pg_start_t, PJE0);
+            fatal_assert(NULL != PValue);
+            struct page_details *pd = mallocz(sizeof(*pd));
+            pd->pos = 0;
+            pd->size = pgc_page_data_size(page);
+            pd->file = 0;
+            pd->fileno = 0;
+            pd->start_time_t = pg_start_t;
+            pd->end_time_t = pg_end_t;
+            pd->datafile = NULL;
+            pd->page_length = pgc_page_data_size(page);   // FIXME: This need to be the actual length
+            pd->update_every_s = pgc_page_update_every(page);
+            pd->page_entry = page;                    // This will be checked to skip attempt to read from datafile
+            pd->type = ctx->page_type;
+            uuid_copy(pd->uuid, *uuid);
+            *PValue = pd;
+        }
+        else
+             break;
+        start_time_t = pg_end_t + pgc_page_update_every(page);
     }
-    uv_rwlock_rdunlock(&page_index->lock);
 
     return JudyL_page_array;
-}
-
-
-/* The caller must hold the page index lock */
-static inline struct rrdeng_page_descr *find_first_page_in_time_range(struct pg_cache_page_index *page_index, usec_t start_time, usec_t end_time)
-{
-    struct rrdeng_page_descr *descr = NULL;
-    Pvoid_t *PValue;
-    Word_t Index;
-
-    Index = (Word_t)(start_time / USEC_PER_SEC);
-    PValue = JudyLLast(page_index->JudyL_array, &Index, PJE0);
-    if (likely(NULL != PValue)) {
-        descr = *PValue;
-        if (is_page_in_time_range(descr, start_time, end_time)) {
-            return descr;
-        }
-    }
-
-    Index = (Word_t)(start_time / USEC_PER_SEC);
-    PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
-    if (likely(NULL != PValue)) {
-        descr = *PValue;
-        if (is_page_in_time_range(descr, start_time, end_time)) {
-            return descr;
-        }
-    }
-
-    return NULL;
 }
 
 /* Update metric oldest and latest timestamps efficiently when adding new values */
@@ -345,100 +281,32 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
     uv_rwlock_wrlock(&page_index->lock);
     PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
     *PValue = descr;
-//    ++page_index->page_count;
-//    pg_cache_add_new_metric_time(page_index, descr);
     uv_rwlock_wrunlock(&page_index->lock);
-
-    uv_rwlock_wrlock(&pg_cache->pg_cache_rwlock);
-    ++ctx->stats.pg_cache_insertions;
-    ++pg_cache->page_descriptors;
-    uv_rwlock_wrunlock(&pg_cache->pg_cache_rwlock);
 }
 
 /**
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
- * Does not get a reference.
  * @param ctx DB context
- * @param page_index the page index that we are trying to preload
+ * @param handle query handle as initialized
  * @param start_time_ut inclusive starting time in usec
  * @param end_time_ut inclusive ending time in usec
- * @return the number of pages that overlap with the time range [start_time,end_time].
+ * @return 1 / 0 (pages found or not found)
  */
 unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *data, time_t start_time_t, time_t end_time_t)
 {
-//    struct rrdeng_page_descr *descr = NULL, *preload_array[PAGE_CACHE_MAX_PRELOAD_PAGES];
-//    struct page_cache_descr *pg_cache_descr = NULL;
-//    unsigned i, j, k, preload_count, count;
-//    unsigned long flags;
-    Pvoid_t *PValue;
-//    Word_t Index;
     struct rrdeng_query_handle *handle = data;
-    struct pg_cache_page_index *page_index = handle->page_index;
 
-    if (unlikely(NULL == page_index))
+    if (unlikely(NULL == handle || NULL == handle->page_index))
         return 0;
 
-    // FIXME: Lets call DBENGINE2 and see whats happening
-//    METRIC *this_metric = mrg_metric_get(main_mrg, &page_index->id, (Word_t) ctx);
-
-//    char uuid_str[UUID_STR_LEN];
-//    uuid_unparse_lower(*mrg_metric_uuid(main_mrg, this_metric), uuid_str);
-//    info("DEBUG: Metric info %s : %ld - %ld", uuid_str,
-//         mrg_metric_get_first_time_t(main_mrg, this_metric),
-//         mrg_metric_get_latest_time_t(main_mrg, this_metric));
-//
-//    info("DEBUG: Page info %s : %llu - %llu", uuid_str,
-//         page_index->oldest_time_ut / USEC_PER_SEC,
-//         page_index->latest_time_ut / USEC_PER_SEC);
+    struct pg_cache_page_index *page_index = handle->page_index;
 
     handle->pl_JudyL = get_page_list(ctx, &page_index->id, start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC);
-//    int ret = pthread_setspecific(query_key, pl_judyL);
 
-    //    fatal_assert(0 == ret);
-//    Word_t time_index;
-//    unsigned entries = 0;
-//    struct page_details *pd = NULL;
-//    if (pl_judyL) {
-//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
-//             pd != NULL;
-//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
-//
-//            info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-//
-//            entries++;
-//        }
-//    }
-
-    if (handle->pl_JudyL) {
+    if (handle->pl_JudyL)
         dbengine_load_page_list(ctx, handle->pl_JudyL);
-        // FIXME: Need to make sure page next "waits"
-        sleep_usec(100000);
-        /* Need to wait on a cond variable */
-    }
 
     return handle->pl_JudyL != NULL;
-
-    // **** DEBUG ***
-    // SHOW THE JUDYL
-
-//    time_index = 0;
-//    if (pl_judyL) {
-//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
-//             pd != NULL;
-//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
-//
-//            if (pd->page_entry)
-//                info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) (PAGE ACQUIRED)", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-//            else
-//                info("DEBUG: Page %d -- %ld - %ld (extent %llu, size %u at file %d) (PAGE MISSING)", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-//
-//            entries++;
-//        }
-//    }
 }
 
 /*
@@ -453,25 +321,32 @@ void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  void 
     if (unlikely(!handle || !handle->pl_JudyL))
             return NULL;
 
-    Word_t Index = start_time_t;
-
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
-    Pvoid_t *Pvalue = JudyLFirst( handle->pl_JudyL, &Index, PJE0);
-    if (!Pvalue || !*Pvalue) {
+
+    PGC_PAGE *page_entry = NULL;
+    struct page_details *pd;
+    Word_t Index;
+    unsigned iterations = 100;  // FIXME: possibly add completion to have dbengine notify us when data is ready
+    do {
+        if (iterations < 100)
+             sleep_usec(1);
+
+        Index = start_time_t;
+        Pvoid_t *Pvalue = JudyLFirst(handle->pl_JudyL, &Index, PJE0);
+        if (!Pvalue || !*Pvalue) {
             handle->pl_JudyL = NULL;
             return NULL;
-    } else {
-        if (start_time_t == Index)
-            info("DEBUG: Requesting page with %ld -- FOUND", start_time_t);
-        else
-            info("DEBUG: Requesting page with %ld but FOUND %ld instead", start_time_t, Index);
-    }
-    struct page_details *pd = *Pvalue;
-    PGC_PAGE *page_entry = pd->page_entry;
+        }
+        pd = *Pvalue;
+        page_entry = pd->page_entry;
+        iterations--;
 
-    Index = start_time_t;
-    (void) JudyLDel(&handle->pl_JudyL, Index, PJE0);
-    freez(pd);
+    } while (!page_entry && iterations); // Wait until dbengine fills this
+
+//    // FIXME: needs a lock here
+//    Index = start_time_t;
+//    (void) JudyLDel(&handle->pl_JudyL, Index, PJE0);
+//    freez(pd);
 
     return page_entry;
 }
@@ -498,7 +373,6 @@ static void init_metrics_index(struct rrdengine_instance *ctx)
     struct page_cache *pg_cache = &ctx->pg_cache;
 
     pg_cache->metrics_index.JudyHS_array = (Pvoid_t) NULL;
-    pg_cache->metrics_index.last_page_index = NULL;
     fatal_assert(0 == uv_rwlock_init(&pg_cache->metrics_index.lock));
 }
 
@@ -513,16 +387,17 @@ void init_page_cache(struct rrdengine_instance *ctx)
     fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     if (!mrg_init) {
-        (void)pthread_key_create(&query_key, NULL /*query_key_release*/);
+        // FIXME: Check if it can be of use
+        // (void)pthread_key_create(&query_key, NULL /*query_key_release*/);
 
         main_mrg = mrg_create();
         mrg_init = 1;
 
         main_cache = pgc_create(
             default_rrdeng_page_cache_mb * 1024 * 1024,
-            page_cache_free_clean_page_callback,
-            64,
-            page_cache_save_dirty_page_callback,
+            dbengine_clean_page_callback,
+            rrdeng_pages_per_extent,
+            dbengine_flush_callback,
             1000,
             10000,
             1,
@@ -531,12 +406,9 @@ void init_page_cache(struct rrdengine_instance *ctx)
     }
 
     init_metrics_index(ctx);
-//    init_replaceQ(ctx);
-//    init_committed_page_index(ctx);
-
-    fatal_assert(0 == uv_rwlock_init(&pg_cache->v2_lock));
 }
 
+// FIXME: DBENGINE2 Release page cache properly
 //void free_page_cache(struct rrdengine_instance *ctx)
 //{
 //    struct page_cache *pg_cache = &ctx->pg_cache;

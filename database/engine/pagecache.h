@@ -19,50 +19,9 @@ struct rrdeng_page_descr;
 #define MAX_PAGE_CACHE_FETCH_RETRIES (3)
 #define PAGE_CACHE_FETCH_WAIT_TIMEOUT (3)
 
-/* Page flags */
-#define RRD_PAGE_DIRTY          (1LU << 0)
-#define RRD_PAGE_LOCKED         (1LU << 1)
-#define RRD_PAGE_READ_PENDING   (1LU << 2)
-#define RRD_PAGE_WRITE_PENDING  (1LU << 3)
-#define RRD_PAGE_POPULATED      (1LU << 4)
-
-//struct page_cache_descr {
-//    struct rrdeng_page_descr *descr; /* parent descriptor */
-//    void *page;
-//    unsigned long flags;
-//    struct page_cache_descr *prev; /* LRU */
-//    struct page_cache_descr *next; /* LRU */
-
-//    unsigned refcnt;
-//    uv_mutex_t mutex; /* always take it after the page cache lock or after the commit lock */
-//    uv_cond_t cond;
-//    unsigned waiters;
-//};
-
-/* Page cache descriptor flags, state = 0 means no descriptor */
-#define PG_CACHE_DESCR_ALLOCATED    (1LU << 0)
-#define PG_CACHE_DESCR_DESTROY      (1LU << 1)
-#define PG_CACHE_DESCR_LOCKED       (1LU << 2)
-#define PG_CACHE_DESCR_SHIFT        (3)
-#define PG_CACHE_DESCR_USERS_MASK   (((unsigned long)-1) << PG_CACHE_DESCR_SHIFT)
-#define PG_CACHE_DESCR_FLAGS_MASK   (((unsigned long)-1) >> (BITS_PER_ULONG - PG_CACHE_DESCR_SHIFT))
-
-/*
- * Page cache descriptor state bits (works for both 32-bit and 64-bit architectures):
- *
- * 63    ...     31   ...     3 |          2 |          1 |          0|
- * -----------------------------+------------+------------+-----------|
- * number of descriptor users   |    DESTROY |     LOCKED | ALLOCATED |
- */
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
     struct extent_info *extent;
-
-    /* points to ephemeral page cache descriptor if the page resides in the cache */
-//    struct page_cache_descr *pg_cache_descr;
-
-    /* Compare-And-Swap target for page cache descriptor allocation algorithm */
-//    volatile unsigned long pg_cache_descr_state;
 
     /* page information */
     usec_t start_time_ut;
@@ -84,11 +43,6 @@ struct rrdeng_page_info {
     uint32_t page_length;
 };
 
-/* returns 1 for success, 0 for failure */
-typedef int pg_cache_page_info_filter_t(struct rrdeng_page_descr *);
-
-#define PAGE_CACHE_MAX_PRELOAD_PAGES    (256)
-
 struct pg_alignment {
     uint32_t page_length;
     uint32_t refcount;
@@ -102,7 +56,6 @@ struct pg_cache_page_index {
      * TODO: examine if we want to support better granularity than seconds
      */
     Pvoid_t JudyL_array;
-//    Word_t page_count;
     unsigned short refcount;
     unsigned short writers;
     uv_rwlock_t lock;
@@ -121,90 +74,31 @@ struct pg_cache_page_index {
 
     struct rrdengine_instance *ctx;
     uint32_t latest_update_every_s;
-
-//    struct pg_cache_page_index *prev;
 };
 
 /* maps UUIDs to page indices */
 struct pg_cache_metrics_index {
     uv_rwlock_t lock;
     Pvoid_t JudyHS_array;
-    struct pg_cache_page_index *last_page_index;
-};
-
-/* gathers dirty pages to be written on disk */
-//struct pg_cache_committed_page_index {
-//    uv_rwlock_t lock;
-//
-//    Pvoid_t JudyL_array;
-//
-//    /*
-//     * Dirty page correlation ID is a hint. Dirty pages that are correlated should have
-//     * a small correlation ID difference. Dirty pages in memory should never have the
-//     * same ID at the same time for correctness.
-//     */
-//    Word_t latest_corr_id;
-//
-//    unsigned nr_committed_pages;
-//};
-
-/*
- * Gathers populated pages to be evicted.
- * Relies on page cache descriptors being there as it uses their memory.
- */
-struct pg_cache_replaceQ {
-    uv_rwlock_t lock; /* LRU lock */
-
-    struct page_cache_descr *head; /* LRU */
-    struct page_cache_descr *tail; /* MRU */
 };
 
 struct page_cache { /* TODO: add statistics */
     uv_rwlock_t pg_cache_rwlock; /* page cache lock */
-    uv_rwlock_t v2_lock;
 
     struct pg_cache_metrics_index metrics_index;
-//    struct pg_cache_committed_page_index committed_page_index;
-//    struct pg_cache_replaceQ replaceQ;
-
     unsigned page_descriptors;
     unsigned active_descriptors;
     unsigned populated_pages;
 };
 
-//void pg_cache_wake_up_waiters_unsafe(struct rrdeng_page_descr *descr);
-//void pg_cache_wake_up_waiters(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-//void pg_cache_wait_event_unsafe(struct rrdeng_page_descr *descr);
-//unsigned long pg_cache_wait_event(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-void pg_cache_replaceQ_insert(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
-//void pg_cache_replaceQ_delete(struct rrdengine_instance *ctx,
-//                                     struct rrdeng_page_descr *descr);
-//void pg_cache_replaceQ_set_hot(struct rrdengine_instance *ctx,
-//                                      struct rrdeng_page_descr *descr);
 struct rrdeng_page_descr *pg_cache_create_descr(void);
-//int pg_cache_try_get_unsafe(struct rrdeng_page_descr *descr, int exclusive_access);
-//void pg_cache_put_unsafe(struct rrdeng_page_descr *descr);
-//void pg_cache_put(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr);
 void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr);
-//uint8_t pg_cache_punch_hole(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
-//                                   uint8_t remove_dirty, uint8_t is_exclusive_holder, uuid_t *metric_id);
-//usec_t pg_cache_oldest_time_in_range(struct rrdengine_instance *ctx, uuid_t *id,
-//                                            usec_t start_time_ut, usec_t end_time_ut);
-//void pg_cache_get_filtered_info_prev(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index,
-//                                            usec_t point_in_time_ut, pg_cache_page_info_filter_t *filter,
-//                                            struct rrdeng_page_info *page_info);
-
-//struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t(*id), usec_t start_time_ut);
 unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *handle, time_t start_time_t, time_t end_time_t);
 void *pg_cache_lookup_next(struct rrdengine_instance *ctx, void *data, time_t start_time_t, time_t end_time_t);
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
-//void free_page_cache(struct rrdengine_instance *ctx);
+void free_page_cache(struct rrdengine_instance *ctx);
 void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr);
-//void pg_cache_update_metric_times(struct pg_cache_page_index *page_index);
-//unsigned long pg_cache_hard_limit(struct rrdengine_instance *ctx);
-//unsigned long pg_cache_soft_limit(struct rrdengine_instance *ctx);
-//unsigned long pg_cache_committed_hard_limit(struct rrdengine_instance *ctx);
 
 void rrdeng_page_descr_aral_go_singlethreaded(void);
 void rrdeng_page_descr_aral_go_multithreaded(void);
