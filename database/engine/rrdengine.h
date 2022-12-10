@@ -74,6 +74,7 @@ struct rrdeng_query_handle {
     storage_number *page;
     time_t page_end_time_t;
     uint32_t page_length;
+    Pvoid_t pl_JudyL;
     time_t dt_s;
 };
 

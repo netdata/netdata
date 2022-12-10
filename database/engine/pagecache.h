@@ -195,8 +195,8 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
 //                                            struct rrdeng_page_info *page_info);
 
 //struct rrdeng_page_descr *pg_cache_lookup_unpopulated_and_lock(struct rrdengine_instance *ctx, uuid_t(*id), usec_t start_time_ut);
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, struct pg_cache_page_index *page_index, time_t start_time_t, time_t end_time_t);
-void *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, time_t start_time_t, time_t end_time_t);
+unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *handle, time_t start_time_t, time_t end_time_t);
+void *pg_cache_lookup_next(struct rrdengine_instance *ctx, void *data, time_t start_time_t, time_t end_time_t);
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
 //void free_page_cache(struct rrdengine_instance *ctx);

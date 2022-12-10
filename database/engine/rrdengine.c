@@ -190,7 +190,7 @@ static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *dat
     }
 
     worker_is_busy(UV_EVENT_PAGE_POPULATION);
-    char uuid_str[UUID_STR_LEN];
+//    char uuid_str[UUID_STR_LEN];
 //    {
 //        struct page_details *pd;
 //        Pvoid_t *PValue;
@@ -223,11 +223,6 @@ static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *dat
 
     unsigned hit = 0, miss = 0;
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
-        // FIXME: This should be the exact bytes
-        void *page_data = mallocz(header->descr[i].page_length);
-
-        uuid_unparse_lower(header->descr[i].uuid, uuid_str);
-        uuid_unparse_lower(header->descr[i].uuid, uuid_str);
 
         Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, header->descr[i].start_time_ut / USEC_PER_SEC, PJE0);
         struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
@@ -237,37 +232,36 @@ static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *dat
 //        else
 //            info("DEBUG: LOOKUP %d  %s @ %llu   NOT FOUND", i, uuid_str, header->descr[i].start_time_ut / USEC_PER_SEC);
 
-
         // Check if we have match
         if (pd) {
-                char uuid_str1[UUID_STR_LEN];
-                char uuid_str2[UUID_STR_LEN];
-                uuid_unparse_lower(pd->uuid, uuid_str1);
-                uuid_unparse_lower(header->descr[i].uuid, uuid_str2);
-//                info("DEBUG: PD UUID = %s -- header uuid = %s", uuid_str1, uuid_str2);
-                if (uuid_compare(pd->uuid, header->descr[i].uuid) == 0)
-                    hit++;
-                else {
-                    pd = NULL;
-                    miss++;
-                }
-        } else
+            if (uuid_compare(pd->uuid, header->descr[i].uuid) == 0) {
+//                if (pd->page_entry) {
+//                    info("DEBUG: Duplicate page request %p !!!!", pd->page_entry);
+//                }
+                hit++;
+            }
+            else {
+                pd = NULL;
                 miss++;
+            }
+        } else
+            miss++;
 
         // Find metric id
         METRIC *this_metric = mrg_metric_get(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
-        if (have_read_error) {
-            fill_page_with_nulls(page_data, header->descr[i].page_length, header->descr[i].type);
-        } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-            memcpy(page_data, data + payload_offset + page_offset, header->descr[i].page_length);
-        } else {
-            memcpy(page_data, uncompressed_buf + page_offset, header->descr[i].page_length);
-        }
-
         PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC), true);
         if (!page) {
+            void *page_data = mallocz(header->descr[i].page_length);
+
+            if (have_read_error) {
+                fill_page_with_nulls(page_data, header->descr[i].page_length, header->descr[i].type);
+            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+                memcpy(page_data, data + payload_offset + page_offset, header->descr[i].page_length);
+            } else {
+                memcpy(page_data, uncompressed_buf + page_offset, header->descr[i].page_length);
+            }
 
             time_t update_every_s = 0;
             if (pd)
@@ -289,6 +283,7 @@ static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *dat
                 .size = header->descr[i].page_length,
                 .data = page_data
             };
+
             bool added = true;
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
             if (false == added)
@@ -297,12 +292,13 @@ static void do_extent_processing2 (struct rrdengine_worker_config *wc, void *dat
         if (pd) {
             pd->page_entry = page;
             pd->page_length = header->descr[i].page_length;
+//            info("DEBUG: %d Retuning page %p as ACQUIRED", gettid(), page);
         }
-        else
+        else {
             pgc_page_release(main_cache, page);
+        }
     }
-    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u (HIT = %u, MISS = %u)", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size,
-         hit, miss);
+//    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u (HIT = %u, MISS = %u)", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size, hit, miss);
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)
         freez(uncompressed_buf);
 }
@@ -2029,7 +2025,7 @@ static void do_read_extent2_work(uv_work_t *req)
 
     // We have one extent to read
 
-    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size);
+//    info("DEBUG: %d Reading %u pages from extent pos %lu, size = %u", gettid(), extent_page_list->count, extent_page_list->pos, extent_page_list->size);
     Word_t start_time_t = 0;
 
     // We know the following here:
@@ -2072,24 +2068,8 @@ static void do_read_extent2_work(uv_work_t *req)
     // Need to decompress and then process the pagelist
     do_extent_processing2(wc, data, extent_page_list);
 
-    // This is debugging
-//    start_time_t = 0;
-//    for (PValue = JudyLFirst(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-//        pd = unlikely(NULL == PValue) ? NULL : *PValue;
-//         pd != NULL;
-//         PValue = JudyLNext(extent_page_list->JudyL_page_list, &start_time_t, PJE0),
-//        pd = unlikely(NULL == PValue) ? NULL : *PValue) {
-//
-//        char uuid_str[UUID_STR_LEN];
-//        uuid_unparse_lower(pd->uuid, uuid_str);
-//        info("  %d Page %u %s -- %lu - %lu (extent %lu, size %u at file %u) ", gettid(), entries, uuid_str, pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->fileno);
-//
-//        entries++;
-//    }
-    // Free the Judy that holds the requested pagelist
+    // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
-
-    // Free the page list
     freez(extent_page_list);
 }
 
