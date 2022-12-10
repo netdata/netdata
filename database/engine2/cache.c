@@ -250,12 +250,13 @@ static inline size_t cache_usage_percent(PGC *cache) {
 
         size_t wanted_cache_size = hot_max * 2;
 
-        size_t max_for_clean;
+        if(wanted_cache_size < cache->config.clean_size + hot_max)
+            wanted_cache_size = cache->config.clean_size + hot_max;
+
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
-            // max_for_clean = cache->config.clean_size;
             return 100;
 
-        max_for_clean = wanted_cache_size - hot - dirty;
+        size_t max_for_clean = wanted_cache_size - hot - dirty;
         size_t percent = clean * 100 / max_for_clean;
         return percent;
     }
@@ -350,6 +351,19 @@ static size_t page_size_from_assumed_size(size_t assumed_size) {
 // ----------------------------------------------------------------------------
 // Linked list management
 
+static inline void atomic_set_max(size_t *max, size_t desired) {
+    size_t expected;
+
+    expected = __atomic_load_n(max, __ATOMIC_RELAXED);
+
+    do {
+
+        if(expected >= desired)
+            return;
+
+    } while(!__atomic_compare_exchange_n(max, &expected, desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+}
+
 struct section_dirty_pages {
     size_t entries;
     size_t size;
@@ -395,20 +409,16 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
     page_flag_set(page, ll->flags);
 
-    if(ll->stats->entries > ll->stats->max_entries + 1)
-        __atomic_store_n(&ll->stats->max_entries, ll->stats->entries + 1, __ATOMIC_RELAXED);
-
-    if(ll->stats->size > ll->stats->max_size + page->assumed_size)
-        __atomic_store_n(&ll->stats->max_size, ll->stats->max_size + page->assumed_size, __ATOMIC_RELAXED);
-
     if(!having_lock)
         pgc_ll_unlock(cache, ll);
 
-    __atomic_add_fetch(&ll->stats->entries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->stats->size, page->assumed_size, __ATOMIC_RELAXED);
+    size_t entries = __atomic_add_fetch(&ll->stats->entries, 1, __ATOMIC_RELAXED);
+    size_t size    = __atomic_add_fetch(&ll->stats->size, page->assumed_size, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->stats->added_entries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&ll->stats->added_size, page->assumed_size, __ATOMIC_RELAXED);
 
+    atomic_set_max(&ll->stats->max_entries, entries);
+    atomic_set_max(&ll->stats->max_size, size);
 }
 
 static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
@@ -554,9 +564,9 @@ static inline void PGC_REFERENCED_PAGES_PLUS1(PGC *cache, PGC_PAGE *page) {
     __atomic_add_fetch(&cache->stats.referenced_size, page->assumed_size, __ATOMIC_RELAXED);
 }
 
-static inline void PGC_REFERENCED_PAGES_MINUS1(PGC *cache, PGC_PAGE *page) {
+static inline void PGC_REFERENCED_PAGES_MINUS1(PGC *cache, size_t assumed_size) {
     __atomic_sub_fetch(&cache->stats.referenced_entries, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&cache->stats.referenced_size, page->assumed_size, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&cache->stats.referenced_size, assumed_size, __ATOMIC_RELAXED);
 }
 
 static inline bool page_acquire___while_having_some_lock(PGC *cache, PGC_PAGE *page) {
@@ -585,6 +595,7 @@ static inline bool page_acquire___while_having_some_lock(PGC *cache, PGC_PAGE *p
 }
 
 static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necessary) {
+    size_t assumed_size = page->assumed_size; // take the size before we release it
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
@@ -604,7 +615,7 @@ static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necess
         __atomic_add_fetch(&cache->stats.release_spins, spins - 1, __ATOMIC_RELAXED);
 
     if(desired == 0) {
-        PGC_REFERENCED_PAGES_MINUS1(cache, page);
+        PGC_REFERENCED_PAGES_MINUS1(cache, assumed_size);
 
         if(evict_if_necessary)
             evict_on_page_release_when_permitted(cache);
@@ -612,6 +623,8 @@ static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necess
 }
 
 static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    size_t assumed_size = page->assumed_size; // take the size before we release it
+
     internal_fatal(!is_page_clean(page),
                    "DBENGINE CACHE: only clean pages can be deleted");
 
@@ -641,7 +654,7 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
     } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
     if(delete_it) {
-        PGC_REFERENCED_PAGES_MINUS1(cache, page);
+        PGC_REFERENCED_PAGES_MINUS1(cache, assumed_size);
 
         // we can delete this page
         internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
