@@ -65,14 +65,6 @@ struct pgc_page {
 
 struct pgc_linked_list {
     SPINLOCK spinlock;
-    size_t entries;
-    size_t size;
-    size_t max_entries;
-    size_t max_size;
-    size_t added_entries;
-    size_t added_size;
-    size_t removed_entries;
-    size_t removed_size;
     union {
         PGC_PAGE *base;
         Pvoid_t sections_judy;
@@ -81,6 +73,7 @@ struct pgc_linked_list {
     size_t version;
     size_t last_version_checked;
     bool linked_list_in_sections_judy; // when true, we use 'sections_judy', otherwise we use 'base'
+    struct pgc_queue_statistics *stats;
 };
 
 struct pgc {
@@ -109,51 +102,7 @@ struct pgc {
     struct pgc_linked_list dirty;       // in the dirty list, pages are ordered the way they were marked dirty
     struct pgc_linked_list hot;         // in the hot list, pages are order the way they were marked hot
 
-    struct {
-        // size_t last_unique_id;          // each page gets a unique id, every time it is added to the cache
-
-        size_t added_entries;
-        size_t added_size;
-
-        size_t removed_entries;
-        size_t removed_size;
-
-        size_t entries;                 // all the entries (includes clean, dirty, host)
-        size_t size;                    // all the entries (includes clean, dirty, host)
-
-        size_t referenced_entries;      // all the entries currently referenced
-        size_t referenced_size;         // all the entries currently referenced
-
-        size_t searches_exact;
-        size_t searches_exact_hits;
-        size_t searches_exact_misses;
-
-        size_t searches_closest;
-        size_t searches_closest_hits;
-        size_t searches_closest_misses;
-
-        size_t flushes_completed;
-        size_t flushes_completed_size;
-        size_t flushes_cancelled;
-        size_t flushes_cancelled_size;
-
-        size_t points_collected;
-
-        size_t insert_spins;
-        size_t evict_spins;
-        size_t release_spins;
-        size_t acquire_spins;
-        size_t delete_spins;
-
-        size_t evict_skipped;
-        size_t hot_empty_pages_evicted_immediately;
-        size_t hot_empty_pages_evicted_later;
-        size_t *pages_added_per_partition;
-
-        size_t events_cache_under_severe_pressure;
-        size_t events_cache_needs_space_90;
-        size_t events_flush_critical;
-    } stats;
+    struct pgc_statistics stats;        // statistics
 
 #ifdef NETDATA_PGC_POINTER_CHECK
     netdata_mutex_t global_pointer_registry_mutex;
@@ -294,10 +243,10 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 
 static inline size_t cache_usage_percent(PGC *cache) {
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
-        size_t clean   = __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
-        size_t dirty   = __atomic_load_n(&cache->dirty.size, __ATOMIC_RELAXED);
-        size_t hot     = __atomic_load_n(&cache->hot.size, __ATOMIC_RELAXED);
-        size_t hot_max = __atomic_load_n(&cache->hot.max_size, __ATOMIC_RELAXED);
+        size_t clean   = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
+        size_t dirty   = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
+        size_t hot     = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+        size_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
 
         size_t wanted_cache_size = hot_max * 2;
 
@@ -311,7 +260,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
         return percent;
     }
     else {
-        size_t clean = __atomic_load_n(&cache->clean.size, __ATOMIC_RELAXED);
+        size_t clean = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
         size_t max = cache->config.clean_size;
         size_t percent = clean * 100 / max;
         return percent;
@@ -379,7 +328,7 @@ static void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
 static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_them);
 
 static inline bool flushing_critical(PGC *cache) {
-    if(unlikely(__atomic_load_n(&cache->dirty.size, __ATOMIC_RELAXED) > __atomic_load_n(&cache->hot.max_size, __ATOMIC_RELAXED))) {
+    if(unlikely(__atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED) > __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED))) {
         __atomic_add_fetch(&cache->stats.events_flush_critical, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -446,27 +395,27 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
     page_flag_set(page, ll->flags);
 
-    if(ll->entries > ll->max_entries + 1)
-        __atomic_store_n(&ll->max_entries, ll->entries + 1, __ATOMIC_RELAXED);
+    if(ll->stats->entries > ll->stats->max_entries + 1)
+        __atomic_store_n(&ll->stats->max_entries, ll->stats->entries + 1, __ATOMIC_RELAXED);
 
-    if(ll->size > ll->max_size + page->assumed_size)
-        __atomic_store_n(&ll->max_size, ll->max_size + page->assumed_size, __ATOMIC_RELAXED);
+    if(ll->stats->size > ll->stats->max_size + page->assumed_size)
+        __atomic_store_n(&ll->stats->max_size, ll->stats->max_size + page->assumed_size, __ATOMIC_RELAXED);
 
     if(!having_lock)
         pgc_ll_unlock(cache, ll);
 
-    __atomic_add_fetch(&ll->entries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->added_entries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->added_size, page->assumed_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->size, page->assumed_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->added_entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->added_size, page->assumed_size, __ATOMIC_RELAXED);
 
 }
 
 static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
-    __atomic_sub_fetch(&ll->entries, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&ll->size, page->assumed_size, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->removed_entries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ll->removed_size, page->assumed_size, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&ll->stats->entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&ll->stats->size, page->assumed_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->removed_entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ll->stats->removed_size, page->assumed_size, __ATOMIC_RELAXED);
 
     if(!having_lock)
         pgc_ll_lock(cache, ll);
@@ -692,6 +641,8 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
     } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
     if(delete_it) {
+        PGC_REFERENCED_PAGES_MINUS1(cache, page);
+
         // we can delete this page
         internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
                        "DBENGINE CACHE: page is already being deleted");
@@ -1021,8 +972,6 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             pointer_add(cache, page);
             pgc_index_write_unlock(cache, partition);
 
-            __atomic_add_fetch(&cache->stats.pages_added_per_partition[partition], 1, __ATOMIC_RELAXED);
-
             if (entry->hot)
                 page_set_hot(cache, page);
             else
@@ -1208,7 +1157,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
     size_t optimal_flush_size = cache->config.max_dirty_pages_per_call;
     size_t dirty_version_at_entry = cache->dirty.version;
-    if(!all_of_them && (cache->dirty.entries < optimal_flush_size || cache->dirty.last_version_checked == dirty_version_at_entry)) {
+    if(!all_of_them && (cache->dirty.stats->entries < optimal_flush_size || cache->dirty.last_version_checked == dirty_version_at_entry)) {
         pgc_ll_unlock(cache, &cache->dirty);
         return false;
     }
@@ -1397,7 +1346,6 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
-    cache->stats.pages_added_per_partition = callocz(cache->config.partitions, sizeof(size_t));
 
     for(size_t part = 0; part < cache->config.partitions ; part++)
         netdata_rwlock_init(&cache->index[part].rwlock);
@@ -1411,6 +1359,10 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->hot.flags = PGC_PAGE_HOT;
     cache->dirty.flags = PGC_PAGE_DIRTY;
     cache->clean.flags = PGC_PAGE_CLEAN;
+
+    cache->hot.stats = &cache->stats.queues.hot;
+    cache->dirty.stats = &cache->stats.queues.dirty;
+    cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
     cache->aral = arrayalloc_create(sizeof(PGC_PAGE), max_clean_size / sizeof(PGC_PAGE) / 3,
@@ -1557,6 +1509,14 @@ void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t) 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact) {
     return page_find_and_acquire(cache, section, metric_id, start_time_t, exact);
 }
+
+struct pgc_statistics pgc_get_statistics(PGC *cache) {
+    // FIXME - get the statistics atomically
+    struct pgc_statistics stats = cache->stats;
+
+    return stats;
+}
+
 
 // ----------------------------------------------------------------------------
 // unittest
@@ -1846,17 +1806,17 @@ void unittest_stress_test(void) {
         stats.deleted       = __atomic_load_n(&pgc_uts.cache->stats.removed_entries, __ATOMIC_RELAXED);
         stats.referenced    = __atomic_load_n(&pgc_uts.cache->stats.referenced_entries, __ATOMIC_RELAXED);
 
-        stats.hot_entries   = __atomic_load_n(&pgc_uts.cache->hot.entries, __ATOMIC_RELAXED);
-        stats.hot_added     = __atomic_load_n(&pgc_uts.cache->hot.added_entries, __ATOMIC_RELAXED);
-        stats.hot_deleted   = __atomic_load_n(&pgc_uts.cache->hot.removed_entries, __ATOMIC_RELAXED);
+        stats.hot_entries   = __atomic_load_n(&pgc_uts.cache->hot.stats->entries, __ATOMIC_RELAXED);
+        stats.hot_added     = __atomic_load_n(&pgc_uts.cache->hot.stats->added_entries, __ATOMIC_RELAXED);
+        stats.hot_deleted   = __atomic_load_n(&pgc_uts.cache->hot.stats->removed_entries, __ATOMIC_RELAXED);
 
-        stats.dirty_entries = __atomic_load_n(&pgc_uts.cache->dirty.entries, __ATOMIC_RELAXED);
-        stats.dirty_added   = __atomic_load_n(&pgc_uts.cache->dirty.added_entries, __ATOMIC_RELAXED);
-        stats.dirty_deleted = __atomic_load_n(&pgc_uts.cache->dirty.removed_entries, __ATOMIC_RELAXED);
+        stats.dirty_entries = __atomic_load_n(&pgc_uts.cache->dirty.stats->entries, __ATOMIC_RELAXED);
+        stats.dirty_added   = __atomic_load_n(&pgc_uts.cache->dirty.stats->added_entries, __ATOMIC_RELAXED);
+        stats.dirty_deleted = __atomic_load_n(&pgc_uts.cache->dirty.stats->removed_entries, __ATOMIC_RELAXED);
 
-        stats.clean_entries = __atomic_load_n(&pgc_uts.cache->clean.entries, __ATOMIC_RELAXED);
-        stats.clean_added   = __atomic_load_n(&pgc_uts.cache->clean.added_entries, __ATOMIC_RELAXED);
-        stats.clean_deleted = __atomic_load_n(&pgc_uts.cache->clean.removed_entries, __ATOMIC_RELAXED);
+        stats.clean_entries = __atomic_load_n(&pgc_uts.cache->clean.stats->entries, __ATOMIC_RELAXED);
+        stats.clean_added   = __atomic_load_n(&pgc_uts.cache->clean.stats->added_entries, __ATOMIC_RELAXED);
+        stats.clean_deleted = __atomic_load_n(&pgc_uts.cache->clean.stats->removed_entries, __ATOMIC_RELAXED);
 
         stats.searches_exact = __atomic_load_n(&pgc_uts.cache->stats.searches_exact, __ATOMIC_RELAXED);
         stats.searches_exact_hits = __atomic_load_n(&pgc_uts.cache->stats.searches_exact_hits, __ATOMIC_RELAXED);

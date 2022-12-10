@@ -259,7 +259,7 @@ void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct
 
     // FIXME: DBENGINE2 rename and proper
     // This will update the metric
-    update_uuid_last_time(page_index->ctx, &page_index->id, (time_t) (descr->end_time_ut / USEC_PER_SEC));
+    update_metric_latest_time_by_uuid(page_index->ctx, &page_index->id, (time_t) (descr->end_time_ut / USEC_PER_SEC));
 }
 
 /* If index is NULL lookup by UUID (descr->id) */

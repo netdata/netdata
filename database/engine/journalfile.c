@@ -4,20 +4,24 @@
 
 // DBENGINE2: Helper
 
-void update_uuid_last_time(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time)
+void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time)
 {
-    METRIC *one_metric = mrg_metric_get(main_mrg, uuid, (Word_t) ctx);
-    if (!one_metric)
+    METRIC *metric = mrg_metric_get(main_mrg, uuid, (Word_t) ctx);
+    if (!metric)
         return;
 
-    mrg_metric_set_latest_time_t(main_mrg, one_metric, last_time);
+    if(!mrg_metric_get_first_time_t(main_mrg, metric))
+        mrg_metric_set_first_time_t(main_mrg, metric, last_time);
+
+    mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
 }
 
-void update_uuid_first_last_update_every(struct rrdengine_instance *ctx, uuid_t *uuid,
-                            time_t first_time, time_t last_time, time_t update_every, bool update_every_only)
+void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid,
+                                                     time_t first_time, time_t last_time,
+                                                     time_t update_every, bool update_every_only)
 {
     MRG_ENTRY entry;
-    METRIC *one_metric;
+    METRIC *metric;
 
     uuid_copy(entry.uuid, *uuid);
     entry.section = (Word_t)ctx;
@@ -26,21 +30,21 @@ void update_uuid_first_last_update_every(struct rrdengine_instance *ctx, uuid_t 
     entry.latest_update_every = update_every;
 
     bool just_added;
-    one_metric = mrg_metric_add(main_mrg, entry, &just_added);
-    mrg_metric_set_update_every(main_mrg, one_metric, update_every);
+    metric = mrg_metric_add(main_mrg, entry, &just_added);
+    mrg_metric_set_update_every(main_mrg, metric, update_every);
 
     if (update_every_only)
         return;
 
     if (likely(!just_added)) {
-        time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, one_metric);
-        time_t latest_time_t = mrg_metric_get_latest_time_t(main_mrg, one_metric);
+        time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
+        time_t latest_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
 
         if (oldest_time_t > first_time)
-            mrg_metric_set_first_time_t(main_mrg, one_metric, first_time);
+            mrg_metric_set_first_time_t(main_mrg, metric, first_time);
 
         if (latest_time_t < last_time)
-            mrg_metric_set_latest_time_t(main_mrg, one_metric, last_time);
+            mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
     }
 }
 
@@ -573,7 +577,8 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             time_t start_time_t = (time_t) (start_time_ut / USEC_PER_SEC);
             time_t end_time_t = (time_t) (end_time_ut / USEC_PER_SEC);
             time_t update_every_s = (update_every_s > 0) ? update_every_s : (time_t) (page_index->latest_update_every_s);
-            update_uuid_first_last_update_every(ctx, temp_id, start_time_t, end_time_t, update_every_s, false);
+            update_metric_retention_and_granularity_by_uuid(ctx, temp_id, start_time_t, end_time_t, update_every_s,
+                                                            false);
         }
 
         if(descr->update_every_s == 0)
@@ -952,7 +957,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         time_t start_time_t = header_start_time_t + metric->delta_start;
         time_t end_time_t = header_start_time_t + metric->delta_end;
         time_t update_every_s = (metric->entries > 1) ? ((end_time_t - start_time_t) / (entries - 1)) : 0;
-        update_uuid_first_last_update_every(ctx, &metric->uuid, start_time_t, end_time_t,update_every_s, false);
+        update_metric_retention_and_granularity_by_uuid(ctx, &metric->uuid, start_time_t, end_time_t, update_every_s,
+                                                        false);
 
 #ifdef NETDATA_INTERNAL_CHECKS
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);

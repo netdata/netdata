@@ -131,6 +131,6 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 void init_commit_log(struct rrdengine_instance *ctx);
 void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc);
 
-void update_uuid_first_last_update_every(struct rrdengine_instance *ctx, uuid_t *uuid, time_t first_time, time_t last_time, time_t update_every, bool update_every_only);
-void update_uuid_last_time(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time);
+void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid, time_t first_time, time_t last_time, time_t update_every, bool update_every_only);
+void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time);
 #endif /* NETDATA_JOURNALFILE_H */

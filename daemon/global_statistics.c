@@ -962,6 +962,49 @@ static void sqlite3_statistics_charts(void) {
     // ----------------------------------------------------------------
 }
 
+extern PGC *main_cache;
+extern MRG *main_mrg;
+
+static void dbengine2_statistics_charts(void) {
+    static struct pgc_statistics stats = {}, old_stats = {};
+
+    old_stats = stats;
+    stats = pgc_get_statistics(main_cache);
+
+    {
+        static RRDSET *st_pgc_memory = NULL;
+        static RRDDIM *rd_pgc_memory_hot = NULL;
+        static RRDDIM *rd_pgc_memory_dirty = NULL;
+        static RRDDIM *rd_pgc_memory_clean = NULL;
+
+        if (unlikely(!st_pgc_memory)) {
+            st_pgc_memory = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_memory",
+                    NULL,
+                    "dbengine memory",
+                    NULL,
+                    "Netdata DB Memory",
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    132000,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_pgc_memory_hot = rrddim_add(st_pgc_memory, "hot", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_dirty = rrddim_add(st_pgc_memory, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_clean = rrddim_add(st_pgc_memory, "clean", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_hot, (collected_number)stats.queues.hot.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_dirty, (collected_number)stats.queues.dirty.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_clean, (collected_number)stats.queues.clean.size);
+
+        rrdset_done(st_pgc_memory);
+    }
+}
+
 static void dbengine_statistics_charts(void) {
 #ifdef ENABLE_DBENGINE
     if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
@@ -2959,6 +3002,7 @@ void *global_statistics_main(void *ptr)
         if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             dbengine_statistics_charts();
+            dbengine2_statistics_charts();
         }
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);

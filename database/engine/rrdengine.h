@@ -47,17 +47,24 @@ struct page_details {
     struct rrdengine_datafile *datafile;
 };
 
+typedef enum __attribute__ ((__packed__)) {
+    RRDENG_CHO_UNALIGNED        = (1 << 0), // set when this metric is not page aligned according to page alignment
+    RRDENG_CHO_SET_FIRST_TIME_T = (1 << 1), // set when this metric has unset first_time_t and needs to be updated on the first data collection
+} RRDENG_COLLECT_HANDLE_OPTIONS;
+
 struct rrdeng_collect_handle {
     struct pg_cache_page_index *page_index;
     struct rrdengine_instance *ctx;
     uint32_t page_length;
-    void *page_entry;
     uint8_t type;
     usec_t end_time_ut;
     usec_t start_time_ut;
-    // set to 1 when this dimension is not page aligned with the other dimensions in the chart
-    uint8_t unaligned_page;
+
     struct pg_alignment *alignment;
+
+    struct metric *metric;
+    struct pgc_page *page;
+    RRDENG_COLLECT_HANDLE_OPTIONS options;
 };
 
 struct rrdeng_query_handle {
