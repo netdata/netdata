@@ -551,8 +551,6 @@ if ENABLE_DBENGINE
         database/engine/rrdengineapi.h \
         database/engine/pagecache.c \
         database/engine/pagecache.h \
-        database/engine/rrdenglocking.c \
-        database/engine/rrdenglocking.h \
         database/engine2/cache.c \
         database/engine2/cache.h \
         database/engine2/metric.c \

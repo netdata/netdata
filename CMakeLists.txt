@@ -777,8 +777,6 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
-        database/engine/rrdenglocking.c
-        database/engine/rrdenglocking.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
