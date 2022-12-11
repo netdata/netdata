@@ -145,11 +145,12 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     // --------------------------------------------------------------
     // PASS 1: Check what the page cache has available
 
-    current_start_time_s = wanted_start_time_s;
     time_t previous_page_update_every_s = 1;
     time_t previous_page_last_time_s = wanted_start_time_s - previous_page_update_every_s;
 
     do {
+        current_start_time_s = previous_page_last_time_s + previous_page_update_every_s;
+
         page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
         if(page) {
             time_t page_first_time_s = pgc_page_start_time_t(page);
@@ -200,7 +201,6 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                 // prepare for the next iteration
                 previous_page_last_time_s = page_last_time_s;
                 previous_page_update_every_s = page_update_every_s;
-                current_start_time_s = previous_page_last_time_s + 1;
 
                 pages_found_in_cache++;
             }
@@ -403,10 +403,16 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle, time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused)
+struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle,
+        time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused, time_t *next_page_start_time_s)
 {
-    if (unlikely(!handle || !handle->pl_JudyL))
-            return NULL;
+    if (unlikely(!handle || !handle->pl_JudyL)) {
+
+        if(next_page_start_time_s)
+            *next_page_start_time_s = INVALID_TIME;
+
+        return NULL;
+    }
 
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
 
@@ -419,17 +425,27 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
              sleep_usec(1);
 
         Index = start_time_t;
-        Pvoid_t *Pvalue = JudyLFirst(handle->pl_JudyL, &Index, PJE0);
-        if (!Pvalue || !*Pvalue) {
-            // FIXME - memory leak here - the judy array should be properly freed
-            handle->pl_JudyL = NULL;
+        Pvoid_t *PValue = JudyLFirst(handle->pl_JudyL, &Index, PJE0);
+        if (!PValue || !*PValue) {
+
+            if(next_page_start_time_s)
+                *next_page_start_time_s = INVALID_TIME;
+
             return NULL;
         }
-        pd = *Pvalue;
+        pd = *PValue;
         page = pd->page;
         iterations--;
 
     } while (!page && iterations); // Wait until dbengine fills this
+
+    if(next_page_start_time_s) {
+        Pvoid_t *PValue = JudyLNext(handle->pl_JudyL, &Index, PJE0);
+        if(!PValue || !*PValue)
+            *next_page_start_time_s = INVALID_TIME;
+        else
+            *next_page_start_time_s = (time_t)Index;
+    }
 
 //    // FIXME: needs a lock here
 //    Index = start_time_t;

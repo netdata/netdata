@@ -52,7 +52,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
 
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
 void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
