@@ -65,18 +65,18 @@ struct rrdeng_collect_handle {
 };
 
 struct rrdeng_query_handle {
-    struct rrdengine_instance *ctx;
     struct metric *metric;
-    void *page_entry;
+    struct pgc_page *page;
+    struct rrdengine_instance *ctx;
+    storage_number *metric_data;
+    Pvoid_t pl_JudyL;
+
     time_t wanted_start_time_s;
     time_t now_s;
+    time_t dt_s;
+
     unsigned position;
     unsigned entries;
-    storage_number *page;
-    time_t page_end_time_t;
-    uint32_t page_length;
-    Pvoid_t pl_JudyL;
-    time_t dt_s;
 };
 
 typedef enum {

@@ -298,11 +298,8 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *data, time_t start_time_t, time_t end_time_t)
-{
-    struct rrdeng_query_handle *handle = data;
-
-    if (unlikely(NULL == handle || NULL == handle->metric))
+bool pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t) {
+    if (unlikely(!handle || !handle->metric))
         return 0;
 
     handle->pl_JudyL = get_page_list(ctx, handle->metric,
@@ -319,10 +316,8 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *data, time_t sta
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  void *data, time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused)
+void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle, time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused)
 {
-    struct rrdeng_query_handle *handle = data;
-
     if (unlikely(!handle || !handle->pl_JudyL))
             return NULL;
 

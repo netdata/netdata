@@ -91,10 +91,12 @@ struct page_cache { /* TODO: add statistics */
     unsigned populated_pages;
 };
 
+struct rrdeng_query_handle;
+
 struct rrdeng_page_descr *pg_cache_create_descr(void);
 void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr);
-unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *handle, time_t start_time_t, time_t end_time_t);
-void *pg_cache_lookup_next(struct rrdengine_instance *ctx, void *data, time_t start_time_t, time_t end_time_t);
+bool pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t);
+void *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t);
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
 void free_page_cache(struct rrdengine_instance *ctx);
