@@ -253,10 +253,12 @@ static inline size_t cache_usage_percent(PGC *cache) {
         if(wanted_cache_size < cache->config.clean_size + hot_max)
             wanted_cache_size = cache->config.clean_size + hot_max;
 
+        size_t max_for_clean;
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
-            return 100;
+            max_for_clean = cache->config.clean_size;
+        else
+            max_for_clean = wanted_cache_size - hot - dirty;
 
-        size_t max_for_clean = wanted_cache_size - hot - dirty;
         size_t percent = clean * 100 / max_for_clean;
         return percent;
     }
