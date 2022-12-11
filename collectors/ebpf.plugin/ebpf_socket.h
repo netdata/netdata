@@ -244,6 +244,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 
 #define NETDATA_NV_CAP_VALUE 50L
 typedef struct ebpf_network_viewer_options {
+    uint32_t enabled;
     uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
     uint32_t hostname_resolution_enabled;
