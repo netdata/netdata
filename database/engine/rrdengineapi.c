@@ -261,14 +261,17 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
             size_t points = handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Deleting page with %lu empty points", __func__, points);
-
-            mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
-            pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
+            if (pgc_is_page_hot(handle->page)) {
+                mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
+                pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
+            }
         }
         else {
-            mrg_metric_set_latest_time_t(main_mrg, handle->metric, pgc_page_end_time_t(handle->page));
-            pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
-            mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
+            if (pgc_is_page_hot(handle->page)) {
+                mrg_metric_set_latest_time_t(main_mrg, handle->metric, pgc_page_end_time_t(handle->page));
+                pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
+                mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
+            }
         }
     }
     else {

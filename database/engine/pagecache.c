@@ -145,9 +145,7 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->extent = NULL;
     descr->page = NULL;
     descr->update_every_s = 0;
-//    descr->extent_entry = NULL;
     descr->type = 0;
-//    descr->file = -1;
     return descr;
 }
 

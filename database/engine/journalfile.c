@@ -971,7 +971,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     info("Journal file \"%s\" loaded (size:%"PRIu64") with %u metrics in %d ms", path, file_size, entries,
          (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
-    return 9;
+    // File is OK load it
+    return 0;
 }
 
 

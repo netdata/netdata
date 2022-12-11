@@ -311,7 +311,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_descr *descr;
-    unsigned i, count;
+    unsigned i;
 
     xt_io_descr = req->data;
     if (req->result < 0) {
@@ -326,7 +326,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
         descr = xt_io_descr->descr_array[i];
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(descr->uuid, uuid_str);
-        info("DEBUG: Writing %d --> %s %ld - %ld", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
+        info("DEBUG: Writing %u --> %s %llu - %llu", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
     //    freez(descr);
     }
     if (xt_io_descr->completion)
@@ -856,17 +856,6 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
     return ret;
 }
 
-static void load_configuration_dynamic(void)
-{
-    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
-    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
-        rrdeng_pages_per_extent = read_num;
-    else {
-        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
-        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
-    }
-}
-
 void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -893,7 +882,6 @@ void timer_cb(uv_timer_t* handle)
         queue_journalfile_v2_migration(wc);
     }
 
-    load_configuration_dynamic();
 #ifdef NETDATA_INTERNAL_CHECKS
     {
         char buf[4096];
@@ -1277,9 +1265,9 @@ void rrdeng_worker(void* arg)
                 fatal_assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
                 info("Shutdown command received. Flushing all pages to disk");
-                usec_t start_flush = now_realtime_usec();
+//                usec_t start_flush = now_realtime_usec();
 
-//                unsigned long total_bytes, bytes_written;
+//                unsigned long total_bytes, bytes_written; 9
 //                total_bytes = 0;
 //                while ((bytes_written = do_flush_pages(wc, 1, NULL))) {
 //                    total_bytes += bytes_written;
@@ -1303,6 +1291,10 @@ void rrdeng_worker(void* arg)
                 do_read_datafile_extent_list(wc, cmd.data);
                 break;
             case RRDENG_READ_EXTENT:
+                if (unlikely(!set_name)) {
+                    set_name = 1;
+                    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+                }
                 do_read_extent2(wc, cmd.data);
                 break;
             case RRDENG_READ_PAGE_LIST:

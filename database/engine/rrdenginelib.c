@@ -190,7 +190,7 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               (long)pg_cache->page_descriptors,
               (long)ctx->stats.page_cache_descriptors,
               (long)pg_cache->populated_pages,
-              0L, //(long)pg_cache->committed_page_index.nr_committed_pages,
+              0L,
               (long)ctx->stats.pg_cache_insertions,
               (long)ctx->stats.pg_cache_deletions,
               (long)ctx->stats.pg_cache_hits,

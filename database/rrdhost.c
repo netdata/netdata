@@ -758,6 +758,14 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
+    unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
+    if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
+        rrdeng_pages_per_extent = read_num;
+    else {
+        error("Invalid dbengine pages per extent %u given. Using %u.", read_num, rrdeng_pages_per_extent);
+        config_set_number(CONFIG_SECTION_DB, "dbengine pages per extent", rrdeng_pages_per_extent);
+    }
+
     storage_tiers = config_get_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     if(storage_tiers < 1) {
         error("At least 1 storage tier is required. Assuming 1.");
