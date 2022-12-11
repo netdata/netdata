@@ -177,7 +177,7 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
             pd = NULL;
 
         // Find metric id
-        METRIC *this_metric = mrg_metric_get(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
+        METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
         time_t start_time_t = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
@@ -222,7 +222,7 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
                 freez(page_data);
         }
         if (pd) {
-            pd->page_entry = page;
+            pd->page = page;
             pd->page_length = pgc_page_data_size(page);
         }
         else
@@ -1184,7 +1184,7 @@ static void do_read_page_list_work(uv_work_t *req)
              PValue = JudyLNext(JudyL_page_list, &time_index, PJE0),
             pd = unlikely(NULL == PValue) ? NULL : *PValue) {
 
-            if (pd->page_entry)
+            if (pd->page)
                 continue;
 
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->fileno, PJE0);
@@ -1212,7 +1212,7 @@ static void do_read_page_list_work(uv_work_t *req)
                 extent_page_list = *PValue2;
             extent_page_list->count++;
 
-            PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->start_time_t, PJE0);
+            PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->first_time_s, PJE0);
             *PValue3 = pd;
         }
 

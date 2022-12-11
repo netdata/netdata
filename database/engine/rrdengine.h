@@ -38,12 +38,12 @@ struct page_details {
     uint32_t size;
     unsigned fileno;
     uuid_t uuid;
-    Word_t start_time_t;
-    Word_t end_time_t;
+    time_t first_time_s;
+    time_t last_time_s;
     uint16_t page_length;
     uint32_t update_every_s;
     uint8_t type;
-    void *page_entry;
+    struct pgc_page *page;
     struct rrdengine_datafile *datafile;
 };
 
@@ -53,23 +53,20 @@ typedef enum __attribute__ ((__packed__)) {
 } RRDENG_COLLECT_HANDLE_OPTIONS;
 
 struct rrdeng_collect_handle {
-    struct pg_cache_page_index *page_index;
-    struct rrdengine_instance *ctx;
-    uint32_t page_length;
-    uint8_t type;
-    usec_t end_time_ut;
-    usec_t start_time_ut;
-
-    struct pg_alignment *alignment;
-
     struct metric *metric;
     struct pgc_page *page;
+    struct pg_alignment *alignment;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
+    uint8_t type;
+
+    uint32_t page_length;                   // keep track of the current page size, to make sure we don't exceed it
+    usec_t start_time_ut;
+    usec_t end_time_ut;
 };
 
 struct rrdeng_query_handle {
     struct rrdengine_instance *ctx;
-    struct pg_cache_page_index *page_index;
+    struct metric *metric;
     void *page_entry;
     time_t wanted_start_time_s;
     time_t now_s;

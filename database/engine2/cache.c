@@ -361,7 +361,8 @@ static inline void atomic_set_max(size_t *max, size_t desired) {
         if(expected >= desired)
             return;
 
-    } while(!__atomic_compare_exchange_n(max, &expected, desired, true, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+    } while(!__atomic_compare_exchange_n(max, &expected, desired,
+                                         false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 struct section_dirty_pages {

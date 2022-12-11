@@ -6,7 +6,7 @@
 
 void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time)
 {
-    METRIC *metric = mrg_metric_get(main_mrg, uuid, (Word_t) ctx);
+    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
     if (!metric)
         return;
 
@@ -30,7 +30,7 @@ void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *
     entry.latest_update_every = update_every;
 
     bool just_added;
-    metric = mrg_metric_add(main_mrg, entry, &just_added);
+    metric = mrg_metric_add_and_acquire(main_mrg, entry, &just_added);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
     if (update_every_only)

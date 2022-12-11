@@ -7,8 +7,9 @@ struct metric {
     uuid_t uuid;
     Word_t section;
     time_t first_time_t;
-    time_t latest_time_t;
-    time_t hot_latest_time_t;
+    time_t latest_time_t;           // the max of clean and hot latest time
+    time_t latest_time_t_clean;     // archived pages latest time
+    time_t latest_time_t_hot;       // currently collected page latest time
     uint32_t latest_update_every;
 };
 
@@ -82,6 +83,24 @@ static void mrg_index_write_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
 }
 
+static inline void atomic_set_max_latest_time_t(METRIC *metric) {
+    time_t expected, desired;
+
+    expected = __atomic_load_n(&metric->latest_time_t, __ATOMIC_RELAXED);
+
+    do {
+
+        time_t clean = __atomic_load_n(&metric->latest_time_t_clean, __ATOMIC_RELAXED);
+        time_t hot   = __atomic_load_n(&metric->latest_time_t_hot,   __ATOMIC_RELAXED);
+        desired = MAX(clean, hot);
+
+        if(expected == desired)
+            return;
+
+    } while(!__atomic_compare_exchange_n(&metric->latest_time_t, &expected, desired,
+                                         false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+}
+
 static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     if(!having_lock)
         mrg_index_read_lock(mrg);
@@ -124,7 +143,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
     metric->first_time_t = entry->first_time_t;
-    metric->latest_time_t = entry->latest_time_t;
+    metric->latest_time_t_clean = entry->latest_time_t;
     metric->latest_update_every = entry->latest_update_every;
 
     *PValue = metric;
@@ -243,17 +262,31 @@ void mrg_destroy(MRG *mrg) {
     freez(mrg);
 }
 
-METRIC *mrg_metric_add(MRG *mrg, MRG_ENTRY entry, bool *ret) {
+METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
+    // FIXME - support refcounting
     return metric_add(mrg, &entry, ret);
 }
 
-METRIC *mrg_metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
+METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
+    // FIXME - support refcounting
     return metric_get(mrg, uuid, section);
 }
 
-bool mrg_metric_del(MRG *mrg, METRIC *metric) {
+bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
+    // FIXME - support refcounting
     return metric_del(mrg, metric, false);
 }
+
+METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
+    // FIXME - duplicate refcount
+    return metric;
+}
+
+void mrg_metric_release(MRG *mrg, METRIC *metric) {
+    // FIXME - release refcount
+
+}
+
 
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
@@ -267,6 +300,13 @@ uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric) {
         return NULL;
 
     return &metric->uuid;
+}
+
+Word_t mrg_metric_section(MRG *mrg, METRIC *metric) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return 0;
+
+    return metric->section;
 }
 
 bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t) {
@@ -288,7 +328,8 @@ bool mrg_metric_set_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    __atomic_store_n(&metric->latest_time_t, latest_time_t, __ATOMIC_RELEASE);
+    __atomic_store_n(&metric->latest_time_t_clean, latest_time_t, __ATOMIC_RELEASE);
+    atomic_set_max_latest_time_t(metric);
     return true;
 }
 
@@ -296,7 +337,8 @@ bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_ti
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    __atomic_store_n(&metric->hot_latest_time_t, latest_time_t, __ATOMIC_RELEASE);
+    __atomic_store_n(&metric->latest_time_t_hot, latest_time_t, __ATOMIC_RELEASE);
+    atomic_set_max_latest_time_t(metric);
     return true;
 }
 
@@ -304,10 +346,7 @@ time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
-    time_t clean = __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
-    time_t hot = __atomic_load_n(&metric->hot_latest_time_t, __ATOMIC_ACQUIRE);
-
-    return MAX(clean, hot);
+    return __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
 }
 
 bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) {
@@ -315,6 +354,26 @@ bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) 
         return false;
 
     __atomic_store_n(&metric->latest_update_every, update_every, __ATOMIC_RELEASE);
+    return true;
+}
+
+bool mrg_metric_set_update_every_if_zero(MRG *mrg, METRIC *metric, time_t update_every) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    uint32_t expected, desired;
+
+    expected = __atomic_load_n(&metric->latest_update_every, __ATOMIC_RELAXED);
+    desired = update_every;
+
+    do {
+
+        if(expected != 0)
+            return false;
+
+    } while(!__atomic_compare_exchange_n(&metric->latest_update_every, &expected, desired,
+                                       false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
     return true;
 }
 
@@ -344,17 +403,17 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
 
         for(size_t section = 0; section < sections ;section++) {
             e.section = section;
-            array[i][section] = mrg_metric_add(mrg, e, &ret);
+            array[i][section] = mrg_metric_add_and_acquire(mrg, e, &ret);
             if(!ret)
                 fatal("DBENGINE METRIC: failed to add metric %zu, section %zu", i, section);
 
-            if(mrg_metric_add(mrg, e, &ret) != array[i][section])
+            if(mrg_metric_add_and_acquire(mrg, e, &ret) != array[i][section])
                 fatal("DBENGINE METRIC: adding the same metric twice, returns a different metric");
 
             if(ret)
                 fatal("DBENGINE METRIC: adding the same metric twice, returns success");
 
-            if(mrg_metric_get(mrg, &e.uuid, e.section) != array[i][section])
+            if(mrg_metric_get_and_acquire(mrg, &e.uuid, e.section) != array[i][section])
                 fatal("DBENGINE METRIC: cannot get back the same metric");
 
             if(uuid_compare(*mrg_metric_uuid(mrg, array[i][section]), e.uuid) != 0)
@@ -367,7 +426,7 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
             uuid_t uuid;
             uuid_generate_random(uuid);
 
-            if(mrg_metric_get(mrg, &uuid, section))
+            if(mrg_metric_get_and_acquire(mrg, &uuid, section))
                 fatal("DBENGINE METRIC: found non-existing uuid");
 
             if(mrg_metric_id(mrg, array[i][section]) != (Word_t)array[i][section])
@@ -398,9 +457,9 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
 
     for(size_t i = 0; i < entries ; i++) {
         for (size_t section = 0; section < sections; section++) {
-            if(!mrg_metric_del(mrg, array[i][section]))
+            if(!mrg_metric_release_and_delete(mrg, array[i][section]))
                 fatal("DBENGINE METRIC: failed to delete metric");
-            if(mrg_metric_del(mrg, array[i][section]))
+            if(mrg_metric_release_and_delete(mrg, array[i][section]))
                 fatal("DBENGINE METRIC: managed to delete the same metric twice");
             if(mrg_metric_get_first_time_t(mrg, array[i][section]) != 0)
                 fatal("DBENGINE METRIC: got first time on deleted metric");
@@ -457,61 +516,61 @@ int mrg_unittest(void) {
             .latest_update_every = 4,
     };
     uuid_generate(entry.uuid);
-    metric1 = mrg_metric_add(mrg, entry, &ret);
+    metric1 = mrg_metric_add_and_acquire(mrg, entry, &ret);
     if(!ret)
         fatal("DBENGINE METRIC: failed to add metric");
 
     // add the same metric again
-    if(mrg_metric_add(mrg, entry, &ret) != metric1)
+    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric1)
         fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
-    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric1)
+    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric1)
         fatal("DBENGINE METRIC: cannot find the metric added");
 
     // add the same metric again
-    if(mrg_metric_add(mrg, entry, &ret) != metric1)
+    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric1)
         fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
     // add the same metric in another section
     entry.section = 0;
-    metric2 = mrg_metric_add(mrg, entry, &ret);
+    metric2 = mrg_metric_add_and_acquire(mrg, entry, &ret);
     if(!ret)
         fatal("DBENGINE METRIC: failed to add metric in different section");
 
     // add the same metric again
-    if(mrg_metric_add(mrg, entry, &ret) != metric2)
+    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric2)
         fatal("DBENGINE METRIC: adding the same metric twice (section 0), does not return the same pointer");
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice in (section 0)");
 
-    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
         fatal("DBENGINE METRIC: cannot find the metric added (section 0)");
 
     // delete the first metric
-    if(!mrg_metric_del(mrg, metric1))
+    if(!mrg_metric_release_and_delete(mrg, metric1))
         fatal("DBENGINE METRIC: cannot delete the first metric");
 
-    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
         fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one");
 
     // delete the first metric again - metric1 pointer is invalid now
-    if(mrg_metric_del(mrg, metric1))
+    if(mrg_metric_release_and_delete(mrg, metric1))
         fatal("DBENGINE METRIC: deleted again an already deleted metric");
 
     // find the section 0 metric again
-    if(mrg_metric_get(mrg, &entry.uuid, entry.section) != metric2)
+    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
         fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one twice");
 
     // delete the second metric
-    if(!mrg_metric_del(mrg, metric2))
+    if(!mrg_metric_release_and_delete(mrg, metric2))
         fatal("DBENGINE METRIC: cannot delete the second metric");
 
     // delete the second metric again
-    if(mrg_metric_del(mrg, metric2))
+    if(mrg_metric_release_and_delete(mrg, metric2))
         fatal("DBENGINE METRIC: managed to delete an already deleted metric");
 
     if(mrg->stats.entries != 0)

@@ -115,10 +115,8 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     return descr;
 }
 
-static inline int is_page_in_time_range(time_t pg_start_t, time_t pg_end_t, time_t start_time_t, time_t end_time_t)
-{
-    return (pg_start_t < start_time_t && pg_end_t >= start_time_t) ||
-           (pg_start_t >= start_time_t && pg_start_t <= end_time_t);
+static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
+    return page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s;
 }
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
@@ -129,8 +127,9 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 // Return a judyL will all pages that have start_time_ut and end_time_ut
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
-Pvoid_t get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start_time_ut, usec_t end_time_ut)
+Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut)
 {
+    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -183,13 +182,13 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start
                 pd->size = extent_list[page_entry->extent_index].datafile_size;
                 pd->file = datafile->file;
                 pd->fileno = datafile->fileno;
-                pd->start_time_t = Index;
-                pd->end_time_t = page_list[index].delta_end_s + journal_start_time_t;
+                pd->first_time_s = Index;
+                pd->last_time_s = page_list[index].delta_end_s + journal_start_time_t;
                 pd->datafile = datafile;
                 pd->page_length =  page_list[index].page_length;
                 pd->update_every_s =  page_list[index].update_every_s;
                 pd->type =  page_list[index].type;
-                pd->page_entry = NULL;          // acquired page from cache FIXME: Check page cache
+                pd->page = NULL;
                 uuid_copy(pd->uuid, *uuid);
                 *PValue = pd;
             }
@@ -204,42 +203,48 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, uuid_t *uuid, usec_t start
     // Try To add additional pages in the list
     // Pages will be acquired -- should be ignored by the dbengine reader
 
-    METRIC *this_metric = mrg_metric_get(main_mrg, uuid, (Word_t)ctx);
-    Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+    Word_t metric_id = mrg_metric_id(main_mrg, metric);
+    time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
+    time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
+    time_t current_start_time_s = wanted_start_time_s;
 
-    time_t start_time_t = (time_t)  (start_time_ut / USEC_PER_SEC);
+    do {
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
+        time_t page_first_time_s = pgc_page_start_time_t(page);
+        time_t page_last_time_s = pgc_page_end_time_t(page);
 
-    PGC_PAGE *page;
-    time_t pg_start_t;
-    time_t pg_end_t;
-    Pvoid_t *PValue;
+        Pvoid_t *PValue = JudyLIns(&JudyL_page_array, (Word_t)page_first_time_s, PJE0);
+        if(!PValue || PValue == PJERR)
+            fatal("DBENGINE: corrupted judy array");
 
-    while ((page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_t, false))) {
+        if(*PValue) {
+            struct page_details *tmp = *PValue;
 
-        pg_start_t = pgc_page_start_time_t(page);
-        pg_end_t = pgc_page_end_time_t(page);
-        if (is_page_in_time_range(pg_start_t, pg_end_t, (time_t) (start_time_ut / USEC_PER_SEC), (time_t) (end_time_ut/ USEC_PER_SEC))) {
-            PValue = JudyLIns(&JudyL_page_array, (Word_t)pg_start_t, PJE0);
-            fatal_assert(NULL != PValue);
+            if(tmp->first_time_s != page_first_time_s || tmp->last_time_s != page_last_time_s || tmp->update_every_s != pgc_page_update_every(page))
+                fatal("DBENGINE: page is already in judy with different retention");
+
+            tmp->page = page;
+        }
+        else {
             struct page_details *pd = mallocz(sizeof(*pd));
             pd->pos = 0;
             pd->size = pgc_page_data_size(page);
             pd->file = 0;
             pd->fileno = 0;
-            pd->start_time_t = pg_start_t;
-            pd->end_time_t = pg_end_t;
+            pd->first_time_s = page_first_time_s;
+            pd->last_time_s = page_last_time_s;
             pd->datafile = NULL;
             pd->page_length = pgc_page_data_size(page);   // FIXME: This need to be the actual length
             pd->update_every_s = pgc_page_update_every(page);
-            pd->page_entry = page;                    // This will be checked to skip attempt to read from datafile
+            pd->page = page;                    // This will be checked to skip attempt to read from datafile
             pd->type = ctx->page_type;
             uuid_copy(pd->uuid, *uuid);
             *PValue = pd;
         }
-        else
-             break;
-        start_time_t = pg_end_t + pgc_page_update_every(page);
-    }
+
+        current_start_time_s = page_last_time_s + 1 /* pgc_page_update_every(page) */;
+
+    } while(current_start_time_s <= wanted_end_time_s);
 
     return JudyL_page_array;
 }
@@ -297,12 +302,11 @@ unsigned pg_cache_preload(struct rrdengine_instance *ctx, void *data, time_t sta
 {
     struct rrdeng_query_handle *handle = data;
 
-    if (unlikely(NULL == handle || NULL == handle->page_index))
+    if (unlikely(NULL == handle || NULL == handle->metric))
         return 0;
 
-    struct pg_cache_page_index *page_index = handle->page_index;
-
-    handle->pl_JudyL = get_page_list(ctx, &page_index->id, start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC);
+    handle->pl_JudyL = get_page_list(ctx, handle->metric,
+                                     start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC);
 
     if (handle->pl_JudyL)
         dbengine_load_page_list(ctx, handle->pl_JudyL);
@@ -339,7 +343,7 @@ void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  void 
             return NULL;
         }
         pd = *Pvalue;
-        page_entry = pd->page_entry;
+        page_entry = pd->page;
         iterations--;
 
     } while (!page_entry && iterations); // Wait until dbengine fills this
