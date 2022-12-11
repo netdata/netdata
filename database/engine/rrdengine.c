@@ -304,114 +304,55 @@ struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index,
     return descr;
 };
 
-// Runs in event loop
-static void flush_pages_worker_cb(uv_work_t *req, int status __maybe_unused)
+// Main event loop callback
+static void do_flush_extent_cb(uv_fs_t *req)
 {
-    struct rrdeng_work  *work_request = req->data;
-
-    freez(work_request);
-    worker_is_idle();
-}
-
-// Runs in a libuv worker
-static void flush_pages_worker(uv_work_t *req_work)
-{
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
-
-    struct rrdengine_worker_config* wc = req_work->loop->data;
+    struct rrdengine_worker_config *wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
-//    struct page_cache *pg_cache = &ctx->pg_cache;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_descr *descr;
-//    struct page_cache_descr *pg_cache_descr;
     unsigned i, count;
-    struct rrdeng_work  *work_request = req_work->data;
-    uv_fs_t *req = work_request->data;
 
-    worker_is_busy(UV_EVENT_FLUSH_PAGES_CB);
     xt_io_descr = req->data;
     if (req->result < 0) {
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
         error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     }
-#ifdef NETDATA_INTERNAL_CHECKS
-    {
-        struct rrdengine_datafile *datafile = xt_io_descr->descr_array[0]->extent->datafile;
-        debug(D_RRDENGINE, "%s: Extent at offset %"PRIu64"(%u) was written to datafile %u-%u. Waking up waiters.",
-              __func__, xt_io_descr->pos, xt_io_descr->bytes, datafile->tier, datafile->fileno);
-    }
-#endif
-    count = xt_io_descr->descr_count;
-    for (i = 0 ; i < count ; ++i) {
-        /* care, we don't hold the descriptor mutex */
-        descr = xt_io_descr->descr_array[i];
-        // FIXME: Flush pages
 
-//        if (NO_QUIESCE == ctx->quiesce)
-//            pg_cache_replaceQ_insert(ctx, descr);
-//        rrdeng_page_descr_mutex_lock(ctx, descr);
-//        pg_cache_descr = descr->pg_cache_descr;
-//        pg_cache_descr->flags &= ~(RRD_PAGE_DIRTY | RRD_PAGE_WRITE_PENDING);
-//        /* wake up waiters, care no reference being held */
-//        pg_cache_wake_up_waiters_unsafe(descr);
-//        rrdeng_page_descr_mutex_unlock(ctx, descr);
+    // Descriptors need to be freed when migration to V2 happens
+    //count = xt_io_descr->descr_count;
+    for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
+        descr = xt_io_descr->descr_array[i];
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(descr->uuid, uuid_str);
+        info("DEBUG: Writing %d --> %s %ld - %ld", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
+    //    freez(descr);
     }
     if (xt_io_descr->completion)
         completion_mark_complete(xt_io_descr->completion);
+
     uv_fs_req_cleanup(req);
     posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
-
-//    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
-//    pg_cache->committed_page_index.nr_committed_pages -= count;
-//    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
-//    wc->inflight_dirty_pages -= count;
-    worker_is_idle();
-}
-
-// Main event loop callback
-static void flush_pages_queue_cb(uv_fs_t *req)
-{
-    struct rrdengine_worker_config *wc = req->loop->data;
-
-    struct rrdeng_work *work_request;
-    work_request = mallocz(sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->completion = NULL;
-
-    worker_is_busy(UV_EVENT_QUEUE_FLASH_CALLBACK);
-    // req.data contains the xt_io_descr
-    work_request->data = req;
-    if (unlikely(uv_queue_work(wc->loop, &work_request->req, flush_pages_worker, flush_pages_worker_cb))) {
-        freez(work_request);
-    }
-    worker_is_idle();
 }
 
 /*
- * completion must be NULL or valid.
- * Returns 0 when no flushing can take place.
- * Returns datafile bytes to be written on successful flushing initiation.
+ * Take a page list in a judy array and write them
  */
-static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct completion *completion)
+static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page_list, struct completion *completion)
 {
     struct rrdengine_instance *ctx = wc->ctx;
-//    struct page_cache *pg_cache = &ctx->pg_cache;
     int ret;
     int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
     struct rrdeng_page_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
-//    struct page_cache_descr *pg_cache_descr;
     struct extent_io_descriptor *xt_io_descr;
     void *compressed_buf = NULL;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
-//    Pvoid_t *PValue;
-//    Word_t Index;
+    Pvoid_t *PValue;
+    Word_t Index;
     uint8_t compression_algorithm = ctx->global_compress_alg;
     struct extent_info *extent;
     struct rrdengine_datafile *datafile;
@@ -420,69 +361,40 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    if (force) {
-        debug(D_RRDENGINE, "Asynchronous flushing of extent has been forced by page pressure.");
+    for (Index = 0, count = 0, uncompressed_payload_length = 0,
+         PValue = JudyLFirst(Judy_page_list, &Index, PJE0),
+         descr = unlikely(NULL == PValue) ? NULL : *PValue ;
+
+         descr != NULL && count != rrdeng_pages_per_extent;
+
+         PValue = JudyLNext(Judy_page_list, &Index, PJE0),
+         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
+
+         uncompressed_payload_length += descr->page_length;
+         descr_commit_idx_array[count] = Index;
+         eligible_pages[count++] = descr;
+
+         ret = JudyLDel(&Judy_page_list, Index, PJE0);
+         fatal_assert(1 == ret);
     }
-    return 0;
 
-    // FIXME: DBENGINE2
-    // Here we will get a bunch of pages and we will write them
-
-//    uv_rwlock_wrlock(&pg_cache->committed_page_index.lock);
-//    for (Index = 0, count = 0, uncompressed_payload_length = 0,
-//         PValue = JudyLFirst(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
-//         descr = unlikely(NULL == PValue) ? NULL : *PValue ;
-//
-//         descr != NULL && count != rrdeng_pages_per_extent;
-//
-//         PValue = JudyLNext(pg_cache->committed_page_index.JudyL_array, &Index, PJE0),
-//         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
-//        uint8_t page_write_pending;
-//
-//        fatal_assert(0 != descr->page_length);
-//        page_write_pending = 0;
-//
-//        rrdeng_page_descr_mutex_lock(ctx, descr);
-//        pg_cache_descr = descr->pg_cache_descr;
-//
-//        if (!(pg_cache_descr->flags & RRD_PAGE_WRITE_PENDING)) {
-//            page_write_pending = 1;
-//            /* care, no reference being held */
-//            pg_cache_descr->flags |= RRD_PAGE_WRITE_PENDING;
-//            uncompressed_payload_length += descr->page_length;
-//            descr_commit_idx_array[count] = Index;
-//            eligible_pages[count++] = descr;
-//        }
-//
-//        rrdeng_page_descr_mutex_unlock(ctx, descr);
-//
-//        if (page_write_pending) {
-//            ret = JudyLDel(&pg_cache->committed_page_index.JudyL_array, Index, PJE0);
-//            fatal_assert(1 == ret);
-//        }
-//    }
-//    uv_rwlock_wrunlock(&pg_cache->committed_page_index.lock);
-
-//    if (!count) {
-//        debug(D_RRDENGINE, "%s: no pages eligible for flushing.", __func__);
-//        if (completion)
-//            completion_mark_complete(completion);
-//        return 0;
-//    }
-//    wc->inflight_dirty_pages += count;
+    if (!count) {
+        if (completion)
+            completion_mark_complete(completion);
+        return 0;
+    }
 
     xt_io_descr = mallocz(sizeof(*xt_io_descr));
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     switch (compression_algorithm) {
-    case RRD_NO_COMPRESSION:
-        // FIXME: DBENGINE2 Calculate the uncompressed length
-        size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
+        case RRD_NO_COMPRESSION:
+            size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
         break;
-    default: /* Compress */
-        fatal_assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
-        max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
-        compressed_buf = mallocz(max_compressed_size);
-        size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
+        default: /* Compress */
+            fatal_assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
+            max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
+            compressed_buf = mallocz(max_compressed_size);
+            size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
         break;
     }
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
@@ -513,7 +425,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
+        uuid_copy(*(uuid_t *)header->descr[i].uuid, descr->uuid);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
         header->descr[i].end_time_ut = descr->end_time_ut;
@@ -531,19 +443,19 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     df_extent_insert(extent);
 
     switch (compression_algorithm) {
-    case RRD_NO_COMPRESSION:
-        header->payload_length = uncompressed_payload_length;
-        break;
-    default: /* Compress */
-        compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
+        case RRD_NO_COMPRESSION:
+            header->payload_length = uncompressed_payload_length;
+            break;
+        default: /* Compress */
+            compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
                                                uncompressed_payload_length, max_compressed_size);
-        ctx->stats.before_compress_bytes += uncompressed_payload_length;
-        ctx->stats.after_compress_bytes += compressed_size;
-        debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
-        (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
-        freez(compressed_buf);
-        size_bytes = payload_offset + compressed_size + sizeof(*trailer);
-        header->payload_length = compressed_size;
+            ctx->stats.before_compress_bytes += uncompressed_payload_length;
+            ctx->stats.after_compress_bytes += compressed_size;
+            debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
+            (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
+            freez(compressed_buf);
+            size_bytes = payload_offset + compressed_size + sizeof(*trailer);
+            header->payload_length = compressed_size;
         break;
     }
     extent->size = size_bytes;
@@ -559,7 +471,7 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
-    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, flush_pages_queue_cb);
+    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, do_flush_extent_cb);
     fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
     ++ctx->stats.io_write_requests;
@@ -568,8 +480,6 @@ static int do_flush_pages(struct rrdengine_worker_config* wc, int force, struct 
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
-    rrdeng_test_quota(wc);
-
     return ALIGN_BYTES_CEILING(size_bytes);
 }
 
@@ -1369,13 +1279,13 @@ void rrdeng_worker(void* arg)
                 info("Shutdown command received. Flushing all pages to disk");
                 usec_t start_flush = now_realtime_usec();
 
-                unsigned long total_bytes, bytes_written;
-                total_bytes = 0;
-                while ((bytes_written = do_flush_pages(wc, 1, NULL))) {
-                    total_bytes += bytes_written;
-                    /* Force flushing of all committed pages. */
-                }
-                info("Pages flushed to disk in %llu usecs (%lu bytes written)", now_realtime_usec() - start_flush, total_bytes);
+//                unsigned long total_bytes, bytes_written;
+//                total_bytes = 0;
+//                while ((bytes_written = do_flush_pages(wc, 1, NULL))) {
+//                    total_bytes += bytes_written;
+//                    /* Force flushing of all committed pages. */
+//                }
+//                info("Pages flushed to disk in %llu usecs (%lu bytes written)", now_realtime_usec() - start_flush, total_bytes);
                 wal_flush_transaction_buffer(wc);
                 if (!rrdeng_threads_alive(wc)) {
                     ctx->quiesce = QUIESCED;
@@ -1386,7 +1296,7 @@ void rrdeng_worker(void* arg)
                 do_commit_transaction(wc, STORE_DATA, NULL);
                 break;
             case RRDENG_FLUSH_PAGES: {
-                (void)do_flush_pages(wc, 1, cmd.completion);
+                (void)do_flush_extent(wc, cmd.data, cmd.completion);
                 break;
             }
             case RRDENG_READ_DF_EXTENT_LIST:
@@ -1415,9 +1325,9 @@ void rrdeng_worker(void* arg)
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
 
-    while (do_flush_pages(wc, 1, NULL)) {
-        ; /* Force flushing of all committed pages. */
-    }
+//    while (do_flush_pages(wc, 1, NULL)) {
+//        ; /* Force flushing of all committed pages. */
+//    }
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 

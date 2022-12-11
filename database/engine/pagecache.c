@@ -51,7 +51,42 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
     // Need to grab pages and save them
     // Schedule a call to DBENGINE
 
+     struct completion queue_flush_command;
+     completion_init(&queue_flush_command);
+
      info("SAVE %zu pages", entries);
+
+     Pvoid_t JudyL_flush = NULL;
+     Pvoid_t *PValue;
+
+     struct rrdengine_instance *ctx = (struct rrdengine_instance *) array[0].section;
+     size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
+
+     for (size_t Index = 0 ; Index < entries; Index++) {
+        time_t start_time_t = array[Index].start_time_t;
+        time_t end_time_t = array[Index].end_time_t;
+        struct rrdeng_page_descr *descr = rrdeng_page_descr_mallocz();
+
+        uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) array[Index].metric_id)));
+        descr->start_time_ut = start_time_t * USEC_PER_SEC;
+        descr->end_time_ut = end_time_t * USEC_PER_SEC;
+        descr->update_every_s = array[Index].update_every;
+        descr->type = ctx->page_type;
+        descr->page_length = (end_time_t - start_time_t + 1) * bytes_per_point;
+        descr->page = array[Index].data;
+        PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
+        fatal_assert( NULL != PValue);
+        *PValue = descr;
+     }
+
+     struct rrdeng_cmd cmd;
+     cmd.opcode = RRDENG_FLUSH_PAGES;
+     cmd.data = JudyL_flush;
+     cmd.completion = &queue_flush_command;
+     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+     completion_wait_for(&queue_flush_command);
+     completion_destroy(&queue_flush_command);
 }
 
 ARAL page_descr_aral = {
@@ -110,10 +145,9 @@ struct rrdeng_page_descr *pg_cache_create_descr(void)
     descr->extent = NULL;
     descr->page = NULL;
     descr->update_every_s = 0;
-    descr->extent_entry = NULL;
+//    descr->extent_entry = NULL;
     descr->type = 0;
-    descr->file = -1;
-
+//    descr->file = -1;
     return descr;
 }
 

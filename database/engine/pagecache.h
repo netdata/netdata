@@ -31,9 +31,10 @@ struct rrdeng_page_descr {
     uint32_t update_every_s:24;
     uint8_t type;
     uint32_t page_length;
-    uv_file file;               // This is the datafile this descriptor belongs
-    void *page;
-    void *extent_entry;
+//    uv_file file;               // This is the datafile this descriptor belongs
+    void *page;                 // Metrics are stored here
+    uuid_t uuid;                // FIXME: Copy of uuid for extent flush
+//    void *extent_entry;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)

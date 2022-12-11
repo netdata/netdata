@@ -1195,8 +1195,8 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             if (unlikely((time_t) index_time > metric_info->max_index_time_s) || index == entries)
                 break;
 
-            if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
-                continue;
+//            if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
+//                continue;
 
             struct journal_page_list *page_entry = &page_list[index++];
 
