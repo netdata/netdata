@@ -127,7 +127,7 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 // Return a judyL will all pages that have start_time_ut and end_time_ut
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
-Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut)
+Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s)
 {
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
@@ -207,11 +207,15 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
     time_t current_start_time_s = wanted_start_time_s;
+    size_t page_count = 0;
 
     do {
         PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
         time_t page_first_time_s = pgc_page_start_time_t(page);
         time_t page_last_time_s = pgc_page_end_time_t(page);
+
+        if(unlikely(!page_count && first_page_first_time_s))
+            *first_page_first_time_s = page_first_time_s;
 
         Pvoid_t *PValue = JudyLIns(&JudyL_page_array, (Word_t)page_first_time_s, PJE0);
         if(!PValue || PValue == PJERR)
@@ -243,8 +247,12 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
         }
 
         current_start_time_s = page_last_time_s + 1 /* pgc_page_update_every(page) */;
+        page_count++;
 
     } while(current_start_time_s <= wanted_end_time_s);
+
+    if(unlikely(!page_count && first_page_first_time_s))
+        *first_page_first_time_s = INVALID_TIME;
 
     return JudyL_page_array;
 }
@@ -298,17 +306,19 @@ void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index 
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-bool pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t) {
+time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t) {
     if (unlikely(!handle || !handle->metric))
         return 0;
 
+    time_t first_page_first_time_s = INVALID_TIME;
     handle->pl_JudyL = get_page_list(ctx, handle->metric,
-                                     start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC);
+                                     start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
+                                     &first_page_first_time_s);
 
     if (handle->pl_JudyL)
         dbengine_load_page_list(ctx, handle->pl_JudyL);
 
-    return handle->pl_JudyL != NULL;
+    return first_page_first_time_s;
 }
 
 /*

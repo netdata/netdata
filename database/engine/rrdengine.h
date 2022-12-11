@@ -71,7 +71,7 @@ struct rrdeng_query_handle {
     storage_number *metric_data;
     Pvoid_t pl_JudyL;
 
-    time_t wanted_start_time_s;
+    time_t wanted_next_page_start_time_s;
     time_t now_s;
     time_t dt_s;
 

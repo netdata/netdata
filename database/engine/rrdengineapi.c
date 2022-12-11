@@ -504,7 +504,6 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     struct rrdeng_query_handle *handle;
-    unsigned pages_nr;
 
     mrg_metric_set_update_every_if_zero(main_mrg, metric, default_rrd_update_every);
 
@@ -513,16 +512,14 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
 
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
     handle->metric = metric;
-    handle->wanted_start_time_s = start_time_s;
     handle->now_s = start_time_s;
     handle->position = 0;
     handle->ctx = ctx;
     handle->page = NULL;
     handle->dt_s = mrg_metric_get_update_every(main_mrg, metric);
     rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    if (unlikely(!pg_cache_preload(ctx, handle, start_time_s, end_time_s)))
-        // there are no metrics to load
-        handle->wanted_start_time_s = INVALID_TIME;
+
+    handle->wanted_next_page_start_time_s = pg_cache_preload(ctx, handle, start_time_s, end_time_s);
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
@@ -530,19 +527,19 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
     struct rrdengine_instance *ctx = handle->ctx;
 
     if (likely(handle->page)) {
-        handle->wanted_start_time_s = (time_t)(pgc_page_end_time_t(handle->page) + 1 /* handle->dt_s */);
+        handle->wanted_next_page_start_time_s = (time_t)(pgc_page_end_time_t(handle->page) + 1 /* handle->dt_s */);
 
         pgc_page_release(main_cache, (PGC_PAGE *)handle->page);
         handle->page = NULL;
 
-        if (unlikely(handle->wanted_start_time_s > rrdimm_handle->end_time_s))
+        if (unlikely(handle->wanted_next_page_start_time_s > rrdimm_handle->end_time_s))
             return false;
     }
 
-    if(handle->wanted_start_time_s == INVALID_TIME)
+    if(handle->wanted_next_page_start_time_s == INVALID_TIME)
         return false;
 
-    time_t wanted_start_time_s = handle->wanted_start_time_s;
+    time_t wanted_start_time_s = handle->wanted_next_page_start_time_s;
     handle->page = pg_cache_lookup_next(ctx, handle, wanted_start_time_s, rrdimm_handle->end_time_s);
 
     if (!handle->page)
@@ -596,8 +593,8 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     unsigned position = handle->position + 1;
     storage_number_tier1_t tier1_value;
 
-    if (unlikely(INVALID_TIME == handle->wanted_start_time_s)) {
-        handle->wanted_start_time_s = INVALID_TIME;
+    if (unlikely(INVALID_TIME == handle->wanted_next_page_start_time_s)) {
+        handle->wanted_next_page_start_time_s = INVALID_TIME;
         handle->now_s = now;
         storage_point_empty(sp, now - handle->dt_s, now);
         return sp;
@@ -607,7 +604,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         // We need to get a new page
         if(!rrdeng_load_page_next(rrddim_handle, false)) {
             // next calls will not load any more metrics
-            handle->wanted_start_time_s = INVALID_TIME;
+            handle->wanted_next_page_start_time_s = INVALID_TIME;
             handle->now_s = now;
             storage_point_empty(sp, now - handle->dt_s, now);
             return sp;
@@ -660,7 +657,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
 
     if (unlikely(now >= rrddim_handle->end_time_s)) {
         // next calls will not load any more metrics
-        handle->wanted_start_time_s = INVALID_TIME;
+        handle->wanted_next_page_start_time_s = INVALID_TIME;
     }
 
     return sp;
@@ -669,7 +666,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
 int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle)
 {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
-    return (INVALID_TIME == handle->wanted_start_time_s);
+    return (INVALID_TIME == handle->wanted_next_page_start_time_s);
 }
 
 /*
