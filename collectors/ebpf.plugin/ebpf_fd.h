@@ -36,9 +36,6 @@
 #define NETDATA_SYSTEMD_FD_CLOSE_ERR_CONTEXT "services.fd_close_error"
 
 typedef struct netdata_fd_stat {
-    uint64_t pid_tgid;                     // Unique identifier
-    uint32_t pid;                          // Process ID
-
     uint32_t open_call;                    // Open syscalls (open and openat)
     uint32_t close_call;                   // Close syscall (close)
 
