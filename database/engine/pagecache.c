@@ -316,14 +316,14 @@ bool pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle, time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused)
+struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle, time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused)
 {
     if (unlikely(!handle || !handle->pl_JudyL))
             return NULL;
 
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
 
-    PGC_PAGE *page_entry = NULL;
+    PGC_PAGE *page = NULL;
     struct page_details *pd;
     Word_t Index;
     unsigned iterations = 100;  // FIXME: possibly add completion to have dbengine notify us when data is ready
@@ -334,21 +334,22 @@ void *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struc
         Index = start_time_t;
         Pvoid_t *Pvalue = JudyLFirst(handle->pl_JudyL, &Index, PJE0);
         if (!Pvalue || !*Pvalue) {
+            // FIXME - memory leak here - the judy array should be properly freed
             handle->pl_JudyL = NULL;
             return NULL;
         }
         pd = *Pvalue;
-        page_entry = pd->page;
+        page = pd->page;
         iterations--;
 
-    } while (!page_entry && iterations); // Wait until dbengine fills this
+    } while (!page && iterations); // Wait until dbengine fills this
 
 //    // FIXME: needs a lock here
 //    Index = start_time_t;
 //    (void) JudyLDel(&handle->pl_JudyL, Index, PJE0);
 //    freez(pd);
 
-    return page_entry;
+    return page;
 }
 
 struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx)

@@ -250,7 +250,8 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    if (unlikely(!ctx || !handle->page)) return;
+    if (unlikely(!handle->page))
+        return;
 
     if (likely(handle->page_length)) {
         int page_is_empty;
@@ -477,14 +478,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 
     rrdeng_store_metric_flush_current_page(collection_handle);
     rrdeng_page_alignment_release(handle->alignment);
-
-    METRIC *metric = handle->metric;
-    mrg_metric_release(main_mrg, metric);
-
-    PGC_PAGE *page = handle->page;
-    if(page)
-        pgc_page_hot_to_dirty_and_release(main_cache, page);
-
+    mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
 
     return 0;
@@ -533,13 +527,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
-
     struct rrdengine_instance *ctx = handle->ctx;
-
-    time_t page_end_time_t;
-    time_t page_start_time_t;
-    time_t update_every_s;
-    unsigned position;
 
     if (likely(handle->page)) {
         handle->wanted_start_time_s = (time_t)(pgc_page_end_time_t(handle->page) + 1 /* handle->dt_s */);
@@ -554,36 +542,37 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
     if(handle->wanted_start_time_s == INVALID_TIME)
         return false;
 
-    time_t wanted_start_time_t = handle->wanted_start_time_s;
-    handle->page = pg_cache_lookup_next(ctx, handle, wanted_start_time_t, rrdimm_handle->end_time_s);
+    time_t wanted_start_time_s = handle->wanted_start_time_s;
+    handle->page = pg_cache_lookup_next(ctx, handle, wanted_start_time_s, rrdimm_handle->end_time_s);
 
     if (!handle->page)
         return false;
 
-    page_start_time_t = pgc_page_start_time_t((PGC_PAGE *)handle->page);
-    page_end_time_t = pgc_page_end_time_t((PGC_PAGE *)handle->page);
-    update_every_s = pgc_page_update_every((PGC_PAGE *)handle->page);
+    time_t page_start_time_s = pgc_page_start_time_t((PGC_PAGE *)handle->page);
+    time_t page_end_time_s = pgc_page_end_time_t((PGC_PAGE *)handle->page);
+    time_t update_every_s = pgc_page_update_every((PGC_PAGE *)handle->page);
 
     // FIXME: Check atomic requirements
     //    pg_cache_atomic_get_pg_info(handle, &page_end_time_t, &page_length);
-    if (unlikely(INVALID_TIME == page_start_time_t || INVALID_TIME == page_end_time_t || 0 == update_every_s)) {
+    if (unlikely(INVALID_TIME == page_start_time_s || INVALID_TIME == page_end_time_s || 0 == update_every_s)) {
         error("DBENGINE: discarding invalid page (start_time = %ld, end_time = %ld, update_every_s = %ld)",
-              page_start_time_t, page_end_time_t, update_every_s);
+              page_start_time_s, page_end_time_s, update_every_s);
         return false;
     }
 
-    internal_fatal(page_start_time_t > page_end_time_t,
+    internal_fatal(page_start_time_s > page_end_time_s,
                    "DBENGINE: page has bigger start time than end time");
 
-    unsigned entries = (page_end_time_t - (page_start_time_t - update_every_s)) / update_every_s;
+    unsigned entries = (page_end_time_s - (page_start_time_s - update_every_s)) / update_every_s;
 
     internal_fatal(entries > pgc_page_data_size(handle->page) / PAGE_POINT_CTX_SIZE_BYTES(ctx),
                    "DBENGINE: page has more points than its size");
 
-    if (unlikely(page_start_time_t != page_end_time_t && wanted_start_time_t > page_start_time_t)) {
+    unsigned position;
+    if (unlikely(page_start_time_s != page_end_time_s && wanted_start_time_s > page_start_time_s)) {
         // we're in the middle of the page somewhere
-        position = ((uint64_t)(wanted_start_time_t - page_start_time_t)) * (entries - 1) /
-                   (page_end_time_t - page_start_time_t);
+        position = ((uint64_t)(wanted_start_time_s - page_start_time_s)) * (entries - 1) /
+                   (page_end_time_s - page_start_time_s);
     }
     else
         position = 0;
