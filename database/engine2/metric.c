@@ -20,18 +20,7 @@ struct mrg {
         Pvoid_t ptr_judy;           // reverse pointer lookup
     } index;
 
-    struct {
-        size_t entries;
-        size_t size;                // memory without indexing
-        size_t additions;
-        size_t additions_duplicate;
-        size_t deletions;
-        size_t delete_misses;
-        size_t search_hits;
-        size_t search_misses;
-        size_t pointer_validation_hits;
-        size_t pointer_validation_misses;
-    } stats;
+    struct mrg_statistics stats;
 };
 
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg) {
@@ -123,11 +112,41 @@ static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     return true;
 }
 
+static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl, size_t mem_after_judyl) {
+    if(mem_after_judyl > mem_before_judyl)
+        __atomic_add_fetch(&mrg->stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
+    else if(mem_after_judyl < mem_before_judyl)
+        __atomic_sub_fetch(&mrg->stats.size, mem_before_judyl - mem_after_judyl, __ATOMIC_RELAXED);
+}
+
+static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg) {
+    __atomic_add_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+}
+
+static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg) {
+    __atomic_sub_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+}
+
 static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     mrg_index_write_lock(mrg);
 
+    size_t mem_before_judyl, mem_after_judyl;
+
     Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index.uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
+    if(!sections_judy_pptr || sections_judy_pptr == PJERR)
+        fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
+
+    if(!*sections_judy_pptr)
+        mrg_stats_size_judyhs_added_uuid(mrg);
+
+    mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
     Pvoid_t *PValue = JudyLIns(sections_judy_pptr, entry->section, PJE0);
+    mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
+    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
+
+    if(!PValue || PValue == PJERR)
+        fatal("DBENGINE METRIC: corrupted section JudyL array");
+
     if(*PValue != NULL) {
         METRIC *metric = *PValue;
         mrg_index_write_unlock(mrg);
@@ -148,7 +167,14 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
 
     *PValue = metric;
 
+    mem_before_judyl = JudyLMemUsed(mrg->index.ptr_judy);
     PValue = JudyLIns(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
+    mem_after_judyl = JudyLMemUsed(mrg->index.ptr_judy);
+    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
+
+    if(!PValue || PValue == PJERR)
+        fatal("DBENGINE METRIC: corrupted pointers JudyL array");
+
     if(*PValue != NULL)
         fatal("DBENGINE METRIC: pointer already exists in registry.");
 
@@ -196,10 +222,17 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
 }
 
 static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
+    size_t mem_before_judyl, mem_after_judyl;
+
     if(!having_write_lock)
         mrg_index_write_lock(mrg);
 
-    if(!JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0)) {
+    mem_before_judyl = JudyLMemUsed(mrg->index.ptr_judy);
+    int rc = JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
+    mem_after_judyl = JudyLMemUsed(mrg->index.ptr_judy);
+    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
+
+    if(!rc) {
         if(!having_write_lock)
             mrg_index_write_unlock(mrg);
 
@@ -211,12 +244,19 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
     if(!sections_judy_pptr || !*sections_judy_pptr)
         fatal("DBENGINE METRIC: uuid should be in judy but it is not.");
 
-    if(!JudyLDel(sections_judy_pptr, metric->section, PJE0))
-        fatal("DBENGINE METRIC: metric not found in sections judy");
+    mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
+    rc = JudyLDel(sections_judy_pptr, metric->section, PJE0);
+    mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
+    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
+
+    if(!rc)
+        fatal("DBENGINE METRIC: metric not found in sections JudyL");
 
     if(!*sections_judy_pptr) {
-        if(!JudyHSDel(&mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0))
-            fatal("DBENGINE METRIC: cannot delete UUID from judy");
+        rc = JudyHSDel(&mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0);
+        if(!rc)
+            fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
+        mrg_stats_size_judyhs_removed_uuid(mrg);
     }
 
     if(!having_write_lock)
@@ -382,6 +422,11 @@ time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric) {
         return 0;
 
     return __atomic_load_n(&metric->latest_update_every, __ATOMIC_ACQUIRE);
+}
+
+struct mrg_statistics mrg_get_statistics(MRG *mrg) {
+    // FIXME - use atomics
+    return mrg->stats;
 }
 
 // ----------------------------------------------------------------------------

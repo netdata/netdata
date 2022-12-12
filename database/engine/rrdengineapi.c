@@ -604,7 +604,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
                     entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
                     internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
                 }
-                entries = entries_by_size;
+                entries = entries_by_time;
 
                 if(page_end_time_s < handle->now_s) {
 

@@ -14,6 +14,19 @@ typedef struct mrg_entry {
     uint32_t latest_update_every;
 } MRG_ENTRY;
 
+struct mrg_statistics {
+    size_t entries;
+    size_t size;                // memory without indexing
+    size_t additions;
+    size_t additions_duplicate;
+    size_t deletions;
+    size_t delete_misses;
+    size_t search_hits;
+    size_t search_misses;
+    size_t pointer_validation_hits;
+    size_t pointer_validation_misses;
+};
+
 MRG *mrg_create(void);
 void mrg_destroy(MRG *mrg);
 
@@ -39,5 +52,7 @@ bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every);
 time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_update_every_if_zero(MRG *mrg, METRIC *metric, time_t update_every);
+
+struct mrg_statistics mrg_get_statistics(MRG *mrg);
 
 #endif // DBENGINE_METRIC_H

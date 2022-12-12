@@ -968,6 +968,7 @@ static void dbengine2_statistics_charts(void) {
 
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_stats = {}, pgc_stats_old = {};
+    static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {};
 
     pgc_stats_old = pgc_stats;
     pgc_stats = pgc_get_statistics(main_cache);
@@ -975,11 +976,15 @@ static void dbengine2_statistics_charts(void) {
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
+    mrg_stats_old = mrg_stats;
+    mrg_stats = mrg_get_statistics(main_mrg);
+
     {
         static RRDSET *st_pgc_memory = NULL;
         static RRDDIM *rd_pgc_memory_clean = NULL;
         static RRDDIM *rd_pgc_memory_hot = NULL;
         static RRDDIM *rd_pgc_memory_dirty = NULL;
+        static RRDDIM *rd_pgc_memory_index = NULL;
         static RRDDIM *rd_pgc_memory_open = NULL;  // open journal memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
 
@@ -998,9 +1003,10 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
+            rd_pgc_memory_clean   = rrddim_add(st_pgc_memory, "clean",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_hot     = rrddim_add(st_pgc_memory, "hot",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_dirty   = rrddim_add(st_pgc_memory, "dirty",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_clean   = rrddim_add(st_pgc_memory, "clean",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_index   = rrddim_add(st_pgc_memory, "index",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -1008,8 +1014,9 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_clean, (collected_number)pgc_stats.queues.clean.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_hot, (collected_number)pgc_stats.queues.hot.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_dirty, (collected_number)pgc_stats.queues.dirty.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_index, (collected_number)(pgc_stats.size - pgc_stats.queues.clean.size - pgc_stats.queues.hot.size - pgc_stats.queues.dirty.size));
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)0); // FIXME open journal memory
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)0); // FIXME metrics registry memory
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
 
         rrdset_done(st_pgc_memory);
     }

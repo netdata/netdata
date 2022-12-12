@@ -373,6 +373,26 @@ struct section_dirty_pages {
     PGC_PAGE *base;
 };
 
+static void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
+    if(mem_after_judyl > mem_before_judyl) {
+        __atomic_add_fetch(&ll->stats->size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
+    }
+    else if(mem_after_judyl < mem_before_judyl) {
+        __atomic_sub_fetch(&ll->stats->size, mem_before_judyl - mem_after_judyl, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&cache->stats.size, mem_before_judyl - mem_after_judyl, __ATOMIC_RELAXED);
+    }
+}
+
+static void pgc_stats_index_judy_change(PGC *cache, size_t mem_before_judyl, size_t mem_after_judyl) {
+    if(mem_after_judyl > mem_before_judyl) {
+        __atomic_add_fetch(&cache->stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
+    }
+    else if(mem_after_judyl < mem_before_judyl) {
+        __atomic_sub_fetch(&cache->stats.size, mem_before_judyl - mem_after_judyl, __ATOMIC_RELAXED);
+    }
+}
+
 static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PGC_PAGE *page, bool having_lock) {
     if(!having_lock)
         pgc_ll_lock(cache, ll);
@@ -383,13 +403,20 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
                    0);
 
     if(ll->linked_list_in_sections_judy) {
-        Pvoid_t *dirty_pages_pptr = JudyLIns(&ll->sections_judy, page->section, PJE0);
-        struct section_dirty_pages *sdp = *dirty_pages_pptr;
+        size_t mem_before_judyl, mem_after_judyl;
 
+        mem_before_judyl = JudyLMemUsed(ll->sections_judy);
+        Pvoid_t *dirty_pages_pptr = JudyLIns(&ll->sections_judy, page->section, PJE0);
+        mem_after_judyl = JudyLMemUsed(ll->sections_judy);
+
+        struct section_dirty_pages *sdp = *dirty_pages_pptr;
         if(!sdp) {
             sdp = callocz(1, sizeof(struct section_dirty_pages));
             *dirty_pages_pptr = sdp;
+
+            mem_after_judyl += sizeof(struct section_dirty_pages);
         }
+        pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
 
         sdp->entries++;
         sdp->size += page->assumed_size;
@@ -450,10 +477,18 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sdp->base, page, link.prev, link.next);
 
         if(!sdp->base) {
-            if(!JudyLDel(&ll->sections_judy, page->section, PJE0))
+            size_t mem_before_judyl, mem_after_judyl;
+
+            mem_before_judyl = JudyLMemUsed(ll->sections_judy);
+            int rc = JudyLDel(&ll->sections_judy, page->section, PJE0);
+            mem_after_judyl = JudyLMemUsed(ll->sections_judy);
+
+            if(!rc)
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
             freez(sdp);
+            mem_after_judyl -= sizeof(struct section_dirty_pages);
+            pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
         }
     }
     else {
@@ -736,16 +771,26 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
         fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
               page->start_time_t, page->metric_id, page->section);
 
+    size_t mem_before_judyl = 0, mem_after_judyl = 0;
+
+    mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
     if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_t, PJE0)))
         fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
               page->start_time_t, page->metric_id, page->section);
+    mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
 
+    mem_before_judyl += JudyLMemUsed(*metrics_judy_pptr);
     if(!*pages_judy_pptr && !JudyLDel(metrics_judy_pptr, page->metric_id, PJE0))
         fatal("DBENGINE CACHE: metric '%lu' in section '%lu' exists and is empty, but cannot be deleted.",
               page->metric_id, page->section);
+    mem_after_judyl += JudyLMemUsed(*metrics_judy_pptr);
 
+    mem_before_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
     if(!*metrics_judy_pptr && !JudyLDel(&cache->index[partition].sections_judy, page->section, PJE0))
         fatal("DBENGINE CACHE: section '%lu' exists and is empty, but cannot be deleted.", page->section);
+    mem_after_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
+
+    pgc_stats_index_judy_change(cache, mem_before_judyl, mem_after_judyl);
 
     pointer_del(cache, page);
 }
@@ -950,17 +995,27 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         size_t partition = indexing_partition(cache, entry->metric_id);
         pgc_index_write_lock(cache, partition);
 
+        size_t mem_before_judyl = 0, mem_after_judyl = 0;
+
+        mem_before_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
         Pvoid_t *metrics_judy_pptr = JudyLIns(&cache->index[partition].sections_judy, entry->section, PJE0);
-        if(unlikely(metrics_judy_pptr == PJERR))
+        if(unlikely(!metrics_judy_pptr || metrics_judy_pptr == PJERR))
             fatal("DBENGINE CACHE: corrupted sections judy array");
+        mem_after_judyl += JudyLMemUsed(cache->index[partition].sections_judy);
 
+        mem_before_judyl += JudyLMemUsed(*metrics_judy_pptr);
         Pvoid_t *pages_judy_pptr = JudyLIns(metrics_judy_pptr, entry->metric_id, PJE0);
-        if(unlikely(pages_judy_pptr == PJERR))
+        if(unlikely(!pages_judy_pptr || pages_judy_pptr == PJERR))
             fatal("DBENGINE CACHE: corrupted pages judy array");
+        mem_after_judyl += JudyLMemUsed(*metrics_judy_pptr);
 
+        mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
         Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_t, PJE0);
-        if(unlikely(page_ptr == PJERR))
+        if(unlikely(!page_ptr || page_ptr == PJERR))
             fatal("DBENGINE CACHE: corrupted page in judy array");
+        mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
+
+        pgc_stats_index_judy_change(cache, mem_before_judyl, mem_after_judyl);
 
         page = *page_ptr;
 
