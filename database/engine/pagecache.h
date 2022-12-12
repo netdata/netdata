@@ -110,6 +110,7 @@ void rrdeng_page_descr_use_mmap(void);
 bool rrdeng_page_descr_is_mmap(void);
 struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
 void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
+void free_judyl_page_list(Pvoid_t pl_judyL);
 
 
 /* The caller must hold a reference to the page and must have already set the new data */

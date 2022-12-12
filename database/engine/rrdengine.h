@@ -32,6 +32,14 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
+struct page_details_control {
+  unsigned reference_count;
+  unsigned jobs_started;
+  unsigned jobs_completed;
+  struct completion completion;
+  Pvoid_t pl_JudyL;
+};
+
 struct page_details {
     uv_file file;
     uint64_t pos;
@@ -43,6 +51,7 @@ struct page_details {
     uint16_t page_length;
     uint32_t update_every_s;
     uint8_t type;
+    unsigned page_is_loaded;
     struct pgc_page *page;
     struct rrdengine_datafile *datafile;
 };
@@ -69,7 +78,7 @@ struct rrdeng_query_handle {
     struct pgc_page *page;
     struct rrdengine_instance *ctx;
     storage_number *metric_data;
-    Pvoid_t pl_JudyL;
+    struct page_details_control *pdc;
 
     time_t wanted_next_page_start_time_s;
     time_t now_s;
@@ -297,5 +306,5 @@ void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
 struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
 struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
-void dbengine_load_page_list(struct rrdengine_instance *ctx, Pvoid_t Judy_page_list);
+void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 #endif /* NETDATA_RRDENGINE_H */

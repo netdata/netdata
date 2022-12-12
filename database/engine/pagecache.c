@@ -38,6 +38,26 @@ pthread_key_t query_key;
 //    pthread_setspecific(query_key, NULL);
 //}
 
+void free_judyl_page_list(Pvoid_t pl_judyL)
+{
+    if (!pl_judyL)
+        return;
+
+    Pvoid_t *PValue;
+    Word_t time_index = 0;
+
+    struct page_details *pd = NULL;
+    for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
+        pd = unlikely(NULL == PValue) ? 0 : *PValue;
+         pd != NULL;
+         PValue = JudyLNext(pl_judyL, &time_index, PJE0),
+        pd = unlikely(NULL == PValue) ? 0 : *PValue) {
+
+        freez(pd);
+    }
+    JudyLFreeArray(&pl_judyL, PJE0);
+}
+
 static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
@@ -459,12 +479,24 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
 
     time_t first_page_first_time_s = INVALID_TIME;
     size_t pages_to_load = 0;
-    handle->pl_JudyL = get_page_list(ctx, handle->metric,
+
+    struct page_details_control *pdc = mallocz(sizeof(*pdc));
+    completion_init(&pdc->completion);
+    handle->pdc = pdc;
+
+    handle->pdc->pl_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
                                      &first_page_first_time_s, &pages_to_load);
 
-    if (pages_to_load && handle->pl_JudyL)
-        dbengine_load_page_list(ctx, handle->pl_JudyL);
+    if (pages_to_load && handle->pdc->pl_JudyL) {
+        pdc->pl_JudyL = handle->pdc->pl_JudyL;
+        pdc->reference_count = 1;
+        pdc->jobs_started = 0;
+        pdc->jobs_completed = 0;
+        dbengine_load_page_list(ctx, pdc);
+    }
+    else
+        completion_mark_complete(&handle->pdc->completion);
 
     return first_page_first_time_s;
 }
@@ -477,7 +509,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle,
         time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused, time_t *next_page_start_time_s)
 {
-    if (unlikely(!handle || !handle->pl_JudyL)) {
+    if (unlikely(!handle || !handle->pdc || !handle->pdc->pl_JudyL)) {
 
         if(next_page_start_time_s)
             *next_page_start_time_s = INVALID_TIME;
@@ -486,32 +518,24 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     }
 
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
+    completion_wait_for(&handle->pdc->completion);
 
     PGC_PAGE *page = NULL;
     struct page_details *pd;
-    Word_t Index;
-    unsigned iterations = 100;  // FIXME: possibly add completion to have dbengine notify us when data is ready
-    do {
-        if (iterations < 100)
-             sleep_usec(1);
+    Word_t Index = start_time_t;
+    Pvoid_t *PValue = JudyLFirst(handle->pdc->pl_JudyL, &Index, PJE0);
+    if (!PValue || !*PValue) {
 
-        Index = start_time_t;
-        Pvoid_t *PValue = JudyLFirst(handle->pl_JudyL, &Index, PJE0);
-        if (!PValue || !*PValue) {
+        if(next_page_start_time_s)
+            *next_page_start_time_s = INVALID_TIME;
 
-            if(next_page_start_time_s)
-                *next_page_start_time_s = INVALID_TIME;
-
-            return NULL;
-        }
-        pd = *PValue;
-        page = pd->page;
-        iterations--;
-
-    } while (!page && iterations); // Wait until dbengine fills this
+        return NULL;
+    }
+    pd = *PValue;
+    page = pd->page;
 
     if(next_page_start_time_s) {
-        Pvoid_t *PValue = JudyLNext(handle->pl_JudyL, &Index, PJE0);
+        Pvoid_t *PValue = JudyLNext(handle->pdc->pl_JudyL, &Index, PJE0);
         if(!PValue || !*PValue)
             *next_page_start_time_s = INVALID_TIME;
         else

@@ -17,6 +17,7 @@ struct datafile_extent_list_s {
     unsigned count;
     unsigned fileno;
     Pvoid_t JudyL_datafile_extent_list;
+    struct page_details_control *pdc;
 };
 
 struct extent_page_list_s {
@@ -25,6 +26,7 @@ struct extent_page_list_s {
     uint32_t size;
     unsigned count;
     Pvoid_t JudyL_page_list;
+    struct page_details_control *pdc;
     struct rrdengine_datafile *datafile;
 };
 
@@ -166,7 +168,9 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
 
-        Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, header->descr[i].start_time_ut / USEC_PER_SEC, PJE0);
+        time_t start_time_t = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
+
+        Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, start_time_t, PJE0);
         struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
 
         // We might have an Index match but check for UUID match as well
@@ -180,7 +184,6 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
         METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
-        time_t start_time_t = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
         uint32_t page_length = header->descr[i].page_length;
 
         PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_t, true);
@@ -224,9 +227,22 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(page);
+            __atomic_store_n(&pd->page_is_loaded, 1, __ATOMIC_SEQ_CST);
         }
         else
             pgc_page_release(main_cache, page);
+    }
+
+    struct page_details_control *pdc = extent_page_list->pdc;
+
+    if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_SEQ_CST) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_SEQ_CST)) {
+        if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
+            completion_destroy(&pdc->completion);
+            free_judyl_page_list(pdc->pl_JudyL);
+            freez(pdc);
+        }
+        else
+            completion_mark_complete(&pdc->completion);
     }
 
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)
@@ -324,9 +340,11 @@ static void do_flush_extent_cb(uv_fs_t *req)
     //count = xt_io_descr->descr_count;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(descr->uuid, uuid_str);
-        info("DEBUG: Writing %u --> %s %llu - %llu", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
+
+        // FIXME: DBegine2 add to JudyL so it can be searched
+//        char uuid_str[UUID_STR_LEN];
+//        uuid_unparse_lower(descr->uuid, uuid_str);
+//        info("DEBUG: Writing %u --> %s %llu - %llu", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
     //    freez(descr);
     }
     if (xt_io_descr->completion)
@@ -928,6 +946,9 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
         struct rrdeng_cmd cmd;
         cmd.opcode = RRDENG_READ_EXTENT;
+        struct page_details_control *pdc = datafile_extent_list->pdc;
+        __atomic_fetch_add(&pdc->jobs_started, 1, __ATOMIC_SEQ_CST);
+        extent_page_list->pdc = pdc;
         cmd.data = extent_page_list;
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
     }
@@ -1056,7 +1077,8 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
 
-    Pvoid_t JudyL_page_list = work_request->data;
+    struct page_details_control *pdc = work_request->data;
+    Pvoid_t JudyL_page_list = pdc->pl_JudyL;
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
     Pvoid_t *PValue2;
@@ -1124,6 +1146,7 @@ static void do_read_page_list_work(uv_work_t *req)
             // List of datafiles
             // Now submit each datafile_extent_list back to the engine
             struct rrdeng_cmd cmd;
+            datafile_extent_list->pdc = pdc;
             cmd.opcode = RRDENG_READ_DF_EXTENT_LIST;
             cmd.data = datafile_extent_list;
             rrdeng_enq_cmd(&ctx->worker_config, &cmd);
@@ -1132,15 +1155,16 @@ static void do_read_page_list_work(uv_work_t *req)
     }
 }
 
-static void do_read_page_list(struct rrdengine_worker_config *wc, Pvoid_t JudyL_page_list, struct completion *completion)
+static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
 {
     struct rrdeng_work *work_request;
 
     work_request = mallocz(sizeof(*work_request));
     work_request->req.data = work_request;
     work_request->wc = wc;
-    work_request->data = JudyL_page_list;
+    work_request->data = pdc;
     work_request->completion = completion;
+    __atomic_fetch_add(&pdc->reference_count, 1, __ATOMIC_SEQ_CST);
 
     int ret = uv_queue_work(wc->loop, &work_request->req, do_read_page_list_work, after_do_read_page_list_work);
     if (ret)
@@ -1151,14 +1175,14 @@ static void do_read_page_list(struct rrdengine_worker_config *wc, Pvoid_t JudyL_
 
 // List of pages to preload
 // Just queue to dbengine
-void dbengine_load_page_list(struct rrdengine_instance *ctx, Pvoid_t Judy_page_list)
+void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc)
 {
     struct completion read_page_received;
 
     completion_init(&read_page_received);
     struct rrdeng_cmd cmd;
     cmd.opcode = RRDENG_READ_PAGE_LIST;
-    cmd.data = Judy_page_list;
+    cmd.data = pdc;
     cmd.completion = &read_page_received;
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 

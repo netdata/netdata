@@ -519,6 +519,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle->position = 0;
     handle->ctx = ctx;
     handle->page = NULL;
+    handle->pdc = NULL;
     handle->dt_s = mrg_metric_get_update_every(main_mrg, metric);
     if(!handle->dt_s)
         handle->dt_s = default_rrd_update_every;
@@ -728,11 +729,18 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
     if (handle->page)
         pgc_page_release(main_cache, (PGC_PAGE *)handle->page);
 
-    freez(handle);
-    rrdimm_handle->handle = NULL;
-
+    struct page_details_control *pdc = handle->pdc;
     // FIXME - we have to release all the pages if the query ends prematurely
     // FIXME - we have to free the page details Judy
+
+    if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        free_judyl_page_list(pdc->pl_JudyL);
+        completion_destroy(&handle->pdc->completion);
+        freez(pdc);
+    }
+
+    freez(handle);
+    rrdimm_handle->handle = NULL;
 }
 
 // FIXME: Get it from metric registry
