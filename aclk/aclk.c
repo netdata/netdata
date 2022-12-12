@@ -71,8 +71,10 @@ static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
     (void)ssl;
     if (!ssl_log_file)
         ssl_log_file = fopen(ssl_log_filename, "a");
-    if (!ssl_log_file)
+    if (!ssl_log_file) {
+        error("Couldn't open ssl_log file (%s) for append.", ssl_log_filename);
         return;
+    }
     fputs(line, ssl_log_file);
     putc('\n', ssl_log_file);
     fflush(ssl_log_file);
