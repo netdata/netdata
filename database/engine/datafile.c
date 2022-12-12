@@ -39,24 +39,19 @@ void df_extent_insert(struct extent_info *extent)
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
-    if (likely(NULL != ctx->datafiles.last)) {
-        ctx->datafiles.last->next = datafile;
-    }
-    if (unlikely(NULL == ctx->datafiles.first)) {
-        ctx->datafiles.first = datafile;
-    }
-    ctx->datafiles.last = datafile;
-
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    ctx->datafiles.last = ctx->datafiles.first->prev;
+    if(ctx->datafiles.last == ctx->datafiles.first)
+        ctx->datafiles.last = NULL;
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
-    struct rrdengine_datafile *next;
-    next = datafile->next;
-    fatal_assert((NULL != next) && (ctx->datafiles.first == datafile) && (ctx->datafiles.last != datafile));
-    ctx->datafiles.first = next;
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+    ctx->datafiles.last = ctx->datafiles.first->prev;
+    if(ctx->datafiles.last == ctx->datafiles.first)
+        ctx->datafiles.last = NULL;
 }
 
 
@@ -71,7 +66,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->extents.first = datafile->extents.last = NULL; /* will be populated by journalfile */
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->journalfile = NULL;
-    datafile->next = NULL;
+    datafile->next = datafile->prev = NULL;
     datafile->ctx = ctx;
     fatal_assert(0 == uv_rwlock_init(&datafile->JudyL_extent_rwlock));
     datafile->JudyL_extent_offset_array = NULL;
