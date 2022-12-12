@@ -186,26 +186,12 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
 
-// Return a judyL will all pages that have start_time_ut and end_time_ut
-// Pvalue of the judy will be the end time for that page
-// DBENGINE2:
-Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s, size_t *pages_to_load) {
+static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx, time_t wanted_start_time_s, time_t wanted_end_time_s,
+                                   Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s, bool set_page) {
+
+    size_t pages_found_in_cache = 0;
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
-    Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
-
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
-    time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
-    time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
-
-    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass3 = 0, pages_pending = 0, pages_total = 0;
-    size_t cache_gaps = 0;
-    bool done_v2 = false;
-
-    PGC_PAGE *page = NULL;
-    time_t first_page_starting_time_s = INVALID_TIME;
-
-    // --------------------------------------------------------------
-    // PASS 1: Check what the page cache has available
 
     time_t current_start_time_s = wanted_start_time_s;
     time_t previous_page_update_every_s = mrg_metric_get_update_every(main_mrg, metric);
@@ -216,9 +202,9 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     time_t previous_page_last_time_s = current_start_time_s - previous_page_update_every_s;
 
     do {
-        page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
+        PGC_PAGE *page = pgc_page_get_and_acquire(cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
         if(!page) {
-            cache_gaps++;
+            (*cache_gaps)++;
             break;
         }
 
@@ -228,19 +214,19 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
         if(!is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
             // not a useful page for this query
-            pgc_page_release(main_cache, page);
+            pgc_page_release(cache, page);
             page = NULL;
-            cache_gaps++;
+            (*cache_gaps)++;
             break;
         }
 
         if (page_first_time_s - previous_page_last_time_s > previous_page_update_every_s)
-            cache_gaps++;
+            (*cache_gaps)++;
 
-        if(first_page_starting_time_s == INVALID_TIME)
-            first_page_starting_time_s = page_first_time_s;
+        if(*first_page_starting_time_s == INVALID_TIME || page_first_time_s < *first_page_starting_time_s)
+            *first_page_starting_time_s = page_first_time_s;
 
-        Pvoid_t *PValue = JudyLIns(&JudyL_page_array, (Word_t) page_first_time_s, PJE0);
+        Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_first_time_s, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: corrupted judy array in %s()", __FUNCTION__ );
 
@@ -253,30 +239,25 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                     pd->update_every_s != page_update_every_s,
                     "DBENGINE: page is already in judy with different retention");
 
-            pgc_page_release(main_cache, page);
-            page_last_time_s++; // prevent an accidental infinite loop
-
-            internal_fatal(true,
-                           "DBENGINE: page found twice in cache, with the same retention - possibly an infinite loop");
+            pgc_page_release(cache, page);
         }
         else {
             struct page_details *pd = mallocz(sizeof(*pd));
             pd->pos = 0;
-            pd->size = pgc_page_data_size(page);
+            pd->size = pgc_page_data_size(cache, page);
             pd->file = 0;
             pd->fileno = 0;
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
             pd->datafile = NULL;
-            pd->page_length = pgc_page_data_size(page);
+            pd->page_length = pgc_page_data_size(cache, page);
             pd->update_every_s = pgc_page_update_every(page);
-            pd->page = page;
+            pd->page = (set_page) ? page : NULL;
             pd->type = ctx->page_type;
             uuid_copy(pd->uuid, *uuid);
             *PValue = pd;
 
             pages_found_in_cache++;
-            pages_total++;
         }
 
         // prepare for the next iteration
@@ -289,11 +270,49 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     } while(current_start_time_s <= wanted_end_time_s);
 
+    return pages_found_in_cache;
+}
+
+// Return a judyL will all pages that have start_time_ut and end_time_ut
+// Pvalue of the judy will be the end time for that page
+// DBENGINE2:
+Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s, size_t *pages_to_load) {
+    Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
+
+    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+    Word_t metric_id = mrg_metric_id(main_mrg, metric);
+    time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
+    time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
+
+    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass3 = 0, pages_pending = 0, pages_total = 0;
+    size_t cache_gaps = 0;
+    bool done_v2 = false;
+
+    time_t first_page_starting_time_s = INVALID_TIME;
+
+    // --------------------------------------------------------------
+    // PASS 1: Check what the main page cache has available
+
+    size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
+                                                &JudyL_page_array, &cache_gaps,
+                                                &first_page_starting_time_s, true);
+    pages_found_in_cache += pages_pass1;
+    pages_total += pages_pass1;
+
     if(pages_found_in_cache && !cache_gaps)
         goto we_are_done;
 
     // --------------------------------------------------------------
-    // PASS 2: Check Journal v2 to fill the gaps
+    // PASS 2: Check what the open journal page cache has available
+
+    size_t pages_pass2 = get_page_list_from_pgc(open_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
+                                                &JudyL_page_array, &cache_gaps,
+                                                &first_page_starting_time_s, false);
+    pages_found_in_cache += pages_pass2;
+    pages_total += pages_pass2;
+
+    // --------------------------------------------------------------
+    // PASS 3: Check Journal v2 to fill the gaps
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
@@ -343,7 +362,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
                 if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
 
-                    if (first_page_starting_time_s == INVALID_TIME)
+                    if (first_page_starting_time_s == INVALID_TIME || page_first_time_s < first_page_starting_time_s)
                         first_page_starting_time_s = page_first_time_s;
 
                     Pvoid_t *PValue = JudyLIns(&JudyL_page_array, page_first_time_s, PJE0);
@@ -385,22 +404,26 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
         datafile = datafile->next;
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-
     done_v2 = true;
 
     // --------------------------------------------------------------
-    // PASS 3: Check the cache again
+    // PASS 4: Check the cache again
 
     // Try To add additional pages in the list
     // Pages will be acquired -- should be ignored by the dbengine reader
 
     if(pages_found_in_journals_v2) {
         bool first = true;
-        Word_t Index = 0;
+        Word_t current_page_end_time = 0;
         Pvoid_t *PValue;
 
+        first_page_starting_time_s = INVALID_TIME;
         pages_total = 0;
-        while((PValue = JudyLFirstThenNext(JudyL_page_array, &Index, &first))) {
+        while((PValue = JudyLFirstThenNext(JudyL_page_array, &current_page_end_time, &first))) {
+
+            if(first_page_starting_time_s == INVALID_TIME || (time_t)current_page_end_time < first_page_starting_time_s)
+                first_page_starting_time_s = (time_t)current_page_end_time;
+
             struct page_details *pd = *PValue;
             if(!pd->page) {
                 pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
@@ -607,20 +630,22 @@ void init_page_cache(struct rrdengine_instance *ctx)
             1000,                           //
             1,                                          // don't delay too much other threads
             PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
-            0                                                 // 0 = as many as the system cpus
+            0,                                                 // 0 = as many as the system cpus
+            0
             );
 
         open_cache = pgc_create(
-            default_rrdeng_page_cache_mb * 1024 * 1024,
+            0,
             open_cache_clean_page_callback,
-            rrdeng_pages_per_extent,
+            1,
             open_cache_flush_callback,
             100,                                //
             1000,                           //
             1,                                          // don't delay too much other threads
             PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
-            0                                                 // 0 = as many as the system cpus
-        );
+            0,                                                 // 0 = as many as the system cpus
+            0
+            );
     }
     netdata_spinlock_unlock(&spinlock);
 

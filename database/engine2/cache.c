@@ -61,6 +61,8 @@ struct pgc_page {
         struct pgc_page *next;
         struct pgc_page *prev;
     } link;
+
+    uint8_t custom_data[];
 };
 
 struct pgc_linked_list {
@@ -84,6 +86,7 @@ struct pgc {
         size_t max_pages_per_inline_eviction;
         size_t max_skip_pages_per_inline_eviction;
         size_t max_flushes_inline;
+        size_t additional_bytes_per_page;
         free_clean_page_callback pgc_free_clean_cb;
         save_dirty_page_callback pgc_save_dirty_cb;
         PGC_OPTIONS options;
@@ -335,12 +338,12 @@ static inline bool flushing_critical(PGC *cache) {
 // ----------------------------------------------------------------------------
 // helpers
 
-static size_t page_assumed_size(size_t size) {
-    return size + sizeof(PGC_PAGE) + sizeof(Word_t) * 3;
+static size_t page_assumed_size(PGC *cache, size_t size) {
+    return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
 }
 
-static size_t page_size_from_assumed_size(size_t assumed_size) {
-    return assumed_size - sizeof(PGC_PAGE) - sizeof(Word_t) * 3;
+static size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
+    return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
 }
 
 // ----------------------------------------------------------------------------
@@ -712,7 +715,7 @@ static void free_this_page(PGC *cache, PGC_PAGE *page) {
             .start_time_t = page->start_time_t,
             .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
             .update_every = page->update_every,
-            .size = page_size_from_assumed_size(page->assumed_size),
+            .size = page_size_from_assumed_size(cache, page->assumed_size),
             .hot = (is_page_hot(page)) ? true : false,
     });
 
@@ -1016,7 +1019,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #ifdef PGC_WITH_ARAL
             page = arrayalloc_mallocz(cache->aral);
 #else
-            page = callocz(1, sizeof(PGC_PAGE));
+            page = callocz(1, sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
             page->refcount = 1;
             page->accesses = (entry->hot) ? 0 : 1;
@@ -1027,9 +1030,12 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             page->end_time_t = entry->end_time_t,
             page->update_every = entry->update_every,
             page->data = entry->data;
-            page->assumed_size = page_assumed_size(entry->size);
+            page->assumed_size = page_assumed_size(cache, entry->size);
             netdata_spinlock_init(&page->transition_spinlock);
             page->link.prev = page->link.next = NULL;
+
+            if(cache->config.additional_bytes_per_page && entry->custom_data)
+                memcpy(page->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
 
             // put it in the index
             *page_ptr = page;
@@ -1276,7 +1282,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                             .start_time_t = page->start_time_t,
                             .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
                             .update_every = page->update_every,
-                            .size = page_size_from_assumed_size(page->assumed_size),
+                            .size = page_size_from_assumed_size(cache, page->assumed_size),
                             .data = page->data,
                             .hot = false,
                     };
@@ -1396,7 +1402,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_call, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
-                PGC_OPTIONS options, size_t partitions) {
+                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page) {
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
@@ -1408,6 +1414,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 1) ? 1 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
+    cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
@@ -1429,7 +1436,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = arrayalloc_create(sizeof(PGC_PAGE), max_clean_size / sizeof(PGC_PAGE) / 3,
+    cache->aral = arrayalloc_create(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page, max_clean_size / sizeof(PGC_PAGE) / 3,
                                     NULL, NULL, false, false);
 #endif
 
@@ -1530,8 +1537,12 @@ void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
 
-size_t pgc_page_data_size(PGC_PAGE *page) {
-    return page_size_from_assumed_size(page->assumed_size);
+void *pgc_page_custom_data(PGC_PAGE *page) {
+    return page->custom_data;
+}
+
+size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page) {
+    return page_size_from_assumed_size(cache, page->assumed_size);
 }
 
 bool pgc_is_page_hot(PGC_PAGE *page) {
@@ -1795,7 +1806,7 @@ void unittest_stress_test(void) {
                                unittest_free_clean_page_callback,
                                64, unittest_save_dirty_page_callback,
                                1000, 10000, 1,
-                               pgc_uts.options, pgc_uts.partitions);
+                               pgc_uts.options, pgc_uts.partitions, 0);
 
     pgc_uts.metrics = callocz(pgc_uts.clean_metrics + pgc_uts.hot_metrics, sizeof(PGC_PAGE *));
 
@@ -1959,7 +1970,7 @@ int pgc_unittest(void) {
     PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, unittest_save_dirty_page_callback,
                             10, 1000, 10,
-                            PGC_OPTIONS_DEFAULT, 1);
+                            PGC_OPTIONS_DEFAULT, 1, 11);
 
     // FIXME - unit tests
     // - add clean page
@@ -1983,7 +1994,15 @@ int pgc_unittest(void) {
         .size = 4096,
         .data = NULL,
         .hot = false,
+        .custom_data = (uint8_t *)"0123456789",
     }, NULL);
+
+    if(strcmp(pgc_page_custom_data(page1), "0123456789") != 0)
+        fatal("custom data do not work");
+
+    memcpy(pgc_page_custom_data(page1), "ABCDEFGHIJ", 11);
+    if(strcmp(pgc_page_custom_data(page1), "ABCDEFGHIJ") != 0)
+        fatal("custom data do not work");
 
     pgc_page_release(cache, page1);
 

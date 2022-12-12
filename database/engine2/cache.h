@@ -24,6 +24,7 @@ typedef struct pgc_entry {
     void *data;                 // a pointer to data outside the cache
     uint32_t update_every;      // the update every of the page
     bool hot;                   // true if this entry is currently being collected
+    uint8_t *custom_data;
 } PGC_ENTRY;
 
 struct pgc_queue_statistics {
@@ -95,7 +96,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_clean
                 size_t max_dirty_pages_per_call, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
-                PGC_OPTIONS options, size_t partitions);
+                PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page);
 
 // destroy the cache
 void pgc_destroy(PGC *cache);
@@ -119,7 +120,8 @@ time_t pgc_page_start_time_t(PGC_PAGE *page);
 time_t pgc_page_end_time_t(PGC_PAGE *page);
 time_t pgc_page_update_every(PGC_PAGE *page);
 void *pgc_page_data(PGC_PAGE *page);
-size_t pgc_page_data_size(PGC_PAGE *page);
+void *pgc_page_custom_data(PGC_PAGE *page);
+size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page);
 bool pgc_is_page_hot(PGC_PAGE *page);
 bool pgc_is_page_dirty(PGC_PAGE *page);
 bool pgc_is_page_clean(PGC_PAGE *page);

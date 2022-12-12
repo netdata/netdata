@@ -226,7 +226,7 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
         }
         if (pd) {
             pd->page = page;
-            pd->page_length = pgc_page_data_size(page);
+            pd->page_length = pgc_page_data_size(main_cache, page);
             __atomic_store_n(&pd->page_is_loaded, 1, __ATOMIC_SEQ_CST);
         }
         else
@@ -360,6 +360,8 @@ static void do_flush_extent_cb(uv_fs_t *req)
 
         bool added = true;
         (void) pgc_page_add_and_acquire(open_cache, page_entry, &added);
+
+        mrg_metric_release(main_mrg, this_metric);
     }
     if (xt_io_descr->completion)
         completion_mark_complete(xt_io_descr->completion);

@@ -565,7 +565,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
             page_start_time_s = pgc_page_start_time_t((PGC_PAGE *) handle->page);
             page_end_time_s = pgc_page_end_time_t((PGC_PAGE *) handle->page);
             page_update_every_s = pgc_page_update_every((PGC_PAGE *) handle->page);
-            page_length = pgc_page_data_size(handle->page);
+            page_length = pgc_page_data_size(main_cache, handle->page);
 
             if( page_start_time_s == INVALID_TIME ||
                 page_end_time_s   == INVALID_TIME
