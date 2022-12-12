@@ -701,6 +701,9 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     }
 
 prepare_for_next_iteration:
+    internal_fatal(sp.end_time < rrddim_handle->start_time_s, "DBENGINE: this point is too old for this query");
+    internal_fatal(sp.end_time < handle->now_s, "DBENGINE: this point is too old for this point in time");
+
     handle->now_s += handle->dt_s;
     handle->position++;
 
