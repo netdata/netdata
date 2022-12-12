@@ -90,3 +90,7 @@ int mqtt_ng_sync(struct mqtt_ng_client *client);
 time_t mqtt_ng_last_send_time(struct mqtt_ng_client *client);
 
 void mqtt_ng_set_max_mem(struct mqtt_ng_client *client, size_t bytes);
+
+void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stats);
+
+int mqtt_ng_set_topic_alias(struct mqtt_ng_client *client, const char *topic);

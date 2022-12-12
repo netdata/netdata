@@ -1087,12 +1087,28 @@ static inline long long int t_till_next_keepalive_ms(mqtt_wss_client client)
     return(next_mqtt_keep_alive - (MQTT_PAL_TIME() * SEC_TO_MSEC));
 }
 
+#ifdef MQTT_WSS_CPUSTATS
+static inline uint64_t mqtt_wss_now_usec(mqtt_wss_client client) {
+    struct timespec ts;
+    if(clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        mws_error(client->log, "clock_gettime(CLOCK_MONOTONIC, &timespec) failed.");
+        return 0;
+    }
+    return (uint64_t)ts.tv_sec * USEC_PER_SEC + (ts.tv_nsec % NSEC_PER_SEC) / NSEC_PER_USEC;
+}
+#endif
+
 int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 {
     char *ptr;
     size_t size;
     int ret;
     int send_keepalive = 0;
+
+#ifdef MQTT_WSS_CPUSTATS
+    uint64_t t1,t2;
+    t1 = mqtt_wss_now_usec(client);
+#endif
 
 #ifdef DEBUG_ULTRA_VERBOSE
     mws_debug(client->log, ">>>>> mqtt_wss_service <<<<<");
@@ -1111,6 +1127,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         timeout_ms = till_next_keep_alive;
         send_keepalive = 1;
     }
+
+#ifdef MQTT_WSS_CPUSTATS
+    t2 = mqtt_wss_now_usec(client);
+    client->stats.time_keepalive += t2 - t1;
+#endif
 
     if ((ret = poll(client->poll_fds, 2, timeout_ms >= 0 ? timeout_ms : -1)) < 0) {
         if (errno == EINTR) {
@@ -1134,6 +1155,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         return client->last_ec;
     }
 
+#ifdef MQTT_WSS_CPUSTATS
+    t1 = mqtt_wss_now_usec(client);
+#endif
+
     if (ret == 0) {
         if (send_keepalive) {
             // otherwise we shortened the timeout ourselves to take care of
@@ -1151,6 +1176,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             return 0;
         }
     }
+
+#ifdef MQTT_WSS_CPUSTATS
+    t2 = mqtt_wss_now_usec(client);
+    client->stats.time_keepalive += t2 - t1;
+#endif
 
     client->poll_fds[POLLFD_SOCKET].events = 0;
 
@@ -1180,6 +1210,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         }
     }
 
+#ifdef MQTT_WSS_CPUSTATS
+    t1 = mqtt_wss_now_usec(client);
+    client->stats.time_read_socket += t1 - t2;
+#endif
+
     ret = ws_client_process(client->ws_client);
     switch(ret) {
         case WS_CLIENT_PROTOCOL_ERROR:
@@ -1194,6 +1229,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
             return MQTT_WSS_ERR_CONN_DROP;
     }
 
+#ifdef MQTT_WSS_CPUSTATS
+    t2 = mqtt_wss_now_usec(client);
+    client->stats.time_process_websocket += t2 - t1;
+#endif
+
     if (handle_mqtt(client))
         return MQTT_WSS_ERR_PROTO_MQTT;
 
@@ -1201,6 +1241,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         client->mqtt_didnt_finish_write = 0;
         client->poll_fds[POLLFD_SOCKET].events |= POLLOUT;
     }
+
+#ifdef MQTT_WSS_CPUSTATS
+    t1 = mqtt_wss_now_usec(client);
+    client->stats.time_process_mqtt += t1 - t2;
+#endif
 
     if ((ptr = rbuf_get_linear_read_range(client->ws_client->buf_write, &size))) {
 #ifdef DEBUG_ULTRA_VERBOSE
@@ -1233,6 +1278,11 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 
     if(client->poll_fds[POLLFD_PIPE].revents & POLLIN)
         util_clear_pipe(client->write_notif_pipe[PIPE_READ_END]);
+
+#ifdef MQTT_WSS_CPUSTATS
+    t2 = mqtt_wss_now_usec(client);
+    client->stats.time_write_socket += t2 - t1;
+#endif
 
     return MQTT_WSS_OK;
 }
@@ -1504,7 +1554,16 @@ struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
     current = client->stats;
     memset(&client->stats, 0, sizeof(client->stats));
     pthread_mutex_unlock(&client->stat_lock);
+    mqtt_ng_get_stats(client->mqtt.mqtt_ctx, &current.mqtt);
     return current;
+}
+
+int mqtt_wss_set_topic_alias(mqtt_wss_client client, const char *topic)
+{
+    if(!client->internal_mqtt)
+        return 0;
+    
+    return mqtt_ng_set_topic_alias(client->mqtt.mqtt_ctx, topic);
 }
 
 #ifdef MQTT_WSS_DEBUG

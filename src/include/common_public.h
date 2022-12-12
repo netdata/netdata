@@ -1,5 +1,8 @@
 #ifndef MQTT_WEBSOCKETS_COMMON_PUBLIC_H
 #define MQTT_WEBSOCKETS_COMMON_PUBLIC_H
+
+#include <stddef.h>
+
 /* free_fnc_t in general (in whatever function or struct it is used)
  * decides how the related data will be handled.
  * - If NULL the data are copied internally (causing malloc and later free)
@@ -14,5 +17,17 @@
 typedef void (*free_fnc_t)(void *ptr);
 void _caller_responsibility(void *ptr);
 #define CALLER_RESPONSIBILITY ((free_fnc_t)&_caller_responsibility)
+
+struct mqtt_ng_stats {
+    size_t tx_bytes_queued;
+    int tx_messages_queued;
+    int tx_messages_sent;
+    int rx_messages_rcvd;
+    size_t tx_buffer_used;
+    size_t tx_buffer_free;
+    size_t tx_buffer_size;
+    // part of transaction buffer that containes mesages we can free alredy during the garbage colleciton step
+    size_t tx_buffer_reclaimable;
+};
 
 #endif /* MQTT_WEBSOCKETS_COMMON_PUBLIC_H */

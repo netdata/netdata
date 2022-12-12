@@ -157,6 +157,8 @@ int mqtt_wss_publish5(mqtt_wss_client client,
                       uint8_t publish_flags,
                       uint16_t *packet_id);
 
+int mqtt_wss_set_topic_alias(mqtt_wss_client client, const char *topic);
+
 /* Subscribes to MQTT topic
  * @param client mqtt_wss_client which should do the subscription
  * @param topic MQTT topic to subscribe to
@@ -165,9 +167,18 @@ int mqtt_wss_publish5(mqtt_wss_client client,
  */
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level);
 
+
 struct mqtt_wss_stats {
     uint64_t bytes_tx;
     uint64_t bytes_rx;
+#ifdef MQTT_WSS_CPUSTATS
+    uint64_t time_keepalive;
+    uint64_t time_read_socket;
+    uint64_t time_write_socket;
+    uint64_t time_process_websocket;
+    uint64_t time_process_mqtt;
+#endif
+    struct mqtt_ng_stats mqtt;
 };
 
 struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client);
