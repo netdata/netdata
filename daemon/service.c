@@ -22,6 +22,8 @@
 #define WORKER_JOB_SAVE_CHART                       13
 #define WORKER_JOB_DELETE_CHART                     14
 #define WORKER_JOB_FREE_DIMENSION                   15
+#define WORKER_JOB_PGC_EVICT                        16
+#define WORKER_JOB_PGC_FLUSH                        17
 
 static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
@@ -276,6 +278,8 @@ void *service_main(void *ptr)
     worker_register_job_name(WORKER_JOB_SAVE_CHART, "save chart");
     worker_register_job_name(WORKER_JOB_DELETE_CHART, "delete chart");
     worker_register_job_name(WORKER_JOB_FREE_DIMENSION, "free dimension");
+    worker_register_job_name(WORKER_JOB_PGC_EVICT, "cache evictions");
+    worker_register_job_name(WORKER_JOB_PGC_FLUSH, "cache flushes");
 
     netdata_thread_cleanup_push(service_main_cleanup, ptr);
     heartbeat_t hb;
@@ -287,6 +291,17 @@ void *service_main(void *ptr)
     while (!netdata_exit) {
         worker_is_idle();
         heartbeat_next(&hb, step);
+
+        if(main_cache) {
+            worker_is_busy(WORKER_JOB_PGC_EVICT);
+            pgc_evict_pages(main_cache, 0, 0);
+
+            worker_is_busy(WORKER_JOB_PGC_FLUSH);
+            pgc_flush_pages(main_cache, 0);
+
+            worker_is_busy(WORKER_JOB_PGC_EVICT);
+            pgc_evict_pages(main_cache, 0, 0);
+        }
 
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
         svc_rrdhost_cleanup_orphan_hosts(localhost);
