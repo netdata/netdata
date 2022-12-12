@@ -1099,15 +1099,12 @@ static void dbengine2_statistics_charts(void) {
             rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "hit", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        size_t pages_from_cache = cache_efficiency_stats.pages_found_in_cache - cache_efficiency_stats_old.pages_found_in_cache;
-        size_t pages_from_disk = cache_efficiency_stats.pages_loaded_from_journal_v2 - cache_efficiency_stats_old.pages_loaded_from_journal_v2;
-        size_t pages_from_pass3 = cache_efficiency_stats.pages_found_in_cache_at_pass3 - cache_efficiency_stats_old.pages_found_in_cache_at_pass3;
-        size_t total = pages_from_cache + pages_from_disk + pages_from_pass3;
-        size_t percent;
-        if(total)
-            percent = (pages_from_cache + pages_from_pass3) * 100 * 10000 / total;
-        else
-            percent = 100;
+        size_t pages_to_load = cache_efficiency_stats.pages_to_load_from_disk - cache_efficiency_stats_old.pages_to_load_from_disk;
+        size_t pages_total = cache_efficiency_stats.pages_total - cache_efficiency_stats_old.pages_total;
+        size_t pages_from_cache = pages_total - pages_to_load;
+        static size_t percent = 100;
+        if(pages_total)
+            percent = pages_from_cache * 100 * 10000 / pages_total;
 
         rrddim_set_by_pointer(st_cache_hit_ratio,
                               rd_hit_ratio,

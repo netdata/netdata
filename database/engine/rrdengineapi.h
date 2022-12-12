@@ -132,6 +132,8 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_found_in_cache;
     size_t pages_loaded_from_journal_v2;
     size_t pages_found_in_cache_at_pass3;
+    size_t pages_to_load_from_disk;
+    size_t pages_total;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

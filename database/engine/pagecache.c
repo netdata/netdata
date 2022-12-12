@@ -129,7 +129,7 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 // Return a judyL will all pages that have start_time_ut and end_time_ut
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
-Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s) {
+Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s, size_t *pages_to_load) {
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
@@ -137,7 +137,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
-    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass3 = 0;
+    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass3 = 0, pages_pending = 0, pages_total = 0;
     size_t cache_gaps = 0;
     bool done_v2 = false;
 
@@ -216,6 +216,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
             *PValue = pd;
 
             pages_found_in_cache++;
+            pages_total++;
         }
 
         // prepare for the next iteration
@@ -315,6 +316,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         *PValue = pd;
 
                         pages_found_in_journals_v2++;
+                        pages_total++;
                     }
                 }
             }
@@ -337,14 +339,18 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
         Word_t Index = 0;
         Pvoid_t *PValue;
 
+        pages_total = 0;
         while((PValue = JudyLFirstThenNext(JudyL_page_array, &Index, &first))) {
             struct page_details *pd = *PValue;
             if(!pd->page) {
                 pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
-                if(pd->page) {
+                if(pd->page)
                     pages_found_pass3++;
-                }
+                else
+                    pages_pending++;
             }
+
+            pages_total++;
         }
     }
 
@@ -352,11 +358,16 @@ we_are_done:
     if(first_page_first_time_s)
         *first_page_first_time_s = first_page_starting_time_s;
 
+    if(pages_to_load)
+        *pages_to_load = pages_pending;
+
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_journal_v2, done_v2 ? 1 : 0, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_cache, pages_found_in_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_from_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_cache_at_pass3, pages_found_pass3, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
 
     return JudyL_page_array;
 }
@@ -415,11 +426,12 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
         return 0;
 
     time_t first_page_first_time_s = INVALID_TIME;
+    size_t pages_to_load = 0;
     handle->pl_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
-                                     &first_page_first_time_s);
+                                     &first_page_first_time_s, &pages_to_load);
 
-    if (handle->pl_JudyL)
+    if (pages_to_load && handle->pl_JudyL)
         dbengine_load_page_list(ctx, handle->pl_JudyL);
 
     return first_page_first_time_s;
