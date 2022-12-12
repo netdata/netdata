@@ -296,7 +296,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, true);
+                                                &first_page_starting_time_s, false);
     pages_found_in_cache += pages_pass1;
     pages_total += pages_pass1;
 
@@ -308,7 +308,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     size_t pages_pass2 = get_page_list_from_pgc(open_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, false);
+                                                &first_page_starting_time_s, true);
     pages_found_in_cache += pages_pass2;
     pages_total += pages_pass2;
 
