@@ -459,6 +459,9 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
  */
 static void clean_allocated_socket_plot()
 {
+    if (!network_viewer_opt.enabled)
+        return;
+
     uint32_t i;
     uint32_t end = inbound_vectors.last;
     netdata_socket_plot_t *plot = inbound_vectors.plot;
@@ -2007,7 +2010,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
-    if (is_socket_allowed(key, family)) {
+    if (network_viewer_opt.enabled && is_socket_allowed(key, family)) {
         uint32_t dir;
         netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
         store_socket_inside_avl(table, &values[0], key, family, dir);
@@ -2883,7 +2886,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         ebpf_socket_update_cgroup_algorithm();
 
     int socket_global_enabled = em->global_charts;
-    int network_connection = em->optional;
+    uint32_t network_connection = network_viewer_opt.enabled;
     int update_every = em->update_every;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
@@ -2901,7 +2904,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (cgroups)
             ebpf_update_socket_cgroup();
 
-        calculate_nv_plot();
+        if (network_connection)
+            calculate_nv_plot();
 
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
@@ -2960,8 +2964,10 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
-    inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
-    outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+    if (network_viewer_opt.enabled) {
+        inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+        outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+    }
 }
 
 /**
@@ -3917,16 +3923,19 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
 
-    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
-    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
-    avl_init_lock(&inbound_vectors.tree, compare_sockets);
-    avl_init_lock(&outbound_vectors.tree, compare_sockets);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = socket_maps;
 
-    parse_network_viewer_section(&socket_config);
-    parse_service_name_section(&socket_config);
+    if (network_viewer_opt.enabled) {
+        memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        avl_init_lock(&inbound_vectors.tree, compare_sockets);
+        avl_init_lock(&outbound_vectors.tree, compare_sockets);
+
+        parse_network_viewer_section(&socket_config);
+        parse_service_name_section(&socket_config);
+        initialize_inbound_outbound();
+    }
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
@@ -3936,7 +3945,6 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
-    initialize_inbound_outbound();
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
