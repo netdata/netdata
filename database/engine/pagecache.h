@@ -7,6 +7,7 @@
 
 extern struct mrg *main_mrg;
 extern struct pgc *main_cache;
+extern struct pgc *open_cache;
 extern pthread_key_t query_key;
 void query_key_release(void *data);
 

@@ -165,6 +165,7 @@ struct extent_io_descriptor {
     struct completion *completion;
     unsigned descr_count;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
+    struct rrdengine_datafile *datafile;
 //    struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
 //    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
 //    BITMAP256 descr_array_wakeup;

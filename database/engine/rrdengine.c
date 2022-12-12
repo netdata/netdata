@@ -327,6 +327,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
     struct rrdeng_page_descr *descr;
+    struct rrdengine_datafile *datafile;
     unsigned i;
 
     xt_io_descr = req->data;
@@ -335,18 +336,30 @@ static void do_flush_extent_cb(uv_fs_t *req)
         rrd_stat_atomic_add(&global_io_errors, 1);
         error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     }
+    datafile = xt_io_descr->datafile;
 
     // Descriptors need to be freed when migration to V2 happens
-    //count = xt_io_descr->descr_count;
+
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
         descr->id = &descr->uuid;   // FIXME:
 
-        // FIXME: DBENGINE2 add to JudyL so it can be searched
-//        char uuid_str[UUID_STR_LEN];
-//        uuid_unparse_lower(descr->uuid, uuid_str);
-//        info("DEBUG: Writing %u --> %s %llu - %llu", i, uuid_str, descr->start_time_ut / USEC_PER_SEC, descr->end_time_ut / USEC_PER_SEC);
-    //    freez(descr);
+        METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &descr->uuid, (Word_t) ctx);
+        Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+
+        PGC_ENTRY page_entry = {
+            .hot = true,
+            .section = (Word_t)ctx,
+            .metric_id = metric_id,
+            .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
+            .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
+            .update_every = descr->update_every_s,
+            .size = (size_t) descr->page_length,
+            .data = descr->page,
+        };
+
+        bool added = true;
+        (void) pgc_page_add_and_acquire(open_cache, page_entry, &added);
     }
     if (xt_io_descr->completion)
         completion_mark_complete(xt_io_descr->completion);
@@ -437,6 +450,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     extent->number_of_pages = count;
     extent->datafile = datafile;
     extent->next = NULL;
+    xt_io_descr->datafile = datafile;
 
     for (i = 0 ; i < count ; ++i) {
         /* This is here for performance reasons */

@@ -5,6 +5,7 @@
 
 struct mrg *main_mrg = NULL;
 struct pgc *main_cache = NULL;
+struct pgc *open_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
 pthread_key_t query_key;
@@ -101,6 +102,20 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
      completion_wait_for(&queue_flush_command);
      completion_destroy(&queue_flush_command);
 }
+
+static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
+{
+     // Release storage associated with the page
+     //info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
+     //freez(entry.data);
+     ;
+}
+
+static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
+{
+     info("Datafile flushing %zu pages", entries);
+}
+
 
 ARAL page_descr_aral = {
     .requested_element_size = sizeof(struct rrdeng_page_descr),
@@ -594,6 +609,18 @@ void init_page_cache(struct rrdengine_instance *ctx)
             PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
             0                                                 // 0 = as many as the system cpus
             );
+
+        open_cache = pgc_create(
+            default_rrdeng_page_cache_mb * 1024 * 1024,
+            open_cache_clean_page_callback,
+            rrdeng_pages_per_extent,
+            open_cache_flush_callback,
+            100,                                //
+            1000,                           //
+            1,                                          // don't delay too much other threads
+            PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
+            0                                                 // 0 = as many as the system cpus
+        );
     }
     netdata_spinlock_unlock(&spinlock);
 

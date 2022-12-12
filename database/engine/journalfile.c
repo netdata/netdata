@@ -180,10 +180,8 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
     journalfile->datafile = datafile;
     journalfile->journal_data = NULL;
     journalfile->journal_data_size = 0;
-    journalfile->JudyL_array = (Pvoid_t) NULL;
     journalfile->data = NULL;
     journalfile->file_index = 0;
-    journalfile->last_access = 0;
     journalfile->is_valid = true;
 }
 
