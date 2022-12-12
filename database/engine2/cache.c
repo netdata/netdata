@@ -243,23 +243,16 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 
 static inline size_t cache_usage_percent(PGC *cache) {
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
-        size_t clean   = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
-        size_t dirty   = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
-        size_t hot     = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+        size_t cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
         size_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
+        size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
+        size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
-        size_t wanted_cache_size = hot_max * 2;
-
-        if(wanted_cache_size < cache->config.clean_size + hot_max)
-            wanted_cache_size = cache->config.clean_size + hot_max;
-
-        size_t max_for_clean;
+        size_t wanted_cache_size = MAX(hot_max, hot) * 2;
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
-            max_for_clean = cache->config.clean_size;
-        else
-            max_for_clean = wanted_cache_size - hot - dirty;
+            wanted_cache_size = hot + dirty + cache->config.clean_size;
 
-        size_t percent = clean * 100 / max_for_clean;
+        size_t percent = cache_size * 100 / wanted_cache_size;
         return percent;
     }
     else {
@@ -845,7 +838,7 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
     size_t total_pages_skipped = 0;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t pages_to_evict_per_run = cache->config.partitions * 1000;
+    size_t pages_to_evict_per_run = cache->config.partitions * 10;
 
     do {
         spins++;
