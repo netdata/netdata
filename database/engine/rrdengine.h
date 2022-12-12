@@ -156,6 +156,12 @@ struct rrdeng_cmdqueue {
     struct rrdeng_cmd cmd_array[RRDENG_CMD_Q_MAX_SIZE];
 };
 
+struct extent_io_data {
+    uv_file file;
+    uint64_t pos;
+    unsigned bytes;
+};
+
 struct extent_io_descriptor {
     uv_fs_t req;
     uv_buf_t iov;

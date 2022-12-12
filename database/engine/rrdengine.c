@@ -183,6 +183,7 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
         // Find metric id
         METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+        mrg_metric_release(main_mrg, this_metric);
 
         uint32_t page_length = header->descr[i].page_length;
 
@@ -347,6 +348,12 @@ static void do_flush_extent_cb(uv_fs_t *req)
         METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &descr->uuid, (Word_t) ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
+        struct extent_io_data ext_io_data = {
+            .file  = datafile->file,
+            .pos = xt_io_descr->pos,
+            .bytes = xt_io_descr->bytes
+        };
+
         PGC_ENTRY page_entry = {
             .hot = true,
             .section = (Word_t)ctx,
@@ -354,8 +361,9 @@ static void do_flush_extent_cb(uv_fs_t *req)
             .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
             .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
             .update_every = descr->update_every_s,
-            .size = (size_t) descr->page_length,
-            .data = descr->page,
+            .size = 0,
+            .data = datafile,
+            .custom_data = (uint8_t *) &ext_io_data
         };
 
         bool added = true;
@@ -1168,7 +1176,13 @@ static void do_read_page_list_work(uv_work_t *req)
             if (pd->page)
                 continue;
 
+            if (pd->custom_data) {
+                pd->datafile_number = pd->datafile->fileno;
+                pd->file = pd->datafile->file;
+            }
+
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile_number, PJE0);
+
             if (PValue1 && !*PValue1) {
                 *PValue1 = datafile_extent_list = malloc(sizeof(*datafile_extent_list));
                 datafile_extent_list->JudyL_datafile_extent_list = NULL;

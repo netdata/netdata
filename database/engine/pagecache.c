@@ -645,7 +645,7 @@ void init_page_cache(struct rrdengine_instance *ctx)
             1,                                          // don't delay too much other threads
             PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
             0,                                                 // 0 = as many as the system cpus
-            0
+            sizeof(struct extent_io_data)
             );
     }
     netdata_spinlock_unlock(&spinlock);
