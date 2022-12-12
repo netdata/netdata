@@ -966,7 +966,7 @@ static void dbengine2_statistics_charts(void) {
     if(!main_cache || !main_mrg)
         return;
 
-    struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
+    static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_stats = {}, pgc_stats_old = {};
 
     pgc_stats_old = pgc_stats;
