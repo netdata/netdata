@@ -717,6 +717,8 @@ static void free_this_page(PGC *cache, PGC_PAGE *page) {
             .update_every = page->update_every,
             .size = page_size_from_assumed_size(cache, page->assumed_size),
             .hot = (is_page_hot(page)) ? true : false,
+            .data = page->data,
+            .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
     });
 
     // update statistics
@@ -1284,6 +1286,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                             .update_every = page->update_every,
                             .size = page_size_from_assumed_size(cache, page->assumed_size),
                             .data = page->data,
+                            .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
                             .hot = false,
                     };
 
