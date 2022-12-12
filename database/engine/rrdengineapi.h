@@ -126,6 +126,16 @@ typedef struct rrdengine_size_statistics {
     double average_page_size_bytes;
 } RRDENG_SIZE_STATS;
 
+struct rrdeng_cache_efficiency_stats {
+    size_t queries;
+    size_t queries_journal_v2;
+    size_t pages_found_in_cache;
+    size_t pages_loaded_from_journal_v2;
+    size_t pages_found_in_cache_at_pass3;
+};
+
+struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
+
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

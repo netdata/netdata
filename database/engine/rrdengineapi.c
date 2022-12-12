@@ -1094,3 +1094,8 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 
     return stats;
 }
+
+struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void) {
+    // FIXME - make cache efficiency stats atomic
+    return rrdeng_cache_efficiency_stats;
+}

@@ -19,6 +19,8 @@ struct rrdeng_page_descr;
 #define MAX_PAGE_CACHE_FETCH_RETRIES (3)
 #define PAGE_CACHE_FETCH_WAIT_TIMEOUT (3)
 
+extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
+
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
     struct extent_info *extent;

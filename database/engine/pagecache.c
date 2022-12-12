@@ -5,8 +5,10 @@
 
 struct mrg *main_mrg = NULL;
 struct pgc *main_cache = NULL;
+struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
 pthread_key_t query_key;
+
 
 // FIXME: Check if it can of use to automatically release reserved pages
 //void query_key_release(void *data)
@@ -135,8 +137,10 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
-    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0;
+    size_t pages_found_in_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass3 = 0;
     size_t cache_gaps = 0;
+    bool done_v2 = false;
+
     PGC_PAGE *page = NULL;
     time_t first_page_starting_time_s = INVALID_TIME;
 
@@ -288,10 +292,11 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                     if (unlikely(*PValue)) {
                         // it is already in the judy
 
-                        struct page_details *pd = *PValue;
-                        if (pd->first_time_s != page_first_time_s || pd->last_time_s != page_last_time_s ||
-                            pd->update_every_s != page_update_every_s)
-                            fatal("DBENGINE: page is already in judy with different retention");
+                        struct page_details *pd = *PValue; (void)pd;
+                        internal_fatal(
+                                pd->first_time_s != page_first_time_s ||
+                                pd->last_time_s != page_last_time_s,
+                                "DBENGINE: page is already in judy with different retention");
                     }
                     else {
                         struct page_details *pd = mallocz(sizeof(*pd));
@@ -319,6 +324,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
+    done_v2 = true;
 
     // --------------------------------------------------------------
     // PASS 3: Check the cache again
@@ -333,14 +339,24 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
         while((PValue = JudyLFirstThenNext(JudyL_page_array, &Index, &first))) {
             struct page_details *pd = *PValue;
-            if(!pd->page)
-                pd->page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, pd->first_time_s,true);
+            if(!pd->page) {
+                pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
+                if(pd->page) {
+                    pages_found_pass3++;
+                }
+            }
         }
     }
 
 we_are_done:
     if(first_page_first_time_s)
         *first_page_first_time_s = first_page_starting_time_s;
+
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_journal_v2, done_v2 ? 1 : 0, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_cache, pages_found_in_cache, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_from_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_cache_at_pass3, pages_found_pass3, __ATOMIC_RELAXED);
 
     return JudyL_page_array;
 }

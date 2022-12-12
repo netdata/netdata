@@ -966,10 +966,14 @@ static void dbengine2_statistics_charts(void) {
     if(!main_cache || !main_mrg)
         return;
 
+    struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_stats = {}, pgc_stats_old = {};
 
     pgc_stats_old = pgc_stats;
     pgc_stats = pgc_get_statistics(main_cache);
+
+    cache_efficiency_stats_old = cache_efficiency_stats;
+    cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
 
     {
         static RRDSET *st_pgc_memory = NULL;
@@ -1004,8 +1008,8 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_clean, (collected_number)pgc_stats.queues.clean.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_hot, (collected_number)pgc_stats.queues.hot.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_dirty, (collected_number)pgc_stats.queues.dirty.size);
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)0); // FIXME
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)0); // FIXME
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)0); // FIXME open journal memory
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)0); // FIXME metrics registry memory
 
         rrdset_done(st_pgc_memory);
     }
@@ -1059,7 +1063,7 @@ static void dbengine2_statistics_charts(void) {
                     "bytes/s",
                     "netdata",
                     "stats",
-                    132001,
+                    132002,
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -1071,6 +1075,78 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_memory_migrations, rd_pgc_memory_dirty_to_clean, (collected_number)pgc_stats.queues.dirty.removed_size);
 
         rrdset_done(st_pgc_memory_migrations);
+    }
+
+    {
+        static RRDSET *st_cache_hit_ratio = NULL;
+        static RRDDIM *rd_hit_ratio = NULL;
+
+        if (unlikely(!st_cache_hit_ratio)) {
+            st_cache_hit_ratio = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_cache_hit_ratio",
+                    NULL,
+                    "dbengine cache",
+                    NULL,
+                    "Netdata Queries Cache Hit Ratio",
+                    "%",
+                    "netdata",
+                    "stats",
+                    132005,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "hit", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        size_t pages_from_cache = cache_efficiency_stats.pages_found_in_cache - cache_efficiency_stats_old.pages_found_in_cache;
+        size_t pages_from_disk = cache_efficiency_stats.pages_loaded_from_journal_v2 - cache_efficiency_stats_old.pages_loaded_from_journal_v2;
+        size_t pages_from_pass3 = cache_efficiency_stats.pages_found_in_cache_at_pass3 - cache_efficiency_stats_old.pages_found_in_cache_at_pass3;
+        size_t total = pages_from_cache + pages_from_disk + pages_from_pass3;
+        size_t percent;
+        if(total)
+            percent = (pages_from_cache + pages_from_pass3) * 100 * 10000 / total;
+        else
+            percent = 100;
+
+        rrddim_set_by_pointer(st_cache_hit_ratio,
+                              rd_hit_ratio,
+                              (collected_number)percent);
+
+        rrdset_done(st_cache_hit_ratio);
+    }
+
+    {
+        static RRDSET *st_query_pages = NULL;
+        static RRDDIM *rd_cache = NULL;
+        static RRDDIM *rd_jv2 = NULL;
+        static RRDDIM *rd_pass3 = NULL;
+
+        if (unlikely(!st_query_pages)) {
+            st_query_pages = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_query_pages",
+                    NULL,
+                    "dbengine cache",
+                    NULL,
+                    "Netdata Query Pages",
+                    "pages/s",
+                    "netdata",
+                    "stats",
+                    132006,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_cache = rrddim_add(st_query_pages, "cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_jv2   = rrddim_add(st_query_pages, "disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pass3 = rrddim_add(st_query_pages, "pass3", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_query_pages, rd_cache, (collected_number)cache_efficiency_stats.pages_found_in_cache);
+        rrddim_set_by_pointer(st_query_pages, rd_jv2, (collected_number)cache_efficiency_stats.pages_loaded_from_journal_v2);
+        rrddim_set_by_pointer(st_query_pages, rd_pass3,(collected_number)cache_efficiency_stats.pages_found_in_cache_at_pass3);
+
+        rrdset_done(st_query_pages);
     }
 }
 
