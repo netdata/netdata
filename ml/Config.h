@@ -14,7 +14,9 @@ public:
     unsigned MaxTrainSamples;
     unsigned MinTrainSamples;
     unsigned TrainEvery;
+
     unsigned NumModelsToUse;
+    bool ConsumeAllModels;
 
     unsigned DBEngineAnomalyRateEvery;
 
