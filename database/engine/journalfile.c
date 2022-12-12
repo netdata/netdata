@@ -1196,9 +1196,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
             if (unlikely((time_t) index_time > metric_info->max_index_time_s) || index == entries)
                 break;
 
-//            if (descr->extent_entry || (!descr->extent_entry && descr->extent && descr->extent->datafile->journalfile != journalfile))
-//                continue;
-
             struct journal_page_list *page_entry = &page_list[index++];
 
             fatal_assert(descr->extent->offset == extent_list[page_entry->extent_index].datafile_offset);
@@ -1387,7 +1384,12 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
     uint32_t trailer_offset = total_file_size;
     total_file_size  += sizeof(struct journal_v2_block_trailer);
 
-    uint8_t *data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false);
+    uint8_t *data_start;
+    if (datafile->fileno == ctx->last_fileno)
+        data_start = netdata_mmap(NULL, total_file_size, MAP_PRIVATE, enable_ksm, false);
+    else
+        data_start = netdata_mmap(path, total_file_size, MAP_SHARED, 0, false);
+
     uint8_t *data = data_start;
 
     memset(data_start, 0, extent_offset);
@@ -1656,8 +1658,10 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     }
 
     // Don't Index the last file
-    if (ctx->last_fileno == journalfile->datafile->fileno || !db_engine_journal_indexing)
+    if (ctx->last_fileno == journalfile->datafile->fileno || !db_engine_journal_indexing) {
+        migrate_journal_file_v2(datafile, true, true);
         return 0;
+    }
 
     if (should_try_migration == 1 || should_try_migration == 2)
         migrate_journal_file_v2(datafile, true, true);
