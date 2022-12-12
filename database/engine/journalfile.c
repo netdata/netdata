@@ -1166,9 +1166,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
         // This is during runtime
         struct rrdeng_page_descr *descr;
         Pvoid_t *PValue;
-        struct pg_cache_page_index *page_index = metric_info->page_index;
-//        struct page_cache *pg_cache = &page_index->ctx->pg_cache;
-//        struct rrdengine_instance *ctx = page_index->ctx;
 
         Word_t  index_time = metric_info->min_index_time_s;
         uint32_t metric_info_offset = metric_info->page_list_header;
@@ -1183,9 +1180,6 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 
         uint32_t index = 0;
         uint32_t entries = page_list_header->entries;
-
-        uv_rwlock_rdlock(&page_index->lock);
-//        uv_file file = journalfile->datafile->file;
 
         for (PValue = JudyLFirst(metric_info->JudyL_array, &index_time, PJE0),
             descr = unlikely(NULL == PValue) ? NULL : *PValue;
@@ -1208,32 +1202,7 @@ static void journal_v2_remove_active_descriptors(struct rrdengine_journalfile *j
 //            rrd_atomic_fetch_add(&pg_cache->active_descriptors, 1);
 //            rrdeng_page_descr_mutex_unlock(ctx, descr);
         }
-//        uint32_t page_offset = (uint8_t *)page_list_header - (uint8_t *)journalfile->journal_data;
-//        mark_journalfile_descriptor(pg_cache, journalfile, page_offset, 1);
-        uv_rwlock_rdunlock(&page_index->lock);
     }
-}
-
-static bool descriptor_is_corrupted(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-    struct pg_cache_page_index *page_index = get_page_index(pg_cache, descr->id);
-
-    if (unlikely(!page_index))
-        return true;
-
-    time_t index_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC);
-    struct rrdeng_page_descr *idx_descr = get_descriptor(page_index, index_time_s);
-
-    bool is_corrupted = (idx_descr != descr);
-
-#ifdef  NETDATA_INTERNAL_CHECKS
-    char uuid_str[UUID_STR_LEN];
-    uuid_unparse_lower(page_index->id, uuid_str);
-    internal_error(is_corrupted, "Descriptor corrupted (Extent %p  Judy %p) @ %ld", descr, idx_descr, index_time_s);
-#endif
-
-    return is_corrupted;
 }
 
 static bool journalfile_ready_to_index(struct rrdengine_datafile *datafile)
@@ -1295,13 +1264,6 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
 
             if (unlikely(!descr))
                 continue;
-
-            if (false == startup) {
-                if (unlikely(descriptor_is_corrupted(ctx, descr))) {
-                    extent->pages[index] = NULL;
-                    continue;
-                }
-            }
 
             PValue = JudyHSGet(metrics_JudyHS_array, descr->id, sizeof(uuid_t));
             if (likely(NULL != PValue)) {
@@ -1543,10 +1505,18 @@ void migrate_journal_file_v2(struct rrdengine_datafile *datafile, bool activate,
         info("Migrated journal file %s, File size %lu", path, total_file_size);
 
         if (activate) {
-            journalfile->journal_data = data_start;
-            journalfile->journal_data_size = total_file_size;
+            uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+            void *old_map = journalfile->journal_data;
+            size_t old_map_size = journalfile->journal_data_size;
+            __atomic_store_n(&journalfile->journal_data, data_start, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&journalfile->journal_data_size, total_file_size, __ATOMIC_SEQ_CST);
             journalfile->is_valid = true;
-
+            if (likely(old_map)) {
+                // FIXME: Release safely
+                int ret = netdata_munmap(old_map, old_map_size);
+                fatal_assert(0 == ret);
+            }
+            uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
             // HERE we need to remove old descriptors and activate the new ones
             {
                 for (Index = 0; Index < number_of_metrics; Index++) {
