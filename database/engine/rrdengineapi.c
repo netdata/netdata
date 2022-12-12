@@ -733,11 +733,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
     // FIXME - we have to release all the pages if the query ends prematurely
     // FIXME - we have to free the page details Judy
 
-    if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
-        free_judyl_page_list(pdc->pl_JudyL);
-        completion_destroy(&handle->pdc->completion);
-        freez(pdc);
-    }
+    page_details_release_and_destroy_if_unreferenced(pdc);
 
     freez(handle);
     rrdimm_handle->handle = NULL;

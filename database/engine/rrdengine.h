@@ -320,4 +320,7 @@ void start_journal_indexing(uv_work_t *req);
 struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
 struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
+
+bool page_details_release_and_destroy_if_unreferenced(struct page_details_control *pdc);
+
 #endif /* NETDATA_RRDENGINE_H */

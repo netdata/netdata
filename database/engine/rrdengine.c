@@ -116,6 +116,17 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+bool page_details_release_and_destroy_if_unreferenced(struct page_details_control *pdc) {
+    if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
+        completion_destroy(&pdc->completion);
+        free_judyl_page_list(pdc->pl_JudyL);
+        freez(pdc);
+        return true;
+    }
+
+    return false;
+}
+
 // DBENGINE2 extent processing
 static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
 {
@@ -238,12 +249,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     struct page_details_control *pdc = extent_page_list->pdc;
 
     if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_SEQ_CST) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_SEQ_CST)) {
-        if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
-            completion_destroy(&pdc->completion);
-            free_judyl_page_list(pdc->pl_JudyL);
-            freez(pdc);
-        }
-        else
+        if(!page_details_release_and_destroy_if_unreferenced(pdc))
             completion_mark_complete(&pdc->completion);
     }
 

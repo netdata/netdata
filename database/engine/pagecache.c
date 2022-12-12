@@ -563,8 +563,6 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         return NULL;
     }
 
-    completion_wait_for(&handle->pdc->completion);
-
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
     PGC_PAGE *page = NULL;
     struct page_details *pd;
@@ -580,6 +578,11 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     pd = *PValue;
     page = pd->page;
 
+    if(!page) {
+        completion_wait_for(&handle->pdc->completion);
+        page = pd->page;
+    }
+
     if(next_page_start_time_s) {
         Pvoid_t *PValue = JudyLNext(handle->pdc->pl_JudyL, &Index, PJE0);
         if(!PValue || !*PValue)
@@ -587,6 +590,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         else
             *next_page_start_time_s = (time_t)Index;
     }
+
     return page;
 }
 
