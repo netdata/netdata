@@ -127,6 +127,12 @@
 #define FEAT_CUPS 0
 #endif
 
+#ifdef ENABLE_LOGSMANAGEMENT
+#define FEAT_LOGSMANAGEMENT 1
+#else
+#define FEAT_LOGSMANAGEMENT 0
+#endif // ENABLE_LOGSMANAGEMENT
+
 #ifdef HAVE_NFACCT
 #define FEAT_NFACCT 1
 #else
@@ -292,6 +298,7 @@ void print_build_info(void) {
     printf("    CUPS:                    %s\n", FEAT_YES_NO(FEAT_CUPS));
     printf("    EBPF:                    %s\n", FEAT_YES_NO(FEAT_EBPF));
     printf("    IPMI:                    %s\n", FEAT_YES_NO(FEAT_IPMI));
+    printf("    Logs Management:         %s\n", FEAT_YES_NO(FEAT_LOGSMANAGEMENT));
     printf("    NFACCT:                  %s\n", FEAT_YES_NO(FEAT_NFACCT));
     printf("    perf:                    %s\n", FEAT_YES_NO(FEAT_PERF));
     printf("    slabinfo:                %s\n", FEAT_YES_NO(FEAT_SLABINFO));
@@ -349,6 +356,7 @@ void print_build_info_json(void) {
     printf("    \"cups\": %s,\n",             FEAT_JSON_BOOL(FEAT_CUPS));
     printf("    \"ebpf\": %s,\n",             FEAT_JSON_BOOL(FEAT_EBPF));
     printf("    \"ipmi\": %s,\n",             FEAT_JSON_BOOL(FEAT_IPMI));
+    printf("    \"logs-management\": %s,\n",  FEAT_JSON_BOOL(FEAT_LOGSMANAGEMENT));
     printf("    \"nfacct\": %s,\n",           FEAT_JSON_BOOL(FEAT_NFACCT));
     printf("    \"perf\": %s,\n",             FEAT_JSON_BOOL(FEAT_PERF));
     printf("    \"slabinfo\": %s,\n",         FEAT_JSON_BOOL(FEAT_SLABINFO));
@@ -435,6 +443,9 @@ void analytics_build_info(BUFFER *b) {
 #endif
 #ifdef HAVE_FREEIPMI
     add_to_bi(b, "IPMI");
+#endif
+#ifdef ENABLE_LOGSMANAGEMENT
+    add_to_bi(b, "Logs Management");
 #endif
 #ifdef HAVE_NFACCT
     add_to_bi(b, "NFACCT");
