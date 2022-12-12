@@ -243,7 +243,8 @@ static void ebpf_sync_free(ebpf_module_t *em)
 static void ebpf_sync_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*sync_threads.thread);
+    if (sync_threads.thread)
+        netdata_thread_cancel(*sync_threads.thread);
     ebpf_sync_free(em);
 }
 

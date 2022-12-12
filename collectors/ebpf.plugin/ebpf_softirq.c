@@ -104,7 +104,8 @@ static void ebpf_softirq_free(ebpf_module_t *em)
 static void softirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*softirq_threads.thread);
+    if (softirq_threads.thread)
+        netdata_thread_cancel(*softirq_threads.thread);
     ebpf_softirq_free(em);
 }
 

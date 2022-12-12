@@ -338,7 +338,8 @@ static void ebpf_dcstat_free(ebpf_module_t *em )
 static void ebpf_dcstat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*dcstat_threads.thread);
+    if (dcstat_threads.thread)
+        netdata_thread_cancel(*dcstat_threads.thread);
     ebpf_dcstat_free(em);
 }
 

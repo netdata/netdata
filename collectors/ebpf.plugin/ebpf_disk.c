@@ -473,7 +473,8 @@ static void ebpf_disk_free(ebpf_module_t *em)
 static void ebpf_disk_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*disk_threads.thread);
+    if (disk_threads.thread)
+        netdata_thread_cancel(*disk_threads.thread);
     ebpf_disk_free(em);
 }
 

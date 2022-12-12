@@ -74,6 +74,14 @@ enum fd_syscalls {
     NETDATA_FD_SYSCALL_END
 };
 
+enum fd_close_syscall {
+    NETDATA_FD_CLOSE_FD,
+    NETDATA_FD___CLOSE_FD,
+
+    NETDATA_FD_CLOSE_END
+};
+
+#define NETDATA_EBPF_MAX_FD_TARGETS 2
 
 void *ebpf_fd_thread(void *ptr);
 void ebpf_fd_create_apps_charts(struct ebpf_module *em, void *ptr);

@@ -123,6 +123,9 @@ enum ebpf_threads_status {
 #endif
 #endif
 
+// Messages
+#define NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND "Cannot find the necessary functions to monitor"
+
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_EBPF_IP_FAMILY "ip"

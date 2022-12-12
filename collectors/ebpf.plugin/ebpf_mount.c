@@ -269,7 +269,8 @@ static void ebpf_mount_free(ebpf_module_t *em)
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*mount_thread.thread);
+    if (mount_thread.thread)
+        netdata_thread_cancel(*mount_thread.thread);
     ebpf_mount_free(em);
 }
 
