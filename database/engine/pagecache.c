@@ -243,20 +243,27 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         }
         else {
             struct page_details *pd = mallocz(sizeof(*pd));
-            pd->datafile_extent_offset = 0;
-            pd->extent_size = 0;
-            pd->file = 0;
-            pd->datafile_number = 0;
+            pd->datafile.extent.pos = 0;
+            pd->datafile.extent.bytes = 0;
+            pd->datafile.file = 0;
+            pd->datafile.fileno = 0;
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
             pd->page_length = pgc_page_data_size(cache, page);
             pd->update_every_s = pgc_page_update_every(page);
             pd->page = (open_cache_mode) ? NULL : page;
             pd->type = ctx->page_type;
-            pd->datafile = (open_cache_mode) ? pgc_page_data(page) : NULL;
-            pd->custom_data = (open_cache_mode) ? pgc_page_custom_data(page) : NULL;
+            pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
             uuid_copy(pd->uuid, *uuid);
             *PValue = pd;
+
+            if(open_cache_mode) {
+                struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(cache, page);
+                pd->datafile.file = xio->file;
+                pd->datafile.extent.pos = xio->pos;
+                pd->datafile.extent.bytes = xio->bytes;
+                pd->datafile.fileno = pd->datafile.ptr->fileno;
+            }
 
             pages_found_in_cache++;
         }
@@ -381,13 +388,13 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                     }
                     else {
                         struct page_details *pd = mallocz(sizeof(*pd));
-                        pd->datafile_extent_offset = extent_list[page_entry_in_journal->extent_index].datafile_offset;
-                        pd->extent_size = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                        pd->file = datafile->file;
-                        pd->datafile_number = datafile->fileno;
+                        pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
+                        pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
+                        pd->datafile.file = datafile->file;
+                        pd->datafile.fileno = datafile->fileno;
                         pd->first_time_s = page_first_time_s;
                         pd->last_time_s = page_last_time_s;
-                        pd->datafile = datafile;
+                        pd->datafile.ptr = datafile;
                         pd->page_length = page_entry_in_journal->page_length;
                         pd->update_every_s = page_update_every_s;
                         pd->type = page_entry_in_journal->type;
@@ -426,12 +433,19 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                 first_page_starting_time_s = (time_t)current_page_end_time;
 
             struct page_details *pd = *PValue;
+
             if(!pd->page) {
                 pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
                 if(pd->page)
                     pages_found_pass3++;
-                else
+                else {
                     pages_pending++;
+
+                    internal_fatal(!pd->datafile.ptr, "datafile is NULL");
+                    internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
+                    internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
+                    internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
+                }
             }
 
             pages_total++;

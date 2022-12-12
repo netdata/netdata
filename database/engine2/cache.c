@@ -1537,8 +1537,11 @@ void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
 
-void *pgc_page_custom_data(PGC_PAGE *page) {
-    return page->custom_data;
+void *pgc_page_custom_data(PGC *cache, PGC_PAGE *page) {
+    if(cache->config.additional_bytes_per_page)
+        return page->custom_data;
+
+    return NULL;
 }
 
 size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page) {
@@ -1997,11 +2000,11 @@ int pgc_unittest(void) {
         .custom_data = (uint8_t *)"0123456789",
     }, NULL);
 
-    if(strcmp(pgc_page_custom_data(page1), "0123456789") != 0)
+    if(strcmp(pgc_page_custom_data(cache, page1), "0123456789") != 0)
         fatal("custom data do not work");
 
-    memcpy(pgc_page_custom_data(page1), "ABCDEFGHIJ", 11);
-    if(strcmp(pgc_page_custom_data(page1), "ABCDEFGHIJ") != 0)
+    memcpy(pgc_page_custom_data(cache, page1), "ABCDEFGHIJ", 11);
+    if(strcmp(pgc_page_custom_data(cache, page1), "ABCDEFGHIJ") != 0)
         fatal("custom data do not work");
 
     pgc_page_release(cache, page1);

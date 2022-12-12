@@ -117,7 +117,7 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
 }
 
 // DBENGINE2 extent processing
-static void do_extent_processing(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
+static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
@@ -225,10 +225,11 @@ static void do_extent_processing(struct rrdengine_worker_config *wc, void *data,
             if (false == added)
                 freez(page_data);
         }
+
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            __atomic_store_n(&pd->page_is_loaded, 1, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_SEQ_CST);
         }
         else
             pgc_page_release(main_cache, page);
@@ -1105,7 +1106,7 @@ static void do_read_extent2_work(uv_work_t *req)
 
     // Extent is now cached and *data contains the compressed extent
     // Need to decompress and then process the pagelist
-    do_extent_processing(wc, extent_data, extent_page_list);
+    extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list);
 
     // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
@@ -1176,32 +1177,27 @@ static void do_read_page_list_work(uv_work_t *req)
             if (pd->page)
                 continue;
 
-            if (pd->custom_data) {
-                pd->datafile_number = pd->datafile->fileno;
-                pd->file = pd->datafile->file;
-            }
-
-            PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile_number, PJE0);
+            PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
 
             if (PValue1 && !*PValue1) {
                 *PValue1 = datafile_extent_list = malloc(sizeof(*datafile_extent_list));
                 datafile_extent_list->JudyL_datafile_extent_list = NULL;
                 datafile_extent_list->count = 0;
-                datafile_extent_list->fileno = pd->datafile_number;
+                datafile_extent_list->fileno = pd->datafile.fileno;
             }
             else
                 datafile_extent_list = *PValue1;
             datafile_extent_list->count++;
 
-            PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile_extent_offset, PJE0);
+            PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile.extent.pos, PJE0);
             if (PValue2 && !*PValue2) {
                 *PValue2 = extent_page_list = malloc( sizeof(*extent_page_list));
                 extent_page_list->JudyL_page_list = NULL;
                 extent_page_list->count = 0;
-                extent_page_list->file = pd->file;
-                extent_page_list->pos = pd->datafile_extent_offset;
-                extent_page_list->size = pd->extent_size;
-                extent_page_list->datafile = pd->datafile;
+                extent_page_list->file = pd->datafile.file;
+                extent_page_list->pos = pd->datafile.extent.pos;
+                extent_page_list->size = pd->datafile.extent.bytes;
+                extent_page_list->datafile = pd->datafile.ptr;
             }
             else
                 extent_page_list = *PValue2;
