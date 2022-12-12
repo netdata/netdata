@@ -248,9 +248,10 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
     struct page_details_control *pdc = extent_page_list->pdc;
 
+    completion_mark_complete_a_job(&pdc->completion);
     if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_SEQ_CST) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_SEQ_CST)) {
-        if(!page_details_release_and_destroy_if_unreferenced(pdc))
-            completion_mark_complete(&pdc->completion);
+        completion_mark_complete(&pdc->completion);
+        page_details_release_and_destroy_if_unreferenced(pdc);
     }
 
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)

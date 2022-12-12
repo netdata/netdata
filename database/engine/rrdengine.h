@@ -36,6 +36,7 @@ struct page_details_control {
   unsigned reference_count;
   unsigned jobs_started;
   unsigned jobs_completed;
+  unsigned completion_jobs_completed;
   struct completion completion;
   Pvoid_t pl_JudyL;
 };

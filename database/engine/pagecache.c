@@ -539,6 +539,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
         pdc->reference_count = 1;
         pdc->jobs_started = 0;
         pdc->jobs_completed = 0;
+        pdc->completion_jobs_completed = 0;
         dbengine_load_page_list(ctx, pdc);
     }
     else
@@ -578,8 +579,10 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     pd = *PValue;
     page = pd->page;
 
-    if(!page) {
-        completion_wait_for(&handle->pdc->completion);
+    while(!page && !completion_is_done(&handle->pdc->completion)) {
+        handle->pdc->completion_jobs_completed =
+                completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completion_jobs_completed);
+
         page = pd->page;
     }
 
