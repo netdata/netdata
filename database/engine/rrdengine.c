@@ -1168,25 +1168,25 @@ static void do_read_page_list_work(uv_work_t *req)
             if (pd->page)
                 continue;
 
-            PValue1 = JudyLIns(&JudyL_datafile_list, pd->fileno, PJE0);
+            PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile_number, PJE0);
             if (PValue1 && !*PValue1) {
                 *PValue1 = datafile_extent_list = malloc(sizeof(*datafile_extent_list));
                 datafile_extent_list->JudyL_datafile_extent_list = NULL;
                 datafile_extent_list->count = 0;
-                datafile_extent_list->fileno = pd->fileno;
+                datafile_extent_list->fileno = pd->datafile_number;
             }
             else
                 datafile_extent_list = *PValue1;
             datafile_extent_list->count++;
 
-            PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->pos, PJE0);
+            PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile_extent_offset, PJE0);
             if (PValue2 && !*PValue2) {
                 *PValue2 = extent_page_list = malloc( sizeof(*extent_page_list));
                 extent_page_list->JudyL_page_list = NULL;
                 extent_page_list->count = 0;
                 extent_page_list->file = pd->file;
-                extent_page_list->pos = pd->pos;
-                extent_page_list->size = pd->size;
+                extent_page_list->pos = pd->datafile_extent_offset;
+                extent_page_list->size = pd->extent_size;
                 extent_page_list->datafile = pd->datafile;
             }
             else

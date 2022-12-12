@@ -187,7 +187,7 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 }
 
 static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx, time_t wanted_start_time_s, time_t wanted_end_time_s,
-                                   Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s, bool set_page) {
+                                   Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s, bool open_cache_mode) {
 
     size_t pages_found_in_cache = 0;
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
@@ -243,17 +243,18 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         }
         else {
             struct page_details *pd = mallocz(sizeof(*pd));
-            pd->pos = 0;
-            pd->size = pgc_page_data_size(cache, page);
+            pd->datafile_extent_offset = 0;
+            pd->extent_size = 0;
             pd->file = 0;
-            pd->fileno = 0;
+            pd->datafile_number = 0;
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
-            pd->datafile = NULL;
             pd->page_length = pgc_page_data_size(cache, page);
             pd->update_every_s = pgc_page_update_every(page);
-            pd->page = (set_page) ? page : NULL;
+            pd->page = (open_cache_mode) ? NULL : page;
             pd->type = ctx->page_type;
+            pd->datafile = (open_cache_mode) ? pgc_page_data(page) : NULL;
+            pd->custom_data = (open_cache_mode) ? pgc_page_custom_data(page) : NULL;
             uuid_copy(pd->uuid, *uuid);
             *PValue = pd;
 
@@ -380,10 +381,10 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                     }
                     else {
                         struct page_details *pd = mallocz(sizeof(*pd));
-                        pd->pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
-                        pd->size = extent_list[page_entry_in_journal->extent_index].datafile_size;
+                        pd->datafile_extent_offset = extent_list[page_entry_in_journal->extent_index].datafile_offset;
+                        pd->extent_size = extent_list[page_entry_in_journal->extent_index].datafile_size;
                         pd->file = datafile->file;
-                        pd->fileno = datafile->fileno;
+                        pd->datafile_number = datafile->fileno;
                         pd->first_time_s = page_first_time_s;
                         pd->last_time_s = page_last_time_s;
                         pd->datafile = datafile;

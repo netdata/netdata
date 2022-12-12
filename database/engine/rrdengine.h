@@ -42,9 +42,9 @@ struct page_details_control {
 
 struct page_details {
     uv_file file;
-    uint64_t pos;
-    uint32_t size;
-    unsigned fileno;
+    uint64_t datafile_extent_offset;
+    uint32_t extent_size;
+    unsigned datafile_number;
     uuid_t uuid;
     time_t first_time_s;
     time_t last_time_s;
@@ -52,6 +52,7 @@ struct page_details {
     uint32_t update_every_s;
     uint8_t type;
     unsigned page_is_loaded;
+    uint8_t *custom_data;
     struct pgc_page *page;
     struct rrdengine_datafile *datafile;
 };
