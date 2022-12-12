@@ -44,9 +44,8 @@ void free_judyl_page_list(Pvoid_t pl_judyL)
         return;
 
     Pvoid_t *PValue;
+    struct page_details *pd;
     Word_t time_index = 0;
-
-    struct page_details *pd = NULL;
     for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
         pd = unlikely(NULL == PValue) ? 0 : *PValue;
          pd != NULL;
@@ -67,14 +66,8 @@ static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY en
 
 static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
 {
-    // FIXME: Todo flush pages
-    // Need to grab pages and save them
-    // Schedule a call to DBENGINE
-
      struct completion queue_flush_command;
      completion_init(&queue_flush_command);
-
-     info("SAVE %zu pages", entries);
 
      Pvoid_t JudyL_flush = NULL;
      Pvoid_t *PValue;
@@ -517,9 +510,9 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         return NULL;
     }
 
-    // Caller will request the next page which will be end_time + update_every so search inclusive from Index
     completion_wait_for(&handle->pdc->completion);
 
+    // Caller will request the next page which will be end_time + update_every so search inclusive from Index
     PGC_PAGE *page = NULL;
     struct page_details *pd;
     Word_t Index = start_time_t;
@@ -541,12 +534,6 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         else
             *next_page_start_time_s = (time_t)Index;
     }
-
-//    // FIXME: needs a lock here
-//    Index = start_time_t;
-//    (void) JudyLDel(&handle->pl_JudyL, Index, PJE0);
-//    freez(pd);
-
     return page;
 }
 

@@ -743,7 +743,6 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
     rrdimm_handle->handle = NULL;
 }
 
-// FIXME: Get it from metric registry
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     METRIC *metric = (METRIC *)db_metric_handle;
     time_t latest_time_t = 0;
@@ -754,7 +753,6 @@ time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return latest_time_t;
 }
 
-// FIXME: Get it from metric registry
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     METRIC *metric = (METRIC *)db_metric_handle;
 
@@ -799,7 +797,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[1] = (uint64_t)ctx->stats.metric_API_consumers;
     array[2] = (uint64_t)pg_cache->page_descriptors;
     array[3] = (uint64_t)pg_cache->populated_pages;
-    array[4] = 0; //(uint64_t)pg_cache->committed_page_index.nr_committed_pages;
+    array[4] = 0;
     array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
     array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
     array[7] = (uint64_t)ctx->stats.pg_cache_hits;
