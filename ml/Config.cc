@@ -33,6 +33,8 @@ void Config::readMLConfig(void) {
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
     unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1);
 
+    unsigned ConsumeAllModels = config_get_boolean(ConfigSectionML, "consume all models", false);
+
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
     unsigned LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
@@ -84,17 +86,19 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
- #if 1
+#if 1
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
     Cfg.NumModelsToUse = NumModelsToUse;
- #else
-    Cfg.MaxTrainSamples = 30;
-    Cfg.MinTrainSamples = 15;
-    Cfg.TrainEvery = 30;
-    Cfg.NumModelsToUse = 1;
- #endif
+    Cfg.ConsumeAllModels = ConsumeAllModels;
+#else
+    Cfg.MaxTrainSamples = 60;
+    Cfg.MinTrainSamples = 30;
+    Cfg.TrainEvery = 60;
+    Cfg.NumModelsToUse = 7 * 24;
+    Cfg.ConsumeAllModels = true;
+#endif
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;
@@ -113,13 +117,9 @@ void Config::readMLConfig(void) {
     Cfg.SP_HostsToSkip = simple_pattern_create(Cfg.HostsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
     // Always exclude anomaly_detection charts from training.
- #if 1
     Cfg.ChartsToSkip = "anomaly_detection.* ";
     Cfg.ChartsToSkip += config_get(ConfigSectionML, "charts to skip from training", "netdata.*");
- #else
-    Cfg.ChartsToSkip = "!prof_type.* *";
- #endif
-    Cfg.SP_ChartsToSkip = simple_pattern_create(ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
+    Cfg.SP_ChartsToSkip = simple_pattern_create(Cfg.ChartsToSkip.c_str(), NULL, SIMPLE_PATTERN_EXACT);
 
     Cfg.StreamADCharts = config_get_boolean(ConfigSectionML, "stream anomaly detection charts", true);
 }
