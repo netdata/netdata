@@ -19,6 +19,8 @@ Netdata, this was the standard practice. However it has a few issues:
    It also requires maintenance, administration, etc.
 4. most centralized monitoring solutions are usually only good for presenting _statistics of past performance_ (i.e.
    cannot be used for real-time performance troubleshooting).
+   
+### Netdata's Registry
 
 So, Netdata follows a different, distributed model approach:
 
@@ -40,7 +42,7 @@ Netdata to provide unified cross-server dashboards. For example, when you jump f
 menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts,
 etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view.
 
-## What data does the registry store?
+### Netdata Registry Storage
 
 The registry keeps track of 4 entities:
 
@@ -66,7 +68,7 @@ For _persons_/_accounts_ and _machines_, the registry keeps links to _URLs_, eac
 seen, last time seen) and a counter (number of times it has been seen). *machines_, _persons_ and timestamps are stored
 in the Netdata registry regardless of whether you sign in or not.
 
-## Who talks to the registry?
+### Who Talks to the Registry
 
 Your web browser **only**! If sending this information is against your policies, you
 can [run your own registry](#run-your-own-registry)
@@ -75,17 +77,19 @@ Your Netdata servers do not talk to the registry. This is a UML diagram of its o
 
 ![registry](https://cloud.githubusercontent.com/assets/2662304/19448565/11a70632-94ab-11e6-9d80-f410b4acb797.png)
 
-## Which is the default registry?
+### Registry default
 
 `https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to
 both HTTP and HTTPS requests but the default is HTTPS.
 
 ### Can this registry handle the global load of Netdata installations?
 
-Yeap! The registry can handle 50.000 - 100.000 requests **per second per core** (depending on the type of CPU, the
+The registry can handle 50.000 - 100.000 requests **per second per core** (depending on the type of CPU, the
 computer's memory bandwidth, etc). 50.000 is on J1900 (celeron 2Ghz).
 
 We believe, it can do it...
+
+<!-- New tasks/reference 
 
 ## Run your own registry
 
@@ -208,9 +212,11 @@ ERROR 409: Cannot ACCESS netdata registry: https://registry.my-netdata.io respon
 
 This error is printed on your web browser console (press F12 on your browser to see it).
 
-## Related topics
+-->
 
-### Related Concepts
+### Related topics
+
+#### Related Concepts
 
 - [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
