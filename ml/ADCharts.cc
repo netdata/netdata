@@ -183,6 +183,114 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
 
 }
 
+void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyRate) {
+    static thread_local RRDSET *HostRateRS = nullptr;
+    static thread_local RRDDIM *AnomalyRateRD = nullptr;
+
+    if (!HostRateRS) {
+        std::stringstream IdSS, NameSS;
+
+        IdSS << "anomaly_rate_on_" << localhost->machine_guid;
+        NameSS << "anomaly_rate_on_" << localhost->hostname;
+
+        HostRateRS = rrdset_create(
+            RH,
+            "anomaly_detection", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "anomaly_rate", // family
+            "anomaly_detection.anomaly_rate", // ctx
+            "Percentage of anomalous dimensions", // title
+            "percentage", // units
+            "netdata", // plugin
+            "ml", // module
+            39184, // priority
+            RH->rrd_update_every, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+        rrdset_flag_set(HostRateRS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+        AnomalyRateRD = rrddim_add(HostRateRS, "anomaly_rate", NULL,
+                1, 100, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(HostRateRS, AnomalyRateRD, AnomalyRate);
+    rrdset_done(HostRateRS);
+
+    static thread_local RRDSET *AnomalyDetectionRS = nullptr;
+    static thread_local RRDDIM *AboveThresholdRD = nullptr;
+    static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
+
+    if (!AnomalyDetectionRS) {
+        std::stringstream IdSS, NameSS;
+
+        IdSS << "anomaly_detection_on_" << localhost->machine_guid;
+        NameSS << "anomaly_detection_on_" << localhost->hostname;
+
+        AnomalyDetectionRS = rrdset_create(
+            RH,
+            "anomaly_detection", // type
+            IdSS.str().c_str(), // id
+            NameSS.str().c_str(), // name
+            "anomaly_detection", // family
+            "anomaly_detection.detector_events", // ctx
+            "Anomaly detection events", // title
+            "percentage", // units
+            "netdata", // plugin
+            "ml", // module
+            39185, // priority
+            RH->rrd_update_every, // update_every
+            RRDSET_TYPE_LINE // chart_type
+        );
+        rrdset_flag_set(AnomalyDetectionRS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+        AboveThresholdRD  = rrddim_add(AnomalyDetectionRS, "above_threshold", NULL,
+                                       1, 1, RRD_ALGORITHM_ABSOLUTE);
+        NewAnomalyEventRD = rrddim_add(AnomalyDetectionRS, "new_anomaly_event", NULL,
+                                       1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    /*
+     * Compute the values of the dimensions based on the host rate chart
+    */
+    ONEWAYALLOC *OWA = onewayalloc_create(0);
+    time_t Now = now_realtime_sec();
+    time_t Before = Now - RH->rrd_update_every;
+    time_t After = Before - Cfg.AnomalyDetectionQueryDuration;
+    RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
+
+    RRDR *R = rrd2rrdr_legacy(
+            OWA, HostRateRS,
+            1 /* points wanted */,
+            After,
+            Before,
+            Cfg.AnomalyDetectionGroupingMethod,
+            0 /* resampling time */,
+            Options, "anomaly_rate",
+            NULL /* group options */,
+            0, /* timeout */
+            0, /* tier */
+            QUERY_SOURCE_ML
+    );
+
+    if(R) {
+        assert(R->d == 1 && R->n == 1 && R->rows == 1);
+
+        static thread_local bool PrevAboveThreshold = false;
+        bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
+        bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
+        PrevAboveThreshold = AboveThreshold;
+
+        rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
+        rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
+        rrdset_done(AnomalyDetectionRS);
+
+        rrdr_free(OWA, R);
+    }
+
+    onewayalloc_destroy(OWA);
+}
+
 void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionRU, const struct rusage &TrainingRU) {
     /*
      * prediction rusage
@@ -405,112 +513,3 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
         rrdset_done(RS);
     }
 }
-
-void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyRate) {
-    static thread_local RRDSET *HostRateRS = nullptr;
-    static thread_local RRDDIM *AnomalyRateRD = nullptr;
-
-    if (!HostRateRS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "anomaly_rate_on_" << localhost->machine_guid;
-        NameSS << "anomaly_rate_on_" << localhost->hostname;
-
-        HostRateRS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "anomaly_rate", // family
-            "anomaly_detection.anomaly_rate", // ctx
-            "Percentage of anomalous dimensions", // title
-            "percentage", // units
-            "netdata", // plugin
-            "ml", // module
-            39184, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(HostRateRS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        AnomalyRateRD = rrddim_add(HostRateRS, "anomaly_rate", NULL,
-                1, 100, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    rrddim_set_by_pointer(HostRateRS, AnomalyRateRD, AnomalyRate);
-    rrdset_done(HostRateRS);
-
-    static thread_local RRDSET *AnomalyDetectionRS = nullptr;
-    static thread_local RRDDIM *AboveThresholdRD = nullptr;
-    static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
-
-    if (!AnomalyDetectionRS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "anomaly_detection_on_" << localhost->machine_guid;
-        NameSS << "anomaly_detection_on_" << localhost->hostname;
-
-        AnomalyDetectionRS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "anomaly_detection", // family
-            "anomaly_detection.detector_events", // ctx
-            "Anomaly detection events", // title
-            "percentage", // units
-            "netdata", // plugin
-            "ml", // module
-            39185, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(AnomalyDetectionRS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        AboveThresholdRD  = rrddim_add(AnomalyDetectionRS, "above_threshold", NULL,
-                                       1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NewAnomalyEventRD = rrddim_add(AnomalyDetectionRS, "new_anomaly_event", NULL,
-                                       1, 1, RRD_ALGORITHM_ABSOLUTE);
-    }
-
-    /*
-     * Compute the values of the dimensions based on the host rate chart
-    */
-    ONEWAYALLOC *OWA = onewayalloc_create(0);
-    time_t Now = now_realtime_sec();
-    time_t Before = Now - RH->rrd_update_every;
-    time_t After = Before - Cfg.AnomalyDetectionQueryDuration;
-    RRDR_OPTIONS Options = static_cast<RRDR_OPTIONS>(0x00000000);
-
-    RRDR *R = rrd2rrdr_legacy(
-            OWA, HostRateRS,
-            1 /* points wanted */,
-            After,
-            Before,
-            Cfg.AnomalyDetectionGroupingMethod,
-            0 /* resampling time */,
-            Options, "anomaly_rate",
-            NULL /* group options */,
-            0, /* timeout */
-            0, /* tier */
-            QUERY_SOURCE_ML
-    );
-
-    if(R) {
-        assert(R->d == 1 && R->n == 1 && R->rows == 1);
-
-        static thread_local bool PrevAboveThreshold = false;
-        bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
-        bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
-        PrevAboveThreshold = AboveThreshold;
-
-        rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
-        rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
-        rrdset_done(AnomalyDetectionRS);
-
-        rrdr_free(OWA, R);
-    }
-
-    onewayalloc_destroy(OWA);
-}
-
