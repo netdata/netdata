@@ -27,10 +27,8 @@ is not an option in your case, always verify the current domain resolution (e.g 
 
 :::
 
-For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our
-full [connect to Cloud documentation](/claim/README.md).
 
-## Data privacy
+### Data privacy
 
 [Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to you.
 This is why **we don't store any metric data in Netdata Cloud**.
@@ -43,6 +41,8 @@ limited number of _metadata_.
 
 Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy) in the
 documentation.
+
+<!-- TODO: Make the following sections tasks
 
 ## Enable and configure the ACLK
 
@@ -154,6 +154,8 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 ```
 
 Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-node).
+
+-->
 
 ### Related Concepts
 
