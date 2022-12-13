@@ -504,6 +504,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
+# ebpf plugin
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+
 # perf plugin
 # This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
 # %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
