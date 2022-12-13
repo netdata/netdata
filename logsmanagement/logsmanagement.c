@@ -211,7 +211,7 @@ static void logs_management_init(struct section *config_section){
         switch(p_file_info->log_type){
             case GENERIC:
             case FLB_GENERIC:
-                if(!strcmp(p_file_info->chart_name, "Auth.log") || !strcmp(p_file_info->chart_name, "auth.log"){
+                if(!strcmp(p_file_info->chart_name, "Auth.log") || !strcmp(p_file_info->chart_name, "auth.log")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL

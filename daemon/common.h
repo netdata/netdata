@@ -66,6 +66,11 @@
 // netdata unit tests
 #include "unit_test.h"
 
+// logs management unit tests
+#if defined(ENABLE_LOGSMANAGEMENT) && defined(ENABLE_LOGSMANAGEMENT_TESTS)
+#include "logsmanagement/unit_test/unit_test.h"
+#endif
+
 // netdata agent claiming
 #include "claim/claim.h"
 
