@@ -589,8 +589,10 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
         pdc->completion_jobs_completed = 0;
         dbengine_load_page_list(ctx, pdc);
     }
-    else
+    else {
+        pdc->reference_count = 1;
         completion_mark_complete(&handle->pdc->completion);
+    }
 
     return first_page_first_time_s;
 }
