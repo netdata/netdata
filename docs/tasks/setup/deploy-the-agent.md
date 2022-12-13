@@ -9,60 +9,64 @@ learn_rel_path: "Setup"
 learn_docs_purpose: "Step by step instructions to deploy an Agent."
 -->
 
-## Linux
-
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 import Admonition from '@theme/Admonition';
 
-This page will guide you through installation using the automatic one-line installation script named `kickstart.sh`.
+This document will guide you through the installation of the Netdata solution to your preferred platform and claim it in the Cloud.
+
+### Linux/UNIX based installation via kickstart (reccomended)
+
+This section will guide you through installation using the automatic one-line installation script named `kickstart.sh`.
 
 :::info
 The kickstart script works on all Linux distributions and, by default, automatic nightly updates are enabled.
 :::
 
-### Prerequisites
+#### Prerequisites
 
 - Connection to the internet
 - A Linux/UNIX based node
 - Either `wget` or `curl` installed on the node
 
-### Steps
+#### Steps
 
-Install Netdata by running one of the following options:
+<!-- TODO: kickstart must validate first the integrity and then run the actual kickstart script -->
 
-<Tabs>
-<TabItem value="wget" label=<code>wget</code>>
+1. Verify script integrity
 
-<OneLineInstallWget/>
+    To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
+    run the following:
 
-</TabItem>
-<TabItem value="curl" label=<code>curl</code>>
+    ```bash
+    [ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
+    ```
 
-<OneLineInstallCurl/>
+    If the script is valid, this command will return `OK, VALID`.
 
-</TabItem>
-</Tabs>
+2. Install Netdata by running one of the following options:
 
-If you want to see all the optional parameters to further alter your installation, check
-the [kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
-.
+    <Tabs>
+    <TabItem value="wget" label=<code>wget</code>>
 
-### Further Actions
+    <OneLineInstallWget/>
 
-#### Verify script integrity
+    </TabItem>
+    <TabItem value="curl" label=<code>curl</code>>
 
-To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
-run the following:
+    <OneLineInstallCurl/>
 
-```bash
-[ "<checksum-will-be-added-in-documentation-processing>" = "$(curl -Ss https://my-netdata.io/kickstart.sh | md5sum | cut -d ' ' -f 1)" ] && echo "OK, VALID" || echo "FAILED, INVALID"
-```
+    </TabItem>
+    </Tabs>
 
-If the script is valid, this command will return `OK, VALID`.
+    If you want to see all the optional parameters to further alter your installation, check
+    the [kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
+    .
 
-### Expected result
+ 
+
+#### Expected result
 
 The script should exit with a success message.  
 To ensure that your installation is working, open up your web browser of choice and navigate to `http://NODE:19999`,
@@ -71,47 +75,34 @@ If you're interacting with the node locally, and you are unsure of its IP addres
 
 If the installation was successful, you will be led to the Agent's local dashboard. Enjoy!
 
-### Example
 
-Here we will install Netdata from the stable release channel:
-
-```bash
-root@netdata~ # wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --stable-channel
-```
-
-### Related topics
+#### Related topics
 
 1. [Kickstart script reference](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md)
 
-
-## Docker
-
+### Docker runtime installation
 
 Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
 you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
 
+This method creates a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
+_within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
+you want to access the configuration files from your _host_ machine, see [host-editable
+configuration](#host-editable-configuration).
+
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-:::note
-Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog
-instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on
-our [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md)
-page.
-
-The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
-_actively_ contributing to Netdata's future.
-:::
-
-### Limitations running the Agent in Docker
+<!--
+#### Limitations running the Agent in Docker
 
 For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
 performance or status, is not accessible or not as detailed in a container as when running the Agent directly on the
 host.
 
 A way around this is to provide special mounts to the Docker container so that the Agent can get visibility on host OS
-information like `/sys` and `/proc` folders or even `/etc/group` and shadow files.
+information like `/sys` and `/proc` folders or even `/etc/group` and shadow files. -->
 
+<!-- MAKE THIS INTO NEW TASKS
 Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint)
 directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about
 ENTRYPOINT vs COMMAND in the [Docker
@@ -119,75 +110,108 @@ documentation](https://docs.docker.com/engine/reference/builder/#understand-how-
 
 Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
 and unfortunately not something we can realistically work around.
+-->
 
-### Prerequisites
+#### Prerequisites
 
-- `docker` and (optional) `docker-compose` installed on the node.
+- `docker` installed on the node.
 
-### Steps
+#### Steps
 
-You can create a new Agent container using either `docker run` or  `docker compose`.
+1. Use the `docker run` command, along with the following options, to start a new container.
 
-Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
+    ```bash
+    docker run -d --name=netdata \
+      -p 19999:19999 \
+      -v netdataconfig:/etc/netdata \
+      -v netdatalib:/var/lib/netdata \
+      -v netdatacache:/var/cache/netdata \
+      -v /etc/passwd:/host/etc/passwd:ro \
+      -v /etc/group:/host/etc/group:ro \
+      -v /proc:/host/proc:ro \
+      -v /sys:/host/sys:ro \
+      -v /etc/os-release:/host/etc/os-release:ro \
+      --restart unless-stopped \
+      --cap-add SYS_PTRACE \
+      --security-opt apparmor=unconfined \
+      netdata/netdata
+    ```
+
+### Docker-compose installation
+
+Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
+you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
+
+This method creates a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
 _within the container_ at `/etc/netdata`. See the [configuration section](#configure-agent-containers) for details. If
 you want to access the configuration files from your _host_ machine, see [host-editable
 configuration](#host-editable-configuration).
 
-#### docker run
+See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
-Use the `docker run` command, along with the following options, to start a new container.
+<!--
+#### Limitations running the Agent in Docker
 
-```bash
-docker run -d --name=netdata \
-  -p 19999:19999 \
-  -v netdataconfig:/etc/netdata \
-  -v netdatalib:/var/lib/netdata \
-  -v netdatacache:/var/cache/netdata \
-  -v /etc/passwd:/host/etc/passwd:ro \
-  -v /etc/group:/host/etc/group:ro \
-  -v /proc:/host/proc:ro \
-  -v /sys:/host/sys:ro \
-  -v /etc/os-release:/host/etc/os-release:ro \
-  --restart unless-stopped \
-  --cap-add SYS_PTRACE \
-  --security-opt apparmor=unconfined \
-  netdata/netdata
-```
+For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
+performance or status, is not accessible or not as detailed in a container as when running the Agent directly on the
+host.
 
-#### docker compose
+A way around this is to provide special mounts to the Docker container so that the Agent can get visibility on host OS
+information like `/sys` and `/proc` folders or even `/etc/group` and shadow files. -->
 
-Copy the following code and paste into a new file called `docker-compose.yml`, then run
+<!-- MAKE THIS INTO NEW TASKS
+Also, we now ship Docker images using an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint)
+directive, not a COMMAND directive. Please adapt your execution scripts accordingly. You can find more information about
+ENTRYPOINT vs COMMAND in the [Docker
+documentation](https://docs.docker.com/engine/reference/builder/#understand-how-cmd-and-entrypoint-interact).
+
+Our POWER8+ Docker images do not support our FreeIPMI collector. This is a technical limitation in FreeIPMI itself,
+and unfortunately not something we can realistically work around.
+-->
+
+#### Prerequisites
+
+- `docker`
+- `docker-compose` 
+
+installed on the node.
+
+
+#### Steps
+
+1. Copy the following code and paste into a new file called `docker-compose.yml`, then run
 `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
-```yaml
-version: '3'
-services:
-  netdata:
-    image: netdata/netdata
-    container_name: netdata
-    hostname: example.com # set to fqdn of host
-    ports:
-      - 19999:19999
-    restart: unless-stopped
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
+    ```yaml
+    version: '3'
+    services:
+      netdata:
+        image: netdata/netdata
+        container_name: netdata
+        hostname: example.com # set to fqdn of host
+        ports:
+          - 19999:19999
+        restart: unless-stopped
+        cap_add:
+          - SYS_PTRACE
+        security_opt:
+          - apparmor:unconfined
+        volumes:
+          - netdataconfig:/etc/netdata
+          - netdatalib:/var/lib/netdata
+          - netdatacache:/var/cache/netdata
+          - /etc/passwd:/host/etc/passwd:ro
+          - /etc/group:/host/etc/group:ro
+          - /proc:/host/proc:ro
+          - /sys:/host/sys:ro
+          - /etc/os-release:/host/etc/os-release:ro
     volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
-volumes:
-  netdataconfig:
-  netdatalib:
-  netdatacache:
-```
+      netdataconfig:
+      netdatalib:
+      netdatacache:
+    ```
 
+<!-- MAKE THIS A CONCEPT
 #### Docker tags
 
 The official `netdata/netdata` Docker image provides the following named tags:
@@ -203,9 +227,9 @@ Additionally, for each stable release, three tags are pushed, one with the full 
 (for example, `v1`). The tags for the minor versions and major versions are updated whenever a release is published
 that would match that tag (for example, if `v1.30.1` were to be published, the `v1.30` tag would be updated to
 point to that instead of `v1.30.0`).
+-->
 
-### Further Actions
-
+<!-- MAKE THIS A TASK, GROUP IT SOMEHOW
 #### Health Checks
 
 Our Docker image provides integrated support for health checks through the standard Docker interfaces.
@@ -228,8 +252,9 @@ In most cases, the default behavior of checking the `/api/v1/info`
 endpoint will be sufficient. If you are using a configuration which
 disables the web server or restricts access to certain APIs, you will
 need to use a non-default configuration for health checks to work.
+-->
 
-#### Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
+### Docker-compose with SSL/TLS enabled HTTP Proxy installation
 
 For a permanent installation on a public server, you should [secure the Netdata
 instance](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/secure-agent-deployments.md). This section contains an example of
@@ -238,66 +263,71 @@ how to install Netdata with an SSL reverse proxy and basic authentication.
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and
 email address for [Let's Encrypt](https://letsencrypt.org/) before starting.
 
-##### Caddyfile
+#### Steps
 
-This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain, and you need to provide
-your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be
-executed internally by the caddy server.
+1. Caddyfile
 
-```caddyfile
-netdata.example.org {
-  reverse_proxy netdata:19999
-  tls admin@example.org
-}
-```
+    This file needs to be placed in `/opt` with name `Caddyfile`. Here you customize your domain, and you need to provide
+    your email address to obtain a Let's Encrypt certificate. Certificate renewal will happen automatically and will be
+    executed internally by the caddy server.
 
-##### docker-compose.yml
+    ```caddyfile
+    netdata.example.org {
+      reverse_proxy netdata:19999
+      tls admin@example.org
+    }
+    ```
 
-After setting Caddyfile, run this with `docker-compose up -d` to have a fully functioning Netdata setup behind an HTTP
-revers proxy.
+2. Create the docker-compose.yml file
 
-```yaml
-version: '3'
-volumes:
-  caddy_data:
-  caddy_config:
-services:
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
+    After setting Caddyfile, run this with `docker-compose up -d` to have a fully functioning Netdata setup behind an HTTP
+    revers proxy.
+
+    ```yaml
+    version: '3'
     volumes:
-      - /opt/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-  netdata:
-    restart: always
-    hostname: netdata.example.org
-    image: netdata/netdata
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
+      caddy_data:
+      caddy_config:
+    services:
+      caddy:
+        image: caddy:2
+        ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /opt/Caddyfile:/etc/caddy/Caddyfile
+          - caddy_data:/data
+          - caddy_config:/config
+      netdata:
+        restart: always
+        hostname: netdata.example.org
+        image: netdata/netdata
+        cap_add:
+          - SYS_PTRACE
+        security_opt:
+          - apparmor:unconfined
+        volumes:
+          - netdatalib:/var/lib/netdata
+          - netdatacache:/var/cache/netdata
+          - /etc/passwd:/host/etc/passwd:ro
+          - /etc/group:/host/etc/group:ro
+          - /proc:/host/proc:ro
+          - /sys:/host/sys:ro
+          - /var/run/docker.sock:/var/run/docker.sock:ro
     volumes:
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-volumes:
-  netdatalib:
-  netdatacache:
-```
+      netdatalib:
+      netdatacache:
+    ```
 
+<!-- THIS IS ANOTHER TASK
 #### Restrict access with basic auth
 
 You can restrict access by
 following [official caddy guide](https://caddyserver.com/docs/caddyfile/directives/basicauth#basicauth) and adding lines
 to Caddyfile.
+-->
 
+<!-- THIS IS ANOTHER TASK
 #### Configure Agent containers
 
 If you started an Agent container using one of the [recommended methods](#steps), and you want to edit Netdata's
@@ -310,9 +340,12 @@ cd /etc/netdata
 ./edit-config netdata.conf
 ```
 
+
 You need to restart the Agent to apply changes. Exit the container if you haven't already, then use the `docker` command
 to restart the container: `docker restart netdata`.
+-->
 
+<!-- THIS IS ANOTHER TASK
 ##### Host-editable configuration
 
 :::caution
@@ -387,6 +420,10 @@ volumes:
   netdatacache:
 ```
 
+-->
+
+
+<!-- THIS IS ANOTHER TASK and also for the kickstart
 ##### Change the default hostname
 
 You can change the hostname of a Docker container, and thus the name that appears in the local dashboard and in Netdata
@@ -418,6 +455,9 @@ If you don't want to destroy and recreate your container, you can edit the Agent
 above section on [configuring Agent containers](#configure-agent-containers) to find the appropriate method based on
 how you created the container.
 
+-->
+
+<!-- THIS IS ANOTHER TASK
 ##### Add or remove other volumes
 
 Some volumes are optional depending on how you use Netdata:
@@ -534,6 +574,10 @@ services:
       - DOCKER_USR=root
 ```
 
+-->
+
+<!--THIS IS ANOTHER TASK
+
 ##### Docker container network interfaces monitoring
 
 Netdata can map a virtual interface in the system namespace to an interface inside a Docker container
@@ -570,60 +614,18 @@ services:
     ...
 ```
 
+-->
+
+<!-- ANOTHER TASK
 ##### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
 [Netdata daemon command line options](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options) such as the IP address Netdata will be
 running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd).
+-->
 
-#### Publish a test image to your own repository
 
-At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
-You may either use the command line tools available or take advantage of our Travis CI infrastructure.
-
-##### Inside Netdata organization, using Travis CI
-
-To enable Travis CI integration on your own repositories (Docker and GitHub), you need to be part of the Netdata
-organization.
-
-Once you have contacted the Netdata owners to setup you up on GitHub and Travis, execute the following steps
-
-- Preparation
-    - Have Netdata forked on your personal GitHub account
-    - Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, and
-      generate a new token with full access to `repo_hook`, read-only access to `admin:org`, `public_repo`,
-      `repo_deployment`, `repo:status`, and `user:email` settings enabled. This will be your `GITHUB_TOKEN` that is
-      described later in the instructions, so keep it somewhere safe.
-    - Contact the Netdata team and seek for permissions on `https://scan.coverity.com` should you require Travis to be
-      able to push your forked code to coverity for analysis and report. Once you are setup, you should have your
-      email you used in coverity and a token from them. These will be your `COVERITY_SCAN_SUBMIT_EMAIL` and
-      `COVERITY_SCAN_TOKEN` that we will refer to later.
-    - Have a valid Docker hub account, the credentials from this account will be your `DOCKER_USERNAME` and
-      `DOCKER_PWD` mentioned later.
-
-- Setting up Travis CI for your own fork (Detailed instructions provided by Travis
-  team [here](https://docs.travis-ci.com/user/tutorial/))
-    - Login to travis with your own GITHUB credentials (There is Open Auth access)
-    - Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup
-      your Netdata fork to be built by Travis CI.
-    - Once the repository has been setup, go to repository settings within Travis CI (usually under
-      `https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings`, where `NETDATA_DEVELOPER` is your GitHub handle),
-      and select your desired settings.
-
-- While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add
-  the following:
-    - `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can log in to your Docker Hub account and publish
-      Docker images there.
-    - `REPOSITORY` variable to `NETDATA_DEVELOPER/netdata`, where `NETDATA_DEVELOPER` is your GitHub handle again.
-    - `GITHUB_TOKEN` variable with the token generated on the preparation step, for Travis workflows to function
-      properly.
-    - `COVERITY_SCAN_SUBMIT_EMAIL` and `COVERITY_SCAN_TOKEN` variables to enable Travis to submit your code for
-      analysis to Coverity.
-
-Having followed these instructions, your forked repository should be all set up for integration with Travis CI. Happy
-testing!
-
-## Kubernetes
+### Kubernetes cluster installation via Helm
 
 This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following these directions, you
 will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to create a Kubernetes monitoring deployment on
@@ -634,7 +636,7 @@ The Helm chart installs one `parent` pod for storing metrics and managing alarm 
 pods/containers, and [supported application-specific
 metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
-### Prerequisites
+#### Prerequisites
 
 To deploy Kubernetes monitoring with Netdata, you need:
 
@@ -644,7 +646,7 @@ To deploy Kubernetes monitoring with Netdata, you need:
   administrative system.
 - The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
 
-### Steps
+#### Steps
 
 We recommend you install the Helm chart using our Helm repository. In the `helm install` command, replace `netdata` with
 the release name of your choice.
@@ -657,7 +659,8 @@ the release name of your choice.
 2. Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
    parent pod, and multiple child pods.
 
+#### Expected result
+
 You've now installed Netdata on your Kubernetes cluster. Next, it's time to enable the powerful Kubernetes
 dashboards available in Netdata Cloud! To do so check out our Task
-on [claiming an Agent to the Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
-.
+on [claiming an Agent to the Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md).
