@@ -32,14 +32,12 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
-struct page_details_control {
-  unsigned reference_count;
-  unsigned jobs_started;
-  unsigned jobs_completed;
-  unsigned completion_jobs_completed;
-  struct completion completion;
-  Pvoid_t pl_JudyL;
-};
+typedef struct page_details_control {
+    Pvoid_t page_list_JudyL;
+    int32_t refcount;
+    int32_t jobs_completed;
+    struct completion completion;
+} PDC;
 
 struct page_details {
     struct {
@@ -307,7 +305,7 @@ struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *
 struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
-bool page_details_release_and_destroy_if_unreferenced(struct page_details_control *pdc);
+bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker);
 
 typedef struct validated_page_descriptor {
     time_t start_time_s;

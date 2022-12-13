@@ -485,24 +485,21 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     time_t first_page_first_time_s = INVALID_TIME;
     size_t pages_to_load = 0;
 
-    struct page_details_control *pdc = mallocz(sizeof(*pdc));
+    struct page_details_control *pdc = callocz(1, sizeof(*pdc));
     completion_init(&pdc->completion);
     handle->pdc = pdc;
 
-    handle->pdc->pl_JudyL = get_page_list(ctx, handle->metric,
+    handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
-                                     &first_page_first_time_s, &pages_to_load);
+                                                 &first_page_first_time_s, &pages_to_load);
 
-    if (pages_to_load && handle->pdc->pl_JudyL) {
-        pdc->pl_JudyL = handle->pdc->pl_JudyL;
-        pdc->reference_count = 1;
-        pdc->jobs_started = 0;
-        pdc->jobs_completed = 0;
-        pdc->completion_jobs_completed = 0;
+    if (pages_to_load && handle->pdc->page_list_JudyL) {
+        pdc->page_list_JudyL = handle->pdc->page_list_JudyL;
+        pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
         dbengine_load_page_list(ctx, pdc);
     }
     else {
-        pdc->reference_count = 1;
+        pdc->refcount = 1; // we are alone in this query - no need for any worker
         completion_mark_complete(&handle->pdc->completion);
     }
 
@@ -517,7 +514,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unused,  struct rrdeng_query_handle *handle,
         time_t start_time_t __maybe_unused, time_t end_time_t __maybe_unused, time_t *next_page_start_time_s)
 {
-    if (unlikely(!handle || !handle->pdc || !handle->pdc->pl_JudyL)) {
+    if (unlikely(!handle || !handle->pdc || !handle->pdc->page_list_JudyL)) {
 
         if(next_page_start_time_s)
             *next_page_start_time_s = INVALID_TIME;
@@ -531,7 +528,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     PGC_PAGE *page = NULL;
     struct page_details *pd;
     Word_t Index = start_time_t;
-    Pvoid_t *PValue = JudyLFirst(handle->pdc->pl_JudyL, &Index, PJE0);
+    Pvoid_t *PValue = JudyLFirst(handle->pdc->page_list_JudyL, &Index, PJE0);
     if (!PValue || !*PValue) {
 
         if(next_page_start_time_s)
@@ -545,8 +542,8 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     while(!page && !completion_is_done(&handle->pdc->completion)) {
         waited = true;
 
-        handle->pdc->completion_jobs_completed =
-                completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completion_jobs_completed);
+        handle->pdc->jobs_completed =
+                completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->jobs_completed);
 
         if(pd->page_is_loaded)
             page = pd->page;
@@ -566,7 +563,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_preloaded, 1, __ATOMIC_RELAXED);
 
     if(next_page_start_time_s) {
-        Pvoid_t *PValue = JudyLNext(handle->pdc->pl_JudyL, &Index, PJE0);
+        Pvoid_t *PValue = JudyLNext(handle->pdc->page_list_JudyL, &Index, PJE0);
         if(!PValue || !*PValue)
             *next_page_start_time_s = INVALID_TIME;
         else

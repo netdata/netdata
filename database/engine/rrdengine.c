@@ -116,10 +116,43 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
-bool page_details_release_and_destroy_if_unreferenced(struct page_details_control *pdc) {
-    if (__atomic_sub_fetch(&pdc->reference_count, 1, __ATOMIC_SEQ_CST) == 0) {
+static void pdc_acquire(PDC *pdc) {
+    int32_t expected, desired;
+
+    expected = __atomic_load_n(&pdc->refcount, __ATOMIC_RELAXED);
+
+    do {
+
+        if(expected < 1)
+            fatal("PDC is not referenced and cannot be acquired");
+
+        desired = expected + 1;
+
+    } while(!__atomic_compare_exchange_n(&pdc->refcount, &expected, desired,
+                                         false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+}
+
+bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker) {
+    int32_t expected, desired;
+
+    expected = __atomic_load_n(&pdc->refcount, __ATOMIC_RELAXED);
+
+    do {
+
+        if(expected <= 0)
+            fatal("PDC is not referenced and cannot be released");
+
+        desired = expected - 1;
+
+    } while(!__atomic_compare_exchange_n(&pdc->refcount, &expected, desired,
+                                         false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
+    if (desired == 0) {
+        if(worker)
+            completion_mark_complete(&pdc->completion);
+
         completion_destroy(&pdc->completion);
-        free_judyl_page_list(pdc->pl_JudyL);
+        free_judyl_page_list(pdc->page_list_JudyL);
         freez(pdc);
         return true;
     }
@@ -286,14 +319,6 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         }
         else
             pgc_page_release(main_cache, page);
-    }
-
-    struct page_details_control *pdc = extent_page_list->pdc;
-
-    completion_mark_complete_a_job(&pdc->completion);
-    if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_RELEASE) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_ACQUIRE)) {
-        completion_mark_complete(&pdc->completion);
-        page_details_release_and_destroy_if_unreferenced(pdc);
     }
 
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)
@@ -974,6 +999,7 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
     struct datafile_extent_list_s *datafile_extent_list = work_request->data;
     struct extent_page_list_s *extent_page_list;
+    struct page_details_control *pdc = datafile_extent_list->pdc;
 
     Pvoid_t *PValue;
     Word_t pos = 0;
@@ -993,13 +1019,14 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
         struct rrdeng_cmd cmd;
         cmd.opcode = RRDENG_READ_EXTENT;
-        struct page_details_control *pdc = datafile_extent_list->pdc;
-        __atomic_fetch_add(&pdc->jobs_started, 1, __ATOMIC_SEQ_CST);
+        pdc_acquire(pdc); // we do this for the next worker: do_read_extent2_work()
         extent_page_list->pdc = pdc;
         cmd.data = extent_page_list;
         rrdeng_enq_cmd(&ctx->worker_config, &cmd);
     }
     JudyLFreeArray(&datafile_extent_list->JudyL_datafile_extent_list, PJE0);
+
+    pdc_release_and_destroy_if_unreferenced(pdc, true);
 }
 
 // New version of READ EXTENT
@@ -1038,7 +1065,7 @@ static void do_read_extent2_work(uv_work_t *req)
     struct rrdengine_worker_config *wc = work_request->wc;
 
     struct extent_page_list_s *extent_page_list = work_request->data;
-//    struct page_details *pd = NULL;
+    struct page_details_control *pdc = extent_page_list->pdc;
 
     // We have one extent to read from file, pos, size
     // Then we need to scan the judy extent_page_list->JudyL_page_list to see exactly the pages we need (extent processing)
@@ -1085,6 +1112,9 @@ static void do_read_extent2_work(uv_work_t *req)
     // Need to decompress and then process the pagelist
     extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list);
 
+    completion_mark_complete_a_job(&extent_page_list->pdc->completion);
+    pdc_release_and_destroy_if_unreferenced(pdc, true);
+
     // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
     freez(extent_page_list);
@@ -1125,7 +1155,7 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
 
     struct page_details_control *pdc = work_request->data;
-    Pvoid_t JudyL_page_list = pdc->pl_JudyL;
+    Pvoid_t JudyL_page_list = pdc->page_list_JudyL;
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
     Pvoid_t *PValue2;
@@ -1193,6 +1223,7 @@ static void do_read_page_list_work(uv_work_t *req)
 
             // List of datafiles
             // Now submit each datafile_extent_list back to the engine
+            pdc_acquire(pdc); // we get this for the next worker: do_read_datafile_extent_list_work()
             struct rrdeng_cmd cmd;
             datafile_extent_list->pdc = pdc;
             cmd.opcode = RRDENG_READ_DF_EXTENT_LIST;
@@ -1201,6 +1232,8 @@ static void do_read_page_list_work(uv_work_t *req)
         }
         JudyLFreeArray(&JudyL_datafile_list, PJE0);
     }
+
+    pdc_release_and_destroy_if_unreferenced(pdc, true);
 }
 
 static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
@@ -1212,7 +1245,6 @@ static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_de
     work_request->wc = wc;
     work_request->data = pdc;
     work_request->completion = completion;
-    __atomic_fetch_add(&pdc->reference_count, 1, __ATOMIC_SEQ_CST);
 
     int ret = uv_queue_work(wc->loop, &work_request->req, do_read_page_list_work, after_do_read_page_list_work);
     if (ret)
