@@ -291,33 +291,18 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
 
     size_t Sum = 0;
 
-    if (Cfg.ConsumeAllModels) {
-        for (const auto &KM : Models) {
-            double AnomalyScore = KM.anomalyScore(Sample);
-            if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN()) {
-                continue;
-            }
+    for (const auto &KM : Models) {
+        double AnomalyScore = KM.anomalyScore(Sample);
+        if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN())
+            continue;
 
-            Sum += (AnomalyScore < (100 * Cfg.DimensionAnomalyScoreThreshold));
-        }
+        if (AnomalyScore < (100 * Cfg.DimensionAnomalyScoreThreshold))
+            return false;
 
-        return Sum != 0;
-    } else {
-        for (const auto &KM : Models) {
-            double AnomalyScore = KM.anomalyScore(Sample);
-            if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN()) {
-                continue;
-            }
-
-            if (AnomalyScore < (100 * Cfg.DimensionAnomalyScoreThreshold)) {
-                return false;
-            }
-
-            Sum += 1;
-        }
-
-        return Sum;
+        Sum += 1;
     }
+
+    return Sum;
 }
 
 std::vector<KMeans> Dimension::getModels() {

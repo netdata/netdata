@@ -33,8 +33,6 @@ void Config::readMLConfig(void) {
     unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
     unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1);
 
-    unsigned ConsumeAllModels = config_get_boolean(ConfigSectionML, "consume all models", false);
-
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
     unsigned LagN = config_get_number(ConfigSectionML, "num samples to lag", 5);
@@ -86,18 +84,16 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
-#if 1
+#if 0
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
     Cfg.NumModelsToUse = NumModelsToUse;
-    Cfg.ConsumeAllModels = ConsumeAllModels;
 #else
     Cfg.MaxTrainSamples = 60;
     Cfg.MinTrainSamples = 30;
     Cfg.TrainEvery = 60;
     Cfg.NumModelsToUse = 7 * 24;
-    Cfg.ConsumeAllModels = true;
 #endif
 
     Cfg.DiffN = DiffN;

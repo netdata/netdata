@@ -16,7 +16,6 @@ public:
     unsigned TrainEvery;
 
     unsigned NumModelsToUse;
-    bool ConsumeAllModels;
 
     unsigned DBEngineAnomalyRateEvery;
 
