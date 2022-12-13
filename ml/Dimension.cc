@@ -295,19 +295,25 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
      * Use the KMeans models to check if the value is anomalous
     */
 
+    size_t ModelsConsulted = 0;
     size_t Sum = 0;
 
     for (const auto &KM : Models) {
+        ModelsConsulted++;
+
         double AnomalyScore = KM.anomalyScore(Sample);
         if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN())
             continue;
 
-        if (AnomalyScore < (100 * Cfg.DimensionAnomalyScoreThreshold))
+        if (AnomalyScore < (100 * Cfg.DimensionAnomalyScoreThreshold)) {
+            global_statistics_ml_models_consulted(ModelsConsulted);
             return false;
+        }
 
         Sum += 1;
     }
 
+    global_statistics_ml_models_consulted(ModelsConsulted);
     return Sum;
 }
 
