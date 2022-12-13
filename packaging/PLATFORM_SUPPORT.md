@@ -59,7 +59,6 @@ to work on these platforms with minimal user effort.
 | Debian | 10.x | x86\_64, i386, ARMv7, AArch64 | |
 | Fedora | 37 | x86\_64, AArch64 | |
 | Fedora | 36 | x86\_64, ARMv7, AArch64 | |
-| Fedora | 35 | x86\_64, ARMv7, AArch64 | |
 | openSUSE | Leap 15.4 | x86\_64, AArch64 | |
 | Oracle Linux | 9.x | x86\_64, AArch64 | |
 | Oracle Linux | 8.x | x86\_64, AArch64 | |
@@ -148,9 +147,8 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Alpine Linux | 3.13 | EOL as of 2022-11-01 |
 | Alpine Linux | 3.12 | EOL as of 2022-05-01 |
 | Debian | 9.x | EOL as of 2022-06-30 |
+| Fedora | 35 | EOL as of 2022-12-13 |
 | Fedora | 34 | EOL as of 2022-06-07 |
-| Fedora | 33 | EOL as of 2021-11-30 |
-| FreeBSD | 11-STABLE | EOL as of 2021-10-30 |
 | openSUSE | Leap 15.3 | EOL as of 2022-12-01 |
 | Ubuntu | 21.10 | EOL as of 2022-07-31 |
 | Ubuntu | 21.04 | EOL as of 2022-01-01 |
