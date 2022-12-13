@@ -128,13 +128,19 @@ typedef struct rrdengine_size_statistics {
 
 struct rrdeng_cache_efficiency_stats {
     size_t queries;
+    size_t queries_with_gaps;
+    size_t queries_open;
     size_t queries_journal_v2;
     size_t pages_found_in_cache;
     size_t pages_found_in_open;
     size_t pages_loaded_from_journal_v2;
-    size_t pages_found_in_cache_at_pass4;
     size_t pages_to_load_from_disk;
     size_t pages_total;
+
+    // for the pending pages
+    size_t pages_pending_found_in_cache_at_pass4;
+    size_t pages_pending_waited_to_load;
+    size_t pages_pending_preloaded;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
