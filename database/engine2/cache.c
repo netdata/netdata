@@ -1672,6 +1672,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
             ei->bytes = xio->bytes;
             ei->number_of_pages = 1;
             ei->index = master_extent_index_id++;
+            *PValue = ei;
 
             count_of_unique_extents++;
         }
