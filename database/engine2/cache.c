@@ -1636,8 +1636,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
     size_t count_of_unique_metrics;
     size_t count_of_unique_pages;
 
-    PGC_PAGE *page;
-    for(page = cache->hot.base; page ; page = page->link.next) {
+    for(PGC_PAGE *page = cache->hot.base; page ; page = page->link.next) {
         if(page->section != section) continue;
 
         struct extent_io_data *xio = (struct extent_io_data *)page->custom_data;
@@ -1732,7 +1731,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
             Word_t start_time = 0;
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
-                make_acquired_page_clean_and_evict_or_page_release(cache, page);
+                make_acquired_page_clean_and_evict_or_page_release(cache, pi->page);
                 freez(pi);
             }
 
