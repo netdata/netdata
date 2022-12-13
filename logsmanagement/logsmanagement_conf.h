@@ -20,6 +20,9 @@
 #define MAX_CUS_CHARTS_PER_SOURCE 100               /**< Hard limit of maximum custom charts per log source **/
 
 /* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
 /*                                  Database                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -45,6 +48,7 @@
 #define CIRCULAR_BUFF_MAX_SIZE_RANGE_MAX (1024 MiB) /**< circular_buffer_max_size read from configuration cannot be larger than this **/
 
 #define CIRC_BUFF_PREP_WR_RETRY_AFTER_MS 1000       /**< If circ_buff_prepare_write() fails due to not enough space, how many millisecs to wait before retrying **/
+
 /* -------------------------------------------------------------------------- */
 
 

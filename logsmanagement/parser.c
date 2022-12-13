@@ -1307,7 +1307,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
 
     /* Extract vhost */
     // TODO: Reduce number of reallocs
-    if((parser_config->chart_config & CHART_VHOST) && line_parsed->vhost && *line_parsed->vhost){
+    if((parser_config->chart_config & CHART_VHOST) && *line_parsed->vhost){
         int i;
         for(i = 0; i < metrics->web_log->vhost_arr.size; i++){
             if(!strcmp(metrics->web_log->vhost_arr.vhosts[i].name, line_parsed->vhost)){

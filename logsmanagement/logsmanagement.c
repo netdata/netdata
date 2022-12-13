@@ -199,29 +199,51 @@ static void logs_management_init(struct section *config_section){
      * Read log path configuration and check if it is valid.
      * ------------------------------------------------------------------------- */
     p_file_info->filename = appconfig_get(&log_management_config, config_section->name, "log path", "auto");
-    if( !p_file_info->filename || 
+    m_assert(p_file_info->filename, "appconfig_get() should never return log path == NULL");
+    if( !p_file_info->filename || /* Sanity check */
         !*p_file_info->filename || 
-        !strcmp(p_file_info->filename, "auto") /* Only valid for FLB_SYSTEMD or FLB_DOCKER_EV */ || 
-        access(p_file_info->filename, F_OK)){ 
+        !strcmp(p_file_info->filename, "auto") || 
+        access(p_file_info->filename, R_OK)){ 
+
+        freez(p_file_info->filename);
+        p_file_info->filename = NULL;
             
         switch(p_file_info->log_type){
+            case WEB_LOG:
+            case FLB_WEB_LOG:
+                if(!strcmp(p_file_info->chart_name, "Apache access.log")){
+                    const char * const apache_access_path_default[] = {
+                        "/var/log/apache/access.log",
+                        "/var/log/apache2/access.log", /* Debian, Ubuntu */
+                        "/etc/httpd/logs/access_log", /* RHEL, Red Hat, CentOS, Fedora */
+                        "/var/log/httpd-access.log", /* FreeBSD */
+                        NULL
+                    };
+                    int i = 0;
+                    while(apache_access_path_default[i] && access(apache_access_path_default[i], R_OK)){i++;};
+                    if(!apache_access_path_default[i]){
+                        error("[%s]: Apache access.log path invalid or unknown", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(apache_access_path_default[i]);
+                }
+                break;
             case FLB_SYSTEMD:
-                freez(p_file_info->filename);
                 p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
                 break;
             case FLB_DOCKER_EV:
-                freez(p_file_info->filename);
                 p_file_info->filename = strdupz(DOCKER_EV_DEFAULT_PATH);
                 break;
             default:
-                error(  "[%s]: log path = %s", p_file_info->chart_name, 
-                        p_file_info->filename ? p_file_info->filename : "NULL!");
+                error("[%s]: log path invalid or unknown", p_file_info->chart_name);
                 return p_file_info_destroy(p_file_info);
         }
     }
     p_file_info->file_basename = get_basename(p_file_info->filename); 
-    info("[%s]: p_file_info->filename: %s", p_file_info->chart_name, p_file_info->filename);
-    info("[%s]: p_file_info->file_basename: %s", p_file_info->chart_name, p_file_info->file_basename);
+    info("[%s]: p_file_info->filename: %s", p_file_info->chart_name, 
+                                            p_file_info->filename ? p_file_info->filename : "NULL");
+    info("[%s]: p_file_info->file_basename: %s", p_file_info->chart_name, 
+                                                 p_file_info->file_basename ? p_file_info->file_basename : "NULL");
+    if(unlikely(!p_file_info->filename)) return p_file_info_destroy(p_file_info);
 
 
     /* -------------------------------------------------------------------------
@@ -428,7 +450,7 @@ static void logs_management_init(struct section *config_section){
         freez(cus_chart_k);
         if(unlikely(!cus_chart_v)){
             error("[%s]: custom %d chart = NULL", p_file_info->chart_name, cus_off);
-            continue; // or we could also break completely instead...
+            break;
         }
 
         /* Read regex config */
@@ -440,7 +462,7 @@ static void logs_management_init(struct section *config_section){
         if(unlikely(!cus_regex_v)) {
             error("[%s]: custom %d regex = NULL", p_file_info->chart_name, cus_off);
             freez(cus_chart_v);
-            continue;
+            break;
         }
 
         /* Read regex name config */
@@ -487,7 +509,7 @@ static void logs_management_init(struct section *config_section){
             freez(cus_chart_v);
             freez(cus_regex_v);
             freez(cus_regex_name_v);
-            continue;
+            break;
         };
 
         /* Allocate memory and copy config to p_file_info->parser_cus_config struct */

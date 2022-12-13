@@ -86,7 +86,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     /* Check all required query parameters are present */
     if(unlikely( !p_query_params->start_timestamp || 
                  !p_query_params->end_timestamp || 
-                (!p_query_params->filename && !p_query_params->chart_name))){
+                (!*p_query_params->filename && !*p_query_params->chart_name))){
         return INVALID_REQUEST_ERROR;
     }
 
