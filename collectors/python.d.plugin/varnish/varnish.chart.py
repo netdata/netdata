@@ -4,7 +4,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 import re
-
+import json
+import urllib.parse
+from bases.FrameworkServices.SocketService import SocketService
 from bases.FrameworkServices.ExecutableService import ExecutableService
 from bases.collection import find_binary
 
@@ -225,18 +227,27 @@ class Parser:
         return self.re_backend.findall(''.join(data))
 
 
-class Service(ExecutableService):
+class Service(ExecutableService, SocketService):
     def __init__(self, configuration=None, name=None):
-        ExecutableService.__init__(self, configuration=configuration, name=name)
+        self.image_name = False
+        self.instance_name = False
+        if('image_name' in configuration):
+            SocketService.__init__(self, configuration=configuration, name=name)
+            self.image_name = configuration.get('image_name')
+            self.unix_socket = configuration.get('socket', '/var/run/docker.sock')
+        else:
+            ExecutableService.__init__(self, configuration=configuration, name=name)
+            self.instance_name = configuration.get('instance_name')
+
         self.order = ORDER
         self.definitions = CHARTS
-        self.instance_name = configuration.get('instance_name')
         self.parser = Parser()
         self.command = None
         self.collected_vbe = set()
         self.collected_storages = set()
 
-    def create_command(self):
+    def create_instance_command(self):
+
         varnishstat = find_binary(VARNISHSTAT)
 
         if not varnishstat:
@@ -267,13 +278,41 @@ class Service(ExecutableService):
         self.info("varnish version: {0}, will use command: '{1}'".format(ver, ' '.join(self.command)))
 
         return True
+    
+    def call_docker(self, url):
+        self._send(url.encode())
+        resp = self._receive().split('\r\n')
+        resp.sort(key=lambda t: len(t))
+        return json.loads(resp.pop())
+
+    def check_docker(self):
+        self._connect()
+        filters = {"status":{"running":True},"name":{self.image_name:True}}
+        try:
+            containers = self.call_docker(
+                "GET /containers/json?limit=1&filters={0} HTTP/1.1\r\nHost:localhost\r\n\r\n".format(urllib.parse.quote_plus(json.dumps(filters)))
+            )
+            self.container_id = containers[0].get('Id')
+        except Exception as e:
+            self.error("Container for image '{0}' not found ".format(self.image_name))
+            self.debug(e)
+            return False        
+
+        return True
+
 
     def check(self):
-        if not self.create_command():
+        if self.image_name and not self.check_docker():
+            return False
+
+        if self.instance_name and not self.create_instance_command():
             return False
 
         # STDOUT is not empty
-        reply = self._get_raw_data()
+        if(self.image_name):
+            reply = self._get_docker_data()
+        else:
+            reply = self._get_raw_data()
         if not reply:
             self.error("no output from '{0}'. Is it running? Not enough privileges?".format(' '.join(self.command)))
             return False
@@ -287,12 +326,57 @@ class Service(ExecutableService):
 
         return True
 
+    def _get_docker_data(self):
+        if(not self.container_id):
+            return None
+        try:
+            self._connect()
+            params = {"AttachStdin":False, "AttachStdout":True,"AttachStderr":True,"Tty":True,"Cmd":["varnishstat","-1"]}
+            exec = self.call_docker(
+                "POST /containers/{0}/exec HTTP/1.1\r\nHost:localhost\r\nContent-Type: application/json\r\nContent-Length: 112\r\n\r\n{1}\r\n\r\n".format(self.container_id, json.dumps(params))
+            )
+            exec_id = exec.get('Id')
+            params = {"Detach":False,"Tty":True}
+            self._send(
+                "POST /exec/{0}/start HTTP/1.1\r\nHost:localhost\r\nContent-Type: application/json\r\nContent-Length: 31\r\n\r\n{1}\r\n\r\n".format(exec_id, json.dumps(params)).encode()
+            )
+            data = ''
+            while True:
+                self.debug('receiving response')
+                try:
+                    buf = self._sock.recv(4096)
+                except Exception as error:
+                    self._socket_error('failed to receive response: {0}'.format(error))
+                    self._disconnect()
+                    break
+
+                if buf is None or len(buf) == 0:  # handle server disconnect
+                    if data == "" or data == b"":
+                        self._socket_error('unexpectedly disconnected')
+                    else:
+                        self.debug('server closed the connection')
+                        break;
+
+
+                self.debug('received data')
+                data += buf.decode('utf-8', 'ignore')
+                    
+            self._disconnect()
+            return data
+        except Exception as e:
+            self.error('error executing exec')
+            self.error(e)
+            return None
+
     def get_data(self):
         """
         Format data received from shell command
         :return: dict
         """
-        raw = self._get_raw_data()
+        if(self.image_name):
+            raw = self._get_docker_data()
+        else:
+            raw = self._get_raw_data()
         if not raw:
             return None
 
