@@ -18,11 +18,9 @@ relevant to the window of interest, you can get to the root cause sooner.
 Because Metric Correlations uses every available metric from that node, with as high as 1-second granularity, you get
 the most accurate insights using every possible metric.
 
-## Using Metric Correlations
+### Using Metric Correlations on the Cloud Dashboard
 
 When viewing the single-node dashboard, the **Metric Correlations** button appears in top right corner of the page.
-
-![The Metric Correlations button in a single-node dashboard](https://user-images.githubusercontent.com/2178292/181750606-4dd5f216-ec83-46c9-92f8-b307264bfd9a.png)
 
 To start correlating metrics, click the **Metric Correlations** button, then hold the `Alt` key (or `⌘` on macOS) and
 click-and-drag a selection of metrics on a single chart. The selected timeframe needs to be at least 15 seconds for
@@ -51,7 +49,7 @@ less significant manner.
 If you find something else interesting in the results, you can select another window and press **Find Correlations**
 again to kick the process off again.
 
-## Metric Correlations on the Agent
+### Metric Correlations on the Agent
 
 As of `v1.35.0` Netdata is able to run the Metric Correlations
 algoritihm ([Two Sample Kolmogorov-Smirnov test](https://en.wikipedia.org/wiki/Kolmogorov%E2%80%93Smirnov_test#Two-sample_Kolmogorov%E2%80%93Smirnov_test))
@@ -73,7 +71,7 @@ Should you still want to, disabling nodes for Metric Corrleation on the agent is
 set `enable metric correlations = no` in the `[global]` section of `netdata.conf`
 :::
 
-## Metric Correlations Options
+### Metric Correlations Options
 
 Netdata's Metric Correlations (MC) feature enables a few input parameters that users can define to iteratively explore
 their data in different ways. As is usually the case in Machine Learning (ML), there is no "one size fits all"
@@ -83,7 +81,7 @@ metric to the next) and even the nature of the event or incident you might be ex
 So when you first run MC, it will use the most sensible and general defaults. But you can also then vary any of the
 following options to explore further what MC can do for your troubleshooting scenario.
 
-### Method
+### Methods of Metric Measurement
 
 There are two algorithms available that aim to score metrics based on how much they have changed between the baseline
 and highlight windows.
@@ -133,13 +131,13 @@ anomaly detection features within netdata.
 
 
 
-## Related Documents
+### Related Documents
 
-### Related Concepts
+#### Related Concepts
 
 - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/machine-learning-powered-anomaly-advisor.md)
 
-### Related Tasks
+#### Related Tasks
 
 - [Find the root cause of an issue with Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/find-the-root-cause-of-an-issue-with-metric-correlations.md)
 
