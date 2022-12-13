@@ -1601,6 +1601,7 @@ struct pgc_statistics pgc_get_statistics(PGC *cache) {
 }
 
 struct jv2_extents_info {
+    size_t index;
     uint64_t pos;
     unsigned bytes;
     size_t number_of_pages;
@@ -1621,6 +1622,7 @@ struct jv2_page_info {
     size_t page_length;
     uint32_t extent_index;
 
+    // private
     PGC_PAGE *page;
 };
 
@@ -1636,6 +1638,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
     size_t count_of_unique_metrics;
     size_t count_of_unique_pages;
 
+    size_t master_extent_index_id = 0;
+
     for(PGC_PAGE *page = cache->hot.base; page ; page = page->link.next) {
         if(page->section != section) continue;
 
@@ -1650,9 +1654,33 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
+        // update the extents JudyL
+
+        size_t current_extent_index_id;
+        Pvoid_t *PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
+        if(!PValue || *PValue == PJERR)
+            fatal("Corrupted JudyL extents pos");
+
+        struct jv2_extents_info *ei;
+        if(!*PValue) {
+            ei = callocz(1, sizeof(struct jv2_extents_info));
+            ei->pos = xio->pos;
+            ei->bytes = xio->bytes;
+            ei->number_of_pages = 1;
+            ei->index = master_extent_index_id++;
+
+            count_of_unique_extents++;
+        }
+        else {
+            ei = *PValue;
+            ei->number_of_pages++;
+        }
+
+        current_extent_index_id = ei->index;
+
         // update the metrics JudyL
 
-        Pvoid_t *PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
+        PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
         if(!PValue || *PValue == PJERR)
             fatal("Corrupted JudyL metrics");
 
@@ -1687,32 +1715,13 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
             pi->update_every = page->update_every;
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;
+            pi->extent_index = current_extent_index_id;
             *PValue = pi;
 
             count_of_unique_pages++;
         }
         else
             fatal("Page is already in JudyL metric pages");
-
-        // update the extents JudyL
-
-        PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
-        if(!PValue || *PValue == PJERR)
-            fatal("Corrupted JudyL extents pos");
-
-        struct jv2_extents_info *ei;
-        if(!*PValue) {
-            ei = callocz(1, sizeof(struct jv2_extents_info));
-            ei->pos = xio->pos;
-            ei->bytes = xio->bytes;
-            ei->number_of_pages = 1;
-
-            count_of_unique_extents++;
-        }
-        else {
-            ei = *PValue;
-            ei->number_of_pages++;
-        }
     }
     pgc_ll_unlock(cache, &cache->hot);
 
