@@ -396,7 +396,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         return;
     }
 
-    usec_t now_usec_t = now_realtime_usec();
+    time_t now_s = now_realtime_sec();
     for (i = 0; i < count ; ++i) {
         uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
@@ -408,71 +408,27 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             }
             continue;
         }
-        uint64_t start_time_ut = jf_metric_data->descr[i].start_time_ut;
-        uint64_t end_time_ut = jf_metric_data->descr[i].end_time_ut;
-        size_t entries = jf_metric_data->descr[i].page_length / page_type_size[page_type];
-        time_t update_every_s = (entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0;
-
-        time_t start_time_t = (time_t) (start_time_ut / USEC_PER_SEC);
-        time_t end_time_t = (time_t) (end_time_ut / USEC_PER_SEC);
-
-        if (unlikely(start_time_ut > end_time_ut)) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].counter++;
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut < end_time_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_FLIPPED_TIME].latest_end_time_ut = end_time_ut;
-            continue;
-        }
-
-        if (unlikely(start_time_ut > now_usec_t || end_time_ut > now_usec_t)) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].counter++;
-            usec_t max_start_end_ut = MAX(start_time_ut, end_time_ut);
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].latest_end_time_ut < max_start_end_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_FUTURE_TIME].latest_end_time_ut = max_start_end_ut;
-            continue;
-        }
-
-        if (unlikely(start_time_ut == end_time_ut && entries != 1)) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].counter++;
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut < end_time_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_EQUAL_TIME].latest_end_time_ut = end_time_ut;
-            continue;
-        }
-
-        if (unlikely(!entries)) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].counter++;
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut < end_time_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_ZERO_ENTRIES].latest_end_time_ut = end_time_ut;
-            continue;
-        }
-
-        if(entries > 1 && update_every_s == 0) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].counter++;
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut < end_time_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_UPDATE_ZERO].latest_end_time_ut = end_time_ut;
-            continue;
-        }
-
-        if(start_time_ut + update_every_s * USEC_PER_SEC * (entries - 1) != end_time_ut) {
-            ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].counter++;
-            if(ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut < end_time_ut)
-                ctx->load_errors[LOAD_ERRORS_PAGE_FLEXY_TIME].latest_end_time_ut = end_time_ut;
-        }
 
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
+        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
 
-        METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
+        VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
+                &jf_metric_data->descr[i], now_s,
+                (metric)? mrg_metric_get_update_every(main_mrg, metric) : 0,
+                false);
+
         bool update_metric_time = true;
-        if (!this_metric) {
+        if (!metric) {
             MRG_ENTRY entry;
             uuid_copy(entry.uuid, *temp_id);
             entry.section = (Word_t)ctx;
-            entry.first_time_t = start_time_t;
-            entry.latest_time_t =  end_time_t;
-            entry.latest_update_every = update_every_s;
-            this_metric = mrg_metric_add_and_acquire(main_mrg, entry, NULL);
+            entry.first_time_t = vd.start_time_s;
+            entry.latest_time_t =  vd.end_time_s;
+            entry.latest_update_every = vd.update_every_s;
+            metric = mrg_metric_add_and_acquire(main_mrg, entry, NULL);
             update_metric_time = false;
         }
-        Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
+        Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
         {
             struct extent_io_data ext_io_data = {
@@ -486,33 +442,38 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                 .hot = true,
                 .section = (Word_t)ctx,
                 .metric_id = metric_id,
-                .start_time_t = start_time_t,
-                .end_time_t =  end_time_t,
-                .update_every = update_every_s,
+                .start_time_t = vd.start_time_s,
+                .end_time_t =  vd.end_time_s,
+                .update_every = vd.update_every_s,
                 .size = 0,
                 .data = journalfile->datafile,
                 .custom_data = (uint8_t *) &ext_io_data
             };
 
             bool added = true;
-            struct pcg_page *page = (struct pcg_page *)pgc_page_add_and_acquire(open_cache, page_entry, &added);
+            PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+            int tries = 100;
+            while(!added && tries--) {
+                pgc_page_hot_to_clean_empty_and_release(open_cache, page);
+                page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+            }
             fatal_assert(true == added);
             pgc_page_release(open_cache, (PGC_PAGE *)page);
         }
 
-        mrg_metric_set_update_every(main_mrg, this_metric, update_every_s);
-
         if (update_metric_time) {
-            time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, this_metric);
-            time_t latest_time_t = mrg_metric_get_latest_time_t(main_mrg, this_metric);
+            time_t metric_first_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
+            time_t metric_last_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
 
-            if (oldest_time_t > start_time_t)
-                mrg_metric_set_first_time_t(main_mrg, this_metric, start_time_t);
+            if (metric_first_time_t > vd.start_time_s)
+                mrg_metric_set_first_time_t(main_mrg, metric, vd.start_time_s);
 
-            if (latest_time_t < end_time_t)
-                mrg_metric_set_latest_time_t(main_mrg, this_metric, end_time_t);
+            if (metric_last_time_t < vd.end_time_s) {
+                mrg_metric_set_update_every(main_mrg, metric, vd.update_every_s);
+                mrg_metric_set_latest_time_t(main_mrg, metric, vd.end_time_s);
+            }
         }
-        mrg_metric_release(main_mrg, this_metric);
+        mrg_metric_release(main_mrg, metric);
     }
 }
 

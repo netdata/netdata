@@ -386,6 +386,7 @@ time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
+    atomic_set_max_latest_time_t(metric);
     return __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
 }
 

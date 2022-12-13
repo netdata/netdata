@@ -127,6 +127,56 @@ bool page_details_release_and_destroy_if_unreferenced(struct page_details_contro
     return false;
 }
 
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+    VALIDATED_PAGE_DESCRIPTOR vd = {
+            .start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC),
+            .end_time_s = (time_t) (descr->end_time_ut / USEC_PER_SEC),
+            .page_length = descr->page_length,
+            .type = descr->type,
+    };
+    vd.point_size = page_type_size[vd.type];
+    vd.entries = (size_t) vd.page_length / vd.point_size;
+    vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
+
+    bool is_valid = true;
+
+    if( have_read_error                                         ||
+        vd.page_length == 0                                     ||
+        vd.page_length > RRDENG_BLOCK_SIZE                      ||
+        vd.start_time_s > vd.end_time_s                         ||
+        vd.end_time_s > now_s                                   ||
+        vd.start_time_s == 0                                    ||
+        vd.end_time_s == 0                                      ||
+        (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
+        (vd.update_every_s == 0 && vd.entries > 1)
+        )
+        is_valid = false;
+
+    else {
+        if (vd.update_every_s) {
+            size_t entries_by_time = (vd.start_time_s - (vd.start_time_s - vd.update_every_s)) / vd.update_every_s;
+
+            if (vd.entries != entries_by_time)
+                vd.end_time_s = (time_t) (vd.start_time_s + (vd.entries - 1) * vd.update_every_s);
+        }
+    }
+
+    if(!is_valid) {
+        if(vd.start_time_s == vd.end_time_s) {
+            vd.page_length = vd.point_size;
+            vd.entries = 1;
+        }
+        else {
+            vd.page_length = vd.point_size * 2;
+            vd.update_every_s = vd.end_time_s - vd.start_time_s;
+            vd.entries = 2;
+        }
+    }
+
+    vd.data_on_disk_valid = is_valid;
+    return vd;
+}
+
 // DBENGINE2 extent processing
 static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
 {
@@ -169,19 +219,20 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
         uncompressed_buf = mallocz(uncompressed_payload_length);
         ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
-                                  payload_length, uncompressed_payload_length);
+                                  (int)payload_length, (int)uncompressed_payload_length);
         ctx->stats.before_decompress_bytes += payload_length;
         ctx->stats.after_decompress_bytes += ret;
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
     }
 
     worker_is_busy(UV_EVENT_PAGE_POPULATION);
+    time_t now_s = now_realtime_sec();
 
     for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
 
-        time_t start_time_t = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
+        time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
 
-        Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, start_time_t, PJE0);
+        Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, start_time_s, PJE0);
         struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
 
         // We might have an Index match but check for UUID match as well
@@ -191,43 +242,34 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (pd && uuid_compare(pd->uuid, header->descr[i].uuid))
             pd = NULL;
 
+        VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
+
         // Find metric id
         METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
         mrg_metric_release(main_mrg, this_metric);
 
-        uint32_t page_length = header->descr[i].page_length;
-
-        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_t, true);
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_s, true);
         if (!page) {
-            void *page_data = mallocz((size_t) page_length);
+            void *page_data = mallocz((size_t) vd.page_length);
 
-            if (have_read_error) {
-                fill_page_with_nulls(page_data, page_length, header->descr[i].type);
-            } else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                memcpy(page_data, data + payload_offset + page_offset, (size_t) page_length);
-            } else {
-                memcpy(page_data, uncompressed_buf + page_offset, (size_t) page_length);
-            }
+            if (!vd.data_on_disk_valid)
+                fill_page_with_nulls(page_data, vd.page_length, vd.type);
 
-            time_t update_every_s = 0;
-            if (pd)
-                update_every_s = (time_t) pd->update_every_s;
-            else {
-                uint64_t start_time_ut = header->descr[i].start_time_ut;
-                uint64_t end_time_ut = header->descr[i].end_time_ut;
-                size_t entries = (size_t) page_length / page_type_size[header->descr[i].type];
-                update_every_s = (time_t) ((entries > 1) ? ((end_time_ut - start_time_ut) / USEC_PER_SEC / (entries - 1)) : 0);
-            }
+            else if (RRD_NO_COMPRESSION == header->compression_algorithm)
+                memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
+
+            else
+                memcpy(page_data, uncompressed_buf + page_offset, (size_t) vd.page_length);
 
             PGC_ENTRY page_entry = {
                 .hot = false,
                 .section = (Word_t)ctx,
                 .metric_id = metric_id,
-                .start_time_t = start_time_t,
-                .end_time_t = (time_t)(header->descr[i].end_time_ut / USEC_PER_SEC),
-                .update_every = update_every_s,
-                .size = (size_t) page_length,
+                .start_time_t = vd.start_time_s,
+                .end_time_t = vd.end_time_s,
+                .update_every = vd.update_every_s,
+                .size = (size_t) vd.page_length,
                 .data = page_data
             };
 

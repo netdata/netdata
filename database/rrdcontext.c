@@ -3086,7 +3086,7 @@ static bool rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
-        internal_error(true, "RRDMETRIC: retention of '%s' is flipped", string2str(rm->id));
+        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
         time_t tmp = min_first_time_t;
         min_first_time_t = max_last_time_t;
         max_last_time_t = tmp;

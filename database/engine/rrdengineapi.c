@@ -349,11 +349,6 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
         if(handle->page)
             rrdeng_store_metric_flush_current_page(collection_handle);
 
-        if(handle->options & RRDENG_CHO_SET_FIRST_TIME_T) {
-            handle->options &= ~RRDENG_CHO_SET_FIRST_TIME_T;
-            mrg_metric_set_first_time_t(main_mrg, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC));
-        }
-
         handle->page = rrdeng_create_new_hot_page(ctx, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC),
                                                   mrg_metric_get_update_every(main_mrg, handle->metric));
         handle->start_time_ut = point_in_time_ut;
@@ -401,6 +396,11 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
 
     if (perfect_page_alignment)
         handle->alignment->page_length = handle->page_length;
+
+    if(handle->options & RRDENG_CHO_SET_FIRST_TIME_T) {
+        handle->options &= ~RRDENG_CHO_SET_FIRST_TIME_T;
+        mrg_metric_set_first_time_t(main_mrg, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC));
+    }
 
     mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
 }
@@ -766,12 +766,15 @@ int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time
         return 1;
     }
 
-    METRIC *one_metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
-    if (unlikely(!one_metric))
+    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
+    if (unlikely(!metric))
         return 1;
 
-    *first_entry_t = mrg_metric_get_first_time_t(main_mrg, one_metric);
-    *last_entry_t = mrg_metric_get_latest_time_t(main_mrg, one_metric);
+    *first_entry_t = mrg_metric_get_first_time_t(main_mrg, metric);
+    *last_entry_t = mrg_metric_get_latest_time_t(main_mrg, metric);
+
+    mrg_metric_release(main_mrg, metric);
+
     return 0;
 }
 

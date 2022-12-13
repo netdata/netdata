@@ -354,4 +354,17 @@ void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details
 
 bool page_details_release_and_destroy_if_unreferenced(struct page_details_control *pdc);
 
+typedef struct validated_page_descriptor {
+    time_t start_time_s;
+    time_t end_time_s;
+    time_t update_every_s;
+    size_t page_length;
+    size_t point_size;
+    size_t entries;
+    uint8_t type;
+    bool data_on_disk_valid;
+} VALIDATED_PAGE_DESCRIPTOR;
+
+VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
+
 #endif /* NETDATA_RRDENGINE_H */
