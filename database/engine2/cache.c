@@ -1292,6 +1292,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                             .hot = false,
                     };
 
+                    internal_fatal(array[added].size > RRDENG_BLOCK_SIZE, "page to flush has bad size");
+
                     added_size += array[added].size;
                     added++;
                 }
@@ -1472,6 +1474,7 @@ void pgc_destroy(PGC *cache) {
 }
 
 PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
+    internal_fatal(entry.hot && entry.size > RRDENG_BLOCK_SIZE, "hot page given has bad page size");
     return page_add(cache, &entry, added);
 }
 
@@ -1609,6 +1612,7 @@ struct jv2_extents_info {
 
 struct jv2_metrics_info {
     uuid_t *uuid;
+    uint32_t page_list_header;
     time_t first_time_t;
     time_t last_time_t;
     size_t number_of_pages;
@@ -1634,9 +1638,9 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_filen
     Pvoid_t JudyL_metrics = NULL;
     Pvoid_t JudyL_extents_pos = NULL;
 
-    size_t count_of_unique_extents;
-    size_t count_of_unique_metrics;
-    size_t count_of_unique_pages;
+    size_t count_of_unique_extents = 0;
+    size_t count_of_unique_metrics = 0;
+    size_t count_of_unique_pages = 0;
 
     size_t master_extent_index_id = 0;
 

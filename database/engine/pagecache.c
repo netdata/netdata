@@ -91,11 +91,13 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
         descr->end_time_ut = end_time_t * USEC_PER_SEC;
         descr->update_every_s = array[Index].update_every;
         descr->type = ctx->page_type;
-        descr->page_length = (end_time_t - start_time_t + 1) * bytes_per_point;
+        descr->page_length = (end_time_t - start_time_t + 1) / descr->update_every_s * bytes_per_point;
         descr->page = array[Index].data;
         PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
         fatal_assert( NULL != PValue);
         *PValue = descr;
+
+         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "faulty page length calculation");
      }
 
      struct rrdeng_cmd cmd;
