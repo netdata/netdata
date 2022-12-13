@@ -25,6 +25,8 @@ Exporting is an important part of Netdata's effort to be interoperable
 with other monitoring software. You can use an external time-series database for long-term metrics retention, further
 analysis, or correlation with other tools, such as application tracing.
 
+
+<!-- where should this go? 
 ## Supported databases
 
 Netdata supports exporting metrics to the following databases through several
@@ -75,10 +77,12 @@ Can't find your preferred external time-series database? Ask our [community](htt
 solutions, or file an [issue on
 GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml).
 
+-->
 
-## Related documentation
 
-### Related Concepts
+### Related documentation
+
+#### Related Concepts
 
 - [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
@@ -87,5 +91,5 @@ GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cne
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
-### Related References
+#### Related References
 -   [Exporting engine reference](https://github.com/netdata/netdata/blob/master/exporting/README.md)
