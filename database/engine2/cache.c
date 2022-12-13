@@ -1,4 +1,5 @@
 #include "cache.h"
+#include "../engine/rrdengine.h"
 
 /* STATES AND TRANSITIONS
  *
@@ -29,6 +30,7 @@ typedef enum __attribute__ ((__packed__)) {
     PGC_PAGE_IS_BEING_CREATED = (1 << 3),
     PGC_PAGE_IS_BEING_DELETED = (1 << 4),
     PGC_PAGE_IS_BEING_SAVED   = (1 << 5),
+    PGC_PAGE_IS_BEING_MIGRATED_TO_V2 = (1 << 6),
 
     PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 6),
 } PGC_PAGE_FLAGS;
@@ -1598,6 +1600,159 @@ struct pgc_statistics pgc_get_statistics(PGC *cache) {
     return stats;
 }
 
+struct jv2_extents_info {
+    uint64_t pos;
+    unsigned bytes;
+    size_t number_of_pages;
+};
+
+struct jv2_metrics_info {
+    uuid_t *uuid;
+    time_t first_time_t;
+    time_t last_time_t;
+    size_t number_of_pages;
+    Pvoid_t JudyL_pages_by_start_time;
+};
+
+struct jv2_page_info {
+    time_t start_time_t;
+    time_t end_time_t;
+    time_t update_every;
+    size_t page_length;
+    uint32_t extent_index;
+
+    PGC_PAGE *page;
+};
+
+typedef void (*migrate_to_v2_callback)(Word_t section, int datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
+
+void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
+    pgc_ll_lock(cache, &cache->hot);
+
+    Pvoid_t JudyL_metrics = NULL;
+    Pvoid_t JudyL_extents_pos = NULL;
+
+    size_t count_of_unique_extents;
+    size_t count_of_unique_metrics;
+    size_t count_of_unique_pages;
+
+    PGC_PAGE *page;
+    for(page = cache->hot.base; page ; page = page->link.next) {
+        if(page->section != section) continue;
+
+        struct extent_io_data *xio = (struct extent_io_data *)page->custom_data;
+        if(xio->fileno != datafile_fileno) continue;
+
+        if(!page_acquire___while_having_some_lock(cache, page))
+            continue;
+
+        if(page_flag_check(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2))
+            continue;
+
+        page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+
+        // update the metrics JudyL
+
+        Pvoid_t *PValue = JudyLIns(&JudyL_metrics, page->metric_id, PJE0);
+        if(!PValue || *PValue == PJERR)
+            fatal("Corrupted JudyL metrics");
+
+        struct jv2_metrics_info *mi;
+        if(!*PValue) {
+            mi = callocz(1, sizeof(struct jv2_metrics_info));
+            mi->uuid = mrg_metric_uuid(main_mrg, (METRIC *)page->metric_id);
+            mi->first_time_t = page->start_time_t;
+            mi->last_time_t = page->end_time_t;
+            mi->number_of_pages = 1;
+            *PValue = mi;
+
+            count_of_unique_metrics++;
+        }
+        else {
+            mi = *PValue;
+            mi->number_of_pages++;
+            if(page->start_time_t < mi->first_time_t)
+                mi->first_time_t = page->start_time_t;
+            if(page->end_time_t > mi->last_time_t)
+                mi->last_time_t = page->end_time_t;
+        }
+
+        PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_t, PJE0);
+        if(!PValue || *PValue == PJERR)
+            fatal("Corrupted JudyL metric pages");
+
+        if(!*PValue) {
+            struct jv2_page_info *pi = callocz(1, (sizeof(struct jv2_page_info)));
+            pi->start_time_t = page->start_time_t;
+            pi->end_time_t = page->end_time_t;
+            pi->update_every = page->update_every;
+            pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
+            pi->page = page;
+            *PValue = pi;
+
+            count_of_unique_pages++;
+        }
+        else
+            fatal("Page is already in JudyL metric pages");
+
+        // update the extents JudyL
+
+        PValue = JudyLIns(&JudyL_extents_pos, xio->pos, PJE0);
+        if(!PValue || *PValue == PJERR)
+            fatal("Corrupted JudyL extents pos");
+
+        struct jv2_extents_info *ei;
+        if(!*PValue) {
+            ei = callocz(1, sizeof(struct jv2_extents_info));
+            ei->pos = xio->pos;
+            ei->bytes = xio->bytes;
+            ei->number_of_pages = 1;
+
+            count_of_unique_extents++;
+        }
+        else {
+            ei = *PValue;
+            ei->number_of_pages++;
+        }
+    }
+    pgc_ll_unlock(cache, &cache->hot);
+
+    // callback
+    cb(section, datafile_fileno, type, JudyL_metrics, JudyL_extents_pos, count_of_unique_extents, count_of_unique_metrics, count_of_unique_pages, data);
+
+    {
+        Pvoid_t *PValue1;
+        bool metric_id_first = true;
+        Word_t metric_id = 0;
+        while ((PValue1 = JudyLFirstThenNext(JudyL_metrics, &metric_id, &metric_id_first))) {
+            struct jv2_metrics_info *mi = *PValue1;
+
+            Pvoid_t *PValue2;
+            bool start_time_first = true;
+            Word_t start_time = 0;
+            while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
+                struct jv2_page_info *pi = *PValue2;
+                make_acquired_page_clean_and_evict_or_page_release(cache, page);
+                freez(pi);
+            }
+
+            JudyLFreeArray(&mi->JudyL_pages_by_start_time, PJE0);
+            freez(mi);
+        }
+        JudyLFreeArray(&JudyL_metrics, PJE0);
+    }
+
+    {
+        Pvoid_t *PValue;
+        bool extent_pos_first = true;
+        Word_t extent_pos = 0;
+        while ((PValue = JudyLFirstThenNext(JudyL_extents_pos, &extent_pos, &extent_pos_first))) {
+            struct jv2_extents_info *ei = *PValue;
+            freez(ei);
+        }
+        JudyLFreeArray(&JudyL_extents_pos, PJE0);
+    }
+}
 
 // ----------------------------------------------------------------------------
 // unittest

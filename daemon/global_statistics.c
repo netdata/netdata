@@ -1127,8 +1127,9 @@ static void dbengine2_statistics_charts(void) {
     {
         static RRDSET *st_query_pages = NULL;
         static RRDDIM *rd_cache = NULL;
+        static RRDDIM *rd_open = NULL;
         static RRDDIM *rd_jv2 = NULL;
-        static RRDDIM *rd_pass3 = NULL;
+        static RRDDIM *rd_pass4 = NULL;
 
         if (unlikely(!st_query_pages)) {
             st_query_pages = rrdset_create_localhost(
@@ -1147,12 +1148,14 @@ static void dbengine2_statistics_charts(void) {
 
             rd_cache = rrddim_add(st_query_pages, "cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_jv2   = rrddim_add(st_query_pages, "disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pass3 = rrddim_add(st_query_pages, "pass3", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_open  = rrddim_add(st_query_pages, "open", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pass4 = rrddim_add(st_query_pages, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_pages, rd_cache, (collected_number)cache_efficiency_stats.pages_found_in_cache);
-        rrddim_set_by_pointer(st_query_pages, rd_jv2, (collected_number)cache_efficiency_stats.pages_loaded_from_journal_v2);
-        rrddim_set_by_pointer(st_query_pages, rd_pass3,(collected_number)cache_efficiency_stats.pages_found_in_cache_at_pass3);
+        rrddim_set_by_pointer(st_query_pages, rd_jv2,   (collected_number)cache_efficiency_stats.pages_loaded_from_journal_v2);
+        rrddim_set_by_pointer(st_query_pages, rd_open,  (collected_number)cache_efficiency_stats.pages_found_in_open);
+        rrddim_set_by_pointer(st_query_pages, rd_pass4, (collected_number)cache_efficiency_stats.pages_found_in_cache_at_pass4);
 
         rrdset_done(st_query_pages);
     }

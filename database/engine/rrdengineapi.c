@@ -537,7 +537,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
 
         handle->wanted_next_page_start_time_s = (time_t)(pgc_page_end_time_t(handle->page) + handle->dt_s);
 
-        pgc_page_release(main_cache, (PGC_PAGE *)handle->page);
+        pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
 
         if (unlikely(handle->wanted_next_page_start_time_s > rrdimm_handle->end_time_s)) {
@@ -568,11 +568,12 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
             page_length = pgc_page_data_size(main_cache, handle->page);
 
             if( page_start_time_s == INVALID_TIME ||
-                page_end_time_s   == INVALID_TIME
+                page_end_time_s   == INVALID_TIME ||
+                page_length > RRDENG_BLOCK_SIZE
             ) {
 
-                internal_error(true, "DBENGINE: page from %ld to %ld (update every %ld) has invalid timestamps for our target time %ld",
-                               page_start_time_s, page_end_time_s, page_update_every_s,
+                internal_error(true, "DBENGINE: page from %ld to %ld (update every %ld, page length %zu) is invalid for our target time %ld",
+                               page_start_time_s, page_end_time_s, page_update_every_s, page_length,
                                handle->now_s);
 
                 pgc_page_release(main_cache, handle->page);
@@ -727,7 +728,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
 
     if (handle->page)
-        pgc_page_release(main_cache, (PGC_PAGE *)handle->page);
+        pgc_page_release(main_cache, handle->page);
 
     struct page_details_control *pdc = handle->pdc;
 

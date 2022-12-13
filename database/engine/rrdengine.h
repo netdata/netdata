@@ -165,6 +165,7 @@ struct rrdeng_cmdqueue {
 };
 
 struct extent_io_data {
+    int fileno;
     uv_file file;
     uint64_t pos;
     unsigned bytes;
