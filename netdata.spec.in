@@ -40,7 +40,7 @@ AutoReqProv: yes
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     netns    # build with netns support (cgroup-network)
+%bcond_without  netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
