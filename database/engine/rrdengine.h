@@ -124,12 +124,6 @@ struct rrdeng_query_handle {
     unsigned entries;
 };
 
-typedef enum {
-    RRDENGINE_STATUS_UNINITIALIZED = 0,
-    RRDENGINE_STATUS_INITIALIZING,
-    RRDENGINE_STATUS_INITIALIZED
-} rrdengine_state_t;
-
 enum rrdeng_opcode {
     /* can be used to return empty status or flush the command queue */
     RRDENG_NOOP = 0,
@@ -145,34 +139,10 @@ enum rrdeng_opcode {
     RRDENG_MAX_OPCODE
 };
 
-struct rrdeng_read_page {
-    struct rrdeng_page_descr *page_cache_descr;
-};
-
-struct uuid_list_s {
-    uuid_t uuid;
-    time_t start_time_t;
-};
-
-struct rrdeng_read_extent {
-    size_t entries;
-    uv_file file;
-    uint64_t pos;
-    uint64_t size;
-//    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
-//    struct rrdeng_page_descr *page_cache_descr[MAX_PAGES_PER_EXTENT];
-    struct completion *completion;
-//    int page_count;
-};
-
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
     void *data;
-    union {
-        struct rrdeng_read_page read_page;
-        struct rrdeng_read_extent read_extent;
-        struct completion *completion;
-    };
+    struct completion *completion;
 };
 
 #define RRDENG_CMD_Q_MAX_SIZE (8192)
@@ -298,16 +268,6 @@ extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of dele
 #define SET_QUIESCE (1) /* set it before shutting down the instance, quiesce long running operations */
 #define QUIESCED    (2) /* is set after all threads have finished running */
 
-typedef enum {
-    LOAD_ERRORS_PAGE_FLIPPED_TIME = 0,
-    LOAD_ERRORS_PAGE_EQUAL_TIME = 1,
-    LOAD_ERRORS_PAGE_ZERO_ENTRIES = 2,
-    LOAD_ERRORS_PAGE_UPDATE_ZERO = 3,
-    LOAD_ERRORS_PAGE_FLEXY_TIME = 4,
-    LOAD_ERRORS_DROPPED_EXTENT = 5,
-    LOAD_ERRORS_PAGE_FUTURE_TIME = 6,
-} INVALID_PAGE_ID;
-
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
@@ -330,11 +290,6 @@ struct rrdengine_instance {
     uint8_t page_type; /* Default page type for this context */
 
     struct rrdengine_statistics stats;
-
-    struct {
-        size_t counter;
-        usec_t latest_end_time_ut;
-    } load_errors[7];
 };
 
 void *dbengine_page_alloc(void);

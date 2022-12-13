@@ -8,37 +8,6 @@ struct pgc *main_cache = NULL;
 struct pgc *open_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
-pthread_key_t query_key;
-
-
-// FIXME: Check if it can of use to automatically release reserved pages
-//void query_key_release(void *data)
-//{
-//    Pvoid_t pl_judyL = data;
-//    Pvoid_t *PValue;
-//    info("Thread %d: Cleaning query data", gettid());
-//    Word_t time_index;
-////    Word_t end_time_t;
-//    unsigned entries = 0;
-//
-//    struct page_details *pd = NULL;
-//    if (pl_judyL) {
-//        for (PValue = JudyLFirst(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue;
-//             pd != NULL;
-//             PValue = JudyLNext(pl_judyL, &time_index, PJE0),
-//            pd = unlikely(NULL == PValue) ? 0 : *PValue) {
-//
-//            info("DEBUG: Page %u -- %lu - %lu (extent %lu, size %u at file %d) ", entries,  pd->start_time_t, pd->end_time_t, pd->pos, pd->size, pd->file);
-//            freez(pd);
-//
-//            entries++;
-//        }
-//    }
-//    JudyLFreeArray(&pl_judyL, PJE0);
-//    pthread_setspecific(query_key, NULL);
-//}
-
 void free_judyl_page_list(Pvoid_t pl_judyL)
 {
     if (!pl_judyL)
@@ -166,22 +135,6 @@ void rrdeng_page_descr_use_mmap(void) {
 
 bool rrdeng_page_descr_is_mmap(void) {
     return page_descr_aral.use_mmap;
-}
-
-struct rrdeng_page_descr *pg_cache_create_descr(void)
-{
-    struct rrdeng_page_descr *descr;
-
-    descr = rrdeng_page_descr_mallocz();
-    descr->page_length = 0;
-    descr->start_time_ut = INVALID_TIME;
-    descr->end_time_ut = INVALID_TIME;
-    descr->id = NULL;
-    descr->extent = NULL;
-    descr->page = NULL;
-    descr->update_every_s = 0;
-    descr->type = 0;
-    return descr;
 }
 
 static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
@@ -517,47 +470,6 @@ we_are_done:
     return JudyL_page_array;
 }
 
-/* Update metric oldest and latest timestamps efficiently when adding new values */
-void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr)
-{
-    usec_t oldest_time = page_index->oldest_time_ut;
-    usec_t latest_time = page_index->latest_time_ut;
-
-    if (unlikely(oldest_time == INVALID_TIME || descr->start_time_ut < oldest_time)) {
-        page_index->oldest_time_ut = descr->start_time_ut;
-    }
-    if (likely(descr->end_time_ut > latest_time || latest_time == INVALID_TIME)) {
-        page_index->latest_time_ut = descr->end_time_ut;
-    }
-
-    // FIXME: DBENGINE2 rename and proper
-    // This will update the metric
-    update_metric_latest_time_by_uuid(page_index->ctx, &page_index->id, (time_t) (descr->end_time_ut / USEC_PER_SEC));
-}
-
-/* If index is NULL lookup by UUID (descr->id) */
-void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-    Pvoid_t *PValue;
-    struct pg_cache_page_index *page_index;
-
-    if (unlikely(NULL == index)) {
-        uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-        PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, descr->id, sizeof(uuid_t));
-        fatal_assert(NULL != PValue);
-        page_index = *PValue;
-        uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    } else {
-        page_index = index;
-    }
-
-    uv_rwlock_wrlock(&page_index->lock);
-    PValue = JudyLIns(&page_index->JudyL_array, (Word_t)(descr->start_time_ut / USEC_PER_SEC), PJE0);
-    *PValue = descr;
-    uv_rwlock_wrunlock(&page_index->lock);
-}
-
 /**
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
  * @param ctx DB context
@@ -664,23 +576,6 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     return page;
 }
 
-struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx)
-{
-    struct pg_cache_page_index *page_index;
-
-    page_index = mallocz(sizeof(*page_index));
-    fatal_assert(0 == uv_rwlock_init(&page_index->lock));
-    page_index->JudyL_array = (Pvoid_t) NULL;
-    uuid_copy(page_index->id, *id);
-    page_index->oldest_time_ut = INVALID_TIME;
-    page_index->latest_time_ut = INVALID_TIME;
-    page_index->refcount = 0;
-    page_index->ctx = ctx;
-    page_index->latest_update_every_s = default_rrd_update_every;
-
-    return page_index;
-}
-
 static void init_metrics_index(struct rrdengine_instance *ctx)
 {
     struct page_cache *pg_cache = &ctx->pg_cache;
@@ -740,67 +635,3 @@ void init_page_cache(struct rrdengine_instance *ctx)
 
     init_metrics_index(ctx);
 }
-
-// FIXME: DBENGINE2 Release page cache properly
-//void free_page_cache(struct rrdengine_instance *ctx)
-//{
-//    struct page_cache *pg_cache = &ctx->pg_cache;
-//    Pvoid_t *PValue;
-//    struct pg_cache_page_index *page_index, *prev_page_index;
-//    Word_t Index;
-//    struct rrdeng_page_descr *descr;
-//    struct page_cache_descr *pg_cache_descr;
-//
-//    // if we are exiting, the OS will recover all memory so do not slow down the shutdown process
-//    // Do the cleanup if we are compiling with NETDATA_INTERNAL_CHECKS
-//    // This affects the reporting of dbengine statistics which are available in real time
-//    // via the /api/v1/dbengine_stats endpoint
-//#ifndef NETDATA_DBENGINE_FREE
-//    if (netdata_exit)
-//        return;
-//#endif
-//    Word_t metrics_index_bytes = 0, pages_index_bytes = 0, pages_dirty_index_bytes = 0;
-//
-//    /* Free committed page index */
-//    pages_dirty_index_bytes = JudyLFreeArray(&pg_cache->committed_page_index.JudyL_array, PJE0);
-//    fatal_assert(NULL == pg_cache->committed_page_index.JudyL_array);
-//
-//    for (page_index = pg_cache->metrics_index.last_page_index ;
-//         page_index != NULL ;
-//         page_index = prev_page_index) {
-//
-//        prev_page_index = page_index->prev;
-//
-//        /* Find first page in range */
-//        Index = (Word_t) 0;
-//        PValue = JudyLFirst(page_index->JudyL_array, &Index, PJE0);
-//        descr = unlikely(NULL == PValue) ? NULL : *PValue;
-//
-//        while (descr != NULL) {
-//            /* Iterate all page descriptors of this metric */
-//
-//            if (descr->pg_cache_descr_state & PG_CACHE_DESCR_ALLOCATED) {
-//                /* Check rrdenglocking.c */
-//                pg_cache_descr = descr->pg_cache_descr;
-//                if (pg_cache_descr->flags & RRD_PAGE_POPULATED) {
-//                    dbengine_page_free(pg_cache_descr->page);
-//                }
-//                rrdeng_destroy_pg_cache_descr(ctx, pg_cache_descr);
-//            }
-//            rrdeng_page_descr_freez(descr);
-//
-//            PValue = JudyLNext(page_index->JudyL_array, &Index, PJE0);
-//            descr = unlikely(NULL == PValue) ? NULL : *PValue;
-//        }
-//
-//        /* Free page index */
-//        pages_index_bytes += JudyLFreeArray(&page_index->JudyL_array, PJE0);
-//        fatal_assert(NULL == page_index->JudyL_array);
-//        freez(page_index);
-//    }
-//    /* Free metrics index */
-//    metrics_index_bytes = JudyHSFreeArray(&pg_cache->metrics_index.JudyHS_array, PJE0);
-//    fatal_assert(NULL == pg_cache->metrics_index.JudyHS_array);
-//    info("Freed %lu bytes of memory from page cache.", pages_dirty_index_bytes + pages_index_bytes + metrics_index_bytes);
-//}
-

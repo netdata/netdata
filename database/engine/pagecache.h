@@ -8,8 +8,6 @@
 extern struct mrg *main_mrg;
 extern struct pgc *main_cache;
 extern struct pgc *open_cache;
-extern pthread_key_t query_key;
-void query_key_release(void *data);
 
 /* Forward declarations */
 struct rrdengine_instance;
@@ -95,14 +93,9 @@ struct page_cache { /* TODO: add statistics */
 
 struct rrdeng_query_handle;
 
-struct rrdeng_page_descr *pg_cache_create_descr(void);
-void pg_cache_insert(struct rrdengine_instance *ctx, struct pg_cache_page_index *index, struct rrdeng_page_descr *descr);
 time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t);
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, time_t *next_page_start_s);
-struct pg_cache_page_index *create_page_index(uuid_t *id, struct rrdengine_instance *ctx);
 void init_page_cache(struct rrdengine_instance *ctx);
-void free_page_cache(struct rrdengine_instance *ctx);
-void pg_cache_add_new_metric_time(struct pg_cache_page_index *page_index, struct rrdeng_page_descr *descr);
 
 void rrdeng_page_descr_aral_go_singlethreaded(void);
 void rrdeng_page_descr_aral_go_multithreaded(void);
@@ -112,18 +105,5 @@ bool rrdeng_page_descr_is_mmap(void);
 struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
 void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
 void free_judyl_page_list(Pvoid_t pl_judyL);
-
-
-/* The caller must hold a reference to the page and must have already set the new data */
-//static inline void pg_cache_atomic_set_pg_info(struct rrdeng_collect_handle *handle, usec_t end_time_ut, uint32_t page_length)
-//{
-//    fatal_assert(!(end_time_ut & 1));
-//    __sync_synchronize();
-//    handle->end_time_ut |= 1; /* mark start of uncertainty period by adding 1 microsecond */
-//    __sync_synchronize();
-//    handle->page_length = page_length;
-//    __sync_synchronize();
-//    handle->end_time_ut = end_time_ut; /* mark end of uncertainty period */
-//}
 
 #endif /* NETDATA_PAGECACHE_H */

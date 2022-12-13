@@ -1603,35 +1603,6 @@ struct pgc_statistics pgc_get_statistics(PGC *cache) {
     return stats;
 }
 
-//struct jv2_extents_info {
-//    size_t index;
-//    uint64_t pos;
-//    unsigned bytes;
-//    size_t number_of_pages;
-//};
-//
-//struct jv2_metrics_info {
-//    uuid_t *uuid;
-//    uint32_t page_list_header;
-//    time_t first_time_t;
-//    time_t last_time_t;
-//    size_t number_of_pages;
-//    Pvoid_t JudyL_pages_by_start_time;
-//};
-//
-//struct jv2_page_info {
-//    time_t start_time_t;
-//    time_t end_time_t;
-//    time_t update_every;
-//    size_t page_length;
-//    uint32_t extent_index;
-//
-//    // private
-//    PGC_PAGE *page;
-//};
-
-typedef void (*migrate_to_v2_callback)(Word_t section, int datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
-
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
     pgc_ll_lock(cache, &cache->hot);
 
