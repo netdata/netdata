@@ -53,6 +53,11 @@ void free_judyl_page_list(Pvoid_t pl_judyL)
          PValue = JudyLNext(pl_judyL, &time_index, PJE0),
         pd = unlikely(NULL == PValue) ? 0 : *PValue) {
 
+        if(!pd->page_is_released) {
+            pgc_page_release(main_cache, pd->page);
+            pd->page_is_released = true;
+        }
+
         freez(pd);
     }
     JudyLFreeArray(&pl_judyL, PJE0);
@@ -242,11 +247,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pgc_page_release(cache, page);
         }
         else {
-            struct page_details *pd = mallocz(sizeof(*pd));
-            pd->datafile.extent.pos = 0;
-            pd->datafile.extent.bytes = 0;
-            pd->datafile.file = 0;
-            pd->datafile.fileno = 0;
+            struct page_details *pd = callocz(1, sizeof(*pd));
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
             pd->page_length = pgc_page_data_size(cache, page);
@@ -387,7 +388,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                                 "DBENGINE: page is already in judy with different retention");
                     }
                     else {
-                        struct page_details *pd = mallocz(sizeof(*pd));
+                        struct page_details *pd = callocz(1, sizeof(*pd));
                         pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
                         pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
                         pd->datafile.file = datafile->file;
@@ -398,7 +399,6 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         pd->page_length = page_entry_in_journal->page_length;
                         pd->update_every_s = page_update_every_s;
                         pd->type = page_entry_in_journal->type;
-                        pd->page = NULL;
                         uuid_copy(pd->uuid, *uuid);
                         *PValue = pd;
 
@@ -583,7 +583,13 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         handle->pdc->completion_jobs_completed =
                 completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completion_jobs_completed);
 
-        page = pd->page;
+        if(pd->page_is_loaded) {
+            page = pd->page;
+            pd->page_is_released = true;
+        }
+
+        else if(pd->page_failed_to_load)
+            break;
     }
 
     if(next_page_start_time_s) {

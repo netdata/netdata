@@ -730,8 +730,6 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
         pgc_page_release(main_cache, (PGC_PAGE *)handle->page);
 
     struct page_details_control *pdc = handle->pdc;
-    // FIXME - we have to release all the pages if the query ends prematurely
-    // FIXME - we have to free the page details Judy
 
     page_details_release_and_destroy_if_unreferenced(pdc);
 

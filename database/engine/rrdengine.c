@@ -240,7 +240,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_SEQ_CST);
+            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_RELEASE);
         }
         else
             pgc_page_release(main_cache, page);
@@ -249,7 +249,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     struct page_details_control *pdc = extent_page_list->pdc;
 
     completion_mark_complete_a_job(&pdc->completion);
-    if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_SEQ_CST) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_SEQ_CST)) {
+    if (__atomic_add_fetch(&pdc->jobs_completed, 1, __ATOMIC_RELEASE) == __atomic_load_n(&pdc->jobs_started, __ATOMIC_ACQUIRE)) {
         completion_mark_complete(&pdc->completion);
         page_details_release_and_destroy_if_unreferenced(pdc);
     }

@@ -59,7 +59,9 @@ struct page_details {
     uint32_t update_every_s;
     uint16_t page_length;
     uint8_t type;
+    bool page_failed_to_load;
     bool page_is_loaded;
+    bool page_is_released;
     struct pgc_page *page;
 };
 
