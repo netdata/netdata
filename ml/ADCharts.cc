@@ -62,7 +62,7 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "metric_types_on_" << localhost->machine_guid;
-            NameSS << "metric_types_on" << localhost->hostname;
+            NameSS << "metric_types_on_" << localhost->hostname;
 
             MetricTypesRS = rrdset_create(
                 RH,
@@ -106,7 +106,7 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "training_status_on_" << localhost->machine_guid;
-            NameSS << "training_status_on" << localhost->hostname;
+            NameSS << "training_status_on_" << localhost->hostname;
 
             TrainingStatusRS = rrdset_create(
                 RH,
@@ -152,7 +152,7 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "prediction_on_" << localhost->machine_guid;
-            NameSS << "prediction_on" << localhost->hostname;
+            NameSS << "prediction_on_" << localhost->hostname;
 
             PredictionRS = rrdset_create(
                 RH,
@@ -197,7 +197,7 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
             std::stringstream IdSS, NameSS;
 
             IdSS << "prediction_usage_on_" << localhost->machine_guid;
-            NameSS << "prediction_usage_on" << localhost->hostname;
+            NameSS << "prediction_usage_on_" << localhost->hostname;
 
             RS = rrdset_create(
                 RH,
@@ -239,7 +239,7 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
             std::stringstream IdSS, NameSS;
 
             IdSS << "training_usage_on_" << localhost->machine_guid;
-            NameSS << "training_usage_on" << localhost->hostname;
+            NameSS << "training_usage_on_" << localhost->hostname;
 
             RS = rrdset_create(
                 RH,
@@ -283,7 +283,7 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "queue_stats_on_" << localhost->machine_guid;
-            NameSS << "queue_stats_on" << localhost->hostname;
+            NameSS << "queue_stats_on_" << localhost->hostname;
 
             RS = rrdset_create(
                 RH,
@@ -326,7 +326,7 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "training_time_stats_on_" << localhost->machine_guid;
-            NameSS << "training_time_stats_on" << localhost->hostname;
+            NameSS << "training_time_stats_on_" << localhost->hostname;
 
             RS = rrdset_create(
                 RH,
