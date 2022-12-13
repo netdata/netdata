@@ -209,6 +209,21 @@ static void logs_management_init(struct section *config_section){
         p_file_info->filename = NULL;
             
         switch(p_file_info->log_type){
+            case GENERIC:
+            case FLB_GENERIC:
+                if(!strcmp(p_file_info->chart_name, "Auth.log") || !strcmp(p_file_info->chart_name, "auth.log"){
+                    const char * const auth_path_default[] = {
+                        "/var/log/auth.log",
+                        NULL
+                    };
+                    int i = 0;
+                    while(auth_path_default[i] && access(auth_path_default[i], R_OK)){i++;};
+                    if(!auth_path_default[i]){
+                        error("[%s]: auth.log path invalid or unknown", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(auth_path_default[i]);
+                }
+                break;
             case WEB_LOG:
             case FLB_WEB_LOG:
                 if(!strcmp(p_file_info->chart_name, "Apache access.log")){
@@ -225,6 +240,17 @@ static void logs_management_init(struct section *config_section){
                         error("[%s]: Apache access.log path invalid or unknown", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(apache_access_path_default[i]);
+                } else if(!strcmp(p_file_info->chart_name, "Nginx access.log")){
+                    const char * const nginx_access_path_default[] = {
+                        "/var/log/nginx/access.log",
+                        NULL
+                    };
+                    int i = 0;
+                    while(nginx_access_path_default[i] && access(nginx_access_path_default[i], R_OK)){i++;};
+                    if(!nginx_access_path_default[i]){
+                        error("[%s]: Nginx access.log path invalid or unknown", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(nginx_access_path_default[i]);
                 }
                 break;
             case FLB_SYSTEMD:
