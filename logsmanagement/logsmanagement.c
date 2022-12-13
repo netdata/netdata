@@ -222,6 +222,18 @@ static void logs_management_init(struct section *config_section){
                         error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(auth_path_default[i]);
+                } else if(!strcmp(p_file_info->chart_name, "syslog")){
+                    const char * const syslog_path_default[] = {
+                        "/var/log/syslog",   /* Debian, Ubuntu */
+                        "/var/log/messages", /* RHEL, Red Hat, CentOS, Fedora */
+                        NULL
+                    };
+                    int i = 0;
+                    while(syslog_path_default[i] && access(syslog_path_default[i], R_OK)){i++;};
+                    if(!syslog_path_default[i]){
+                        error("[%s]: syslog path invalid, unknown or needs permissions", p_file_info->chart_name);
+                        return p_file_info_destroy(p_file_info);
+                    } else p_file_info->filename = strdupz(syslog_path_default[i]);
                 }
                 break;
             case WEB_LOG:
@@ -230,8 +242,8 @@ static void logs_management_init(struct section *config_section){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log", /* Debian, Ubuntu */
-                        "/etc/httpd/logs/access_log", /* RHEL, Red Hat, CentOS, Fedora */
-                        "/var/log/httpd-access.log", /* FreeBSD */
+                        "/etc/httpd/logs/access_log",  /* RHEL, Red Hat, CentOS, Fedora */
+                        "/var/log/httpd-access.log",   /* FreeBSD */
                         NULL
                     };
                     int i = 0;
