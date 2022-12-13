@@ -505,7 +505,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 %endif
 
 # ebpf plugin
+%if 0%{?_have_ebpf}
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%endif
 
 # perf plugin
 # This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
