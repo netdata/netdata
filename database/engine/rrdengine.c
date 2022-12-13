@@ -1229,7 +1229,7 @@ static void do_read_page_list_work(uv_work_t *req)
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
 
             if (PValue1 && !*PValue1) {
-                *PValue1 = datafile_extent_list = malloc(sizeof(*datafile_extent_list));
+                *PValue1 = datafile_extent_list = mallocz(sizeof(*datafile_extent_list));
                 datafile_extent_list->JudyL_datafile_extent_list = NULL;
                 datafile_extent_list->count = 0;
                 datafile_extent_list->fileno = pd->datafile.fileno;
@@ -1240,7 +1240,7 @@ static void do_read_page_list_work(uv_work_t *req)
 
             PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile.extent.pos, PJE0);
             if (PValue2 && !*PValue2) {
-                *PValue2 = extent_page_list = malloc( sizeof(*extent_page_list));
+                *PValue2 = extent_page_list = mallocz( sizeof(*extent_page_list));
                 extent_page_list->JudyL_page_list = NULL;
                 extent_page_list->count = 0;
                 extent_page_list->file = pd->datafile.file;
