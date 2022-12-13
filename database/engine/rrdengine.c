@@ -147,10 +147,14 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker) {
     } while(!__atomic_compare_exchange_n(&pdc->refcount, &expected, desired,
                                          false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 
-    if (desired == 0) {
-        if(worker)
-            completion_mark_complete(&pdc->completion);
+    if (desired <= 1 && worker)
+        // when 1 refcount is remaining, and we are a worker,
+        // we can mark the job completed:
+        // - if the remaining refcount is from the query caller, we will wake it up
+        // - if the remaining refcount is from a worker, the caller is already away
+        completion_mark_complete(&pdc->completion);
 
+    if (desired == 0) {
         completion_destroy(&pdc->completion);
         free_judyl_page_list(pdc->page_list_JudyL);
         freez(pdc);
