@@ -38,6 +38,7 @@ struct TrainingStats {
     size_t TrainingResultInvalidQueryTimeRange;
     size_t TrainingResultNotEnoughCollectedValues;
     size_t TrainingResultNullAcquiredDimension;
+    size_t TrainingResultChartUnderReplication;
 };
 
 } // namespace ml

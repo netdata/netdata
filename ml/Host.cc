@@ -112,6 +112,7 @@ void Host::detectOnce() {
         TS.TrainingResultInvalidQueryTimeRange = 0;
         TS.TrainingResultNotEnoughCollectedValues = 0;
         TS.TrainingResultNullAcquiredDimension = 0;
+        TS.TrainingResultChartUnderReplication = 0;
     }
 
     // Calc the avg values
@@ -125,6 +126,7 @@ void Host::detectOnce() {
         TSCopy.TrainingResultInvalidQueryTimeRange /= TSCopy.NumPoppedItems;
         TSCopy.TrainingResultNotEnoughCollectedValues /= TSCopy.NumPoppedItems;
         TSCopy.TrainingResultNullAcquiredDimension /= TSCopy.NumPoppedItems;
+        TSCopy.TrainingResultChartUnderReplication /= TSCopy.NumPoppedItems;
     } else {
         TSCopy.QueueSize = 0;
         TSCopy.AllottedUT = 0;
@@ -242,6 +244,9 @@ void Host::train() {
                     break;
                 case TrainingResult::NullAcquiredDimension:
                     TS.TrainingResultNullAcquiredDimension += 1;
+                    break;
+                case TrainingResult::ChartUnderReplication:
+                    TS.TrainingResultChartUnderReplication += 1;
                     break;
             }
         }
