@@ -151,17 +151,17 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
         if (!PredictionRS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "prediction_on_" << localhost->machine_guid;
-            NameSS << "prediction_on_" << localhost->hostname;
+            IdSS << "dimensions_on_" << localhost->machine_guid;
+            NameSS << "dimensions_on_" << localhost->hostname;
 
             PredictionRS = rrdset_create(
                 RH,
                 "anomaly_detection", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "prediction", // family
-                "anomaly_detection.prediction", // ctx
-                "Prediction status of dimensions", // title
+                "dimensions", // family
+                "anomaly_detection.dimensions", // ctx
+                "Anomaly detection dimensions", // title
                 "dimensions", // units
                 "netdata", // plugin
                 "ml", // module
