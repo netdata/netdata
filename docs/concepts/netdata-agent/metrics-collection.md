@@ -28,15 +28,17 @@ meaningfully](https://github.com/netdata/netdata/blob/master/docs/concepts/visua
 Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
 can be a URL and port, a socket, a file, a web page, and more.
 
-For example, the Nginx collector searches
+:::Example 
+The Nginx collector searches
 at `http://127.0.0.1/stub_status`, which is the default endpoint for exposing Nginx metrics. The web log collector for
 Nginx or Apache searches at
 `/var/log/nginx/access.log` and `/var/log/apache2/access.log`, respectively, both of which are standard locations for
 access log files on Linux systems.
 
 The endpoint is user-configurable, as are many other specifics of what a given collector does.
+:::
 
-## What can Netdata collect?
+### What can Netdata collect?
 
 <!--To quickly find your answer, see our [list of supported collectors](/collectors/COLLECTORS.md).-->
 
@@ -49,7 +51,7 @@ Generally, Netdata's collectors can be grouped into three types:
 -   Applications: Collect per-second metrics from web servers, databases, logs,
     message brokers, APM tools, email servers, and much more.
 
-## Collector architecture and terminology
+### Collector architecture and terminology
 
 **Collector** is a catch-all term for any Netdata process that gathers metrics from an endpoint. 
 
@@ -70,9 +72,9 @@ terms related to collecting metrics.
 -   **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`,
     and run as threads within the Netdata daemon.
 
-## Related Documentation
+### Related Documentation
 
-### Related Concepts
+#### Related Concepts
 
 - [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
 - [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
@@ -81,6 +83,6 @@ terms related to collecting metrics.
 - [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
 - [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
 
-### Related Tasks
+#### Related Tasks
 
 - [Claim existing Agent deployments](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
