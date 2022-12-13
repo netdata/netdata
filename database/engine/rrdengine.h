@@ -65,6 +65,33 @@ struct page_details {
     struct pgc_page *page;
 };
 
+struct jv2_extents_info {
+    size_t index;
+    uint64_t pos;
+    unsigned bytes;
+    size_t number_of_pages;
+};
+
+struct jv2_metrics_info {
+    uuid_t *uuid;
+    uint32_t page_list_header;
+    time_t first_time_t;
+    time_t last_time_t;
+    size_t number_of_pages;
+    Pvoid_t JudyL_pages_by_start_time;
+};
+
+struct jv2_page_info {
+    time_t start_time_t;
+    time_t end_time_t;
+    time_t update_every;
+    size_t page_length;
+    uint32_t extent_index;
+
+    // private
+    struct pgc_page *page;
+};
+
 typedef enum __attribute__ ((__packed__)) {
     RRDENG_CHO_UNALIGNED        = (1 << 0), // set when this metric is not page aligned according to page alignment
     RRDENG_CHO_SET_FIRST_TIME_T = (1 << 1), // set when this metric has unset first_time_t and needs to be updated on the first data collection
