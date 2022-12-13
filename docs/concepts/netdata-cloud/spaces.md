@@ -26,6 +26,7 @@ or more. Hover over each icon to see the full name in a tooltip.
 
 To add a new Space, click on the green **+** button . Enter the name of the Space and click **Save**.
 
+<!-- is this a task already
 
 ## Space Management
 
@@ -59,17 +60,17 @@ Netdata admin users now have the ability to remove obsolete nodes from a space, 
   space
 - If the obsoleted nodes eventually become live or online once more they will be automatically re-added to the space
 
-![Obsoleting an offline node](https://user-images.githubusercontent.com/24860547/173087202-70abfd2d-f0eb-4959-bd0f-74aeee2a2a5a.gif)
+-->
 
-## Related Topics
+### Related Topics
 
-### **Related Concepts**
+#### **Related Concepts**
 - [Netdata Views](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
 - [Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md)
 - [Dashboards](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md)
 - [From raw metrics to visualizations](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
-### Related Tasks
+#### Related Tasks
 - [Space Administration](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/spaces.md)
 - [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
 - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
