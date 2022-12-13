@@ -486,6 +486,7 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
         static thread_local RRDDIM *InvalidQueryTimeRange = nullptr;
         static thread_local RRDDIM *NotEnoughCollectedValues = nullptr;
         static thread_local RRDDIM *NullAcquiredDimension = nullptr;
+        static thread_local RRDDIM *ChartUnderReplication = nullptr;
 
         if (!RS) {
             std::stringstream IdSS, NameSS;
@@ -513,12 +514,14 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             InvalidQueryTimeRange = rrddim_add(RS, "invalid-queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             NotEnoughCollectedValues = rrddim_add(RS, "not-enough-values", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             NullAcquiredDimension = rrddim_add(RS, "null-acquired-dimensions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ChartUnderReplication = rrddim_add(RS, "chart-under-replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(RS, Ok, TS.TrainingResultOk);
         rrddim_set_by_pointer(RS, InvalidQueryTimeRange, TS.TrainingResultInvalidQueryTimeRange);
         rrddim_set_by_pointer(RS, NotEnoughCollectedValues, TS.TrainingResultNotEnoughCollectedValues);
         rrddim_set_by_pointer(RS, NullAcquiredDimension, TS.TrainingResultNullAcquiredDimension);
+        rrddim_set_by_pointer(RS, ChartUnderReplication, TS.TrainingResultChartUnderReplication);
 
         rrdset_done(RS);
     }

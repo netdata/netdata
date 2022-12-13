@@ -56,6 +56,8 @@ static const char *tr2str(TrainingResult TR) {
             return "missing-values";
         case ml::TrainingResult::NullAcquiredDimension:
             return "null-acquired-dim";
+        case ml::TrainingResult::ChartUnderReplication:
+            return "chart-under-replication";
         default:
             return "unknown";
     }
@@ -83,7 +85,11 @@ std::pair<CalculatedNumber *, TrainingResponse> Dimension::getCalculatedNumbers(
 
     if (TrainingResp.QueryAfterT >= TrainingResp.QueryBeforeT) {
         TrainingResp.Result = TrainingResult::InvalidQueryTimeRange;
+        return { nullptr, TrainingResp };
+    }
 
+    if (rrdset_is_replicating(RD->rrdset)) {
+        TrainingResp.Result = TrainingResult::ChartUnderReplication;
         return { nullptr, TrainingResp };
     }
 

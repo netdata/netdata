@@ -77,6 +77,8 @@ enum TrainingResult {
     NotEnoughCollectedValues,
     // Acquired a null dimension
     NullAcquiredDimension,
+    // Chart is under replication
+    ChartUnderReplication,
 };
 
 struct TrainingResponse {
