@@ -84,17 +84,10 @@ void Config::readMLConfig(void) {
 
     Cfg.EnableAnomalyDetection = EnableAnomalyDetection;
 
-#if 0
     Cfg.MaxTrainSamples = MaxTrainSamples;
     Cfg.MinTrainSamples = MinTrainSamples;
     Cfg.TrainEvery = TrainEvery;
     Cfg.NumModelsToUse = NumModelsToUse;
-#else
-    Cfg.MaxTrainSamples = 60;
-    Cfg.MinTrainSamples = 30;
-    Cfg.TrainEvery = 60;
-    Cfg.NumModelsToUse = 7 * 24;
-#endif
 
     Cfg.DiffN = DiffN;
     Cfg.SmoothN = SmoothN;
