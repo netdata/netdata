@@ -67,11 +67,12 @@ DATABASE_FUNC_MIGRATION_LIST migration_list_metadata_db[] = {
  * @brief Throws fatal SQLite3 error
  * @details In case of a fatal SQLite3 error, the SQLite3 error code will be 
  * translated to a readable error message and logged to stderr. 
+ * @param[in] source Source that cause the error
  * @param[in] rc SQLite3 error code
  * @param[in] line_no Line number where the error occurred 
  */
-static inline void fatal_sqlite3_err(int rc, int line_no){
-    fatal("SQLite error: %s (line %d)", sqlite3_errstr(rc), line_no);
+static inline void fatal_sqlite3_err(const char *source, int rc, int line_no){
+    fatal("[%s]: SQLite error: %s (line %d)", source ? source : "-", sqlite3_errstr(rc), line_no);
 }
 
 /**
@@ -93,13 +94,13 @@ char *db_get_sqlite_version() {
     int rc = 0;
     sqlite3_stmt *stmt_get_sqlite_version;
     rc = sqlite3_prepare_v2(main_db, "SELECT sqlite_version();", -1, &stmt_get_sqlite_version, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
     rc = sqlite3_step(stmt_get_sqlite_version);
-    if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(NULL, rc, __LINE__);
     char *text = mallocz(sqlite3_column_bytes(stmt_get_sqlite_version, 0) + 1);
     strcpy(text, (char *)sqlite3_column_text(stmt_get_sqlite_version, 0));
     rc = sqlite3_finalize(stmt_get_sqlite_version);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
     return text;
 }
 
@@ -116,18 +117,18 @@ int db_user_version(sqlite3 *db, const int set_user_version){
     if(set_user_version <= 0){
         sqlite3_stmt *stmt_get_user_version;
         rc = sqlite3_prepare_v2(db, "PRAGMA user_version;", -1, &stmt_get_user_version, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
         rc = sqlite3_step(stmt_get_user_version);
-        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(NULL, rc, __LINE__);
         int current_user_version = sqlite3_column_int(stmt_get_user_version, 0);
         rc = sqlite3_finalize(stmt_get_user_version);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
         return current_user_version;
     } else {
         char buf[25];
         snprintfz(buf, 25, "PRAGMA user_version=%d;", set_user_version);
         rc = sqlite3_exec(db, buf, NULL, NULL, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
         return set_user_version;
     }
 }
@@ -151,14 +152,14 @@ static void db_writer(void *arg){
                         "Msg_decompr_size"
                         ") VALUES (?,?,?,?,?) ;",
                         -1, &stmt_logs_insert, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
     /* Prepare BLOBS_TABLE get total filesize statement */
     sqlite3_stmt *stmt_blobs_get_total_filesize;
     rc = sqlite3_prepare_v2(p_file_info->db,
                             "SELECT SUM(Filesize) FROM " BLOBS_TABLE " ;",
                             -1, &stmt_blobs_get_total_filesize, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
      
     /* Prepare BLOBS_TABLE UPDATE statement */
     sqlite3_stmt *stmt_blobs_update;
@@ -167,7 +168,7 @@ static void db_writer(void *arg){
                             " SET Filesize = Filesize + ?"
                             " WHERE Id = ? ;",
                             -1, &stmt_blobs_update, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
     /* Prepare BLOBS_TABLE Filename rotate statement */
     sqlite3_stmt *stmt_rotate_blobs;
@@ -175,7 +176,7 @@ static void db_writer(void *arg){
                             "UPDATE " BLOBS_TABLE
                             " SET Filename = REPLACE(Filename, ?, ?);",
                             -1, &stmt_rotate_blobs, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
     /* Prepare BLOBS_TABLE UPDATE SET zero filesize statement */
     sqlite3_stmt *stmt_blobs_set_zero_filesize;
@@ -184,7 +185,7 @@ static void db_writer(void *arg){
                             " SET Filesize = 0"
                             " WHERE Id = ? ;",
                             -1, &stmt_blobs_set_zero_filesize, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     
     /* Prepare LOGS_TABLE DELETE statement */
     sqlite3_stmt *stmt_logs_delete;
@@ -192,7 +193,7 @@ static void db_writer(void *arg){
                             "DELETE FROM " LOGS_TABLE
                             " WHERE FK_BLOB_Id = ? ;",
                             -1, &stmt_logs_delete, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         
     /* Get initial filesize of logs.bin.0 BLOB */
     sqlite3_stmt *stmt_retrieve_filesize_from_id;
@@ -200,19 +201,19 @@ static void db_writer(void *arg){
                             "SELECT Filesize FROM " BLOBS_TABLE 
                             " WHERE Id = ? ;",
                             -1, &stmt_retrieve_filesize_from_id, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     rc = sqlite3_bind_int(stmt_retrieve_filesize_from_id, 1, p_file_info->blob_write_handle_offset);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     rc = sqlite3_step(stmt_retrieve_filesize_from_id);
-    if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     int64_t blob_filesize = (int64_t) sqlite3_column_int64(stmt_retrieve_filesize_from_id, 0);
     rc = sqlite3_finalize(stmt_retrieve_filesize_from_id);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         
     while(1){
         uv_mutex_lock(p_file_info->db_mut);
         rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         Circ_buff_item_t *item = circ_buff_read_item(p_file_info->circ_buff);
         while (item) {  // Retrieve buff items and store in DB until there are no more items in the buffer
             
@@ -227,32 +228,32 @@ static void db_writer(void *arg){
             
             /* Write metadata of log message in LOGS_TABLE */
             rc = sqlite3_bind_int(stmt_logs_insert, 1, p_file_info->blob_write_handle_offset);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_bind_int64(stmt_logs_insert, 2, (sqlite3_int64) blob_filesize);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_bind_int64(stmt_logs_insert, 3, (sqlite3_int64) item->timestamp);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             m_assert(item->timestamp > 1649175852000 && item->timestamp < 2532788652000, "item->timestamp == 0"); // Timestamp within valid range up to 2050
             rc = sqlite3_bind_int64(stmt_logs_insert, 4, (sqlite3_int64) item->text_compressed_size);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             m_assert(item->text_compressed_size != 0, "item->text_compressed_size == 0");
             rc = sqlite3_bind_int64(stmt_logs_insert, 5, (sqlite3_int64)item->text_size);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             m_assert(item->text_size != 0, "item->text_size == 0");
             rc = sqlite3_step(stmt_logs_insert);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_logs_insert);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* Update metadata of BLOBs filesize in BLOBS_TABLE */
             rc = sqlite3_bind_int64(stmt_blobs_update, 1, (sqlite3_int64)item->text_compressed_size);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_bind_int(stmt_blobs_update, 2, p_file_info->blob_write_handle_offset);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_blobs_update);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_blobs_update);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* Increase BLOB offset and read next log message until no more messages in buff */
             blob_filesize += (int64_t) item->text_compressed_size;
@@ -264,7 +265,7 @@ static void db_writer(void *arg){
         uv_fs_req_cleanup(&dsync_req);
         if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
         rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         // TODO: Should we log it if there is a fatal error in the above line, as there will be a mismatch between BLOBs and SQLite metadata?
         //sqlite3_wal_checkpoint_v2(p_file_info->db,NULL,SQLITE_CHECKPOINT_PASSIVE,0,0);
         
@@ -278,18 +279,18 @@ static void db_writer(void *arg){
              * (a) First increase all of their endings numbers by 1 and 
              * (b) then replace the maximum number with 0. */
             rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             for(int i = BLOB_MAX_FILES - 1; i >= 0; i--){
                 
                 /* Rotate BLOBS_TABLE Filenames */
                 rc = sqlite3_bind_int(stmt_rotate_blobs, 1, i);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 rc = sqlite3_bind_int(stmt_rotate_blobs, 2, i + 1);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 rc = sqlite3_step(stmt_rotate_blobs);
-                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 rc = sqlite3_reset(stmt_rotate_blobs);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 
                 /* Rotate path of BLOBs */
                 sprintf(old_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i);
@@ -300,15 +301,15 @@ static void db_writer(void *arg){
             }
             /* Replace the maximum number with 0 in SQLite DB. */
             rc = sqlite3_bind_int(stmt_rotate_blobs, 1, BLOB_MAX_FILES);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_bind_int(stmt_rotate_blobs, 2, 0);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_rotate_blobs);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_rotate_blobs);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* Replace the maximum number with 0 in BLOB files. */
             sprintf(old_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, BLOB_MAX_FILES);
@@ -330,18 +331,18 @@ static void db_writer(void *arg){
             uv_fs_req_cleanup(&trunc_req);
             /* (c) */ 
             rc = sqlite3_bind_int(stmt_blobs_set_zero_filesize, 1, p_file_info->blob_write_handle_offset);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_blobs_set_zero_filesize);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_blobs_set_zero_filesize);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             /* (d) */
             rc = sqlite3_bind_int(stmt_logs_delete, 1, p_file_info->blob_write_handle_offset);
-            if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+            if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_logs_delete);
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_logs_delete);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             /* (e) */
             blob_filesize = 0;
 
@@ -349,11 +350,11 @@ static void db_writer(void *arg){
 
         /* Update total disk usage of all BLOBs for this log source */
         rc = sqlite3_step(stmt_blobs_get_total_filesize);
-        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
         __atomic_store_n(&p_file_info->blob_total_size, sqlite3_column_int64(stmt_blobs_get_total_filesize, 0), __ATOMIC_RELAXED);
         // debug(D_LOGS_MANAG, "p_file_info->blob_total_size: %lld for: %s\n", p_file_info->blob_total_size, p_file_info->filename);
         rc = sqlite3_reset(stmt_blobs_get_total_filesize);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 
         // TODO: Can uv_mutex_unlock(p_file_info->db_mut) be moved before if(blob_filesize > p_file_info-> blob_max_size) ?
         uv_mutex_unlock(p_file_info->db_mut);
@@ -397,7 +398,7 @@ int db_init() {
 
     /* Create or open main db */
     rc = sqlite3_open(main_db_path, &main_db);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     
     /* Configure main database */
     rc = sqlite3_exec(main_db,
@@ -411,7 +412,7 @@ int db_init() {
         error("Failed to configure database");
         error("SQL error: %s\n", err_msg);
         sqlite3_free(err_msg);
-        fatal_sqlite3_err(rc, __LINE__);
+        fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     } else {
         info("%s configured successfully", MAIN_DB);
     }
@@ -443,7 +444,7 @@ int db_init() {
         error("Failed to create table" MAIN_COLLECTIONS_TABLE);
         error("SQL error: %s", err_msg);
         sqlite3_free(err_msg);
-        fatal_sqlite3_err(rc, __LINE__);
+        fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     }
     
     sqlite3_stmt *stmt_search_if_log_source_exists;
@@ -451,14 +452,14 @@ int db_init() {
                             "SELECT COUNT(*), Id, DB_Dir FROM " MAIN_COLLECTIONS_TABLE
                             " WHERE Log_Source_Path = ? ;",
                             -1, &stmt_search_if_log_source_exists, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     
     sqlite3_stmt *stmt_insert_log_collection_metadata;
     rc = sqlite3_prepare_v2(main_db,
                             "INSERT INTO " MAIN_COLLECTIONS_TABLE
                             " (Machine_GUID, Log_Source_Path, Type, DB_Dir) VALUES (?,?,?,?) ;",
                             -1, &stmt_insert_log_collection_metadata, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(MAIN_DB, rc, __LINE__);
     
     for (int i = 0; i < p_file_infos_arr->count; i++) {
 
@@ -469,10 +470,10 @@ int db_init() {
         uv_mutex_lock(p_file_infos_arr->data[i]->db_mut);
 
         rc = sqlite3_bind_text(stmt_search_if_log_source_exists, 1, p_file_infos_arr->data[i]->filename, -1, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         rc = sqlite3_step(stmt_search_if_log_source_exists);
         /* COUNT(*) query should always return SQLITE_ROW */
-        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         
         int log_source_occurences = sqlite3_column_int(stmt_search_if_log_source_exists, 0);
         // debug(D_LOGS_MANAG, "DB file occurences of %s: %d", p_file_infos_arr->data[i]->filename, log_source_occurences);
@@ -481,15 +482,15 @@ int db_init() {
                 
                 /* Bind machine GUID */
                 rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 1, localhost->machine_guid, -1, NULL);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
                 /* Bind log source path */
                 rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 2, p_file_infos_arr->data[i]->filename, -1, NULL);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 
                 /* Bind log type */
                 rc = sqlite3_bind_int(stmt_insert_log_collection_metadata, 3, p_file_infos_arr->data[i]->log_type);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 
                 /* Create directory of collection of logs for the particular 
                  * log source (in the form of a UUID) and bind it. */
@@ -509,14 +510,14 @@ int db_init() {
                 uv_fs_req_cleanup(&mkdir_req);
                 
                 rc = sqlite3_bind_text(stmt_insert_log_collection_metadata, 4, db_dir, -1, NULL);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_step(stmt_insert_log_collection_metadata);
-                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                     
                 p_file_infos_arr->data[i]->db_dir = db_dir;
                 
                 rc = sqlite3_reset(stmt_insert_log_collection_metadata);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 break;
                 
             case 1:  // File metadata found in DB            
@@ -530,13 +531,13 @@ int db_init() {
                         p_file_infos_arr->data[i]->filename);
         }
         rc = sqlite3_reset(stmt_search_if_log_source_exists);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         
         /* Create or open metadata DBs for each log collection */
         char *db_metadata = mallocz(snprintf(NULL, 0, "%s" METADATA_DB_FILENAME, p_file_infos_arr->data[i]->db_dir) + 1);
         sprintf(db_metadata, "%s" METADATA_DB_FILENAME, p_file_infos_arr->data[i]->db_dir);
         rc = sqlite3_open(db_metadata, &p_file_infos_arr->data[i]->db);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         p_file_infos_arr->data[i]->db_metadata = db_metadata;
         // freez(db_metadata);
         
@@ -579,9 +580,9 @@ int db_init() {
                                 "SELECT COUNT(*) FROM sqlite_master" 
                                 " WHERE type='table' AND name='"BLOBS_TABLE"';",
                                 -1, &stmt_check_if_BLOBS_TABLE_exists, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         rc = sqlite3_step(stmt_check_if_BLOBS_TABLE_exists);
-        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__); /* COUNT(*) query should always return SQLITE_ROW */
+        if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__); /* COUNT(*) query should always return SQLITE_ROW */
         
         /* If BLOBS_TABLE doesn't exist, create and populate it */
         if(sqlite3_column_int(stmt_check_if_BLOBS_TABLE_exists, 0) == 0){
@@ -606,25 +607,25 @@ int db_init() {
                             "INSERT INTO " BLOBS_TABLE 
                             " (Filename, Filesize) VALUES (?,?) ;",
                             -1, &stmt_init_BLOBS_table, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             for( int i = 0; i < BLOB_MAX_FILES; i++){
                 char *filename = mallocz(snprintf(NULL, 0, BLOB_STORE_FILENAME ".%d", i) + 1);
                 sprintf(filename, BLOB_STORE_FILENAME ".%d", i);
                 rc = sqlite3_bind_text(stmt_init_BLOBS_table, 1, filename, -1, NULL);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);
+                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_bind_int64(stmt_init_BLOBS_table, 2, (sqlite3_int64) 0);
-                if (rc != SQLITE_OK) fatal_sqlite3_err(rc, __LINE__);      
+                if (rc != SQLITE_OK) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);      
                 rc = sqlite3_step(stmt_init_BLOBS_table);
-                if (rc != SQLITE_DONE) fatal_sqlite3_err(rc, __LINE__);
+                if (rc != SQLITE_DONE) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_reset(stmt_init_BLOBS_table);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 freez(filename);
             }
             rc = sqlite3_finalize(stmt_init_BLOBS_table);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         }
         rc = sqlite3_finalize(stmt_check_if_BLOBS_TABLE_exists);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         
         /* If LOGS_TABLE doesn't exist, create it */
         rc = sqlite3_exec(p_file_infos_arr->data[i]->db,
@@ -667,9 +668,9 @@ int db_init() {
             rc = sqlite3_prepare_v2(p_file_infos_arr->data[i]->db,
                 "SELECT MAX(Id) FROM " BLOBS_TABLE ";",
                 -1, &stmt_get_BLOBS_TABLE_size, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_get_BLOBS_TABLE_size);
-            if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             const int blobs_table_max_id = sqlite3_column_int(stmt_get_BLOBS_TABLE_size, 0);
 
             sqlite3_stmt *stmt_retrieve_filename_last_digits; // This statement retrieves the last digit(s) from the Filename column of BLOBS_TABLE
@@ -678,23 +679,23 @@ int db_init() {
                 "UNION ALL SELECT substr(str, 0, instr(str, '.')), substr(str, instr(str, '.')+1) FROM split WHERE str!='' ) "
                 "SELECT word FROM split WHERE word!='' ORDER BY LENGTH(str) LIMIT 1;",
                 -1, &stmt_retrieve_filename_last_digits, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             sqlite3_stmt *stmt_delete_row_by_id; 
             rc = sqlite3_prepare_v2(p_file_infos_arr->data[i]->db,
                 "DELETE FROM " BLOBS_TABLE " WHERE Id = ?;",
                 -1, &stmt_delete_row_by_id, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             for (int id = 1; id <= blobs_table_max_id; id++){
 
                 rc = sqlite3_bind_int(stmt_retrieve_filename_last_digits, 1, id);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_step(stmt_retrieve_filename_last_digits);
-                if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 int last_digits = sqlite3_column_int(stmt_retrieve_filename_last_digits, 0);
                 rc = sqlite3_reset(stmt_retrieve_filename_last_digits);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
                 /* If last_digits > BLOB_MAX_FILES - 1, then some BLOB files will need to be removed
                  * (both from DB BLOBS_TABLE and also from the disk) */
@@ -702,11 +703,11 @@ int db_init() {
 
                     // Delete entry from DB BLOBS_TABLE
                     rc = sqlite3_bind_int(stmt_delete_row_by_id, 1, id);
-                    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                     rc = sqlite3_step(stmt_delete_row_by_id);
-                    if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+                    if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                     rc = sqlite3_reset(stmt_delete_row_by_id);
-                    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
                     // Delete BLOB file from filesystem
                     char blob_delete_path[FILENAME_MAX + 1];
@@ -719,9 +720,9 @@ int db_init() {
                 }
             }
             rc = sqlite3_finalize(stmt_retrieve_filename_last_digits);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_finalize(stmt_delete_row_by_id);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             /* BLOBS_TABLE ids after the deletion might not be continuous. This
              * needs to be fixed, by having the ids updated. LOGS_TABLE FKs will
@@ -733,35 +734,35 @@ int db_init() {
             rc = sqlite3_prepare_v2(p_file_infos_arr->data[i]->db,
                 "SELECT Id FROM " BLOBS_TABLE " ORDER BY Id ASC;",
                 -1, &stmt_retrieve_all_ids, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             rc = sqlite3_step(stmt_retrieve_all_ids);
             while(rc == SQLITE_ROW){
                 old_blobs_table_ids[off++] = sqlite3_column_int(stmt_retrieve_all_ids, 0);
                 rc = sqlite3_step(stmt_retrieve_all_ids);
             }
-            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_finalize(stmt_retrieve_all_ids);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             sqlite3_stmt *stmt_update_id; 
             rc = sqlite3_prepare_v2(p_file_infos_arr->data[i]->db,
                 "UPDATE " BLOBS_TABLE " SET Id = ? WHERE Id = ?;",
                 -1, &stmt_update_id, NULL);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
             for (int i = 0; i < BLOB_MAX_FILES; i++){
                 rc = sqlite3_bind_int(stmt_update_id, 1, i + 1);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_bind_int(stmt_update_id, 2, old_blobs_table_ids[i]);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_step(stmt_update_id);
-                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
                 rc = sqlite3_reset(stmt_update_id);
-                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+                if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             }
             rc = sqlite3_finalize(stmt_update_id);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         }
 
         /* Traverse BLOBS_TABLE, open logs.bin.X files and store their file handles in p_file_info array. */
@@ -770,22 +771,22 @@ int db_init() {
                                 "SELECT Filename, Filesize FROM " BLOBS_TABLE 
                                 " WHERE Id = ? ;",
                                 -1, &stmt_retrieve_metadata_from_id, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         
         sqlite3_stmt *stmt_retrieve_total_logs_size;
         rc = sqlite3_prepare_v2(p_file_infos_arr->data[i]->db,
                                 "SELECT SUM(Msg_compr_size) FROM " LOGS_TABLE 
                                 " WHERE FK_BLOB_Id = ? GROUP BY FK_BLOB_Id ;",
                                 -1, &stmt_retrieve_total_logs_size, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         
         uv_fs_t open_req;
         for(int id = 1; id <= BLOB_MAX_FILES; id++){
             /* Open BLOB file based on filename stored in BLOBS_TABLE. */
             rc = sqlite3_bind_int(stmt_retrieve_metadata_from_id, 1, id);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_retrieve_metadata_from_id);
-            if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             char *filename = mallocz(snprintf(NULL, 0, "%s%s", 
                 p_file_infos_arr->data[i]->db_dir, 
                 sqlite3_column_text(stmt_retrieve_metadata_from_id, 0)) + 1);
@@ -803,13 +804,13 @@ int db_init() {
              * it is probably the initial execution of the program so still valid (except if rc is other
              * than SQLITE_DONE, which is an error then). */
             rc = sqlite3_bind_int(stmt_retrieve_total_logs_size, 1, id);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_retrieve_total_logs_size);
             if (rc == SQLITE_ROW){ 
                 const int64_t total_logs_filesize = (int64_t) sqlite3_column_int64(stmt_retrieve_total_logs_size, 0);
                 m_assert(total_logs_filesize == metadata_filesize, "Metadata filesize != total logs filesize");
             }
-            else if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+            else if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             
             /* Get filesize of BLOB file. */ 
             uv_fs_t stat_req;
@@ -863,12 +864,12 @@ int db_init() {
             freez(filename);
             uv_fs_req_cleanup(&open_req);
             rc = sqlite3_reset(stmt_retrieve_total_logs_size);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_reset(stmt_retrieve_metadata_from_id);
-            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+            if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
         }
         rc = sqlite3_finalize(stmt_retrieve_metadata_from_id);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
 
         /* DB initialisation finished; release lock */
         uv_mutex_unlock(p_file_infos_arr->data[i]->db_mut);
@@ -880,9 +881,9 @@ int db_init() {
         
     }
     rc = sqlite3_finalize(stmt_search_if_log_source_exists);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
     rc = sqlite3_finalize(stmt_insert_log_collection_metadata);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(NULL, rc, __LINE__);
 
     uv_thread_t *db_loop_run_thread = mallocz(sizeof(uv_thread_t));
     if(unlikely(uv_thread_create(db_loop_run_thread, db_loop_run, NULL))) fatal("uv_thread_create() error");
@@ -923,17 +924,17 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
                             "WHERE Timestamp BETWEEN ? AND ? "
                             "ORDER BY Timestamp;",
                             -1, &stmt_retrieve_log_msg_metadata, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 
     rc = sqlite3_exec(p_file_info->db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, (sqlite3_int64)p_query_params->start_timestamp);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, (sqlite3_int64)p_query_params->end_timestamp);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 
     rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
-    if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 
     while (rc == SQLITE_ROW) {
         Circ_buff_item_t temp_msg = {0};
@@ -1008,13 +1009,13 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 
         rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
         // debug(D_LOGS_MANAG, "Query: %s\n rc:%d\n", sqlite3_expanded_sql(stmt_retrieve_log_msg_metadata), rc);
-        if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     }
 
     rc = sqlite3_exec(p_file_info->db, "END TRANSACTION;", NULL, NULL, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
     rc = sqlite3_finalize(stmt_retrieve_log_msg_metadata);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
 }
 
 #define TMP_VIEW_TABLE		   "compound_view"
@@ -1030,26 +1031,26 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
 
     sqlite3 *dbt;
     rc = sqlite3_open_v2(p_file_infos[0]->db_metadata, &dbt, SQLITE_OPEN_READONLY, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
     rc = sqlite3_exec(dbt, "BEGIN TRANSACTION;", NULL, NULL, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);	
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);	
 
     /* Attach DBs */
     sqlite3_stmt *stmt_attach_db;
     rc = sqlite3_prepare_v2(dbt,"ATTACH DATABASE ?  AS ? ;", -1, &stmt_attach_db, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     for(pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
         rc = sqlite3_bind_text(stmt_attach_db, 1, p_file_infos[pfi_off]->db_metadata, -1, NULL);
         // rc = sqlite3_bind_text(stmt_attach_db, 2, METADATA_DB_FILENAME, -1, NULL);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[pfi_off]->chart_name, rc, __LINE__);
         rc = sqlite3_bind_int(stmt_attach_db, 2, pfi_off);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[pfi_off]->chart_name, rc, __LINE__);
         // debug(D_LOGS_MANAG, "Attach db query[%d]:%s", pfi_off, sqlite3_expanded_sql(stmt_attach_db));
         rc = sqlite3_step(stmt_attach_db);
-        if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos[pfi_off]->chart_name, rc, __LINE__);
         rc = sqlite3_reset(stmt_attach_db);
-        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[pfi_off]->chart_name, rc, __LINE__);
     }
 
     /* Create temporary view */
@@ -1070,11 +1071,11 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
 
     sqlite3_stmt *stmt_create_tmp_view;
     rc = sqlite3_prepare_v2(dbt, tmp_view_query, -1, &stmt_create_tmp_view, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
     // debug(D_LOGS_MANAG, "stmt_create_tmp_view:%s", sqlite3_expanded_sql(stmt_create_tmp_view));
     rc = sqlite3_step(stmt_create_tmp_view);
-    if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
 
     /* Prepare retrieval of metadata from TMP_VIEW_TABLE statement */
@@ -1087,16 +1088,16 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
                             "FROM " TMP_VIEW_TABLE " "
                             "WHERE Timestamp BETWEEN ? AND ? ;",
                             -1, &stmt_retrieve_log_msg_metadata, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
     /* Execute search */
     rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 1, (sqlite3_int64)p_query_params->start_timestamp);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     rc = sqlite3_bind_int64(stmt_retrieve_log_msg_metadata, 2, (sqlite3_int64)p_query_params->end_timestamp);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
     rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
-    if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     // debug(D_LOGS_MANAG, "Query: %s\n rc:%d\n", sqlite3_expanded_sql(stmt_retrieve_log_msg_metadata), rc);
     while (rc == SQLITE_ROW) {
         Circ_buff_item_t temp_msg = {0};
@@ -1172,19 +1173,19 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
 
         rc = sqlite3_step(stmt_retrieve_log_msg_metadata);
         // debug(D_LOGS_MANAG, "Query: %s\n rc:%d\n", sqlite3_expanded_sql(stmt_retrieve_log_msg_metadata), rc);
-        if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(rc, __LINE__);
+        if (unlikely(rc != SQLITE_ROW && rc != SQLITE_DONE)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     }
 
     rc = sqlite3_finalize(stmt_attach_db);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     rc = sqlite3_finalize(stmt_retrieve_log_msg_metadata);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     rc = sqlite3_finalize(stmt_create_tmp_view);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
     
     rc = sqlite3_exec(dbt, "END TRANSACTION;", NULL, NULL, NULL);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 
     rc = sqlite3_close(dbt);
-    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(rc, __LINE__);
+    if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos[0]->chart_name, rc, __LINE__);
 }
