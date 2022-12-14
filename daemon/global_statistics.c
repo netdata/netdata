@@ -1166,11 +1166,11 @@ static void dbengine2_statistics_charts(void) {
         if (unlikely(!st_query_pages_source)) {
             st_query_pages_source = rrdset_create_localhost(
                     "netdata",
-                    "dbengine_query_pages_source",
+                    "dbengine_query_pages_metadata_source",
                     NULL,
                     "dbengine cache",
                     NULL,
-                    "Netdata Query Pages Source",
+                    "Netdata Query Pages Metadata Source",
                     "pages/s",
                     "netdata",
                     "stats",
