@@ -115,23 +115,80 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+static void pdc_mark_all_unset_pages_as_failed(Pvoid_t JudyL, PDC_PAGE_STATUS reason, size_t *statistics_counter) {
+    bool first_then_next = true;
+    Pvoid_t *PValue;
+    Word_t Index = 0;
+    size_t pages_matched = 0;
+
+    while((PValue = JudyLFirstThenNext(JudyL, &Index, &first_then_next))) {
+        struct page_details *pd = *PValue;
+
+        if(!pd->page) {
+            pdc_page_status_set(pd, PDC_PAGE_FAILED | reason);
+            pages_matched++;
+        }
+    }
+
+    if(pages_matched && statistics_counter)
+        __atomic_add_fetch(statistics_counter, pages_matched, __ATOMIC_RELAXED);
+}
+
+static void pdc_destroy(PDC *pdc) {
+    completion_destroy(&pdc->completion);
+
+    Pvoid_t *PValue;
+    struct page_details *pd;
+    Word_t time_index = 0;
+    bool first_then_next = true;
+    size_t unroutable = 0;
+    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
+        pd = *PValue;
+
+        // no need for atomics here - we are done...
+        PDC_PAGE_STATUS status = pd->status;
+
+        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED))) {
+            // pdc_page_status_set(pd, PDC_PAGE_FAILED);
+            unroutable++;
+        }
+
+        if(pd->page && !(status & PDC_PAGE_RELEASED)) {
+            pgc_page_release(main_cache, pd->page);
+            // pdc_page_status_set(pd, PDC_PAGE_RELEASED);
+        }
+
+        freez(pd);
+    }
+
+    JudyLFreeArray(&pdc->page_list_JudyL, PJE0);
+
+    freez(pdc);
+
+    if(unroutable)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
+}
+
 static void pdc_acquire(PDC *pdc) {
-    netdata_spinlock_lock(&pdc->spinlock);
+    netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount < 1)
         fatal("PDC is not referenced and cannot be acquired");
 
     pdc->refcount++;
-    netdata_spinlock_unlock(&pdc->spinlock);
+    netdata_spinlock_unlock(&pdc->refcount_spinlock);
 }
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router) {
-    netdata_spinlock_lock(&pdc->spinlock);
+    netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount <= 0)
         fatal("PDC is not referenced and cannot be released");
 
     pdc->refcount--;
+
+    if(!worker && !router)
+        pdc->query_thread_left = true;
 
     if (pdc->refcount <= 1 && worker) {
         // when 1 refcount is remaining, and we are a worker,
@@ -139,33 +196,15 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router)
         // - if the remaining refcount is from the query caller, we will wake it up
         // - if the remaining refcount is from a worker, the caller is already away
         completion_mark_complete(&pdc->completion);
-
-        if(router) {
-            bool first_then_next = true;
-            Pvoid_t *PValue;
-            Word_t Index = 0;
-            while((PValue = JudyLFirstThenNext(&pdc->page_list_JudyL, &Index, &first_then_next))) {
-                struct page_details *pd = *PValue;
-
-                if(!pd->page) {
-                    __atomic_store_n(&pd->page_failed_to_load, true, __ATOMIC_RELEASE);
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, 1, __ATOMIC_RELAXED);
-                }
-            }
-
-            internal_fatal(true, "DBENGINE: page loading failed to be routed");
-        }
     }
 
     if (pdc->refcount == 0) {
-        completion_destroy(&pdc->completion);
-        free_judyl_page_list(pdc->page_list_JudyL);
-        netdata_spinlock_unlock(&pdc->spinlock);
-        freez(pdc);
+        netdata_spinlock_unlock(&pdc->refcount_spinlock);
+        pdc_destroy(pdc);
         return true;
     }
 
-    netdata_spinlock_unlock(&pdc->spinlock);
+    netdata_spinlock_unlock(&pdc->refcount_spinlock);
     return false;
 }
 
@@ -276,7 +315,6 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     time_t now_s = now_realtime_sec();
 
     page_offset = 0;
-    size_t pages_found = 0;
     for (i = 0; i < count; i++) {
         uint32_t page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
@@ -302,9 +340,6 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
         if(!preload_all_pages && !pd)
             continue;
-
-        if(pd)
-            pages_found++;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
 
@@ -367,15 +402,15 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_RELEASE);
+            pdc_page_status_set(pd, PDC_PAGE_READY);
         }
         else
             pgc_page_release(main_cache, page);
     }
 
-    size_t pages_expected = JudyLCount(extent_page_list->JudyL_page_list, 0, -1, PJE0);
-    if(pages_found != pages_expected)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_uuid_not_found, pages_expected - pages_found, __ATOMIC_RELAXED);
+    pdc_mark_all_unset_pages_as_failed(
+            extent_page_list->JudyL_page_list, PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT,
+            &rrdeng_cache_efficiency_stats.pages_load_fail_uuid_not_found);
 
     freez(uncompressed_buf);
 
@@ -914,10 +949,7 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
 
     while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next))) {
         extent_page_list = *PValue;
-        if(unlikely(!extent_page_list)) {
-            internal_fatal(true, "DBENGINE: extent_list is not populated properly");
-            continue;
-        }
+        internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
 
         // The extent page list can be dispatched to a worker
         // It will need to populate the cache with "acquired" pages that are in the list (pd) only
@@ -1003,12 +1035,12 @@ static void extent_exclusive_access_unlock(struct extent_page_list_s *extent_pag
     netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
 }
 
-static bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
+static bool pdc_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list, PDC_PAGE_STATUS reason) {
     Word_t Index = 0;
     Pvoid_t *PValue;
     bool first = true;
     size_t count_remaining = 0;
-
+    size_t found = 0;
     while((PValue = JudyLFirstThenNext(extent_page_list->JudyL_page_list, &Index, &first))) {
         struct page_details *pd = *PValue;
         if(pd->page)
@@ -1016,12 +1048,15 @@ static bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengi
 
         pd->page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, pd->metric_id, pd->first_time_s, true);
         if(pd->page) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_preloaded, 1, __ATOMIC_RELAXED);
-            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_RELEASE);
+            found++;
+            pdc_page_status_set(pd, PDC_PAGE_READY | reason);
         }
         else
             count_remaining++;
     }
+
+    if(found)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_preloaded, found, __ATOMIC_RELAXED);
 
     return count_remaining == 0;
 }
@@ -1044,7 +1079,7 @@ static void do_read_extent_work(uv_work_t *req)
             goto datafile_not_available;
         }
 
-        if (extent_check_if_required_pdc_pages_are_already_loaded(wc->ctx, extent_page_list))
+        if (pdc_check_if_pages_are_already_in_cache(wc->ctx, extent_page_list, PDC_PAGE_FOUND_IN_CACHE_BY_WORKER))
             goto pages_are_preloaded;
     }
     else {
@@ -1068,19 +1103,11 @@ static void do_read_extent_work(uv_work_t *req)
         int ret = munmap(data, length);
         fatal_assert(0 == ret);
     }
-    else {
-        bool first_then_next = true;
-        Pvoid_t *PValue;
-        Word_t Index = 0;
-        while((PValue = JudyLFirstThenNext(&extent_page_list->JudyL_page_list, &Index, &first_then_next))) {
-            struct page_details *pd = *PValue;
-
-            if(!pd->page) {
-                __atomic_store_n(&pd->page_failed_to_load, true, __ATOMIC_RELEASE);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent, 1, __ATOMIC_RELAXED);
-            }
-        }
-    }
+    else
+        // we failed to map the data
+        pdc_mark_all_unset_pages_as_failed(
+                extent_page_list->JudyL_page_list, PDC_PAGE_FAILED_TO_MAP_EXTENT,
+                &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
 pages_are_preloaded:
     if(pdc->preload_all_extent_pages)
@@ -1191,6 +1218,10 @@ static void do_read_page_list_work(uv_work_t *req)
 
             PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->first_time_s, PJE0);
             *PValue3 = pd;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            pdc_page_status_set(pd, PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT);
+#endif
         }
 
         Word_t datafile_no = 0;

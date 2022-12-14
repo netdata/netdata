@@ -51,7 +51,4 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, time_t *next_page_start_s);
 void init_page_cache(void);
 
-void free_judyl_page_list(Pvoid_t pl_judyL);
-
-
 #endif /* NETDATA_PAGECACHE_H */

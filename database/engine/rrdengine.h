@@ -33,13 +33,31 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 typedef struct page_details_control {
-    Pvoid_t page_list_JudyL;
-    int32_t refcount;
-    unsigned jobs_completed;
-    struct completion completion;
-    bool preload_all_extent_pages;
-    SPINLOCK spinlock;
+    struct completion completion;   // sync between the query thread and the workers
+
+    Pvoid_t page_list_JudyL;        // the list of page details
+    unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
+    bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
+    bool query_thread_left;         // true when the query thread went home...
+
+    SPINLOCK refcount_spinlock;     // spinlock to protect refcount
+    int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
 } PDC;
+
+typedef enum __attribute__ ((__packed__)) {
+    // all pages must pass through these states
+    PDC_PAGE_READY     = (1 << 0),
+    PDC_PAGE_FAILED    = (1 << 1),
+    PDC_PAGE_RELEASED  = (1 << 2),
+
+    // other statuses for tracking issues
+#ifdef NETDATA_INTERNAL_CHECKS
+    PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT = (1 << 3),
+#endif
+    PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT  = (1 << 4),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 5),
+    PDC_PAGE_FOUND_IN_CACHE_BY_WORKER  = (1 << 6),
+} PDC_PAGE_STATUS;
 
 struct page_details {
     struct {
@@ -53,18 +71,20 @@ struct page_details {
         } extent;
     } datafile;
 
-    Word_t metric_id;
     uuid_t uuid;
+    Word_t metric_id;
     time_t first_time_s;
     time_t last_time_s;
     uint32_t update_every_s;
     uint16_t page_length;
     uint8_t type;
-    bool page_failed_to_load; // FIXME - report failures back
-    bool page_is_loaded;
-    bool page_is_released;
+    PDC_PAGE_STATUS status;
     struct pgc_page *page;
 };
+
+#define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))
+#define pdc_page_status_set(pd, flag)   __atomic_or_fetch(&((pd)->status), flag, __ATOMIC_RELEASE)
+#define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((od)->status), ~(flag), __ATOMIC_RELEASE)
 
 struct jv2_extents_info {
     size_t index;
