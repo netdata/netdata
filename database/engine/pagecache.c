@@ -535,10 +535,8 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
             break;
     }
 
-    if(page) {
+    if(page)
         pd->page_is_released = true;
-        pd->page = NULL;
-    }
 
     if(!page)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_failed_to_load, 1, __ATOMIC_RELAXED);

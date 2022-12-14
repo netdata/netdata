@@ -715,7 +715,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
 
     struct page_details_control *pdc = handle->pdc;
 
-    pdc_release_and_destroy_if_unreferenced(pdc, false);
+    pdc_release_and_destroy_if_unreferenced(pdc, false, false);
 
     freez(handle);
     rrdimm_handle->handle = NULL;

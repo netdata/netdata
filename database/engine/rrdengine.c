@@ -116,50 +116,45 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
 }
 
 static void pdc_acquire(PDC *pdc) {
-    int32_t expected, desired;
+    netdata_spinlock_lock(&pdc->spinlock);
 
-    expected = __atomic_load_n(&pdc->refcount, __ATOMIC_RELAXED);
+    if(pdc->refcount < 1)
+        fatal("PDC is not referenced and cannot be acquired");
 
-    do {
-
-        if(expected < 1)
-            fatal("PDC is not referenced and cannot be acquired");
-
-        desired = expected + 1;
-
-    } while(!__atomic_compare_exchange_n(&pdc->refcount, &expected, desired,
-                                         false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
+    pdc->refcount++;
+    netdata_spinlock_unlock(&pdc->spinlock);
 }
 
-bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker) {
-    int32_t expected, desired;
+bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router) {
+    netdata_spinlock_lock(&pdc->spinlock);
 
-    expected = __atomic_load_n(&pdc->refcount, __ATOMIC_RELAXED);
+    if(pdc->refcount <= 0)
+        fatal("PDC is not referenced and cannot be released");
 
-    do {
+    pdc->refcount--;
 
-        if(expected <= 0)
-            fatal("PDC is not referenced and cannot be released");
-
-        desired = expected - 1;
-
-    } while(!__atomic_compare_exchange_n(&pdc->refcount, &expected, desired,
-                                         false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    if (desired <= 1 && worker)
+    if (pdc->refcount <= 1 && worker) {
         // when 1 refcount is remaining, and we are a worker,
         // we can mark the job completed:
         // - if the remaining refcount is from the query caller, we will wake it up
         // - if the remaining refcount is from a worker, the caller is already away
         completion_mark_complete(&pdc->completion);
 
-    if (desired == 0) {
+        if(router) {
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_unroutable, 1, __ATOMIC_RELAXED);
+            internal_fatal(true, "DBENGINE: page loading failed to be routed");
+        }
+    }
+
+    if (pdc->refcount == 0) {
         completion_destroy(&pdc->completion);
         free_judyl_page_list(pdc->page_list_JudyL);
+        netdata_spinlock_unlock(&pdc->spinlock);
         freez(pdc);
         return true;
     }
 
+    netdata_spinlock_unlock(&pdc->spinlock);
     return false;
 }
 
@@ -892,8 +887,12 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
     // Check and send datafile_extent_list->count  extent requests per datafile
     bool first_then_next = true;
 
-    while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next)) && *PValue) {
+    while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next))) {
         extent_page_list = *PValue;
+        if(unlikely(!extent_page_list)) {
+            internal_fatal(true, "DBENGINE: extent_list is not populated properly");
+            continue;
+        }
 
         // The extent page list can be dispatched to a worker
         // It will need to populate the cache with "acquired" pages that are in the list (pd) only
@@ -908,7 +907,7 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
     }
     JudyLFreeArray(&datafile_extent_list->JudyL_datafile_extent_list, PJE0);
 
-    pdc_release_and_destroy_if_unreferenced(pdc, true);
+    pdc_release_and_destroy_if_unreferenced(pdc, true, true);
     worker_is_idle();
 }
 
@@ -1052,7 +1051,7 @@ pages_are_preloaded:
 
 datafile_not_available:
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
-    pdc_release_and_destroy_if_unreferenced(pdc, true);
+    pdc_release_and_destroy_if_unreferenced(pdc, true, false);
 
     // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
@@ -1179,7 +1178,7 @@ static void do_read_page_list_work(uv_work_t *req)
         JudyLFreeArray(&JudyL_datafile_list, PJE0);
     }
 
-    pdc_release_and_destroy_if_unreferenced(pdc, true);
+    pdc_release_and_destroy_if_unreferenced(pdc, true, true);
     worker_is_idle();
 }
 

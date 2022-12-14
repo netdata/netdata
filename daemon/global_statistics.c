@@ -1265,6 +1265,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_unavailable = NULL;
         static RRDDIM *rd_already_loaded = NULL;
         static RRDDIM *rd_preloaded = NULL;
+        static RRDDIM *rd_unroutable = NULL;
 
         if (unlikely(!st_query_pages_from_disk)) {
             st_query_pages_from_disk = rrdset_create_localhost(
@@ -1286,6 +1287,7 @@ static void dbengine2_statistics_charts(void) {
             rd_uncompressed = rrddim_add(st_query_pages_from_disk, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_mmap_failed = rrddim_add(st_query_pages_from_disk, "mmap failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_unavailable = rrddim_add(st_query_pages_from_disk, "unavailable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_unroutable = rrddim_add(st_query_pages_from_disk, "unroutable", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_already_loaded = rrddim_add(st_query_pages_from_disk, "already loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_preloaded = rrddim_add(st_query_pages_from_disk, "preloaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
@@ -1294,7 +1296,8 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid, (collected_number)cache_efficiency_stats.pages_loaded_invalid);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_uncompressed, (collected_number)cache_efficiency_stats.pages_loaded_uncompressed);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_mmap_failed, (collected_number)cache_efficiency_stats.pages_loaded_mmap_failed);
-        rrddim_set_by_pointer(st_query_pages_from_disk, rd_mmap_failed, (collected_number)cache_efficiency_stats.pages_loaded_datafile_not_available);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_unavailable, (collected_number)cache_efficiency_stats.pages_loaded_datafile_not_available);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_unroutable, (collected_number)cache_efficiency_stats.pages_loaded_unroutable);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_already_loaded, (collected_number)cache_efficiency_stats.pages_loaded_but_then_found_in_cache);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_preloaded, (collected_number)cache_efficiency_stats.pages_loaded_preloaded);
 

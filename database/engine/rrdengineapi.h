@@ -155,6 +155,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_loaded_compressed;
     size_t pages_loaded_preloaded;
     size_t pages_loaded_datafile_not_available;
+    size_t pages_loaded_unroutable;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

@@ -38,6 +38,7 @@ typedef struct page_details_control {
     unsigned jobs_completed;
     struct completion completion;
     bool preload_all_extent_pages;
+    SPINLOCK spinlock;
 } PDC;
 
 struct page_details {
@@ -300,7 +301,7 @@ void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
-bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker);
+bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
 
 typedef struct validated_page_descriptor {
     time_t start_time_s;
