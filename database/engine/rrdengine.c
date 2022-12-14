@@ -272,7 +272,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
         page_offset += page_length;
 
-        if(!page_length || start_time_s) {
+        if(!page_length || !start_time_s) {
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. Page %d is EMPTY",
                         __func__, extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno, i);
