@@ -171,6 +171,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         time_t page_first_time_s = pgc_page_start_time_t(page);
         time_t page_last_time_s = pgc_page_end_time_t(page);
         time_t page_update_every_s = pgc_page_update_every(page);
+        size_t page_length = pgc_page_data_size(cache, page);
 
         if(!is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
             // not a useful page for this query
@@ -193,11 +194,17 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         if (unlikely(*PValue)) {
             struct page_details *pd = *PValue;
 
-            internal_fatal(
+            internal_error(
                     pd->first_time_s != page_first_time_s ||
                     pd->last_time_s != page_last_time_s ||
                     pd->update_every_s != page_update_every_s,
-                    "DBENGINE: page is already in judy with different retention");
+                    "DBENGINE: duplicate page with different retention in %s cache "
+                    "1st: %ld to %ld, ue %u, size %u "
+                    "2nd: %ld to %ld, ue %ld size %zu "
+                    "- ignoring the second",
+                    cache == open_cache ? "open" : "main",
+                    pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
+                    page_first_time_s, page_last_time_s, page_update_every_s, page_length);
 
             pgc_page_release(cache, page);
         }
@@ -205,8 +212,8 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             struct page_details *pd = callocz(1, sizeof(*pd));
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
-            pd->page_length = pgc_page_data_size(cache, page);
-            pd->update_every_s = pgc_page_update_every(page);
+            pd->page_length = page_length;
+            pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->type = ctx->page_type;
             pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
@@ -394,6 +401,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                 time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
                 time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
                 time_t page_update_every_s = page_entry_in_journal->update_every_s;
+                size_t page_length = page_entry_in_journal->page_length;
 
                 if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
 
@@ -408,10 +416,16 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         // it is already in the judy
 
                         struct page_details *pd = *PValue; (void)pd;
-                        internal_fatal(
+                        internal_error(
                                 pd->first_time_s != page_first_time_s ||
-                                pd->last_time_s != page_last_time_s,
-                                "DBENGINE: page is already in judy with different retention");
+                                pd->last_time_s != page_last_time_s ||
+                                pd->update_every_s != page_update_every_s,
+                                "DBENGINE: duplicate page with different retention in journal v2 "
+                                "1st: %ld to %ld, ue %u, size %u "
+                                "2nd: %ld to %ld, ue %ld size %zu "
+                                "- ignoring the second",
+                                pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
+                                page_first_time_s, page_last_time_s, page_update_every_s, page_length);
                     }
                     else {
                         struct page_details *pd = callocz(1, sizeof(*pd));
@@ -422,7 +436,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         pd->first_time_s = page_first_time_s;
                         pd->last_time_s = page_last_time_s;
                         pd->datafile.ptr = datafile;
-                        pd->page_length = page_entry_in_journal->page_length;
+                        pd->page_length = page_length;
                         pd->update_every_s = page_update_every_s;
                         pd->type = page_entry_in_journal->type;
                         uuid_copy(pd->uuid, *uuid);
