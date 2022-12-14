@@ -312,9 +312,10 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
             else {
                 if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
-                    internal_error(true,
-                                   "DBENGINE: page offset %u + page length %zu exceeds than the uncompressed buffer size %u",
-                                   page_offset, vd.page_length, uncompressed_payload_length);
+                    error_limit_static_global_var(erl, 10, 0);
+                    error_limit(&erl,
+                                   "DBENGINE: page %d offset %u + page length %zu exceeds than the uncompressed buffer size %u",
+                                   i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
                     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_invalid, 1, __ATOMIC_RELAXED);
