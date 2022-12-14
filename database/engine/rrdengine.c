@@ -781,6 +781,12 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
+        if(!datafile_acquire_for_deletion(ctx->datafiles.first, false)) {
+            error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
+                  " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
+                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+            return;
+        }
         info("Deleting data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
         wc->now_deleting_files = mallocz(sizeof(*wc->now_deleting_files));
@@ -992,22 +998,23 @@ static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-static bool extent_get_exclusive_access(struct extent_page_list_s *extent_page_list) {
+static bool datafile_get_exclusive_access_to_extent(struct extent_page_list_s *extent_page_list) {
     struct rrdengine_datafile *df = extent_page_list->datafile;
     bool is_it_mine = false;
 
     while(!is_it_mine) {
-        netdata_spinlock_lock(&df->extent_exclusive_access_sp);
-        if(!df->available_for_queries) {
-            netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
+        netdata_spinlock_lock(&df->extent_exclusive_access.spinlock);
+        if(!df->users.available) {
+            netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
             return false;
         }
-        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access.extents_JudyL, extent_page_list->pos, PJE0);
         if (!*PValue) {
             *(Word_t *) PValue = gettid();
+            df->extent_exclusive_access.lockers++;
             is_it_mine = true;
         }
-        netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
+        netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
 
         if(!is_it_mine) {
             static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
@@ -1017,22 +1024,23 @@ static bool extent_get_exclusive_access(struct extent_page_list_s *extent_page_l
     return true;
 }
 
-static void extent_exclusive_access_unlock(struct extent_page_list_s *extent_page_list) {
+static void datafile_release_exclusive_access_to_extent(struct extent_page_list_s *extent_page_list) {
     struct rrdengine_datafile *df = extent_page_list->datafile;
 
-    netdata_spinlock_lock(&df->extent_exclusive_access_sp);
+    netdata_spinlock_lock(&df->extent_exclusive_access.spinlock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access.extents_JudyL, extent_page_list->pos, PJE0);
     if (*(Word_t *) PValue != (Word_t)gettid())
         fatal("DBENGINE: exclusive extent access is not mine");
 #endif
 
-    int rc = JudyLDel(&df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+    int rc = JudyLDel(&df->extent_exclusive_access.extents_JudyL, extent_page_list->pos, PJE0);
     if (!rc)
         fatal("DBENGINE: cannot find my exclusive access");
 
-    netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
+    df->extent_exclusive_access.lockers--;
+    netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
 }
 
 static bool pdc_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list, PDC_PAGE_STATUS reason) {
@@ -1073,20 +1081,23 @@ static void do_read_extent_work(uv_work_t *req)
     struct extent_page_list_s *extent_page_list = work_request->data;
     struct page_details_control *pdc = extent_page_list->pdc;
 
+    bool datafile_acquired = false, extent_exclusive = false;
+
+    if(!datafile_acquire(extent_page_list->datafile)) {
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
+        goto cleanup;
+    }
+    datafile_acquired = true;
+
     if(pdc->preload_all_extent_pages) {
-        if (!extent_get_exclusive_access(extent_page_list)) {
+        if (!datafile_get_exclusive_access_to_extent(extent_page_list)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
-            goto datafile_not_available;
+            goto cleanup;
         }
+        extent_exclusive = true;
 
         if (pdc_check_if_pages_are_already_in_cache(wc->ctx, extent_page_list, PDC_PAGE_FOUND_IN_CACHE_BY_WORKER))
-            goto pages_are_preloaded;
-    }
-    else {
-        if (!extent_page_list->datafile->available_for_queries) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
-            goto datafile_not_available;
-        }
+            goto cleanup;
     }
 
     worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
@@ -1109,11 +1120,13 @@ static void do_read_extent_work(uv_work_t *req)
                 extent_page_list->JudyL_page_list, PDC_PAGE_FAILED_TO_MAP_EXTENT,
                 &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
-pages_are_preloaded:
-    if(pdc->preload_all_extent_pages)
-        extent_exclusive_access_unlock(extent_page_list);
+cleanup:
+    if(extent_exclusive)
+        datafile_release_exclusive_access_to_extent(extent_page_list);
 
-datafile_not_available:
+    if(datafile_acquired)
+        datafile_release(extent_page_list->datafile);
+
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true, false);
 

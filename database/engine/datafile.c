@@ -62,9 +62,65 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->journalfile = NULL;
     datafile->next = datafile->prev = NULL;
     datafile->ctx = ctx;
-    datafile->available_for_queries = true;
-    datafile->extent_exclusive_access_sp = NETDATA_SPINLOCK_INITIALIZER;
-    datafile->extent_exclusive_access_JudyL = NULL;
+
+    datafile->users.spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    datafile->users.lockers = 0;
+    datafile->users.available = true;
+
+    datafile->extent_exclusive_access.spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    datafile->extent_exclusive_access.lockers = 0;
+    datafile->extent_exclusive_access.extents_JudyL = NULL;
+}
+
+bool datafile_acquire(struct rrdengine_datafile *df) {
+    bool ret;
+
+    netdata_spinlock_lock(&df->users.spinlock);
+
+    if(df->users.available) {
+        ret = true;
+        df->users.lockers++;
+    }
+    else
+        ret = false;
+
+    netdata_spinlock_unlock(&df->users.spinlock);
+
+    return ret;
+}
+
+void datafile_release(struct rrdengine_datafile *df) {
+    netdata_spinlock_lock(&df->users.spinlock);
+    if(!df->users.lockers)
+        fatal("DBENGINE DATAFILE: cannot release a datafile that is not acquired");
+
+    df->users.lockers--;
+    netdata_spinlock_unlock(&df->users.spinlock);
+}
+
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait) {
+    bool can_be_deleted = false;
+
+    while(!can_be_deleted) {
+        netdata_spinlock_lock(&df->users.spinlock);
+        df->users.available = false;
+
+        if(!df->users.lockers)
+            can_be_deleted = true;
+
+        netdata_spinlock_unlock(&df->users.spinlock);
+
+        if(!can_be_deleted) {
+            if(wait) {
+                static const struct timespec ns = {.tv_sec = 0, .tv_nsec = 1};
+                nanosleep(&ns, NULL);
+            }
+            else
+                break;
+        }
+    }
+
+    return can_be_deleted;
 }
 
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)

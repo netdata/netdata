@@ -54,10 +54,24 @@ struct rrdengine_datafile {
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *prev;
     struct rrdengine_datafile *next;
-    bool available_for_queries;
-    SPINLOCK extent_exclusive_access_sp;
-    Pvoid_t extent_exclusive_access_JudyL;
+
+    // exclusive access to extents
+    struct {
+        SPINLOCK spinlock;
+        unsigned lockers;
+        Pvoid_t extents_JudyL;
+    } extent_exclusive_access;
+
+    struct {
+        SPINLOCK spinlock;
+        unsigned lockers;
+        bool available;
+    } users;
 };
+
+bool datafile_acquire(struct rrdengine_datafile *df);
+void datafile_release(struct rrdengine_datafile *df);
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait);
 
 struct rrdengine_datafile_list {
     uv_rwlock_t rwlock;
