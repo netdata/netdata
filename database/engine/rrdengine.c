@@ -906,47 +906,6 @@ struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config* wc)
     return ret;
 }
 
-// FIXME: Expire cached extents per datafile -- Improve so that it doesnt need to scan all the items
-static void expire_extent_caching(struct rrdengine_worker_config *wc)
-{
-    struct rrdengine_datafile *datafile = wc->ctx->datafiles.first;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    time_t now = now_realtime_sec();
-
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    while (datafile) {
-        uv_rwlock_wrlock(&datafile->JudyL_extent_rwlock);
-        Word_t pos = 0;
-        bool first = true;
-        Pvoid_t *PValue;
-        do {
-            PValue = JudyLFirstThenNext(datafile->JudyL_extent_expire_array, &pos, &first);
-            if (PValue && *PValue) {
-                time_t expire_time_t = (time_t) * (Word_t *)PValue;
-
-                if (expire_time_t <= now) {
-                    // Find the address of memory to free
-                    PValue = JudyLGet(datafile->JudyL_extent_offset_array, pos, PJE0);
-                    fatal_assert(NULL != PValue && NULL != *PValue);
-                    freez(*PValue);
-
-                    PValue = JudyLGet(datafile->JudyL_extent_size_array, pos, PJE0);
-                    fatal_assert(NULL != PValue && NULL != *PValue);
-                    //size_t bytes = (size_t) *(Word_t *) PValue;
-                    //info("DEBUG: Extent caching -- Releasing extent @ pos %lu (%lu bytes)", pos, bytes);
-                    JudyLDel(&datafile->JudyL_extent_offset_array, pos, PJE0);
-                    JudyLDel(&datafile->JudyL_extent_size_array, pos, PJE0);
-                    JudyLDel(&datafile->JudyL_extent_expire_array, pos, PJE0);
-                }
-            }
-        } while (PValue);
-        uv_rwlock_wrunlock(&datafile->JudyL_extent_rwlock);
-        datafile = datafile->next;
-    }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-}
-
 void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
@@ -972,9 +931,6 @@ void timer_cb(uv_timer_t* handle)
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }
-
-    if (NO_QUIESCE == wc->ctx->quiesce && !wc->now_deleting_files)
-        expire_extent_caching(wc);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     {
@@ -1071,46 +1027,17 @@ static void do_read_extent2_work(uv_work_t *req)
     struct extent_page_list_s *extent_page_list = work_request->data;
     struct page_details_control *pdc = extent_page_list->pdc;
 
-    // We have one extent to read from file, pos, size
-    // Then we need to scan the judy extent_page_list->JudyL_page_list to see exactly the pages we need (extent processing)
-    // We first need to check if under the datafile we have the extent "cached"
-    // 1. extent_page_list->datafile->JudyL_extent_offset_array
-    //    Index the file offset and value the actual extent data (compressed)
-    //    Note
-    // 2. extent_page_list->datafile->JudyL_extent_rwlock (lock)
-
     off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->pos);
     size_t length = ALIGN_BYTES_CEILING(extent_page_list->pos + extent_page_list->size) - map_start;
 
-    void *extent_data;
+    void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
+    fatal_assert(MAP_FAILED != data);
 
-    // FIXME: DBENGINE2 add an extent cache cleanup
-    uv_rwlock_wrlock(&extent_page_list->datafile->JudyL_extent_rwlock);
-    Pvoid_t *PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_offset_array, extent_page_list->pos, PJE0);
-    fatal_assert(NULL != PValue);
-    if (NULL == *PValue) {
-        void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
-        fatal_assert(MAP_FAILED != data);
+    void *extent_data = mallocz(extent_page_list->size);
+    memcpy(extent_data, data + (extent_page_list->pos - map_start), extent_page_list->size);
 
-        extent_data = mallocz(extent_page_list->size);
-        memcpy(extent_data, data + (extent_page_list->pos - map_start), extent_page_list->size);
-        *PValue = extent_data;
-
-        int ret = munmap(data, length);
-        fatal_assert(0 == ret);
-
-        // Store the extent length here
-        PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_size_array, extent_page_list->pos, PJE0);
-        *(Word_t *) PValue = (Word_t) extent_page_list->size;
-    } else  // extent is cached, reuse it
-        extent_data = *PValue;
-
-    // Store an "expire after" timestamp sometime in the future
-    // When checking for extents to expire, get the lock and check if the entry needs to be deleted
-    PValue = JudyLIns(&extent_page_list->datafile->JudyL_extent_expire_array, extent_page_list->pos, PJE0);
-    *(Word_t *) PValue = now_realtime_sec() + 60;
-
-    uv_rwlock_wrunlock(&extent_page_list->datafile->JudyL_extent_rwlock);
+    int ret = munmap(data, length);
+    fatal_assert(0 == ret);
 
     // Extent is now cached and *data contains the compressed extent
     // Need to decompress and then process the pagelist
