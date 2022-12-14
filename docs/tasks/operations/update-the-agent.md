@@ -11,21 +11,20 @@ learn_docs_purpose: "Instructions on how to update the Agent"
 
 By default, the Netdata Agent automatically updates with the latest nightly or stable version depending on which
 you installed. If you opted out of automatic updates, you need to update your Netdata Agent to the latest nightly
-or stable version. You can
-also [enable or disable automatic updates on an existing installation](#control-automatic-updates).
+or stable version. You can also [enable or disable automatic updates on an existing installation](#control-automatic-updates).
 
-## Prerequisites
+### Prerequisites
 
 - A node with the Agent installed
 - Terminal access to that node
 - An internet connection
 
-## Update a Linux Agent
+## Linux Agent updating
+
+### Determine which installation method you used
 
 Before you update the Netdata Agent, check to see if your Netdata Agent is already up-to-date by clicking on the update
 icon in the local Agent dashboard's top navigation. This modal informs you whether your Agent needs an update or not.
-
-### Determine which installation method you used
 
 The exact update method to use depends on the installation type:
 
@@ -35,6 +34,8 @@ The exact update method to use depends on the installation type:
 - Installations with a type starting with `binpkg` or ending with `build` or `static` can be updated using
   our [regular update method](#updates-for-most-systems).
 - Manually built installs should check [our update instructions for manual builds](#manual-installation-from-git).
+
+#### Steps
 
 Starting with Netdata `v1.33.0`, you can use Netdata itself to determine the installation type by running:
 
@@ -68,6 +69,8 @@ In most cases, you can update Netdata using our one-line installation script. Th
 run the update script that was installed as part of the initial install (even if you disabled automatic updates)
 and preserve the existing installation options you specified.
 
+#### Steps
+
 If you installed Netdata using an installation prefix, you will need to add an `--install` option specifying
 that prefix to this command to make sure it finds Netdata.
 
@@ -86,9 +89,9 @@ On such installs, you can update Netdata using your distribution package manager
 
 ### Manual installation from Git
 
-If you
-installed Netdata manually from Git, you can run that installer again
-to update your agent.
+If you installed Netdata manually from Git, you can run that installer again to update your agent.
+
+#### Steps
 
 1. First, run our automatic requirements' installer, which works on many Linux distributions, to
    ensure your system has the dependencies necessary for new features.
@@ -117,6 +120,8 @@ to update your agent.
 Starting with Netdata `v1.34.0`, you can easily enable or disable automatic updates on an existing installation
 using the updater script.
 
+#### Steps
+
 - For most installs on Linux, you can enable auto-updates with:
 
     ```bash
@@ -141,11 +146,13 @@ using the updater script.
     /opt/netdata/usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
     ```
 
-## Docker
+## Docker container Agent updating
 
 Docker-based installations do not update automatically. To update a Netdata Agent running in a Docker container, you
 must pull the [latest image from Docker Hub](https://hub.docker.com/r/netdata/netdata), stop and remove the container,
 and re-create it using the latest image.
+
+#### Steps
 
 1. First, pull the latest version of the image.
 
@@ -167,7 +174,9 @@ our [Docker
 installation instructions](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-the-agent.md)
 for details.
 
-## Kubernetes
+## Kubernetes cluster Agent updating
+
+#### Steps
 
 If you want to update Netdata's Helm chart to the latest version:
 
