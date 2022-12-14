@@ -1033,18 +1033,15 @@ static void do_read_extent2_work(uv_work_t *req)
     void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
     fatal_assert(MAP_FAILED != data);
 
-    void *extent_data = mallocz(extent_page_list->size);
-    memcpy(extent_data, data + (extent_page_list->pos - map_start), extent_page_list->size);
-
-    int ret = munmap(data, length);
-    fatal_assert(0 == ret);
-
-    // Extent is now cached and *data contains the compressed extent
     // Need to decompress and then process the pagelist
+    void *extent_data = data + (extent_page_list->pos - map_start);
     extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list);
 
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true);
+
+    int ret = munmap(data, length);
+    fatal_assert(0 == ret);
 
     // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
