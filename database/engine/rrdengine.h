@@ -35,7 +35,7 @@ struct rrdengine_instance;
 typedef struct page_details_control {
     Pvoid_t page_list_JudyL;
     int32_t refcount;
-    int32_t jobs_completed;
+    unsigned jobs_completed;
     struct completion completion;
 } PDC;
 
@@ -57,7 +57,7 @@ struct page_details {
     uint32_t update_every_s;
     uint16_t page_length;
     uint8_t type;
-    bool page_failed_to_load;
+    bool page_failed_to_load; // FIXME - report failures back
     bool page_is_loaded;
     bool page_is_released;
     struct pgc_page *page;

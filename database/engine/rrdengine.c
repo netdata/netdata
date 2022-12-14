@@ -300,11 +300,15 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
-            if (unlikely(!vd.data_on_disk_valid))
+            if (unlikely(!vd.data_on_disk_valid)) {
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_invalid, 1, __ATOMIC_RELAXED);
+            }
 
-            else if (RRD_NO_COMPRESSION == header->compression_algorithm)
+            else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
                 memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_uncompressed, 1, __ATOMIC_RELAXED);
+            }
 
             else {
                 if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
@@ -313,9 +317,12 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                                    page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_invalid, 1, __ATOMIC_RELAXED);
                 }
-                else
+                else {
                     memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_compressed, 1, __ATOMIC_RELAXED);
+                }
             }
 
             PGC_ENTRY page_entry = {
@@ -331,9 +338,13 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
             bool added = true;
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
-            if (false == added)
+            if (false == added) {
                 freez(page_data);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_but_then_found_in_cache, 1, __ATOMIC_RELAXED);
+            }
         }
+        else
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_but_then_found_in_cache, 1, __ATOMIC_RELAXED);
 
         if (pd) {
             pd->page = page;
@@ -344,8 +355,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
             pgc_page_release(main_cache, page);
     }
 
-    if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)
-        freez(uncompressed_buf);
+    freez(uncompressed_buf);
 }
 
 static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)

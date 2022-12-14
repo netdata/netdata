@@ -1089,6 +1089,39 @@ static void dbengine2_statistics_charts(void) {
     }
 
     {
+        static RRDSET *st_pgc_memory_pressure_events = NULL;
+        static RRDDIM *rd_pgc_memory_evictions_critical = NULL;
+        static RRDDIM *rd_pgc_memory_evictions_aggressive = NULL;
+        static RRDDIM *rd_pgc_memory_flushes_critical = NULL;
+
+        if (unlikely(!st_pgc_memory_pressure_events)) {
+            st_pgc_memory_pressure_events = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_memory_pressure_events",
+                    NULL,
+                    "dbengine memory",
+                    NULL,
+                    "Netdata DB Memory Pressure Events",
+                    "events/s",
+                    "netdata",
+                    "stats",
+                    132003,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            rd_pgc_memory_evictions_aggressive = rrddim_add(st_pgc_memory_pressure_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pgc_memory_evictions_critical   = rrddim_add(st_pgc_memory_pressure_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pgc_memory_flushes_critical     = rrddim_add(st_pgc_memory_pressure_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_aggressive, (collected_number)pgc_main_stats.events_cache_needs_space_90);
+        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_critical, (collected_number)pgc_main_stats.events_cache_under_severe_pressure);
+        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_flushes_critical, (collected_number)pgc_main_stats.events_flush_critical);
+
+        rrdset_done(st_pgc_memory_pressure_events);
+    }
+
+    {
         static RRDSET *st_cache_hit_ratio = NULL;
         static RRDDIM *rd_hit_ratio = NULL;
 
@@ -1151,7 +1184,7 @@ static void dbengine2_statistics_charts(void) {
         }
 
         rrddim_set_by_pointer(st_query_pages_source, rd_cache, (collected_number)cache_efficiency_stats.pages_found_in_cache);
-        rrddim_set_by_pointer(st_query_pages_source, rd_jv2, (collected_number)cache_efficiency_stats.pages_loaded_from_journal_v2);
+        rrddim_set_by_pointer(st_query_pages_source, rd_jv2, (collected_number)cache_efficiency_stats.pages_found_in_jv2);
         rrddim_set_by_pointer(st_query_pages_source, rd_open, (collected_number)cache_efficiency_stats.pages_found_in_open);
 
         rrdset_done(st_query_pages_source);
@@ -1192,7 +1225,10 @@ static void dbengine2_statistics_charts(void) {
 
     {
         static RRDSET *st_query_pages_from_disk = NULL;
-        static RRDDIM *rd_disk = NULL;
+        static RRDDIM *rd_compressed = NULL;
+        static RRDDIM *rd_invalid = NULL;
+        static RRDDIM *rd_uncompressed = NULL;
+        static RRDDIM *rd_already_loaded = NULL;
 
         if (unlikely(!st_query_pages_from_disk)) {
             st_query_pages_from_disk = rrdset_create_localhost(
@@ -1201,7 +1237,7 @@ static void dbengine2_statistics_charts(void) {
                     NULL,
                     "dbengine cache",
                     NULL,
-                    "Netdata Query Pages to Load from Disk",
+                    "Netdata Query Pages Loaded from Disk",
                     "pages/s",
                     "netdata",
                     "stats",
@@ -1209,10 +1245,16 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-            rd_disk  = rrddim_add(st_query_pages_from_disk, "pages from disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_compressed = rrddim_add(st_query_pages_from_disk, "compressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_invalid = rrddim_add(st_query_pages_from_disk, "invalid", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_uncompressed = rrddim_add(st_query_pages_from_disk, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_already_loaded = rrddim_add(st_query_pages_from_disk, "already loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_query_pages_from_disk, rd_disk, (collected_number)cache_efficiency_stats.pages_to_load_from_disk);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_compressed, (collected_number)cache_efficiency_stats.pages_loaded_compressed);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid, (collected_number)cache_efficiency_stats.pages_loaded_invalid);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_uncompressed, (collected_number)cache_efficiency_stats.pages_loaded_uncompressed);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_already_loaded, (collected_number)cache_efficiency_stats.pages_loaded_but_then_found_in_cache);
 
         rrdset_done(st_query_pages_from_disk);
     }

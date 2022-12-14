@@ -76,6 +76,7 @@ struct pgc_statistics {
     size_t hot_empty_pages_evicted_immediately;
     size_t hot_empty_pages_evicted_later;
 
+    // events
     size_t events_cache_under_severe_pressure;
     size_t events_cache_needs_space_90;
     size_t events_flush_critical;

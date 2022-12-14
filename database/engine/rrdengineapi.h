@@ -131,16 +131,26 @@ struct rrdeng_cache_efficiency_stats {
     size_t queries_with_gaps;
     size_t queries_open;
     size_t queries_journal_v2;
+
+    // pages of the queries
+    size_t pages_total;
+    size_t pages_to_load_from_disk;
+
+    // pages sources
     size_t pages_found_in_cache;
     size_t pages_found_in_open;
-    size_t pages_loaded_from_journal_v2;
-    size_t pages_to_load_from_disk;
-    size_t pages_total;
+    size_t pages_found_in_jv2;
 
-    // for the pending pages
+    // preloading
     size_t pages_pending_found_in_cache_at_pass4;
     size_t pages_pending_waited_to_load;
     size_t pages_pending_preloaded;
+
+    // loading
+    size_t pages_loaded_but_then_found_in_cache;
+    size_t pages_loaded_invalid;
+    size_t pages_loaded_uncompressed;
+    size_t pages_loaded_compressed;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

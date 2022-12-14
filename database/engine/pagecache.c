@@ -477,7 +477,7 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_cache, pages_found_in_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_open, pages_found_in_open, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_from_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_found_in_jv2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_found_in_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
 
