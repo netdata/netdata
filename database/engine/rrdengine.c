@@ -11,7 +11,6 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
-// DBENGINE 2
 struct datafile_extent_list_s {
     uv_file file;
     unsigned count;
@@ -853,11 +852,7 @@ void timer_cb(uv_timer_t* handle)
     worker_is_idle();
 }
 
-// ******************
-// DBENGINE2 -- start
-// ******************
-
-void after_do_read_datafile_extent_list_work(uv_work_t *req, int status __maybe_unused)
+static void after_do_read_datafile_extent_list_work(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdeng_work  *work_request = req->data;
     freez(work_request);
@@ -865,6 +860,12 @@ void after_do_read_datafile_extent_list_work(uv_work_t *req, int status __maybe_
 
 static void do_read_datafile_extent_list_work(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_EXTEXT_DISPATCH);
+
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -876,16 +877,12 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
     Pvoid_t *PValue;
     Word_t pos = 0;
     // Check and send datafile_extent_list->count  extent requests per datafile
-    for (PValue = JudyLFirst(datafile_extent_list->JudyL_datafile_extent_list, &pos, PJE0),
-        extent_page_list = unlikely(NULL == PValue) ? NULL : *PValue;
-         extent_page_list != NULL;
-         PValue = JudyLNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, PJE0),
-        extent_page_list = unlikely(NULL == PValue) ? NULL : *PValue) {
+    bool first_then_next = true;
+
+    while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next)) && *PValue) {
+        extent_page_list = *PValue;
 
         // The extent page list can be dispatched to a worker
-        // The worker will add the extent pages to the cache
-        // The worker will try to check if the extent is cached and if so, reuse the data
-        // The check for precache should be per datafile
         // It will need to populate the cache with "acquired" pages that are in the list (pd) only
         // the rest of the extent pages will be added to the cache butnot acquired
 
@@ -899,9 +896,10 @@ static void do_read_datafile_extent_list_work(uv_work_t *req)
     JudyLFreeArray(&datafile_extent_list->JudyL_datafile_extent_list, PJE0);
 
     pdc_release_and_destroy_if_unreferenced(pdc, true);
+    worker_is_idle();
 }
 
-// New version of READ EXTENT
+// Receive a list of extents and start a worker to schedule them in parallel
 static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, void *data)
 {
     struct rrdeng_work *work_request;
@@ -919,20 +917,20 @@ static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, voi
     fatal_assert(0 == ret);
 }
 
-
-void after_do_read_extent2_work(uv_work_t *req, int status)
+static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdeng_work  *work_request = req->data;
-    //    struct rrdengine_worker_config *wc = work_request->wc;
-
-    if (likely(status != UV_ECANCELED)) {
-        ;
-    }
     freez(work_request);
 }
 
-static void do_read_extent2_work(uv_work_t *req)
+static void do_read_extent_work(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
 
@@ -958,9 +956,10 @@ static void do_read_extent2_work(uv_work_t *req)
     // Free the Judy that holds the requested pagelist and the extents
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
     freez(extent_page_list);
+
+    worker_is_idle();
 }
 
-// New version of READ EXTENT
 static void do_read_extent2(struct rrdengine_worker_config *wc, void *data)
 {
     struct rrdeng_work *work_request;
@@ -971,7 +970,7 @@ static void do_read_extent2(struct rrdengine_worker_config *wc, void *data)
     work_request->data = data;
     work_request->completion = NULL;
 
-    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_extent2_work, after_do_read_extent2_work);
+    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_extent_work, after_do_read_extent_work);
     if (ret)
         freez(work_request);
     fatal_assert(ret == 0);
@@ -990,6 +989,12 @@ void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
 
 static void do_read_page_list_work(uv_work_t *req)
 {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_PAGE_DISPATCH);
+
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1074,6 +1079,7 @@ static void do_read_page_list_work(uv_work_t *req)
     }
 
     pdc_release_and_destroy_if_unreferenced(pdc, true);
+    worker_is_idle();
 }
 
 static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
@@ -1108,11 +1114,7 @@ void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details
 
     completion_wait_for(&read_page_received);
     completion_destroy(&read_page_received);
-
 }
-
-// DBENGINE2 -- end
-
 
 #define MAX_CMD_BATCH_SIZE (256)
 
@@ -1125,6 +1127,8 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
     worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
     worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
+    worker_register_job_name(RRDENG_READ_DF_EXTENT_LIST,           "query extent list");
+    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
     worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
     worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
 
@@ -1209,15 +1213,7 @@ void rrdeng_worker(void* arg)
                 fatal_assert(0 == uv_timer_stop(&timer_req));
                 uv_close((uv_handle_t *)&timer_req, NULL);
                 info("Shutdown command received. Flushing all pages to disk");
-//                usec_t start_flush = now_realtime_usec();
-
-//                unsigned long total_bytes, bytes_written; 9
-//                total_bytes = 0;
-//                while ((bytes_written = do_flush_pages(wc, 1, NULL))) {
-//                    total_bytes += bytes_written;
-//                    /* Force flushing of all committed pages. */
-//                }
-//                info("Pages flushed to disk in %llu usecs (%lu bytes written)", now_realtime_usec() - start_flush, total_bytes);
+                // FIXME: Check if we need to ask page cache if flushing is done
                 wal_flush_transaction_buffer(wc);
                 if (!rrdeng_threads_alive(wc)) {
                     ctx->quiesce = QUIESCED;
@@ -1261,9 +1257,7 @@ void rrdeng_worker(void* arg)
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
 
-//    while (do_flush_pages(wc, 1, NULL)) {
-//        ; /* Force flushing of all committed pages. */
-//    }
+    // FIXME: Check if we need to ask page cache if flushing is done
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
