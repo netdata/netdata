@@ -12,13 +12,13 @@ learn_docs_purpose: "Instructions on how the user can see their active alerts"
 From the Cloud interface, you can see the active Alerts of a War Room. In this Task you will learn how to inspect a War
 Room's Alerts, and how to further filter the results to your liking.
 
-## Prerequisites
+#### Prerequisites
 
 To inspect your alerts, you will need the following:
 
 - A Cloud account with at least one node connected to one of its Spaces.
 
-## Steps
+#### Steps
 
 1. Click on the **Alerts** view
 2. Click on the **Active** tab
@@ -38,11 +38,7 @@ To inspect your alerts, you will need the following:
     - OS
     - Node (Select any node from the War Room)
 
-## Related topics
-
-### Related Concepts
+#### Related topics
 
 - [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
-
-### Related References
 - [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
