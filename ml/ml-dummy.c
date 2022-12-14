@@ -54,8 +54,11 @@ char *ml_get_host_models(RRDHOST *RH) {
     return NULL;
 }
 
-bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
-    (void) RD; (void) Value; (void) Exists;
+bool ml_is_anomalous(RRDDIM *RD, time_t CurrT, double Value, bool Exists) {
+    (void) RD;
+    (void) CurrT;
+    (void) Value;
+    (void) Exists;
     return false;
 }
 
