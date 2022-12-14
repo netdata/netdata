@@ -49,6 +49,14 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
     return NULL;
 }
 
+void ml_chart_update_begin(RRDSET *RS) {
+    (void) RS;
+}
+
+void ml_chart_update_end(RRDSET *RS) {
+    (void) RS;
+}
+
 char *ml_get_host_models(RRDHOST *RH) {
     (void) RH;
     return NULL;
