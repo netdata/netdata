@@ -851,18 +851,6 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     return 0;
 }
 
-
-//struct metric_info_s {
-//    uuid_t *id;
-//    uint32_t entries;
-//    time_t min_index_time_s;
-//    time_t max_index_time_s;
-//    usec_t min_time_ut;
-//    usec_t max_time_ut;
-//    uint32_t page_list_header;
-//    Pvoid_t JudyL_array;
-//};
-
 struct journal_metric_list_to_sort {
     struct jv2_metrics_info *metric_info;
 };
@@ -879,32 +867,23 @@ static int journal_metric_compare (const void *item1, const void *item2)
 // Write list of extents for the journalfile
 void *journal_v2_write_extent_list(Pvoid_t JudyL_extents_pos, void *data)
 {
-    bool first = true;
     Pvoid_t *PValue;
-    struct journal_extent_list *j2_extent = (void *) data;
-
-    Word_t pos = 0;
+    struct journal_extent_list *j2_extent_base = (void *) data;
     struct jv2_extents_info *ext_info;
 
-    Pvoid_t JudyL = NULL;
+    bool first = true;
+    Word_t pos = 0;
+    size_t count = 0;
     while ((PValue = JudyLFirstThenNext(JudyL_extents_pos, &pos, &first))) {
         ext_info = *PValue;
-        PValue = JudyLIns(&JudyL, ext_info->index, PJE0);
-        *PValue = ext_info;
+        size_t index = ext_info->index;
+        j2_extent_base[index].file_index = 0;
+        j2_extent_base[index].datafile_offset = ext_info->pos;
+        j2_extent_base[index].datafile_size = ext_info->bytes;
+        j2_extent_base[index].pages = ext_info->number_of_pages;
+        count++;
     }
-
-    pos = 0;
-    first = true;
-    while ((PValue = JudyLFirstThenNext(JudyL, &pos, &first))) {
-        ext_info = *PValue;
-        j2_extent->datafile_offset = ext_info->pos;
-        j2_extent->datafile_size = ext_info->bytes;
-        j2_extent->pages = ext_info->number_of_pages;
-        j2_extent->file_index = 0;
-        j2_extent++;
-    }
-    JudyLFreeArray(&JudyL, PJE0);
-    return j2_extent;
+    return j2_extent_base + count;
 }
 
 static int verify_journal_space(struct journal_v2_header *j2_header, void *data, uint32_t bytes)
