@@ -1228,6 +1228,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_compressed = NULL;
         static RRDDIM *rd_invalid = NULL;
         static RRDDIM *rd_uncompressed = NULL;
+        static RRDDIM *rd_mmap_failed = NULL;
         static RRDDIM *rd_already_loaded = NULL;
 
         if (unlikely(!st_query_pages_from_disk)) {
@@ -1248,12 +1249,14 @@ static void dbengine2_statistics_charts(void) {
             rd_compressed = rrddim_add(st_query_pages_from_disk, "compressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid = rrddim_add(st_query_pages_from_disk, "invalid", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_uncompressed = rrddim_add(st_query_pages_from_disk, "uncompressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mmap_failed = rrddim_add(st_query_pages_from_disk, "mmap failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_already_loaded = rrddim_add(st_query_pages_from_disk, "already loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_compressed, (collected_number)cache_efficiency_stats.pages_loaded_compressed);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid, (collected_number)cache_efficiency_stats.pages_loaded_invalid);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_uncompressed, (collected_number)cache_efficiency_stats.pages_loaded_uncompressed);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_mmap_failed, (collected_number)cache_efficiency_stats.pages_loaded_mmap_failed);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_already_loaded, (collected_number)cache_efficiency_stats.pages_loaded_but_then_found_in_cache);
 
         rrdset_done(st_query_pages_from_disk);
