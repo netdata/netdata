@@ -108,21 +108,15 @@ jobs:
         continue-on-error: true
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
-          .github/scripts/package-upload.sh \
-          ${{ matrix.pkgclouddistro }} \
-          ${{ matrix.platform }} \
-          ${{ matrix.format }} \
-          netdata/netdata
-          .github/scripts/package-upload.sh \
-          ${{ matrix.pkgclouddistro }} \
-          ${{ matrix.platform }} \
-          ${{ matrix.format }} \
-          netdata/netdata-edge
-          .github/scripts/package-upload.sh \
-          ${{ matrix.pkgclouddistro }} \
-          ${{ matrix.platform }} \
-          ${{ matrix.format }} \
-          netdata/netdata-repoconfig
+          for arch in ${{ matrix.arches }}; do
+            for suffix in '' -edge -repoconfig ; do
+              .github/scripts/package-upload.sh \
+              ${{ matrix.pkgclouddistro }} \
+              ${arch} \
+              ${{ matrix.format }} \
+              netdata/netdata${suffix}
+            done
+          done
       - name: Upload Packages
         id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
