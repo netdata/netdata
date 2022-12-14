@@ -129,8 +129,8 @@ Below is a list of all the available configuration params and their default valu
 	# maximum number of k-means iterations = 1000
 	# dimension anomaly score threshold = 0.99
 	# host anomaly rate threshold = 1.0
-    # anomaly detection grouping method = average
-    # anomaly detection grouping duration = 300
+	# anomaly detection grouping method = average
+	# anomaly detection grouping duration = 300
 	# hosts to skip from training = !*
 	# charts to skip from training = netdata.*
 ```
