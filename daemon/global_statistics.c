@@ -1193,6 +1193,7 @@ static void dbengine2_statistics_charts(void) {
     {
         static RRDSET *st_query_pages_preloading = NULL;
         static RRDDIM *rd_pass4 = NULL;
+        static RRDDIM *rd_failed = NULL;
         static RRDDIM *rd_waited = NULL;
         static RRDDIM *rd_preloaded = NULL;
 
@@ -1212,11 +1213,13 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_STACKED);
 
             rd_pass4 = rrddim_add(st_query_pages_preloading, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_failed = rrddim_add(st_query_pages_preloading, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_waited = rrddim_add(st_query_pages_preloading, "waited", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_preloaded = rrddim_add(st_query_pages_preloading, "preloaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_pages_preloading, rd_pass4, (collected_number)cache_efficiency_stats.pages_pending_found_in_cache_at_pass4);
+        rrddim_set_by_pointer(st_query_pages_preloading, rd_failed, (collected_number)cache_efficiency_stats.pages_pending_failed_to_load);
         rrddim_set_by_pointer(st_query_pages_preloading, rd_waited, (collected_number)cache_efficiency_stats.pages_pending_waited_to_load);
         rrddim_set_by_pointer(st_query_pages_preloading, rd_preloaded, (collected_number)cache_efficiency_stats.pages_pending_preloaded);
 

@@ -144,6 +144,7 @@ struct rrdeng_cache_efficiency_stats {
     // preloading
     size_t pages_pending_found_in_cache_at_pass4;
     size_t pages_pending_waited_to_load;
+    size_t pages_pending_failed_to_load;
     size_t pages_pending_preloaded;
 
     // loading
