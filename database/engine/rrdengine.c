@@ -361,6 +361,10 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     }
 
     freez(uncompressed_buf);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    freez(data_copy);
+#endif
 }
 
 static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)
