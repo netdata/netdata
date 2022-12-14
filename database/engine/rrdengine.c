@@ -141,7 +141,18 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router)
         completion_mark_complete(&pdc->completion);
 
         if(router) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_unroutable, 1, __ATOMIC_RELAXED);
+            bool first_then_next = true;
+            Pvoid_t *PValue;
+            Word_t Index = 0;
+            while((PValue = JudyLFirstThenNext(&pdc->page_list_JudyL, &Index, &first_then_next))) {
+                struct page_details *pd = *PValue;
+
+                if(!pd->page) {
+                    __atomic_store_n(&pd->page_failed_to_load, true, __ATOMIC_RELEASE);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, 1, __ATOMIC_RELAXED);
+                }
+            }
+
             internal_fatal(true, "DBENGINE: page loading failed to be routed");
         }
     }
@@ -265,6 +276,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     time_t now_s = now_realtime_sec();
 
     page_offset = 0;
+    size_t pages_found = 0;
     for (i = 0; i < count; i++) {
         uint32_t page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
@@ -291,6 +303,9 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if(!preload_all_pages && !pd)
             continue;
 
+        if(pd)
+            pages_found++;
+
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
 
         // Find metric id
@@ -304,12 +319,12 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
             if (unlikely(!vd.data_on_disk_valid)) {
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_invalid, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
             }
 
             else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
                 memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_uncompressed, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_uncompressed, 1, __ATOMIC_RELAXED);
             }
 
             else {
@@ -320,11 +335,11 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                                    i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_invalid, 1, __ATOMIC_RELAXED);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
                 }
                 else {
                     memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_compressed, 1, __ATOMIC_RELAXED);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_compressed, 1, __ATOMIC_RELAXED);
                 }
             }
 
@@ -343,11 +358,11 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
             if (false == added) {
                 freez(page_data);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_but_then_found_in_cache, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_found_in_cache, 1, __ATOMIC_RELAXED);
             }
         }
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_but_then_found_in_cache, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_found_in_cache, 1, __ATOMIC_RELAXED);
 
         if (pd) {
             pd->page = page;
@@ -357,6 +372,10 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         else
             pgc_page_release(main_cache, page);
     }
+
+    size_t pages_expected = JudyLCount(extent_page_list->JudyL_page_list, 0, -1, PJE0);
+    if(pages_found != pages_expected)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_uuid_not_found, pages_expected - pages_found, __ATOMIC_RELAXED);
 
     freez(uncompressed_buf);
 
@@ -992,7 +1011,7 @@ static bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengi
 
         pd->page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, pd->metric_id, pd->first_time_s, true);
         if(pd->page)
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_preloaded, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_preloaded, 1, __ATOMIC_RELAXED);
         else
             count_remaining++;
     }
@@ -1014,7 +1033,7 @@ static void do_read_extent_work(uv_work_t *req)
 
     if(pdc->preload_all_extent_pages) {
         if (!extent_get_exclusive_access(extent_page_list)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
             goto datafile_not_available;
         }
 
@@ -1023,7 +1042,7 @@ static void do_read_extent_work(uv_work_t *req)
     }
     else {
         if (!extent_page_list->datafile->available_for_queries) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
             goto datafile_not_available;
         }
     }
@@ -1042,8 +1061,19 @@ static void do_read_extent_work(uv_work_t *req)
         int ret = munmap(data, length);
         fatal_assert(0 == ret);
     }
-    else
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_mmap_failed, 1, __ATOMIC_RELAXED);
+    else {
+        bool first_then_next = true;
+        Pvoid_t *PValue;
+        Word_t Index = 0;
+        while((PValue = JudyLFirstThenNext(&extent_page_list->JudyL_page_list, &Index, &first_then_next))) {
+            struct page_details *pd = *PValue;
+
+            if(!pd->page) {
+                __atomic_store_n(&pd->page_failed_to_load, true, __ATOMIC_RELEASE);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent, 1, __ATOMIC_RELAXED);
+            }
+        }
+    }
 
 pages_are_preloaded:
     if(pdc->preload_all_extent_pages)

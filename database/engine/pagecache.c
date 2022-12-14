@@ -252,8 +252,10 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
             if(lookup_pending_in_open_cache)
                 pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
 
-            if(pd->page)
+            if(pd->page) {
                 (*pages_found_pass4)++;
+                pd->page_is_loaded = true;
+            }
             else {
                 (*pages_pending)++;
 
@@ -520,30 +522,44 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         return NULL;
     }
     pd = *PValue;
-    page = pd->page;
 
-    while(!page && !completion_is_done(&handle->pdc->completion)) {
-        waited = true;
+    if(pd->page && !pd->page_is_loaded)
+        pd->page_is_loaded = true;
 
-        handle->pdc->jobs_completed =
-                completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->jobs_completed);
+    bool done = false;
+    while(  !done &&
+            !__atomic_load_n(&pd->page_is_loaded, __ATOMIC_ACQUIRE) &&
+            !__atomic_load_n(&pd->page_failed_to_load, __ATOMIC_ACQUIRE)
+            ) {
 
-        if(__atomic_load_n(&pd->page_is_loaded, __ATOMIC_ACQUIRE))
-            page = pd->page;
 
-        else if(pd->page_failed_to_load)
-            break;
+        if(!completion_is_done(&handle->pdc->completion)) {
+            handle->pdc->jobs_completed =
+                    completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->jobs_completed);
+
+            waited = true;
+        }
+        else
+            done = true;
     }
 
-    if(page)
+    page = pd->page;
+
+    if(page) {
+        // this is for the page details JudyL to not release the page again
         pd->page_is_released = true;
 
-    if(!page)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_failed_to_load, 1, __ATOMIC_RELAXED);
-    else if(waited)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_waited_to_load, 1, __ATOMIC_RELAXED);
-    else
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_preloaded, 1, __ATOMIC_RELAXED);
+        if(waited)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_nowait_loaded, 1, __ATOMIC_RELAXED);
+    }
+    else {
+        if(waited)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_failed, 1, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_nowait_failed, 1, __ATOMIC_RELAXED);
+    }
 
     if(next_page_start_time_s) {
         Pvoid_t *PValue = JudyLNext(handle->pdc->page_list_JudyL, &Index, PJE0);

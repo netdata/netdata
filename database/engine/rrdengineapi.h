@@ -143,19 +143,21 @@ struct rrdeng_cache_efficiency_stats {
 
     // preloading
     size_t pages_pending_found_in_cache_at_pass4;
-    size_t pages_pending_waited_to_load;
-    size_t pages_pending_failed_to_load;
-    size_t pages_pending_preloaded;
+    size_t page_next_wait_failed;
+    size_t page_next_wait_loaded;
+    size_t page_next_nowait_failed;
+    size_t page_next_nowait_loaded;
 
     // loading
-    size_t pages_loaded_but_then_found_in_cache;
-    size_t pages_loaded_invalid;
-    size_t pages_loaded_mmap_failed;
-    size_t pages_loaded_uncompressed;
-    size_t pages_loaded_compressed;
-    size_t pages_loaded_preloaded;
-    size_t pages_loaded_datafile_not_available;
-    size_t pages_loaded_unroutable;
+    size_t pages_load_ok_loaded_but_found_in_cache;
+    size_t pages_load_ok_uncompressed;
+    size_t pages_load_ok_compressed;
+    size_t pages_load_ok_preloaded;
+    size_t pages_load_fail_invalid_page_in_extent;
+    size_t pages_load_fail_cant_mmap_extent;
+    size_t pages_load_fail_datafile_not_available;
+    size_t pages_load_fail_unroutable;
+    size_t pages_load_fail_uuid_not_found;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
