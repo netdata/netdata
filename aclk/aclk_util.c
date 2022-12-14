@@ -308,24 +308,6 @@ const char *aclk_get_topic(enum aclk_topics topic)
 }
 
 /*
- * Allows iterating all topics in topic cache without
- * having to resort to callbacks. 
- */
-
-const char *aclk_topic_cache_iterate(aclk_topic_cache_iter_t *iter)
-{
-    if (!aclk_topic_cache) {
-        error("Topic cache not initialized when %s was called.", __FUNCTION__);
-        return NULL;
-    }
-
-    if (*iter >= aclk_topic_cache_items)
-        return NULL;
-
-    return aclk_topic_cache[(*iter)++]->topic;
-}
-
-/*
  * TBEB with randomness
  *
  * @param reset 1 - to reset the delay,
