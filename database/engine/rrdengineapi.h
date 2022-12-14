@@ -152,6 +152,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_loaded_mmap_failed;
     size_t pages_loaded_uncompressed;
     size_t pages_loaded_compressed;
+    size_t pages_loaded_preloaded;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

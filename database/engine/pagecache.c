@@ -182,6 +182,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->page = (open_cache_mode) ? NULL : page;
             pd->type = ctx->page_type;
             pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
+            pd->metric_id = metric_id;
             uuid_copy(pd->uuid, *uuid);
             *PValue = pd;
 
@@ -284,6 +285,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+    Word_t metric_id = mrg_metric_id(main_mrg, metric);
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
@@ -404,6 +406,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         pd->page_length = page_length;
                         pd->update_every_s = page_update_every_s;
                         pd->type = page_entry_in_journal->type;
+                        pd->metric_id = metric_id;
                         uuid_copy(pd->uuid, *uuid);
                         *PValue = pd;
 

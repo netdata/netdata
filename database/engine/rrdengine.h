@@ -51,6 +51,7 @@ struct page_details {
         } extent;
     } datafile;
 
+    Word_t metric_id;
     uuid_t uuid;
     time_t first_time_s;
     time_t last_time_s;

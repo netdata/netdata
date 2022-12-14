@@ -932,19 +932,53 @@ static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
+void extent_get_exclusive_access(struct extent_page_list_s *extent_page_list __maybe_unused) {
+    ;
+}
+
+void extent_exclusive_access_unlock(struct extent_page_list_s *extent_page_list __maybe_unused) {
+    ;
+}
+
+bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
+    struct page_details_control *pdc = extent_page_list->pdc;
+    Word_t Index = 0;
+    Pvoid_t *PValue;
+    bool first = true;
+    size_t count_remaining = 0;
+
+    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &Index, &first))) {
+        struct page_details *pd = *PValue;
+        if(pd->page)
+            continue;
+
+        pd->page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, pd->metric_id, pd->first_time_s, true);
+        if(pd->page)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_preloaded, 1, __ATOMIC_RELAXED);
+        else
+            count_remaining++;
+    }
+
+    return count_remaining == 0;
+}
+
 static void do_read_extent_work(uv_work_t *req)
 {
     static __thread int worker = -1;
     if (unlikely(worker == -1))
         register_libuv_worker_jobs();
 
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
-
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
 
     struct extent_page_list_s *extent_page_list = work_request->data;
     struct page_details_control *pdc = extent_page_list->pdc;
+
+    extent_get_exclusive_access(extent_page_list);
+    if(extent_check_if_required_pdc_pages_are_already_loaded(wc->ctx, extent_page_list))
+        goto cleanup;
+
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
     off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->pos);
     size_t length = ALIGN_BYTES_CEILING(extent_page_list->pos + extent_page_list->size) - map_start;
@@ -960,6 +994,9 @@ static void do_read_extent_work(uv_work_t *req)
     }
     else
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_mmap_failed, 1, __ATOMIC_RELAXED);
+
+cleanup:
+    extent_exclusive_access_unlock(extent_page_list);
 
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true);
