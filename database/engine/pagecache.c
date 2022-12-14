@@ -528,7 +528,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         handle->pdc->jobs_completed =
                 completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->jobs_completed);
 
-        if(pd->page_is_loaded)
+        if(__atomic_load_n(&pd->page_is_loaded, __ATOMIC_ACQUIRE))
             page = pd->page;
 
         else if(pd->page_failed_to_load)
