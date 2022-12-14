@@ -564,14 +564,8 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
                 continue;
             }
             else {
-                if (!page_update_every_s || page_update_every_s > 86400) {
-                    internal_error(true,
-                                   "DBENGINE: page from %ld to %ld (update every %ld) maintaining current query update every of %ld",
-                                   page_start_time_s, page_end_time_s, page_update_every_s,
-                                   handle->dt_s);
-
-                    page_update_every_s = handle->dt_s;
-                }
+                if (page_update_every_s <= 0 || page_update_every_s > 86400)
+                    page_update_every_s = pgc_page_fix_update_every(handle->page, handle->dt_s);
 
                 size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
                 size_t entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;

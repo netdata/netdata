@@ -1541,6 +1541,13 @@ time_t pgc_page_update_every(PGC_PAGE *page) {
     return page->update_every;
 }
 
+time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every) {
+    if(page->update_every == 0)
+        page->update_every = update_every;
+
+    return page->update_every;
+}
+
 void *pgc_page_data(PGC_PAGE *page) {
     return page->data;
 }
