@@ -917,9 +917,6 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     fatal_assert(0 == uv_thread_join(&ctx->worker_config.thread));
 
     finalize_rrd_files(ctx);
-    //metalog_exit(ctx->metalog_ctx);
-    // FIXME: DBENGINE2 free entire page cache for everyone
-//    free_page_cache(ctx);
 
     if(!is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
         freez(ctx);

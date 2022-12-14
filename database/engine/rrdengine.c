@@ -481,8 +481,14 @@ static void do_flush_extent_cb(uv_fs_t *req)
         };
 
         bool added = true;
-        (void) pgc_page_add_and_acquire(open_cache, page_entry, &added);
-
+        int tries = 100;
+        PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+        while(!added && tries--) {
+            pgc_page_hot_to_clean_empty_and_release(open_cache, page);
+            page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+        }
+        fatal_assert(true == added);
+        pgc_page_release(open_cache, (PGC_PAGE *)page);
         mrg_metric_release(main_mrg, this_metric);
     }
     if (xt_io_descr->completion)

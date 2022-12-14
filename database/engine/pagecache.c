@@ -580,9 +580,6 @@ void init_page_cache(void)
     if (!initialized) {
         initialized = true;
 
-        // FIXME: Check if it can be of use
-        // (void)pthread_key_create(&query_key, NULL /*query_key_release*/);
-
         main_mrg = mrg_create();
 
         main_cache = pgc_create(
