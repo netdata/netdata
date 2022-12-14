@@ -19,7 +19,7 @@ for i, v in enumerate(data['include']):
             'format': data['include'][i]['packages']['type'],
             'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
             'platform': data['platform_map']['amd64'],
-            'arches': data['include'][i]['packages']['arches']
+            'arches': ' '.join(['"' + x + '"' for x in data['include'][i]['packages']['arches']])
         })
 
 entries.sort(key=lambda k: (k['distro'], k['version']))
