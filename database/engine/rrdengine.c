@@ -265,9 +265,19 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     worker_is_busy(UV_EVENT_PAGE_POPULATION);
     time_t now_s = now_realtime_sec();
 
-    for (i = 0, page_offset = 0; i < count; page_offset += header->descr[i].page_length, i++) {
-
+    page_offset = 0;
+    for (i = 0; i < count; i++) {
+        uint32_t page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
+
+        page_offset += page_length;
+
+        if(!page_length || start_time_s) {
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. Page %d is EMPTY",
+                        __func__, extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno, i);
+            continue;
+        }
 
         Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, start_time_s, PJE0);
         struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
