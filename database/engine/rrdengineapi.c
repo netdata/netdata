@@ -93,23 +93,6 @@ void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_
     memcpy(ret_uuid, hash_value, sizeof(uuid_t));
 }
 
-/* Transform legacy UUID to be unique across hosts deterministically */
-void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid, uuid_t *ret_uuid)
-{
-    EVP_MD_CTX *evpctx;
-    unsigned char hash_value[EVP_MAX_MD_SIZE];
-    unsigned int hash_len;
-
-    evpctx = EVP_MD_CTX_create();
-    EVP_DigestInit_ex(evpctx, EVP_sha256(), NULL);
-    EVP_DigestUpdate(evpctx, machine_guid, GUID_LEN);
-    EVP_DigestUpdate(evpctx, *legacy_uuid, sizeof(uuid_t));
-    EVP_DigestFinal_ex(evpctx, hash_value, &hash_len);
-    EVP_MD_CTX_destroy(evpctx);
-    fatal_assert(hash_len > sizeof(uuid_t));
-    memcpy(ret_uuid, hash_value, sizeof(uuid_t));
-}
-
 static METRIC *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id) {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     uuid_t legacy_uuid;
@@ -789,12 +772,10 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     if (ctx == NULL)
         return;
 
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
     array[0] = (uint64_t)ctx->stats.metric_API_producers;
     array[1] = (uint64_t)ctx->stats.metric_API_consumers;
-    array[2] = (uint64_t)pg_cache->page_descriptors;
-    array[3] = (uint64_t)pg_cache->populated_pages;
+    array[2] = 0;
+    array[3] = 0;
     array[4] = 0;
     array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
     array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
@@ -828,7 +809,7 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
     array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
     array[36] = (uint64_t)global_flushing_pressure_page_deletions;
-    array[37] = (uint64_t)pg_cache->active_descriptors;
+    array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
     fatal_assert(RRDENG_NR_STATS == 38);
 }
@@ -869,9 +850,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
-    ctx->max_cache_pages = page_cache_mb * (1048576LU / RRDENG_BLOCK_SIZE);
-    /* try to keep 5% of the page cache free */
-//    ctx->cache_pages_low_watermark = (ctx->max_cache_pages * 95LLU) / 100;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->max_disk_space = disk_space_mb * 1048576LLU;
@@ -882,14 +860,13 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     else
         strncpyz(ctx->machine_guid, host->machine_guid, GUID_LEN);
 
-//    ctx->drop_metrics_under_page_cache_pressure = rrdeng_drop_metrics_under_page_cache_pressure;
     ctx->metric_API_max_producers = 0;
     ctx->quiesce = NO_QUIESCE;
     ctx->host = host;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     ctx->worker_config.ctx = ctx;
-    init_page_cache(ctx);
+    init_page_cache();
     init_commit_log(ctx);
     error = init_rrd_files(ctx);
     if (error) {
@@ -1126,7 +1103,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         }
     }
 
-    stats.sizeof_metric = struct_natural_alignment(sizeof(struct pg_cache_page_index) + sizeof(struct pg_alignment));
+    stats.sizeof_metric = 0;
     stats.sizeof_page = struct_natural_alignment(sizeof(struct rrdeng_page_descr));
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));

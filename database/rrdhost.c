@@ -792,11 +792,6 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
     }
 
-    if(config_get_boolean(CONFIG_SECTION_DB, "dbengine page descriptors in file mapped memory", rrdeng_page_descr_is_mmap()) == CONFIG_BOOLEAN_YES)
-        rrdeng_page_descr_use_mmap();
-    else
-        rrdeng_page_descr_use_malloc();
-
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];

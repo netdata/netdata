@@ -144,9 +144,6 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
 
 char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
 {
-    struct page_cache *pg_cache;
-
-    pg_cache = &ctx->pg_cache;
     snprintfz(str, size,
               "metric_API_producers: %ld\n"
               "metric_API_consumers: %ld\n"
@@ -187,9 +184,9 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "global_flushing_pressure_page_deletions: %ld\n",
               (long)ctx->stats.metric_API_producers,
               (long)ctx->stats.metric_API_consumers,
-              (long)pg_cache->page_descriptors,
+              0L,
               (long)ctx->stats.page_cache_descriptors,
-              (long)pg_cache->populated_pages,
+              0L,
               0L,
               (long)ctx->stats.pg_cache_insertions,
               (long)ctx->stats.pg_cache_deletions,

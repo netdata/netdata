@@ -177,9 +177,6 @@ struct extent_io_descriptor {
     unsigned descr_count;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
-//    struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
-//    struct uuid_list_s uuid_list[MAX_PAGES_PER_EXTENT];
-//    BITMAP256 descr_array_wakeup;
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };
@@ -269,7 +266,6 @@ extern rrdeng_stats_t global_flushing_pressure_page_deletions; /* number of dele
 struct rrdengine_instance {
     struct rrdengine_worker_config worker_config;
     struct completion rrdengine_completion;
-    struct page_cache pg_cache;
     bool journal_initialization;
     uint8_t global_compress_alg;
     struct transaction_commit_log commit_log;
@@ -281,7 +277,6 @@ struct rrdengine_instance {
     uint64_t max_disk_space;
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
-    unsigned long max_cache_pages;
     unsigned long metric_API_max_producers;
 
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
@@ -301,8 +296,6 @@ void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
 void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
-struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid);
-struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s);
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker);

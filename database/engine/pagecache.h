@@ -22,9 +22,6 @@ extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
-    struct extent_info *extent;
-
-    /* page information */
     usec_t start_time_ut;
     usec_t end_time_ut;
     uint32_t update_every_s:24;
@@ -48,62 +45,13 @@ struct pg_alignment {
     uint32_t refcount;
 };
 
-/* maps time ranges to pages */
-struct pg_cache_page_index {
-    uuid_t id;
-    /*
-     * care: JudyL_array indices are converted from useconds to seconds to fit in one word in 32-bit architectures
-     * TODO: examine if we want to support better granularity than seconds
-     */
-    Pvoid_t JudyL_array;
-    unsigned short refcount;
-    unsigned short writers;
-    uv_rwlock_t lock;
-
-    /*
-     * Only one effective writer, data deletion workqueue.
-     * It's also written during the DB loading phase.
-     */
-    usec_t oldest_time_ut;
-
-    /*
-     * Only one effective writer, data collection thread.
-     * It's also written by the data deletion workqueue when data collection is disabled for this metric.
-     */
-    usec_t latest_time_ut;
-
-    struct rrdengine_instance *ctx;
-    uint32_t latest_update_every_s;
-};
-
-/* maps UUIDs to page indices */
-struct pg_cache_metrics_index {
-    uv_rwlock_t lock;
-    Pvoid_t JudyHS_array;
-};
-
-struct page_cache { /* TODO: add statistics */
-    uv_rwlock_t pg_cache_rwlock; /* page cache lock */
-
-    struct pg_cache_metrics_index metrics_index;
-    unsigned page_descriptors;
-    unsigned active_descriptors;
-    unsigned populated_pages;
-};
-
 struct rrdeng_query_handle;
 
 time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t);
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, time_t *next_page_start_s);
-void init_page_cache(struct rrdengine_instance *ctx);
+void init_page_cache(void);
 
-void rrdeng_page_descr_aral_go_singlethreaded(void);
-void rrdeng_page_descr_aral_go_multithreaded(void);
-void rrdeng_page_descr_use_malloc(void);
-void rrdeng_page_descr_use_mmap(void);
-bool rrdeng_page_descr_is_mmap(void);
-struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void);
-void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr);
 void free_judyl_page_list(Pvoid_t pl_judyL);
+
 
 #endif /* NETDATA_PAGECACHE_H */

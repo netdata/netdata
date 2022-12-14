@@ -53,7 +53,7 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
      for (size_t Index = 0 ; Index < entries; Index++) {
         time_t start_time_t = array[Index].start_time_t;
         time_t end_time_t = array[Index].end_time_t;
-        struct rrdeng_page_descr *descr = rrdeng_page_descr_mallocz();
+        struct rrdeng_page_descr *descr = callocz(1, sizeof(*descr));
 
         uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) array[Index].metric_id)));
         descr->start_time_ut = start_time_t * USEC_PER_SEC;
@@ -101,41 +101,6 @@ ARAL page_descr_aral = {
     .use_mmap = false,
     .internal.initialized = false
 };
-
-void rrdeng_page_descr_aral_go_singlethreaded(void) {
-    page_descr_aral.internal.lockless = true;
-}
-void rrdeng_page_descr_aral_go_multithreaded(void) {
-    page_descr_aral.internal.lockless = false;
-}
-
-struct rrdeng_page_descr *rrdeng_page_descr_mallocz(void) {
-    struct rrdeng_page_descr *descr;
-    descr = arrayalloc_mallocz(&page_descr_aral);
-    return descr;
-}
-
-void rrdeng_page_descr_freez(struct rrdeng_page_descr *descr) {
-    arrayalloc_freez(&page_descr_aral, descr);
-}
-
-void rrdeng_page_descr_use_malloc(void) {
-    if(page_descr_aral.internal.initialized)
-        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
-    else
-        page_descr_aral.use_mmap = false;
-}
-
-void rrdeng_page_descr_use_mmap(void) {
-    if(page_descr_aral.internal.initialized)
-        error("DBENGINE: cannot change ARAL allocation policy after it has been initialized.");
-    else
-        page_descr_aral.use_mmap = true;
-}
-
-bool rrdeng_page_descr_is_mmap(void) {
-    return page_descr_aral.use_mmap;
-}
 
 static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     return page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s;
@@ -586,26 +551,10 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
     return page;
 }
-
-static void init_metrics_index(struct rrdengine_instance *ctx)
-{
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
-    pg_cache->metrics_index.JudyHS_array = (Pvoid_t) NULL;
-    fatal_assert(0 == uv_rwlock_init(&pg_cache->metrics_index.lock));
-}
-
-void init_page_cache(struct rrdengine_instance *ctx)
+void init_page_cache(void)
 {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
     static bool initialized = false;
-
-    struct page_cache *pg_cache = &ctx->pg_cache;
-
-    pg_cache->page_descriptors = 0;
-    pg_cache->active_descriptors = 0;
-    pg_cache->populated_pages = 0;
-    fatal_assert(0 == uv_rwlock_init(&pg_cache->pg_cache_rwlock));
 
     netdata_spinlock_lock(&spinlock);
     if (!initialized) {
@@ -644,5 +593,4 @@ void init_page_cache(struct rrdengine_instance *ctx)
     }
     netdata_spinlock_unlock(&spinlock);
 
-    init_metrics_index(ctx);
 }

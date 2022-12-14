@@ -274,7 +274,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
         if(!page_length || !start_time_s) {
             error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. Page %d is EMPTY",
+            error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. Page %u is EMPTY",
                         __func__, extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno, i);
             continue;
         }
@@ -314,7 +314,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                 if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
                     error_limit_static_global_var(erl, 10, 0);
                     error_limit(&erl,
-                                   "DBENGINE: page %d offset %u + page length %zu exceeds than the uncompressed buffer size %u",
+                                   "DBENGINE: page %u offset %u + page length %zu exceeds than the uncompressed buffer size %u",
                                    i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
@@ -409,27 +409,6 @@ static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t ty
     }
 }
 
-struct pg_cache_page_index *get_page_index(struct page_cache *pg_cache, uuid_t *uuid)
-{
-    uv_rwlock_rdlock(&pg_cache->metrics_index.lock);
-    Pvoid_t *PValue = JudyHSGet(pg_cache->metrics_index.JudyHS_array, uuid, sizeof(uuid_t));
-    struct pg_cache_page_index *page_index = (NULL == PValue) ? NULL : *PValue;
-    uv_rwlock_rdunlock(&pg_cache->metrics_index.lock);
-    return page_index;
-}
-
-struct rrdeng_page_descr *get_descriptor(struct pg_cache_page_index *page_index, time_t start_time_s)
-{
-    if (unlikely(!page_index))
-        return NULL;
-
-    uv_rwlock_rdlock(&page_index->lock);
-    Pvoid_t *PValue = JudyLGet(page_index->JudyL_array, start_time_s, PJE0);
-    struct rrdeng_page_descr *descr = unlikely(NULL == PValue) ? NULL : *PValue;
-    uv_rwlock_rdunlock(&page_index->lock);
-    return descr;
-};
-
 // Main event loop callback
 static void do_flush_extent_cb(uv_fs_t *req)
 {
@@ -505,7 +484,6 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     Pvoid_t *PValue;
     Word_t Index;
     uint8_t compression_algorithm = ctx->global_compress_alg;
-    struct extent_info *extent;
     struct rrdengine_datafile *datafile;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
@@ -563,12 +541,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    extent = mallocz(sizeof(*extent) + count * sizeof(extent->pages[0]));
     datafile = ctx->datafiles.last;  /* TODO: check for exceeded size quota */
-    extent->offset = datafile->pos;
-    extent->number_of_pages = count;
-    extent->datafile = datafile;
-    extent->next = NULL;
     xt_io_descr->datafile = datafile;
 
     for (i = 0 ; i < count ; ++i) {
@@ -585,14 +558,9 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     }
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        /* care, we don't hold the descriptor mutex */
         (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
-        descr->extent = extent;
-        extent->pages[i] = descr;
-
         pos += descr->page_length;
     }
-    df_extent_insert(extent);
 
     switch (compression_algorithm) {
         case RRD_NO_COMPRESSION:
@@ -610,7 +578,6 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
             header->payload_length = compressed_size;
         break;
     }
-    extent->size = size_bytes;
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = datafile->pos;
     xt_io_descr->req.data = xt_io_descr;
@@ -695,94 +662,9 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
 static void delete_old_data(void *arg)
 {
     struct rrdengine_instance *ctx = arg;
-    struct rrdengine_worker_config* wc = &ctx->worker_config;
-    struct rrdengine_datafile *datafile;
-    struct extent_info *extent, *next;
-    struct rrdeng_page_descr *descr;
-    unsigned count, i;
-//    uint8_t can_delete_metric;
-//    uuid_t metric_id;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
 
-    /* Safe to use since it will be deleted after we are done */
-
-    datafile = ctx->datafiles.first;
-    // If this is migrated then do special cleanup
-    if (datafile->journalfile->journal_data && datafile->journalfile->is_valid) {
-
-        // loop and find decriptors from file
-        void *data_start = datafile->journalfile->journal_data;
-        struct journal_v2_header *j2_header = (void *) data_start;
-
-        struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
-
-        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-
-        info("Removing %u metrics that exist in the journalfile", j2_header->metric_count);
-        unsigned entries;
-        unsigned evicted = 0;
-        unsigned deleted = 0;
-        unsigned delete_check = 0;
-
-        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-        datafile->journalfile->is_valid = false;
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
-
-        for (entries = 0; entries < j2_header->metric_count; entries++) {
-            struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-            struct journal_page_list *descr_page = (struct journal_page_list *) ((uint8_t *) metric_list_header + sizeof(struct journal_page_header));
-            for (uint32_t index = 0; index < metric->entries; index++) {
-                struct pg_cache_page_index *page_index = get_page_index(&ctx->pg_cache, &metric->uuid);
-
-                if (unlikely(!page_index))
-                    continue;
-
-                time_t start_time_s = journal_start_time_s + descr_page->delta_start_s;
-
-                descr = get_descriptor(page_index, start_time_s);
-                if (unlikely(descr)) {
-                    // FIXME: DBENGINE2
-//                    can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
-//                    if (unlikely(can_delete_metric)) {
-//                        metaqueue_delete_dimension_uuid(&metric_id);
-//                        ++delete_check;
-//                    }
-                    ++evicted;
-                }
-                ++deleted;
-                descr_page++;
-            }
-            metric++;
-        }
-        info("Removed %u pages from %u metrics (evicted %u), %u queued for final deletion check", deleted,  entries, evicted, delete_check);
-        wc->cleanup_thread_deleting_files = 1;
-        /* wake up event loop */
-        fatal_assert(0 == uv_async_send(&wc->async));
-        return;
-    }
-
-    uv_rwlock_wrlock(&datafile->extent_rwlock);
-    for (extent = datafile->extents.first ; extent != NULL ; extent = next) {
-        count = extent->number_of_pages;
-        for (i = 0 ; i < count ; ++i) {
-            descr = extent->pages[i];
-            if (unlikely(!descr))
-                continue;
-
-            // FIXME: DBENGINE2
-//            can_delete_metric = pg_cache_punch_hole(ctx, descr, 0, 0, &metric_id);
-//            if (unlikely(can_delete_metric)) {
-//                /*
-//                 * If the metric is empty, has no active writers and if the metadata log has been initialized then
-//                 * attempt to delete the corresponding netdata dimension.
-//                 */
-//                metaqueue_delete_dimension_uuid(&metric_id);
-//            }
-        }
-        next = extent->next;
-        freez(extent);
-    }
-    uv_rwlock_wrunlock(&datafile->extent_rwlock);
-
+    // FIXME: Check if metadata needs to be handled
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&wc->async));
