@@ -448,6 +448,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
         Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
 
         struct extent_io_data ext_io_data = {
+            .fileno = datafile->fileno,
             .file  = datafile->file,
             .pos = xt_io_descr->pos,
             .bytes = xt_io_descr->bytes
