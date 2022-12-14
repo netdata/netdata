@@ -7,6 +7,7 @@ void *analytics_main(void *ptr);
 void *cpuidlejitter_main(void *ptr);
 void *global_statistics_main(void *ptr);
 void *global_statistics_workers_main(void *ptr);
+void *global_statistics_sqlite3_main(void *ptr);
 void *health_main(void *ptr);
 void *pluginsd_main(void *ptr);
 void *service_main(void *ptr);
@@ -65,6 +66,17 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_workers_main
+    },
+    {
+        .name = "SQLITE3_STATS",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = global_statistics_sqlite3_main
     },
     {
         .name = "PLUGINSD",

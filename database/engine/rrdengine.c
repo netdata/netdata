@@ -164,7 +164,7 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker) {
     return false;
 }
 
-VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC),
             .end_time_s = (time_t) (descr->end_time_ut / USEC_PER_SEC),
