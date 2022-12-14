@@ -54,6 +54,7 @@ struct rrdengine_datafile {
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *prev;
     struct rrdengine_datafile *next;
+    bool available_for_queries;
     SPINLOCK extent_exclusive_access_sp;
     Pvoid_t extent_exclusive_access_JudyL;
 };

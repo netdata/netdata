@@ -478,6 +478,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     if (pages_to_load && handle->pdc->page_list_JudyL) {
         pdc->page_list_JudyL = handle->pdc->page_list_JudyL;
         pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
+        pdc->preload_all_extent_pages = false;
         dbengine_load_page_list(ctx, pdc);
     }
     else {

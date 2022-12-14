@@ -214,7 +214,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 // DBENGINE2 extent processing
-static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list)
+static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
@@ -292,6 +292,9 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
 
         if (pd && uuid_compare(pd->uuid, header->descr[i].uuid))
             pd = NULL;
+
+        if(!preload_all_pages && !pd)
+            continue;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
 
@@ -932,12 +935,16 @@ static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-static void extent_get_exclusive_access(struct extent_page_list_s *extent_page_list) {
+static bool extent_get_exclusive_access(struct extent_page_list_s *extent_page_list) {
     struct rrdengine_datafile *df = extent_page_list->datafile;
     bool is_it_mine = false;
 
     while(!is_it_mine) {
         netdata_spinlock_lock(&df->extent_exclusive_access_sp);
+        if(!df->available_for_queries) {
+            netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
+            return false;
+        }
         Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
         if (!*PValue) {
             *(Word_t *) PValue = gettid();
@@ -950,6 +957,7 @@ static void extent_get_exclusive_access(struct extent_page_list_s *extent_page_l
             nanosleep(&ns, NULL);
         }
     }
+    return true;
 }
 
 static void extent_exclusive_access_unlock(struct extent_page_list_s *extent_page_list) {
@@ -1004,9 +1012,13 @@ static void do_read_extent_work(uv_work_t *req)
     struct extent_page_list_s *extent_page_list = work_request->data;
     struct page_details_control *pdc = extent_page_list->pdc;
 
-    extent_get_exclusive_access(extent_page_list);
+    if(!extent_get_exclusive_access(extent_page_list)) {
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
+        goto datafile_not_available;
+    }
+
     if(extent_check_if_required_pdc_pages_are_already_loaded(wc->ctx, extent_page_list))
-        goto cleanup;
+        goto pages_are_preloaded;
 
     worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
@@ -1017,7 +1029,7 @@ static void do_read_extent_work(uv_work_t *req)
     if(data != MAP_FAILED) {
         // Need to decompress and then process the pagelist
         void *extent_data = data + (extent_page_list->pos - map_start);
-        extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list);
+        extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list, pdc->preload_all_extent_pages);
 
         int ret = munmap(data, length);
         fatal_assert(0 == ret);
@@ -1025,9 +1037,10 @@ static void do_read_extent_work(uv_work_t *req)
     else
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_mmap_failed, 1, __ATOMIC_RELAXED);
 
-cleanup:
+pages_are_preloaded:
     extent_exclusive_access_unlock(extent_page_list);
 
+datafile_not_available:
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true);
 

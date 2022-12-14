@@ -37,6 +37,7 @@ typedef struct page_details_control {
     int32_t refcount;
     unsigned jobs_completed;
     struct completion completion;
+    bool preload_all_extent_pages;
 } PDC;
 
 struct page_details {

@@ -68,6 +68,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->journalfile = NULL;
     datafile->next = datafile->prev = NULL;
     datafile->ctx = ctx;
+    datafile->available_for_queries = true;
     datafile->extent_exclusive_access_sp = NETDATA_SPINLOCK_INITIALIZER;
     datafile->extent_exclusive_access_JudyL = NULL;
 }
