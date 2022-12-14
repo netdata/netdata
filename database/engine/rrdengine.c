@@ -300,14 +300,23 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
-            if (!vd.data_on_disk_valid)
+            if (unlikely(!vd.data_on_disk_valid))
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
 
             else if (RRD_NO_COMPRESSION == header->compression_algorithm)
                 memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
 
-            else
-                memcpy(page_data, uncompressed_buf + page_offset, (size_t) vd.page_length);
+            else {
+                if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
+                    internal_error(true,
+                                   "DBENGINE: page offset %u + page length %zu exceeds than the uncompressed buffer size %u",
+                                   page_offset, vd.page_length, uncompressed_payload_length);
+
+                    fill_page_with_nulls(page_data, vd.page_length, vd.type);
+                }
+                else
+                    memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
+            }
 
             PGC_ENTRY page_entry = {
                 .hot = false,
