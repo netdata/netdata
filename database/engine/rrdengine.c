@@ -1137,7 +1137,6 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
 
     struct page_details_control *pdc = work_request->data;
-    Pvoid_t JudyL_page_list = pdc->page_list_JudyL;
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
     Pvoid_t *PValue2;
@@ -1156,14 +1155,12 @@ static void do_read_page_list_work(uv_work_t *req)
     struct datafile_extent_list_s *datafile_extent_list;
     struct extent_page_list_s *extent_page_list;
 
-    if (JudyL_page_list) {
-        for (PValue = JudyLFirst(JudyL_page_list, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? NULL : *PValue;
-             pd != NULL;
-             PValue = JudyLNext(JudyL_page_list, &time_index, PJE0),
-            pd = unlikely(NULL == PValue) ? NULL : *PValue) {
+    if (pdc->page_list_JudyL) {
+        bool first_then_next = true;
+        while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
+            pd = *PValue;
 
-            if (pd->page)
+            if (!pd || pd->page)
                 continue;
 
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
