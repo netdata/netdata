@@ -61,6 +61,26 @@ struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_rcvd = 0
 };
 
+#ifdef MQTT_WSS_DEBUG
+#include <openssl/ssl.h>
+#define DEFAULT_SSKEYLOGFILE_NAME "SSLKEYLOGFILE"
+const char *ssl_log_filename = NULL;
+FILE *ssl_log_file = NULL;
+static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
+{
+    (void)ssl;
+    if (!ssl_log_file)
+        ssl_log_file = fopen(ssl_log_filename, "a");
+    if (!ssl_log_file) {
+        error("Couldn't open ssl_log file (%s) for append.", ssl_log_filename);
+        return;
+    }
+    fputs(line, ssl_log_file);
+    putc('\n', ssl_log_file);
+    fflush(ssl_log_file);
+}
+#endif
+
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
 OSSL_DECODER_CTX *aclk_dctx = NULL;
 EVP_PKEY *aclk_private_key = NULL;
@@ -681,6 +701,18 @@ void *aclk_main(void *ptr)
         goto exit;
     }
 
+#ifdef MQTT_WSS_DEBUG
+    size_t default_ssl_log_filename_size = strlen(netdata_configured_log_dir) + strlen(DEFAULT_SSKEYLOGFILE_NAME) + 2;
+    char *default_ssl_log_filename = mallocz(default_ssl_log_filename_size);
+    snprintfz(default_ssl_log_filename, default_ssl_log_filename_size, "%s/%s", netdata_configured_log_dir, DEFAULT_SSKEYLOGFILE_NAME);
+    ssl_log_filename = config_get(CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
+    freez(default_ssl_log_filename);
+    if (ssl_log_filename) {
+        error_report("SSLKEYLOGFILE active (path:\"%s\")!", ssl_log_filename);
+        mqtt_wss_set_SSL_CTX_keylog_cb(mqttwss_client, aclk_ssl_keylog_cb);
+    }
+#endif
+
     // Enable MQTT buffer growth if necessary
     // e.g. old cloud architecture clients with huge nodes
     // that send JSON payloads of 10 MB as single messages
@@ -716,6 +748,11 @@ void *aclk_main(void *ptr)
     } while (!netdata_exit);
 
     aclk_graceful_disconnect(mqttwss_client);
+
+#ifdef MQTT_WSS_DEBUG
+    if (ssl_log_file)
+        fclose(ssl_log_file);
+#endif
 
 exit_full:
 // Tear Down
