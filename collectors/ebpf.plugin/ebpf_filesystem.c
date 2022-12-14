@@ -367,7 +367,8 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
 static void ebpf_filesystem_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*filesystem_threads.thread);
+    if (filesystem_threads.thread)
+        netdata_thread_cancel(*filesystem_threads.thread);
     ebpf_filesystem_free(em);
 }
 

@@ -183,7 +183,8 @@ static void ebpf_hardirq_free(ebpf_module_t *em)
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*hardirq_threads.thread);
+    if (hardirq_threads.thread)
+        netdata_thread_cancel(*hardirq_threads.thread);
     ebpf_hardirq_free(em);
 }
 

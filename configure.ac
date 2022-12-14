@@ -213,6 +213,12 @@ AC_ARG_ENABLE(
     [enable_ml_tests="yes"],
     [enable_ml_tests="no"]
 )
+AC_ARG_ENABLE(
+    [aclk_ssl_debug],
+    [AS_HELP_STRING([--enable-aclk-ssl-debug], [Enables possibility for SSL key logging @<:@default no@:>@])],
+    [aclk_ssl_debug="yes"],
+    [aclk_ssl_debug="no"]
+)
 
 # -----------------------------------------------------------------------------
 # Enforce building with C99, bail early if we can't.
@@ -711,6 +717,11 @@ if test "${with_bundled_protobuf}" != "no"; then
     if test "${with_bundled_protobuf}" == "detect" -a "${bundled_proto_avail}" == "yes"; then
         with_bundled_protobuf="yes"
     fi
+fi
+
+AM_CONDITIONAL([MQTT_WSS_DEBUG], [test "${aclk_ssl_debug}" = "yes"])
+if test "${aclk_ssl_debug}" = "yes"; then
+    AC_DEFINE([MQTT_WSS_DEBUG], [1], [ACLK SSL allow debugging])
 fi
 
 if test "${with_bundled_protobuf}" != "yes"; then

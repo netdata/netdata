@@ -48,7 +48,9 @@ enum cachestat_counters {
 enum cachestat_account_dirty_pages {
     NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
     NETDATA_CACHESTAT_SET_PAGE_DIRTY,
-    NETDATA_CACHESTAT_FOLIO_DIRTY
+    NETDATA_CACHESTAT_FOLIO_DIRTY,
+
+    NETDATA_CACHESTAT_ACCOUNT_DIRTY_END
 };
 
 enum cachestat_indexes {

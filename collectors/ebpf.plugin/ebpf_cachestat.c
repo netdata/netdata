@@ -51,6 +51,9 @@ netdata_ebpf_targets_t cachestat_targets[] = { {.name = "add_to_page_cache_lru",
                                                {.name = "mark_buffer_dirty", .mode = EBPF_LOAD_TRAMPOLINE},
                                                {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
+static char *account_page[NETDATA_CACHESTAT_ACCOUNT_DIRTY_END] ={ "account_page_dirtied",
+                                                                  "__set_page_dirty", "__folio_mark_dirty"  };
+
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/cachestat.skel.h" // BTF code
 
@@ -83,10 +86,12 @@ static void ebpf_cachestat_disable_probe(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_probe(struct cachestat_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_kprobe, false);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_kprobe, false);
     } else {
@@ -122,10 +127,12 @@ static void ebpf_cachestat_disable_trampoline(struct cachestat_bpf *obj)
  */
 static void ebpf_cachestat_disable_specific_trampoline(struct cachestat_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_set_page_dirty_fentry, false);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_autoload(obj->progs.netdata_folio_mark_dirty_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata_account_page_dirtied_fentry, false);
     } else {
@@ -149,10 +156,12 @@ static inline void netdata_set_trampoline_target(struct cachestat_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_mark_page_accessed_fentry, 0,
                                    cachestat_targets[NETDATA_KEY_CALLS_MARK_PAGE_ACCESSED].name);
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         bpf_program__set_attach_target(obj->progs.netdata_folio_mark_dirty_fentry, 0,
                                        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         bpf_program__set_attach_target(obj->progs.netdata_set_page_dirty_fentry, 0,
                                        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
     } else {
@@ -192,12 +201,14 @@ static int ebpf_cachestat_attach_probe(struct cachestat_bpf *obj)
     if (ret)
         return -1;
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16) {
+    if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                account_page[NETDATA_CACHESTAT_FOLIO_DIRTY])) {
         obj->links.netdata_folio_mark_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_folio_mark_dirty_kprobe,
                                                                                 false,
                                                                                 cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
         ret = libbpf_get_error(obj->links.netdata_folio_mark_dirty_kprobe);
-    } else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15) {
+    } else if (!strcmp(cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name,
+                       account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY])) {
         obj->links.netdata_set_page_dirty_kprobe = bpf_program__attach_kprobe(obj->progs.netdata_set_page_dirty_kprobe,
                                                                               false,
                                                                               cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name);
@@ -363,7 +374,8 @@ static void ebpf_cachestat_free(ebpf_module_t *em)
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    netdata_thread_cancel(*cachestat_threads.thread);
+    if (cachestat_threads.thread)
+        netdata_thread_cancel(*cachestat_threads.thread);
     ebpf_cachestat_free(em);
 }
 
@@ -1237,16 +1249,28 @@ static void ebpf_cachestat_allocate_global_vectors(int apps)
  * Update Internal value
  *
  * Update values used during runtime.
+ *
+ * @return It returns 0 when one of the functions is present and -1 otherwise.
  */
-static void ebpf_cachestat_set_internal_value()
+static int ebpf_cachestat_set_internal_value()
 {
-    static char *account_page[] = { "account_page_dirtied", "__set_page_dirty", "__folio_mark_dirty"  };
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_16)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_FOLIO_DIRTY];
-    else if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_15)
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_SET_PAGE_DIRTY];
-    else
-        cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = account_page[NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY];
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    int i;
+    for (i = 0; i < NETDATA_CACHESTAT_ACCOUNT_DIRTY_END ; i++) {
+        address.function = account_page[i];
+        ebpf_load_addresses(&address, -1);
+        if (address.addr)
+            break;
+    }
+
+    if (!address.addr) {
+        error("%s cachestat.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        return -1;
+    }
+
+    cachestat_targets[NETDATA_KEY_CALLS_ACCOUNT_PAGE_DIRTIED].name = address.function;
+
+    return 0;
 }
 
 /*
@@ -1300,7 +1324,10 @@ void *ebpf_cachestat_thread(void *ptr)
 
     ebpf_update_pid_table(&cachestat_maps[NETDATA_CACHESTAT_PID_STATS], em);
 
-    ebpf_cachestat_set_internal_value();
+    if (ebpf_cachestat_set_internal_value()) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+        goto endcachestat;
+    }
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);

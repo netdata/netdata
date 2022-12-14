@@ -1160,7 +1160,8 @@ void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mo
  * Helper used to get address from /proc/kallsym
  *
  * @param fa address structure
- * @param fd file descriptor loaded inside kernel.
+ * @param fd file descriptor loaded inside kernel. If a negative value is given
+ *           the function will load address and it won't update hash table.
  */
 void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
 {
@@ -1182,11 +1183,15 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
         char *fcnt = procfile_lineword(ff, l, 2);
         uint32_t hash = simple_hash(fcnt);
         if (fa->hash == hash && !strcmp(fcnt, fa->function)) {
-            char addr[128];
-            snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
-            fa->addr = (unsigned long) strtoul(addr, NULL, 16);
-            uint32_t key = 0;
-            bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+            if (fd > 0) {
+                char addr[128];
+                snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
+                fa->addr = (unsigned long) strtoul(addr, NULL, 16);
+                uint32_t key = 0;
+                bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+            } else
+                fa->addr = 1;
+            break;
         }
     }
 

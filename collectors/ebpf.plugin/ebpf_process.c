@@ -745,7 +745,8 @@ static void ebpf_process_exit(void *ptr)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-    pthread_cancel(*cgroup_thread.thread);
+    if (cgroup_thread.thread)
+        pthread_cancel(*cgroup_thread.thread);
 }
 
 /*****************************************************************
