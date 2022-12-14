@@ -1009,7 +1009,11 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
 
-    info("Indexing file %s", path);
+    info("Indexing file %s: Extents %lu, Metrics %lu, Pages %lu",
+        path,
+        number_of_extents,
+        number_of_metrics,
+        number_of_pages);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t start_loading = now_realtime_usec();
