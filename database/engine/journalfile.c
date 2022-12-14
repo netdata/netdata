@@ -101,7 +101,7 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
         return;
     }
     /* care with outstanding transactions when switching journal files */
-    journalfile = ctx->datafiles.last->journalfile;
+    journalfile = ctx->datafiles.first->prev->journalfile;
 
     io_descr = mallocz(sizeof(*io_descr));
     pos = ctx->commit_log.buf_pos;

@@ -40,18 +40,12 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
 {
     uv_rwlock_wrlock(&ctx->datafiles.rwlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(ctx->datafiles.first, datafile, prev, next);
-    ctx->datafiles.last = ctx->datafiles.first->prev;
-    if(ctx->datafiles.last == ctx->datafiles.first)
-        ctx->datafiles.last = NULL;
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ctx->datafiles.first, datafile, prev, next);
-    ctx->datafiles.last = ctx->datafiles.first->prev;
-    if(ctx->datafiles.last == ctx->datafiles.first)
-        ctx->datafiles.last = NULL;
 }
 
 

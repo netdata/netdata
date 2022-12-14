@@ -608,7 +608,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    datafile = ctx->datafiles.last;  /* TODO: check for exceeded size quota */
+    datafile = ctx->datafiles.first->prev;  /* TODO: check for exceeded size quota */
     xt_io_descr->datafile = datafile;
 
     for (i = 0 ; i < count ; ++i) {
@@ -750,7 +750,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE))) {
         out_of_space = 1;
     }
-    datafile = ctx->datafiles.last;
+    datafile = ctx->datafiles.first->prev;
     current_size = datafile->pos;
     target_size = ctx->max_disk_space / TARGET_DATAFILES;
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
@@ -759,7 +759,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 
     if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
         /* Finalize data and journal file and create a new pair */
-        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.last) ? NULL : ctx->datafiles.last->journalfile;
+        struct rrdengine_journalfile *journalfile = unlikely(NULL == ctx->datafiles.first) ? NULL : ctx->datafiles.first->prev->journalfile;
         wal_flush_transaction_buffer(wc);
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
         if (likely(!ret)) {
