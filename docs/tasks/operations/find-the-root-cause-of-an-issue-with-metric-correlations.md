@@ -18,13 +18,13 @@ the most accurate insights using every possible metric.
 
 In the following task sections, you will learn how to run a Metric Correlation from the Netdata Cloud interface.
 
-## Prerequisites
+#### Prerequisites
 
 To find the root cause of an issue with Metric Correlations, you will need the following:
 
 - A Netdata Cloud account with at least one node claimed to one of its Spaces
 
-## Steps
+#### Steps
 
 From within a War Room:
 
@@ -43,9 +43,7 @@ From within a War Room:
     -  **aggregation method**: Use this to select an aggregation method.
     -  **data to correlate**: Use this to select which data to correlate.
 
-## Related topics
-
-### Related Concepts
+#### Related topics
 
 - [Guided Troubleshooting Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md)
 - [Metric Correlation Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md)
