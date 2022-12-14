@@ -885,7 +885,17 @@ void *journal_v2_write_extent_list(Pvoid_t JudyL_extents_pos, void *data)
 
     Word_t pos = 0;
     struct jv2_extents_info *ext_info;
+
+    Pvoid_t JudyL = NULL;
     while ((PValue = JudyLFirstThenNext(JudyL_extents_pos, &pos, &first))) {
+        ext_info = *PValue;
+        PValue = JudyLIns(&JudyL, ext_info->index, PJE0);
+        *PValue = ext_info;
+    }
+
+    pos = 0;
+    first = true;
+    while ((PValue = JudyLFirstThenNext(JudyL, &pos, &first))) {
         ext_info = *PValue;
         j2_extent->datafile_offset = ext_info->pos;
         j2_extent->datafile_size = ext_info->bytes;
@@ -893,6 +903,7 @@ void *journal_v2_write_extent_list(Pvoid_t JudyL_extents_pos, void *data)
         j2_extent->file_index = 0;
         j2_extent++;
     }
+    JudyLFreeArray(&JudyL, PJE0);
     return j2_extent;
 }
 
