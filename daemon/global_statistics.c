@@ -1114,7 +1114,7 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_memory_flushes_critical     = rrddim_add(st_pgc_memory_pressure_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
-        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_aggressive, (collected_number)pgc_main_stats.events_cache_needs_space_90);
+        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_aggressive, (collected_number)pgc_main_stats.events_cache_needs_space_aggressively);
         rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_critical, (collected_number)pgc_main_stats.events_cache_under_severe_pressure);
         rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_flushes_critical, (collected_number)pgc_main_stats.events_flush_critical);
 

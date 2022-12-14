@@ -269,7 +269,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
 }
 
 static inline bool cache_under_severe_pressure(PGC *cache) {
-    if(unlikely(cache_usage_percent(cache) >= 95)) {
+    if(unlikely(cache_usage_percent(cache) >= 98)) {
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -277,22 +277,22 @@ static inline bool cache_under_severe_pressure(PGC *cache) {
     return false;
 }
 
-static inline bool cache_needs_space_90(PGC *cache) {
-    if(unlikely(cache_usage_percent(cache) >= 90)) {
-        __atomic_add_fetch(&cache->stats.events_cache_needs_space_90, 1, __ATOMIC_RELAXED);
+static inline bool cache_needs_space_aggressively(PGC *cache) {
+    if(unlikely(cache_usage_percent(cache) >= 96)) {
+        __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
         return true;
     }
 
     return false;
 }
 
-#define cache_above_healthy_limit_85(cache) (cache_usage_percent(cache) >= 85)
+#define cache_above_healthy_limit(cache) (cache_usage_percent(cache) >= 94)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
 static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them);
 
 static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
-    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_90(cache)) {
+    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
         bool under_pressure = cache_under_severe_pressure(cache);
         evict_pages(cache,
                     under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
@@ -314,7 +314,7 @@ static void evict_on_page_searched_and_not_found(PGC *cache __maybe_unused) {
 }
 
 static void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
-    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_90(cache))) {
+    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache))) {
         bool under_pressure = cache_under_severe_pressure(cache);
         evict_pages(cache,
                     under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
@@ -826,7 +826,7 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
 
 // returns true, when there is more work to do
 static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them) {
-    if(!all_of_them && !cache_above_healthy_limit_85(cache))
+    if(!all_of_them && !cache_above_healthy_limit(cache))
         // don't bother - not enough to do anything
         return false;
 
@@ -962,7 +962,7 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
         }
 
-    } while(pages_to_evict && (all_of_them || (cache_above_healthy_limit_85(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while(pages_to_evict && (all_of_them || (cache_above_healthy_limit(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && PGC_REFERENCED_PAGES(cache)) {
         error_limit_static_global_var(erl, 1, 0);
@@ -2045,7 +2045,7 @@ void unittest_stress_test(void) {
         stats.searches_closest_hits = __atomic_load_n(&pgc_uts.cache->stats.searches_closest_hits, __ATOMIC_RELAXED);
 
         stats.events_cache_under_severe_pressure = __atomic_load_n(&pgc_uts.cache->stats.events_cache_under_severe_pressure, __ATOMIC_RELAXED);
-        stats.events_cache_needs_space_90 = __atomic_load_n(&pgc_uts.cache->stats.events_cache_needs_space_90, __ATOMIC_RELAXED);
+        stats.events_cache_needs_space_90 = __atomic_load_n(&pgc_uts.cache->stats.events_cache_needs_space_aggressively, __ATOMIC_RELAXED);
         stats.events_flush_critical = __atomic_load_n(&pgc_uts.cache->stats.events_flush_critical, __ATOMIC_RELAXED);
 
         size_t searches_exact = stats.searches_exact - old_stats.searches_exact;

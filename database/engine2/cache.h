@@ -78,7 +78,7 @@ struct pgc_statistics {
 
     // events
     size_t events_cache_under_severe_pressure;
-    size_t events_cache_needs_space_90;
+    size_t events_cache_needs_space_aggressively;
     size_t events_flush_critical;
 
     struct {
