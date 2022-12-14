@@ -385,10 +385,6 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
     aclk_rcvd_cloud_msgs = 0;
     aclk_connection_counter++;
 
-    aclk_topic_cache_iter_t iter = ACLK_TOPIC_CACHE_ITER_T_INITIALIZER;
-    while ((topic = (char*)aclk_topic_cache_iterate(&iter)) != NULL)
-        mqtt_wss_set_topic_alias(client, topic);
-
     aclk_send_agent_connection_update(client, 1);
 }
 
