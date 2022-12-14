@@ -932,15 +932,45 @@ static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-void extent_get_exclusive_access(struct extent_page_list_s *extent_page_list __maybe_unused) {
-    ;
+static void extent_get_exclusive_access(struct extent_page_list_s *extent_page_list) {
+    struct rrdengine_datafile *df = extent_page_list->datafile;
+    bool is_it_mine = false;
+
+    while(!is_it_mine) {
+        netdata_spinlock_lock(&df->extent_exclusive_access_sp);
+        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+        if (!*PValue) {
+            *(Word_t *) PValue = gettid();
+            is_it_mine = true;
+        }
+        netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
+
+        if(!is_it_mine) {
+            static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+            nanosleep(&ns, NULL);
+        }
+    }
 }
 
-void extent_exclusive_access_unlock(struct extent_page_list_s *extent_page_list __maybe_unused) {
-    ;
+static void extent_exclusive_access_unlock(struct extent_page_list_s *extent_page_list) {
+    struct rrdengine_datafile *df = extent_page_list->datafile;
+
+    netdata_spinlock_lock(&df->extent_exclusive_access_sp);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+    if (*(Word_t *) PValue != (Word_t)gettid())
+        fatal("DBENGINE: exclusive extent access is not mine");
+#endif
+
+    int rc = JudyLDel(&df->extent_exclusive_access_JudyL, extent_page_list->pos, PJE0);
+    if (!rc)
+        fatal("DBENGINE: cannot find my exclusive access");
+
+    netdata_spinlock_unlock(&df->extent_exclusive_access_sp);
 }
 
-bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
+static bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
     struct page_details_control *pdc = extent_page_list->pdc;
     Word_t Index = 0;
     Pvoid_t *PValue;
