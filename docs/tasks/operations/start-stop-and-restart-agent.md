@@ -24,13 +24,11 @@ Stopping or restarting the Agent will cause gaps in stored metrics until the `ne
 the database engine.
 :::
 
-## Prerequisites
+### Prerequisites
 
 To start/stop the agent, you will need the following:
 
 - A node with the Agent installed
-
-## Steps
 
 :::tip
 `systemctl` is the recommended way to start, stop, or restart the Netdata daemon.  
@@ -39,6 +37,8 @@ Lastly, you can also use the `init.d` command for this operation.
 :::
 
 ### Starting the Agent
+
+#### Steps
 
 You can start the Agent with one of the following options:
 
@@ -121,6 +121,8 @@ Active: active (running)
 
 ### Stopping the Agent
 
+#### Steps
+
 You can stop the Agent with one of the following options:
 
 <Tabs groupId="choice">
@@ -200,6 +202,8 @@ Active: inactive (dead)
 
 ### Reload health configuration
 
+#### Steps
+
 You do not need to restart the Agent between changes to health configuration files, such as specific health entities.
 
 Instead, use `netdatacli` and the `reload-health` option to prevent gaps in metrics collection:
@@ -216,6 +220,8 @@ killall -USR2 netdata
 ```
 
 ### Restarting the Agent
+
+#### Steps
 
 You can restart the Agent with one of the following options:
 
@@ -280,9 +286,9 @@ Active: active (running)
 ...
 ```
 
-## Further actions
+### Force stop a stalled or unresponsive `netdata` processes
 
-### Force stop stalled or unresponsive `netdata` processes
+#### Steps
 
 In rare cases, the Agent may stall or not properly close sockets, preventing a new process from starting. In these
 cases, try the following three commands _(you can replace the `systemctl` command with your preferred command to stop
@@ -294,11 +300,11 @@ sudo killall netdata
 ps aux| grep netdata
 ```
 
+#### Expected result
+
 The output of `ps aux` should show no `netdata` or associated processes running. You can now start the Agent again
 with `service netdata start`, or the appropriate method for your system.
 
-## Related topics
-
-### Related References
+### Related topics
 
 - [Netdata Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
