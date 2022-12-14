@@ -1012,13 +1012,21 @@ static void do_read_extent_work(uv_work_t *req)
     struct extent_page_list_s *extent_page_list = work_request->data;
     struct page_details_control *pdc = extent_page_list->pdc;
 
-    if(!extent_get_exclusive_access(extent_page_list)) {
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
-        goto datafile_not_available;
-    }
+    if(pdc->preload_all_extent_pages) {
+        if (!extent_get_exclusive_access(extent_page_list)) {
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
+            goto datafile_not_available;
+        }
 
-    if(extent_check_if_required_pdc_pages_are_already_loaded(wc->ctx, extent_page_list))
-        goto pages_are_preloaded;
+        if (extent_check_if_required_pdc_pages_are_already_loaded(wc->ctx, extent_page_list))
+            goto pages_are_preloaded;
+    }
+    else {
+        if (!extent_page_list->datafile->available_for_queries) {
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_datafile_not_available, 1, __ATOMIC_RELAXED);
+            goto datafile_not_available;
+        }
+    }
 
     worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
@@ -1038,7 +1046,8 @@ static void do_read_extent_work(uv_work_t *req)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_loaded_mmap_failed, 1, __ATOMIC_RELAXED);
 
 pages_are_preloaded:
-    extent_exclusive_access_unlock(extent_page_list);
+    if(pdc->preload_all_extent_pages)
+        extent_exclusive_access_unlock(extent_page_list);
 
 datafile_not_available:
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
