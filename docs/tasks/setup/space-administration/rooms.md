@@ -28,13 +28,13 @@ the [Space administration](https://github.com/netdata/netdata/blob/master/docs/t
 Task.
 :::
 
-## Prerequisites
+### Prerequisites
 
 To perform administrative actions on Rooms, you will need the following:
 
 - A Netdata Cloud account with at least one node claimed to one of its Spaces.
 
-## Node management
+### Node management
 
 You can perform the following actions from either :
 
@@ -91,7 +91,7 @@ You can perform the following actions from either :
 </TabItem>
 </Tabs>
 
-## User management
+### User management
 
 You can add/remove users by following the Tasks below by navigating to the **War Room settings** interface.
 
@@ -114,7 +114,7 @@ From the **War Room settings** interface:
 1. Click on the **Users** tab
 2. Remove a user from the War Room by clicking the trashcan icon in the **Actions** column.
 
-## Create/Delete Custom Dashboards
+### Create/Delete Custom Dashboards
 
 From the **Dashboards** view of a War Room, you can Create Custom Dashboards by clicking the green **Create new**
 button.  
@@ -129,9 +129,9 @@ Task.
 
 To delete a Custom Dashboard, select it from the tick box column, and then click the **Delete** button.
 
-## Related topics
+### Related topics
 
-### Related Concepts
+#### Related Concepts
 
 1. [War Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md)
 2. [Views Concept](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
