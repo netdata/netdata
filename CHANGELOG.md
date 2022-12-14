@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Remove Fedora 35 from the list of supported platforms. [\#14136](https://github.com/netdata/netdata/pull/14136) ([Ferroin](https://github.com/Ferroin))
+- Fix conditions for uploading repoconfig packages to new infra. [\#14134](https://github.com/netdata/netdata/pull/14134) ([Ferroin](https://github.com/Ferroin))
+- fix httpcheck alarms [\#14133](https://github.com/netdata/netdata/pull/14133) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.46.0 [\#14124](https://github.com/netdata/netdata/pull/14124) ([ilyam8](https://github.com/ilyam8))
 - heartbeat: don't log every discrepancy [\#14122](https://github.com/netdata/netdata/pull/14122) ([ktsaou](https://github.com/ktsaou))
 - ARAL: add destroy function and optimize ifdefs [\#14121](https://github.com/netdata/netdata/pull/14121) ([ktsaou](https://github.com/ktsaou))
@@ -32,6 +35,7 @@
 - remove deprecated fping.plugin in accordance with v1.37.0 deprecation notice  [\#14073](https://github.com/netdata/netdata/pull/14073) ([ilyam8](https://github.com/ilyam8))
 - remove deprecated python.d collectors announced in v1.37.0 deprecation notice [\#14072](https://github.com/netdata/netdata/pull/14072) ([ilyam8](https://github.com/ilyam8))
 - Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
+- MQTT 5 publish topic alias support [\#14067](https://github.com/netdata/netdata/pull/14067) ([underhood](https://github.com/underhood))
 - add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
 - Cleanly reimplement system/edit-config.in. [\#13702](https://github.com/netdata/netdata/pull/13702) ([Ferroin](https://github.com/Ferroin))
@@ -361,11 +365,6 @@
 - chore: add WireGuard description and icon to dashboard info [\#13483](https://github.com/netdata/netdata/pull/13483) ([ilyam8](https://github.com/ilyam8))
 - feat\(cgroups.plugin\): resolve nomad containers name \(docker driver only\) [\#13481](https://github.com/netdata/netdata/pull/13481) ([ilyam8](https://github.com/ilyam8))
 - Check for protected when excluding mounts [\#13479](https://github.com/netdata/netdata/pull/13479) ([MrZammler](https://github.com/MrZammler))
-- update postgres dashboard info [\#13474](https://github.com/netdata/netdata/pull/13474) ([ilyam8](https://github.com/ilyam8))
-- Remove the single threaded arrayallocator optiomization during agent startup [\#13473](https://github.com/netdata/netdata/pull/13473) ([stelfrag](https://github.com/stelfrag))
-- Handle cases where entries where stored as text \(with strftime\("%s"\)\) [\#13472](https://github.com/netdata/netdata/pull/13472) ([stelfrag](https://github.com/stelfrag))
-- Enable rrdcontexts by default [\#13471](https://github.com/netdata/netdata/pull/13471) ([stelfrag](https://github.com/stelfrag))
-- Fix cgroup name detection for docker containers in containerd cgroup [\#13470](https://github.com/netdata/netdata/pull/13470) ([xkisu](https://github.com/xkisu))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
