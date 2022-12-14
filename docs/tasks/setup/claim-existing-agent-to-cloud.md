@@ -13,13 +13,10 @@ Running on a distributed node, you can securely connect a Netdata Agent to Netda
 A Space's administrator creates a **claiming token**, which is used to add an Agent to their Space via
 the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
-When connecting an Agent (also referred to as a node) to the Cloud, you must complete a verification process that proves
-you have some level of authorization to manage the node itself. This verification is a security feature that helps
-prevent unauthorized users from seeing the data on your node.
+When connecting an Agent (also referred to as a node) to the Cloud, you must complete a verification process that proves you have some level of authorization to manage the node itself. This verification is a security feature that helps prevent unauthorized users from seeing the data on your node.
 
 :::info
-While the data does flow through the Netdata Cloud servers on its way from Agents to the browser, we do not store or log
-it in any way.
+While the data does flow through the Netdata Cloud servers on its way from Agents to the browser, we do not store or log it in any way.
 :::
 
 Only the administrators of a Space in Netdata Cloud can view the claiming token and accompanying script that is
@@ -41,14 +38,7 @@ the identity of the Agent when it connects to the Cloud.
 
 :::
 
-## Prerequisites
-
-In order to claim an existing agent to the Cloud, you will need the following:
-
-- A node with a Netdata Agent installed
-- A Netdata Cloud account with a Space created
-
-## Steps
+## A quick run through of how to claim an Agent to the Cloud
 
 There will be four main flows from where you can connect a node to Netdata Cloud:
 
@@ -60,7 +50,19 @@ There will be four main flows from where you can connect a node to Netdata Cloud
 If there are extra steps needed for claiming on your environment, they will be stated on the claiming tab of the UI, and
 you can keep reading for detailed guidance.
 
+### Prerequisites
+
+In order to claim an existing agent to the Cloud, you will need the following:
+
+- A node with a Netdata Agent installed
+- A Netdata Cloud account with a Space created
+
+
+<!-- this can be also a tabbed setup thing -->
+
 ### Empty War Room
+
+#### Steps
 
 Either at your first sign in or following ones, when you enter Netdata Cloud and are at a War Room that doesn't have any
 node added to it, you will be able to:
@@ -73,6 +75,8 @@ Kubernetes) and then you will be provided with a script to initiate the connecti
 
 ### Admin Interface / Manage Space tab
 
+#### Steps
+
 To connect a node:
 
 1. Navigate to the **Nodes tab** from the sidebar, and click the **+** button
@@ -81,6 +85,8 @@ To connect a node:
 4. Copy and paste the script on your terminal
 
 ### Admin Interface / War Room settings tab
+
+#### Steps
 
 This tab will have predefined the War Room which settings button you clicked.  
 To connect a node:
@@ -91,6 +97,8 @@ To connect a node:
 4. Copy and paste the script on your terminal
 
 ### Nodes View
+
+#### Steps
 
 From a War Room's Nodes View you can select to connect an Agent to this War Room.  
 To do so:
