@@ -23,13 +23,13 @@ Before we begin, let's explain some of the terminology we are going to use:
 We will begin analyzing all the buttons and the actions from the top of the chart to the bottom, in a left-to-right
 fashion.
 
-## Prerequisites
+### Prerequisites
 
 To interact with charts, you will need the following:
 
 - A Netdata Cloud Space with at least one live node claimed to it
 
-## Stopping a chart from updating (and restarting)
+### Stopping a chart from updating (and restarting)
 
 You can stop a chart from updating by clicking on it. This will pause all the charts in order to take a better look!
 
@@ -196,7 +196,5 @@ In this bar you can:
 - Expand or contract the chart for better visibility.
 
 ## Related topics
-
-### Related Concepts
 
 - [From raw metrics to visualization](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
