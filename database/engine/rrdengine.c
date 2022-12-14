@@ -233,6 +233,11 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
     trailer = data + extent_page_list->size - sizeof(*trailer);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    void *data_copy = mallocz(payload_length);
+    memcpy(data_copy, data, payload_length);
+#endif
+
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, data, extent_page_list->size  - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
@@ -313,7 +318,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                 if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
                     error_limit_static_global_var(erl, 10, 0);
                     error_limit(&erl,
-                                   "DBENGINE: page %u offset %u + page length %zu exceeds than the uncompressed buffer size %u",
+                                   "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
                                    i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
