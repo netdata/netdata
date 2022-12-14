@@ -1191,6 +1191,36 @@ static void dbengine2_statistics_charts(void) {
     }
 
     {
+        static RRDSET *st_query_pages_data_source = NULL;
+        static RRDDIM *rd_pages_in_mem = NULL;
+        static RRDDIM *rd_pages_to_load = NULL;
+
+        if (unlikely(!st_query_pages_data_source)) {
+            st_query_pages_data_source = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_query_pages_data_source",
+                    NULL,
+                    "dbengine cache",
+                    NULL,
+                    "Netdata Query Pages to Data Source",
+                    "pages/s",
+                    "netdata",
+                    "stats",
+                    132007,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_pages_in_mem = rrddim_add(st_query_pages_data_source, "memory", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pages_to_load = rrddim_add(st_query_pages_data_source, "disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_in_mem, (collected_number)(cache_efficiency_stats.pages_total - cache_efficiency_stats.pages_to_load_from_disk));
+        rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_to_load, (collected_number)cache_efficiency_stats.pages_to_load_from_disk);
+
+        rrdset_done(st_query_pages_data_source);
+    }
+
+    {
         static RRDSET *st_query_pages_preloading = NULL;
         static RRDDIM *rd_pass4 = NULL;
         static RRDDIM *rd_failed = NULL;
@@ -1208,7 +1238,7 @@ static void dbengine2_statistics_charts(void) {
                     "pages/s",
                     "netdata",
                     "stats",
-                    132007,
+                    132008,
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
@@ -1246,7 +1276,7 @@ static void dbengine2_statistics_charts(void) {
                     "pages/s",
                     "netdata",
                     "stats",
-                    132008,
+                    132009,
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
