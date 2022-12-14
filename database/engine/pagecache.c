@@ -469,22 +469,21 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     time_t first_page_first_time_s = INVALID_TIME;
     size_t pages_to_load = 0;
 
-    struct page_details_control *pdc = callocz(1, sizeof(*pdc));
-    completion_init(&pdc->completion);
-    handle->pdc = pdc;
+    handle->pdc = callocz(1, sizeof(struct page_details_control));
+    netdata_spinlock_init(&handle->pdc->spinlock);
+    completion_init(&handle->pdc->completion);
 
     handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
                                                  &first_page_first_time_s, &pages_to_load);
 
     if (pages_to_load && handle->pdc->page_list_JudyL) {
-        pdc->page_list_JudyL = handle->pdc->page_list_JudyL;
-        pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
-        pdc->preload_all_extent_pages = false;
-        dbengine_load_page_list(ctx, pdc);
+        handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
+        handle->pdc->preload_all_extent_pages = false;
+        dbengine_load_page_list(ctx, handle->pdc);
     }
     else {
-        pdc->refcount = 1; // we are alone in this query - no need for any worker
+        handle->pdc->refcount = 1; // we are alone in this query - no need for any worker
         completion_mark_complete(&handle->pdc->completion);
     }
 

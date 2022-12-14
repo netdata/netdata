@@ -1004,20 +1004,21 @@ static void extent_exclusive_access_unlock(struct extent_page_list_s *extent_pag
 }
 
 static bool extent_check_if_required_pdc_pages_are_already_loaded(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
-    struct page_details_control *pdc = extent_page_list->pdc;
     Word_t Index = 0;
     Pvoid_t *PValue;
     bool first = true;
     size_t count_remaining = 0;
 
-    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &Index, &first))) {
+    while((PValue = JudyLFirstThenNext(extent_page_list->JudyL_page_list, &Index, &first))) {
         struct page_details *pd = *PValue;
         if(pd->page)
             continue;
 
         pd->page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, pd->metric_id, pd->first_time_s, true);
-        if(pd->page)
+        if(pd->page) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_preloaded, 1, __ATOMIC_RELAXED);
+            __atomic_store_n(&pd->page_is_loaded, true, __ATOMIC_RELEASE);
+        }
         else
             count_remaining++;
     }
