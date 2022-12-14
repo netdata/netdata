@@ -120,7 +120,7 @@ Below is a list of all the available configuration params and their default valu
 	# maximum num samples to train = 14400
 	# minimum num samples to train = 3600
 	# train every = 3600
-    # number of models per dimension = 1
+	# number of models per dimension = 1
 	# dbengine anomaly rate every = 30
 	# num samples to diff = 1
 	# num samples to smooth = 3
