@@ -17,8 +17,8 @@ static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY en
 
 static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
 {
-     struct completion queue_flush_command;
-     completion_init(&queue_flush_command);
+//     struct completion queue_flush_command;
+//     completion_init(&queue_flush_command);
 
      Pvoid_t JudyL_flush = NULL;
      Pvoid_t *PValue;
@@ -48,11 +48,11 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
      struct rrdeng_cmd cmd;
      cmd.opcode = RRDENG_FLUSH_PAGES;
      cmd.data = JudyL_flush;
-     cmd.completion = &queue_flush_command;
+     cmd.completion = NULL; //&queue_flush_command;
      rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
-     completion_wait_for(&queue_flush_command);
-     completion_destroy(&queue_flush_command);
+     //completion_wait_for(&queue_flush_command);
+     //completion_destroy(&queue_flush_command);
 }
 
 static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
