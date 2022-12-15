@@ -734,8 +734,12 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     freez(wc->now_deleting_files);
     /* unfreeze command processing */
     wc->now_deleting_files = NULL;
+    wc->now_flushing_pages = NULL;
+    wc->now_evicting_pages = NULL;
 
     wc->cleanup_thread_deleting_files = 0;
+    wc->cleanup_thread_evict_pages = 0;
+    wc->cleanup_thread_flush_pages = 0;
 
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
@@ -1388,9 +1392,15 @@ void rrdeng_worker(void* arg)
     wc->async.data = wc;
 
     wc->now_deleting_files = NULL;
+    wc->now_evicting_pages = NULL;
+    wc->now_flushing_pages = NULL;
     wc->cleanup_thread_deleting_files = 0;
     wc->running_journal_migration = 0;
     wc->run_indexing = false;
+
+    wc->cleanup_thread_deleting_files = 0;
+    wc->cleanup_thread_evict_pages = 0;
+    wc->cleanup_thread_flush_pages = 0;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
