@@ -1339,15 +1339,15 @@ void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details
 {
     struct completion read_page_received;
 
-    completion_init(&read_page_received);
+    //completion_init(&read_page_received);
     struct rrdeng_cmd cmd;
     cmd.opcode = RRDENG_READ_PAGE_LIST;
     cmd.data = pdc;
-    cmd.completion = &read_page_received;
+    cmd.completion = NULL; // &read_page_received;
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 
-    completion_wait_for(&read_page_received);
-    completion_destroy(&read_page_received);
+//    completion_wait_for(&read_page_received);
+//    completion_destroy(&read_page_received);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
