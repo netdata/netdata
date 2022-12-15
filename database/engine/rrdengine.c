@@ -516,9 +516,6 @@ static void do_flush_extent_cb(uv_fs_t *req)
         descr = xt_io_descr->descr_array[i];
         descr->id = &descr->uuid;   // FIXME:
 
-        METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &descr->uuid, (Word_t) ctx);
-        Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
-
         struct extent_io_data ext_io_data = {
             .fileno = datafile->fileno,
             .file  = datafile->file,
@@ -529,7 +526,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
         PGC_ENTRY page_entry = {
             .hot = true,
             .section = (Word_t)ctx,
-            .metric_id = metric_id,
+            .metric_id = descr->metric_id,
             .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
             .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
             .update_every = descr->update_every_s,
@@ -547,7 +544,6 @@ static void do_flush_extent_cb(uv_fs_t *req)
         }
         fatal_assert(true == added);
         pgc_page_release(open_cache, (PGC_PAGE *)page);
-        mrg_metric_release(main_mrg, this_metric);
     }
 
     uv_fs_req_cleanup(req);

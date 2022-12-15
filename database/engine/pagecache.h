@@ -22,6 +22,7 @@ extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 
 struct rrdeng_page_descr {
     uuid_t *id; /* never changes */
+    Word_t metric_id;
     usec_t start_time_ut;
     usec_t end_time_ut;
     uint32_t update_every_s:24;

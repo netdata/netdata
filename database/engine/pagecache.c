@@ -32,6 +32,7 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
         struct rrdeng_page_descr *descr = callocz(1, sizeof(*descr));
 
         uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) array[Index].metric_id)));
+        descr->metric_id = array[Index].metric_id;
         descr->start_time_ut = start_time_t * USEC_PER_SEC;
         descr->end_time_ut = end_time_t * USEC_PER_SEC;
         descr->update_every_s = array[Index].update_every;
