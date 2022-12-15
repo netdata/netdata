@@ -3,6 +3,9 @@
 
 #include "../rrd.h"
 
+// CACHE COMPILE TIME CONFIGURATION
+// #define PGC_COUNT_POINTS_COLLECTED 1
+
 typedef struct pgc PGC;
 typedef struct pgc_page PGC_PAGE;
 
@@ -39,6 +42,9 @@ struct pgc_queue_statistics {
 };
 
 struct pgc_statistics {
+    size_t wanted_cache_size;
+    size_t current_cache_size;
+
     size_t added_entries;
     size_t added_size;
 
@@ -64,7 +70,9 @@ struct pgc_statistics {
     size_t flushes_cancelled;
     size_t flushes_cancelled_size;
 
+#ifdef PGC_COUNT_POINTS_COLLECTED
     size_t points_collected;
+#endif
 
     size_t insert_spins;
     size_t evict_spins;

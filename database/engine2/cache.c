@@ -247,25 +247,39 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 // evictions control
 
 static inline size_t cache_usage_percent(PGC *cache) {
+    size_t current_cache_size;
+    size_t wanted_cache_size;
+    size_t percent;
+
+    current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
+
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
-        size_t cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
+        size_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
         size_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
         size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
         size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
-        size_t wanted_cache_size = MAX(hot_max, hot) * 2;
+        size_t max_size1 = MAX(hot_max, hot) * 2;
+        size_t max_size2 = hot_max + (dirty_max * 2);
+        wanted_cache_size = MIN(max_size1, max_size2);
+
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
             wanted_cache_size = hot + dirty + cache->config.clean_size;
-
-        size_t percent = cache_size * 100 / wanted_cache_size;
-        return percent;
     }
     else {
-        size_t clean = __atomic_load_n(&cache->clean.stats->size, __ATOMIC_RELAXED);
-        size_t max = cache->config.clean_size;
-        size_t percent = clean * 100 / max;
-        return percent;
+        size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
+        size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+
+        size_t max_for_clean = cache->config.clean_size;
+        wanted_cache_size = hot + dirty + max_for_clean;
     }
+
+    percent = current_cache_size * 100 / wanted_cache_size;
+
+    __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
+    __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
+
+    return percent;
 }
 
 static inline bool cache_under_severe_pressure(PGC *cache) {
@@ -1596,7 +1610,9 @@ void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t) 
 //        fatal("DBENGINE CACHE: end_time_t is not bigger than existing");
 
     __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_RELAXED);
+#ifdef PGC_COUNT_POINTS_COLLECTED
     __atomic_add_fetch(&cache->stats.points_collected, 1, __ATOMIC_RELAXED);
+#endif
 }
 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact) {
@@ -2064,7 +2080,9 @@ void unittest_stress_test(void) {
         double hit_exact_pc = (searches_exact > 0) ? (double)hit_exact * 100.0 / (double)searches_exact : 0.0;
         double hit_closest_pc = (searches_closest > 0) ? (double)hit_closest * 100.0 / (double)searches_closest : 0.0;
 
+#ifdef PGC_COUNT_POINTS_COLLECTED
         stats.collections = __atomic_load_n(&pgc_uts.cache->stats.points_collected, __ATOMIC_RELAXED);
+#endif
 
         char *cache_status = "N";
         if(stats.events_cache_under_severe_pressure > old_stats.events_cache_under_severe_pressure)
@@ -2082,7 +2100,9 @@ void unittest_stress_test(void) {
              "| DRT %s %5zuk +%4zuk -%4zuk "
              "| CLN %s %5zuk +%4zuk -%4zuk "
              "| SRCH %4zuk %4zuk, HIT %4.1f%% %4.1f%% "
+#ifdef PGC_COUNT_POINTS_COLLECTED
              "| CLCT %8.4f Mps"
+#endif
              , stats.entries / 1000
              , (stats.added - old_stats.added) / 1000, (stats.deleted - old_stats.deleted) / 1000
              , stats.referenced / 1000
@@ -2095,7 +2115,9 @@ void unittest_stress_test(void) {
              , (stats.clean_added - old_stats.clean_added) / 1000, (stats.clean_deleted - old_stats.clean_deleted) / 1000
              , searches_exact / 1000, searches_closest / 1000
              , hit_exact_pc, hit_closest_pc
+#ifdef PGC_COUNT_POINTS_COLLECTED
              , (double)(stats.collections - old_stats.collections) / 1000.0 / 1000.0
+#endif
              );
     }
     info("Waiting for threads to stop...");
