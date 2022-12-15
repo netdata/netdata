@@ -572,14 +572,14 @@ void init_page_cache(void)
             );
 
         open_cache = pgc_create(
-                0,
+                0,                                          // the default is 1MB
                 open_cache_clean_page_callback,
                 1,
                 open_cache_flush_callback,
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
+                PGC_OPTIONS_NONE,                                   // AUTOSCALE = 2x max hot pages
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
             );

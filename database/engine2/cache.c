@@ -1438,7 +1438,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
-    cache->config.clean_size = (clean_size_bytes < 8 * 1024 * 1024) ? 8 * 1024 * 1024 : clean_size_bytes;
+    cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_call,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
