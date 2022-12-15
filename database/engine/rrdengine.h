@@ -46,17 +46,25 @@ typedef struct page_details_control {
 
 typedef enum __attribute__ ((__packed__)) {
     // all pages must pass through these states
-    PDC_PAGE_READY     = (1 << 0),
-    PDC_PAGE_FAILED    = (1 << 1),
-    PDC_PAGE_RELEASED  = (1 << 2),
+    PDC_PAGE_READY     = (1 << 0),                  // ready to be processed (pd->page is not null)
+    PDC_PAGE_FAILED    = (1 << 1),                  // failed to be loaded (pd->page is null)
+    PDC_PAGE_PROCESSED = (1 << 2),                  // processed by the query caller
+    PDC_PAGE_RELEASED  = (1 << 3),                  // already released
 
     // other statuses for tracking issues
+
+    // data found in cache (preloaded) or on disk?
+    PDC_PAGE_PRELOADED                 = (1 << 4),  // data found in memory
+    PDC_PAGE_DISK_PENDING              = (1 << 5),  // data need to be loaded from disk
+
+    // worker related statuses
+    PDC_PAGE_INVALID_EXTENT            = (1 << 6),
+    PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT  = (1 << 7),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 8),
+    PDC_PAGE_FOUND_IN_CACHE_BY_WORKER  = (1 << 9),
 #ifdef NETDATA_INTERNAL_CHECKS
-    PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT = (1 << 3),
+    PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT = (1 << 10),
 #endif
-    PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT  = (1 << 4),
-    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 5),
-    PDC_PAGE_FOUND_IN_CACHE_BY_WORKER  = (1 << 6),
 } PDC_PAGE_STATUS;
 
 struct page_details {

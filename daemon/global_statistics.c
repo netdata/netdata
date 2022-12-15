@@ -1287,10 +1287,10 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_STACKED);
 
             rd_pass4 = rrddim_add(st_query_next_page, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_wait_failed = rrddim_add(st_query_next_page, "slow failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_nowait_failed = rrddim_add(st_query_next_page, "fast failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_wait_loaded = rrddim_add(st_query_next_page, "slow loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_nowait_loaded = rrddim_add(st_query_next_page, "fast loaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_wait_failed = rrddim_add(st_query_next_page, "failed slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_nowait_failed = rrddim_add(st_query_next_page, "failed fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_wait_loaded = rrddim_add(st_query_next_page, "loaded slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_nowait_loaded = rrddim_add(st_query_next_page, "loaded fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_next_page, rd_pass4, (collected_number)cache_efficiency_stats.pages_pending_found_in_cache_at_pass4);
@@ -1314,6 +1314,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_preloaded = NULL;
         static RRDDIM *rd_unroutable = NULL;
         static RRDDIM *rd_not_found = NULL;
+        static RRDDIM *rd_invalid_extent = NULL;
 
         if (unlikely(!st_query_pages_from_disk)) {
             st_query_pages_from_disk = rrdset_create_localhost(
@@ -1331,7 +1332,7 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_LINE);
 
             rd_compressed = rrddim_add(st_query_pages_from_disk, "ok compressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_invalid = rrddim_add(st_query_pages_from_disk, "fail invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_invalid = rrddim_add(st_query_pages_from_disk, "fail invalid page", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_uncompressed = rrddim_add(st_query_pages_from_disk, "ok uncompressed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_mmap_failed = rrddim_add(st_query_pages_from_disk, "fail cant mmap", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_already_loaded = rrddim_add(st_query_pages_from_disk, "ok but preloaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -1339,6 +1340,7 @@ static void dbengine2_statistics_charts(void) {
             rd_preloaded = rrddim_add(st_query_pages_from_disk, "ok preloaded", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_unroutable = rrddim_add(st_query_pages_from_disk, "fail unroutable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_not_found = rrddim_add(st_query_pages_from_disk, "fail uuid not found", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_invalid_extent = rrddim_add(st_query_pages_from_disk, "fail invalid extent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_compressed, (collected_number)cache_efficiency_stats.pages_load_ok_compressed);
@@ -1350,6 +1352,7 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_preloaded, (collected_number)cache_efficiency_stats.pages_load_ok_preloaded);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_unroutable, (collected_number)cache_efficiency_stats.pages_load_fail_unroutable);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_not_found, (collected_number)cache_efficiency_stats.pages_load_fail_uuid_not_found);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid_extent, (collected_number)cache_efficiency_stats.pages_load_fail_invalid_extent);
 
         rrdset_done(st_query_pages_from_disk);
         priority++;

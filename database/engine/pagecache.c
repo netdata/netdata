@@ -156,7 +156,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->page_length = page_length;
             pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
-            pd->status |= (pd->page) ? PDC_PAGE_READY : 0;
+            pd->status |= (pd->page) ? (PDC_PAGE_READY | PDC_PAGE_PRELOADED) : 0;
             pd->type = ctx->page_type;
             pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
             pd->metric_id = metric_id;
@@ -231,10 +231,12 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
 
             if(pd->page) {
                 (*pages_found_pass4)++;
-                pd->status |= PDC_PAGE_READY;
+                pd->status &= ~PDC_PAGE_DISK_PENDING;
+                pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED;
             }
             else {
                 (*pages_pending)++;
+                pd->status |= PDC_PAGE_DISK_PENDING;
 
                 internal_fatal(!pd->datafile.ptr, "datafile is NULL");
                 internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
@@ -242,8 +244,10 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
                 internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
             }
         }
-        else
-            pd->status |= PDC_PAGE_READY;
+        else {
+            pd->status &= ~PDC_PAGE_DISK_PENDING;
+            pd->status |= (PDC_PAGE_READY | PDC_PAGE_PRELOADED);
+        }
 
         previous_page_last_time_s = pd->last_time_s;
         previous_page_update_every_s = pd->update_every_s;
@@ -406,6 +410,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     // --------------------------------------------------------------
     // PASS 4: Check the cache again
     //         and calculate the time gaps in the query
+    //         THIS IS REQUIRED AFTER JOURNAL V2 LOOKUP
 
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
                                     &first_page_starting_time_s, &pages_total, &pages_found_pass4, &pages_pending,
@@ -517,7 +522,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     page = pd->page;
     if(page) {
         // this is for pdc_destroy() to not release the page again
-        pdc_page_status_set(pd, PDC_PAGE_RELEASED);
+        pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
 
         if(waited)
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);

@@ -259,28 +259,49 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 // DBENGINE2 extent processing
-static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
+static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, size_t data_length, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
     unsigned i, count;
     void *uncompressed_buf = NULL;
-    uint32_t payload_length, payload_offset, page_offset, uncompressed_payload_length = 0;
+    uint32_t payload_length, payload_offset, page_offset, trailer_offset, uncompressed_payload_length = 0;
     uint8_t have_read_error = 0;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    header = data;
-    payload_length = header->payload_length;
-    count = header->number_of_pages;
-    payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
-    trailer = data + extent_page_list->size - sizeof(*trailer);
+    bool can_use_data = true;
+    if(data_length < sizeof(*header)) {
+        can_use_data = false;
+    }
+    else {
+        header = data;
+        payload_length = header->payload_length;
+        count = header->number_of_pages;
+        payload_offset = sizeof(*header) + sizeof(header->descr[0]) * count;
+        trailer_offset = data_length - sizeof(*trailer);
+        trailer = data + trailer_offset;
+    }
+
+    if( !can_use_data ||
+        count > MAX_PAGES_PER_EXTENT ||
+        (header->compression_algorithm != RRD_NO_COMPRESSION && header->compression_algorithm != RRD_LZ4) ||
+        (payload_length != trailer_offset - payload_offset) ||
+        (data_length != payload_offset + payload_length + sizeof(*trailer))
+        ) {
+
+        pdc_mark_all_unset_pages_as_failed(
+                extent_page_list->JudyL_page_list, PDC_PAGE_INVALID_EXTENT,
+                &rrdeng_cache_efficiency_stats.pages_load_fail_invalid_extent);
+
+        return;
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    void *data_copy = mallocz(payload_length);
-    memcpy(data_copy, data, payload_length);
+    void *data_copy = mallocz(data_length);
+    memcpy(data_copy, data, data_length);
 #endif
 
     crc = crc32(0L, Z_NULL, 0);
@@ -1111,7 +1132,7 @@ static void do_read_extent_work(uv_work_t *req)
     if(data != MAP_FAILED) {
         // Need to decompress and then process the pagelist
         void *extent_data = data + (extent_page_list->pos - map_start);
-        extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list, pdc->preload_all_extent_pages);
+        extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list->size, extent_page_list, pdc->preload_all_extent_pages);
 
         int ret = munmap(data, length);
         fatal_assert(0 == ret);
