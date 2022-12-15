@@ -114,7 +114,7 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
-static void pdc_mark_all_unset_pages_as_failed(Pvoid_t JudyL, PDC_PAGE_STATUS reason, size_t *statistics_counter) {
+static void pdc_mark_all_not_loaded_pages_as_failed(Pvoid_t JudyL, PDC_PAGE_STATUS reason, size_t *statistics_counter) {
     bool first_then_next = true;
     Pvoid_t *PValue;
     Word_t Index = 0;
@@ -258,7 +258,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 // DBENGINE2 extent processing
-static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, size_t data_length, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
+static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, size_t data_length, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
@@ -296,17 +296,8 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but header is INVALID", __func__,
                     extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno);
 
-        pdc_mark_all_unset_pages_as_failed(
-                extent_page_list->JudyL_page_list, PDC_PAGE_INVALID_EXTENT,
-                &rrdeng_cache_efficiency_stats.pages_load_fail_invalid_extent);
-
-        return;
+        return false;
     }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    void *data_copy = mallocz(data_length);
-    memcpy(data_copy, data, data_length);
-#endif
 
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, data, extent_page_list->size  - sizeof(*trailer));
@@ -339,7 +330,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     worker_is_busy(UV_EVENT_PAGE_POPULATION);
     time_t now_s = now_realtime_sec();
 
-    uint32_t page_offset = 0, page_length = 0;
+    uint32_t page_offset = 0, page_length;
     for (i = 0; i < count; i++, page_offset += page_length) {
         page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
@@ -364,14 +355,26 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if(!preload_all_pages && !pd)
             continue;
 
-        VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
+        VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
+                &header->descr[i], now_s,
+                (pd) ? pd->update_every_s : 0,
+                have_read_error);
 
-        // Find metric id
-        METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
-        Word_t metric_id = mrg_metric_id(main_mrg, this_metric);
-        mrg_metric_release(main_mrg, this_metric);
+        Word_t metric_id;
+        if(pd) {
+            metric_id = pd->metric_id;
+        }
+        else {
+            METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
+            metric_id = mrg_metric_id(main_mrg, this_metric);
+            mrg_metric_release(main_mrg, this_metric);
+        }
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, (Word_t)metric_id, start_time_s, true);
+        PGC_PAGE *page = pgc_page_get_and_acquire(
+                main_cache, (Word_t)ctx,
+                (Word_t)metric_id, start_time_s,
+                true);
+
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
@@ -425,21 +428,17 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            pdc_page_status_set(pd, PDC_PAGE_READY);
+            pdc_page_status_set(pd, PDC_PAGE_READY | PDC_PAGE_LOADED_FROM_DISK);
         }
         else
             pgc_page_release(main_cache, page);
     }
 
-    pdc_mark_all_unset_pages_as_failed(
-            extent_page_list->JudyL_page_list, PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT,
-            &rrdeng_cache_efficiency_stats.pages_load_fail_uuid_not_found);
+    worker_is_idle();
 
     freez(uncompressed_buf);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    freez(data_copy);
-#endif
+    return true;
 }
 
 static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent_io_descriptor *xt_io_descr)
@@ -1144,20 +1143,32 @@ static void do_read_extent_work(uv_work_t *req)
     off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->pos);
     size_t length = ALIGN_BYTES_CEILING(extent_page_list->pos + extent_page_list->size) - map_start;
 
+    PDC_PAGE_STATUS not_loaded_pages_reason;
     void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
     if(data != MAP_FAILED) {
         // Need to decompress and then process the pagelist
         void *extent_data = data + (extent_page_list->pos - map_start);
-        extent_uncompress_and_populate_pages(wc, extent_data, extent_page_list->size, extent_page_list, pdc->preload_all_extent_pages);
+        bool extent_used = extent_uncompress_and_populate_pages(
+                wc, extent_data, extent_page_list->size,
+                extent_page_list, pdc->preload_all_extent_pages);
+
+        if(extent_used)
+            // since the extent was used, all the pages that are not
+            // loaded from this extent, were not found in the extent
+            not_loaded_pages_reason = PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT;
+        else
+            not_loaded_pages_reason = PDC_PAGE_INVALID_EXTENT;
 
         int ret = munmap(data, length);
         fatal_assert(0 == ret);
     }
     else
-        // we failed to map the data
-        pdc_mark_all_unset_pages_as_failed(
-                extent_page_list->JudyL_page_list, PDC_PAGE_FAILED_TO_MAP_EXTENT,
-                &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+        not_loaded_pages_reason = PDC_PAGE_FAILED_TO_MAP_EXTENT;
+
+    // mark all pending pages as failed
+    pdc_mark_all_not_loaded_pages_as_failed(
+            extent_page_list->JudyL_page_list, not_loaded_pages_reason,
+            &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
 cleanup:
     if(extent_exclusive)

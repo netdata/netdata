@@ -62,9 +62,8 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT  = (1 << 7),
     PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 8),
     PDC_PAGE_FOUND_IN_CACHE_BY_WORKER  = (1 << 9),
-#ifdef NETDATA_INTERNAL_CHECKS
-    PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT = (1 << 10),
-#endif
+    PDC_PAGE_LOADED_FROM_DISK          = (1 << 10),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 11),
 } PDC_PAGE_STATUS;
 
 struct page_details {

@@ -202,7 +202,7 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     bool first = true;
-    Word_t current_page_end_time = 0;
+    Word_t this_page_start_time = 0;
     Pvoid_t *PValue;
     size_t query_gaps = 0;
 
@@ -210,19 +210,18 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     *pages_pending = 0;
     *pages_total = 0;
 
-    time_t current_start_time_s = wanted_start_time_s;
     time_t previous_page_update_every_s = mrg_metric_get_update_every(main_mrg, metric);
 
     if(!previous_page_update_every_s)
         previous_page_update_every_s = default_rrd_update_every;
 
-    time_t previous_page_last_time_s = current_start_time_s - previous_page_update_every_s;
+    time_t previous_page_last_time_s = wanted_start_time_s - previous_page_update_every_s;
 
-    while((PValue = JudyLFirstThenNext(JudyL_page_array, &current_page_end_time, &first))) {
+    while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         struct page_details *pd = *PValue;
 
-        if(unlikely(*first_page_starting_time_s == INVALID_TIME || (time_t)current_page_end_time < *first_page_starting_time_s))
-            *first_page_starting_time_s = (time_t)current_page_end_time;
+        if(unlikely(*first_page_starting_time_s == INVALID_TIME || (time_t)this_page_start_time < *first_page_starting_time_s))
+            *first_page_starting_time_s = (time_t)this_page_start_time;
 
         if(previous_page_last_time_s + previous_page_update_every_s < pd->first_time_s)
             query_gaps++;
@@ -234,7 +233,7 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
             if(pd->page) {
                 (*pages_found_pass4)++;
                 pd->status &= ~PDC_PAGE_DISK_PENDING;
-                pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED;
+                pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED | PDC_PAGE_PRELOADED_PASS4;
             }
             else {
                 (*pages_pending)++;
@@ -245,6 +244,8 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
                 internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
                 internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
             }
+
+            internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
         }
         else {
             pd->status &= ~PDC_PAGE_DISK_PENDING;
@@ -252,9 +253,7 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
         }
 
         previous_page_last_time_s = pd->last_time_s;
-        previous_page_update_every_s = pd->update_every_s;
-
-        current_start_time_s = previous_page_last_time_s + previous_page_update_every_s;
+        previous_page_update_every_s = (pd->update_every_s) ? pd->update_every_s : previous_page_update_every_s;
 
         (*pages_total)++;
     }
