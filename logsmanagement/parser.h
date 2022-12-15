@@ -200,7 +200,7 @@ int parse_web_log_buf(  char *text, size_t text_size,
 
 
 /* -------------------------------------------------------------------------- */
-/*                             Systemd metrics                                */
+/*                        Systemd and Syslog metrics                          */
 /* -------------------------------------------------------------------------- */
 
 #define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
@@ -260,6 +260,19 @@ typedef struct docker_ev_metrics{
 } Docker_ev_metrics_t;
 
 /* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
+/*                       Syslog parsing configuration                         */
+/* -------------------------------------------------------------------------- */
+
+typedef struct syslog_parser_config{
+    char *log_format;
+    char *listen;
+    char *port;
+    char *mode;
+    char *unix_perm;
+} Syslog_parser_config_t;
 
 
 /* -------------------------------------------------------------------------- */

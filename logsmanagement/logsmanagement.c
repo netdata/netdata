@@ -202,10 +202,11 @@ static void logs_management_init(struct section *config_section){
      * ------------------------------------------------------------------------- */
     p_file_info->filename = appconfig_get(&log_management_config, config_section->name, "log path", "auto");
     m_assert(p_file_info->filename, "appconfig_get() should never return log path == NULL");
-    if( !p_file_info->filename || /* Sanity check */
+    if( (p_file_info->log_type != FLB_SYSLOG) /* FLB_SYSLOG is a special case, may or may not require path */ &&
+        (!p_file_info->filename || /* Sanity check */
         !*p_file_info->filename || 
         !strcmp(p_file_info->filename, "auto") || 
-        (p_file_info->log_type != FLB_SYSLOG && access(p_file_info->filename, R_OK))){ 
+        access(p_file_info->filename, R_OK))){ 
 
         freez(p_file_info->filename);
         p_file_info->filename = NULL;
@@ -435,6 +436,50 @@ static void logs_management_init(struct section *config_section){
         }
     }
     else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
+        if(p_file_info->log_type == FLB_SYSLOG){
+            Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
+
+            /* Read syslog socket path */
+            syslog_config->log_format = appconfig_get(&log_management_config, config_section->name, "log format", NULL);
+            info("[%s]: log format = %s", p_file_info->chart_name, syslog_config->log_format ? syslog_config->log_format : "NULL!");
+            if(!syslog_config->log_format || !*syslog_config->log_format || !strcmp(syslog_config->log_format, "auto")){
+                freez(syslog_config->log_format);
+                freez(syslog_config);
+                return p_file_info_destroy(p_file_info);
+            }
+
+            /* Read syslog socket mode
+             * see also https://docs.fluentbit.io/manual/pipeline/inputs/syslog#configuration-parameters */
+            syslog_config->mode = appconfig_get(&log_management_config, config_section->name, "mode", "unix_udp");
+            info("[%s]: mode = %s", p_file_info->chart_name, syslog_config->mode);
+
+            /* Check for valid socket path if (mode == unix_udp) or 
+             * (mode == unix_tcp), else read syslog network interface to bind, 
+             * if (mode == udp) or (mode == tcp). */
+            if(!strcmp(syslog_config->mode, "unix_udp") || !strcmp(syslog_config->mode, "unix_tcp")){
+                if(!p_file_info->filename || !*p_file_info->filename || !strcmp(p_file_info->filename, "auto")){
+                    freez(syslog_config->log_format);
+                    freez(syslog_config->mode);
+                    freez(syslog_config);
+                    return p_file_info_destroy(p_file_info);
+                }
+                syslog_config->unix_perm = appconfig_get(&log_management_config, config_section->name, "unix_perm", "0644");
+                info("[%s]: unix_perm = %s", p_file_info->chart_name, syslog_config->unix_perm);
+            } else if(!strcmp(syslog_config->mode, "udp") || !strcmp(syslog_config->mode, "tcp")){
+                // TODO: Check if listen is in valid format
+                syslog_config->listen = appconfig_get(&log_management_config, config_section->name, "listen", "0.0.0.0");
+                info("[%s]: listen = %s", p_file_info->chart_name, syslog_config->listen);
+                syslog_config->port = appconfig_get(&log_management_config, config_section->name, "port", "5140");
+                info("[%s]: port = %s", p_file_info->chart_name, syslog_config->port);
+            } else { 
+                /* Any other modes are invalid */
+                freez(syslog_config->log_format);
+                freez(syslog_config);
+                return p_file_info_destroy(p_file_info);
+            }
+
+            p_file_info->parser_config->gen_config = syslog_config;
+        }
         if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", 0)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_PRIOR;
         }

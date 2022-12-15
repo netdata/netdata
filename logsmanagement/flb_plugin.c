@@ -608,7 +608,6 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             if(likely(syslog_facility[0])){
                 if(likely(str2int(&syslog_facility_d, syslog_facility, 10) == STR2XX_SUCCESS)){
                     p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
-                    debug(D_LOGS_MANAG,"** syslog_facility_d:%d", syslog_facility_d);
                 } // else parsing errors ++ ??
             } else p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
 
@@ -746,11 +745,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
             new_tmp_text_size += docker_ev_datetime_size; // -1 for null terminator, +1 for ' ' character
 
-            debug(D_LOGS_MANAG, "docker_time:%s", docker_ev_datetime);
+            // debug(D_LOGS_MANAG, "docker_time:%s", docker_ev_datetime);
         }
 
         if(likely(docker_ev_type)){
-            debug(D_LOGS_MANAG,"docker_ev_type: %.*s", (int) docker_ev_type_size, docker_ev_type);
+            // debug(D_LOGS_MANAG,"docker_ev_type: %.*s", (int) docker_ev_type_size, docker_ev_type);
             int i;
             for(i = 0; i < NUM_OF_DOCKER_EV_TYPES - 1; i++){
                 if(!strncmp(docker_ev_type, docker_ev_type_string[i], docker_ev_type_size)){
@@ -1006,8 +1005,6 @@ int flb_add_input(struct File_info *const p_file_info){
             }
             
             
-            debug(D_LOGS_MANAG, "FLB_DOCKER_EV input added");
-
             /* Set up output */
             callback->cb = flb_write_to_buff_cb;
             callback->data = p_file_info;
@@ -1017,29 +1014,44 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Match", tag_s,
                 NULL) != 0) return FLB_OUTPUT_SET_ERROR;
             
-            debug(D_LOGS_MANAG, "FLB_DOCKER_EV output added");
-
             break;
         }
         case FLB_SYSLOG: {
             debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
 
             /* Set up syslog parser */
-            const char *p_regex = "/^\\<(?<PRIVAL>[0-9]+)\\>(?<SYSLOG_TIMESTAMP>[^ ]* {1,2}[^ ]* [^ ]* )(?<HOSTNAME>[^ ]*) (?<SYSLOG_IDENTIFIER>[a-zA-Z0-9_\\/\\.\\-]*)(?:\\[(?<PID>[0-9]+)\\])?(?:[^\\:]*\\:)? *(?<MESSAGE>.*)$/";
-            if(flb_parser_create( "syslog-rfc3164", "regex", p_regex,
+            Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) p_file_info->parser_config->gen_config;
+            if(flb_parser_create( "syslog", "regex", syslog_config->log_format,
                 FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
                 NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
         
             /* Set up syslog input */
             p_file_info->flb_input = flb_input(ctx, "syslog", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            if(flb_input_set(ctx, p_file_info->flb_input, 
-                "Tag", tag_s,
-                "Path", p_file_info->filename,
-                "Parser", "syslog-rfc3164",
-                "Mode", "unix_udp",
-                "Unix_Perm", "0666",
-                NULL) != 0) return FLB_INPUT_SET_ERROR;
+            
+            if(!strcmp(syslog_config->mode, "unix_udp") || !strcmp(syslog_config->mode, "unix_tcp")){
+                m_assert(syslog_config->unix_perm, "unix_perm is not set");
+                if(flb_input_set(ctx, p_file_info->flb_input, 
+                    "Tag", tag_s,
+                    "Path", p_file_info->filename,
+                    "Parser", "syslog",
+                    "Mode", syslog_config->mode,
+                    "Unix_Perm", syslog_config->unix_perm,
+                    NULL) != 0) return FLB_INPUT_SET_ERROR;
+            } else if(!strcmp(syslog_config->mode, "udp") || !strcmp(syslog_config->mode, "tcp")){
+                m_assert(syslog_config->listen, "listen is not set");
+                m_assert(syslog_config->port, "port is not set");
+                if(flb_input_set(ctx, p_file_info->flb_input, 
+                    "Tag", tag_s,
+                    "Path", p_file_info->filename,
+                    "Parser", "syslog",
+                    "Mode", syslog_config->mode,
+                    "Listen", syslog_config->listen,
+                    "Port", syslog_config->port,
+                    NULL) != 0) return FLB_INPUT_SET_ERROR;
+            } else 
+            return FLB_INPUT_SET_ERROR; // should never reach this line
+            
             
             /* Set up output */
             callback->cb = flb_write_to_buff_cb;
