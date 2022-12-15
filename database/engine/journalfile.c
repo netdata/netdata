@@ -32,6 +32,7 @@ void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *
     bool just_added;
     metric = mrg_metric_add_and_acquire(main_mrg, entry, &just_added);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
+    mrg_metric_release(main_mrg, metric);
 
     if (update_every_only)
         return;
