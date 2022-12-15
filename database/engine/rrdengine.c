@@ -1193,7 +1193,7 @@ static void do_read_page_list_work(uv_work_t *req)
             datafile_extent_list = *PValue;
 
             bool first_then_next_extent = true;
-            Word_t pos;
+            Word_t pos = 0;
             while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next_extent))) {
                 extent_page_list = *PValue;
                 internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
