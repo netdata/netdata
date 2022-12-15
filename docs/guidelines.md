@@ -9,12 +9,12 @@ learn_rel_path: "Contribute"
 learn_docs_purpose: "TBD"
 -->
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+import Tabs from '@theme/Tabs'; import TabItem from '@theme/TabItem';
 
 Welcome to our docs developer guidelines!
 
-This document will guide you to the process of contributing to our docs [learn.netdata.cloud/docs](https://learn.netdata.cloud/doc)
+This document will guide you to the process of contributing to our
+docs [learn.netdata.cloud/docs](https://learn.netdata.cloud/doc)
 
 ## Documentation architecture
 
@@ -32,20 +32,24 @@ To this end:
     - netdata/agent-service-discovery
 
    In each of these repos you will find markdown files. These markdown files may or not be part of the final docs. You
-   understand what documents are part of the final docs in the following section:[_How to update documentation of learn.netdata.cloud_](#how-to-update-documentation-of-learn-netdata-cloud)
+   understand what documents are part of the final docs in the following section:[_How to update documentation of
+   learn.netdata.cloud_](#how-to-update-documentation-of-learn-netdata-cloud)
 
-2. Netdata docs processes are inspired from the [DITA 1.2 guidelines](http://docs.oasis-open.org/dita/v1.2/os/spec/archSpec/dita-1.2_technicalContent_overview.html) for Technical content.
-
+2. Netdata docs processes are inspired from
+   the [DITA 1.2 guidelines](http://docs.oasis-open.org/dita/v1.2/os/spec/archSpec/dita-1.2_technicalContent_overview.html)
+   for Technical content.
 
 ## Topic types
 
 ### Concepts
 
 A concept introduces a single feature or concept. A concept should answer the questions:
+
 - What is this?
 - Why would I use it?
 
 Concept topics:
+
 - Are abstract ideas
 - Explain meaning or benefit
 - Can stay when specifications change
@@ -53,12 +57,13 @@ Concept topics:
 
 ### Tasks
 
-Concept and reference topics exist to support tasks. _The goal for users … is not to understand a concept but to complete a task_.
-A task gives instructions for how to complete a procedure.
+Concept and reference topics exist to support tasks. _The goal for users … is not to understand a concept but to
+complete a task_. A task gives instructions for how to complete a procedure.
 
 Much of the uncertainty whether a topic is a concept or a reference disappears, when you have strong, solid task topics
-in place, furthermore topics directly address your users and their daily tasks and help them to get their job done. A task **must
-give an answer** to the **following questions**:
+in place, furthermore topics directly address your users and their daily tasks and help them to get their job done. A
+task **must give an answer** to the **following questions**:
+
 - How do I create cool espresso drinks with my new coffee machine?
 - How do I clean the milk steamer?
 
@@ -66,26 +71,27 @@ For the title text, use the structure active verb + noun. For example, for insta
 
 ### References
 
-The reference document and information types provide for the separation of fact-based information from concepts and tasks. \
-Factual information may include tables and lists of specifications, parameters, parts, commands, edit-files and other information
-that the users are likely to look up. The reference information type allows fact-based content to be maintained by those
- responsible for its accuracy and consistency.
+The reference document and information types provide for the separation of fact-based information from concepts and
+tasks. \
+Factual information may include tables and lists of specifications, parameters, parts, commands, edit-files and other
+information that the users are likely to look up. The reference information type allows fact-based content to be
+maintained by those responsible for its accuracy and consistency.
 
 ## Contribute to the documentation of learn.netdata.cloud
 
 ### Encapsulate topics into markdown files.
 
 Netdata uses markdown files to document everything. To implement concrete sections of these [Topic types](#topic-types)
-we encapsulate this logic as follows. Every document is characterized by its topic type ('learn_topic_type' metadata field).
-To avoid breaking every single netdata concept into numerous small markdown files each document can be either
-a single `Reference` or `Concept` or `Task` or a group of `References`, `Concepts`, `Tasks`.
+we encapsulate this logic as follows. Every document is characterized by its topic type ('learn_topic_type' metadata
+field). To avoid breaking every single netdata concept into numerous small markdown files each document can be either a
+single `Reference` or `Concept` or `Task` or a group of `References`, `Concepts`, `Tasks`.
 
-To this end, every single topic is encapsulated into a `Heading 3 (###)` section. That means, when you have a single file
-you only make use of `Headings 4` and lower (`4, 5, 6`, for templated section or subsection). In case you want to includ
-multiple (`Concepts` let's say) in a single document, you use `Headings 3` to seperate each concept. `Headings 2` are used
-only in case you want to logically group topics inside a document.
+To this end, every single topic is encapsulated into a `Heading 3 (###)` section. That means, when you have a single
+file you only make use of `Headings 4` and lower (`4, 5, 6`, for templated section or subsection). In case you want to
+includ multiple (`Concepts` let's say) in a single document, you use `Headings 3` to seperate each concept. `Headings 2`
+are used only in case you want to logically group topics inside a document.
 
-For instance: 
+For instance:
 
 ```markdown
 
@@ -93,7 +99,8 @@ Small introduction of the document.
 
 ### Concept A
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna
+aliqua.
 
 #### Field from template 1
 
@@ -105,7 +112,7 @@ Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu 
 
 ##### Subsection 1
 
-. . . 
+. . .
 
 ### Concept A
 
@@ -224,23 +231,21 @@ Here you can find the preferred templates for each topic type:
     #### Troubleshoot
     
     backlink to the task to run this module in debug mode (here you provide the debug flags)
-    
-        
-   ```
+
+
+```
 
   </TabItem>
 </Tabs>
 
-
 ### Metadata fields
 
 All Docs that are supposed to be part of learn.netdata.cloud have **hidden** sections in the begining of document. These
-sections are plain lines of text and we call them metadata. Their represented as `key : "Value"` pairs. Some of them
-are needed from our statice website builder (docusaurus) others are needed for our internal pipelines to build docs 
+sections are plain lines of text and we call them metadata. Their represented as `key : "Value"` pairs. Some of them are
+needed from our statice website builder (docusaurus) others are needed for our internal pipelines to build docs
 (have prefix `learn_`).
 
 So let's go through the different necessary metadata tags to get a document properly published on Learn:
-
 
 |     metadata_key      | Value(s)                                                                                                      |                                                                     Frontmatter effect                                                                      | Mandatory |              Limitations               |
 |:---------------------:|---------------------------------------------------------------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------:|:---------:|:--------------------------------------:|
@@ -254,14 +259,15 @@ So let's go through the different necessary metadata tags to get a document prop
 |   `learn_rel_path`    | `Path` (the path you want this file to appear in learn<br/> without the /docs prefix and the name of the file |                                                                                                                                                             |    yes    |                                        |
 | `learn_autogenerated` | `Dictionary` (for intenral use)                                                                               |                                                                                                                                                             |    no     | Keys in the dictionary must be in `' '` |
 
-
 :::important
 
-1. In case any mandatory tags are missing or falsely inputted the file will remain unpublished. This is by design to prevent non-properly tagged files from getting published.
+1. In case any mandatory tags are missing or falsely inputted the file will remain unpublished. This is by design to
+   prevent non-properly tagged files from getting published.
 2. All metadata values must be included in `" "`. From `string` noted text inside the fields use `' ''`
-:::
+   :::
 
-While Docusaurus can make use of more metadata tags than the above, these are the minimum we require to publish the file on Learn.
+While Docusaurus can make use of more metadata tags than the above, these are the minimum we require to publish the file
+on Learn.
 
 ### Placing a document in learn
 
@@ -271,14 +277,17 @@ Here you can see how the metadata are parsed and create a markdown file in learn
 
 ### Before you get started
 
-Anyone interested in contributing to documentation should first read the [Netdata style guide](#styling-guide) further down below and the [Netdata Community Code of Conduct](/contribute/code-of-conduct).
+Anyone interested in contributing to documentation should first read the [Netdata style guide](#styling-guide) further
+down below and the [Netdata Community Code of Conduct](/contribute/code-of-conduct).
 
-Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read the [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating paragraphs, styled text, lists, tables, and more, and read further down about some special occasions [while writing in MDX](#mdx-and-markdown).
-
+Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read
+the [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on
+creating paragraphs, styled text, lists, tables, and more, and read further down about some special
+occasions [while writing in MDX](#mdx-and-markdown).
 
 ### Making your first contribution
 
-The easiest way to contribute to Netdata's documentation is to edit a file directly on GitHub. This is perfect for small 
+The easiest way to contribute to Netdata's documentation is to edit a file directly on GitHub. This is perfect for small
 fixes to a single document, such as fixing a typo or clarifying a confusing sentence.
 
 Click on the **Edit this page** button on any published document on [Netdata Learn](https://learn.netdata.cloud). Each
@@ -291,33 +300,46 @@ button to initiate your pull request (PR).
 
 Jump down to our instructions on [PRs](#making-a-pull-request) for your next steps.
 
-**Note**: If you wish to contribute documentation that is more tailored from your specific infrastructure monitoring/troubleshooting experience, please consider submitting a blog post about your experience. Check the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo! Any blog submissions that have widespread or universal application will be integrated into our permanent documentation.
+**Note**: If you wish to contribute documentation that is more tailored from your specific infrastructure
+monitoring/troubleshooting experience, please consider submitting a blog post about your experience. Check
+the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo! Any blog submissions that have
+widespread or universal application will be integrated into our permanent documentation.
 
 ### Edit locally
 
-Editing documentation locally is the preferred method for complex changes that span multiple documents or change the documentation's style or structure.
+Editing documentation locally is the preferred method for complex changes that span multiple documents or change the
+documentation's style or structure.
 
-Create a fork of the Netdata Agent repository by visit the [Netdata repository](https://github.com/netdata/netdata) and clicking on the **Fork** button.
+Create a fork of the Netdata Agent repository by visit the [Netdata repository](https://github.com/netdata/netdata) and
+clicking on the **Fork** button.
 
-GitHub will ask you where you want to clone the repository. When finished, you end up at the index of your forked Netdata Agent repository. Clone your fork to your local machine:
+GitHub will ask you where you want to clone the repository. When finished, you end up at the index of your forked
+Netdata Agent repository. Clone your fork to your local machine:
 
 ```bash
 git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
 ```
 
-Create a new branch using `git checkout -b BRANCH-NAME`. Use your favorite text editor to make your changes, keeping the [Netdata style guide](/contribute/style-guide) in mind. Add, commit, and push changes to your fork. When you're finished, visit the [Netdata Agent Pull requests](https://github.com/netdata/netdata/pulls) to create a new pull request based on the changes you made in the new branch of your fork.
+Create a new branch using `git checkout -b BRANCH-NAME`. Use your favorite text editor to make your changes, keeping
+the [Netdata style guide](/contribute/style-guide) in mind. Add, commit, and push changes to your fork. When you're
+finished, visit the [Netdata Agent Pull requests](https://github.com/netdata/netdata/pulls) to create a new pull request
+based on the changes you made in the new branch of your fork.
 
 ### Making a pull request
 
-Pull requests (PRs) should be concise and informative. See our [PR guidelines](/contribute/handbook#pr-guidelines) for specifics.
+Pull requests (PRs) should be concise and informative. See our [PR guidelines](/contribute/handbook#pr-guidelines) for
+specifics.
 
-- The title must follow the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) and be no more than ~50 characters.
-- The description should explain what was changed and why. Verify that you tested any code or processes that you are trying to change.
+- The title must follow the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) and be no more than ~50
+  characters.
+- The description should explain what was changed and why. Verify that you tested any code or processes that you are
+  trying to change.
 
-The Netdata team will review your PR and assesses it for correctness, conciseness, and overall quality. We may point to specific sections and ask for additional information or other fixes.
+The Netdata team will review your PR and assesses it for correctness, conciseness, and overall quality. We may point to
+specific sections and ask for additional information or other fixes.
 
-After merging your PR, the Netdata team rebuilds the [documentation site](https://learn.netdata.cloud) to publish the changed documentation.
-
+After merging your PR, the Netdata team rebuilds the [documentation site](https://learn.netdata.cloud) to publish the
+changed documentation.
 
 ## Styling guide
 
@@ -338,9 +360,9 @@ goals, your writing should be:
 
 You can achieve these goals by reading and adhering to the principles outlined below.
 
-If you're not familiar with Markdown, read the [Mastering
-Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating
-paragraphs, styled text, lists, tables, and more.
+If you're not familiar with Markdown, read
+the [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on
+creating paragraphs, styled text, lists, tables, and more.
 
 The following sections describe situations in which a specific syntax is required.
 
@@ -361,21 +383,33 @@ If you want to see all the settings, open the
 #### MDX and markdown
 
 While writing in Docusaurus, you might want to take leverage of it's features that are supported in MDX formatted files.
-One of those that we use is [Tabs](https://docusaurus.io/docs/next/markdown-features/tabs). They use an HTML syntax, which requires some changes in the way we write markdown inside them.
+One of those that we use is [Tabs](https://docusaurus.io/docs/next/markdown-features/tabs). They use an HTML syntax,
+which requires some changes in the way we write markdown inside them.
 
 In detail:
 
-Due to a bug with docusaurus, we prefer to use `<h1>heading</h1> instead of # H1` so that docusaurus doesn't render the contents of all Tabs on the right hand side, while not being able to navigate them [relative link](https://github.com/facebook/docusaurus/issues/7008).
+Due to a bug with docusaurus, we prefer to use `<h1>heading</h1> instead of # H1` so that docusaurus doesn't render the
+contents of all Tabs on the right hand side, while not being able to navigate
+them [relative link](https://github.com/facebook/docusaurus/issues/7008).
 
 You can use markdown syntax for every other styling you want to do except Admonitions:
-For admonitions, follow [this](https://docusaurus.io/docs/markdown-features/admonitions#usage-in-jsx) guide to use admonitions inside JSX. While writing in JSX, all the markdown stylings have to be in HTML format to be rendered properly.
+For admonitions, follow [this](https://docusaurus.io/docs/markdown-features/admonitions#usage-in-jsx) guide to use
+admonitions inside JSX. While writing in JSX, all the markdown stylings have to be in HTML format to be rendered
+properly.
+
+#### Admonitions
+
+Use admonitions cautiously. Admonitions may draw user's attention, to that end we advise you to use them only for side
+content/info, without significantly interrupting the document flow.
+
+You can find the supported admonitions in the docusaurus's [documentation](https://docusaurus.io/docs/markdown-features/admonitions).
 
 #### Images
 
 Don't rely on images to convey features, ideas, or instructions. Accompany every image with descriptive alt text.
 
-In Markdown, use the standard image syntax, `![](/docs/agent/contributing)`, and place the alt text between the brackets `[]`. Here's an example
-using our logo:
+In Markdown, use the standard image syntax, `![](/docs/agent/contributing)`, and place the alt text between the
+brackets `[]`. Here's an example using our logo:
 
 ```markdown
 ![The Netdata logo](/docs/agent/web/gui/static/img/netdata-logomark.svg)
@@ -388,9 +422,12 @@ information.
 #### Syntax highlighting
 
 Our documentation site at [learn.netdata.cloud](https://learn.netdata.cloud) uses
-[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata
-documentation will use the following for the most part: `c`, `python`, `js`, `shell`, `markdown`, `bash`, `css`, `html`,
-and `go`. If no language is specified, Prism tries to guess the language based on its content.
+[Prism](https://v2.docusaurus.io/docs/markdown-features#syntax-highlighting) for syntax highlighting. Netdata can use
+any of
+the [supported languages by prism-react-renderer](https://github.com/FormidableLabs/prism-react-renderer/blob/master/src/vendor/prism/includeLangs.js)
+.
+
+If no language is specified, Prism tries to guess the language based on its content.
 
 Include the language directly after the three backticks (```` ``` ````) that start the code block. For highlighting C
 code, for example:
@@ -415,9 +452,8 @@ inline char *health_stock_config_dir(void) {
 }
 ```
 
-Prism also supports titles and line highlighting. See the [Docusaurus
-documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
-
+Prism also supports titles and line highlighting. See
+the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
 
 ## Language, grammar, and mechanics
 
@@ -465,7 +501,8 @@ Netdata is a global company in every sense, with employees, contributors, and us
 communicate in a way that is clear and easily understood by everyone.
 
 Here are some guidelines, pointers, and questions to be aware of as you write to ensure your writing is universal. Some
-of these are expanded into individual sections in the [language, grammar, and mechanics](#language-grammar-and-mechanics) section below.
+of these are expanded into individual sections in
+the [language, grammar, and mechanics](#language-grammar-and-mechanics) section below.
 
 - Would this language make sense to someone who doesn't work here?
 - Could someone quickly scan this document and understand the material?
@@ -492,8 +529,8 @@ of these are expanded into individual sections in the [language, grammar, and me
 
 To ensure Netdata's writing is clear, concise, and universal, we have established standards for language, grammar, and
 certain writing mechanics. However, if you're writing about Netdata for an external publication, such as a guest blog
-post, follow that publication's style guide or standards, while keeping the [preferred spelling of Netdata
-terms](#netdata-specific-terms) in mind.
+post, follow that publication's style guide or standards, while keeping
+the [preferred spelling of Netdata terms](#netdata-specific-terms) in mind.
 
 #### Active voice
 
@@ -523,9 +560,9 @@ One valid exception is when a member of the Netdata team or community wants to w
 
 #### "Easy" or "simple"
 
-Using words that imply the complexity of a task or feature goes against our policy of [universal
-communication](#universal-communication). If you claim that a task is easy and the reader struggles to complete it, you
-may inadvertently discourage them.
+Using words that imply the complexity of a task or feature goes against our policy
+of [universal communication](#universal-communication). If you claim that a task is easy and the reader struggles to
+complete it, you may inadvertently discourage them.
 
 However, if you give users two options and want to relay that one option is genuinely less complex than another, be
 specific about how and why.
@@ -561,7 +598,7 @@ capitalization. In summary:
 - Capitalize the first word of every new sentence.
 - Don't use uppercase for emphasis. (Netdata is the BEST!)
 - Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata,
-    Docker, Apache, NGINX)
+  Docker, Apache, NGINX)
 - Avoid camel case (NetData) or all caps (NETDATA).
 
 Whenever you refer to the company Netdata, Inc., or the open-source monitoring agent the company develops, capitalize
@@ -587,7 +624,8 @@ Also, don't put a period (`.`) or colon (`:`) at the end of a title or header.
 |                 |                                                                                                     |
 | --------------- | --------------------------------------------------------------------------------------------------- |
 | Not recommended | Getting Started Guide <br />Service Discovery and Auto-Detection: <br />Install netdata with docker |
-| **Recommended** | Getting started guide <br />Service discovery and auto-detection <br />Install Netdata with Docker  |
+| **
+Recommended** | Getting started guide <br />Service discovery and auto-detection <br />Install Netdata with Docker  |
 
 #### Abbreviations (acronyms and initialisms)
 
@@ -598,8 +636,7 @@ the readability of a document.
 When introducing an abbreviation to a document for the first time, give the reader both the spelled-out version and the
 shortened version at the same time. For example:
 
-> Use Netdata to monitor Extended Berkeley Packet Filter (eBPF) metrics in real-time.
-After you define an abbreviation, don't switch back and forth. Use only the abbreviation for the rest of the document.
+> Use Netdata to monitor Extended Berkeley Packet Filter (eBPF) metrics in real-time. After you define an abbreviation, don't switch back and forth. Use only the abbreviation for the rest of the document.
 
 You can also use abbreviations in a document's title to keep the title short and relevant. If you do this, you should
 still introduce the spelled-out name alongside the abbreviation as soon as possible.
@@ -629,9 +666,9 @@ before "and" or "or."
 Do not mention future releases or upcoming features in writing unless they have been previously communicated via a
 public roadmap.
 
-In particular, documentation must describe, as accurately as possible, the Netdata Agent _as of the [latest
-commit](https://github.com/netdata/netdata/commits/master) in the GitHub repository_. For Netdata Cloud, documentation
-must reflect the *current state* of [production](https://app.netdata.cloud).
+In particular, documentation must describe, as accurately as possible, the Netdata Agent _as of
+the [latest commit](https://github.com/netdata/netdata/commits/master) in the GitHub repository_. For Netdata Cloud,
+documentation must reflect the *current state* of [production](https://app.netdata.cloud).
 
 #### Informational links
 
@@ -676,7 +713,8 @@ or API endpoint in a browser.
 |                 |                                                                                                                                                                             |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Not recommended | Navigate to `http://example.com:19999` in your browser to see Netdata's dashboard. <br />Navigate to `http://203.0.113.0:19999` in your browser to see Netdata's dashboard. |
-| **Recommended** | Navigate to `http://NODE:19999` in your browser to see Netdata's dashboard.                                                                                                 |
+| **
+Recommended** | Navigate to `http://NODE:19999` in your browser to see Netdata's dashboard.                                                                                                 |
 
 If you worry that `NODE` doesn't provide enough context for the user, particularly in documentation or guides designed
 for beginners, you can provide an explanation:
@@ -691,16 +729,16 @@ Netdata Agent installation will have commands under the same paths. When applica
 path, providing a recommendation or instructions on how to view the running configuration, which includes the correct
 paths.
 
-For example, the [configuration](/docs/configure/nodes) doc first teaches users how to find the Netdata config
-directory and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more
-universal.
+For example, the [configuration](/docs/configure/nodes) doc first teaches users how to find the Netdata config directory
+and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more universal.
 
 Don't include full paths, beginning from the system's root (`/`), as these might not work on certain systems.
 
 |                 |                                                                                                                                                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`.                                                                                                                                                  |
-| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/configure/nodes#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+| **
+Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/configure/nodes#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
 
 #### `sudo`
 
@@ -714,8 +752,8 @@ by the `netdata` user. Same goes for restarting the Netdata Agent with `systemct
 |                 |                                                                                                                                              |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Not recommended | Run `edit-config netdata.conf` to configure the Netdata Agent. <br />Run `systemctl restart netdata` to restart the Netdata Agent.           |
-| **Recommended** | Run `sudo edit-config netdata.conf` to configure the Netdata Agent. <br />Run `sudo systemctl restart netdata` to restart the Netdata Agent. |
-
+| **
+Recommended** | Run `sudo edit-config netdata.conf` to configure the Netdata Agent. <br />Run `sudo systemctl restart netdata` to restart the Netdata Agent. |
 
 ## Deploy and test docs
 
@@ -726,8 +764,6 @@ TODO: Update this section after implemeting a _docker-compose_ for builting and 
 The Netdata team aggregates and publishes all documentation at [learn.netdata.cloud](/) using
 [Docusaurus](https://v2.docusaurus.io/) over at the [`netdata/learn` repository](https://github.com/netdata/learn).
 
-
 ## Netdata-specific terms
-
 
 Consult the [Netdata Glossary](https://github.com/netdata/netdata/blob/master/docs/glossary.md) Netdata specific terms 
