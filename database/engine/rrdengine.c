@@ -810,6 +810,7 @@ static void cache_flush_pages(void *arg)
 
     if (open_cache)
         pgc_flush_pages(open_cache, 0);
+
     wc->cleanup_thread_flush_pages = 1;
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&wc->async));
@@ -881,9 +882,9 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 {
-    if (wc->now_deleting_files) {
+    if (wc->now_deleting_files || wc->now_flushing_pages || wc->now_evicting_pages)
         return 1;
-    }
+
     return 0;
 }
 
