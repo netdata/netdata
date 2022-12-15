@@ -147,6 +147,9 @@ static void pdc_destroy(PDC *pdc) {
         // no need for atomics here - we are done...
         PDC_PAGE_STATUS status = pd->status;
 
+        if(status & PDC_PAGE_DATAFILE_ACQUIRED && pd->datafile.ptr)
+            datafile_release(pd->datafile.ptr);
+
         if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED))) {
             // pdc_page_status_set(pd, PDC_PAGE_FAILED);
             unroutable++;
@@ -1337,7 +1340,7 @@ static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_de
 // Just queue to dbengine
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc)
 {
-    struct completion read_page_received;
+//    struct completion read_page_received;
 
     //completion_init(&read_page_received);
     struct rrdeng_cmd cmd;

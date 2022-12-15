@@ -389,23 +389,26 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                                 page_first_time_s, page_last_time_s, page_update_every_s, page_length);
                     }
                     else {
-                        struct page_details *pd = callocz(1, sizeof(*pd));
-                        pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
-                        pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                        pd->datafile.file = datafile->file;
-                        pd->datafile.fileno = datafile->fileno;
-                        pd->first_time_s = page_first_time_s;
-                        pd->last_time_s = page_last_time_s;
-                        pd->datafile.ptr = datafile;
-                        pd->page_length = page_length;
-                        pd->update_every_s = page_update_every_s;
-                        pd->type = page_entry_in_journal->type;
-                        pd->metric_id = metric_id;
-                        uuid_copy(pd->uuid, *uuid);
-                        *PValue = pd;
+                        if(datafile_acquire(datafile)) {
+                            struct page_details *pd = callocz(1, sizeof(*pd));
+                            pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
+                            pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
+                            pd->datafile.file = datafile->file;
+                            pd->datafile.fileno = datafile->fileno;
+                            pd->first_time_s = page_first_time_s;
+                            pd->last_time_s = page_last_time_s;
+                            pd->datafile.ptr = datafile;
+                            pd->page_length = page_length;
+                            pd->update_every_s = page_update_every_s;
+                            pd->type = page_entry_in_journal->type;
+                            pd->metric_id = metric_id;
+                            pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_DATAFILE_ACQUIRED;
+                            uuid_copy(pd->uuid, *uuid);
+                            *PValue = pd;
 
-                        pages_found_in_journals_v2++;
-                        pages_total++;
+                            pages_found_in_journals_v2++;
+                            pages_total++;
+                        }
                     }
                 }
             }

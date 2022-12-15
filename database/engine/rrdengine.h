@@ -64,6 +64,9 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_FOUND_IN_CACHE_BY_WORKER  = (1 << 9),
     PDC_PAGE_LOADED_FROM_DISK          = (1 << 10),
     PDC_PAGE_PRELOADED_PASS4           = (1 << 11),
+
+    // datafile acquired
+    PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 15),
 } PDC_PAGE_STATUS;
 
 struct page_details {
