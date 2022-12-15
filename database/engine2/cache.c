@@ -260,7 +260,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
         size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
         size_t max_size1 = MAX(hot_max, hot) * 2;
-        size_t max_size2 = hot_max + (dirty_max * 2);
+        size_t max_size2 = hot_max + ((dirty_max < hot_max / 4) ? hot_max / 4 : dirty_max * 2);
         wanted_cache_size = MIN(max_size1, max_size2);
 
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
