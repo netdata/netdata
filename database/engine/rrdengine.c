@@ -272,7 +272,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     uLong crc;
 
     bool can_use_data = true;
-    if(data_length < sizeof(*header)) {
+    if(data_length < sizeof(*header) + sizeof(header->descr[0]) + sizeof(*trailer)) {
         can_use_data = false;
     }
     else {
@@ -285,6 +285,7 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     }
 
     if( !can_use_data ||
+        count < 1 ||
         count > MAX_PAGES_PER_EXTENT ||
         (header->compression_algorithm != RRD_NO_COMPRESSION && header->compression_algorithm != RRD_LZ4) ||
         (payload_length != trailer_offset - payload_offset) ||
