@@ -103,6 +103,11 @@ struct pgc {
         Pvoid_t sections_judy;
     } *index;
 
+    struct {
+        SPINLOCK spinlock;
+        size_t per1000;
+    } usage;
+
     struct pgc_linked_list clean;       // LRU is applied here to free memory from the cache
     struct pgc_linked_list dirty;       // in the dirty list, pages are ordered the way they were marked dirty
     struct pgc_linked_list hot;         // in the hot list, pages are order the way they were marked hot
@@ -246,10 +251,14 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 // ----------------------------------------------------------------------------
 // evictions control
 
-static inline size_t cache_usage_percent(PGC *cache) {
+static inline size_t cache_usage_per1000(PGC *cache) {
+
+    if(!netdata_spinlock_trylock(&cache->usage.spinlock))
+        return __atomic_load_n(&cache->usage.per1000, __ATOMIC_RELAXED);
+
     size_t current_cache_size;
     size_t wanted_cache_size;
-    size_t percent;
+    size_t per1000;
 
     current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
 
@@ -260,7 +269,7 @@ static inline size_t cache_usage_percent(PGC *cache) {
         size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
         size_t max_size1 = MAX(hot_max, hot) * 2;
-        size_t max_size2 = hot_max + ((dirty_max < hot_max / 4) ? hot_max / 4 : dirty_max * 2);
+        size_t max_size2 = hot_max + ((dirty_max < hot_max / 2) ? hot_max / 2 : dirty_max * 2);
         wanted_cache_size = MIN(max_size1, max_size2);
 
         if(wanted_cache_size < hot + dirty + cache->config.clean_size)
@@ -274,16 +283,18 @@ static inline size_t cache_usage_percent(PGC *cache) {
         wanted_cache_size = hot + dirty + max_for_clean;
     }
 
-    percent = current_cache_size * 100 / wanted_cache_size;
+    per1000 = current_cache_size * 1000 / wanted_cache_size;
 
+    __atomic_store_n(&cache->usage.per1000, per1000, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
-    return percent;
+    netdata_spinlock_unlock(&cache->usage.spinlock);
+    return per1000;
 }
 
 static inline bool cache_under_severe_pressure(PGC *cache) {
-    if(unlikely(cache_usage_percent(cache) >= 98)) {
+    if(unlikely(cache_usage_per1000(cache) >= 1000)) {
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -292,7 +303,7 @@ static inline bool cache_under_severe_pressure(PGC *cache) {
 }
 
 static inline bool cache_needs_space_aggressively(PGC *cache) {
-    if(unlikely(cache_usage_percent(cache) >= 96)) {
+    if(unlikely(cache_usage_per1000(cache) >= 995)) {
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -300,7 +311,7 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
     return false;
 }
 
-#define cache_above_healthy_limit(cache) (cache_usage_percent(cache) >= 94)
+#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache) >= 990)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
 static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them);
@@ -986,7 +997,7 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
                     "DBENGINE CACHE: cache is %zu %% full, but all the data in it are currently referenced and cannot be evicted",
-                    cache_usage_percent(cache));
+                    cache_usage_per1000(cache));
     }
 
 premature_exit:
@@ -1602,7 +1613,7 @@ bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
     return flush_pages(cache, under_pressure ? 0 : max_flushes, true, false);
 }
 
-void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t) {
+void pgc_page_hot_set_end_time_t(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_t) {
     if(!is_page_hot(page))
         fatal("DBENGINE CACHE: end_time_t update on non-hot page");
 

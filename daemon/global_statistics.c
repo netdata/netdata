@@ -967,9 +967,9 @@ static void dbengine2_statistics_charts(void) {
         return;
 
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
-    static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {};
-    static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {};
-    static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {};
+    static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {}; (void)pgc_main_stats_old;
+    static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {}; (void)pgc_open_stats_old;
+    static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
     pgc_main_stats = pgc_get_statistics(main_cache);
