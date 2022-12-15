@@ -3,9 +3,7 @@
 #include "common.h"
 
 /* Run service jobs every X seconds */
-#define SERVICE_HEARTBEAT_USEC (250 * USEC_PER_MS)
-#define HOSTS_TO_CLEANUP_PER_RUN 1
-#define RUN_OBSOLETIONS_EVERY_USEC (5 * USEC_PER_SEC)
+#define SERVICE_HEARTBEAT 10
 
 #define TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT (3600 / 2)
 #define ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT 60
@@ -223,18 +221,11 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
     time_t now = now_realtime_sec();
 
     RRDHOST *host;
-    size_t hosts_cleaned_up = 0;
 
 restart_after_removal:
-
-    if(hosts_cleaned_up >= HOSTS_TO_CLEANUP_PER_RUN)
-        goto cleanup;
-
     rrdhost_foreach_write(host) {
         if(!rrdhost_should_be_removed(host, protected_host, now))
             continue;
-
-        hosts_cleaned_up++;
 
         info("Host '%s' with machine guid '%s' is obsolete - cleaning up.", rrdhost_hostname(host), host->machine_guid);
 
@@ -255,7 +246,6 @@ restart_after_removal:
         goto restart_after_removal;
     }
 
-cleanup:
     rrd_unlock();
 }
 
@@ -298,15 +288,13 @@ void *service_main(void *ptr)
     netdata_thread_cleanup_push(service_main_cleanup, ptr);
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step_ut = SERVICE_HEARTBEAT_USEC;
+    usec_t step = USEC_PER_SEC * SERVICE_HEARTBEAT;
 
     debug(D_SYSTEM, "Service thread starts");
 
-    usec_t last_run_osboletions_ut = 0, now_ut;
     while (!netdata_exit) {
         worker_is_idle();
-        heartbeat_next(&hb, step_ut);
-        now_ut = now_monotonic_usec();
+        heartbeat_next(&hb, step);
 
         if(main_cache) {
             worker_is_busy(WORKER_JOB_PGC_MAIN_EVICT);
@@ -330,11 +318,8 @@ void *service_main(void *ptr)
             pgc_evict_pages(open_cache, 0, 0);
         }
 
-        if(now_ut - last_run_osboletions_ut >= RUN_OBSOLETIONS_EVERY_USEC) {
-            last_run_osboletions_ut = now_ut;
-            svc_rrd_cleanup_obsolete_charts_from_all_hosts();
-            svc_rrdhost_cleanup_orphan_hosts(localhost);
-        }
+        svc_rrd_cleanup_obsolete_charts_from_all_hosts();
+        svc_rrdhost_cleanup_orphan_hosts(localhost);
     }
 
     netdata_thread_cleanup_pop(1);
