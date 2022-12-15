@@ -1113,8 +1113,8 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
-            rd_free = rrddim_add(st_pgc_cache_size, "free", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_used = rrddim_add(st_pgc_cache_size, "used", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_free = rrddim_add(st_pgc_cache_size, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_used = rrddim_add(st_pgc_cache_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(st_pgc_cache_size, rd_free, (collected_number)(pgc_main_stats.wanted_cache_size - pgc_main_stats.current_cache_size));
