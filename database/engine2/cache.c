@@ -868,12 +868,14 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
     size_t pages_to_evict;
     size_t total_pages_evicted = 0;
     size_t total_pages_skipped = 0;
+    size_t last_run_pages_skipped;
     bool stopped_before_finishing = false;
     size_t spins = 0;
     size_t pages_to_evict_per_run = cache->config.partitions * 10;
 
     do {
         spins++;
+        last_run_pages_skipped = 0;
 
         // zero our partition linked lists
         for (size_t partition = 0; partition < cache->config.partitions; partition++)
@@ -917,6 +919,8 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
             }
             else {
                 // we can't delete this page
+
+                last_run_pages_skipped++;
 
                 // check if we have to stop
                 if(++total_pages_skipped >= max_skip && !all_of_them) {
@@ -989,15 +993,16 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
 
     } while(pages_to_evict && (all_of_them || (cache_above_healthy_limit(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
-    if(all_of_them && PGC_REFERENCED_PAGES(cache)) {
+    if(all_of_them && last_run_pages_skipped) {
         error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, some are still referenced");
+        error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, %zu are still referenced",
+                    last_run_pages_skipped);
     }
-    else if(!total_pages_evicted && cache_under_severe_pressure(cache)) {
+    else if(max_evict == SIZE_MAX && last_run_pages_skipped && cache_under_severe_pressure(cache)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
-                    "DBENGINE CACHE: cache is %zu %% full, but all the data in it are currently referenced and cannot be evicted",
-                    cache_usage_per1000(cache));
+                    "DBENGINE CACHE: cache is %zu %% full, but %zu clean pages are currently referenced and cannot be evicted",
+                    cache_usage_per1000(cache) / 10, last_run_pages_skipped);
     }
 
 premature_exit:
