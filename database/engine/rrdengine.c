@@ -549,8 +549,6 @@ static void do_flush_extent_cb(uv_fs_t *req)
         pgc_page_release(open_cache, (PGC_PAGE *)page);
         mrg_metric_release(main_mrg, this_metric);
     }
-    if (xt_io_descr->completion)
-        completion_mark_complete(xt_io_descr->completion);
 
     uv_fs_req_cleanup(req);
     posix_memfree(xt_io_descr->buf);
@@ -689,6 +687,9 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
+
+    if (xt_io_descr->completion)
+        completion_mark_complete(xt_io_descr->completion);
     return ALIGN_BYTES_CEILING(size_bytes);
 }
 
