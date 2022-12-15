@@ -10,67 +10,57 @@ learn_docs_purpose: "Explain how metrics are collected [Existing plugins, Custom
 -->
 
 With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects
-per-second metrics.
-
-Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you install Netdata.
+per-second metrics. **Collector** is a catch-all term for any Netdata process that gathers metrics from an endpoint.
 
 Every collector has two primary jobs:
 
--   Look for exposed metrics at a pre- or user-defined endpoint.
--   Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
+- Look for exposed metrics at a pre- or user-defined endpoint.
+- Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
 
-If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
-Netdata Agent gathers these metrics, sends them to the [database engine for
-storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md), and immediately [visualizes them
-meaningfully](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md) on dashboards.
+### Plugins & Orchestrators
 
-Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
-can be a URL and port, a socket, a file, a web page, and more.
+Plugins are the fundamental building blocks which aggregate or collect metrics. A plugin is responsible for one or more
+data collection process. We distinguish our plugins in:
 
-:::Example 
-The Nginx collector searches
-at `http://127.0.0.1/stub_status`, which is the default endpoint for exposing Nginx metrics. The web log collector for
-Nginx or Apache searches at
+- **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
+    - go.d.plugin: An orchestrator for data collection modules written in `go`.
+    - python.d.plugin: An orchestrator for data collection modules written in
+      `python` v2/v3.
+    - charts.d.plugin: An orchestrator for data collection modules written in
+      `bash` v4+.
+- **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
+  processes that communicate with the Netdata daemon via pipes.
+- **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`, and
+  run as threads within the Netdata daemon.
+
+When you apply configuration changes in any plugin, it affects all the modules/processes it manages. For instance if you
+update the `update_every = X` frequency of the `go.d.plugin` in the `netdata.conf` it will affect all the modules it
+manages by c.
+
+### Modules
+
+Modules are entities that include one or more metric collection jobs for a single topic, for example, all the metric
+collection jobs as far as an _Apache Webserver_ are managed and configured by a single module.
+
+### Job
+
+Every metric collection process is a job. For instance when you want to monitor N Nginx servers from a single Netdata
+deployment, you don't have to configure N Nginx Netdata modules, you just have to specify N Jobs in the Nginx module.
+
+### Auto detection
+
+Netdata has reached and found out every default configuration option for any component it monitors. This give you the
+ability to monitor any component that follows the <u>default setup configuration</u> out of the box. So if a collector
+finds compatible metrics exposed on the configured endpoint, the Netdata Agent gathers these metrics and produces the
+corresponding charts. Periodically Netdata checks for new endpoints or endpoints that wasn't ready in its start up.
+
+For instance, the Nginx collector searches at `http://127.0.0.1/stub_status`, which is the default endpoint for exposing
+Nginx metrics. The web log collector for
+Nginx searches at
 `/var/log/nginx/access.log` and `/var/log/apache2/access.log`, respectively, both of which are standard locations for
 access log files on Linux systems.
 
 The endpoint is user-configurable, as are many other specifics of what a given collector does.
-:::
-
-### What can Netdata collect?
-
-<!--To quickly find your answer, see our [list of supported collectors](/collectors/COLLECTORS.md).-->
-
-Generally, Netdata's collectors can be grouped into three types:
-
--   Systems: Monitor CPU, memory, disk, networking, systemd, eBPF, and much more.
-    Every metric exposed by `/proc`, `/sys`, and other Linux kernel sources.
--   Containers: Gather metrics from container agents, like `dockerd` or `kubectl`,
-    along with the resource usage of containers and the applications they run.
--   Applications: Collect per-second metrics from web servers, databases, logs,
-    message brokers, APM tools, email servers, and much more.
-
-### Collector architecture and terminology
-
-**Collector** is a catch-all term for any Netdata process that gathers metrics from an endpoint. 
-
-While we use _collector_ most often in documentation, release notes, and educational content, you may encounter other
-terms related to collecting metrics.
-
--   **Modules** are a type of collector.
--   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
-    The Go orchestrator is in active development.
-    -   go.d.plugin: An orchestrator for data
-        collection modules written in `go`.
-    -   python.d.plugin: An orchestrator for data collection modules written in
-        `python` v2/v3.
-    -   charts.d.plugin: An orchestrator for data collection modules written in
-        `bash` v4+.
--   **External plugins** gather metrics from external processes, such as a webserver or database, and run as independent
-    processes that communicate with the Netdata daemon via pipes.
--   **Internal plugins** gather metrics from `/proc`, `/sys`, and other Linux kernel sources. They are written in `C`,
-    and run as threads within the Netdata daemon.
 
 ### Related Documentation
 
