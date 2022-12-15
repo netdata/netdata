@@ -553,29 +553,29 @@ void init_page_cache(void)
         main_mrg = mrg_create();
 
         main_cache = pgc_create(
-            default_rrdeng_page_cache_mb * 1024 * 1024,
-            dbengine_clean_page_callback,
-            rrdeng_pages_per_extent,
-            dbengine_flush_callback,
-            100,                                //
-            1000,                           //
-            1,                                          // don't delay too much other threads
-            PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
-            0,                                                 // 0 = as many as the system cpus
-            0
+                (size_t)default_rrdeng_page_cache_mb * 1024 * 1024,
+                dbengine_clean_page_callback,
+                (size_t)rrdeng_pages_per_extent,
+                dbengine_flush_callback,
+                100,                                //
+                1000,                           //
+                1,                                          // don't delay too much other threads
+                PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
+                0,                                                 // 0 = as many as the system cpus
+                0
             );
 
         open_cache = pgc_create(
-            0,
-            open_cache_clean_page_callback,
-            1,
-            open_cache_flush_callback,
-            100,                                //
-            1000,                           //
-            1,                                          // don't delay too much other threads
-            PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
-            0,                                                 // 0 = as many as the system cpus
-            sizeof(struct extent_io_data)
+                0,
+                open_cache_clean_page_callback,
+                1,
+                open_cache_flush_callback,
+                100,                                //
+                1000,                           //
+                1,                                          // don't delay too much other threads
+                PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
+                0,                                                 // 0 = as many as the system cpus
+                sizeof(struct extent_io_data)
             );
     }
     netdata_spinlock_unlock(&spinlock);
