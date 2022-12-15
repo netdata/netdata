@@ -134,6 +134,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
         if (unlikely(*PValue)) {
             struct page_details *pd = *PValue;
+            UNUSED(pd);
 
             internal_error(
                     pd->first_time_s != page_first_time_s ||
