@@ -64,11 +64,12 @@ static void p_file_info_destroy(struct File_info *p_file_info){
     if(p_file_info->parser_metrics){
         switch(p_file_info->log_type){
             case WEB_LOG: 
-            case FLB_WEB_LOG:{
+            case FLB_WEB_LOG: {
                 freez(p_file_info->parser_metrics->web_log);
                 break;
             }
-            case FLB_SYSTEMD: {
+            case FLB_SYSTEMD: 
+            case FLB_SYSLOG: {
                 freez(p_file_info->parser_metrics->systemd);
                 break;
             }
@@ -189,6 +190,7 @@ static void logs_management_init(struct section *config_section){
         else if (!strcmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
         else if (!strcmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
         else if (!strcmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
+        else if (!strcmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
         else p_file_info->log_type = FLB_GENERIC;
     }
     freez(type);
@@ -203,7 +205,7 @@ static void logs_management_init(struct section *config_section){
     if( !p_file_info->filename || /* Sanity check */
         !*p_file_info->filename || 
         !strcmp(p_file_info->filename, "auto") || 
-        access(p_file_info->filename, R_OK)){ 
+        (p_file_info->log_type != FLB_SYSLOG && access(p_file_info->filename, R_OK))){ 
 
         freez(p_file_info->filename);
         p_file_info->filename = NULL;
@@ -211,7 +213,7 @@ static void logs_management_init(struct section *config_section){
         switch(p_file_info->log_type){
             case GENERIC:
             case FLB_GENERIC:
-                if(!strcmp(p_file_info->chart_name, "Auth.log") || !strcmp(p_file_info->chart_name, "auth.log")){
+                if(!strcmp(p_file_info->chart_name, "Auth.log tail") || !strcmp(p_file_info->chart_name, "auth.log tail")){
                     const char * const auth_path_default[] = {
                         "/var/log/auth.log",
                         NULL
@@ -222,7 +224,7 @@ static void logs_management_init(struct section *config_section){
                         error("[%s]: auth.log path invalid, unknown or needs permissions", p_file_info->chart_name);
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(auth_path_default[i]);
-                } else if(!strcmp(p_file_info->chart_name, "syslog")){
+                } else if(!strcmp(p_file_info->chart_name, "syslog tail")){
                     const char * const syslog_path_default[] = {
                         "/var/log/syslog",   /* Debian, Ubuntu */
                         "/var/log/messages", /* RHEL, Red Hat, CentOS, Fedora */
@@ -432,7 +434,7 @@ static void logs_management_init(struct section *config_section){
             }
         }
     }
-    else if(p_file_info->log_type == FLB_SYSTEMD){
+    else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
         if(appconfig_get_boolean(&log_management_config, config_section->name, "priority value chart", 0)) {
             p_file_info->parser_config->chart_config |= CHART_SYSLOG_PRIOR;
         }
@@ -460,7 +462,8 @@ static void logs_management_init(struct section *config_section){
             p_file_info->parser_metrics->web_log = callocz(1, sizeof(Web_log_metrics_t));
             break;
         }
-        case FLB_SYSTEMD: {
+        case FLB_SYSTEMD: 
+        case FLB_SYSLOG: {
             p_file_info->parser_metrics->systemd = callocz(1, sizeof(Systemd_metrics_t));
             break;
         }
@@ -615,7 +618,8 @@ static void logs_management_init(struct section *config_section){
         case FLB_GENERIC:
         case FLB_WEB_LOG:
         case FLB_SYSTEMD:
-        case FLB_DOCKER_EV: {
+        case FLB_DOCKER_EV: 
+        case FLB_SYSLOG: {
             rc = flb_add_input(p_file_info);
             if(unlikely(rc)){
                 error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);

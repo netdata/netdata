@@ -13,7 +13,7 @@
 #include "parser.h"
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
-#define LOG_SRC_TYPES LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC)LST(FLB_WEB_LOG)LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV)
+#define LOG_SRC_TYPES LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC)LST(FLB_WEB_LOG)LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV)LST(FLB_SYSLOG)
 #define LST(x) x,
 enum log_source_t {LOG_SRC_TYPES};
 #undef LST
@@ -59,7 +59,7 @@ struct File_info {
     
     /* Struct members related to log parsing */
     uv_thread_t *log_parser_thread;                 /**< Log parsing thread. **/ 
-    Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from XX.conf **/ 
+    Log_parser_config_t *parser_config;             /**< Configuration to be user by log parser - read from logsmanagement.conf **/ 
     Log_parser_cus_config_t **parser_cus_config;    /**< Array of custom log parsing configurations **/
     Log_parser_metrics_t *parser_metrics;           /**< Extracted metrics **/
     uv_mutex_t *parser_metrics_mut;                 /**< Mutex controlling access to parser_metrics **/

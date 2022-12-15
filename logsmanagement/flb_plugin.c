@@ -241,8 +241,8 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
 
     circ_buff_insert(buff);
 
-    /* Extract systemd and docker events metrics */
-    if(p_file_info->log_type == FLB_SYSTEMD) {
+    /* Extract systemd, syslog and docker events metrics */
+    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
         p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
@@ -296,11 +296,11 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     struct flb_time tmp_time;
     msgpack_object *x;   
 
-    /* FLB_WEB_LOG case */
-    char *syslog_severity = NULL;
-    size_t syslog_severity_size = 0;
-    char *syslog_facility = NULL;
-    size_t syslog_facility_size = 0;
+    /* FLB_SYSTEMD or FLB_SYSLOG case */
+    char syslog_prival[4] = "";
+    size_t syslog_prival_size = 0;
+    char syslog_severity[2] = "";
+    char syslog_facility[3] = "";
     char *syslog_timestamp = NULL;
     size_t syslog_timestamp_size = 0;
     char *hostname = NULL;
@@ -311,7 +311,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     size_t pid_size = 0;
     char *message = NULL;
     size_t message_size = 0;
-    /* FLB_WEB_LOG case end */
+    /* FLB_SYSTEMD or FLB_SYSLOG case end */
 
     /* FLB_DOCKER_EV case */
     long docker_ev_time = 0;
@@ -390,25 +390,33 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                     }
                     /* FLB_GENERIC and FLB_WEB_LOG case end */
 
-                    /* FLB_SYSTEMD case */
-                    if(p_file_info->log_type == FLB_SYSTEMD){
+                    /* FLB_SYSTEMD or FLB_SYSLOG case */
+                    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
                         if(!new_tmp_text_size){
                             /* set new_tmp_text_size to previous size of buffer, do only once */
                             new_tmp_text_size = buff->in->text_size; 
                         }
-                        if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
-                            syslog_severity = (char *) p->val.via.str.ptr;
-                            syslog_severity_size = p->val.via.str.size;
-
+                        if(!strncmp(p->key.via.str.ptr, "PRIVAL", (size_t) p->key.via.str.size)){
+                            m_assert(p->val.via.str.size <= 3, "p->val.via.str.size > 3");
+                            strncpy(syslog_prival, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            syslog_prival[p->val.via.str.size] = '\0';
+                            syslog_prival_size = (size_t) p->val.via.str.size;
+                            
+                            m_assert(syslog_prival, "syslog_prival is NULL");
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "PRIORITY", (size_t) p->key.via.str.size)){
+                            m_assert(p->val.via.str.size <= 1, "p->val.via.str.size > 1");
+                            strncpy(syslog_severity, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            syslog_severity[p->val.via.str.size] = '\0';
+                            
                             m_assert(syslog_severity, "syslog_severity is NULL");
-                            m_assert(syslog_severity_size, "syslog_severity_size is 0");
                         }
                         else if(!strncmp(p->key.via.str.ptr, "SYSLOG_FACILITY", (size_t) p->key.via.str.size)){
-                            syslog_facility = (char *) p->val.via.str.ptr;
-                            syslog_facility_size = p->val.via.str.size;
-
+                            m_assert(p->val.via.str.size <= 2, "p->val.via.str.size > 2");
+                            strncpy(syslog_facility, p->val.via.str.ptr, (size_t) p->val.via.str.size);
+                            syslog_facility[p->val.via.str.size] = '\0';
+                            
                             m_assert(syslog_facility, "syslog_facility is NULL");
-                            m_assert(syslog_facility_size, "syslog_facility_size is 0");
                         }
                         else if(!strncmp(p->key.via.str.ptr, "SYSLOG_TIMESTAMP", (size_t) p->key.via.str.size)){
                             syslog_timestamp = (char *) p->val.via.str.ptr;
@@ -419,7 +427,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                             
                             new_tmp_text_size += syslog_timestamp_size;
                         }
-                        else if(!strncmp(p->key.via.str.ptr, "_HOSTNAME", (size_t) p->key.via.str.size)){
+                        else if(!strncmp(p->key.via.str.ptr, "HOSTNAME", (size_t) p->key.via.str.size)){
                             hostname = (char *) p->val.via.str.ptr;
                             hostname_size = p->val.via.str.size;
 
@@ -437,7 +445,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
                             new_tmp_text_size += syslog_identifier_size;
                         }
-                        else if(!strncmp(p->key.via.str.ptr, "_PID", (size_t) p->key.via.str.size)){
+                        else if(!strncmp(p->key.via.str.ptr, "PID", (size_t) p->key.via.str.size)){
                             pid = (char *) p->val.via.str.ptr;
                             pid_size = p->val.via.str.size;
 
@@ -458,7 +466,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         ++p;
                         continue;
                     }
-                    /* FLB_SYSTEMD case end */
+                    /* FLB_SYSTEMD or FLB_SYSLOG case end */
 
                     /* FLB_DOCKER_EV case */
                     if(p_file_info->log_type == FLB_DOCKER_EV){ 
@@ -568,55 +576,78 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         } 
     }
     
-    /* FLB_SYSTEMD case - extract metrics and reconstruct log message */
-    if(p_file_info->log_type == FLB_SYSTEMD){
-
-        /* Temporary variables for null-terminated severity, facility and 
-         * priority value strings and their conversions to integers */
-        char syslog_severity_s[2];
-        int syslog_severity_d = SYSLOG_SEVER_ARR_SIZE - 1; // Initialise to 'unknown'
-        char syslog_facility_s[3];
-        int syslog_facility_d = SYSLOG_FACIL_ARR_SIZE - 1; // Initialise to 'unknown'
-        char syslog_prival_s[4];
-        size_t syslog_prival_s_size = 0;
-        int syslog_prival_d = SYSLOG_PRIOR_ARR_SIZE - 1; // Initialise to 'unknown'
+    /* FLB_SYSTEMD or FLB_SYSLOG case - extract metrics and reconstruct log message */
+    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
 
         /* Parse number of log lines */
         p_file_info->flb_tmp_systemd_metrics.num_lines++;
 
-        /* Parse syslog_severity char* field into int and extract metrics. 
-         * syslog_severity_s will consist of 1 char (plus '\0'), 
-         * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
-        if(likely(syslog_severity)){
-            snprintfz(syslog_severity_s, 2, "%.*s", (int) syslog_severity_size, syslog_severity);
-            if(likely(str2int(&syslog_severity_d, syslog_severity_s, 10) == STR2XX_SUCCESS)){
-                p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
-            } // else parsing errors ++ ??
-        } else p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
+        int syslog_prival_d = SYSLOG_PRIOR_ARR_SIZE - 1; // Initialise to 'unknown'
+        int syslog_severity_d = SYSLOG_SEVER_ARR_SIZE - 1; // Initialise to 'unknown'
+        int syslog_facility_d = SYSLOG_FACIL_ARR_SIZE - 1; // Initialise to 'unknown'
 
-        /* Parse syslog_facility char* field into int and extract metrics. 
-         * syslog_facility_s will consist of up to 2 chars (plus '\0'), 
-         * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
-        if(likely(syslog_facility)){
-            snprintfz(syslog_facility_s, 3, "%.*s", (int) syslog_facility_size, syslog_facility);
-            if(likely(str2int(&syslog_facility_d, syslog_facility_s, 10) == STR2XX_SUCCESS)){
-                p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
-            } // else parsing errors ++ ??
-        } else p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
 
-        if(likely(syslog_severity && syslog_facility)){
-            /* Definition of syslog priority value == facility * 8 + severity */
-            syslog_prival_d = syslog_facility_d * 8 + syslog_severity_d; 
-            syslog_prival_s_size = snprintfz(syslog_prival_s, 4, "%d", syslog_prival_d);
-            m_assert(syslog_prival_s_size < 4 && syslog_prival_s_size > 0, "error with snprintf()");
-    
-            new_tmp_text_size += syslog_prival_s_size + 2; // +2 for '<' and '>'
+        /* FLB_SYSTEMD case has syslog_severity and syslog_facility values that
+         * are used to calculate syslog_prival from. FLB_SYSLOG is the opposite
+         * case, as it has a syslog_prival value that is used to calculate 
+         * syslog_severity and syslog_facility from. */
+        if(p_file_info->log_type == FLB_SYSTEMD){
 
-            p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
-        } else {
-            new_tmp_text_size += 3; // +3 for "<->" string
-            p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
-        } 
+            /* Parse syslog_severity char* field into int and extract metrics. 
+            * syslog_severity_s will consist of 1 char (plus '\0'), 
+            * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
+            if(likely(syslog_severity[0])){            
+                if(likely(str2int(&syslog_severity_d, syslog_severity, 10) == STR2XX_SUCCESS)){
+                    p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
+                } // else parsing errors ++ ??
+            } else p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
+
+            /* Parse syslog_facility char* field into int and extract metrics. 
+            * syslog_facility_s will consist of up to 2 chars (plus '\0'), 
+            * see https://datatracker.ietf.org/doc/html/rfc5424#section-6.2.1 */
+            if(likely(syslog_facility[0])){
+                if(likely(str2int(&syslog_facility_d, syslog_facility, 10) == STR2XX_SUCCESS)){
+                    p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
+                    debug(D_LOGS_MANAG,"** syslog_facility_d:%d", syslog_facility_d);
+                } // else parsing errors ++ ??
+            } else p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
+
+            if(likely(syslog_severity[0] && syslog_facility[0])){
+                /* Definition of syslog priority value == facility * 8 + severity */
+                syslog_prival_d = syslog_facility_d * 8 + syslog_severity_d; 
+                syslog_prival_size = snprintfz(syslog_prival, 4, "%d", syslog_prival_d);
+                m_assert(syslog_prival_size < 4 && syslog_prival_size > 0, "error with snprintf()");
+        
+                new_tmp_text_size += syslog_prival_size + 2; // +2 for '<' and '>'
+
+                p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
+            } else {
+                new_tmp_text_size += 3; // +3 for "<->" string
+                p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
+            } 
+
+        } else if(p_file_info->log_type == FLB_SYSLOG){
+
+            if(likely(syslog_prival[0])){            
+                if(likely(str2int(&syslog_prival_d, syslog_prival, 10) == STR2XX_SUCCESS)){
+                    syslog_severity_d = syslog_prival_d % 8;
+                    syslog_facility_d = syslog_prival_d / 8;
+
+                    p_file_info->flb_tmp_systemd_metrics.prior[syslog_prival_d]++;
+                    p_file_info->flb_tmp_systemd_metrics.sever[syslog_severity_d]++;
+                    p_file_info->flb_tmp_systemd_metrics.facil[syslog_facility_d]++;
+
+                    new_tmp_text_size += syslog_prival_size + 2; // +2 for '<' and '>'
+
+                } // else parsing errors ++ ??
+            } else {
+                new_tmp_text_size += 3; // +3 for "<->" string
+                p_file_info->flb_tmp_systemd_metrics.prior[SYSLOG_PRIOR_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->flb_tmp_systemd_metrics.sever[SYSLOG_SEVER_ARR_SIZE - 1]++; // 'unknown'
+                p_file_info->flb_tmp_systemd_metrics.facil[SYSLOG_FACIL_ARR_SIZE - 1]++; // 'unknown'
+            }
+
+        } else m_assert(0, "shoudn't get here");
 
         char syslog_time_from_flb_time[25]; // 25 just to be on the safe side, but 16 + 1 chars bytes needed only.
         if(unlikely(!syslog_timestamp)){
@@ -639,15 +670,17 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         size_t tmp_item_off = buff->in->text_size;
 
         memcpy(&buff->in->data[tmp_item_off++], "<", 1);
-        if(likely(syslog_severity && syslog_facility)){
-            memcpy(&buff->in->data[tmp_item_off], syslog_prival_s, syslog_prival_s_size);
-            m_assert(syslog_prival_s_size, "syslog_prival_s_size cannot be 0");
-            tmp_item_off += syslog_prival_s_size;
+        if(likely(syslog_prival[0])){
+            memcpy(&buff->in->data[tmp_item_off], syslog_prival, syslog_prival_size);
+            m_assert(syslog_prival_size, "syslog_prival_size cannot be 0");
+            tmp_item_off += syslog_prival_size;
         } else memcpy(&buff->in->data[tmp_item_off++], "-", 1);
         memcpy(&buff->in->data[tmp_item_off++], ">", 1);
 
         if(likely(syslog_timestamp)){
             memcpy(&buff->in->data[tmp_item_off], syslog_timestamp, syslog_timestamp_size);
+            // FLB_SYSLOG doesn't add space, but FLB_SYSTEMD does:
+            // if(buff->in->data[tmp_item_off] != ' ') buff->in->data[tmp_item_off++] = ' '; 
             tmp_item_off += syslog_timestamp_size;
         } else {
             memcpy(&buff->in->data[tmp_item_off], syslog_time_from_flb_time, SYSLOG_TIMESTAMP_SIZE);
@@ -690,7 +723,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
     }
-    /* FLB_SYSTEMD case end */
+    /* FLB_SYSTEMD or FLB_SYSLOG case end */
 
     /* FLB_DOCKER_EV case */
     if(p_file_info->log_type == FLB_DOCKER_EV){
@@ -925,11 +958,13 @@ int flb_add_input(struct File_info *const p_file_info){
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Read_From_Tail", "On",
+                    "Strip_Underscores", "On",
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
             } else {
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Read_From_Tail", "On",
+                    "Strip_Underscores", "On",
                     "Path", p_file_info->filename,
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
             }
@@ -983,6 +1018,37 @@ int flb_add_input(struct File_info *const p_file_info){
                 NULL) != 0) return FLB_OUTPUT_SET_ERROR;
             
             debug(D_LOGS_MANAG, "FLB_DOCKER_EV output added");
+
+            break;
+        }
+        case FLB_SYSLOG: {
+            debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
+
+            /* Set up syslog parser */
+            const char *p_regex = "/^\\<(?<PRIVAL>[0-9]+)\\>(?<SYSLOG_TIMESTAMP>[^ ]* {1,2}[^ ]* [^ ]* )(?<HOSTNAME>[^ ]*) (?<SYSLOG_IDENTIFIER>[a-zA-Z0-9_\\/\\.\\-]*)(?:\\[(?<PID>[0-9]+)\\])?(?:[^\\:]*\\:)? *(?<MESSAGE>.*)$/";
+            if(flb_parser_create( "syslog-rfc3164", "regex", p_regex,
+                FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
+                NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
+        
+            /* Set up syslog input */
+            p_file_info->flb_input = flb_input(ctx, "syslog", NULL);
+            if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
+            if(flb_input_set(ctx, p_file_info->flb_input, 
+                "Tag", tag_s,
+                "Path", p_file_info->filename,
+                "Parser", "syslog-rfc3164",
+                "Mode", "unix_udp",
+                "Unix_Perm", "0666",
+                NULL) != 0) return FLB_INPUT_SET_ERROR;
+            
+            /* Set up output */
+            callback->cb = flb_write_to_buff_cb;
+            callback->data = p_file_info;
+            p_file_info->flb_output = flb_output(ctx, "lib", callback);
+            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
+            if(flb_output_set(ctx, p_file_info->flb_output, 
+                "Match", tag_s,
+                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
 
             break;
         }

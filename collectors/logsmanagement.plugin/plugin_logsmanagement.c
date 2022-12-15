@@ -20,7 +20,8 @@ static struct Chart_meta chart_types[] = {
     {.type = WEB_LOG,       .init = web_log_chart_init,   .collect = web_log_chart_collect,   .update = web_log_chart_update},
     {.type = FLB_WEB_LOG,   .init = web_log_chart_init,   .collect = web_log_chart_collect,   .update = web_log_chart_update},
     {.type = FLB_SYSTEMD,   .init = systemd_chart_init,   .collect = systemd_chart_collect,   .update = systemd_chart_update},
-    {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .collect = docker_ev_chart_collect, .update = docker_ev_chart_update}
+    {.type = FLB_DOCKER_EV, .init = docker_ev_chart_init, .collect = docker_ev_chart_collect, .update = docker_ev_chart_update},
+    {.type = FLB_SYSLOG,   .init = systemd_chart_init,   .collect = systemd_chart_collect,   .update = systemd_chart_update},
 };
 
 struct Stats_chart_data{

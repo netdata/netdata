@@ -35,7 +35,7 @@ typedef enum{
     CHART_SSL_PROTO = 1 << 12,
     CHART_SSL_CIPHER = 1 << 13,
 
-    /* FLB_SYSTEMD charts */
+    /* FLB_SYSTEMD or FLB_SYSLOG charts */
     CHART_SYSLOG_PRIOR = 1 << 14,
     CHART_SYSLOG_SEVER = 1 << 15,
     CHART_SYSLOG_FACIL = 1 << 16,
