@@ -90,7 +90,8 @@ static inline void atomic_set_max_latest_time_t(METRIC *metric) {
                                          false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
+static bool metric_validate(MRG *mrg __maybe_unused, METRIC *metric __maybe_unused, bool having_lock __maybe_unused) {
+#ifdef MRG_WITH_VALIDATION
     if(!having_lock)
         mrg_index_read_lock(mrg);
 
@@ -109,6 +110,7 @@ static bool metric_validate(MRG *mrg, METRIC *metric, bool having_lock) {
     }
 
     MRG_STATS_POINTER_VALIDATION_HIT(mrg);
+#endif
     return true;
 }
 
@@ -227,8 +229,9 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
     if(!having_write_lock)
         mrg_index_write_lock(mrg);
 
+    int rc;
     mem_before_judyl = JudyLMemUsed(mrg->index.ptr_judy);
-    int rc = JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
+    rc = JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
     mem_after_judyl = JudyLMemUsed(mrg->index.ptr_judy);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
 
