@@ -1775,7 +1775,6 @@ ssize_t web_client_send_deflate(struct web_client *w)
         debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client (zhave = %zu, zsent = %zu, need to send = %zu).",
             w->id, w->response.zhave, w->response.zsent, w->response.zhave - w->response.zsent);
 
-        WEB_CLIENT_IS_DEAD(w);
     }
     else {
         debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
@@ -1828,7 +1827,6 @@ ssize_t web_client_send(struct web_client *w) {
     }
     else if(likely(bytes == 0)) {
         debug(D_WEB_CLIENT, "%llu: Did not send any bytes to the client.", w->id);
-        WEB_CLIENT_IS_DEAD(w);
     }
     else {
         debug(D_WEB_CLIENT, "%llu: Failed to send data to client.", w->id);
