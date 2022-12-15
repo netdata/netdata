@@ -761,6 +761,60 @@ static void delete_old_data(void *arg)
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
+static void after_cache_evict_pages(struct rrdengine_worker_config* wc)
+{
+    struct rrdengine_instance *ctx = wc->ctx;
+    UNUSED(ctx);
+
+    freez(wc->now_evicting_pages);
+    wc->now_evicting_pages = NULL;
+    wc->cleanup_thread_evict_pages = 0;
+    /* interrupt event loop */
+    uv_stop(wc->loop);
+}
+
+static void cache_evict_pages(void *arg)
+{
+    struct rrdengine_instance *ctx = arg;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
+
+    if (main_cache)
+        pgc_evict_pages(main_cache, 0, 0);
+
+    if (open_cache)
+        pgc_evict_pages(open_cache, 0, 0);
+
+    wc->cleanup_thread_evict_pages = 1;
+    fatal_assert(0 == uv_async_send(&wc->async));
+}
+
+static void after_cache_flush_pages(struct rrdengine_worker_config *wc)
+{
+    struct rrdengine_instance *ctx = wc->ctx;
+    UNUSED(ctx);
+
+    freez(wc->now_flushing_pages);
+    wc->now_flushing_pages = NULL;
+    wc->cleanup_thread_flush_pages = 0;
+    /* interrupt event loop */
+    uv_stop(wc->loop);
+}
+
+static void cache_flush_pages(void *arg)
+{
+    struct rrdengine_instance *ctx = arg;
+    struct rrdengine_worker_config *wc = &ctx->worker_config;
+
+    if (main_cache)
+        pgc_flush_pages(main_cache, 0);
+
+    if (open_cache)
+        pgc_flush_pages(open_cache, 0);
+    wc->cleanup_thread_flush_pages = 1;
+    /* wake up event loop */
+    fatal_assert(0 == uv_async_send(&wc->async));
+}
+
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;
@@ -839,6 +893,14 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
+    }
+
+    if (unlikely(wc->cleanup_thread_evict_pages)) {
+        after_cache_evict_pages(wc);
+    }
+
+    if (unlikely(wc->cleanup_thread_flush_pages)) {
+        after_cache_flush_pages(wc);
     }
 
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
@@ -939,6 +1001,28 @@ void timer_cb(uv_timer_t* handle)
     if (true == wc->run_indexing) {
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
+    }
+
+    if (!wc->now_evicting_pages) {
+        wc->now_evicting_pages = mallocz(sizeof(*wc->now_deleting_files));
+        wc->cleanup_thread_evict_pages = 0;
+        int error = uv_thread_create(wc->now_evicting_pages, cache_evict_pages, wc->ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_evicting_pages);
+            wc->now_evicting_pages = NULL;
+        }
+    }
+
+    if (!wc->now_flushing_pages) {
+        wc->now_flushing_pages = mallocz(sizeof(*wc->now_deleting_files));
+        wc->cleanup_thread_flush_pages = 0;
+        int error = uv_thread_create(wc->now_flushing_pages, cache_flush_pages, wc->ctx);
+        if (error) {
+            error("uv_thread_create(): %s", uv_strerror(error));
+            freez(wc->now_flushing_pages);
+            wc->now_flushing_pages = NULL;
+        }
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS

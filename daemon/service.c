@@ -296,28 +296,6 @@ void *service_main(void *ptr)
         worker_is_idle();
         heartbeat_next(&hb, step);
 
-        if(main_cache) {
-            worker_is_busy(WORKER_JOB_PGC_MAIN_EVICT);
-            pgc_evict_pages(main_cache, 0, 0);
-
-            worker_is_busy(WORKER_JOB_PGC_MAIN_FLUSH);
-            pgc_flush_pages(main_cache, 0);
-
-            worker_is_busy(WORKER_JOB_PGC_MAIN_EVICT);
-            pgc_evict_pages(main_cache, 0, 0);
-        }
-
-        if(open_cache) {
-            worker_is_busy(WORKER_JOB_PGC_OPEN_EVICT);
-            pgc_evict_pages(open_cache, 0, 0);
-
-            worker_is_busy(WORKER_JOB_PGC_OPEN_FLUSH);
-            pgc_flush_pages(open_cache, 0);
-
-            worker_is_busy(WORKER_JOB_PGC_OPEN_EVICT);
-            pgc_evict_pages(open_cache, 0, 0);
-        }
-
         svc_rrd_cleanup_obsolete_charts_from_all_hosts();
         svc_rrdhost_cleanup_orphan_hosts(localhost);
     }
