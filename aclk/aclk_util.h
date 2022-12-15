@@ -93,13 +93,9 @@ enum aclk_topics {
     ACLK_TOPICID_CTXS_UPDATED          = 20
 };
 
-typedef size_t aclk_topic_cache_iter_t;
-#define ACLK_TOPIC_CACHE_ITER_T_INITIALIZER (0)
-
 const char *aclk_get_topic(enum aclk_topics topic);
 int aclk_generate_topic_cache(struct json_object *json);
 void free_topic_cache(void);
-const char *aclk_topic_cache_iterate(aclk_topic_cache_iter_t *iter);
 // TODO
 // aclk_topics_reload //when claim id changes
 

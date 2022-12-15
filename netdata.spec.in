@@ -40,7 +40,7 @@ AutoReqProv: yes
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     netns    # build with netns support (cgroup-network)
+%bcond_without  netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
@@ -502,6 +502,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 # the helper script reads /proc/PID/fdinfo/* files, runs virsh, etc.
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
+%endif
+
+# ebpf plugin
+%if 0%{?_have_ebpf}
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
 %endif
 
 # perf plugin
