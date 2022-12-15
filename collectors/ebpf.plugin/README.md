@@ -106,8 +106,8 @@ The eBPF collector also creates charts for each running application through an i
 [`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
 interact with the Linux kernel.
 
-If you want to _disable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
-`no`.
+If you want to _enable_ the integration with `apps.plugin` along with the above charts, change the setting `apps` to
+`yes`.
 
 ```conf
 [global]
