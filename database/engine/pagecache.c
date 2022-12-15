@@ -565,7 +565,7 @@ void init_page_cache(void)
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
-                PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
+                PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
                 0,                                                 // 0 = as many as the system cpus
                 0
             );
@@ -578,7 +578,7 @@ void init_page_cache(void)
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
-                PGC_OPTIONS_DEFAULT,                                // AUTOSCALE = 2x max hot pages
+                PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
             );
