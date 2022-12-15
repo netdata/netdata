@@ -688,8 +688,8 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
 
-    if (xt_io_descr->completion)
-        completion_mark_complete(xt_io_descr->completion);
+    if (completion)
+        completion_mark_complete(completion);
     return ALIGN_BYTES_CEILING(size_bytes);
 }
 
