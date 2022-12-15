@@ -319,8 +319,6 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         uint32_t page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
 
-        page_offset += page_length;
-
         if(!page_length || !start_time_s) {
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Extent at offset %"PRIu64"(%u) was read from datafile %u. Page %u is EMPTY",
@@ -338,8 +336,10 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         if (pd && uuid_compare(pd->uuid, header->descr[i].uuid))
             pd = NULL;
 
-        if(!preload_all_pages && !pd)
+        if(!preload_all_pages && !pd) {
+            page_offset += page_length;
             continue;
+        }
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(&header->descr[i], now_s, (pd) ? pd->update_every_s : 0, have_read_error);
 
@@ -406,6 +406,8 @@ static void extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         }
         else
             pgc_page_release(main_cache, page);
+
+        page_offset += page_length;
     }
 
     pdc_mark_all_unset_pages_as_failed(
