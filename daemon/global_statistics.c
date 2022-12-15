@@ -1117,7 +1117,10 @@ static void dbengine2_statistics_charts(void) {
             rd_used = rrddim_add(st_pgc_cache_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_pgc_cache_size, rd_free, (collected_number)(pgc_main_stats.wanted_cache_size - pgc_main_stats.current_cache_size));
+        collected_number free = (pgc_main_stats.current_cache_size > pgc_main_stats.wanted_cache_size) ? 0 :
+                (collected_number)(pgc_main_stats.wanted_cache_size - pgc_main_stats.current_cache_size);
+
+        rrddim_set_by_pointer(st_pgc_cache_size, rd_free, free);
         rrddim_set_by_pointer(st_pgc_cache_size, rd_used, (collected_number)pgc_main_stats.current_cache_size);
 
         rrdset_done(st_pgc_cache_size);
