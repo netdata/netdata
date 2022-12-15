@@ -13,7 +13,6 @@ unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
 struct datafile_extent_list_s {
     uv_file file;
-    unsigned count;
     unsigned fileno;
     Pvoid_t JudyL_datafile_extent_list;
     struct page_details_control *pdc;
@@ -949,72 +948,6 @@ void timer_cb(uv_timer_t* handle)
     worker_is_idle();
 }
 
-static void after_do_read_datafile_extent_list_work(uv_work_t *req, int status __maybe_unused)
-{
-    struct rrdeng_work  *work_request = req->data;
-    freez(work_request);
-}
-
-static void do_read_datafile_extent_list_work(uv_work_t *req)
-{
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
-
-    worker_is_busy(UV_EVENT_EXTEXT_DISPATCH);
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    struct datafile_extent_list_s *datafile_extent_list = work_request->data;
-    struct extent_page_list_s *extent_page_list;
-    struct page_details_control *pdc = datafile_extent_list->pdc;
-
-    Pvoid_t *PValue;
-    Word_t pos = 0;
-    // Check and send datafile_extent_list->count  extent requests per datafile
-    bool first_then_next = true;
-
-    while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next))) {
-        extent_page_list = *PValue;
-        internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
-
-        // The extent page list can be dispatched to a worker
-        // It will need to populate the cache with "acquired" pages that are in the list (pd) only
-        // the rest of the extent pages will be added to the cache butnot acquired
-
-        struct rrdeng_cmd cmd;
-        cmd.opcode = RRDENG_READ_EXTENT;
-        pdc_acquire(pdc); // we do this for the next worker: do_read_extent2_work()
-        extent_page_list->pdc = pdc;
-        cmd.data = extent_page_list;
-        rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-    }
-    JudyLFreeArray(&datafile_extent_list->JudyL_datafile_extent_list, PJE0);
-
-    pdc_release_and_destroy_if_unreferenced(pdc, true, true);
-    worker_is_idle();
-}
-
-// Receive a list of extents and start a worker to schedule them in parallel
-static void do_read_datafile_extent_list(struct rrdengine_worker_config *wc, void *data)
-{
-    struct rrdeng_work *work_request;
-
-    work_request = mallocz(sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->data = data;
-    work_request->completion = NULL;
-
-    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_datafile_extent_list_work, after_do_read_datafile_extent_list_work);
-    if (ret)
-        freez(work_request);
-
-    fatal_assert(0 == ret);
-}
-
 static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdeng_work  *work_request = req->data;
@@ -1160,7 +1093,7 @@ cleanup:
     worker_is_idle();
 }
 
-static void do_read_extent2(struct rrdengine_worker_config *wc, void *data)
+static void do_read_extent(struct rrdengine_worker_config *wc, void *data)
 {
     struct rrdeng_work *work_request;
 
@@ -1227,16 +1160,13 @@ static void do_read_page_list_work(uv_work_t *req)
                 continue;
 
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
-
             if (PValue1 && !*PValue1) {
                 *PValue1 = datafile_extent_list = mallocz(sizeof(*datafile_extent_list));
                 datafile_extent_list->JudyL_datafile_extent_list = NULL;
-                datafile_extent_list->count = 0;
                 datafile_extent_list->fileno = pd->datafile.fileno;
             }
             else
                 datafile_extent_list = *PValue1;
-            datafile_extent_list->count++;
 
             PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile.extent.pos, PJE0);
             if (PValue2 && !*PValue2) {
@@ -1250,31 +1180,36 @@ static void do_read_page_list_work(uv_work_t *req)
             }
             else
                 extent_page_list = *PValue2;
+
             extent_page_list->count++;
 
             PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->first_time_s, PJE0);
             *PValue3 = pd;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-            pdc_page_status_set(pd, PDC_PAGE_ROUTED_TO_DATAFILE_EXTENT);
-#endif
         }
 
         Word_t datafile_no = 0;
-        for (PValue = JudyLFirst(JudyL_datafile_list, &datafile_no, PJE0),
-            datafile_extent_list = unlikely(NULL == PValue) ? NULL : *PValue;
-             datafile_extent_list != NULL;
-             PValue = JudyLNext(JudyL_datafile_list, &datafile_no, PJE0),
-            datafile_extent_list = unlikely(NULL == PValue) ? NULL : *PValue) {
+        first_then_next = true;
+        while((PValue = JudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
+            datafile_extent_list = *PValue;
 
-            // List of datafiles
-            // Now submit each datafile_extent_list back to the engine
-            pdc_acquire(pdc); // we get this for the next worker: do_read_datafile_extent_list_work()
-            struct rrdeng_cmd cmd;
-            datafile_extent_list->pdc = pdc;
-            cmd.opcode = RRDENG_READ_DF_EXTENT_LIST;
-            cmd.data = datafile_extent_list;
-            rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+            bool first_then_next_extent = true;
+            Word_t pos;
+            while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next_extent))) {
+                extent_page_list = *PValue;
+                internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
+
+                // The extent page list can be dispatched to a worker
+                // It will need to populate the cache with "acquired" pages that are in the list (pd) only
+                // the rest of the extent pages will be added to the cache butnot acquired
+
+                struct rrdeng_cmd cmd;
+                cmd.opcode = RRDENG_READ_EXTENT;
+                pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
+                extent_page_list->pdc = pdc;
+                cmd.data = extent_page_list;
+                rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+            }
+            freez(datafile_extent_list);
         }
         JudyLFreeArray(&JudyL_datafile_list, PJE0);
     }
@@ -1328,7 +1263,6 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
     worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
     worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
-    worker_register_job_name(RRDENG_READ_DF_EXTENT_LIST,           "query extent list");
     worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
     worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
     worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
@@ -1428,15 +1362,12 @@ void rrdeng_worker(void* arg)
                 (void)do_flush_extent(wc, cmd.data, cmd.completion);
                 break;
             }
-            case RRDENG_READ_DF_EXTENT_LIST:
-                do_read_datafile_extent_list(wc, cmd.data);
-                break;
             case RRDENG_READ_EXTENT:
                 if (unlikely(!set_name)) {
                     set_name = 1;
                     uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
                 }
-                do_read_extent2(wc, cmd.data);
+                do_read_extent(wc, cmd.data);
                 break;
             case RRDENG_READ_PAGE_LIST:
                 do_read_page_list(wc, cmd.data, cmd.completion);

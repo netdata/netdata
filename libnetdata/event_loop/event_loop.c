@@ -20,6 +20,5 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_JOURNAL_INDEX, "journal v2 indexing");
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
-    worker_register_job_name(UV_EVENT_EXTEXT_DISPATCH, "dispatch extent list");
     worker_register_job_name(UV_EVENT_PAGE_DISPATCH, "dispatch page list");
 }
