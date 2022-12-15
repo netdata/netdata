@@ -264,6 +264,8 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     return query_gaps;
 }
 
+#define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
+
 // Return a judyL will all pages that have start_time_ut and end_time_ut
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
@@ -281,9 +283,12 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     time_t first_page_starting_time_s = INVALID_TIME;
 
+    usec_t pass1_ut = 0, pass2_ut = 0, pass3_ut = 0, pass4_ut = 0;
+
     // --------------------------------------------------------------
     // PASS 1: Check what the main page cache has available
 
+    pass1_ut = now_monotonic_usec();
     size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
                                                 &first_page_starting_time_s, false);
@@ -294,10 +299,12 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     if(pages_found_in_cache && !cache_gaps)
         goto we_are_done;
 
+
     // --------------------------------------------------------------
     // PASS 2: Check what the open journal page cache has available
     //         these will be loaded from disk
 
+    pass2_ut = now_monotonic_usec();
     size_t pages_pass2 = get_page_list_from_pgc(open_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
                                                 &first_page_starting_time_s, true);
@@ -309,6 +316,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     // --------------------------------------------------------------
     // PASS 3: Check Journal v2 to fill the gaps
 
+    pass3_ut = now_monotonic_usec();
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     bool lookup_continue = true;
@@ -413,6 +421,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     //         and calculate the time gaps in the query
     //         THIS IS REQUIRED AFTER JOURNAL V2 LOOKUP
 
+    pass4_ut = now_monotonic_usec();
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
                                     &first_page_starting_time_s, &pages_total, &pages_found_pass4, &pages_pending,
                                     true);
@@ -424,6 +433,16 @@ we_are_done:
 
     if(pages_to_load)
         *pages_to_load = pages_pending;
+
+    usec_t finish_ut = now_monotonic_usec();
+    time_delta(finish_ut, pass4_ut);
+    time_delta(finish_ut, pass3_ut);
+    time_delta(finish_ut, pass2_ut);
+    time_delta(finish_ut, pass1_ut);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_in_main_cache_lookup, pass1_ut, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_in_open_cache_lookup, pass2_ut, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_in_journal_v2_lookup, pass3_ut, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_in_pass4_lookup, pass4_ut, __ATOMIC_RELAXED);
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_with_gaps, (query_gaps)?1:0, __ATOMIC_RELAXED);
@@ -465,7 +484,9 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     if (pages_to_load && handle->pdc->page_list_JudyL) {
         handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
         handle->pdc->preload_all_extent_pages = false;
+        usec_t start_ut = now_monotonic_usec();
         dbengine_load_page_list(ctx, handle->pdc);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else {
         handle->pdc->refcount = 1; // we are alone in this query - no need for any worker
@@ -490,6 +511,8 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
         return NULL;
     }
+
+    usec_t start_ut = now_monotonic_usec();
 
     bool waited = false;
 
@@ -544,6 +567,11 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         else
             *next_page_start_time_s = (time_t)Index;
     }
+
+    if(waited)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_slow_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_fast_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
 
     return page;
 }
