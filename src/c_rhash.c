@@ -233,6 +233,26 @@ int c_rhash_iter_uint64_keys(c_rhash hash, c_rhash_iter_t *iter, uint64_t *key) 
     return 1;
 }
 
+int c_rhash_iter_str_keys(c_rhash hash, c_rhash_iter_t *iter, const char **key) {
+    while (iter->bin < hash->bin_count) {
+        if (iter->item != NULL)
+            iter->item = iter->item->next;
+        if (iter->item == NULL) {
+            if (iter->initialized)
+                iter->bin++;
+            else
+                iter->initialized = 1;
+            if (iter->bin < hash->bin_count)
+                iter->item = hash->bins[iter->bin];
+        }
+        if (iter->item != NULL && iter->item->key_type == ITEMTYPE_STRING) {
+            *key = (const char*)iter->item->key;
+            return 0;
+        }
+    }
+    return 1;
+}
+
 void c_rhash_destroy(c_rhash hash) {
     for (size_t i = 0; i < hash->bin_count; i++) {
         if (hash->bins[i] != NULL)

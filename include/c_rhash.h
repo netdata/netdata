@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #ifndef DEFAULT_BIN_COUNT
     #define DEFAULT_BIN_COUNT 1000
@@ -39,6 +40,8 @@ typedef struct {
 
 #define C_RHASH_ITER_T_INITIALIZER { .bin = 0, .item = NULL, .initialized = 0 }
 
+#define c_rhash_iter_t_initialize(p_iter) memset(p_iter, 0, sizeof(c_rhash_iter_t))
+
 /* 
  * goes trough whole hash map and returns every
  * type uint64 key present/stored
@@ -52,3 +55,5 @@ typedef struct {
  *     1 on error or when all keys of this type has been already iterated over
  */
 int c_rhash_iter_uint64_keys(c_rhash hash, c_rhash_iter_t *iter, uint64_t *key);
+
+int c_rhash_iter_str_keys(c_rhash hash, c_rhash_iter_t *iter, const char **key);
