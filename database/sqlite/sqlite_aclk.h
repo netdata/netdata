@@ -99,7 +99,7 @@ struct aclk_database_cmd {
     struct aclk_completion *completion;
 };
 
-#define ACLK_DATABASE_CMD_Q_MAX_SIZE (16384)
+#define ACLK_DATABASE_CMD_Q_MAX_SIZE (1024)
 
 struct aclk_database_cmdqueue {
     unsigned head, tail;
