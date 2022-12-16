@@ -15,7 +15,7 @@ static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY en
     freez(entry.data);
 }
 
-static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
+static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE *pages_array __maybe_unused, size_t entries __maybe_unused)
 {
 //     struct completion queue_flush_command;
 //     completion_init(&queue_flush_command);
@@ -23,22 +23,22 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array 
      Pvoid_t JudyL_flush = NULL;
      Pvoid_t *PValue;
 
-     struct rrdengine_instance *ctx = (struct rrdengine_instance *) array[0].section;
+     struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
      size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
 
      for (size_t Index = 0 ; Index < entries; Index++) {
-        time_t start_time_t = array[Index].start_time_t;
-        time_t end_time_t = array[Index].end_time_t;
+        time_t start_time_t = entries_array[Index].start_time_t;
+        time_t end_time_t = entries_array[Index].end_time_t;
         struct rrdeng_page_descr *descr = callocz(1, sizeof(*descr));
 
-        uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) array[Index].metric_id)));
-        descr->metric_id = array[Index].metric_id;
+        uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id)));
+        descr->metric_id = entries_array[Index].metric_id;
         descr->start_time_ut = start_time_t * USEC_PER_SEC;
         descr->end_time_ut = end_time_t * USEC_PER_SEC;
-        descr->update_every_s = array[Index].update_every;
+        descr->update_every_s = entries_array[Index].update_every;
         descr->type = ctx->page_type;
         descr->page_length = (end_time_t - start_time_t + 1) / descr->update_every_s * bytes_per_point;
-        descr->page = array[Index].data;
+        descr->page = entries_array[Index].data;
         PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
         fatal_assert( NULL != PValue);
         *PValue = descr;
@@ -64,7 +64,7 @@ static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY 
      ;
 }
 
-static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused)
+static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE *pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      info("Datafile flushing %zu pages", entries);
 }

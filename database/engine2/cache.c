@@ -1381,7 +1381,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         // call the callback to save them
         // it may take some time, so let's release the lock
-        cache->config.pgc_save_dirty_cb(cache, array, added);
+        cache->config.pgc_save_dirty_cb(cache, array, *pages, added);
         flushes_so_far++;
 
         pgc_ll_lock(cache, &cache->clean);
@@ -1506,6 +1506,13 @@ void pgc_destroy(PGC *cache) {
 PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
     internal_fatal(entry.hot && entry.size > RRDENG_BLOCK_SIZE, "hot page given has bad page size");
     return page_add(cache, &entry, added);
+}
+
+PGC_PAGE *pgc_page_dup(PGC *cache, PGC_PAGE *page) {
+    if(!page_acquire___while_having_some_lock(cache, page))
+        fatal("DBENGINE CACHE: tried to dup a page that is not acquired!");
+
+    return page;
 }
 
 void pgc_page_release(PGC *cache, PGC_PAGE *page) {
