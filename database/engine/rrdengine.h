@@ -233,15 +233,10 @@ struct rrdengine_worker_config {
     /* file deletion thread */
     uv_thread_t *now_deleting_files;
     unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
-
-    uv_thread_t *now_evicting_pages;
-    unsigned long cleanup_thread_evict_pages; /* set to 0 when now_deleting_files is still running */
-
-    uv_thread_t *now_flushing_pages;
-    unsigned long cleanup_thread_flush_pages; /* set to 0 when now_deleting_files is still running */
-
     unsigned long running_journal_migration;
+    unsigned long running_cache_flush_evictions;
     bool run_indexing;
+    bool cache_flush_can_run;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;

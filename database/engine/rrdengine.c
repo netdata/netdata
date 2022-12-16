@@ -558,6 +558,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     uv_fs_req_cleanup(req);
     posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
+    wc->cache_flush_can_run = true;
 }
 
 /*
@@ -744,12 +745,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     freez(wc->now_deleting_files);
     /* unfreeze command processing */
     wc->now_deleting_files = NULL;
-    wc->now_flushing_pages = NULL;
-    wc->now_evicting_pages = NULL;
-
     wc->cleanup_thread_deleting_files = 0;
-    wc->cleanup_thread_evict_pages = 0;
-    wc->cleanup_thread_flush_pages = 0;
 
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
@@ -770,59 +766,63 @@ static void delete_old_data(void *arg)
     fatal_assert(0 == uv_async_send(&wc->async));
 }
 
-static void after_cache_evict_pages(struct rrdengine_worker_config* wc)
+static void after_do_cache_flush_and_evict(uv_work_t *req, int status __maybe_unused)
 {
-    struct rrdengine_instance *ctx = wc->ctx;
-    UNUSED(ctx);
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
 
-    freez(wc->now_evicting_pages);
-    wc->now_evicting_pages = NULL;
-    wc->cleanup_thread_evict_pages = 0;
-    /* interrupt event loop */
-    uv_stop(wc->loop);
+    wc->running_cache_flush_evictions = 0;
+    freez(work_request);
 }
 
-static void cache_evict_pages(void *arg)
+static void do_cache_flush_and_evict(uv_work_t *req)
 {
-    struct rrdengine_instance *ctx = arg;
-    struct rrdengine_worker_config *wc = &ctx->worker_config;
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
 
-    if (main_cache)
+    struct rrdeng_work *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+
+    if (wc->cache_flush_can_run) {
+        if (main_cache) {
+            worker_is_busy(UV_EVENT_FLUSH_MAIN);
+            pgc_flush_pages(main_cache, 0);
+        }
+        if (open_cache) {
+            worker_is_busy(UV_EVENT_FLUSH_OPEN);
+            pgc_flush_pages(open_cache, 0);
+        }
+    }
+
+    if (main_cache) {
+        worker_is_busy(UV_EVENT_EVICT_MAIN);
         pgc_evict_pages(main_cache, 0, 0);
+    }
 
-    if (open_cache)
+    if (open_cache) {
+        worker_is_busy(UV_EVENT_EVICT_OPEN);
         pgc_evict_pages(open_cache, 0, 0);
+    }
 
-    wc->cleanup_thread_evict_pages = 1;
-    fatal_assert(0 == uv_async_send(&wc->async));
+    worker_is_idle();
 }
 
-static void after_cache_flush_pages(struct rrdengine_worker_config *wc)
+static void cache_flush_and_evict(struct rrdengine_worker_config *wc)
 {
-    struct rrdengine_instance *ctx = wc->ctx;
-    UNUSED(ctx);
+    struct rrdeng_work *work_request;
 
-    freez(wc->now_flushing_pages);
-    wc->now_flushing_pages = NULL;
-    wc->cleanup_thread_flush_pages = 0;
-    /* interrupt event loop */
-    uv_stop(wc->loop);
-}
+    if (unlikely(wc->running_cache_flush_evictions))
+        return;
 
-static void cache_flush_pages(void *arg)
-{
-    struct rrdengine_instance *ctx = arg;
-    struct rrdengine_worker_config *wc = &ctx->worker_config;
-
-    if (main_cache)
-        pgc_flush_pages(main_cache, 0);
-
-    if (open_cache)
-        pgc_flush_pages(open_cache, 0);
-
-    wc->cleanup_thread_flush_pages = 1;
-    /* wake up event loop */
-    fatal_assert(0 == uv_async_send(&wc->async));
+    work_request = callocz(1, sizeof(*work_request));
+    work_request->req.data = work_request;
+    work_request->wc = wc;
+    wc->running_cache_flush_evictions = 1;
+    if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_flush_and_evict, after_do_cache_flush_and_evict))) {
+        freez(work_request);
+        wc->running_cache_flush_evictions = 0;
+    }
 }
 
 void rrdeng_test_quota(struct rrdengine_worker_config* wc)
@@ -865,13 +865,13 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
         if (NULL == ctx->datafiles.first->next) {
             error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
-                 " to reclaim space, there are no other file pairs left.",
-                 ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+                                                                                                                 " to reclaim space, there are no other file pairs left.",
+                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
         if(!datafile_acquire_for_deletion(ctx->datafiles.first, false)) {
             error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
-                  " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
+                                                                                                                 " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
@@ -891,7 +891,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 {
-    if (wc->now_deleting_files || wc->now_flushing_pages || wc->now_evicting_pages)
+    if (wc->now_deleting_files)
         return 1;
 
     return 0;
@@ -903,14 +903,6 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 
     if (unlikely(wc->cleanup_thread_deleting_files)) {
         after_delete_old_data(wc);
-    }
-
-    if (unlikely(wc->cleanup_thread_evict_pages)) {
-        after_cache_evict_pages(wc);
-    }
-
-    if (unlikely(wc->cleanup_thread_flush_pages)) {
-        after_cache_flush_pages(wc);
     }
 
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
@@ -1013,27 +1005,7 @@ void timer_cb(uv_timer_t* handle)
         queue_journalfile_v2_migration(wc);
     }
 
-    if (!wc->now_evicting_pages) {
-        wc->now_evicting_pages = mallocz(sizeof(*wc->now_deleting_files));
-        wc->cleanup_thread_evict_pages = 0;
-        int error = uv_thread_create(wc->now_evicting_pages, cache_evict_pages, wc->ctx);
-        if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_evicting_pages);
-            wc->now_evicting_pages = NULL;
-        }
-    }
-
-    if (!wc->now_flushing_pages) {
-        wc->now_flushing_pages = mallocz(sizeof(*wc->now_deleting_files));
-        wc->cleanup_thread_flush_pages = 0;
-        int error = uv_thread_create(wc->now_flushing_pages, cache_flush_pages, wc->ctx);
-        if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_flushing_pages);
-            wc->now_flushing_pages = NULL;
-        }
-    }
+    cache_flush_and_evict(wc);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     {
@@ -1163,8 +1135,8 @@ static void do_read_extent_work(uv_work_t *req)
         // Need to decompress and then process the pagelist
         void *extent_data = data + (extent_page_list->pos - map_start);
         bool extent_used = extent_uncompress_and_populate_pages(
-                wc, extent_data, extent_page_list->size,
-                extent_page_list, pdc->preload_all_extent_pages);
+            wc, extent_data, extent_page_list->size,
+            extent_page_list, pdc->preload_all_extent_pages);
 
         if(extent_used)
             // since the extent was used, all the pages that are not
@@ -1181,10 +1153,10 @@ static void do_read_extent_work(uv_work_t *req)
 
     // mark all pending pages as failed
     pdc_mark_all_not_loaded_pages_as_failed(
-            extent_page_list->JudyL_page_list, not_loaded_pages_reason,
-            &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+        extent_page_list->JudyL_page_list, not_loaded_pages_reason,
+        &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
-cleanup:
+    cleanup:
     if(extent_exclusive)
         datafile_release_exclusive_access_to_extent(extent_page_list);
 
@@ -1405,15 +1377,13 @@ void rrdeng_worker(void* arg)
     wc->async.data = wc;
 
     wc->now_deleting_files = NULL;
-    wc->now_evicting_pages = NULL;
-    wc->now_flushing_pages = NULL;
     wc->cleanup_thread_deleting_files = 0;
     wc->running_journal_migration = 0;
+    wc->running_cache_flush_evictions = 0;
     wc->run_indexing = false;
+    wc->cache_flush_can_run = true;
 
     wc->cleanup_thread_deleting_files = 0;
-    wc->cleanup_thread_evict_pages = 0;
-    wc->cleanup_thread_flush_pages = 0;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
@@ -1476,6 +1446,7 @@ void rrdeng_worker(void* arg)
                 do_commit_transaction(wc, STORE_DATA, NULL);
                 break;
             case RRDENG_FLUSH_PAGES: {
+                wc->cache_flush_can_run = false;
                 (void)do_flush_extent(wc, cmd.data, cmd.completion);
                 break;
             }
@@ -1520,11 +1491,11 @@ void rrdeng_worker(void* arg)
     worker_unregister();
     return;
 
-error_after_timer_init:
+    error_after_timer_init:
     uv_close((uv_handle_t *)&wc->async, NULL);
-error_after_async_init:
+    error_after_async_init:
     fatal_assert(0 == uv_loop_close(loop));
-error_after_loop_init:
+    error_after_loop_init:
     freez(loop);
 
     wc->error = UV_EAGAIN;

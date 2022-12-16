@@ -22,4 +22,9 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
     worker_register_job_name(UV_EVENT_EXTENT_MMAP, "extent mmap");
     worker_register_job_name(UV_EVENT_PAGE_DISPATCH, "dispatch page list");
+    worker_register_job_name(UV_EVENT_FLUSH_CALLBACK, "flush callback");
+    worker_register_job_name(UV_EVENT_FLUSH_MAIN, "flush main");
+    worker_register_job_name(UV_EVENT_FLUSH_OPEN, "flush open");
+    worker_register_job_name(UV_EVENT_EVICT_MAIN, "evict open");
+    worker_register_job_name(UV_EVENT_EVICT_OPEN, "evict main");
 }
