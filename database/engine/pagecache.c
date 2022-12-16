@@ -15,11 +15,8 @@ static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY en
     freez(entry.data);
 }
 
-static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE *pages_array __maybe_unused, size_t entries __maybe_unused)
+static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
-//     struct completion queue_flush_command;
-//     completion_init(&queue_flush_command);
-
      Pvoid_t JudyL_flush = NULL;
      Pvoid_t *PValue;
 
@@ -31,14 +28,14 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entrie
         time_t end_time_t = entries_array[Index].end_time_t;
         struct rrdeng_page_descr *descr = callocz(1, sizeof(*descr));
 
-        uuid_copy(descr->uuid, *(mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id)));
+        descr->id = mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id);
         descr->metric_id = entries_array[Index].metric_id;
         descr->start_time_ut = start_time_t * USEC_PER_SEC;
         descr->end_time_ut = end_time_t * USEC_PER_SEC;
         descr->update_every_s = entries_array[Index].update_every;
         descr->type = ctx->page_type;
         descr->page_length = (end_time_t - start_time_t + 1) / descr->update_every_s * bytes_per_point;
-        descr->page = entries_array[Index].data;
+        descr->page = pgc_page_dup(main_cache, pages_array[Index]);
         PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
         fatal_assert( NULL != PValue);
         *PValue = descr;
@@ -49,11 +46,8 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entrie
      struct rrdeng_cmd cmd;
      cmd.opcode = RRDENG_FLUSH_PAGES;
      cmd.data = JudyL_flush;
-     cmd.completion = NULL; //&queue_flush_command;
+     cmd.completion = NULL;
      rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-
-     //completion_wait_for(&queue_flush_command);
-     //completion_destroy(&queue_flush_command);
 }
 
 static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
@@ -64,7 +58,7 @@ static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY 
      ;
 }
 
-static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE *pages_array __maybe_unused, size_t entries __maybe_unused)
+static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      info("Datafile flushing %zu pages", entries);
 }

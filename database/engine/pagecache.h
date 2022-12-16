@@ -25,11 +25,10 @@ struct rrdeng_page_descr {
     Word_t metric_id;
     usec_t start_time_ut;
     usec_t end_time_ut;
-    uint32_t update_every_s:24;
     uint8_t type;
+    uint32_t update_every_s:24;
     uint32_t page_length;
     void *page;                 // Metrics are stored here
-    uuid_t uuid;                // FIXME: Copy of uuid for extent flush
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)

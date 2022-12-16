@@ -1381,7 +1381,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         // call the callback to save them
         // it may take some time, so let's release the lock
-        cache->config.pgc_save_dirty_cb(cache, array, *pages, added);
+        cache->config.pgc_save_dirty_cb(cache, array, pages, added);
         flushes_so_far++;
 
         pgc_ll_lock(cache, &cache->clean);

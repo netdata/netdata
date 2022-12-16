@@ -522,7 +522,6 @@ static void do_flush_extent_cb(uv_fs_t *req)
 
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        descr->id = &descr->uuid;   // FIXME:
 
         struct extent_io_data ext_io_data = {
             .fileno = datafile->fileno,
@@ -552,7 +551,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
         }
         fatal_assert(true == added);
         pgc_page_release(open_cache, (PGC_PAGE *)page);
-
+        pgc_page_release(main_cache, (PGC_PAGE *) descr->page);
         freez(descr);
     }
 
@@ -644,7 +643,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
 
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
-        uuid_copy(*(uuid_t *)header->descr[i].uuid, descr->uuid);
+        uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
         header->descr[i].page_length = descr->page_length;
         header->descr[i].start_time_ut = descr->start_time_ut;
         header->descr[i].end_time_ut = descr->end_time_ut;
@@ -652,7 +651,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     }
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
+        (void) memcpy(xt_io_descr->buf + pos, pgc_page_data(descr->page), descr->page_length);
         pos += descr->page_length;
     }
 

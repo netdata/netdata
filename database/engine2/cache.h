@@ -98,7 +98,7 @@ struct pgc_statistics {
 
 
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
-typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE *pages_array, size_t entries);
+typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);
 
 // create a cache
 PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_clean_cb,
