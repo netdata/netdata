@@ -66,6 +66,7 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
     debug(D_ANALYTICS, "NETDATA_HEALTH_ENABLED             : [%s]", analytics_data.netdata_health_enabled);
     debug(D_ANALYTICS, "NETDATA_HEALTH_CONF_ALARMS_DISABLED: [%s]", analytics_data.netdata_health_conf_alarms_disabled);
+    debug(D_ANALYTICS, "NETDATA_HEALTH_ALARMS_SILENCED     : [%s]", analytics_data.netdata_health_alarms_silenced);
 }
 
 /*
@@ -115,6 +116,7 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_health_enabled);
     freez(analytics_data.netdata_health_conf_alarms_disabled);
     buffer_free(netdata_health_conf_alarms_disabled_b);
+    freez(analytics_data.netdata_health_alarms_silenced);
 }
 
 /*
@@ -223,6 +225,28 @@ void analytics_log_conf_disabled_alarm(char *name) {
         snprintfz(stored_name, 100, "%s|", name);
         buffer_strcat(netdata_health_conf_alarms_disabled_b, stored_name);
     }
+}
+
+void analytics_health_silenced(void) {
+    RRDCALC *rc;
+    BUFFER *bi = buffer_create(FILENAME_MAX);
+
+    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
+        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            continue;
+
+        if (unlikely(!rrdset_is_available_for_exporting_and_alarms(rc->rrdset)))
+            continue;
+
+        if (rc->run_flags & RRDCALC_FLAG_SILENCED || !strcmp( (rc->recipient?rrdcalc_recipient(rc):string2str(localhost->health_default_recipient)), "silent")) {
+            buffer_strcat(bi, "|");
+            buffer_strcat(bi, rrdcalc_name(rc));
+        }
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    analytics_set_data_str(&analytics_data.netdata_health_alarms_silenced, (char *)buffer_tostring(bi));
+    buffer_free(bi);
 }
 
 void analytics_mirrored_hosts(void)
@@ -535,6 +559,7 @@ void analytics_gather_immutable_meta_data(void)
     analytics_misc();
     analytics_exporters();
     analytics_https();
+    analytics_health_silenced();
 }
 
 /*
@@ -914,6 +939,7 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_health_conf_alarms_disabled, "null");
     netdata_health_conf_alarms_disabled_b = buffer_create(FILENAME_MAX);
     buffer_strcat(netdata_health_conf_alarms_disabled_b, "|");
+    analytics_set_data(&analytics_data.netdata_health_alarms_silenced, "null");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -993,7 +1019,7 @@ void send_statistics(const char *action, const char *action_result, const char *
 
     sprintf(
         command_to_run,
-        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s'",
+        "%s '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s' '%s'",
         as_script,
         action,
         action_result,
@@ -1038,7 +1064,8 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_oom_score,
         analytics_data.netdata_prebuilt_distro,
         analytics_data.netdata_health_enabled,
-        analytics_data.netdata_health_conf_alarms_disabled);
+        analytics_data.netdata_health_conf_alarms_disabled,
+        analytics_data.netdata_health_alarms_silenced);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
