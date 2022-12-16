@@ -711,7 +711,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             rpt->timezone = strdupz(value);
 
         else if(!strcmp(name, "abbrev_timezone") && !rpt->abbrev_timezone)
-            rpt->abbrev_timezone = value;
+            rpt->abbrev_timezone = strdupz(value);
 
         else if(!strcmp(name, "utc_offset"))
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);

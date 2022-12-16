@@ -47,33 +47,6 @@ void receiver_state_free(struct receiver_state *rpt) {
     freez(rpt);
 }
 
-static void rrdpush_receiver_thread_cleanup(void *ptr) {
-    worker_unregister();
-
-    static __thread int executed = 0;
-    if(!executed) {
-        executed = 1;
-        struct receiver_state *rpt = (struct receiver_state *) ptr;
-        // If the shutdown sequence has started, and this receiver is still attached to the host then we cannot touch
-        // the host pointer as it is unpredictable when the RRDHOST is deleted. Do the cleanup from rrdhost_free().
-        if (netdata_exit && rpt->host) {
-            rpt->exited = 1;
-            return;
-        }
-
-        // Make sure that we detach this thread and don't kill a freshly arriving receiver
-        if (!netdata_exit && rpt->host) {
-            netdata_mutex_lock(&rpt->host->receiver_lock);
-            if (rpt->host->receiver == rpt)
-                rpt->host->receiver = NULL;
-            netdata_mutex_unlock(&rpt->host->receiver_lock);
-        }
-
-        info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-        receiver_state_free(rpt);
-    }
-}
-
 #include "collectors/plugins.d/pluginsd_parser.h"
 
 PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
@@ -845,18 +818,41 @@ static int rrdpush_receive(struct receiver_state *rpt)
     return (int)count;
 }
 
+static void rrdpush_receiver_thread_cleanup(void *ptr) {
+    netdata_thread_disable_cancelability();
+    struct receiver_state *rpt = (struct receiver_state *) ptr;
+    worker_unregister();
+
+    // Make sure that we detach this thread and don't kill a freshly arriving receiver
+    if(rpt->host) {
+        netdata_mutex_lock(&rpt->host->receiver_lock);
+        if (rpt->host->receiver == rpt)
+            rpt->host->receiver = NULL;
+        netdata_mutex_unlock(&rpt->host->receiver_lock);
+    }
+
+    info("STREAM '%s' [receive from [%s]:%s]: "
+         "receive thread ended (task id %d)"
+    , rpt->hostname
+    , rpt->client_ip, rpt->client_port
+    , gettid());
+
+    receiver_state_free(rpt);
+    netdata_thread_enable_cancelability();
+}
+
 void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_push(rrdpush_receiver_thread_cleanup, ptr);
-
-    struct receiver_state *rpt = (struct receiver_state *)ptr;
-    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
 
     worker_register("STREAMRCV");
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_READ, "received bytes", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, "uncompressed bytes", "bytes/s", WORKER_METRIC_INCREMENT);
     worker_register_job_custom_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, "replication completion", "%", WORKER_METRIC_ABSOLUTE);
+
+    struct receiver_state *rpt = (struct receiver_state *)ptr;
+    info("STREAM %s [%s]:%s: receive thread created (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
+
     rrdpush_receive(rpt);
-    worker_unregister();
 
     netdata_thread_cleanup_pop(1);
     return NULL;
