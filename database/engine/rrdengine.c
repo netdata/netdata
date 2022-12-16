@@ -545,6 +545,8 @@ static void do_flush_extent_cb(uv_fs_t *req)
         }
         fatal_assert(true == added);
         pgc_page_release(open_cache, (PGC_PAGE *)page);
+
+        freez(descr);
     }
 
     uv_fs_req_cleanup(req);
