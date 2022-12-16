@@ -11,7 +11,7 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_READ_EXTENT_CB, "read extent cb");
     worker_register_job_name(UV_EVENT_COMMIT_PAGE_CB, "commit cb");
     worker_register_job_name(UV_EVENT_FLUSH_PAGES_CB, "flush cb");
-    worker_register_job_name(UV_EVENT_PAGE_POPULATION, "populate cache");
+    worker_register_job_name(UV_EVENT_PAGE_POPULATION, "populate page");
     worker_register_job_name(UV_EVENT_EXT_DECOMPRESSION, "extent decompression");
     worker_register_job_name(UV_EVENT_READ_MMAP_EXTENT, "read extent (mmap)");
     worker_register_job_name(UV_EVENT_EXTENT_PROCESSING, "extent processing");
@@ -20,5 +20,6 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_JOURNAL_INDEX, "journal v2 indexing");
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
+    worker_register_job_name(UV_EVENT_EXTENT_MMAP, "extent mmap");
     worker_register_job_name(UV_EVENT_PAGE_DISPATCH, "dispatch page list");
 }

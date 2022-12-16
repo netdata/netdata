@@ -315,7 +315,7 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                     extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno);
     }
 
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);// SPDX-License-Identifier: GPL-3.0-or-later
+    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
@@ -330,7 +330,6 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
     }
 
-    worker_is_busy(UV_EVENT_PAGE_POPULATION);
     time_t now_s = now_realtime_sec();
 
     uint32_t page_offset = 0, page_length;
@@ -363,6 +362,7 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                 (pd) ? pd->update_every_s : 0,
                 have_read_error);
 
+        worker_is_busy(UV_EVENT_PAGE_POPULATION);
         Word_t metric_id;
         if(pd) {
             metric_id = pd->metric_id;
@@ -1319,94 +1319,9 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
-
     struct page_details_control *pdc = work_request->data;
-    Pvoid_t *PValue;
-    Pvoid_t *PValue1;
-    Pvoid_t *PValue2;
-    Pvoid_t *PValue3;
-    Word_t time_index = 0;
-    struct page_details *pd = NULL;
 
-    // this is the entire page list
-    // Lets do some deduplication
-    // 1. Per datafile
-    // 2. Per extent
-    // 3. Pages per extent will be added to the cache either as acquired or not
-
-    Pvoid_t JudyL_datafile_list = NULL;
-
-    struct datafile_extent_list_s *datafile_extent_list;
-    struct extent_page_list_s *extent_page_list;
-
-    if (pdc->page_list_JudyL) {
-        bool first_then_next = true;
-        while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
-            pd = *PValue;
-
-            if (!pd || pd->page)
-                continue;
-
-            PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
-            if (PValue1 && !*PValue1) {
-                *PValue1 = datafile_extent_list = mallocz(sizeof(*datafile_extent_list));
-                datafile_extent_list->JudyL_datafile_extent_list = NULL;
-                datafile_extent_list->fileno = pd->datafile.fileno;
-            }
-            else
-                datafile_extent_list = *PValue1;
-
-            PValue2 = JudyLIns(&datafile_extent_list->JudyL_datafile_extent_list, pd->datafile.extent.pos, PJE0);
-            if (PValue2 && !*PValue2) {
-                *PValue2 = extent_page_list = mallocz( sizeof(*extent_page_list));
-                extent_page_list->JudyL_page_list = NULL;
-                extent_page_list->count = 0;
-                extent_page_list->file = pd->datafile.file;
-                extent_page_list->pos = pd->datafile.extent.pos;
-                extent_page_list->size = pd->datafile.extent.bytes;
-                extent_page_list->datafile = pd->datafile.ptr;
-            }
-            else
-                extent_page_list = *PValue2;
-
-            extent_page_list->count++;
-
-            PValue3 = JudyLIns(&extent_page_list->JudyL_page_list, pd->first_time_s, PJE0);
-            *PValue3 = pd;
-        }
-
-        Word_t datafile_no = 0;
-        first_then_next = true;
-        while((PValue = JudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
-            datafile_extent_list = *PValue;
-
-            bool first_then_next_extent = true;
-            Word_t pos = 0;
-            int count = 0;
-            while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next_extent))) {
-                extent_page_list = *PValue;
-                internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
-
-                // The extent page list can be dispatched to a worker
-                // It will need to populate the cache with "acquired" pages that are in the list (pd) only
-                // the rest of the extent pages will be added to the cache butnot acquired
-
-                struct rrdeng_cmd cmd;
-                cmd.opcode = RRDENG_READ_EXTENT;
-                pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
-                extent_page_list->pdc = pdc;
-                cmd.data = extent_page_list;
-                rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-                count++;
-                if (count % 3 == 0)
-                    sleep_usec(1000);
-            }
-            freez(datafile_extent_list);
-        }
-        JudyLFreeArray(&JudyL_datafile_list, PJE0);
-    }
-
-    pdc_release_and_destroy_if_unreferenced(pdc, true, true);
+    queue_extent_commands(ctx, pdc);
     worker_is_idle();
 }
 
