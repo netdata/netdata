@@ -315,8 +315,6 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                     extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno);
     }
 
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
-
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
         for (i = 0; i < count; ++i)
@@ -1145,7 +1143,7 @@ static void do_read_extent_work(uv_work_t *req)
             goto cleanup;
     }
 
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+    worker_is_busy(UV_EVENT_EXTENT_MMAP);
 
     off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->pos);
     size_t length = ALIGN_BYTES_CEILING(extent_page_list->pos + extent_page_list->size) - map_start;
