@@ -1295,6 +1295,7 @@ static void do_read_page_list_work(uv_work_t *req)
 
             bool first_then_next_extent = true;
             Word_t pos = 0;
+            int count = 0;
             while ((PValue = JudyLFirstThenNext(datafile_extent_list->JudyL_datafile_extent_list, &pos, &first_then_next_extent))) {
                 extent_page_list = *PValue;
                 internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
@@ -1309,6 +1310,9 @@ static void do_read_page_list_work(uv_work_t *req)
                 extent_page_list->pdc = pdc;
                 cmd.data = extent_page_list;
                 rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+                count++;
+                if (count % 3 == 0)
+                    sleep_usec(1000);
             }
             freez(datafile_extent_list);
         }
