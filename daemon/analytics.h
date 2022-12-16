@@ -61,7 +61,7 @@ struct analytics_data {
     char *netdata_config_oom_score;
     char *netdata_prebuilt_distro;
     char *netdata_health_enabled;
-    char *netdata_health_conf_alarms_enabled;
+    char *netdata_health_conf_alarms_disabled;
 
     size_t data_length;
 
@@ -83,6 +83,7 @@ void analytics_log_dashboard(void);
 void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
+void analytics_log_conf_disabled_alarm(char *name);
 
 extern struct analytics_data analytics_data;
 

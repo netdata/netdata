@@ -8,6 +8,7 @@ extern void analytics_exporting_connectors (BUFFER *b);
 extern void analytics_exporting_connectors_ssl (BUFFER *b);
 extern void analytics_build_info (BUFFER *b);
 extern int aclk_connected;
+BUFFER *netdata_health_conf_alarms_disabled_b;
 
 struct collector {
     const char *plugin;
@@ -64,7 +65,7 @@ void analytics_log_data(void)
     debug(D_ANALYTICS, "NETDATA_CONFIG_USE_PRIVATE_REGISTRY: [%s]", analytics_data.netdata_config_use_private_registry);
     debug(D_ANALYTICS, "NETDATA_CONFIG_OOM_SCORE           : [%s]", analytics_data.netdata_config_oom_score);
     debug(D_ANALYTICS, "NETDATA_HEALTH_ENABLED             : [%s]", analytics_data.netdata_health_enabled);
-    debug(D_ANALYTICS, "NETDATA_HEALTH_CONF_ALARMS_ENABLED : [%s]", analytics_data.netdata_health_conf_alarms_enabled);
+    debug(D_ANALYTICS, "NETDATA_HEALTH_CONF_ALARMS_DISABLED: [%s]", analytics_data.netdata_health_conf_alarms_disabled);
 }
 
 /*
@@ -112,7 +113,8 @@ void analytics_free_data(void)
     freez(analytics_data.netdata_config_oom_score);
     freez(analytics_data.netdata_prebuilt_distro);
     freez(analytics_data.netdata_health_enabled);
-    freez(analytics_data.netdata_health_conf_alarms_enabled);
+    freez(analytics_data.netdata_health_conf_alarms_disabled);
+    buffer_free(netdata_health_conf_alarms_disabled_b);
 }
 
 /*
@@ -211,6 +213,16 @@ void analytics_report_oom_score(long long int score){
     char b[7];
     snprintfz(b, 6, "%d", (int)score);
     analytics_set_data(&analytics_data.netdata_config_oom_score, b);
+}
+
+void analytics_log_conf_disabled_alarm(char *name) {
+    char stored_name[100 + 1];
+    snprintfz(stored_name, 100, "|%s|", name);
+
+    if (!strstr(buffer_tostring(netdata_health_conf_alarms_disabled_b), stored_name)) {
+        snprintfz(stored_name, 100, "%s|", name);
+        buffer_strcat(netdata_health_conf_alarms_disabled_b, stored_name);
+    }
 }
 
 void analytics_mirrored_hosts(void)
@@ -498,7 +510,7 @@ void analytics_misc(void)
         analytics_set_data(&analytics_data.netdata_config_is_private_registry, "true");
 
     analytics_set_data(&analytics_data.netdata_health_enabled, default_health_enabled ? "true" : "false");
-    analytics_set_data_str(&analytics_data.netdata_health_conf_alarms_enabled, config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"));
+    analytics_set_data_str(&analytics_data.netdata_health_conf_alarms_disabled, (char *)buffer_tostring(netdata_health_conf_alarms_disabled_b));
 }
 
 void analytics_aclk(void)
@@ -899,7 +911,9 @@ void set_global_environment()
     analytics_set_data(&analytics_data.netdata_config_oom_score, "null");
     analytics_set_data(&analytics_data.netdata_prebuilt_distro, "null");
     analytics_set_data(&analytics_data.netdata_health_enabled, "null");
-    analytics_set_data(&analytics_data.netdata_health_conf_alarms_enabled, "null");
+    analytics_set_data(&analytics_data.netdata_health_conf_alarms_disabled, "null");
+    netdata_health_conf_alarms_disabled_b = buffer_create(FILENAME_MAX);
+    buffer_strcat(netdata_health_conf_alarms_disabled_b, "|");
 
     analytics_data.prometheus_hits = 0;
     analytics_data.shell_hits = 0;
@@ -1024,7 +1038,7 @@ void send_statistics(const char *action, const char *action_result, const char *
         analytics_data.netdata_config_oom_score,
         analytics_data.netdata_prebuilt_distro,
         analytics_data.netdata_health_enabled,
-        analytics_data.netdata_health_conf_alarms_enabled);
+        analytics_data.netdata_health_conf_alarms_disabled);
 
     info("%s '%s' '%s' '%s'", as_script, action, action_result, action_data);
 
