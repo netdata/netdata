@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Disable integration by default \(eBPF \<-\> APPS\) [\#14147](https://github.com/netdata/netdata/pull/14147) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "MQTT 5 publish topic alias support" [\#14145](https://github.com/netdata/netdata/pull/14145) ([MrZammler](https://github.com/MrZammler))
 - fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
 - use chart labels in portcheck alarms [\#14137](https://github.com/netdata/netdata/pull/14137) ([ilyam8](https://github.com/ilyam8))
@@ -358,9 +359,6 @@
 - docs: add deprecation notice to python.d/postgres readme [\#13497](https://github.com/netdata/netdata/pull/13497) ([ilyam8](https://github.com/ilyam8))
 - docs: change postgres links to go version [\#13496](https://github.com/netdata/netdata/pull/13496) ([ilyam8](https://github.com/ilyam8))
 - bump go.d version to v0.35.0 [\#13494](https://github.com/netdata/netdata/pull/13494) ([ilyam8](https://github.com/ilyam8))
-- add PgBouncer charts description and icon to dashboard info [\#13493](https://github.com/netdata/netdata/pull/13493) ([ilyam8](https://github.com/ilyam8))
-- Add chart\_context to alert snapshots [\#13492](https://github.com/netdata/netdata/pull/13492) ([MrZammler](https://github.com/MrZammler))
-- Remove prompt to add dashboard issues [\#13490](https://github.com/netdata/netdata/pull/13490) ([cakrit](https://github.com/cakrit))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
