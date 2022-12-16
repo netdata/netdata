@@ -68,6 +68,8 @@ NETDATA_IS_PRIVATE_REGISTRY="${39}"
 NETDATA_USE_PRIVATE_REGISTRY="${40}"
 NETDATA_CONFIG_OOM_SCORE="${41}"
 NETDATA_PREBUILT_DISTRO="${42}"
+NETDATA_HEALTH_ENABLED="${43}"
+NETDATA_HEALTH_CONF_ALARMS_ENABLED="${44}"
 
 
 # define body of request to be sent
@@ -157,7 +159,9 @@ REQ_BODY="$(cat << EOF
         "mirrored_host_count": ${NETDATA_MIRRORED_HOST_COUNT},
         "mirrored_hosts_reachable": ${NETDATA_MIRRORED_HOSTS_REACHABLE},
         "mirrored_hosts_unreachable": ${NETDATA_MIRRORED_HOSTS_UNREACHABLE},
-        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS}
+        "exporting_connectors": ${NETDATA_EXPORTING_CONNECTORS},
+        "health_enabled": ${NETDATA_HEALTH_ENABLED},
+        "health_conf_alarms_enabled": ${NETDATA_HEALTH_CONF_ALARMS_ENABLED}
   }
 }
 EOF
