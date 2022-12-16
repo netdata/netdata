@@ -167,8 +167,10 @@ struct rrdeng_cache_efficiency_stats {
     size_t time_in_pass4_lookup;
 
     size_t time_to_route;
-    size_t time_to_slow_next_page;
-    size_t time_to_fast_next_page;
+    size_t time_to_slow_disk_next_page;
+    size_t time_to_fast_disk_next_page;
+    size_t time_to_slow_preload_next_page;
+    size_t time_to_fast_preload_next_page;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

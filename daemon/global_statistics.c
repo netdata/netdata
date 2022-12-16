@@ -1365,8 +1365,10 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_journal_v2 = NULL;
         static RRDDIM *rd_pass4 = NULL;
         static RRDDIM *rd_routing = NULL;
-        static RRDDIM *rd_next_page_fast = NULL;
-        static RRDDIM *rd_next_page_slow = NULL;
+        static RRDDIM *rd_next_page_disk_fast = NULL;
+        static RRDDIM *rd_next_page_disk_slow = NULL;
+        static RRDDIM *rd_next_page_preload_fast = NULL;
+        static RRDDIM *rd_next_page_preload_slow = NULL;
 
         if (unlikely(!st_query_timings)) {
             st_query_timings = rrdset_create_localhost(
@@ -1388,8 +1390,10 @@ static void dbengine2_statistics_charts(void) {
             rd_journal_v2 = rrddim_add(st_query_timings, "journal v2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pass4 = rrddim_add(st_query_timings, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_routing = rrddim_add(st_query_timings, "routing", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_next_page_fast = rrddim_add(st_query_timings, "next page fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_next_page_slow = rrddim_add(st_query_timings, "next page slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_next_page_disk_fast = rrddim_add(st_query_timings, "next page disk fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_next_page_disk_slow = rrddim_add(st_query_timings, "next page disk slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_next_page_preload_fast = rrddim_add(st_query_timings, "next page preload fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_next_page_preload_slow = rrddim_add(st_query_timings, "next page preload slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
 
         rrddim_set_by_pointer(st_query_timings, rd_main_cache, (collected_number)cache_efficiency_stats.time_in_main_cache_lookup);
@@ -1397,8 +1401,10 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_timings, rd_journal_v2, (collected_number)cache_efficiency_stats.time_in_journal_v2_lookup);
         rrddim_set_by_pointer(st_query_timings, rd_pass4, (collected_number)cache_efficiency_stats.time_in_pass4_lookup);
         rrddim_set_by_pointer(st_query_timings, rd_routing, (collected_number)cache_efficiency_stats.time_to_route);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_fast, (collected_number)cache_efficiency_stats.time_to_fast_next_page);
-        rrddim_set_by_pointer(st_query_timings, rd_next_page_slow, (collected_number)cache_efficiency_stats.time_to_slow_next_page);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_fast, (collected_number)cache_efficiency_stats.time_to_fast_disk_next_page);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_disk_slow, (collected_number)cache_efficiency_stats.time_to_slow_disk_next_page);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_fast, (collected_number)cache_efficiency_stats.time_to_fast_preload_next_page);
+        rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_slow, (collected_number)cache_efficiency_stats.time_to_slow_preload_next_page);
 
         rrdset_done(st_query_timings);
         priority++;

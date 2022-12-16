@@ -571,10 +571,18 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
             *next_page_start_time_s = (time_t)Index;
     }
 
-    if(waited)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_slow_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
-    else
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_fast_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+    if(waited) {
+        if(pd->status & PDC_PAGE_PRELOADED)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_slow_preload_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_slow_disk_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+    }
+    else {
+        if(pd->status & PDC_PAGE_PRELOADED)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_fast_preload_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+        else
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_fast_disk_next_page, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+    }
 
     return page;
 }
