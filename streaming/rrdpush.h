@@ -22,6 +22,9 @@
 
 typedef enum {
     // do not use the first 3 bits
+    // they used to be versions 1, 2 and 3
+    // before we introduce capabilities
+
     STREAM_CAP_V1               = (1 << 3), // v1 = the oldest protocol
     STREAM_CAP_V2               = (1 << 4), // v2 = the second version of the protocol (with host labels)
     STREAM_CAP_VN               = (1 << 5), // version negotiation supported (for versions 3, 4, 5 of the protocol)
@@ -37,6 +40,7 @@ typedef enum {
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
 
+    STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
@@ -299,6 +303,8 @@ void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+
+void receiver_state_free(struct receiver_state *rpt);
 
 #include "replication.h"
 

@@ -809,7 +809,7 @@ RRDSET *rrdset_create_custom(
         , long history_entries
 ) {
     if (host != localhost)
-        host->senders_last_chart_command = now_realtime_sec();
+        host->child_last_chart_command = now_realtime_sec();
 
     if(!type || !type[0])
         fatal("Cannot create rrd stats without a type: id '%s', name '%s', family '%s', context '%s', title '%s', units '%s', plugin '%s', module '%s'."

@@ -16,7 +16,8 @@
 
 extern struct config stream_config;
 
-void destroy_receiver_state(struct receiver_state *rpt) {
+void receiver_state_free(struct receiver_state *rpt) {
+
     freez(rpt->key);
     freez(rpt->hostname);
     freez(rpt->registry_hostname);
@@ -29,15 +30,20 @@ void destroy_receiver_state(struct receiver_state *rpt) {
     freez(rpt->client_port);
     freez(rpt->program_name);
     freez(rpt->program_version);
+
 #ifdef ENABLE_HTTPS
-    if(rpt->ssl.conn){
+    if(rpt->ssl.conn)
         SSL_free(rpt->ssl.conn);
-    }
 #endif
+
 #ifdef ENABLE_COMPRESSION
     if (rpt->decompressor)
         rpt->decompressor->destroy(&rpt->decompressor);
 #endif
+
+    if(rpt->system_info)
+        rrdhost_system_info_free(rpt->system_info);
+
     freez(rpt);
 }
 
@@ -64,7 +70,7 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
         }
 
         info("STREAM %s [receive from [%s]:%s]: receive thread ended (task id %d)", rpt->hostname, rpt->client_ip, rpt->client_port, gettid());
-        destroy_receiver_state(rpt);
+        receiver_state_free(rpt);
     }
 }
 
@@ -466,7 +472,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
     mode = rrd_memory_mode_id(appconfig_get(&stream_config, rpt->machine_guid, "memory mode", rrd_memory_mode_name(mode)));
 
     if (unlikely(mode == RRD_MEMORY_MODE_DBENGINE && !dbengine_enabled)) {
-        error("STREAM %s [receive from %s:%s]: dbengine is not enabled, falling back to default.", rpt->hostname, rpt->client_ip, rpt->client_port);
+        error("STREAM '%s' [receive from %s:%s]: "
+              "dbengine is not enabled, falling back to default."
+              , rpt->hostname
+              , rpt->client_ip, rpt->client_port
+              );
+
         mode = default_rrd_memory_mode;
     }
 
@@ -507,107 +518,123 @@ static int rrdpush_receive(struct receiver_state *rpt)
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
-        error("STREAM %s [receive from %s:%s]: denied to receive metrics, machine GUID [%s] is my own. Did you copy the parent/proxy machine GUID to a child, or is this an inter-agent loop?", rpt->hostname, rpt->client_ip, rpt->client_port, rpt->machine_guid);
+
+        log_stream_connection(rpt->client_ip, rpt->client_port,
+                              rpt->key,
+                              rpt->machine_guid,
+                              rpt->hostname,
+                              "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
+
+        error("STREAM '%s' [receive from %s:%s]: "
+              "denied to receive metrics, machine GUID [%s] is my own. "
+              "Did you copy the parent/proxy machine GUID to a child, or is this an inter-agent loop? "
+              "RESPONSE: PERMISSION DENIED."
+              , rpt->hostname
+              , rpt->client_ip, rpt->client_port
+              , rpt->machine_guid
+              );
+
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
+
+        if(send_timeout(
 #ifdef ENABLE_HTTPS
-        if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
-#else
-        if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+                &rpt->ssl,
 #endif
-            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
-            error("STREAM %s [receive from [%s]:%s]: cannot send command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
-            close(rpt->fd);
-            return 0;
+                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+
+            log_stream_connection(rpt->client_ip, rpt->client_port,
+                                  rpt->key,
+                                  rpt->machine_guid,
+                                  rpt->hostname,
+                                  "FAILED - CANNOT REPLY");
+
+            error("STREAM '%s' [receive from [%s]:%s]: cannot send command."
+                  , rpt->hostname
+                  , rpt->client_ip, rpt->client_port
+                  );
         }
+
         close(rpt->fd);
         return 0;
     }
 
-    if (rpt->host==NULL) {
+    rpt->host = rrdhost_find_or_create(
+            rpt->hostname
+            , rpt->registry_hostname
+            , rpt->machine_guid
+            , rpt->os
+            , rpt->timezone
+            , rpt->abbrev_timezone
+            , rpt->utc_offset
+            , rpt->tags
+            , rpt->program_name
+            , rpt->program_version
+            , rpt->update_every
+            , history
+            , mode
+            , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
+            , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+            , rrdpush_destination
+            , rrdpush_api_key
+            , rrdpush_send_charts_matching
+            , rrdpush_enable_replication
+            , rrdpush_seconds_to_replicate
+            , rrdpush_replication_step
+            , rpt->system_info
+            , 0
+    );
 
-        rpt->host = rrdhost_find_or_create(
-                rpt->hostname
-                , rpt->registry_hostname
-                , rpt->machine_guid
-                , rpt->os
-                , rpt->timezone
-                , rpt->abbrev_timezone
-                , rpt->utc_offset
-                , rpt->tags
-                , rpt->program_name
-                , rpt->program_version
-                , rpt->update_every
-                , history
-                , mode
-                , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
-                , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
-                , rrdpush_destination
-                , rrdpush_api_key
-                , rrdpush_send_charts_matching
-                , rrdpush_enable_replication
-                , rrdpush_seconds_to_replicate
-                , rrdpush_replication_step
-                , rpt->system_info
-                , 0
-        );
+    if(!rpt->host) {
 
-        if(!rpt->host) {
-            close(rpt->fd);
-            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "FAILED - CANNOT ACQUIRE HOST");
-            error("STREAM %s [receive from [%s]:%s]: failed to find/create host structure.", rpt->hostname, rpt->client_ip, rpt->client_port);
-            return 1;
-        }
+        log_stream_connection(rpt->client_ip, rpt->client_port,
+                              rpt->key,
+                              rpt->machine_guid,
+                              rpt->hostname,
+                              "FAILED - CANNOT ACQUIRE HOST");
 
-        netdata_mutex_lock(&rpt->host->receiver_lock);
-        if (rpt->host->receiver == NULL)
-            rpt->host->receiver = rpt;
-        else {
-            error("Multiple receivers connected for %s concurrently, cancelling this one...", rpt->machine_guid);
-            netdata_mutex_unlock(&rpt->host->receiver_lock);
-            close(rpt->fd);
-            log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->machine_guid, rpt->hostname, "FAILED - BEATEN TO HOST CREATION");
-            return 1;
-        }
-        netdata_mutex_unlock(&rpt->host->receiver_lock);
+        error("STREAM '%s' [receive from [%s]:%s]: "
+              "failed to find/create host structure. "
+              "RESPONSE: DROPPING CONNECTION."
+              , rpt->hostname
+              , rpt->client_ip, rpt->client_port
+              );
+
+        close(rpt->fd);
+        return 1;
     }
+
+    // system_info has been consumed by the host structure
+    rpt->system_info = NULL;
+
+    netdata_mutex_lock(&rpt->host->receiver_lock);
+    if (!rpt->host->receiver)
+        rpt->host->receiver = rpt;
     else {
-        rrd_wrlock();
-        rrdhost_update(
-            rpt->host,
-            rpt->hostname,
-            rpt->registry_hostname,
-            rpt->machine_guid,
-            rpt->os,
-            rpt->timezone,
-            rpt->abbrev_timezone,
-            rpt->utc_offset,
-            rpt->tags,
-            rpt->program_name,
-            rpt->program_version,
-            rpt->update_every,
-            history,
-            mode,
-            (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO),
-            (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key),
-            rrdpush_destination,
-            rrdpush_api_key,
-            rrdpush_send_charts_matching,
-            rrdpush_enable_replication,
-            rrdpush_seconds_to_replicate,
-            rrdpush_replication_step,
-            rpt->system_info);
-        rrd_unlock();
+        netdata_mutex_unlock(&rpt->host->receiver_lock);
+
+        log_stream_connection(rpt->client_ip, rpt->client_port,
+                              rpt->key,
+                              rpt->machine_guid,
+                              rpt->hostname,
+                              "FAILED - DUPLICATE RECEIVER");
+
+        error("STREAM '%s' [receive from [%s]:%s]: "
+                     "multiple receivers connected for GUID '%s' concurrently. "
+                     "RESPONSE: DROPPING CONNECTION."
+                     , rrdhost_hostname(rpt->host)
+                     , rpt->client_ip, rpt->client_port
+                     , rpt->machine_guid);
+
+        close(rpt->fd);
+        return 1;
     }
+    netdata_mutex_unlock(&rpt->host->receiver_lock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    int ssl = 0;
-#ifdef ENABLE_HTTPS
-    if (rpt->ssl.conn != NULL)
-        ssl = 1;
-#endif
-    info("STREAM %s [receive from [%s]:%s]: client willing to stream metrics for host '%s' with machine_guid '%s': update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
+    info("STREAM '%s' [receive from [%s]:%s]: "
+         "client willing to stream metrics for host '%s' with machine_guid '%s': "
+         "update every = %d, history = %ld, memory mode = %s, health %s,%s tags '%s'"
          , rpt->hostname
          , rpt->client_ip
          , rpt->client_port
@@ -617,7 +644,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
          , rpt->host->rrd_history_entries
          , rrd_memory_mode_name(rpt->host->rrd_memory_mode)
          , (health_enabled == CONFIG_BOOLEAN_NO)?"disabled":((health_enabled == CONFIG_BOOLEAN_YES)?"enabled":"auto")
-         , ssl ? " SSL," : ""
+#ifdef ENABLE_HTTPS
+         , (rpt->ssl.conn != NULL) ? " SSL," : ""
+#else
+         , ""
+#endif
          , rrdhost_tags(rpt->host)
     );
 #endif // NETDATA_INTERNAL_CHECKS
@@ -657,46 +688,59 @@ static int rrdpush_receive(struct receiver_state *rpt)
     else if (stream_has_capability(rpt, STREAM_CAP_VN)) {
         log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s%d", START_STREAMING_PROMPT_VN, stream_capabilities_to_vn(rpt->capabilities));
-    } else if (stream_has_capability(rpt, STREAM_CAP_V2)) {
+    }
+    else if (stream_has_capability(rpt, STREAM_CAP_V2)) {
         log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V2);
-    } else { // stream_has_capability(rpt, STREAM_CAP_V1)
+    }
+    else { // stream_has_capability(rpt, STREAM_CAP_V1)
         log_receiver_capabilities(rpt);
         sprintf(initial_response, "%s", START_STREAMING_PROMPT_V1);
     }
+
     debug(D_STREAM, "Initial response to %s: %s", rpt->client_ip, initial_response);
+    if(send_timeout(
 #ifdef ENABLE_HTTPS
-    if(send_timeout(&rpt->ssl, rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
-#else
-    if(send_timeout(rpt->fd, initial_response, strlen(initial_response), 0, 60) != strlen(initial_response)) {
+            &rpt->ssl,
 #endif
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "FAILED - CANNOT REPLY");
-        error("STREAM %s [receive from [%s]:%s]: cannot send ready command.", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+            rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+
+        log_stream_connection(rpt->client_ip, rpt->client_port,
+                              rpt->key,
+                              rpt->host->machine_guid,
+                              rrdhost_hostname(rpt->host),
+                              "FAILED - CANNOT REPLY");
+
+        error("STREAM '%s' [receive from [%s]:%s]: "
+              "cannot send ready command."
+              , rrdhost_hostname(rpt->host)
+              , rpt->client_ip, rpt->client_port
+              );
+
         close(rpt->fd);
         return 0;
     }
 
     // remove the non-blocking flag from the socket
     if(sock_delnonblock(rpt->fd) < 0)
-        error("STREAM %s [receive from [%s]:%s]: cannot remove the non-blocking flag from socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        error("STREAM '%s' [receive from [%s]:%s]: "
+              "cannot remove the non-blocking flag from socket %d"
+              , rrdhost_hostname(rpt->host)
+              , rpt->client_ip, rpt->client_port
+              , rpt->fd);
 
     struct timeval timeout;
     timeout.tv_sec = 600;
     timeout.tv_usec = 0;
     if (unlikely(setsockopt(rpt->fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof timeout) != 0))
-        error("STREAM %s [receive from [%s]:%s]: cannot set timeout for socket %d", rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port, rpt->fd);
+        error("STREAM '%s' [receive from [%s]:%s]: "
+              "cannot set timeout for socket %d"
+              , rrdhost_hostname(rpt->host)
+              , rpt->client_ip, rpt->client_port
+              , rpt->fd);
 
     rrdhost_wrlock(rpt->host);
-/* if(rpt->host->connected_senders > 0) {
-        rrdhost_unlock(rpt->host);
-        log_stream_connection(rpt->client_ip, rpt->client_port, rpt->key, rpt->host->machine_guid, rpt->host->hostname, "REJECTED - ALREADY CONNECTED");
-        info("STREAM %s [receive from [%s]:%s]: multiple streaming connections for the same host detected. Rejecting new connection.", rpt->host->hostname, rpt->client_ip, rpt->client_port);
-        fclose(fp);
-        return 0;
-    }
-*/
 
-//    rpt->host->connected_senders++;
     if(health_enabled != CONFIG_BOOLEAN_NO) {
         if(alarms_delay > 0) {
             rpt->host->health_delay_up_to = now_realtime_sec() + alarms_delay;
@@ -706,18 +750,23 @@ static int rrdpush_receive(struct receiver_state *rpt)
                 (int64_t)alarms_delay);
         }
     }
-    rpt->host->senders_connect_time = now_realtime_sec();
-    rpt->host->senders_last_chart_command = 0;
+    rpt->host->child_connect_time = now_realtime_sec();
+    rpt->host->child_last_chart_command = 0;
     rpt->host->trigger_chart_obsoletion_check = 1;
 
     rrdhost_unlock(rpt->host);
 
-    // call the plugins.d processor to receive the metrics
-    info("STREAM %s [receive from [%s]:%s]: receiving metrics...",
-         rrdhost_hostname(rpt->host), rpt->client_ip, rpt->client_port);
+    info("STREAM '%s' [receive from [%s]:%s]: "
+         "ready to receive data..."
+         , rrdhost_hostname(rpt->host)
+         , rpt->client_ip, rpt->client_port
+         );
 
     log_stream_connection(rpt->client_ip, rpt->client_port,
-                          rpt->key, rpt->host->machine_guid, rrdhost_hostname(rpt->host), "CONNECTED");
+                          rpt->key,
+                          rpt->host->machine_guid,
+                          rrdhost_hostname(rpt->host),
+                          "CONNECTED");
 
     cd.capabilities = rpt->capabilities;
 
@@ -728,7 +777,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 1);
 #endif
 
-    rrdhost_set_is_parent_label(++localhost->senders_count);
+    rrdhost_set_is_parent_label(++localhost->connected_children_count);
 
     rrdpush_receiver_replication_reset(rpt);
     rrdcontext_host_child_connected(rpt->host);
@@ -749,8 +798,11 @@ static int rrdpush_receive(struct receiver_state *rpt)
                           rpt->key, rpt->host->machine_guid, rpt->hostname,
                           "DISCONNECTED");
 
-    error("STREAM %s [receive from [%s]:%s]: disconnected (completed %zu updates).",
-          rpt->hostname, rpt->client_ip, rpt->client_port, count);
+    error("STREAM '%s' [receive from [%s]:%s]: "
+          "disconnected (completed %zu updates)."
+          , rpt->hostname
+          , rpt->client_ip, rpt->client_port
+          , count);
 
     rrdcontext_host_child_disconnected(rpt->host);
     rrdpush_receiver_replication_reset(rpt);
@@ -762,25 +814,28 @@ static int rrdpush_receive(struct receiver_state *rpt)
         aclk_host_state_update(rpt->host, 0);
 #endif
 
-    rrdhost_set_is_parent_label(--localhost->senders_count);
+    rrdhost_set_is_parent_label(--localhost->connected_children_count);
 
     // During a shutdown there is cleanup code in rrdhost that will cancel the sender thread
     if (!netdata_exit && rpt->host) {
         rrd_rdlock();
         rrdhost_wrlock(rpt->host);
         netdata_mutex_lock(&rpt->host->receiver_lock);
+
         if (rpt->host->receiver == rpt) {
-            rpt->host->senders_connect_time = 0;
+            rpt->host->child_connect_time = 0;
             rpt->host->trigger_chart_obsoletion_check = 0;
-            rpt->host->senders_disconnected_time = now_realtime_sec();
+            rpt->host->child_disconnected_time = now_realtime_sec();
             rrdhost_flag_set(rpt->host, RRDHOST_FLAG_ORPHAN);
             if(health_enabled == CONFIG_BOOLEAN_AUTO)
                 rpt->host->health_enabled = 0;
         }
+
         rrdhost_unlock(rpt->host);
-        if (rpt->host->receiver == rpt) {
+
+        if (rpt->host->receiver == rpt)
             rrdpush_sender_thread_stop(rpt->host);
-        }
+
         netdata_mutex_unlock(&rpt->host->receiver_lock);
         rrd_unlock();
     }
@@ -806,4 +861,3 @@ void *rrdpush_receiver_thread(void *ptr) {
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
-

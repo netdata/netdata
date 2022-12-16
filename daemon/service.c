@@ -172,8 +172,8 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
 
         last_entry_t = rrdset_last_entry_t(st);
 
-        if(last_entry_t && last_entry_t < host->senders_connect_time &&
-             host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
+        if(last_entry_t && last_entry_t < host->child_connect_time &&
+           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
              < now)
 
             rrdset_is_obsolete(st);
@@ -200,10 +200,10 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             && host->trigger_chart_obsoletion_check
             && (
                    (
-                    host->senders_last_chart_command
-                 && host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec()
+                    host->child_last_chart_command
+                 && host->child_last_chart_command + host->health_delay_up_to < now_realtime_sec()
                    )
-                || (host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
+                || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
             ) {
             svc_rrdset_check_obsoletion(host);

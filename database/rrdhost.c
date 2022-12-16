@@ -555,9 +555,15 @@ void rrdhost_update(RRDHOST *host
 
     host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
 
-    rrdhost_system_info_free(host->system_info);
-    host->system_info = system_info;
-    metaqueue_host_update_system_info(host);
+    {
+        struct rrdhost_system_info *old = host->system_info;
+
+        host->system_info = system_info;
+        metaqueue_host_update_system_info(host);
+
+        // FIXME - this is error prone! What happens if someone uses system_info while we free it?
+        rrdhost_system_info_free(old);
+    }
 
     rrdhost_init_os(host, os);
     rrdhost_init_timezone(host, timezone, abbrev_timezone, utc_offset);
@@ -666,6 +672,7 @@ RRDHOST *rrdhost_find_or_create(
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
     rrd_wrlock();
+
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
@@ -674,6 +681,7 @@ RRDHOST *rrdhost_find_or_create(
         rrdhost_free(host, 1);
         host = NULL;
     }
+
     if(!host) {
         host = rrdhost_create(
                 hostname
@@ -727,10 +735,11 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_replication_step
            , system_info);
     }
+
     if (host) {
         rrdhost_wrlock(host);
         rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
-        host->senders_disconnected_time = 0;
+        host->child_disconnected_time = 0;
         rrdhost_unlock(host);
     }
 
@@ -746,8 +755,8 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)
        && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
        && !host->receiver
-       && host->senders_disconnected_time
-       && host->senders_disconnected_time + rrdhost_free_orphan_time < now)
+       && host->child_disconnected_time
+       && host->child_disconnected_time + rrdhost_free_orphan_time < now)
         return 1;
 
     return 0;
@@ -1045,7 +1054,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
-void destroy_receiver_state(struct receiver_state *rpt);
+void receiver_state_free(struct receiver_state *rpt);
 
 void stop_streaming_sender(RRDHOST *host)
 {
@@ -1078,7 +1087,7 @@ void stop_streaming_receiver(RRDHOST *host)
             sleep_usec(50 * USEC_PER_MS);
         // If the receiver detached from the host then its thread will destroy the state
         if (host->receiver == rpt)
-            destroy_receiver_state(host->receiver);
+            receiver_state_free(host->receiver);
     } else
         netdata_mutex_unlock(&host->receiver_lock);
 }
@@ -1315,8 +1324,7 @@ static void rrdhost_load_auto_labels(void) {
 
     health_add_host_labels();
 
-    rrdlabels_add(
-        labels, "_is_parent", (localhost->senders_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(labels, "_is_parent", (localhost->connected_children_count > 0) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     if (localhost->rrdpush_send_destination)
         rrdlabels_add(labels, "_streams_to", localhost->rrdpush_send_destination, RRDLABEL_SRC_AUTO);

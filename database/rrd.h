@@ -984,10 +984,10 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver
 
-    time_t senders_connect_time;                    // the time the last sender was connected
-    time_t senders_last_chart_command;              // the time of the last CHART streaming command
-    time_t senders_disconnected_time;               // the time the last sender was disconnected
-    int senders_count;                              // number of senders currently streaming
+    time_t child_connect_time;                      // the time the last sender was connected
+    time_t child_last_chart_command;                // the time of the last CHART streaming command
+    time_t child_disconnected_time;                 // the time the last sender was disconnected
+    int connected_children_count;                   // number of senders currently streaming
 
     struct receiver_state *receiver;
     netdata_mutex_t receiver_lock;
