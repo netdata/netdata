@@ -1976,7 +1976,7 @@ static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENT
     ;
 }
 
-static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *array __maybe_unused, size_t entries __maybe_unused) {
+static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) {
     // info("SAVE %zu pages", entries);
     if(!pgc_uts.stop) {
         usec_t t = pgc_uts.time_per_flush_ut;
