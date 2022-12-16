@@ -316,6 +316,7 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
     }
 
     worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
         for (i = 0; i < count; ++i)
@@ -343,17 +344,22 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
             continue;
         }
 
+        struct page_details *pd = NULL;
         Pvoid_t *PValue = JudyLGet(extent_page_list->JudyL_page_list, start_time_s, PJE0);
-        struct page_details *pd = (NULL == PValue || NULL == *PValue) ? NULL : *PValue;
+        internal_fatal(PValue == PJERR, "DBENGINE: corrupted extent pages JudyHS");
 
-        // We might have an Index match but check for UUID match as well
-        // if there is no match we will add the page in cache but not in
-        // the preload response
+        if(PValue && *PValue) {
+            pd = *PValue;
 
-        if (pd && uuid_compare(pd->uuid, header->descr[i].uuid))
-            pd = NULL;
+            // We might have an Index match but check for UUID match as well
+            // if there is no match we will add the page in cache but not in
+            // the preload response
 
-        if(!preload_all_pages && !pd)
+            if (uuid_compare(pd->uuid, header->descr[i].uuid) != 0)
+                pd = NULL;
+        }
+
+        if(!pd && !preload_all_pages)
             continue;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
@@ -362,14 +368,15 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                 have_read_error);
 
         worker_is_busy(UV_EVENT_PAGE_POPULATION);
+
         Word_t metric_id;
-        if(pd) {
+        if(pd)
             metric_id = pd->metric_id;
-        }
+
         else {
-            METRIC *this_metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
-            metric_id = mrg_metric_id(main_mrg, this_metric);
-            mrg_metric_release(main_mrg, this_metric);
+            METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t) ctx);
+            metric_id = mrg_metric_id(main_mrg, metric);
+            mrg_metric_release(main_mrg, metric);
         }
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
