@@ -307,7 +307,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
         web_client_send(w);
     }
 
-    if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
+    else if(unlikely(w->mode == WEB_CLIENT_MODE_FILECOPY)) {
         if(w->pollinfo_filecopy_slot == 0) {
             debug(D_WEB_CLIENT, "%llu: FILECOPY DETECTED ON FD %d", w->id, pi->fd);
 

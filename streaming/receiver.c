@@ -420,6 +420,22 @@ static void rrdpush_receiver_replication_reset(struct receiver_state *rpt) {
     rrdhost_receiver_replicating_charts_zero(rpt->host);
 }
 
+bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
+    bool set_this = false;
+
+    netdata_mutex_lock(&host->receiver_lock);
+
+    if (!host->receiver || host->receiver == rpt) {
+        host->receiver = rpt;
+        rpt->host = host;
+        set_this = true;
+    }
+
+    netdata_mutex_unlock(&host->receiver_lock);
+
+    return set_this;
+}
+
 static int rrdpush_receive(struct receiver_state *rpt)
 {
     int history = default_rrd_history_entries;
@@ -490,119 +506,76 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     (void)appconfig_set_default(&stream_config, rpt->machine_guid, "host tags", (rpt->tags)?rpt->tags:"");
 
-    if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
+    // find the host for this receiver
+    {
+        // this will also update the host with our system_info
+        RRDHOST *host = rrdhost_find_or_create(
+                rpt->hostname
+                , rpt->registry_hostname
+                , rpt->machine_guid
+                , rpt->os
+                , rpt->timezone
+                , rpt->abbrev_timezone
+                , rpt->utc_offset
+                , rpt->tags
+                , rpt->program_name
+                , rpt->program_version
+                , rpt->update_every
+                , history
+                , mode
+                , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
+                , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
+                , rrdpush_destination
+                , rrdpush_api_key
+                , rrdpush_send_charts_matching
+                , rrdpush_enable_replication
+                , rrdpush_seconds_to_replicate
+                , rrdpush_replication_step
+                , rpt->system_info
+                , 0
+        );
 
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
-
-        error("STREAM '%s' [receive from %s:%s]: "
-              "denied to receive metrics, machine GUID [%s] is my own. "
-              "Did you copy the parent/proxy machine GUID to a child, or is this an inter-agent loop? "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              , rpt->machine_guid
-              );
-
-        char initial_response[HTTP_HEADER_SIZE + 1];
-        snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
-
-        if(send_timeout(
-#ifdef ENABLE_HTTPS
-                &rpt->ssl,
-#endif
-                rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
+        if(!host) {
 
             log_stream_connection(rpt->client_ip, rpt->client_port,
                                   rpt->key,
                                   rpt->machine_guid,
                                   rpt->hostname,
-                                  "FAILED - CANNOT REPLY");
+                                  "FAILED - CANNOT ACQUIRE HOST");
 
-            error("STREAM '%s' [receive from [%s]:%s]: cannot send command."
+            error("STREAM '%s' [receive from [%s]:%s]: "
+                  "failed to find/create host structure. "
+                  "RESPONSE: DROPPING CONNECTION."
                   , rpt->hostname
                   , rpt->client_ip, rpt->client_port
                   );
+
+            close(rpt->fd);
+            return 1;
         }
 
-        close(rpt->fd);
-        return 0;
+        // system_info has been consumed by the host structure
+        rpt->system_info = NULL;
+
+        if(!rrdhost_set_receiver(host, rpt)) {
+
+            log_stream_connection(rpt->client_ip, rpt->client_port,
+                                  rpt->key,
+                                  rpt->machine_guid,
+                                  rpt->hostname,
+                                  "FAILED - DUPLICATE RECEIVER");
+
+            error("STREAM '%s' [receive from [%s]:%s]: "
+                  "multiple receivers connected for GUID '%s' concurrently. "
+                  "RESPONSE: DROPPING CONNECTION."
+            , rpt->hostname
+            , rpt->client_ip, rpt->client_port
+            , rpt->machine_guid);
+
+            close(rpt->fd);
+            return 1;
+        }
     }
-
-    rpt->host = rrdhost_find_or_create(
-            rpt->hostname
-            , rpt->registry_hostname
-            , rpt->machine_guid
-            , rpt->os
-            , rpt->timezone
-            , rpt->abbrev_timezone
-            , rpt->utc_offset
-            , rpt->tags
-            , rpt->program_name
-            , rpt->program_version
-            , rpt->update_every
-            , history
-            , mode
-            , (unsigned int)(health_enabled != CONFIG_BOOLEAN_NO)
-            , (unsigned int)(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key)
-            , rrdpush_destination
-            , rrdpush_api_key
-            , rrdpush_send_charts_matching
-            , rrdpush_enable_replication
-            , rrdpush_seconds_to_replicate
-            , rrdpush_replication_step
-            , rpt->system_info
-            , 0
-    );
-
-    if(!rpt->host) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "FAILED - CANNOT ACQUIRE HOST");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "failed to find/create host structure. "
-              "RESPONSE: DROPPING CONNECTION."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              );
-
-        close(rpt->fd);
-        return 1;
-    }
-
-    // system_info has been consumed by the host structure
-    rpt->system_info = NULL;
-
-    netdata_mutex_lock(&rpt->host->receiver_lock);
-    if (!rpt->host->receiver)
-        rpt->host->receiver = rpt;
-    else {
-        netdata_mutex_unlock(&rpt->host->receiver_lock);
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "FAILED - DUPLICATE RECEIVER");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-                     "multiple receivers connected for GUID '%s' concurrently. "
-                     "RESPONSE: DROPPING CONNECTION."
-                     , rrdhost_hostname(rpt->host)
-                     , rpt->client_ip, rpt->client_port
-                     , rpt->machine_guid);
-
-        close(rpt->fd);
-        return 1;
-    }
-    netdata_mutex_unlock(&rpt->host->receiver_lock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     info("STREAM '%s' [receive from [%s]:%s]: "
@@ -819,7 +792,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
 }
 
 static void rrdpush_receiver_thread_cleanup(void *ptr) {
-    netdata_thread_disable_cancelability();
     struct receiver_state *rpt = (struct receiver_state *) ptr;
     worker_unregister();
 
@@ -833,12 +805,11 @@ static void rrdpush_receiver_thread_cleanup(void *ptr) {
 
     info("STREAM '%s' [receive from [%s]:%s]: "
          "receive thread ended (task id %d)"
-    , rpt->hostname
-    , rpt->client_ip, rpt->client_port
+    , rpt->hostname ? rpt->hostname : "-"
+    , rpt->client_ip ? rpt->client_ip : "-", rpt->client_port ? rpt->client_port : "-"
     , gettid());
 
     receiver_state_free(rpt);
-    netdata_thread_enable_cancelability();
 }
 
 void *rrdpush_receiver_thread(void *ptr) {

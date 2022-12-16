@@ -1935,3 +1935,24 @@ ssize_t web_client_receive(struct web_client *w)
 
     return(bytes);
 }
+
+
+int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
+    // prevent the web_client from closing the streaming socket
+
+    WEB_CLIENT_IS_DEAD(w);
+
+    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
+    }
+    else {
+        if(w->ifd == w->ofd)
+            w->ifd = w->ofd = -1;
+        else
+            w->ifd = -1;
+    }
+
+    buffer_flush(w->response.data);
+
+    return HTTP_RESP_OK;
+}
