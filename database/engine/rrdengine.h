@@ -134,11 +134,11 @@ struct rrdeng_collect_handle {
     struct pg_alignment *alignment;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;
-
-    uint32_t entries_max;
-    uint32_t position;                   // keep track of the current page size, to make sure we don't exceed it
-    usec_t start_time_ut;
-    usec_t end_time_ut;
+    // 2 bytes remaining here for future use
+    uint32_t page_entries_max;
+    uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
+    usec_t page_end_time_ut;
+    usec_t update_every_ut;
 };
 
 struct rrdeng_query_handle {

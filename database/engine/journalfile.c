@@ -16,26 +16,21 @@ void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *u
     mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
 }
 
-void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid,
-                                                     time_t first_time, time_t last_time,
-                                                     time_t update_every, bool update_every_only)
+static void update_metric_retention_and_granularity_by_uuid(
+        struct rrdengine_instance *ctx, uuid_t *uuid,
+                time_t first_time, time_t last_time,
+                time_t update_every)
 {
-    MRG_ENTRY entry;
-    METRIC *metric;
-
+    MRG_ENTRY entry = {
+            .section = (Word_t)ctx,
+            .first_time_t = first_time,
+            .latest_time_t = last_time,
+            .latest_update_every = update_every
+    };
     uuid_copy(entry.uuid, *uuid);
-    entry.section = (Word_t)ctx;
-    entry.first_time_t = first_time;
-    entry.latest_time_t = last_time;
-    entry.latest_update_every = update_every;
 
     bool just_added;
-    metric = mrg_metric_add_and_acquire(main_mrg, entry, &just_added);
-    mrg_metric_set_update_every(main_mrg, metric, update_every);
-    mrg_metric_release(main_mrg, metric);
-
-    if (update_every_only)
-        return;
+    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &just_added);
 
     if (likely(!just_added)) {
         time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
@@ -44,9 +39,15 @@ void update_metric_retention_and_granularity_by_uuid(struct rrdengine_instance *
         if (oldest_time_t > first_time)
             mrg_metric_set_first_time_t(main_mrg, metric, first_time);
 
-        if (latest_time_t < last_time)
+        if (latest_time_t < last_time) {
+            if(update_every)
+                mrg_metric_set_update_every(main_mrg, metric, update_every);
+
             mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
+        }
     }
+
+    mrg_metric_release(main_mrg, metric);
 }
 
 void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
@@ -418,6 +419,11 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                 (metric)? mrg_metric_get_update_every(main_mrg, metric) : 0,
                 false);
 
+        if(!vd.data_on_disk_valid) {
+            mrg_metric_release(main_mrg, metric);
+            continue;
+        }
+
         bool update_metric_time = true;
         if (!metric) {
             MRG_ENTRY entry;
@@ -470,7 +476,10 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                 mrg_metric_set_first_time_t(main_mrg, metric, vd.start_time_s);
 
             if (metric_last_time_t < vd.end_time_s) {
-                mrg_metric_set_update_every(main_mrg, metric, vd.update_every_s);
+
+                if(vd.update_every_s)
+                    mrg_metric_set_update_every(main_mrg, metric, vd.update_every_s);
+
                 mrg_metric_set_latest_time_t(main_mrg, metric, vd.end_time_s);
             }
         }
@@ -793,34 +802,36 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     info("Checking integrity of %s", path);
     int rc = check_journal_v2_file(data_start, file_size, original_file_size);
-    if (rc) {
+    if (unlikely(rc)) {
         if (rc == 2)
             error_report("File %s needs to be rebuilt", path);
         else if (rc == 3)
             error_report("File %s will be skipped", path);
         else
             error_report("File %s is invalid and it will be rebuilt", path);
+
         if (unlikely(munmap(data_start, file_size)))
             error("Failed to unmap %s", path);
+
         return rc;
     }
 
     struct journal_v2_header *j2_header = (void *) data_start;
-
     uint32_t entries = j2_header->metric_count;
 
-    if (!entries) {
+    if (unlikely(!entries)) {
         if (unlikely(munmap(data_start, file_size)))
             error("Failed to unmap %s", path);
+
         return 1;
     }
 
     rc = madvise(data_start, file_size, MADV_DONTFORK);
-    if (rc)
+    if (unlikely(rc))
         error("MADV_DONTFORK: setting failed");
 
     rc = madvise(data_start, file_size, MADV_DONTDUMP);
-    if (rc)
+    if (unlikely(rc))
         error("MADV_DONTDUMP: setting failed");
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
@@ -832,11 +843,11 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     time_t header_start_time_t  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
     for (size_t i=0; i < entries; i++) {
-        time_t start_time_t = header_start_time_t + metric->delta_start;
-        time_t end_time_t = header_start_time_t + metric->delta_end;
-        time_t update_every_s = (metric->entries > 1) ? ((end_time_t - start_time_t) / (entries - 1)) : 0;
-        update_metric_retention_and_granularity_by_uuid(ctx, &metric->uuid, start_time_t, end_time_t, update_every_s,
-                                                        false);
+        time_t start_time_s = header_start_time_t + metric->delta_start;
+        time_t end_time_s = header_start_time_t + metric->delta_end;
+        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
+        update_metric_retention_and_granularity_by_uuid(
+                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s);
 
 #ifdef NETDATA_INTERNAL_CHECKS
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
@@ -848,6 +859,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     info("Journal file \"%s\" loaded (size:%"PRIu64") with %u metrics in %d ms", path, file_size, entries,
          (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
+
     // File is OK load it
     return 0;
 }

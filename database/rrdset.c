@@ -920,15 +920,8 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
                 );
             #endif
 
-            st->last_collected_time.tv_sec  = now.tv_sec - st->update_every;
-            st->last_collected_time.tv_usec = now.tv_usec;
-            last_collected_time_align(st);
+            duration_since_last_update = 0;
 
-            st->last_updated.tv_sec  = now.tv_sec - st->update_every;
-            st->last_updated.tv_usec = now.tv_usec;
-            last_updated_time_align(st);
-
-            duration_since_last_update = st->update_every * USEC_PER_SEC;
             #ifdef NETDATA_INTERNAL_CHECKS
             if(!discard_reason) discard_reason = "COLLECTION TIME IN FUTURE";
             #endif
@@ -941,6 +934,7 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
             #endif
 
             duration_since_last_update = (usec_t)since_last_usec;
+
             #ifdef NETDATA_INTERNAL_CHECKS
             if(!discard_reason) discard_reason = "COLLECTION TIME TOO FAR IN THE PAST";
             #endif
@@ -1430,7 +1424,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     if(unlikely(netdata_exit)) return;
 
     if (pending_rrdset_next)
-        rrdset_next(st);
+        rrdset_timed_next(st, now, 0ULL);
 
     debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
 

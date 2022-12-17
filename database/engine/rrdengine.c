@@ -232,9 +232,13 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
         vd.end_time_s == 0                                      ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
         (vd.update_every_s == 0 && vd.entries > 1)
-        )
+        ) {
         is_valid = false;
 
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: ignoring invalid page of type %u from %ld to %ld (now %ld), update every %ld, page length %zu, point size %zu, entries %zu.",
+                    vd.type, vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.point_size, vd.entries);
+    }
     else {
         if (vd.update_every_s) {
             size_t entries_by_time = (vd.start_time_s - (vd.start_time_s - vd.update_every_s)) / vd.update_every_s;
