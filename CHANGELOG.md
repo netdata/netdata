@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Populate field values in send\_slack\(\) for Mattermost [\#14153](https://github.com/netdata/netdata/pull/14153) ([je2555](https://github.com/je2555))
+- bump go.d.plugin to v0.46.1 [\#14151](https://github.com/netdata/netdata/pull/14151) ([ilyam8](https://github.com/ilyam8))
 - Disable integration by default \(eBPF \<-\> APPS\) [\#14147](https://github.com/netdata/netdata/pull/14147) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "MQTT 5 publish topic alias support" [\#14145](https://github.com/netdata/netdata/pull/14145) ([MrZammler](https://github.com/MrZammler))
 - fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
@@ -356,9 +358,6 @@
 **Merged pull requests:**
 
 - rrdcontexts allow not linked dimensions and charts [\#13501](https://github.com/netdata/netdata/pull/13501) ([ktsaou](https://github.com/ktsaou))
-- docs: add deprecation notice to python.d/postgres readme [\#13497](https://github.com/netdata/netdata/pull/13497) ([ilyam8](https://github.com/ilyam8))
-- docs: change postgres links to go version [\#13496](https://github.com/netdata/netdata/pull/13496) ([ilyam8](https://github.com/ilyam8))
-- bump go.d version to v0.35.0 [\#13494](https://github.com/netdata/netdata/pull/13494) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.35.1](https://github.com/netdata/netdata/tree/v1.35.1) (2022-06-10)
 
