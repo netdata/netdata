@@ -793,7 +793,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
                               (rpt->hostname && *rpt->hostname)?rpt->hostname:"-",
                               "ACCESS DENIED - NO KEY");
 
-        error("STREAM %s [receive from [%s]:%s]: "
+        error("STREAM '%s' [receive from [%s]:%s]: "
               "request without an API key. "
               "RESPONSE: PERMISSION DENIED."
               , rpt->hostname ? rpt->hostname : "-"
@@ -1125,9 +1125,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             time_t age = now_realtime_sec() - host->receiver->last_msg_t;
             if (age > 30) {
 
+                host->receiver = NULL;      // Thread holds reference to structure
                 host->receiver->shutdown = 1;
                 shutdown(host->receiver->fd, SHUT_RDWR);
-                host->receiver = NULL;      // Thread holds reference to structure
 
                 info ("STREAM '%s' [receive from [%s]:%s]: "
                       "multiple connections for same host detected, "
