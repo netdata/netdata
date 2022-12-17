@@ -403,6 +403,11 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                             pages_found_in_journals_v2++;
                             pages_total++;
                         }
+                        else {
+                            // we cannot add it
+                            if(!JudyLDel(&JudyL_page_array, page_first_time_s, PJE0))
+                                fatal("DBENGINE: cannot delete page from routing JudyL");
+                        }
                     }
                 }
             }
