@@ -3,10 +3,10 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "database/rrd.h"
 #include "libnetdata/libnetdata.h"
-#include "web/server/web_client.h"
 #include "daemon/common.h"
+#include "web/server/web_client.h"
+#include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -220,13 +220,29 @@ struct receiver_state {
     char *program_name;        // Duplicated in pluginsd
     char *program_version;
     struct rrdhost_system_info *system_info;
-    int update_every;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
     unsigned int shutdown:1;    // Tell the thread to exit
     unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+
+    struct {
+        RRD_MEMORY_MODE mode;
+        int history;
+        int update_every;
+        int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
+        time_t alarms_delay;
+        int rrdpush_enabled;
+        char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
+        char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
+        bool rrdpush_enable_replication;
+        time_t rrdpush_seconds_to_replicate;
+        time_t rrdpush_replication_step;
+        char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
+        unsigned int rrdpush_compression;
+    } config;
+
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif

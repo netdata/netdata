@@ -52,6 +52,32 @@ struct rrdengine_instance;
 struct pg_cache_page_index;
 #endif
 
+// ----------------------------------------------------------------------------
+// memory mode
+
+typedef enum rrd_memory_mode {
+    RRD_MEMORY_MODE_NONE = 0,
+    RRD_MEMORY_MODE_RAM  = 1,
+    RRD_MEMORY_MODE_MAP  = 2,
+    RRD_MEMORY_MODE_SAVE = 3,
+    RRD_MEMORY_MODE_ALLOC = 4,
+    RRD_MEMORY_MODE_DBENGINE = 5,
+
+    // this is 8-bit
+} RRD_MEMORY_MODE;
+
+#define RRD_MEMORY_MODE_NONE_NAME "none"
+#define RRD_MEMORY_MODE_RAM_NAME "ram"
+#define RRD_MEMORY_MODE_MAP_NAME "map"
+#define RRD_MEMORY_MODE_SAVE_NAME "save"
+#define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
+#define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
+
+extern RRD_MEMORY_MODE default_rrd_memory_mode;
+
+const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
+RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
+
 #include "daemon/common.h"
 #include "web/api/queries/query.h"
 #include "web/api/queries/rrdr.h"
@@ -122,33 +148,6 @@ typedef enum rrdset_type {
 
 RRDSET_TYPE rrdset_type_id(const char *name);
 const char *rrdset_type_name(RRDSET_TYPE chart_type);
-
-
-// ----------------------------------------------------------------------------
-// memory mode
-
-typedef enum rrd_memory_mode {
-    RRD_MEMORY_MODE_NONE = 0,
-    RRD_MEMORY_MODE_RAM  = 1,
-    RRD_MEMORY_MODE_MAP  = 2,
-    RRD_MEMORY_MODE_SAVE = 3,
-    RRD_MEMORY_MODE_ALLOC = 4,
-    RRD_MEMORY_MODE_DBENGINE = 5,
-
-    // this is 8-bit
-} RRD_MEMORY_MODE;
-
-#define RRD_MEMORY_MODE_NONE_NAME "none"
-#define RRD_MEMORY_MODE_RAM_NAME "ram"
-#define RRD_MEMORY_MODE_MAP_NAME "map"
-#define RRD_MEMORY_MODE_SAVE_NAME "save"
-#define RRD_MEMORY_MODE_ALLOC_NAME "alloc"
-#define RRD_MEMORY_MODE_DBENGINE_NAME "dbengine"
-
-extern RRD_MEMORY_MODE default_rrd_memory_mode;
-
-const char *rrd_memory_mode_name(RRD_MEMORY_MODE id);
-RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 
 
 // ----------------------------------------------------------------------------

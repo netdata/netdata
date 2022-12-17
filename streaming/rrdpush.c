@@ -669,7 +669,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->client_ip         = strdupz(w->client_ip);
     rpt->client_port       = strdupz(w->client_port);
 
-    rpt->update_every      = default_rrd_update_every;
+    rpt->config.update_every = default_rrd_update_every;
 
 #ifdef ENABLE_HTTPS
     rpt->ssl.conn          = w->ssl.conn;
@@ -702,7 +702,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             rpt->machine_guid = strdupz(value);
 
         else if(!strcmp(name, "update_every"))
-            rpt->update_every = (int)strtoul(value, NULL, 0);
+            rpt->config.update_every = (int)strtoul(value, NULL, 0);
 
         else if(!strcmp(name, "os") && !rpt->os)
             rpt->os = strdupz(value);
