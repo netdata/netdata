@@ -967,9 +967,12 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_hit_ratio_closest;
     RRDDIM *rd_hit_ratio_exact;
 
-    RRDSET *st_searches;
+    RRDSET *st_operations;
     RRDDIM *rd_searches_closest;
     RRDDIM *rd_searches_exact;
+    RRDDIM *rd_add_hot;
+    RRDDIM *rd_add_clean;
+    RRDDIM *rd_evict_clean;
 
     RRDSET *st_pgc_memory;
     RRDDIM *rd_pgc_memory_clean;
@@ -1058,17 +1061,17 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-        if (unlikely(!ptrs->st_searches)) {
+        if (unlikely(!ptrs->st_operations)) {
             BUFFER *id = buffer_create(100);
-            buffer_sprintf(id, "dbengine_%s_cache_searches", name);
+            buffer_sprintf(id, "dbengine_%s_cache_operations", name);
 
             BUFFER *family = buffer_create(100);
             buffer_sprintf(family, "dbengine %s cache", name);
 
             BUFFER *title = buffer_create(100);
-            buffer_sprintf(title, "Netdata %s Cache Searches", name);
+            buffer_sprintf(title, "Netdata %s Cache Operations", name);
 
-            ptrs->st_searches = rrdset_create_localhost(
+            ptrs->st_operations = rrdset_create_localhost(
                     "netdata",
                     buffer_tostring(id),
                     NULL,
@@ -1082,8 +1085,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-            ptrs->rd_searches_closest   = rrddim_add(ptrs->st_searches, "closest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_searches_exact     = rrddim_add(ptrs->st_searches, "exact", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_searches_closest   = rrddim_add(ptrs->st_operations, "search closest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_searches_exact     = rrddim_add(ptrs->st_operations, "search exact", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_add_hot            = rrddim_add(ptrs->st_operations, "add hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_add_clean          = rrddim_add(ptrs->st_operations, "add clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_evict_clean        = rrddim_add(ptrs->st_operations, "evict clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1091,10 +1097,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        rrddim_set_by_pointer(ptrs->st_searches, ptrs->rd_searches_closest, (collected_number)pgc_stats->searches_closest);
-        rrddim_set_by_pointer(ptrs->st_searches, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_closest, (collected_number)pgc_stats->searches_closest);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_hot, (collected_number)pgc_stats->queues.hot.added_entries);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evict_clean, (collected_number)pgc_stats->queues.clean.removed_entries);
 
-        rrdset_done(ptrs->st_searches);
+        rrdset_done(ptrs->st_operations);
     }
 
     {
@@ -1227,48 +1236,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_hot, (collected_number)pgc_stats->queues.hot.added_size);
 
         rrdset_done(ptrs->st_pgc_memory_changes);
-    }
-
-    {
-        if (unlikely(!ptrs->st_pgc_pages_changes)) {
-            BUFFER *id = buffer_create(100);
-            buffer_sprintf(id, "dbengine_%s_cache_pages_changes", name);
-
-            BUFFER *family = buffer_create(100);
-            buffer_sprintf(family, "dbengine %s cache", name);
-
-            BUFFER *title = buffer_create(100);
-            buffer_sprintf(title, "Netdata %s Cache Pages Changes", name);
-
-            ptrs->st_pgc_pages_changes = rrdset_create_localhost(
-                    "netdata",
-                    buffer_tostring(id),
-                    NULL,
-                    buffer_tostring(family),
-                    NULL,
-                    buffer_tostring(title),
-                    "bytes/s",
-                    "netdata",
-                    "stats",
-                    priority,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
-
-            ptrs->rd_pgc_pages_new_clean         = rrddim_add(ptrs->st_pgc_pages_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_pages_clean_evictions   = rrddim_add(ptrs->st_pgc_pages_changes, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_pages_new_hot           = rrddim_add(ptrs->st_pgc_pages_changes, "new hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            buffer_free(id);
-            buffer_free(family);
-            buffer_free(title);
-            priority++;
-        }
-
-        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_new_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
-        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_clean_evictions, (collected_number)pgc_stats->queues.clean.removed_size);
-        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_new_hot, (collected_number)pgc_stats->queues.hot.added_size);
-
-        rrdset_done(ptrs->st_pgc_pages_changes);
     }
 
     {
