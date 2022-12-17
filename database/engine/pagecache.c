@@ -91,8 +91,10 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
 
-static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx, time_t wanted_start_time_s, time_t wanted_end_time_s,
-                                   Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s, bool open_cache_mode) {
+static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
+        time_t wanted_start_time_s, time_t wanted_end_time_s,
+        Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s,
+        bool open_cache_mode, PDC_PAGE_STATUS tags) {
 
     size_t pages_found_in_cache = 0;
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
@@ -161,7 +163,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->page_length = page_length;
             pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
-            pd->status |= (pd->page) ? (PDC_PAGE_READY | PDC_PAGE_PRELOADED) : 0;
+            pd->status |= ((pd->page) ? (PDC_PAGE_READY | PDC_PAGE_PRELOADED) : 0) | tags;
             pd->type = ctx->page_type;
             pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
             pd->metric_id = metric_id;
@@ -294,7 +296,8 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     pass1_ut = now_monotonic_usec();
     size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, false);
+                                                &first_page_starting_time_s, false,
+                                                PDC_PAGE_PRELOADED_PASS1 | PDC_PAGE_SOURCE_MAIN_CACHE);
     query_gaps += cache_gaps;
     pages_found_in_cache += pages_pass1;
     pages_total += pages_pass1;
@@ -310,7 +313,8 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     pass2_ut = now_monotonic_usec();
     size_t pages_pass2 = get_page_list_from_pgc(open_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, true);
+                                                &first_page_starting_time_s, true,
+                                                PDC_PAGE_SOURCE_OPEN_CACHE);
     query_gaps += cache_gaps;
     pages_found_in_open += pages_pass2;
     pages_total += pages_pass2;
@@ -405,7 +409,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                             pd->update_every_s = page_update_every_s;
                             pd->type = page_entry_in_journal->type;
                             pd->metric_id = metric_id;
-                            pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_DATAFILE_ACQUIRED;
+                            pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
                             uuid_copy(pd->uuid, *uuid);
                             *PValue = pd;
 

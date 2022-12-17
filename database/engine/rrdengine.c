@@ -1124,7 +1124,7 @@ static void do_read_extent_work(uv_work_t *req)
         }
         extent_exclusive = true;
 
-        if (pdc_check_if_pages_are_already_in_cache(wc->ctx, extent_page_list, PDC_PAGE_FOUND_IN_CACHE_BY_WORKER))
+        if (pdc_check_if_pages_are_already_in_cache(wc->ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
             goto cleanup;
     }
 
@@ -1145,9 +1145,9 @@ static void do_read_extent_work(uv_work_t *req)
         if(extent_used)
             // since the extent was used, all the pages that are not
             // loaded from this extent, were not found in the extent
-            not_loaded_pages_reason = PDC_PAGE_UUID_NOT_FOUND_IN_EXTENT;
+            not_loaded_pages_reason = PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT;
         else
-            not_loaded_pages_reason = PDC_PAGE_INVALID_EXTENT;
+            not_loaded_pages_reason = PDC_PAGE_FAILED_INVALID_EXTENT;
 
         int ret = munmap(data, length);
         fatal_assert(0 == ret);

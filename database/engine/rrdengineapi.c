@@ -243,9 +243,6 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
 
         page_is_empty = page_has_only_empty_metrics(handle);
         if (page_is_empty) {
-            size_t points = handle->page_position;
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "%s: Deleting page with %lu empty points", __func__, points);
             if (pgc_is_page_hot(handle->page)) {
                 mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
                 pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
