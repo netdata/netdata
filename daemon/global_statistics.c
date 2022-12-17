@@ -1078,7 +1078,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     buffer_tostring(family),
                     NULL,
                     buffer_tostring(title),
-                    "searches/s",
+                    "ops/s",
                     "netdata",
                     "stats",
                     priority,
@@ -1100,7 +1100,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_closest, (collected_number)pgc_stats->searches_closest);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_hot, (collected_number)pgc_stats->queues.hot.added_entries);
-        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_entries - pgc_stats->queues.hot.added_entries));
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evict_clean, (collected_number)pgc_stats->queues.clean.removed_entries);
 
         rrdset_done(ptrs->st_operations);
