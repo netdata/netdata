@@ -1075,29 +1075,6 @@ void stop_streaming_sender(RRDHOST *host)
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 }
 
-void stop_streaming_receiver(RRDHOST *host) {
-    netdata_mutex_lock(&host->receiver_lock);
-
-    if(host->receiver)
-        netdata_thread_cancel(host->receiver->thread);
-
-    int count = 5000;
-    while (host->receiver && count-- > 0) {
-        netdata_mutex_unlock(&host->receiver_lock);
-        sleep_usec(1 * USEC_PER_MS);
-        netdata_mutex_lock(&host->receiver_lock);
-    }
-
-    if(host->receiver)
-        error("STREAM '%s' [receive from [%s]:%s]: "
-             "thread %d takes too long to stop, giving up..."
-        , rrdhost_hostname(host)
-        , host->receiver->client_ip, host->receiver->client_port
-        , gettid());
-
-    netdata_mutex_unlock(&host->receiver_lock);
-}
-
 void rrdhost_free(RRDHOST *host, bool force) {
     if(!host) return;
 

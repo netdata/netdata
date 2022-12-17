@@ -321,6 +321,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
+bool stop_streaming_receiver(RRDHOST *host);
 
 #include "replication.h"
 

@@ -1117,56 +1117,50 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         host = NULL;
 
     if (host) {
-        rrdhost_wrlock(host);
+        time_t age;
+        bool receiver_stale = false;
+        bool receiver_working = false;
+
         netdata_mutex_lock(&host->receiver_lock);
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
-        host->child_disconnected_time = 0;
         if (host->receiver) {
-            time_t age = now_realtime_sec() - host->receiver->last_msg_t;
-            if (age > 30) {
+            age = now_realtime_sec() - host->receiver->last_msg_t;
 
-                host->receiver->shutdown = 1;
-                host->receiver = NULL;      // Thread holds reference to structure
-                shutdown(host->receiver->fd, SHUT_RDWR);
-
-                info ("STREAM '%s' [receive from [%s]:%s]: "
-                      "multiple connections for same host detected, "
-                      "but old connection is dead (%"PRId64" sec). "
-                      "RESPONSE: ACCEPTING CONNECTION."
-                      , rpt->hostname
-                      , rpt->client_ip, rpt->client_port
-                      , (int64_t)age);
-
-            }
-            else {
-                netdata_mutex_unlock(&host->receiver_lock);
-                rrdhost_unlock(host);
-                rrd_unlock();
-
-                log_stream_connection(rpt->client_ip, rpt->client_port,
-                                      rpt->key,
-                                      host->machine_guid,
-                                      rpt->hostname,
-                                      "REJECTED - ALREADY CONNECTED");
-
-                error("STREAM '%s' [receive from [%s]:%s]: "
-                      "multiple connections for same host detected, "
-                      "but old connection is still active (within last %"PRId64" sec). "
-                      "RESPONSE: ALREADY CONNECTED."
-                      , rpt->hostname
-                      , rpt->client_ip, rpt->client_port
-                      , (int64_t)age);
-
-                // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
-                buffer_flush(w->response.data);
-                buffer_strcat(w->response.data, "This GUID is already streaming to this server");
-                receiver_state_free(rpt);
-                return HTTP_RESP_CONFLICT;
-            }
+            if(age < 30)
+                receiver_working = true;
+            else
+                receiver_stale = true;
         }
-
         netdata_mutex_unlock(&host->receiver_lock);
-        rrdhost_unlock(host);
+
+        if (receiver_stale && stop_streaming_receiver(host))
+            // we stopped the receiver
+            // we can proceed with this connection
+            receiver_stale = false;
+
+        if(receiver_working || receiver_stale) {
+            // another receiver is already connected
+            // try again later
+
+            log_stream_connection(rpt->client_ip, rpt->client_port,
+                                  rpt->key,
+                                  host->machine_guid,
+                                  rpt->hostname,
+                                  "REJECTED - ALREADY CONNECTED");
+
+            error("STREAM '%s' [receive from [%s]:%s]: "
+                  "multiple connections for same host detected, "
+                  "but old connection is still active (within last %"PRId64" sec). "
+                  "RESPONSE: ALREADY CONNECTED%s.",
+                  rpt->hostname, rpt->client_ip, rpt->client_port, (int64_t) age,
+                  receiver_stale ? " - STOPPED OLD THREAD" : ""
+            );
+
+            // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "This GUID is already streaming to this server");
+            receiver_state_free(rpt);
+            return HTTP_RESP_CONFLICT;
+        }
     }
     rrd_unlock();
 

@@ -485,6 +485,41 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
     }
 }
 
+bool stop_streaming_receiver(RRDHOST *host) {
+    bool ret = false;
+
+    netdata_mutex_lock(&host->receiver_lock);
+
+    if(host->receiver) {
+        host->receiver->shutdown = 1;
+        shutdown(host->receiver->fd, SHUT_RDWR);
+        netdata_thread_cancel(host->receiver->thread);
+    }
+
+    int count = 1000;
+    while (host->receiver && count-- > 0) {
+        netdata_mutex_unlock(&host->receiver_lock);
+
+        // let the lock for the receiver thread to exit
+        sleep_usec(1 * USEC_PER_MS);
+
+        netdata_mutex_lock(&host->receiver_lock);
+    }
+
+    if(host->receiver)
+        error("STREAM '%s' [receive from [%s]:%s]: "
+              "thread %d takes too long to stop, giving up..."
+        , rrdhost_hostname(host)
+        , host->receiver->client_ip, host->receiver->client_port
+        , gettid());
+    else
+        ret = true;
+
+    netdata_mutex_unlock(&host->receiver_lock);
+
+    return ret;
+}
+
 static int rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
