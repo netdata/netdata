@@ -217,9 +217,6 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
         if(unlikely(*first_page_starting_time_s == INVALID_TIME || (time_t)this_page_start_time < *first_page_starting_time_s))
             *first_page_starting_time_s = (time_t)this_page_start_time;
 
-        if(previous_page_last_time_s + previous_page_update_every_s < pd->first_time_s)
-            query_gaps++;
-
         if(!pd->page) {
             if(lookup_pending_in_open_cache)
                 pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
@@ -245,6 +242,9 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
             pd->status &= ~PDC_PAGE_DISK_PENDING;
             pd->status |= (PDC_PAGE_READY | PDC_PAGE_PRELOADED);
         }
+
+        if(previous_page_last_time_s + previous_page_update_every_s < pd->first_time_s)
+            query_gaps++;
 
         previous_page_last_time_s = pd->last_time_s;
         previous_page_update_every_s = (pd->update_every_s) ? pd->update_every_s : previous_page_update_every_s;
