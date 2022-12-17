@@ -962,10 +962,448 @@ static void sqlite3_statistics_charts(void) {
     // ----------------------------------------------------------------
 }
 
+struct dbengine2_cache_pointers {
+    RRDSET *st_cache_hit_ratio;
+    RRDDIM *rd_hit_ratio_closest;
+    RRDDIM *rd_hit_ratio_exact;
+
+    RRDSET *st_searches;
+    RRDDIM *rd_searches_closest;
+    RRDDIM *rd_searches_exact;
+
+    RRDSET *st_pgc_memory;
+    RRDDIM *rd_pgc_memory_clean;
+    RRDDIM *rd_pgc_memory_hot;
+    RRDDIM *rd_pgc_memory_dirty;
+    RRDDIM *rd_pgc_memory_index;
+
+    RRDSET *st_pgc_pages;
+    RRDDIM *rd_pgc_pages_clean;
+    RRDDIM *rd_pgc_pages_hot;
+    RRDDIM *rd_pgc_pages_dirty;
+    RRDDIM *rd_pgc_pages_referenced;
+
+    RRDSET *st_pgc_memory_changes;
+    RRDDIM *rd_pgc_memory_new_hot;
+    RRDDIM *rd_pgc_memory_new_clean;
+    RRDDIM *rd_pgc_memory_clean_evictions;
+
+    RRDSET *st_pgc_pages_changes;
+    RRDDIM *rd_pgc_pages_new_hot;
+    RRDDIM *rd_pgc_pages_new_clean;
+    RRDDIM *rd_pgc_pages_clean_evictions;
+
+    RRDSET *st_pgc_memory_migrations;
+    RRDDIM *rd_pgc_memory_hot_to_dirty;
+    RRDDIM *rd_pgc_memory_dirty_to_clean;
+
+    RRDSET *st_pgc_cache_target_size;
+    RRDDIM *rd_free;
+    RRDDIM *rd_used;
+
+    RRDSET *st_pgc_memory_events;
+    RRDDIM *rd_pgc_memory_evictions_critical;
+    RRDDIM *rd_pgc_memory_evictions_aggressive;
+    RRDDIM *rd_pgc_memory_flushes_critical;
+};
+
+static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *ptrs, struct pgc_statistics *pgc_stats, struct pgc_statistics *pgc_stats_old __maybe_unused, const char *name, int priority) {
+
+    {
+        if (unlikely(!ptrs->st_cache_hit_ratio)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_hit_ratio", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Hit Ratio", name);
+
+            ptrs->st_cache_hit_ratio = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "%",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            ptrs->rd_hit_ratio_closest = rrddim_add(ptrs->st_cache_hit_ratio, "closest", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_hit_ratio_exact = rrddim_add(ptrs->st_cache_hit_ratio, "exact", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        static size_t closest_percent = 100;
+        if(pgc_stats->searches_closest)
+            closest_percent = pgc_stats->searches_closest_hits * 100 * 10000 / pgc_stats->searches_closest;
+
+        static size_t exact_percent = 100;
+        if(pgc_stats->searches_exact)
+            exact_percent = pgc_stats->searches_exact_hits * 100 * 10000 / pgc_stats->searches_exact;
+
+        rrddim_set_by_pointer(ptrs->st_cache_hit_ratio, ptrs->rd_hit_ratio_closest, (collected_number)closest_percent);
+        rrddim_set_by_pointer(ptrs->st_cache_hit_ratio, ptrs->rd_hit_ratio_exact, (collected_number)exact_percent);
+
+        rrdset_done(ptrs->st_cache_hit_ratio);
+    }
+
+    {
+        if (unlikely(!ptrs->st_searches)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_searches", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Searches", name);
+
+            ptrs->st_searches = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "searches/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            ptrs->rd_searches_closest   = rrddim_add(ptrs->st_searches, "closest", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_searches_exact     = rrddim_add(ptrs->st_searches, "exact", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_searches, ptrs->rd_searches_closest, (collected_number)pgc_stats->searches_closest);
+        rrddim_set_by_pointer(ptrs->st_searches, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
+
+        rrdset_done(ptrs->st_searches);
+    }
+
+    {
+
+        if (unlikely(!ptrs->st_pgc_memory)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_memory", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Memory", name);
+
+            ptrs->st_pgc_memory = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            ptrs->rd_pgc_memory_clean   = rrddim_add(ptrs->st_pgc_memory, "clean",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_hot     = rrddim_add(ptrs->st_pgc_memory, "hot",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_dirty   = rrddim_add(ptrs->st_pgc_memory, "dirty",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_index   = rrddim_add(ptrs->st_pgc_memory, "index",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_clean, (collected_number)pgc_stats->queues.clean.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_hot, (collected_number)pgc_stats->queues.hot.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_dirty, (collected_number)pgc_stats->queues.dirty.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_index,
+                              (collected_number)(pgc_stats->size - pgc_stats->queues.clean.size - pgc_stats->queues.hot.size - pgc_stats->queues.dirty.size));
+
+        rrdset_done(ptrs->st_pgc_memory);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_pages)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_pages", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Pages", name);
+
+            ptrs->st_pgc_pages = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "pages",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            ptrs->rd_pgc_pages_clean   = rrddim_add(ptrs->st_pgc_pages, "clean", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_pages_hot     = rrddim_add(ptrs->st_pgc_pages, "hot", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_pages_dirty   = rrddim_add(ptrs->st_pgc_pages, "dirty", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_pages_referenced = rrddim_add(ptrs->st_pgc_pages, "referenced", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_clean, (collected_number)pgc_stats->queues.clean.entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_hot, (collected_number)pgc_stats->queues.hot.entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_dirty, (collected_number)pgc_stats->queues.dirty.entries);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages, ptrs->rd_pgc_pages_referenced, (collected_number)pgc_stats->referenced_entries);
+
+        rrdset_done(ptrs->st_pgc_pages);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_memory_changes)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_memory_changes", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Memory Changes", name);
+
+            ptrs->st_pgc_memory_changes = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            ptrs->rd_pgc_memory_new_clean         = rrddim_add(ptrs->st_pgc_memory_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_memory_clean_evictions   = rrddim_add(ptrs->st_pgc_memory_changes, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_memory_new_hot           = rrddim_add(ptrs->st_pgc_memory_changes, "new hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_clean_evictions, (collected_number)pgc_stats->queues.clean.removed_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_changes, ptrs->rd_pgc_memory_new_hot, (collected_number)pgc_stats->queues.hot.added_size);
+
+        rrdset_done(ptrs->st_pgc_memory_changes);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_pages_changes)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_pages_changes", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Pages Changes", name);
+
+            ptrs->st_pgc_pages_changes = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            ptrs->rd_pgc_pages_new_clean         = rrddim_add(ptrs->st_pgc_pages_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_pages_clean_evictions   = rrddim_add(ptrs->st_pgc_pages_changes, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_pages_new_hot           = rrddim_add(ptrs->st_pgc_pages_changes, "new hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_new_clean, (collected_number)(pgc_stats->added_size - pgc_stats->queues.hot.added_size));
+        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_clean_evictions, (collected_number)pgc_stats->queues.clean.removed_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_pages_changes, ptrs->rd_pgc_pages_new_hot, (collected_number)pgc_stats->queues.hot.added_size);
+
+        rrdset_done(ptrs->st_pgc_pages_changes);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_memory_migrations)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_memory_migrations", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Memory Migrations", name);
+
+            ptrs->st_pgc_memory_migrations = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            ptrs->rd_pgc_memory_dirty_to_clean    = rrddim_add(ptrs->st_pgc_memory_migrations, "dirty to clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_memory_hot_to_dirty      = rrddim_add(ptrs->st_pgc_memory_migrations, "hot to dirty", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_dirty_to_clean, (collected_number)pgc_stats->queues.dirty.removed_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_migrations, ptrs->rd_pgc_memory_hot_to_dirty, (collected_number)pgc_stats->queues.dirty.added_size);
+
+        rrdset_done(ptrs->st_pgc_memory_migrations);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_cache_target_size)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_target_size", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Target Size", name);
+
+            ptrs->st_pgc_cache_target_size = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            ptrs->rd_free = rrddim_add(ptrs->st_pgc_cache_target_size, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_used = rrddim_add(ptrs->st_pgc_cache_target_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        collected_number free = (pgc_stats->current_cache_size > pgc_stats->wanted_cache_size) ? 0 :
+                                (collected_number)(pgc_stats->wanted_cache_size - pgc_stats->current_cache_size);
+
+        rrddim_set_by_pointer(ptrs->st_pgc_cache_target_size, ptrs->rd_free, free);
+        rrddim_set_by_pointer(ptrs->st_pgc_cache_target_size, ptrs->rd_used, (collected_number)pgc_stats->current_cache_size);
+
+        rrdset_done(ptrs->st_pgc_cache_target_size);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_memory_events)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_events", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Events", name);
+
+            ptrs->st_pgc_memory_events = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "events/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            ptrs->rd_pgc_memory_evictions_aggressive = rrddim_add(ptrs->st_pgc_memory_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_memory_evictions_critical   = rrddim_add(ptrs->st_pgc_memory_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_memory_flushes_critical     = rrddim_add(ptrs->st_pgc_memory_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_aggressive, (collected_number)pgc_stats->events_cache_needs_space_aggressively);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_evictions_critical, (collected_number)pgc_stats->events_cache_under_severe_pressure);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory_events, ptrs->rd_pgc_memory_flushes_critical, (collected_number)pgc_stats->events_flush_critical);
+
+        rrdset_done(ptrs->st_pgc_memory_events);
+    }
+
+}
+
+
 static void dbengine2_statistics_charts(void) {
     if(!main_cache || !main_mrg)
         return;
 
+    static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {};
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {}; (void)pgc_main_stats_old;
     static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {}; (void)pgc_open_stats_old;
@@ -973,9 +1411,11 @@ static void dbengine2_statistics_charts(void) {
 
     pgc_main_stats_old = pgc_main_stats;
     pgc_main_stats = pgc_get_statistics(main_cache);
+    dbengine2_cache_statistics_charts(&main_cache_ptrs, &pgc_main_stats, &pgc_main_stats_old, "main", 135100);
 
     pgc_open_stats_old = pgc_open_stats;
     pgc_open_stats = pgc_get_statistics(open_cache);
+    dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();
@@ -983,14 +1423,11 @@ static void dbengine2_statistics_charts(void) {
     mrg_stats_old = mrg_stats;
     mrg_stats = mrg_get_statistics(main_mrg);
 
-    size_t priority = 132000;
+    size_t priority = 135000;
 
     {
         static RRDSET *st_pgc_memory = NULL;
-        static RRDDIM *rd_pgc_memory_clean = NULL;
-        static RRDDIM *rd_pgc_memory_hot = NULL;
-        static RRDDIM *rd_pgc_memory_dirty = NULL;
-        static RRDDIM *rd_pgc_memory_index = NULL;
+        static RRDDIM *rd_pgc_memory_main = NULL;
         static RRDDIM *rd_pgc_memory_open = NULL;  // open journal memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
 
@@ -1009,156 +1446,18 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
-            rd_pgc_memory_clean   = rrddim_add(st_pgc_memory, "clean",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_hot     = rrddim_add(st_pgc_memory, "hot",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_dirty   = rrddim_add(st_pgc_memory, "dirty",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_index   = rrddim_add(st_pgc_memory, "index",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_main   = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            priority++;
         }
 
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_clean, (collected_number)pgc_main_stats.queues.clean.size);
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_hot, (collected_number)pgc_main_stats.queues.hot.size);
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_dirty, (collected_number)pgc_main_stats.queues.dirty.size);
-        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_index, (collected_number)(pgc_main_stats.size - pgc_main_stats.queues.clean.size - pgc_main_stats.queues.hot.size - pgc_main_stats.queues.dirty.size));
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_main, (collected_number)pgc_main_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
 
         rrdset_done(st_pgc_memory);
-        priority++;
-    }
-
-    {
-        static RRDSET *st_pgc_memory_changes = NULL;
-        static RRDDIM *rd_pgc_memory_new_hot = NULL;
-        static RRDDIM *rd_pgc_memory_new_clean = NULL;
-        static RRDDIM *rd_pgc_memory_clean_evictions = NULL;
-
-        if (unlikely(!st_pgc_memory_changes)) {
-            st_pgc_memory_changes = rrdset_create_localhost(
-                    "netdata",
-                    "dbengine_memory_changes",
-                    NULL,
-                    "dbengine memory",
-                    NULL,
-                    "Netdata DB Memory Changes",
-                    "bytes/s",
-                    "netdata",
-                    "stats",
-                    priority,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
-
-            rd_pgc_memory_new_clean         = rrddim_add(st_pgc_memory_changes, "new clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pgc_memory_clean_evictions   = rrddim_add(st_pgc_memory_changes, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pgc_memory_new_hot           = rrddim_add(st_pgc_memory_changes, "new hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            priority++;
-        }
-
-        rrddim_set_by_pointer(st_pgc_memory_changes, rd_pgc_memory_new_clean, (collected_number)(pgc_main_stats.added_size - pgc_main_stats.queues.hot.added_size));
-        rrddim_set_by_pointer(st_pgc_memory_changes, rd_pgc_memory_clean_evictions, (collected_number)pgc_main_stats.queues.clean.removed_size);
-        rrddim_set_by_pointer(st_pgc_memory_changes, rd_pgc_memory_new_hot, (collected_number)pgc_main_stats.queues.hot.added_size);
-
-        rrdset_done(st_pgc_memory_changes);
-    }
-
-    {
-        static RRDSET *st_pgc_memory_migrations = NULL;
-        static RRDDIM *rd_pgc_memory_hot_to_dirty = NULL;
-        static RRDDIM *rd_pgc_memory_dirty_to_clean = NULL;
-
-        if (unlikely(!st_pgc_memory_migrations)) {
-            st_pgc_memory_migrations = rrdset_create_localhost(
-                    "netdata",
-                    "dbengine_memory_migrations",
-                    NULL,
-                    "dbengine memory",
-                    NULL,
-                    "Netdata DB Memory Migrations",
-                    "bytes/s",
-                    "netdata",
-                    "stats",
-                    priority,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
-
-            rd_pgc_memory_dirty_to_clean    = rrddim_add(st_pgc_memory_migrations, "dirty to clean", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pgc_memory_hot_to_dirty      = rrddim_add(st_pgc_memory_migrations, "hot to dirty", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_pgc_memory_migrations, rd_pgc_memory_dirty_to_clean, (collected_number)pgc_main_stats.queues.dirty.removed_size);
-        rrddim_set_by_pointer(st_pgc_memory_migrations, rd_pgc_memory_hot_to_dirty, (collected_number)pgc_main_stats.queues.dirty.added_size);
-
-        rrdset_done(st_pgc_memory_migrations);
-        priority++;
-    }
-
-    {
-        static RRDSET *st_pgc_cache_size = NULL;
-        static RRDDIM *rd_free = NULL;
-        static RRDDIM *rd_used = NULL;
-
-        if (unlikely(!st_pgc_cache_size)) {
-            st_pgc_cache_size = rrdset_create_localhost(
-                    "netdata",
-                    "dbengine_memory_main_cache_size",
-                    NULL,
-                    "dbengine memory",
-                    NULL,
-                    "Netdata DB Cache Size",
-                    "bytes",
-                    "netdata",
-                    "stats",
-                    priority,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
-
-            rd_free = rrddim_add(st_pgc_cache_size, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_used = rrddim_add(st_pgc_cache_size, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        }
-
-        collected_number free = (pgc_main_stats.current_cache_size > pgc_main_stats.wanted_cache_size) ? 0 :
-                (collected_number)(pgc_main_stats.wanted_cache_size - pgc_main_stats.current_cache_size);
-
-        rrddim_set_by_pointer(st_pgc_cache_size, rd_free, free);
-        rrddim_set_by_pointer(st_pgc_cache_size, rd_used, (collected_number)pgc_main_stats.current_cache_size);
-
-        rrdset_done(st_pgc_cache_size);
-        priority++;
-    }
-
-    {
-        static RRDSET *st_pgc_memory_pressure_events = NULL;
-        static RRDDIM *rd_pgc_memory_evictions_critical = NULL;
-        static RRDDIM *rd_pgc_memory_evictions_aggressive = NULL;
-        static RRDDIM *rd_pgc_memory_flushes_critical = NULL;
-
-        if (unlikely(!st_pgc_memory_pressure_events)) {
-            st_pgc_memory_pressure_events = rrdset_create_localhost(
-                    "netdata",
-                    "dbengine_memory_pressure_events",
-                    NULL,
-                    "dbengine memory",
-                    NULL,
-                    "Netdata DB Memory Pressure Events",
-                    "events/s",
-                    "netdata",
-                    "stats",
-                    priority,
-                    localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
-
-            rd_pgc_memory_evictions_aggressive = rrddim_add(st_pgc_memory_pressure_events, "evictions critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pgc_memory_evictions_critical   = rrddim_add(st_pgc_memory_pressure_events, "evictions aggressive", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_pgc_memory_flushes_critical     = rrddim_add(st_pgc_memory_pressure_events, "flushes critical", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
-
-        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_aggressive, (collected_number)pgc_main_stats.events_cache_needs_space_aggressively);
-        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_evictions_critical, (collected_number)pgc_main_stats.events_cache_under_severe_pressure);
-        rrddim_set_by_pointer(st_pgc_memory_pressure_events, rd_pgc_memory_flushes_critical, (collected_number)pgc_main_stats.events_flush_critical);
-
-        rrdset_done(st_pgc_memory_pressure_events);
-        priority++;
     }
 
     {
@@ -1170,7 +1469,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_cache_hit_ratio",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Queries Cache Hit Ratio",
                     "%",
@@ -1181,6 +1480,8 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_LINE);
 
             rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "hit", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+
+            priority++;
         }
 
         size_t pages_to_load = cache_efficiency_stats.pages_to_load_from_disk - cache_efficiency_stats_old.pages_to_load_from_disk;
@@ -1195,7 +1496,6 @@ static void dbengine2_statistics_charts(void) {
                               (collected_number)percent);
 
         rrdset_done(st_cache_hit_ratio);
-        priority++;
     }
 
     {
@@ -1209,7 +1509,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_query_pages_metadata_source",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Query Pages Metadata Source",
                     "pages/s",
@@ -1222,6 +1522,8 @@ static void dbengine2_statistics_charts(void) {
             rd_cache = rrddim_add(st_query_pages_source, "cache hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_jv2   = rrddim_add(st_query_pages_source, "journal v2 scan", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_open  = rrddim_add(st_query_pages_source, "open journal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
         }
 
         rrddim_set_by_pointer(st_query_pages_source, rd_cache, (collected_number)cache_efficiency_stats.pages_found_in_cache);
@@ -1229,7 +1531,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_source, rd_open, (collected_number)cache_efficiency_stats.pages_found_in_open);
 
         rrdset_done(st_query_pages_source);
-        priority++;
     }
 
     {
@@ -1242,7 +1543,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_query_pages_data_source",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Query Pages to Data Source",
                     "pages/s",
@@ -1254,13 +1555,14 @@ static void dbengine2_statistics_charts(void) {
 
             rd_pages_in_mem = rrddim_add(st_query_pages_data_source, "memory", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_to_load = rrddim_add(st_query_pages_data_source, "disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
         }
 
         rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_in_mem, (collected_number)(cache_efficiency_stats.pages_total - cache_efficiency_stats.pages_to_load_from_disk));
         rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_to_load, (collected_number)cache_efficiency_stats.pages_to_load_from_disk);
 
         rrdset_done(st_query_pages_data_source);
-        priority++;
     }
 
     {
@@ -1276,7 +1578,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_query_next_page",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Query Next Page",
                     "pages/s",
@@ -1291,6 +1593,8 @@ static void dbengine2_statistics_charts(void) {
             rd_nowait_failed = rrddim_add(st_query_next_page, "failed fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_wait_loaded = rrddim_add(st_query_next_page, "loaded slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_nowait_loaded = rrddim_add(st_query_next_page, "loaded fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
         }
 
         rrddim_set_by_pointer(st_query_next_page, rd_pass4, (collected_number)cache_efficiency_stats.pages_pending_found_in_cache_at_pass4);
@@ -1300,7 +1604,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_next_page, rd_nowait_loaded, (collected_number)cache_efficiency_stats.page_next_nowait_loaded);
 
         rrdset_done(st_query_next_page);
-        priority++;
     }
 
     {
@@ -1321,7 +1624,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_query_pages_disk_load",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Query Pages Loaded from Disk",
                     "pages/s",
@@ -1341,6 +1644,8 @@ static void dbengine2_statistics_charts(void) {
             rd_unroutable = rrddim_add(st_query_pages_from_disk, "fail unroutable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_not_found = rrddim_add(st_query_pages_from_disk, "fail uuid not found", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid_extent = rrddim_add(st_query_pages_from_disk, "fail invalid extent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
         }
 
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_compressed, (collected_number)cache_efficiency_stats.pages_load_ok_compressed);
@@ -1355,7 +1660,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid_extent, (collected_number)cache_efficiency_stats.pages_load_fail_invalid_extent);
 
         rrdset_done(st_query_pages_from_disk);
-        priority++;
     }
 
     {
@@ -1375,7 +1679,7 @@ static void dbengine2_statistics_charts(void) {
                     "netdata",
                     "dbengine_query_timings",
                     NULL,
-                    "dbengine cache",
+                    "dbengine query router",
                     NULL,
                     "Netdata Query Timings",
                     "usec/s",
@@ -1394,6 +1698,8 @@ static void dbengine2_statistics_charts(void) {
             rd_next_page_disk_slow = rrddim_add(st_query_timings, "next page disk slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_preload_fast = rrddim_add(st_query_timings, "next page preload fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_preload_slow = rrddim_add(st_query_timings, "next page preload slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
         }
 
         rrddim_set_by_pointer(st_query_timings, rd_main_cache, (collected_number)cache_efficiency_stats.time_in_main_cache_lookup);
@@ -1407,7 +1713,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_timings, rd_next_page_preload_slow, (collected_number)cache_efficiency_stats.time_to_slow_preload_next_page);
 
         rrdset_done(st_query_timings);
-        priority++;
     }
 
 }
