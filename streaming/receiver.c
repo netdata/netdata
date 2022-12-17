@@ -426,10 +426,13 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     netdata_mutex_lock(&host->receiver_lock);
 
     if (!host->receiver || host->receiver == rpt) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+
         host->receiver = rpt;
         rpt->host = host;
 
         host->child_connect_time = now_realtime_sec();
+        host->child_disconnected_time = 0;
         host->child_last_chart_command = 0;
         host->trigger_chart_obsoletion_check = 1;
 
@@ -463,11 +466,9 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
         // Make sure that we detach this thread and don't kill a freshly arriving receiver
         if(host->receiver == rpt) {
-            host->child_connect_time = 0;
             host->trigger_chart_obsoletion_check = 0;
+            host->child_connect_time = 0;
             host->child_disconnected_time = now_realtime_sec();
-
-            rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
 
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health_enabled = 0;
@@ -479,6 +480,8 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
 
             if (host->receiver == rpt)
                 host->receiver = NULL;
+
+            rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
         }
 
         netdata_mutex_unlock(&rpt->host->receiver_lock);

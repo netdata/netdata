@@ -1111,33 +1111,36 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
      * lookup to the now-attached structure).
      */
 
-    rrd_rdlock();
-    RRDHOST *host = rrdhost_find_by_guid(rpt->machine_guid);
-    if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
-        host = NULL;
-
-    if (host) {
+    {
         time_t age;
         bool receiver_stale = false;
         bool receiver_working = false;
 
-        netdata_mutex_lock(&host->receiver_lock);
-        if (host->receiver) {
-            age = now_realtime_sec() - host->receiver->last_msg_t;
+        rrd_rdlock();
+        RRDHOST *host = rrdhost_find_by_guid(rpt->machine_guid);
+        if (unlikely(host && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) /* Ignore archived hosts. */
+            host = NULL;
 
-            if(age < 30)
-                receiver_working = true;
-            else
-                receiver_stale = true;
+        if (host) {
+            netdata_mutex_lock(&host->receiver_lock);
+            if (host->receiver) {
+                age = now_realtime_sec() - host->receiver->last_msg_t;
+
+                if (age < 30)
+                    receiver_working = true;
+                else
+                    receiver_stale = true;
+            }
+            netdata_mutex_unlock(&host->receiver_lock);
         }
-        netdata_mutex_unlock(&host->receiver_lock);
+        rrd_unlock();
 
         if (receiver_stale && stop_streaming_receiver(host))
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
 
-        if(receiver_working || receiver_stale) {
+        if (receiver_working || receiver_stale) {
             // another receiver is already connected
             // try again later
 
@@ -1162,7 +1165,6 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             return HTTP_RESP_CONFLICT;
         }
     }
-    rrd_unlock();
 
     debug(D_SYSTEM, "starting STREAM receive thread.");
 
@@ -1172,7 +1174,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt)) {
         log_stream_connection(rpt->client_ip, rpt->client_port,
                               rpt->key,
-                              host->machine_guid,
+                              rpt->machine_guid,
                               rpt->hostname,
                               "FAILED - CANT CREATE THREAD");
 

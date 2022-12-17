@@ -671,8 +671,6 @@ RRDHOST *rrdhost_find_or_create(
 ) {
     debug(D_RRDHOST, "Searching for host '%s' with guid '%s'", hostname, guid);
 
-    rrd_wrlock();
-
     RRDHOST *host = rrdhost_find_by_guid(guid);
     if (unlikely(host && host->rrd_memory_mode != mode && rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))) {
         /* If a legacy memory mode instantiates all dbengine state must be discarded to avoid inconsistencies */
@@ -683,6 +681,8 @@ RRDHOST *rrdhost_find_or_create(
     }
 
     if(!host) {
+        rrd_wrlock();
+
         host = rrdhost_create(
                 hostname
                 , registry_hostname
@@ -709,6 +709,8 @@ RRDHOST *rrdhost_find_or_create(
                 , 0
                 , archived
         );
+
+        rrd_unlock();
     }
     else {
         rrdhost_update(host
@@ -735,15 +737,6 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_replication_step
            , system_info);
     }
-
-    if (host) {
-        rrdhost_wrlock(host);
-        rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
-        host->child_disconnected_time = 0;
-        rrdhost_unlock(host);
-    }
-
-    rrd_unlock();
 
     return host;
 }
