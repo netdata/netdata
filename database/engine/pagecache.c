@@ -34,7 +34,16 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entrie
         descr->end_time_ut = end_time_t * USEC_PER_SEC;
         descr->update_every_s = entries_array[Index].update_every;
         descr->type = ctx->page_type;
-        descr->page_length = (end_time_t - start_time_t + descr->update_every_s) / descr->update_every_s * bytes_per_point;
+
+        descr->page_length = (end_time_t - (start_time_t - descr->update_every_s)) / descr->update_every_s * bytes_per_point;
+
+        if(descr->page_length > entries_array[Index].size) {
+            descr->page_length = entries_array[Index].size;
+
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
+        }
+
         descr->page = pgc_page_dup(main_cache, pages_array[Index]);
         PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
         fatal_assert( NULL != PValue);

@@ -197,7 +197,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
 static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
     switch(handle->type) {
         case PAGE_METRICS: {
-            size_t slots = handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(mrg_metric_ctx(handle->metric));
+            size_t slots = handle->position;
             storage_number *array = (storage_number *)pgc_page_data(handle->page);
             for (size_t i = 0 ; i < slots; ++i) {
                 if(does_storage_number_exist(array[i]))
@@ -207,7 +207,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
         break;
 
         case PAGE_TIER: {
-            size_t slots = handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(mrg_metric_ctx(handle->metric));
+            size_t slots = handle->position;
             storage_number_tier1_t *array = (storage_number_tier1_t *)pgc_page_data(handle->page);
             for (size_t i = 0 ; i < slots; ++i) {
                 if(fpclassify(array[i].sum_value) != FP_NAN)
@@ -231,17 +231,16 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
 
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
-    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     if (unlikely(!handle->page))
         return;
 
-    if (likely(handle->page_length)) {
+    if (likely(handle->position)) {
         int page_is_empty;
 
         page_is_empty = page_has_only_empty_metrics(handle);
         if (page_is_empty) {
-            size_t points = handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+            size_t points = handle->position;
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Deleting page with %lu empty points", __func__, points);
             if (pgc_is_page_hot(handle->page)) {
@@ -262,34 +261,46 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
     }
 
+    handle->position = 0;
+    handle->entries_max = 0;
     handle->page = NULL;
 }
 
-static PGC_PAGE *rrdeng_create_new_hot_page(struct rrdengine_instance *ctx, METRIC *metric, time_t point_in_time_s, time_t update_every_s) {
+static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle, struct rrdengine_instance *ctx, usec_t point_in_time_ut, void *data) {
+    time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+
     PGC_ENTRY page_entry = {
             .section = (Word_t) ctx,
-            .metric_id = mrg_metric_id(main_mrg, metric),
+            .metric_id = mrg_metric_id(main_mrg, handle->metric),
             .start_time_t = point_in_time_s,
             .end_time_t = point_in_time_s,
             .size = RRDENG_BLOCK_SIZE,
-            .data = dbengine_page_alloc(),
-            .update_every = update_every_s,
+            .data = data,
+            .update_every = mrg_metric_get_update_every(main_mrg, handle->metric),
             .hot = true
     };
 
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     if (false == added) {
+        // copy the point in data
+        memcpy(pgc_page_data(page), data, PAGE_POINT_CTX_SIZE_BYTES(ctx));
+
+        // free data
         dbengine_page_free(page_entry.data);
 
-        // FIXME - what we should do if the page returned is not hot?
-        // FIXME - what we should do if the page returned is also written by another collector?
-    }
-    else {
-        mrg_metric_set_hot_latest_time_t(main_mrg, metric, point_in_time_s);
-    }
+        if(!pgc_is_page_hot(page))
+            fatal("DBENGINE: hot page already exists in cache, but is not hot");
 
-    return page;
+        handle->entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+    }
+    else
+        handle->entries_max = RRDENG_BLOCK_SIZE / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+
+    handle->start_time_ut = point_in_time_ut;
+    handle->end_time_ut = point_in_time_ut;
+    handle->position = 0;
+    handle->page = page;
 }
 
 static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection_handle,
@@ -304,61 +315,50 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
-    bool must_flush_unaligned_page = false, perfect_page_alignment = false;
+    bool perfect_page_alignment = false;
+    void *data;
 
-    if(handle->page) {
+    if(likely(handle->page)) {
         /* Make alignment decisions */
-        if (handle->page_length == handle->alignment->page_length) {
+        if (handle->position == handle->alignment->position) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = true;
         }
 
         /* is the metric far enough out of alignment with the others? */
-        if (unlikely(handle->page_length + PAGE_POINT_CTX_SIZE_BYTES(ctx) < handle->alignment->page_length))
+        if (unlikely(handle->position + 1 < handle->alignment->position))
             handle->options |= RRDENG_CHO_UNALIGNED;
 
         if (unlikely((handle->options & RRDENG_CHO_UNALIGNED) &&
                      /* did the other metrics change page? */
-                     handle->alignment->page_length <= PAGE_POINT_CTX_SIZE_BYTES(ctx))) {
-            must_flush_unaligned_page = true;
+                     handle->alignment->position <= 1)) {
             handle->options &= ~RRDENG_CHO_UNALIGNED;
-        }
-    }
 
-    if (unlikely(!handle->page ||
-                 handle->page_length + PAGE_POINT_CTX_SIZE_BYTES(ctx) > RRDENG_BLOCK_SIZE ||
-                 must_flush_unaligned_page)) {
-
-        if(handle->page)
             rrdeng_store_metric_flush_current_page(collection_handle);
-
-        handle->page = rrdeng_create_new_hot_page(ctx, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC),
-                                                  mrg_metric_get_update_every(main_mrg, handle->metric));
-        handle->start_time_ut = point_in_time_ut;
-        handle->page_length = 0;
-
-        if (0 == handle->alignment->page_length) {
-            /* this is the leading dimension that defines chart alignment */
-            perfect_page_alignment = true;
+            data = dbengine_page_alloc();
         }
+        else
+            data = pgc_page_data(handle->page);
     }
+    else
+        data = dbengine_page_alloc();
 
     switch (ctx->page_type) {
         case PAGE_METRICS: {
-            storage_number *tier0_metric_data = pgc_page_data(handle->page);
-            tier0_metric_data[handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx)] = pack_storage_number(n, flags);
+            storage_number *tier0_metric_data = data;
+            tier0_metric_data[handle->position++] = pack_storage_number(n, flags);
         }
         break;
 
         case PAGE_TIER: {
-            storage_number_tier1_t *tier12_metric_data = pgc_page_data(handle->page);
+            storage_number_tier1_t *tier12_metric_data = data;
             storage_number_tier1_t number_tier1;
             number_tier1.sum_value = (float)n;
             number_tier1.min_value = (float)min_value;
             number_tier1.max_value = (float)max_value;
             number_tier1.anomaly_count = anomaly_count;
             number_tier1.count = count;
-            tier12_metric_data[handle->page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx)] = number_tier1;
+            tier12_metric_data[handle->position++] = number_tier1;
         }
         break;
 
@@ -372,15 +372,29 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
         break;
     }
 
-    handle->page_length += PAGE_POINT_CTX_SIZE_BYTES(ctx);
-    handle->end_time_ut = point_in_time_ut;
+    if(unlikely(!handle->page)){
+        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data);
 
-    pgc_page_hot_set_end_time_t(main_cache, handle->page, (time_t) (point_in_time_ut / USEC_PER_SEC));
+        if (0 == handle->alignment->position) {
+            /* this is the leading dimension that defines chart alignment */
+            perfect_page_alignment = true;
+        }
+    }
+    else {
+        // update an existing page
+        handle->end_time_ut = point_in_time_ut;
+        pgc_page_hot_set_end_time_t(main_cache, handle->page, (time_t) (point_in_time_ut / USEC_PER_SEC));
+    }
+
+    if(unlikely(handle->position >= handle->entries_max))
+        rrdeng_store_metric_flush_current_page(collection_handle);
 
     if (perfect_page_alignment)
-        handle->alignment->page_length = handle->page_length;
+        handle->alignment->position = handle->position;
 
-    if(handle->options & RRDENG_CHO_SET_FIRST_TIME_T) {
+    // update the metric information
+
+    if(unlikely(handle->options & RRDENG_CHO_SET_FIRST_TIME_T)) {
         handle->options &= ~RRDENG_CHO_SET_FIRST_TIME_T;
         mrg_metric_set_first_time_t(main_mrg, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC));
     }
@@ -425,7 +439,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
             size_t point_size = PAGE_POINT_CTX_SIZE_BYTES(mrg_metric_ctx(handle->metric));
             size_t page_size_in_points = RRDENG_BLOCK_SIZE / point_size;
-            size_t used_points = handle->page_length / point_size;
+            size_t used_points = handle->position;
             size_t remaining_points_in_page = page_size_in_points - used_points;
 
             bool new_point_is_aligned = true;

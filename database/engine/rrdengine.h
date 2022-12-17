@@ -135,7 +135,8 @@ struct rrdeng_collect_handle {
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;
 
-    uint32_t page_length;                   // keep track of the current page size, to make sure we don't exceed it
+    uint32_t entries_max;
+    uint32_t position;                   // keep track of the current page size, to make sure we don't exceed it
     usec_t start_time_ut;
     usec_t end_time_ut;
 };
