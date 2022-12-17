@@ -131,17 +131,17 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             struct page_details *pd = *PValue;
             UNUSED(pd);
 
-            internal_error(
-                    pd->first_time_s != page_first_time_s ||
-                    pd->last_time_s != page_last_time_s ||
-                    pd->update_every_s != page_update_every_s,
-                    "DBENGINE: duplicate page with different retention in %s cache "
-                    "1st: %ld to %ld, ue %u, size %u "
-                    "2nd: %ld to %ld, ue %ld size %zu "
-                    "- ignoring the second",
-                    cache == open_cache ? "open" : "main",
-                    pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
-                    page_first_time_s, page_last_time_s, page_update_every_s, page_length);
+//            internal_error(
+//                    pd->first_time_s != page_first_time_s ||
+//                    pd->last_time_s != page_last_time_s ||
+//                    pd->update_every_s != page_update_every_s,
+//                    "DBENGINE: duplicate page with different retention in %s cache "
+//                    "1st: %ld to %ld, ue %u, size %u "
+//                    "2nd: %ld to %ld, ue %ld size %zu "
+//                    "- ignoring the second",
+//                    cache == open_cache ? "open" : "main",
+//                    pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
+//                    page_first_time_s, page_last_time_s, page_update_every_s, page_length);
 
             pgc_page_release(cache, page);
         }
@@ -371,16 +371,16 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         // it is already in the judy
 
                         struct page_details *pd = *PValue; (void)pd;
-                        internal_error(
-                                pd->first_time_s != page_first_time_s ||
-                                pd->last_time_s != page_last_time_s ||
-                                pd->update_every_s != page_update_every_s,
-                                "DBENGINE: duplicate page with different retention in journal v2 "
-                                "1st: %ld to %ld, ue %u, size %u "
-                                "2nd: %ld to %ld, ue %ld size %zu "
-                                "- ignoring the second",
-                                pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
-                                page_first_time_s, page_last_time_s, page_update_every_s, page_length);
+//                        internal_error(
+//                                pd->first_time_s != page_first_time_s ||
+//                                pd->last_time_s != page_last_time_s ||
+//                                pd->update_every_s != page_update_every_s,
+//                                "DBENGINE: duplicate page with different retention in journal v2 "
+//                                "1st: %ld to %ld, ue %u, size %u "
+//                                "2nd: %ld to %ld, ue %ld size %zu "
+//                                "- ignoring the second",
+//                                pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
+//                                page_first_time_s, page_last_time_s, page_update_every_s, page_length);
                     }
                     else {
                         if(datafile_acquire(datafile)) {

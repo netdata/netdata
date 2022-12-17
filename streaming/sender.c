@@ -878,7 +878,7 @@ void execute_commands(struct sender_state *s) {
         log_access("STREAM: %d from '%s' for host '%s': %s",
                    gettid(), s->connected_to, rrdhost_hostname(s->host), start);
 
-        internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
+        // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
         size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
