@@ -462,8 +462,8 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     internal_fatal((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every(main_mrg, handle->metric),
                    "DBENGINE: the collection handle update every and the metric registry update every are not the same");
 
-    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
-        "DBENGINE: new point is not aligned to update every");
+//    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
+//        "DBENGINE: new point is not aligned to update every");
 
     rrdeng_store_metric_next_internal(collection_handle, point_in_time_ut, n, min_value, max_value, count, anomaly_count, flags);
 }
