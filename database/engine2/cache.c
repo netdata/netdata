@@ -1849,8 +1849,8 @@ static bool match_page_data(PGC_PAGE *page, void *data) {
     return (page->data == data);
 }
 
-bool pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile) {
-    return evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
+void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile) {
+    evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
 }
 
 // ----------------------------------------------------------------------------
