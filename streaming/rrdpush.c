@@ -1045,7 +1045,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             snprintfz(msg, 100,
                       "multiple connections for same host, "
                       "old connection was used %ld secs ago%s",
-                      age, receiver_stale ? ", signaled old receiver to stop" : "");
+                      age, receiver_stale ? ", signaled old receiver to stop, try again later" : "new connection not accepted");
 
             rrdpush_receive_log_status(
                     rpt,
