@@ -3927,16 +3927,6 @@ void *ebpf_socket_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = socket_maps;
 
-    if (network_viewer_opt.enabled) {
-        memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
-        memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
-        avl_init_lock(&inbound_vectors.tree, compare_sockets);
-        avl_init_lock(&outbound_vectors.tree, compare_sockets);
-
-        parse_network_viewer_section(&socket_config);
-        parse_service_name_section(&socket_config);
-        initialize_inbound_outbound();
-    }
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
@@ -3946,6 +3936,15 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
+
+    if (network_viewer_opt.enabled) {
+        memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        avl_init_lock(&inbound_vectors.tree, compare_sockets);
+        avl_init_lock(&outbound_vectors.tree, compare_sockets);
+
+        initialize_inbound_outbound();
+    }
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;
