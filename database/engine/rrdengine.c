@@ -1204,7 +1204,7 @@ static void queue_extent_list(struct rrdengine_instance *ctx, struct extent_page
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
 
-static void pdc_to_extent_list(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_list_t exec_extent_list)
+static void pdc_to_extent_list(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_list_t exec_first_extent_list, execute_extent_list_t exec_rest_extent_list)
 {
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
@@ -1262,6 +1262,7 @@ static void pdc_to_extent_list(struct rrdengine_instance *ctx, struct page_detai
             *PValue3 = pd;
         }
 
+        size_t extent_list_no = 0;
         Word_t datafile_no = 0;
         first_then_next = true;
         while((PValue = JudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
@@ -1280,7 +1281,10 @@ static void pdc_to_extent_list(struct rrdengine_instance *ctx, struct page_detai
                 pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
                 extent_page_list->pdc = pdc;
 
-                exec_extent_list(ctx, extent_page_list);
+                if(extent_list_no++ == 0)
+                    exec_first_extent_list(ctx, extent_page_list);
+                else
+                    exec_rest_extent_list(ctx, extent_page_list);
             }
             freez(datafile_extent_list);
         }
@@ -1304,7 +1308,7 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_details_control *pdc = work_request->data;
 
-    pdc_to_extent_list(ctx, pdc, queue_extent_list);
+    pdc_to_extent_list(ctx, pdc, queue_extent_list, queue_extent_list);
     worker_is_idle();
 }
 
@@ -1330,7 +1334,7 @@ static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_de
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc)
 {
 
-    pdc_to_extent_list(ctx, pdc, queue_extent_list);
+    pdc_to_extent_list(ctx, pdc, queue_extent_list, queue_extent_list);
 
 //    struct rrdeng_cmd cmd;
 //    cmd.opcode = RRDENG_READ_PAGE_LIST;
@@ -1339,12 +1343,12 @@ void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details
 //    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
 
-void load_pages_from_an_extext_list_directly(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_list) {
+void load_pages_from_an_extent_list_directly(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_list) {
     load_pages_from_an_extent_list(ctx, extent_list, false);
 }
 
 void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
-    pdc_to_extent_list(ctx, pdc, load_pages_from_an_extext_list_directly);
+    pdc_to_extent_list(ctx, pdc, load_pages_from_an_extent_list_directly, queue_extent_list);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
