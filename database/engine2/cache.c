@@ -645,7 +645,10 @@ static inline void PGC_REFERENCED_PAGES_MINUS1(PGC *cache, size_t assumed_size) 
     __atomic_sub_fetch(&cache->stats.referenced_size, assumed_size, __ATOMIC_RELAXED);
 }
 
-static inline bool page_acquire___while_having_some_lock(PGC *cache, PGC_PAGE *page) {
+// If the page is not already acquired,
+// YOU HAVE TO HAVE THE QUEUE (hot, dirty, clean) THE PAGE IS IN, L O C K E D !
+// If you don't have it locked, NOTHING PREVENTS THIS PAGE FOR VANISHING WHILE THIS IS CALLED!
+static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
@@ -696,6 +699,44 @@ static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necess
         if(evict_if_necessary)
             evict_on_page_release_when_permitted(cache);
     }
+}
+
+static inline bool non_acquired_page_get_for_deletion___while_having_clean_locked(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    internal_fatal(!is_page_clean(page),
+                   "DBENGINE CACHE: only clean pages can be deleted");
+
+    REFCOUNT expected, desired;
+
+    expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
+    size_t spins = 0;
+    bool delete_it;
+
+    do {
+        spins++;
+
+        if (expected == 0) {
+            desired = REFCOUNT_DELETING;
+            delete_it = true;
+        }
+        else {
+            delete_it = false;
+            break;
+        }
+
+    } while(!__atomic_compare_exchange_n(&page->refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
+
+    if(delete_it) {
+        // we can delete this page
+        internal_fatal(page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
+                       "DBENGINE CACHE: page is already being deleted");
+
+        page_flag_set(page, PGC_PAGE_IS_BEING_DELETED);
+    }
+
+    if(unlikely(spins > 1))
+        __atomic_add_fetch(&cache->stats.delete_spins, spins - 1, __ATOMIC_RELAXED);
+
+    return delete_it;
 }
 
 static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __maybe_unused, PGC_PAGE *page) {
@@ -912,8 +953,7 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
         for(PGC_PAGE *page = cache->clean.base; page ; ) {
             PGC_PAGE *next = page->link.next;
 
-            if(page_acquire___while_having_some_lock(cache, page) &&
-               acquired_page_get_for_deletion_or_release_it(cache, page)) {
+            if(non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page)) {
                 // we can delete this page
 
                 // remove it from the clean list
@@ -1111,7 +1151,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
                 *added = true;
         }
         else {
-            if (!page_acquire___while_having_some_lock(cache, page))
+            if (!page_acquire(cache, page))
                 page = NULL;
 
             else if(added)
@@ -1213,7 +1253,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
     if(page) {
         pointer_check(cache, page);
 
-        if(!page_acquire___while_having_some_lock(cache, page)) {
+        if(!page_acquire(cache, page)) {
             // this page is not good to use
             page = NULL;
         }
@@ -1243,7 +1283,7 @@ static void all_hot_pages_to_dirty(PGC *cache) {
     while(page) {
         PGC_PAGE *next = page->link.next;
 
-        if(page_acquire___while_having_some_lock(cache, page)) {
+        if(page_acquire(cache, page)) {
             page_set_dirty(cache, page, true);
             page_release(cache, page, false);
             // page ptr may be invalid now
@@ -1312,7 +1352,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             internal_fatal(page_get_status_flags(page) != PGC_PAGE_DIRTY,
                            "DBENGINE CACHE: page should be in the dirty list before saved");
 
-            if (page_acquire___while_having_some_lock(cache, page)) {
+            if (page_acquire(cache, page)) {
                 internal_fatal(page_get_status_flags(page) != PGC_PAGE_DIRTY,
                                "DBENGINE CACHE: page should be in the dirty list before saved");
 
@@ -1524,7 +1564,7 @@ PGC_PAGE *pgc_page_add_and_acquire(PGC *cache, PGC_ENTRY entry, bool *added) {
 }
 
 PGC_PAGE *pgc_page_dup(PGC *cache, PGC_PAGE *page) {
-    if(!page_acquire___while_having_some_lock(cache, page))
+    if(!page_acquire(cache, page))
         fatal("DBENGINE CACHE: tried to dup a page that is not acquired!");
 
     return page;
@@ -1682,7 +1722,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         struct extent_io_data *xio = (struct extent_io_data *)page->custom_data;
         if(xio->fileno != datafile_fileno) continue;
 
-        if(!page_acquire___while_having_some_lock(cache, page))
+        if(!page_acquire(cache, page))
             continue;
 
         if(page_flag_check(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2))
