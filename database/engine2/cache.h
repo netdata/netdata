@@ -33,10 +33,19 @@ typedef struct pgc_entry {
 struct pgc_queue_statistics {
     size_t entries;
     size_t size;
+
+    uint8_t padding1[64];
+
     size_t max_entries;
     size_t max_size;
+
+    uint8_t padding2[64];
+
     size_t added_entries;
     size_t added_size;
+
+    uint8_t padding3[64];
+
     size_t removed_entries;
     size_t removed_size;
 };
@@ -45,25 +54,39 @@ struct pgc_statistics {
     size_t wanted_cache_size;
     size_t current_cache_size;
 
+    uint8_t padding1[64];
+
     size_t added_entries;
     size_t added_size;
+
+    uint8_t padding2[64];
 
     size_t removed_entries;
     size_t removed_size;
 
+    uint8_t padding3[64];
+
     size_t entries;                 // all the entries (includes clean, dirty, host)
     size_t size;                    // all the entries (includes clean, dirty, host)
 
+    uint8_t padding4[64];
+
     size_t referenced_entries;      // all the entries currently referenced
     size_t referenced_size;         // all the entries currently referenced
+
+    uint8_t padding5[64];
 
     size_t searches_exact;
     size_t searches_exact_hits;
     size_t searches_exact_misses;
 
+    uint8_t padding6[64];
+
     size_t searches_closest;
     size_t searches_closest_hits;
     size_t searches_closest_misses;
+
+    uint8_t padding7[64];
 
     size_t flushes_completed;
     size_t flushes_completed_size;
@@ -71,8 +94,11 @@ struct pgc_statistics {
     size_t flushes_cancelled_size;
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
+    uint8_t padding7a[64];
     size_t points_collected;
 #endif
+
+    uint8_t padding8[64];
 
     size_t insert_spins;
     size_t evict_spins;
@@ -80,18 +106,26 @@ struct pgc_statistics {
     size_t acquire_spins;
     size_t delete_spins;
 
+    uint8_t padding9[64];
+
     size_t evict_skipped;
     size_t hot_empty_pages_evicted_immediately;
     size_t hot_empty_pages_evicted_later;
+
+    uint8_t padding10[64];
 
     // events
     size_t events_cache_under_severe_pressure;
     size_t events_cache_needs_space_aggressively;
     size_t events_flush_critical;
 
+    uint8_t padding11[64];
+
     struct {
         struct pgc_queue_statistics hot;
+        uint8_t padding1[64];
         struct pgc_queue_statistics dirty;
+        uint8_t padding2[64];
         struct pgc_queue_statistics clean;
     } queues;
 };
