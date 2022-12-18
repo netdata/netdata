@@ -527,34 +527,14 @@ static void do_flush_extent_cb(uv_fs_t *req)
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
-        struct extent_io_data ext_io_data = {
-            .fileno = datafile->fileno,
-            .file  = datafile->file,
-            .pos = xt_io_descr->pos,
-            .bytes = xt_io_descr->bytes
-        };
+        pgc_open_add_hot_page(
+                (Word_t)ctx, descr->metric_id,
+                (time_t) (descr->start_time_ut / USEC_PER_SEC),
+                (time_t) (descr->end_time_ut / USEC_PER_SEC),
+                descr->update_every_s,
+                datafile,
+                xt_io_descr->pos, xt_io_descr->bytes);
 
-        PGC_ENTRY page_entry = {
-            .hot = true,
-            .section = (Word_t)ctx,
-            .metric_id = descr->metric_id,
-            .start_time_t = (time_t) (descr->start_time_ut / USEC_PER_SEC),
-            .end_time_t =  (time_t) (descr->end_time_ut / USEC_PER_SEC),
-            .update_every = descr->update_every_s,
-            .size = 0,
-            .data = datafile,
-            .custom_data = (uint8_t *) &ext_io_data
-        };
-
-        bool added = true;
-        int tries = 100;
-        PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
-        while(!added && tries--) {
-            pgc_page_hot_to_clean_empty_and_release(open_cache, page);
-            page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
-        }
-        fatal_assert(true == added);
-        pgc_page_release(open_cache, (PGC_PAGE *)page);
         pgc_page_release(main_cache, (PGC_PAGE *) descr->page);
         freez(descr);
     }

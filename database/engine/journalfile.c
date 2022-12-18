@@ -437,36 +437,10 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         }
         Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
-        {
-            struct extent_io_data ext_io_data = {
-                .file  = journalfile->datafile->file,
-                .pos = jf_metric_data->extent_offset,
-                .bytes = jf_metric_data->extent_size,
-                .fileno = journalfile->datafile->fileno
-            };
-
-            PGC_ENTRY page_entry = {
-                .hot = true,
-                .section = (Word_t)ctx,
-                .metric_id = metric_id,
-                .start_time_t = vd.start_time_s,
-                .end_time_t =  vd.end_time_s,
-                .update_every = vd.update_every_s,
-                .size = 0,
-                .data = journalfile->datafile,
-                .custom_data = (uint8_t *) &ext_io_data
-            };
-
-            bool added = true;
-            PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
-            int tries = 100;
-            while(!added && tries--) {
-                pgc_page_hot_to_clean_empty_and_release(open_cache, page);
-                page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
-            }
-            fatal_assert(true == added);
-            pgc_page_release(open_cache, (PGC_PAGE *)page);
-        }
+        pgc_open_add_hot_page(
+                (Word_t)ctx, metric_id, vd.start_time_s, vd.end_time_s, vd.update_every_s,
+                journalfile->datafile,
+                jf_metric_data->extent_offset, jf_metric_data->extent_size);
 
         if (update_metric_time) {
             time_t metric_first_time_t = mrg_metric_get_first_time_t(main_mrg, metric);

@@ -8,14 +8,14 @@ struct pgc *main_cache = NULL;
 struct pgc *open_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
-static void dbengine_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
+static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
     //info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
     freez(entry.data);
 }
 
-static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
+static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      Pvoid_t JudyL_flush = NULL;
      Pvoid_t *PValue;
@@ -59,28 +59,15 @@ static void dbengine_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entrie
      rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
 
-static void open_cache_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
+static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
-     // Release storage associated with the page
-     //info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
-     //freez(entry.data);
      ;
 }
 
-static void open_cache_flush_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
+static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
-     info("Datafile flushing %zu pages", entries);
+    ;
 }
-
-
-ARAL page_descr_aral = {
-    .requested_element_size = sizeof(struct rrdeng_page_descr),
-    .initial_elements = 20000,
-    .filename = "page_descriptors",
-    .cache_dir = &netdata_configured_cache_dir,
-    .use_mmap = false,
-    .internal.initialized = false
-};
 
 static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     return page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s;
@@ -598,6 +585,44 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
     return page;
 }
+
+void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s, struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size) {
+
+    struct extent_io_data ext_io_data = {
+            .file  = datafile->file,
+            .fileno = datafile->fileno,
+            .pos = extent_offset,
+            .bytes = extent_size,
+    };
+
+    PGC_ENTRY page_entry = {
+            .hot = true,
+            .section = section,
+            .metric_id = metric_id,
+            .start_time_t = start_time_s,
+            .end_time_t =  end_time_s,
+            .update_every = update_every_s,
+            .size = 0,
+            .data = datafile,
+            .custom_data = (uint8_t *) &ext_io_data,
+    };
+
+    internal_fatal(!datafile->fileno, "DBENGINE: datafile supplied does not have a number");
+
+    bool added = true;
+    PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+    int tries = 100;
+    while(!added && page_entry.end_time_t > pgc_page_end_time_t(page) && tries--) {
+        pgc_page_hot_to_clean_empty_and_release(open_cache, page);
+        page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
+    }
+
+    internal_fatal(!added && page_entry.end_time_t > pgc_page_end_time_t(page),
+                   "DBENGINE: cannot add longer page to open cache");
+
+    pgc_page_release(open_cache, (PGC_PAGE *)page);
+}
+
 void init_page_cache(void)
 {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -610,30 +635,30 @@ void init_page_cache(void)
         main_mrg = mrg_create();
 
         main_cache = pgc_create(
-                (size_t)default_rrdeng_page_cache_mb * 1024 * 1024,
-                dbengine_clean_page_callback,
-                (size_t)rrdeng_pages_per_extent,
-                dbengine_flush_callback,
+                (size_t) default_rrdeng_page_cache_mb * 1024 * 1024,
+                main_cache_free_clean_page_callback,
+                (size_t) rrdeng_pages_per_extent,
+                main_cache_flush_dirty_page_callback,
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
                 0,                                                 // 0 = as many as the system cpus
                 0
-            );
+        );
 
         open_cache = pgc_create(
                 0,                                          // the default is 1MB
-                open_cache_clean_page_callback,
+                open_cache_free_clean_page_callback,
                 1,
-                open_cache_flush_callback,
+                open_cache_flush_dirty_page_callback,
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
                 PGC_OPTIONS_NONE,                                   // AUTOSCALE = 2x max hot pages
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
-            );
+        );
     }
     netdata_spinlock_unlock(&spinlock);
 
