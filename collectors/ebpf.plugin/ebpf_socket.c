@@ -751,6 +751,7 @@ static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_sock
  */
 static inline void calculate_nv_plot()
 {
+    pthread_mutex_lock(&nv_mutex);
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
@@ -771,6 +772,7 @@ static inline void calculate_nv_plot()
     // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
+    pthread_mutex_unlock(&nv_mutex);
 }
 
 /**
