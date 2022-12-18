@@ -265,9 +265,8 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 // DBENGINE2 extent processing
-static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config *wc, void *data, size_t data_length, struct extent_page_list_s *extent_page_list, bool preload_all_pages)
+static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx, void *data, size_t data_length, struct extent_page_list_s *extent_page_list, bool preload_all_pages, bool worker)
 {
-    struct rrdengine_instance *ctx = wc->ctx;
     int ret;
     unsigned i, count;
     void *uncompressed_buf = NULL;
@@ -319,7 +318,8 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                     extent_page_list->pos, extent_page_list->size, extent_page_list->datafile->fileno);
     }
 
-    worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+    if(worker)
+        worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
     if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
         uncompressed_payload_length = 0;
@@ -371,7 +371,8 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
                 (pd) ? pd->update_every_s : 0,
                 have_read_error);
 
-        worker_is_busy(UV_EVENT_PAGE_POPULATION);
+        if(worker)
+            worker_is_busy(UV_EVENT_PAGE_POPULATION);
 
         Word_t metric_id;
         if(pd)
@@ -447,7 +448,8 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
             pgc_page_release(main_cache, page);
     }
 
-    worker_is_idle();
+    if(worker)
+        worker_is_idle();
 
     freez(uncompressed_buf);
 
@@ -1077,16 +1079,7 @@ static bool pdc_check_if_pages_are_already_in_cache(struct rrdengine_instance *c
     return count_remaining == 0;
 }
 
-static void do_read_extent_work(uv_work_t *req)
-{
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-
-    struct extent_page_list_s *extent_page_list = work_request->data;
+static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list, bool worker) {
     struct page_details_control *pdc = extent_page_list->pdc;
 
     bool datafile_acquired = false, extent_exclusive = false;
@@ -1104,11 +1097,12 @@ static void do_read_extent_work(uv_work_t *req)
         }
         extent_exclusive = true;
 
-        if (pdc_check_if_pages_are_already_in_cache(wc->ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
+        if (pdc_check_if_pages_are_already_in_cache(ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
             goto cleanup;
     }
 
-    worker_is_busy(UV_EVENT_EXTENT_MMAP);
+    if(worker)
+        worker_is_busy(UV_EVENT_EXTENT_MMAP);
 
     off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->pos);
     size_t length = ALIGN_BYTES_CEILING(extent_page_list->pos + extent_page_list->size) - map_start;
@@ -1119,8 +1113,9 @@ static void do_read_extent_work(uv_work_t *req)
         // Need to decompress and then process the pagelist
         void *extent_data = data + (extent_page_list->pos - map_start);
         bool extent_used = extent_uncompress_and_populate_pages(
-            wc, extent_data, extent_page_list->size,
-            extent_page_list, pdc->preload_all_extent_pages);
+                ctx, extent_data, extent_page_list->size,
+                extent_page_list, pdc->preload_all_extent_pages,
+                worker);
 
         if(extent_used)
             // since the extent was used, all the pages that are not
@@ -1137,8 +1132,8 @@ static void do_read_extent_work(uv_work_t *req)
 
     // mark all pending pages as failed
     pdc_mark_all_not_loaded_pages_as_failed(
-        extent_page_list->JudyL_page_list, not_loaded_pages_reason,
-        &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+            extent_page_list->JudyL_page_list, not_loaded_pages_reason,
+            &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
     cleanup:
     if(extent_exclusive)
@@ -1154,7 +1149,23 @@ static void do_read_extent_work(uv_work_t *req)
     JudyLFreeArray(&extent_page_list->JudyL_page_list, PJE0);
     freez(extent_page_list);
 
-    worker_is_idle();
+    if(worker)
+        worker_is_idle();
+}
+
+static void do_read_extent_work(uv_work_t *req)
+{
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    struct rrdeng_work *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+    struct rrdengine_instance *ctx = wc->ctx;
+
+    struct extent_page_list_s *extent_page_list = work_request->data;
+
+    load_pages_from_an_extent_list(ctx, extent_page_list, true);
 }
 
 static void do_read_extent(struct rrdengine_worker_config *wc, void *data)
@@ -1184,7 +1195,16 @@ void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-static void queue_extent_commands(struct rrdengine_instance *ctx, struct page_details_control *pdc)
+typedef void (*execute_extent_list_t)(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list);
+
+static void queue_extent_list(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_page_list) {
+    struct rrdeng_cmd cmd;
+    cmd.opcode = RRDENG_READ_EXTENT;
+    cmd.data = extent_page_list;
+    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+}
+
+static void pdc_to_extent_list(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_list_t exec_extent_list)
 {
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
@@ -1257,12 +1277,10 @@ static void queue_extent_commands(struct rrdengine_instance *ctx, struct page_de
                 // It will need to populate the cache with "acquired" pages that are in the list (pd) only
                 // the rest of the extent pages will be added to the cache butnot acquired
 
-                struct rrdeng_cmd cmd;
-                cmd.opcode = RRDENG_READ_EXTENT;
                 pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
                 extent_page_list->pdc = pdc;
-                cmd.data = extent_page_list;
-                rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+
+                exec_extent_list(ctx, extent_page_list);
             }
             freez(datafile_extent_list);
         }
@@ -1286,7 +1304,7 @@ static void do_read_page_list_work(uv_work_t *req)
     struct rrdengine_instance *ctx = wc->ctx;
     struct page_details_control *pdc = work_request->data;
 
-    queue_extent_commands(ctx, pdc);
+    pdc_to_extent_list(ctx, pdc, queue_extent_list);
     worker_is_idle();
 }
 
@@ -1312,13 +1330,21 @@ static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_de
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc)
 {
 
-    queue_extent_commands(ctx, pdc);
+    pdc_to_extent_list(ctx, pdc, queue_extent_list);
 
 //    struct rrdeng_cmd cmd;
 //    cmd.opcode = RRDENG_READ_PAGE_LIST;
 //    cmd.data = pdc;
 //    cmd.completion = NULL;
 //    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+}
+
+void load_pages_from_an_extext_list_directly(struct rrdengine_instance *ctx, struct extent_page_list_s *extent_list) {
+    load_pages_from_an_extent_list(ctx, extent_list, false);
+}
+
+void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
+    pdc_to_extent_list(ctx, pdc, load_pages_from_an_extext_list_directly);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
