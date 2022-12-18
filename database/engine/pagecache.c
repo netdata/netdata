@@ -61,7 +61,8 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
-     ;
+    struct rrdengine_datafile *datafile = entry.data;
+    datafile_release(datafile);
 }
 
 static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
@@ -144,7 +145,12 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pgc_page_release(cache, page);
         }
         else {
+
+            internal_fatal(pgc_page_metric(page) != metric_id, "Wrong metric id in page found in cache");
+            internal_fatal(pgc_page_section(page) != (Word_t)ctx, "Wrong section in page found in cache");
+
             struct page_details *pd = callocz(1, sizeof(*pd));
+            pd->metric_id = metric_id;
             pd->first_time_s = page_first_time_s;
             pd->last_time_s = page_last_time_s;
             pd->page_length = page_length;
@@ -152,19 +158,24 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= ((pd->page) ? (PDC_PAGE_READY | PDC_PAGE_PRELOADED) : 0) | tags;
             pd->type = ctx->page_type;
-            pd->datafile.ptr = (open_cache_mode) ? pgc_page_data(page) : NULL;
-            pd->metric_id = metric_id;
-            uuid_copy(pd->uuid, *uuid);
-            *PValue = pd;
 
             if(open_cache_mode) {
                 struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(cache, page);
+                uuid_copy(pd->datafile.extent.page_uuid, *uuid);
+                pd->datafile.ptr = pgc_page_data(page);
                 pd->datafile.file = xio->file;
                 pd->datafile.extent.pos = xio->pos;
                 pd->datafile.extent.bytes = xio->bytes;
                 pd->datafile.fileno = pd->datafile.ptr->fileno;
                 pgc_page_release(cache, page);
+
+                if(datafile_acquire(pd->datafile.ptr))
+                    pd->status |= PDC_PAGE_DATAFILE_ACQUIRED;
+                else
+                    fatal("DBENGINE: cannot acquire datafile from page in open cache");
             }
+
+            *PValue = pd;
 
             pages_found_in_cache++;
         }
@@ -397,7 +408,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                             pd->type = page_entry_in_journal->type;
                             pd->metric_id = metric_id;
                             pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
-                            uuid_copy(pd->uuid, *uuid);
+                            uuid_copy(pd->datafile.extent.page_uuid, *uuid);
                             *PValue = pd;
 
                             pages_found_in_journals_v2++;
@@ -588,6 +599,9 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
 void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s, struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size) {
 
+    if(!datafile_acquire(datafile))
+        fatal("DBENGINE: cannot acquire datafile to put page in open cache");
+
     struct extent_io_data ext_io_data = {
             .file  = datafile->file,
             .fileno = datafile->fileno,
@@ -617,8 +631,12 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
         page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
     }
 
-    internal_fatal(!added && page_entry.end_time_t > pgc_page_end_time_t(page),
-                   "DBENGINE: cannot add longer page to open cache");
+    if(!added) {
+        datafile_release(datafile);
+
+        internal_fatal(page_entry.end_time_t > pgc_page_end_time_t(page),
+                       "DBENGINE: cannot add longer page to open cache");
+    }
 
     pgc_page_release(open_cache, (PGC_PAGE *)page);
 }

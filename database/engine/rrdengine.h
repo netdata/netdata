@@ -83,12 +83,13 @@ struct page_details {
         unsigned fileno;
 
         struct {
+            uuid_t page_uuid; // metric UUID in extent
             uint64_t pos;
             uint32_t bytes;
         } extent;
     } datafile;
 
-    uuid_t uuid;
+    struct pgc_page *page;
     Word_t metric_id;
     time_t first_time_s;
     time_t last_time_s;
@@ -96,7 +97,6 @@ struct page_details {
     uint16_t page_length;
     uint8_t type;
     PDC_PAGE_STATUS status;
-    struct pgc_page *page;
 };
 
 #define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))

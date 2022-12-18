@@ -101,6 +101,8 @@ void datafile_release(struct rrdengine_datafile *df) {
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait) {
     bool can_be_deleted = false;
 
+    pgc_open_evict_clean_pages_of_datafile(open_cache, df);
+
     while(!can_be_deleted) {
         netdata_spinlock_lock(&df->users.spinlock);
         df->users.available = false;

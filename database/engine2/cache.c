@@ -329,7 +329,10 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
 #define cache_above_healthy_limit(cache) (cache_usage_per1000(cache) >= 990)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
-static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them);
+
+typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
+static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
+#define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
     if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
@@ -906,7 +909,7 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
 }
 
 // returns true, when there is more work to do
-static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them) {
+static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data) {
     if(!all_of_them && !cache_above_healthy_limit(cache))
         // don't bother - not enough to do anything
         return false;
@@ -950,8 +953,12 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
         else
             pgc_ll_lock(cache, &cache->clean);
 
-        for(PGC_PAGE *page = cache->clean.base; page ; ) {
-            PGC_PAGE *next = page->link.next;
+        PGC_PAGE *next = NULL;
+        for(PGC_PAGE *page = cache->clean.base; page ; page = next) {
+            next = page->link.next;
+
+            if(unlikely(filter && !filter(page, data)))
+                continue;
 
             if(non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page)) {
                 // we can delete this page
@@ -983,8 +990,6 @@ static bool evict_pages(PGC *cache, size_t max_skip, size_t max_evict, bool wait
                     break;
                 }
             }
-
-            page = next;
         }
         pgc_ll_unlock(cache, &cache->clean);
 
@@ -1817,7 +1822,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             Word_t start_time = 0;
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
-                make_acquired_page_clean_and_evict_or_page_release(cache, pi->page);
+                pgc_page_hot_to_dirty_and_release(cache, pi->page);
+                // make_acquired_page_clean_and_evict_or_page_release(cache, pi->page);
                 freez(pi);
             }
 
@@ -1837,6 +1843,14 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         }
         JudyLFreeArray(&JudyL_extents_pos, PJE0);
     }
+}
+
+static bool match_page_data(PGC_PAGE *page, void *data) {
+    return (page->data == data);
+}
+
+bool pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile) {
+    return evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
 }
 
 // ----------------------------------------------------------------------------

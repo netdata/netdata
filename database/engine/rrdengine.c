@@ -359,7 +359,7 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_worker_config 
             // if there is no match we will add the page in cache but not in
             // the preload response
 
-            if (uuid_compare(pd->uuid, header->descr[i].uuid) != 0)
+            if (uuid_compare(pd->datafile.extent.page_uuid, header->descr[i].uuid) != 0)
                 pd = NULL;
         }
 
@@ -848,18 +848,18 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             return;
         }
         if (NULL == ctx->datafiles.first->next) {
-            error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
-                                                                                                                 " to reclaim space, there are no other file pairs left.",
+            error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
+                  " to reclaim space, there are no other file pairs left.",
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
         if(!datafile_acquire_for_deletion(ctx->datafiles.first, false)) {
-            error("Cannot delete data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\""
-                                                                                                                 " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
+            error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
+                  " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
-        info("Deleting data file \"%s/"DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION"\".",
+        info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
         wc->now_deleting_files = mallocz(sizeof(*wc->now_deleting_files));
         wc->cleanup_thread_deleting_files = 0;
@@ -1230,6 +1230,8 @@ static void queue_extent_commands(struct rrdengine_instance *ctx, struct page_de
                 extent_page_list->pos = pd->datafile.extent.pos;
                 extent_page_list->size = pd->datafile.extent.bytes;
                 extent_page_list->datafile = pd->datafile.ptr;
+
+                // FIXME - ktsaou - is datafile pointer always valid here?
             }
             else
                 extent_page_list = *PValue2;
