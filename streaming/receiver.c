@@ -523,6 +523,25 @@ bool stop_streaming_receiver(RRDHOST *host) {
     return ret;
 }
 
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status) {
+
+    log_stream_connection(rpt->client_ip, rpt->client_port,
+                          (rpt->key && *rpt->key)? rpt->key : "-",
+                          (rpt->machine_guid && *rpt->machine_guid) ? rpt->machine_guid : "-",
+                          (rpt->hostname && *rpt->hostname) ? rpt->hostname : "-",
+                          status);
+
+    info("STREAM '%s' [receive from [%s]:%s]: "
+          "%s. "
+          "STATUS: %s"
+          , rpt->hostname
+          , rpt->client_ip, rpt->client_port
+          , msg
+          , status
+    );
+
+}
+
 static int rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
@@ -626,20 +645,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         );
 
         if(!host) {
-
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "FAILED - CANNOT ACQUIRE HOST");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "failed to find/create host structure. "
-                  "RESPONSE: DROPPING CONNECTION."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-                  );
-
+            rrdpush_receive_log_status(rpt, "failed to find/create host structure", "INTERNAL ERROR DROPPING CONNECTION");
             close(rpt->fd);
             return 1;
         }
@@ -648,20 +654,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
         rpt->system_info = NULL;
 
         if(!rrdhost_set_receiver(host, rpt)) {
-
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "FAILED - DUPLICATE RECEIVER");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "multiple receivers connected for GUID '%s' concurrently. "
-                  "RESPONSE: DROPPING CONNECTION."
-            , rpt->hostname
-            , rpt->client_ip, rpt->client_port
-            , rpt->machine_guid);
-
+            rrdpush_receive_log_status(rpt, "host is already served by another receiver", "DUPLICATE RECEIVER DROPPING CONNECTION");
             close(rpt->fd);
             return 1;
         }
@@ -742,18 +735,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->host->machine_guid,
-                                  rrdhost_hostname(rpt->host),
-                                  "FAILED - CANNOT REPLY");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "cannot send ready command."
-                  , rrdhost_hostname(rpt->host)
-                  , rpt->client_ip, rpt->client_port
-                  );
-
+            rrdpush_receive_log_status(rpt, "cannot reply back", "CANT REPLY DROPPING CONNECTION");
             close(rpt->fd);
             return 0;
         }
@@ -780,17 +762,7 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     }
 
-    info("STREAM '%s' [receive from [%s]:%s]: "
-         "ready to receive data..."
-         , rrdhost_hostname(rpt->host)
-         , rpt->client_ip, rpt->client_port
-         );
-
-    log_stream_connection(rpt->client_ip, rpt->client_port,
-                          rpt->key,
-                          rpt->host->machine_guid,
-                          rrdhost_hostname(rpt->host),
-                          "CONNECTED");
+    rrdpush_receive_log_status(rpt, "ready to receive data", "CONNECTED");
 
     cd.capabilities = rpt->capabilities;
 
@@ -813,15 +785,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
-    log_stream_connection(rpt->client_ip, rpt->client_port,
-                          rpt->key, rpt->host->machine_guid, rpt->hostname,
-                          "DISCONNECTED");
+    {
+        char msg[100 + 1];
+        snprintfz(msg, 100, "disconnected (completed %zu updates)", count);
+        rrdpush_receive_log_status(rpt, msg, "DISCONNECTED");
 
-    error("STREAM '%s' [receive from [%s]:%s]: "
-          "disconnected (completed %zu updates)."
-          , rpt->hostname
-          , rpt->client_ip, rpt->client_port
-          , count);
+    }
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

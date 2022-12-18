@@ -315,6 +315,7 @@ struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 #endif
 
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);

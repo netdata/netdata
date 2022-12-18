@@ -786,38 +786,20 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     // check if we should accept this connection
 
     if(!rpt->key || !*rpt->key) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              "-",
-                              (rpt->machine_guid && *rpt->machine_guid)?rpt->machine_guid:"-",
-                              (rpt->hostname && *rpt->hostname)?rpt->hostname:"-",
-                              "ACCESS DENIED - NO KEY");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "request without an API key. "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname ? rpt->hostname : "-"
-              , rpt->client_ip, rpt->client_port
-              );
+        rrdpush_receive_log_status(
+                rpt,
+                "request without an API key",
+                "NO API KEY PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!rpt->hostname || !*rpt->hostname) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              (rpt->key && *rpt->key)?rpt->key:"-",
-                              (rpt->machine_guid && *rpt->machine_guid)?rpt->machine_guid:"-",
-                              "-",
-                              "ACCESS DENIED - NO HOSTNAME");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "request without a hostname. "
-              "RESPONSE: PERMISSION DENIED."
-              , "-"
-              , rpt->client_ip, rpt->client_port
-              );
+        rrdpush_receive_log_status(
+                rpt,
+                "request without a hostname",
+                "NO HOSTNAME PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -827,19 +809,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         rpt->registry_hostname = strdupz(rpt->hostname);
 
     if(!rpt->machine_guid || !*rpt->machine_guid) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              "-",
-                              rpt->hostname,
-                              "ACCESS DENIED - NO MACHINE GUID");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "request without a machine GUID. "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              );
+        rrdpush_receive_log_status(
+                rpt,
+                "request without a machine GUID",
+                "NO MACHINE GUID PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -849,39 +822,20 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         char buf[GUID_LEN + 1];
 
         if (regenerate_guid(rpt->key, buf) == -1) {
-
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "ACCESS DENIED - INVALID KEY");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "API key '%s' is not valid GUID "
-                  "(use the command uuidgen to generate one). "
-                  "RESPONSE: PERMISSION DENIED."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-                  , rpt->key);
+            rrdpush_receive_log_status(
+                    rpt,
+                    "API key is not a valid UUID (use the command uuidgen to generate one)",
+                    "INVALID API KEY PERMISSION DENIED");
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
         }
 
         if (regenerate_guid(rpt->machine_guid, buf) == -1) {
-
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "ACCESS DENIED - INVALID MACHINE GUID");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "machine GUID '%s' is not GUID. "
-                  "RESPONSE: PERMISSION DENIED."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-                  , rpt->machine_guid);
+            rrdpush_receive_log_status(
+                    rpt,
+                    "machine GUID is not a valid UUID",
+                    "INVALID MACHINE GUID PERMISSION DENIED");
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
@@ -891,38 +845,20 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     const char *api_key_type = appconfig_get(&stream_config, rpt->key, "type", "api");
     if(!api_key_type || !*api_key_type) api_key_type = "unknown";
     if(strcmp(api_key_type, "api") != 0) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "ACCESS DENIED - API KEY GIVEN IS NOT API KEY");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "API key '%s' is a %s GUID. "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              , rpt->key, api_key_type);
+        rrdpush_receive_log_status(
+                rpt,
+                "API key is a machine GUID",
+                "INVALID API KEY PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, rpt->key, "enabled", 0)) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "ACCESS DENIED - KEY NOT ENABLED");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "API key '%s' is not allowed. "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              , rpt->key);
+        rrdpush_receive_log_status(
+                rpt,
+                "API key is not enabled",
+                "API KEY DISABLED PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -937,18 +873,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
 
-                log_stream_connection(rpt->client_ip, rpt->client_port,
-                                      rpt->key,
-                                      rpt->machine_guid,
-                                      rpt->hostname,
-                                      "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
-
-                error("STREAM '%s' [receive from [%s]:%s]: "
-                      "API key '%s' is not permitted from this IP. "
-                      "RESPONSE: PERMISSION DENIED."
-                      , rpt->hostname
-                      , rpt->client_ip, rpt->client_port
-                      , rpt->key);
+                rrdpush_receive_log_status(
+                        rpt,
+                        "API key is not allowed from this IP",
+                        "NOT ALLOWED IP PERMISSION DENIED");
 
                 receiver_state_free(rpt);
                 return rrdpush_receiver_permission_denied(w);
@@ -963,19 +891,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         if (!machine_guid_type || !*machine_guid_type) machine_guid_type = "unknown";
 
         if (strcmp(machine_guid_type, "machine") != 0) {
-
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "ACCESS DENIED - MACHINE GUID GIVEN IS NOT A MACHINE GUID");
-
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "machine GUID '%s' is a %s GUID. "
-                  "RESPONSE: PERMISSION DENIED."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-                  , rpt->machine_guid, machine_guid_type);
+            rrdpush_receive_log_status(
+                    rpt,
+                    "machine GUID is an API key",
+                    "INVALID MACHINE GUID PERMISSION DENIED");
 
             receiver_state_free(rpt);
             return rrdpush_receiver_permission_denied(w);
@@ -983,19 +902,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     }
 
     if(!appconfig_get_boolean(&stream_config, rpt->machine_guid, "enabled", 1)) {
-
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "ACCESS DENIED - MACHINE GUID NOT ENABLED");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "machine GUID '%s' is not allowed. "
-              "RESPONSE: PERMISSION DENIED."
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              , rpt->machine_guid);
+        rrdpush_receive_log_status(
+                rpt,
+                "machine GUID is not enabled",
+                "MACHINE GUID DISABLED PERMISSION DENIED");
 
         receiver_state_free(rpt);
         return rrdpush_receiver_permission_denied(w);
@@ -1010,18 +920,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);
 
-                log_stream_connection(rpt->client_ip, rpt->client_port,
-                                      rpt->key,
-                                      rpt->machine_guid,
-                                      rpt->hostname,
-                                      "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
-
-                error("STREAM '%s' [receive from [%s]:%s]: "
-                      "Machine GUID '%s' is not permitted from this IP. "
-                      "RESPONSE: PERMISSION DENIED."
-                      , rpt->hostname
-                      , rpt->client_ip, rpt->client_port
-                      , rpt->machine_guid);
+                rrdpush_receive_log_status(
+                        rpt,
+                        "machine GUID is not allowed from this IP",
+                        "NOT ALLOWED IP PERMISSION DENIED");
 
                 receiver_state_free(rpt);
                 return rrdpush_receiver_permission_denied(w);
@@ -1033,19 +935,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
     if (strcmp(rpt->machine_guid, localhost->machine_guid) == 0) {
 
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "DENIED - ATTEMPT TO RECEIVE METRICS FROM MACHINE_GUID IDENTICAL TO PARENT");
-
-        error("STREAM '%s' [receive from %s:%s]: "
-              "denied to receive metrics, machine GUID [%s] is my own. "
-              "RESPONSE: PERMISSION DENIED."
-        , rpt->hostname
-        , rpt->client_ip, rpt->client_port
-        , rpt->machine_guid
-        );
+        rrdpush_receive_log_status(
+                rpt,
+                "machine GUID is my own",
+                "LOCALHOST PERMISSION DENIED");
 
         char initial_response[HTTP_HEADER_SIZE + 1];
         snprintfz(initial_response, HTTP_HEADER_SIZE, "%s", START_STREAMING_ERROR_SAME_LOCALHOST);
@@ -1056,15 +949,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 #endif
                 rpt->fd, initial_response, strlen(initial_response), 0, 60) != (ssize_t)strlen(initial_response)) {
 
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  rpt->machine_guid,
-                                  rpt->hostname,
-                                  "FAILED - CANNOT REPLY");
-
-            error("STREAM '%s' [receive from [%s]:%s]: cannot send command."
-            , rpt->hostname
-            , rpt->client_ip, rpt->client_port
+            error("STREAM '%s' [receive from [%s]:%s]: "
+                  "failed to reply."
+                  , rpt->hostname
+                  , rpt->client_ip, rpt->client_port
             );
         }
 
@@ -1086,13 +974,15 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         if(now - last_stream_accepted_t < web_client_streaming_rate_t) {
             netdata_spinlock_unlock(&spinlock);
 
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "too busy to accept new streaming request. "
-                  "Will be allowed in %ld secs."
-                  "RESPONSE: TRY LATER."
-                  , rpt->hostname
-                  , rpt->client_ip, rpt->client_port
-                  , (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
+            char msg[100 + 1];
+            snprintfz(msg, 100,
+                      "rate limit, will accept new connection in %ld secs",
+                      (long)(web_client_streaming_rate_t - (now - last_stream_accepted_t)));
+
+            rrdpush_receive_log_status(
+                    rpt,
+                    msg,
+                    "RATE LIMIT TRY LATER");
 
             receiver_state_free(rpt);
             return rrdpush_receiver_too_busy_now(w);
@@ -1135,28 +1025,32 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host))
+        if (receiver_stale && stop_streaming_receiver(host)) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
+
+            info("STREAM '%s' [receive from [%s]:%s]: "
+                 "stopped previous stale receiver to accept this one."
+                 , rpt->hostname
+                 , rpt->client_ip, rpt->client_port
+            );
+        }
 
         if (receiver_working || receiver_stale) {
             // another receiver is already connected
             // try again later
 
-            log_stream_connection(rpt->client_ip, rpt->client_port,
-                                  rpt->key,
-                                  host->machine_guid,
-                                  rpt->hostname,
-                                  "REJECTED - ALREADY CONNECTED");
+            char msg[100 + 1];
+            snprintfz(msg, 100,
+                      "multiple connections for same host, "
+                      "old connection was used %ld secs ago%s",
+                      age, receiver_stale ? ", signaled old receiver to stop" : "");
 
-            error("STREAM '%s' [receive from [%s]:%s]: "
-                  "multiple connections for same host detected, "
-                  "but old connection is still active (within last %"PRId64" sec). "
-                  "RESPONSE: ALREADY CONNECTED%s.",
-                  rpt->hostname, rpt->client_ip, rpt->client_port, (int64_t) age,
-                  receiver_stale ? " - STOPPED OLD THREAD" : ""
-            );
+            rrdpush_receive_log_status(
+                    rpt,
+                    msg,
+                    "ALREADY CONNECT CONFLICT");
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);
@@ -1172,17 +1066,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     snprintfz(tag, FILENAME_MAX, "STREAM_RECEIVER[%s,[%s]:%s]", rpt->hostname, w->client_ip, w->client_port);
 
     if(netdata_thread_create(&rpt->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_receiver_thread, (void *)rpt)) {
-        log_stream_connection(rpt->client_ip, rpt->client_port,
-                              rpt->key,
-                              rpt->machine_guid,
-                              rpt->hostname,
-                              "FAILED - CANT CREATE THREAD");
-
-        error("STREAM '%s' [receive from [%s]:%s]: "
-              "failed to create thread "
-              , rpt->hostname
-              , rpt->client_ip, rpt->client_port
-              );
+        rrdpush_receive_log_status(
+                rpt,
+                "can't create receiver thread",
+                "INTERNAL SERVER ERROR");
 
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Can't handle this request");
