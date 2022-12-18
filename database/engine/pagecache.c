@@ -674,7 +674,7 @@ void init_page_cache(void)
                 100,                                //
                 1000,                           //
                 1,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE,                              // AUTOSCALE = 2x max hot pages
+                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
         );
