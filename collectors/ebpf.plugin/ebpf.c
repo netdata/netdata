@@ -1647,8 +1647,10 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         ebpf_enable_all_charts(*disable_apps, *disable_cgroups);
         // Read network viewer section
         // This is kept here to keep backward compatibility
-        parse_network_viewer_section(&collector_config);
-        parse_service_name_section(&collector_config);
+        if (network_viewer_opt.enabled) {
+            parse_network_viewer_section(&collector_config);
+            parse_service_name_section(&collector_config);
+        }
     }
 }
 
