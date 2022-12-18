@@ -3301,7 +3301,7 @@ void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_li
  * @param out a pointer to store the link list
  * @param ip the value given as parameter
  */
-static void parse_ip_list(void **out, char *ip)
+static void ebpf_parse_ip_list(void **out, char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
@@ -3449,7 +3449,7 @@ static void parse_ip_list(void **out, char *ip)
 
     ebpf_network_viewer_ip_list_t *store;
 
-    storethisip:
+storethisip:
     store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
     store->value = ipdup;
     store->hash = simple_hash(ipdup);
@@ -3471,7 +3471,7 @@ cleanipdup:
  *
  * @param ptr  is a pointer with the text to parse.
  */
-static void parse_ips(char *ptr)
+static void ebpf_parse_ips(char *ptr)
 {
     // No value
     if (unlikely(!ptr))
@@ -3498,8 +3498,9 @@ static void parse_ips(char *ptr)
         }
 
         if (isascii(*ptr)) { // Parse port
-            parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
-                          ptr);
+            ebpf_parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:
+                                      (void **)&network_viewer_opt.excluded_ips,
+                                ptr);
         }
 
         ptr = end;
@@ -3769,7 +3770,7 @@ void parse_network_viewer_section(struct config *cfg)
 
     value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION,
                           "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
-    parse_ips(value);
+    ebpf_parse_ips(value);
 }
 
 /**
