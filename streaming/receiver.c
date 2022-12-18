@@ -370,6 +370,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     size_t read_buffer_start = 0;
     char buffer[PLUGINSD_LINE_MAX + 2] = "";
     while(!netdata_exit) {
+        netdata_thread_testcancel();
+
         if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
             bool have_new_data;
             if(likely(compressed_connection))
