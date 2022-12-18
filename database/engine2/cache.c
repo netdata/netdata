@@ -98,23 +98,38 @@ struct pgc {
     ARAL *aral;
 #endif
 
+    PGC_CACHE_LINE_PADDING(0);
+
     struct pgc_index {
         netdata_rwlock_t rwlock;
         Pvoid_t sections_judy;
     } *index;
+
+    PGC_CACHE_LINE_PADDING(1);
 
     struct {
         SPINLOCK spinlock;
         size_t per1000;
     } usage;
 
+    PGC_CACHE_LINE_PADDING(2);
+
     struct pgc_linked_list clean;       // LRU is applied here to free memory from the cache
+
+    PGC_CACHE_LINE_PADDING(3);
+
     struct pgc_linked_list dirty;       // in the dirty list, pages are ordered the way they were marked dirty
+
+    PGC_CACHE_LINE_PADDING(4);
+
     struct pgc_linked_list hot;         // in the hot list, pages are order the way they were marked hot
+
+    PGC_CACHE_LINE_PADDING(5);
 
     struct pgc_statistics stats;        // statistics
 
 #ifdef NETDATA_PGC_POINTER_CHECK
+    PGC_CACHE_LINE_PADDING(6);
     netdata_mutex_t global_pointer_registry_mutex;
     Pvoid_t global_pointer_registry;
 #endif
