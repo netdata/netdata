@@ -424,13 +424,15 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         ;
     }
     else if(unlikely(point_in_time_ut < handle->page_end_time_ut)) {
-        internal_fatal(true, "DBENGINE: new point at %llu is older than the last collected %llu",
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: new point at %llu is older than the last collected %llu, ignoring it",
                        point_in_time_ut, handle->page_end_time_ut);
         return;
     }
 
     else if(unlikely(point_in_time_ut == handle->page_end_time_ut)) {
-        internal_fatal(true, "DBENGINE: new point time %llu is equal to the last collected",
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: new point time %llu has the same timestamp to the last collected point, ignoring it",
                        point_in_time_ut);
         return;
     }
@@ -459,6 +461,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     internal_fatal((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every(main_mrg, handle->metric),
                    "DBENGINE: the collection handle update every and the metric registry update every are not the same");
 
+//    FIXME - is this a problem?
 //    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
 //        "DBENGINE: new point is not aligned to update every");
 
