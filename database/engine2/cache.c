@@ -1649,7 +1649,7 @@ struct pgc_statistics pgc_get_statistics(PGC *cache) {
     return stats;
 }
 
-void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, int datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
+void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
     pgc_ll_lock(cache, &cache->hot);
 
     Pvoid_t JudyL_metrics = NULL;
