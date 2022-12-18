@@ -69,6 +69,7 @@ struct rrdengine_datafile {
     } users;
 };
 
+void datafile_acquire_dup(struct rrdengine_datafile *df);
 bool datafile_acquire(struct rrdengine_datafile *df);
 void datafile_release(struct rrdengine_datafile *df);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait);

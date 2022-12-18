@@ -167,12 +167,9 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
                 pd->datafile.extent.pos = xio->pos;
                 pd->datafile.extent.bytes = xio->bytes;
                 pd->datafile.fileno = pd->datafile.ptr->fileno;
+                datafile_acquire_dup(pd->datafile.ptr); // has to be done before releasing the page
+                pd->status |= PDC_PAGE_DATAFILE_ACQUIRED;
                 pgc_page_release(cache, page);
-
-                if(datafile_acquire(pd->datafile.ptr))
-                    pd->status |= PDC_PAGE_DATAFILE_ACQUIRED;
-                else
-                    fatal("DBENGINE: cannot acquire datafile from page in open cache");
             }
 
             *PValue = pd;
