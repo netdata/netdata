@@ -2024,12 +2024,13 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * Read data from hash tables created on kernel ring.
  *
- * @param fd  the hash table with data.
- * @param family the family associated to the hash table
+ * @param fd                 the hash table with data.
+ * @param family             the family associated to the hash table
+ * @param network_connection Status of network connection monitoring ( 0 - disabled; 1 - enabled)
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd, int family, int network_connection)
+static void read_socket_hash_table(int fd, int family, uint32_t network_connection)
 {
     if (wait_to_plot)
         return;
@@ -2172,7 +2173,7 @@ void *ebpf_socket_read_hash(void *ptr)
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    int network_connection = em->optional;
+    uint32_t network_connection = network_viewer_opt.enabled;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
 
