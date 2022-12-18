@@ -372,36 +372,45 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     while(!netdata_exit) {
         if(!receiver_next_line(rpt, buffer, PLUGINSD_LINE_MAX + 2, &read_buffer_start)) {
             bool have_new_data;
-            if(compressed_connection)
+            if(likely(compressed_connection))
                 have_new_data = receiver_read_compressed(rpt);
             else
                 have_new_data = receiver_read_uncompressed(rpt);
 
-            if(!have_new_data)
+            if(unlikely(!have_new_data)) {
+                if(!rpt->exit.reason)
+                    rpt->exit.reason = "SOCKET READ ERROR";
+
                 break;
+            }
 
             rpt->last_msg_t = now_realtime_sec();
             continue;
         }
 
         if(unlikely(netdata_exit)) {
-            internal_error(true, "exiting...");
+            if(!rpt->exit.reason)
+                rpt->exit.reason = "NETDATA EXIT";
             goto done;
         }
-        if(unlikely(rpt->shutdown)) {
-            internal_error(true, "parser shutdown...");
+        if(unlikely(rpt->exit.shutdown)) {
+            if(!rpt->exit.reason)
+                rpt->exit.reason = "SHUTDOWN REQUESTED";
+
             goto done;
         }
 
         if (unlikely(parser_action(parser,  buffer))) {
             internal_error(true, "parser_action() failed on keyword '%s'.", buffer);
+
+            if(!rpt->exit.reason)
+                rpt->exit.reason = "PARSER FAILED";
+
             break;
         }
     }
 
 done:
-    internal_error(true, "Streaming receiver thread stopping...");
-
     result = user.count;
 
     // free parser with the pop function
@@ -488,14 +497,18 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
     }
 }
 
-bool stop_streaming_receiver(RRDHOST *host) {
+bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
     bool ret = false;
 
     netdata_mutex_lock(&host->receiver_lock);
 
     if(host->receiver) {
-        host->receiver->shutdown = 1;
-        shutdown(host->receiver->fd, SHUT_RDWR);
+        if(!host->receiver->exit.shutdown) {
+            host->receiver->exit.shutdown = true;
+            host->receiver->exit.reason = reason;
+            shutdown(host->receiver->fd, SHUT_RDWR);
+        }
+
         netdata_thread_cancel(host->receiver->thread);
     }
 
@@ -533,11 +546,14 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
     info("STREAM '%s' [receive from [%s]:%s]: "
           "%s. "
-          "STATUS: %s"
+          "STATUS: %s%s%s%s"
           , rpt->hostname
           , rpt->client_ip, rpt->client_port
           , msg
           , status
+          , rpt->exit.reason?" (":""
+          , rpt->exit.reason?rpt->exit.reason:""
+          , rpt->exit.reason?")":""
     );
 
 }
@@ -759,7 +775,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
                   , rrdhost_hostname(rpt->host)
                   , rpt->client_ip, rpt->client_port
                   , rpt->fd);
-
     }
 
     rrdpush_receive_log_status(rpt, "ready to receive data", "CONNECTED");
@@ -785,11 +800,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     rrdhost_flag_set(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
+    if(!rpt->exit.reason)
+        rpt->exit.reason = "PARSER EXIT";
+
     {
         char msg[100 + 1];
         snprintfz(msg, 100, "disconnected (completed %zu updates)", count);
         rrdpush_receive_log_status(rpt, msg, "DISCONNECTED");
-
     }
 
 #ifdef ENABLE_ACLK

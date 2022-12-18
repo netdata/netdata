@@ -1025,7 +1025,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host)) {
+        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER")) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;
@@ -1041,16 +1041,16 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             // another receiver is already connected
             // try again later
 
-            char msg[100 + 1];
-            snprintfz(msg, 100,
+            char msg[200 + 1];
+            snprintfz(msg, 200,
                       "multiple connections for same host, "
                       "old connection was used %ld secs ago%s",
-                      age, receiver_stale ? ", signaled old receiver to stop, try again later" : "new connection not accepted");
+                      age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 
             rrdpush_receive_log_status(
                     rpt,
                     msg,
-                    "ALREADY CONNECT CONFLICT");
+                    "ALREADY CONNECTED");
 
             // Have not set WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET - caller should clean up
             buffer_flush(w->response.data);

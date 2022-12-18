@@ -224,8 +224,11 @@ struct receiver_state {
     time_t last_msg_t;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
-    unsigned int shutdown:1;    // Tell the thread to exit
-    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+
+    struct {
+        bool shutdown;      // signal the streaming parser to exit
+        const char *reason; // the reason of disconnection to log
+    } exit;
 
     struct {
         RRD_MEMORY_MODE mode;
@@ -322,7 +325,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
-bool stop_streaming_receiver(RRDHOST *host);
+bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
 #include "replication.h"
 

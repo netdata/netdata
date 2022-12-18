@@ -1086,7 +1086,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     stop_streaming_sender(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host);
+        stop_streaming_receiver(host, "HOST CLEANUP");
 
 
     // ------------------------------------------------------------------------
