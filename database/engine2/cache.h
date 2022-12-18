@@ -30,7 +30,7 @@ typedef struct pgc_entry {
     uint8_t *custom_data;
 } PGC_ENTRY;
 
-#define PGC_CACHE_LINE_PADDING(x) uint8_t padding##x[64]
+#define PGC_CACHE_LINE_PADDING(x) uint8_t padding##x[128]
 
 struct pgc_queue_statistics {
     size_t entries;
