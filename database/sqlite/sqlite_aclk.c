@@ -648,6 +648,10 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     if (likely(host)) {
         host->dbsync_worker = (void *)wc;
         wc->hostname = strdupz(rrdhost_hostname(host));
+        if (node_id && !host->node_id) {
+            host->node_id = mallocz(sizeof(host->node_id));
+            uuid_copy(*host->node_id, *node_id);
+        }
     }
     else
         wc->hostname = get_hostname_by_node_id(wc->node_id);
@@ -663,7 +667,6 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
     UNUSED(host_uuid);
     UNUSED(node_id);
 #endif
-    return;
 }
 
 void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd)
