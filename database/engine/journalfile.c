@@ -180,8 +180,8 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
     journalfile->file = (uv_file)0;
     journalfile->pos = 0;
     journalfile->datafile = datafile;
-    journalfile->journal_data = NULL;
-    journalfile->journal_data_size = 0;
+    SET_JOURNAL_DATA(journalfile, 0);
+    SET_JOURNAL_DATA_SIZE(journalfile, 0);
     journalfile->data = NULL;
 }
 
@@ -207,15 +207,18 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
     struct rrdengine_instance *ctx = datafile->ctx;
     char path[RRDENG_PATH_MAX];
 
-    if (likely(journalfile->journal_data)) {
-        if (munmap(journalfile->journal_data, journalfile->journal_data_size)) {
+    void *journal_data = GET_JOURNAL_DATA(journalfile);
+    size_t journal_data_size = GET_JOURNAL_DATA_SIZE(journalfile);
+
+    if (likely(journal_data)) {
+        if (munmap(journal_data, journal_data_size)) {
             generate_journalfilepath_v2(datafile, path, sizeof(path));
             error("Failed to unmap journal index file for %s", path);
             ++ctx->stats.fs_errors;
             rrd_stat_atomic_add(&global_fs_errors, 1);
         }
-        journalfile->journal_data = NULL;
-        journalfile->journal_data_size = 0;
+        SET_JOURNAL_DATA(journalfile, 0);
+        SET_JOURNAL_DATA_SIZE(journalfile, 0);
         return 0;
     }
 
@@ -287,8 +290,11 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
     ++ctx->stats.journalfile_deletions;
     ++ctx->stats.journalfile_deletions;
 
-    if (journalfile->journal_data) {
-        if (munmap(journalfile->journal_data, journalfile->journal_data_size)) {
+    void *journal_data = GET_JOURNAL_DATA(journalfile);
+    size_t journal_data_size = GET_JOURNAL_DATA_SIZE(journalfile);
+
+    if (journal_data) {
+        if (munmap(journal_data, journal_data_size)) {
             error("Failed to unmap index file %s", path_v2);
         }
     }
@@ -809,8 +815,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
 
     // Initialize the journal file to be able to access the data
-    journalfile->journal_data = data_start;
-    journalfile->journal_data_size = file_size;
+    SET_JOURNAL_DATA(journalfile, data_start);
+    SET_JOURNAL_DATA_SIZE(journalfile, file_size);
 
     time_t header_start_time_t  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
@@ -1153,10 +1159,8 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
 
         info("Migrated journal file %s, File size %lu", path, total_file_size);
 
-        uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-        __atomic_store_n(&journalfile->journal_data, data_start, __ATOMIC_RELEASE);
-        __atomic_store_n(&journalfile->journal_data_size, total_file_size, __ATOMIC_RELEASE);
-        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+        SET_JOURNAL_DATA(journalfile, data_start);
+        SET_JOURNAL_DATA_SIZE(journalfile, total_file_size);
 
         internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
         ctx->disk_space += total_file_size;
@@ -1301,7 +1305,7 @@ void start_journal_indexing(uv_work_t *req)
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     worker_is_busy(UV_EVENT_JOURNAL_INDEX);
     while (datafile && datafile->fileno != ctx->last_fileno) {
-        if (unlikely(!datafile->journalfile->journal_data)) {
+        if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
             info("Journal file %u is ready to be indexed", datafile->fileno);
             pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
            ++work_request->count;

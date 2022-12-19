@@ -878,7 +878,7 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     journalfile = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journalfile_bytes = journalfile->pos;
-    deleted_bytes = journalfile->journal_data_size;
+    deleted_bytes = GET_JOURNAL_DATA_SIZE(journalfile);
 
     info("Deleting data and journal files");
     datafile_list_delete_unsafe(ctx, datafile);
@@ -919,26 +919,84 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
     uv_stop(wc->loop);
 }
 
+struct uuid_first_time_s {
+    uuid_t *uuid;
+    time_t first_time_t;
+};
+
+void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t *metric_unique_JudyHS)
+{
+    if (unlikely(!datafile))
+        return;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    while (datafile) {
+        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
+        if (!journal_header || !datafile->users.available) {
+            datafile = datafile->next;
+            continue;
+        }
+
+        time_t journal_start_time_t = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+
+        for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
+            Pvoid_t *PValue = JudyHSGet(metric_unique_JudyHS, &uuid_list[index].uuid, sizeof(uuid_t));
+            if (!PValue || !*PValue)
+                continue;
+
+            struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+            time_t first_time_t = uuid_list[index].delta_start + journal_start_time_t;
+            uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t , first_time_t);
+        }
+        datafile = datafile->next;
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+}
+
+
 static void delete_old_data(void *arg)
 {
     struct rrdengine_instance *ctx = arg;
     struct rrdengine_worker_config *wc = &ctx->worker_config;
+
     struct rrdengine_journalfile *journalfile = ctx->datafiles.first->journalfile;
 
-    struct journal_v2_header *journal_header = (struct journal_v2_header *) journalfile->journal_data;
-    // struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
-    // time_t journal_start_time_t =  (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+    struct journal_v2_header *journal_header = (struct journal_v2_header *)GET_JOURNAL_DATA(journalfile);
+    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+
+    Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
+    Pvoid_t metric_unique_JudyHS = (Pvoid_t) NULL;
+    Pvoid_t *PValue;
+
     for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
-        //time_t metric_start_t = journal_start_time_t + uuid_list[index].delta_start;
-        //time_t metric_end_t = journal_start_time_t + uuid_list[index].delta_end;
-        //uuid_list[index].uuid
-        // Removing duration of metric
-        //char uuid_str[UUID_STR_LEN];
-        //uuid_unparse_lower(uuid_list[index].uuid, uuid_str);
-        //info("DEBUG: Remove %s (%ld, %ld)", uuid_str, metric_start_t, metric_end_t);
-        // FIXME: Metric uuid_list[index].uuid retention for this context should be updated (metric_start_t, metric_end_time) will be removed
-        ;
+        struct uuid_first_time_s *uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
+        PValue = JudyLIns(&metric_first_time_JudyL, (Word_t) index, PJE0);
+        fatal_assert(NULL != PValue);
+        if (!*PValue) {
+            uuid_first_t_entry->uuid = &uuid_list[index].uuid;
+            uuid_first_t_entry->first_time_t = LONG_MAX;
+        }
+        PValue = JudyHSIns(&metric_unique_JudyHS, uuid_first_t_entry->uuid, sizeof(uuid_t), PJE0);
+        fatal_assert(NULL != PValue);
+        *PValue = uuid_first_t_entry;
     }
+
+    // Update the first time for all metrics we plan to delete
+    find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_unique_JudyHS);
+
+    Word_t index = 0;
+    bool first_then_next = true;
+    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
+        struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+        // Update metric registry
+        // FIXME: Update metric registry here
+        freez(uuid_first_t_entry);
+    }
+
+    JudyHSFreeArray(&metric_first_time_JudyL, PJE0);
+    JudyHSFreeArray(&metric_unique_JudyHS, PJE0);
+
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&wc->async));
@@ -1178,7 +1236,7 @@ void timer_cb(uv_timer_t* handle)
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
 
-    if (true == wc->run_indexing) {
+    if (true == wc->run_indexing && !wc->now_deleting_files && !wc->running_cache_flush_evictions) {
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }

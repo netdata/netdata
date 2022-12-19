@@ -960,7 +960,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
-    void *data_start = datafile->journalfile->journal_data;
+    void *data_start = GET_JOURNAL_DATA(datafile->journalfile);
     if (unlikely(!data_start))
         return;
 
@@ -1035,7 +1035,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
 
-        if (df->journalfile->journal_data) {
+        if (GET_JOURNAL_DATA(df->journalfile)) {
             populate_v2_statistics(df, &stats);
         }
         else
