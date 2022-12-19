@@ -701,6 +701,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
     wc->cache_flush_can_run = true;
+    wc->outstanding_flush_requests--;
 }
 
 /*
@@ -1120,7 +1121,8 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
         after_delete_old_data(wc);
     }
 
-    if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc))) {
+    if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc) && !wc->outstanding_flush_requests)) {
+        wal_flush_transaction_buffer(wc);
         ctx->quiesce = QUIESCED;
         completion_mark_complete(&ctx->rrdengine_completion);
     }
@@ -1209,9 +1211,15 @@ void timer_cb(uv_timer_t* handle)
 {
     worker_is_busy(RRDENG_MAX_OPCODE + 1);
 
-    struct rrdengine_worker_config* wc = handle->data;
+    struct rrdengine_worker_config *wc = handle->data;
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
+
+    if (wc->ctx->quiesce != NO_QUIESCE) {
+        worker_is_idle();
+        return;
+    }
+
     rrdeng_test_quota(wc);
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
@@ -1579,6 +1587,7 @@ void rrdeng_worker(void* arg)
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
     int set_name = 0;
+    wc->outstanding_flush_requests = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -1603,45 +1612,44 @@ void rrdeng_worker(void* arg)
                 worker_is_busy(opcode);
 
             switch (opcode) {
-            case RRDENG_NOOP:
-                /* the command queue was empty, do nothing */
-                break;
-            case RRDENG_SHUTDOWN:
-                shutdown = 1;
-                break;
-            case RRDENG_QUIESCE:
-                ctx->quiesce = SET_QUIESCE;
-                fatal_assert(0 == uv_timer_stop(&timer_req));
-                uv_close((uv_handle_t *)&timer_req, NULL);
-                info("Shutdown command received. Flushing all pages to disk");
-                // FIXME: Check if we need to ask page cache if flushing is done
-                wal_flush_transaction_buffer(wc);
-                if (!rrdeng_threads_alive(wc)) {
-                    ctx->quiesce = QUIESCED;
-                    completion_mark_complete(&ctx->rrdengine_completion);
+                case RRDENG_NOOP:
+                    /* the command queue was empty, do nothing */
+                    break;
+                case RRDENG_SHUTDOWN:
+                    shutdown = 1;
+                    break;
+                case RRDENG_QUIESCE:
+                    ctx->quiesce = SET_QUIESCE;
+                    info("Shutdown command received. Flushing all pages to disk. %u flush requests pending", wc->outstanding_flush_requests);
+                    wal_flush_transaction_buffer(wc);
+                    if (!rrdeng_threads_alive(wc) && !wc->outstanding_flush_requests) {
+                        wal_flush_transaction_buffer(wc);
+                        ctx->quiesce = QUIESCED;
+                        completion_mark_complete(&ctx->rrdengine_completion);
+                    }
+                    break;
+                case RRDENG_COMMIT_PAGE:
+                    do_commit_transaction(wc, STORE_DATA, NULL);
+                    break;
+                case RRDENG_FLUSH_PAGES: {
+                    wc->cache_flush_can_run = false;
+                    wc->outstanding_flush_requests++;
+                    (void)do_flush_extent(wc, cmd.data, cmd.completion);
+                    break;
                 }
-                break;
-            case RRDENG_COMMIT_PAGE:
-                do_commit_transaction(wc, STORE_DATA, NULL);
-                break;
-            case RRDENG_FLUSH_PAGES: {
-                wc->cache_flush_can_run = false;
-                (void)do_flush_extent(wc, cmd.data, cmd.completion);
-                break;
-            }
-            case RRDENG_READ_EXTENT:
-                if (unlikely(!set_name)) {
-                    set_name = 1;
-                    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
-                }
-                do_read_extent(wc, cmd.data);
-                break;
-            case RRDENG_READ_PAGE_LIST:
-                do_read_page_list(wc, cmd.data, cmd.completion);
-                break;
-            default:
-                debug(D_RRDENGINE, "%s: default.", __func__);
-                break;
+                case RRDENG_READ_EXTENT:
+                    if (unlikely(!set_name)) {
+                        set_name = 1;
+                        uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
+                    }
+                    do_read_extent(wc, cmd.data);
+                    break;
+                case RRDENG_READ_PAGE_LIST:
+                    do_read_page_list(wc, cmd.data, cmd.completion);
+                    break;
+                default:
+                    debug(D_RRDENGINE, "%s: default.", __func__);
+                    break;
             }
         } while (opcode != RRDENG_NOOP);
     }
@@ -1655,6 +1663,9 @@ void rrdeng_worker(void* arg)
      * an issue in the future.
      */
     uv_close((uv_handle_t *)&wc->async, NULL);
+
+    fatal_assert(0 == uv_timer_stop(&timer_req));
+    uv_close((uv_handle_t *)&timer_req, NULL);
 
     // FIXME: Check if we need to ask page cache if flushing is done
     wal_flush_transaction_buffer(wc);
