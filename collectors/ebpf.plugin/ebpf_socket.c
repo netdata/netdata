@@ -1963,6 +1963,9 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  */
 static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
 {
+    if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
+        return;
+
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
     uint16_t retransmit = 0;
     int i;
@@ -1992,11 +1995,9 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
-    if (network_viewer_opt.enabled && is_socket_allowed(key, family)) {
-        uint32_t dir;
-        netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
-        store_socket_inside_avl(table, &values[0], key, family, dir);
-    }
+    uint32_t dir;
+    netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
+    store_socket_inside_avl(table, &values[0], key, family, dir);
 }
 
 /**
