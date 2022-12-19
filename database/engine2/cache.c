@@ -266,9 +266,12 @@ static inline void page_transition_unlock(PGC *cache __maybe_unused, PGC_PAGE *p
 // ----------------------------------------------------------------------------
 // evictions control
 
-static inline size_t cache_usage_per1000(PGC *cache) {
+static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
-    if(!netdata_spinlock_trylock(&cache->usage.spinlock))
+    if(size_to_evict)
+        netdata_spinlock_lock(&cache->usage.spinlock);
+
+    else if(!netdata_spinlock_trylock(&cache->usage.spinlock))
         return __atomic_load_n(&cache->usage.per1000, __ATOMIC_RELAXED);
 
     size_t current_cache_size;
@@ -304,12 +307,20 @@ static inline size_t cache_usage_per1000(PGC *cache) {
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
+    if(size_to_evict) {
+        size_t target = wanted_cache_size * 9 / 10;
+        if(current_cache_size > target)
+            *size_to_evict = current_cache_size - target;
+        else
+            *size_to_evict = 0;
+    }
+
     netdata_spinlock_unlock(&cache->usage.spinlock);
     return per1000;
 }
 
 static inline bool cache_under_severe_pressure(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache) >= 1000)) {
+    if(unlikely(cache_usage_per1000(cache, NULL) >= 1000)) {
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -318,7 +329,7 @@ static inline bool cache_under_severe_pressure(PGC *cache) {
 }
 
 static inline bool cache_needs_space_aggressively(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache) >= 995)) {
+    if(unlikely(cache_usage_per1000(cache, NULL) >= 995)) {
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -326,8 +337,7 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
     return false;
 }
 
-#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache) >= 990)
-#define cache_above_eviction_threshold(cache) (cache_usage_per1000(cache) >= 900)
+#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= 990)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
 
@@ -937,11 +947,16 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t last_run_pages_skipped;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t pages_to_evict_per_run = (max_skip == SIZE_MAX) ? cache->config.partitions * 10000 : cache->config.partitions * 10;
+    size_t pages_to_evict_per_run = (max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
 
     do {
         spins++;
         last_run_pages_skipped = 0;
+
+        size_t max_size_to_evict = 0, size_to_evict = 0;
+        cache_usage_per1000(cache, &max_size_to_evict);
+        if(!max_size_to_evict)
+            break;
 
         // zero our partition linked lists
         for (size_t partition = 0; partition < cache->config.partitions; partition++)
@@ -984,6 +999,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 }
 
                 if(++pages_to_evict >= pages_to_evict_per_run)
+                    break;
+
+                size_to_evict += page->assumed_size;
+                if(size_to_evict >= max_size_to_evict)
                     break;
             }
             else {
@@ -1058,7 +1077,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             }
         }
 
-    } while(pages_to_evict && (all_of_them || (cache_above_eviction_threshold(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while(pages_to_evict && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && last_run_pages_skipped) {
         error_limit_static_global_var(erl, 1, 0);
@@ -1069,7 +1088,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
                     "DBENGINE CACHE: cache is %zu %% full, but %zu clean pages are currently referenced and cannot be evicted",
-                    cache_usage_per1000(cache) / 10, last_run_pages_skipped);
+                    cache_usage_per1000(cache, NULL) / 10, last_run_pages_skipped);
     }
 
 premature_exit:
