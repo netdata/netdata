@@ -279,29 +279,7 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // ----------------------------------------------------------------------------
-
 
 void *dbengine_page_alloc() {
     void *page = NULL;
@@ -1160,6 +1138,7 @@ void finalize_rrd_files(struct rrdengine_instance *ctx)
 
 void rrdeng_init_cmd_queue(struct rrdengine_worker_config* wc)
 {
+    sanity_check();
     wc->cmd_queue.head = wc->cmd_queue.tail = 0;
     wc->queue_size = 0;
     fatal_assert(0 == uv_cond_init(&wc->cmd_cond));
