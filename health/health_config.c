@@ -582,6 +582,7 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg->alarm = string_dup(rc->name);
                 ignore_this = 0;
             } else {
+                analytics_log_conf_disabled_alarm(value);
                 rc = NULL;
             }
         }
@@ -628,6 +629,7 @@ static int health_readfile(const char *filename, void *data) {
                 alert_cfg->template_key = string_dup(rt->name);
                 ignore_this = 0;
             } else {
+                analytics_log_conf_disabled_alarm(value);
                 rt = NULL;
             }
         }
