@@ -327,6 +327,7 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
 }
 
 #define cache_above_healthy_limit(cache) (cache_usage_per1000(cache) >= 990)
+#define cache_above_eviction_threshold(cache) (cache_usage_per1000(cache) >= 900)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
 
@@ -336,11 +337,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
 static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
     if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
-        bool under_pressure = cache_under_severe_pressure(cache);
         evict_pages(cache,
-                    under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
-                    under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
-                    under_pressure, false);
+                    cache->config.max_skip_pages_per_inline_eviction,
+                    cache->config.max_pages_per_inline_eviction,
+                    false, false);
     }
 }
 
@@ -358,11 +358,10 @@ static void evict_on_page_searched_and_not_found(PGC *cache __maybe_unused) {
 
 static void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
     if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache))) {
-        bool under_pressure = cache_under_severe_pressure(cache);
         evict_pages(cache,
-                    under_pressure ? 0 : cache->config.max_skip_pages_per_inline_eviction,
-                    under_pressure ? 0 : cache->config.max_pages_per_inline_eviction,
-                    under_pressure, false);
+                    cache->config.max_skip_pages_per_inline_eviction,
+                    cache->config.max_pages_per_inline_eviction,
+                    false, false);
     }
 }
 
@@ -1059,7 +1058,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             }
         }
 
-    } while(pages_to_evict && (all_of_them || (cache_above_healthy_limit(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while(pages_to_evict && (all_of_them || (cache_above_eviction_threshold(cache) && total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && last_run_pages_skipped) {
         error_limit_static_global_var(erl, 1, 0);
