@@ -597,15 +597,15 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
         // signal the thread that we want to join it
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
 
-        // shutdown its socket
-        shutdown(host->sender->rrdpush_sender_socket, SHUT_RDWR);
-
         // copy the thread id, so that we will be waiting for the right one
         // even if a new one has been spawn
         thr = host->rrdpush_sender_thread;
 
         // signal it to cancel
         netdata_thread_cancel(host->rrdpush_sender_thread);
+
+        // shutdown its socket
+        shutdown(host->sender->rrdpush_sender_socket, SHUT_RDWR);
     }
 
     netdata_mutex_unlock(&host->sender->mutex);

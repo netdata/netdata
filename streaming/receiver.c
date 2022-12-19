@@ -514,7 +514,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
         netdata_thread_cancel(host->receiver->thread);
     }
 
-    int count = 1000;
+    int count = 2000;
     while (host->receiver && count-- > 0) {
         netdata_mutex_unlock(&host->receiver_lock);
 

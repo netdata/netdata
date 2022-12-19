@@ -740,7 +740,13 @@ static bool attempt_to_connect(struct sender_state *state)
     state->sent_bytes_on_this_connection = 0;
 
     // slow re-connection on repeating errors
-    sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
+    usec_t now_ut = now_monotonic_usec();
+    usec_t end_ut = now_ut + USEC_PER_SEC * state->reconnect_delay;
+    while(now_ut < end_ut) {
+        netdata_thread_testcancel();
+        sleep_usec(500 * USEC_PER_MS); // seconds
+        now_ut = now_monotonic_usec();
+    }
 
     return false;
 }
@@ -1022,10 +1028,10 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
 }
 
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
-    struct rrdpush_sender_thread_data *data = ptr;
+    struct rrdpush_sender_thread_data *s = ptr;
     worker_unregister();
 
-    RRDHOST *host = data->host;
+    RRDHOST *host = s->host;
 
     netdata_mutex_lock(&host->sender->mutex);
 
@@ -1045,8 +1051,8 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     netdata_mutex_unlock(&host->sender->mutex);
 
-    freez(data->pipe_buffer);
-    freez(data);
+    freez(s->pipe_buffer);
+    freez(s);
 }
 
 void sender_init(RRDHOST *host)
@@ -1248,6 +1254,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 .revents = 0,
             }
         };
+
         int poll_rc = poll(fds, 2, 1000);
 
         debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
@@ -1263,6 +1270,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
+            netdata_thread_testcancel();
             debug(D_STREAM, "Spurious wakeup");
             continue;
         }
