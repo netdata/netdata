@@ -1046,7 +1046,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             // repeat until all partitions have been cleaned up
             size_t repeats = cache->config.partitions * 2;
             size_t waiting = cache->config.partitions;
-            bool force = false;
+            bool force = (max_evict != SIZE_MAX || max_skip != SIZE_MAX || all_of_them) ? true : false;
             while(waiting) {
                 if(--repeats == 0 || waiting == 1) force = true;
                 waiting = 0;
@@ -1536,7 +1536,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
 
     if(max_dirty_pages_per_flush < 1)
         max_dirty_pages_per_flush = 1;
-    
+
     if(max_flushes_inline * max_dirty_pages_per_flush < 2)
         max_flushes_inline = 2;
 
