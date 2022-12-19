@@ -495,7 +495,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
         }
 
-        netdata_mutex_unlock(&rpt->host->receiver_lock);
+        netdata_mutex_unlock(&host->receiver_lock);
     }
 }
 
