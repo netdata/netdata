@@ -1086,7 +1086,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         struct rrdengine_datafile *df = ctx->datafiles.first;
         if(!datafile_acquire_for_deletion(df, false)) {
             error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, it is in use currently by %d users, but it has been marked as not available for queries to stop using it.",
+                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it.",
                   ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
             return;
         }
@@ -1308,7 +1308,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
     if(worker)
         worker_is_busy(UV_EVENT_EXTENT_CACHE);
 
-    PDC_PAGE_STATUS not_loaded_pages_tag, loaded_pages_tag;
+    PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
 
     void *extent_compressed_data = NULL;
     PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(extent_cache, (Word_t)ctx, (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset, true);
