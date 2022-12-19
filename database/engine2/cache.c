@@ -278,8 +278,6 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     size_t wanted_cache_size;
     size_t per1000;
 
-    current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
-
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
         size_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
         size_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
@@ -297,9 +295,10 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
         size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
-        size_t max_for_clean = cache->config.clean_size;
-        wanted_cache_size = hot + dirty + max_for_clean;
+        wanted_cache_size = hot + dirty + cache->config.clean_size;
     }
+
+    current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
 
     per1000 = current_cache_size * 1000 / wanted_cache_size;
 
@@ -954,8 +953,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         last_run_pages_skipped = 0;
 
         size_t max_size_to_evict = 0, size_to_evict = 0;
-        cache_usage_per1000(cache, &max_size_to_evict);
-        if(!max_size_to_evict)
+        if (all_of_them)
+            max_size_to_evict = SIZE_MAX;
+
+        else
+            cache_usage_per1000(cache, &max_size_to_evict);
+
+        if (!max_size_to_evict)
             break;
 
         // zero our partition linked lists
