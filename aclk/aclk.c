@@ -776,35 +776,40 @@ exit:
 void aclk_host_state_update(RRDHOST *host, int cmd)
 {
     uuid_t node_id;
-    int ret;
+    int ret = 0;
 
     if (!aclk_connected)
         return;
 
-    ret = get_node_id(&host->host_uuid, &node_id);
-    if (ret > 0) {
-        // this means we were not able to check if node_id already present
-        error("Unable to check for node_id. Ignoring the host state update.");
-        return;
+    if (host->node_id && !uuid_is_null(*host->node_id)) {
+        uuid_copy(node_id, *host->node_id);
     }
-    if (ret < 0) {
-        // node_id not found
-        aclk_query_t create_query;
-        create_query = aclk_query_new(REGISTER_NODE);
-        rrdhost_aclk_state_lock(localhost);
-        node_instance_creation_t node_instance_creation = {
-            .claim_id = localhost->aclk_state.claimed_id,
-            .hops = host->system_info->hops,
-            .hostname = rrdhost_hostname(host),
-            .machine_guid = host->machine_guid
-        };
-        create_query->data.bin_payload.payload = generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
-        rrdhost_aclk_state_unlock(localhost);
-        create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
-        create_query->data.bin_payload.msg_name = "CreateNodeInstance";
-        info("Registering host=%s, hops=%u",host->machine_guid, host->system_info->hops);
-        aclk_queue_query(create_query);
-        return;
+    else {
+        ret = get_node_id(&host->host_uuid, &node_id);
+        if (ret > 0) {
+            // this means we were not able to check if node_id already present
+            error("Unable to check for node_id. Ignoring the host state update.");
+            return;
+        }
+        if (ret < 0) {
+            // node_id not found
+            aclk_query_t create_query;
+            create_query = aclk_query_new(REGISTER_NODE);
+            rrdhost_aclk_state_lock(localhost);
+            node_instance_creation_t node_instance_creation = {
+                .claim_id = localhost->aclk_state.claimed_id,
+                .hops = host->system_info->hops,
+                .hostname = rrdhost_hostname(host),
+                .machine_guid = host->machine_guid};
+            create_query->data.bin_payload.payload =
+                generate_node_instance_creation(&create_query->data.bin_payload.size, &node_instance_creation);
+            rrdhost_aclk_state_unlock(localhost);
+            create_query->data.bin_payload.topic = ACLK_TOPICID_CREATE_NODE;
+            create_query->data.bin_payload.msg_name = "CreateNodeInstance";
+            info("Registering host=%s, hops=%u", host->machine_guid, host->system_info->hops);
+            aclk_queue_query(create_query);
+            return;
+        }
     }
 
     aclk_query_t query = aclk_query_new(NODE_STATE_UPDATE);
