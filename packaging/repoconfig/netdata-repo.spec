@@ -1,8 +1,8 @@
 %{?rhel:%global centos_ver %rhel}
 
 Name:           netdata-repo
-Version:        1
-Release:        2
+Version:        2
+Release:        1
 Summary:        Netdata stable repositories configuration.
 
 Group:          System Environment/Base
@@ -96,6 +96,8 @@ This package contains the official Netdata package repository configuration for 
 %endif
 
 %changelog
+* Wed Dec 7 2022 Austin Hemmelgarn <austin@netdata.cloud> 2-1
+- Switch to new hosting at repo.netdata.cloud.
 * Mon Jun 6 2022 Austin Hemmelgarn <austin@netdata.cloud> 1-2
 - Bump release to keep in sync with DEB package.
 * Mon Jun 14 2021 Austin Hemmelgarn <austin@netdata.cloud> 1-1
