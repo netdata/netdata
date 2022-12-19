@@ -1002,11 +1002,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     break;
                 }
 
-                if(++pages_to_evict >= pages_to_evict_per_run)
+                if(++pages_to_evict >= pages_to_evict_per_run && !all_of_them)
                     break;
 
                 size_to_evict += page->assumed_size;
-                if(size_to_evict >= max_size_to_evict)
+                if(size_to_evict >= max_size_to_evict && !all_of_them)
                     break;
             }
             else {
