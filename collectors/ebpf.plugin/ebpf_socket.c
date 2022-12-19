@@ -62,8 +62,6 @@ ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 pthread_mutex_t nv_mutex;
-int wait_to_plot = 0;
-
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
@@ -2014,9 +2012,6 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  */
 static void read_socket_hash_table(int fd, int family, uint32_t network_connection)
 {
-    if (wait_to_plot)
-        return;
-
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
 
@@ -2163,7 +2158,6 @@ void *ebpf_socket_read_hash(void *ptr)
         read_listen_table();
         read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
         read_socket_hash_table(fd_ipv6, AF_INET6, network_connection);
-        wait_to_plot = 1;
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -2915,7 +2909,6 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
             ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
             fflush(stdout);
             ebpf_socket_send_nv_data(&outbound_vectors);
-            wait_to_plot = 0;
             pthread_mutex_unlock(&nv_mutex);
 
         }
