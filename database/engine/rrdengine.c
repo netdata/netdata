@@ -1010,14 +1010,11 @@ static void do_cache_flush_and_evict(uv_work_t *req)
         }
     }
 
-    if (main_cache && wc->ctx->tier == 0) {
-        worker_is_busy(UV_EVENT_EVICT_MAIN);
-        pgc_evict_pages(main_cache, 0, 0);
-    }
-
-    if (open_cache && wc->ctx->tier == 0) {
-        worker_is_busy(UV_EVENT_EVICT_OPEN);
-        pgc_evict_pages(open_cache, 0, 0);
+    if (0 == wc->ctx->tier) {
+        if (main_cache) {
+            worker_is_busy(UV_EVENT_EVICT_MAIN);
+            pgc_evict_pages(main_cache, 0, 0);
+        }
     }
 
     worker_is_idle();

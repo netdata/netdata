@@ -27,7 +27,6 @@ enum event_loop_job {
     UV_EVENT_FLUSH_MAIN,
     UV_EVENT_FLUSH_OPEN,
     UV_EVENT_EVICT_MAIN,
-    UV_EVENT_EVICT_OPEN,
     UV_EVENT_PAGE_DISPATCH,
 };
 
