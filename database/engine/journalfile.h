@@ -22,10 +22,8 @@ struct rrdengine_journalfile {
     uv_file file;
     uint64_t pos;
     void *data;
-    uint16_t file_index;                        // File index
     void *journal_data;                         // MMAPed file of journal v2
     uint32_t journal_data_size;                 // Total file size mapped
-    bool is_valid;
     struct rrdengine_datafile *datafile;
 };
 

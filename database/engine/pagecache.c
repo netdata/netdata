@@ -324,7 +324,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     bool lookup_continue = true;
     while (lookup_continue && datafile) {
         struct journal_v2_header *journal_header = (struct journal_v2_header *) datafile->journalfile->journal_data;
-        if (!journal_header || !datafile->journalfile->is_valid || !datafile->users.available) {
+        if (!journal_header || !datafile->users.available) {
             datafile = datafile->next;
             continue;
         }

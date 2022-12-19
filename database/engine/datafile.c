@@ -424,7 +424,6 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         journalfile = mallocz(sizeof(*journalfile));
         datafile->journalfile = journalfile;
         journalfile_init(journalfile, datafile);
-        journalfile->file_index = i;
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */

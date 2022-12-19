@@ -183,8 +183,6 @@ void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengin
     journalfile->journal_data = NULL;
     journalfile->journal_data_size = 0;
     journalfile->data = NULL;
-    journalfile->file_index = 0;
-    journalfile->is_valid = true;
 }
 
 static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
@@ -1158,7 +1156,6 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
         uv_rwlock_wrlock(&ctx->datafiles.rwlock);
         __atomic_store_n(&journalfile->journal_data, data_start, __ATOMIC_RELEASE);
         __atomic_store_n(&journalfile->journal_data_size, total_file_size, __ATOMIC_RELEASE);
-        journalfile->is_valid = true;
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
         internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
