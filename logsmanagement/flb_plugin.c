@@ -668,13 +668,13 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
 
         size_t tmp_item_off = buff->in->text_size;
 
-        memcpy(&buff->in->data[tmp_item_off++], "<", 1);
+        buff->in->data[tmp_item_off++] = '<';
         if(likely(syslog_prival[0])){
             memcpy(&buff->in->data[tmp_item_off], syslog_prival, syslog_prival_size);
             m_assert(syslog_prival_size, "syslog_prival_size cannot be 0");
             tmp_item_off += syslog_prival_size;
-        } else memcpy(&buff->in->data[tmp_item_off++], "-", 1);
-        memcpy(&buff->in->data[tmp_item_off++], ">", 1);
+        } else buff->in->data[tmp_item_off++] = '-';
+        buff->in->data[tmp_item_off++] = '>';
 
         if(likely(syslog_timestamp)){
             memcpy(&buff->in->data[tmp_item_off], syslog_timestamp, syslog_timestamp_size);
@@ -689,7 +689,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         if(likely(hostname)){
             memcpy(&buff->in->data[tmp_item_off], hostname, hostname_size);
             tmp_item_off += hostname_size;
-            memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+            buff->in->data[tmp_item_off++] = ' ';
         }
 
         if(likely(syslog_identifier)){
@@ -700,7 +700,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             tmp_item_off += sizeof(UNKNOWN) - 1;
         }
 
-        memcpy(&buff->in->data[tmp_item_off++], "[", 1);
+        buff->in->data[tmp_item_off++] = '[';
         if(likely(pid)){
             memcpy(&buff->in->data[tmp_item_off], pid, pid_size);
             tmp_item_off += pid_size;
@@ -708,17 +708,17 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             memcpy(&buff->in->data[tmp_item_off], UNKNOWN, sizeof(UNKNOWN) - 1);
             tmp_item_off += sizeof(UNKNOWN) - 1;
         }
-        memcpy(&buff->in->data[tmp_item_off++], "]", 1);
+        buff->in->data[tmp_item_off++] = ']';
         
-        memcpy(&buff->in->data[tmp_item_off++], ":", 1);
-        memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+        buff->in->data[tmp_item_off++] = ':';
+        buff->in->data[tmp_item_off++] = ' ';
 
         if(likely(message)){
             memcpy(&buff->in->data[tmp_item_off], message, message_size);
             tmp_item_off += message_size;  
         }
 
-        memcpy(&buff->in->data[tmp_item_off++], "\n", 1);
+        buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
     }
@@ -817,44 +817,43 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         if(likely(*docker_ev_datetime)){
             memcpy(&buff->in->data[tmp_item_off], docker_ev_datetime, docker_ev_datetime_size - 1);
             tmp_item_off += docker_ev_datetime_size - 1; // -1 due to null terminator
-            memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+            buff->in->data[tmp_item_off++] = ' ';
         }
 
         if(likely(docker_ev_type)){
             memcpy(&buff->in->data[tmp_item_off], docker_ev_type, docker_ev_type_size);
             tmp_item_off += docker_ev_type_size;
-            memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+            buff->in->data[tmp_item_off++] = ' ';
         }
 
         if(likely(docker_ev_action)){
             memcpy(&buff->in->data[tmp_item_off], docker_ev_action, docker_ev_action_size);
             tmp_item_off += docker_ev_action_size;
-            memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+            buff->in->data[tmp_item_off++] = ' ';
         }
 
         if(likely(docker_ev_id)){
             memcpy(&buff->in->data[tmp_item_off], docker_ev_id, docker_ev_id_size);
             tmp_item_off += docker_ev_id_size;
-            memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+            buff->in->data[tmp_item_off++] = ' ';
         }
 
         if(likely(docker_ev_attr.size)){
-            memcpy(&buff->in->data[tmp_item_off++], "(", 1);
+            buff->in->data[tmp_item_off++] = '(';
             for(int i = 0; i < docker_ev_attr.size; i++){
                 memcpy(&buff->in->data[tmp_item_off], docker_ev_attr.key[i], docker_ev_attr.key_size[i]);
                 tmp_item_off += docker_ev_attr.key_size[i];
-                memcpy(&buff->in->data[tmp_item_off++], "=", 1);
+                buff->in->data[tmp_item_off++] = '=';
                 memcpy(&buff->in->data[tmp_item_off], docker_ev_attr.val[i], docker_ev_attr.val_size[i]);
                 tmp_item_off += docker_ev_attr.val_size[i];
-                memcpy(&buff->in->data[tmp_item_off++], ",", 1);
-                memcpy(&buff->in->data[tmp_item_off++], " ", 1);
+                buff->in->data[tmp_item_off++] = ',';
+                buff->in->data[tmp_item_off++] = ' ';
             }
             tmp_item_off -= 2; // overwrite last ',' and ' ' characters with a ')' character
-            memcpy(&buff->in->data[tmp_item_off++], ")", 1);
+            buff->in->data[tmp_item_off++] = ')';
         }
 
-
-        memcpy(&buff->in->data[tmp_item_off++], "\n", 1);
+        buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
     }
