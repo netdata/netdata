@@ -1594,30 +1594,14 @@ static int compare_sockets(void *a, void *b)
 
     // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
-        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
-            if (val1->index.sport == val2->index.sport)
-                cmp = 0;
-            else {
-                cmp = (val1->index.sport > val2->index.sport)?1:-1;
-            }
-        } else {
-            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
-            if (!cmp) {
-                cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
-            }
+        cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (!cmp) {
+            cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
         }
     } else {
-        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
-            if (val1->index.sport == val2->index.sport)
-                cmp = 0;
-            else {
-                cmp = (val1->index.sport > val2->index.sport)?1:-1;
-            }
-        } else {
-            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
-            if (!cmp) {
-                cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
-            }
+        cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (!cmp) {
+            cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
         }
     }
 
@@ -1861,9 +1845,7 @@ static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *
     sock->recv_bytes   += lvalues->recv_bytes;
     sock->sent_bytes   += lvalues->sent_bytes;
     sock->retransmit   += lvalues->retransmit;
-
-    if (lvalues->ct > sock->ct)
-        sock->ct = lvalues->ct;
+    sock->ct = lvalues->ct;
 }
 
 /**
@@ -1887,7 +1869,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
-        if (lvalues->ct > ret->plot.last_time) {
+        if (lvalues->ct != ret->plot.last_time) {
             update_socket_data(&ret->sock, lvalues);
         }
     } else {
