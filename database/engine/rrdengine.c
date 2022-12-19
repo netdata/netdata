@@ -923,8 +923,22 @@ static void delete_old_data(void *arg)
 {
     struct rrdengine_instance *ctx = arg;
     struct rrdengine_worker_config *wc = &ctx->worker_config;
+    struct rrdengine_journalfile *journalfile = ctx->datafiles.first->journalfile;
 
-    // FIXME: Check if metadata needs to be handled
+    struct journal_v2_header *journal_header = (struct journal_v2_header *) journalfile->journal_data;
+    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+    time_t journal_start_time_t =  (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+    for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
+        //time_t metric_start_t = journal_start_time_t + uuid_list[index].delta_start;
+        //time_t metric_end_t = journal_start_time_t + uuid_list[index].delta_end;
+        //uuid_list[index].uuid
+        // Removing duration of metric
+        //char uuid_str[UUID_STR_LEN];
+        //uuid_unparse_lower(uuid_list[index].uuid, uuid_str);
+        //info("DEBUG: Remove %s (%ld, %ld)", uuid_str, metric_start_t, metric_end_t);
+        // FIXME: Metric uuid_list[index].uuid retention for this context should be updated (metric_start_t, metric_end_time) will be removed
+        ;
+    }
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
     fatal_assert(0 == uv_async_send(&wc->async));
