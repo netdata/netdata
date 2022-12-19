@@ -73,6 +73,12 @@ struct pgc_statistics {
     size_t entries;                 // all the entries (includes clean, dirty, host)
     size_t size;                    // all the entries (includes clean, dirty, host)
 
+    size_t evicting_entries;
+    size_t evicting_size;
+
+    size_t flushing_entries;
+    size_t flushing_size;
+
     PGC_CACHE_LINE_PADDING(4);
 
     size_t acquires;
@@ -118,6 +124,9 @@ struct pgc_statistics {
     size_t delete_spins;
 
     PGC_CACHE_LINE_PADDING(10);
+
+    size_t evictors;
+    size_t flushers;
 
     size_t evict_skipped;
     size_t hot_empty_pages_evicted_immediately;

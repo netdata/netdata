@@ -983,6 +983,8 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_hot;
     RRDDIM *rd_pgc_memory_dirty;
     RRDDIM *rd_pgc_memory_index;
+    RRDDIM *rd_pgc_memory_evicting;
+    RRDDIM *rd_pgc_memory_flushing;
 
     RRDSET *st_pgc_pages;
     RRDDIM *rd_pgc_pages_clean;
@@ -998,6 +1000,10 @@ struct dbengine2_cache_pointers {
     RRDSET *st_pgc_memory_migrations;
     RRDDIM *rd_pgc_memory_hot_to_dirty;
     RRDDIM *rd_pgc_memory_dirty_to_clean;
+
+    RRDSET *st_pgc_workers;
+    RRDDIM *rd_pgc_workers_evictors;
+    RRDDIM *rd_pgc_workers_flushers;
 
     RRDSET *st_pgc_cache_target_size;
     RRDDIM *rd_free;
@@ -1149,10 +1155,12 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
-            ptrs->rd_pgc_memory_clean   = rrddim_add(ptrs->st_pgc_memory, "clean",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            ptrs->rd_pgc_memory_hot     = rrddim_add(ptrs->st_pgc_memory, "hot",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            ptrs->rd_pgc_memory_dirty   = rrddim_add(ptrs->st_pgc_memory, "dirty",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            ptrs->rd_pgc_memory_index   = rrddim_add(ptrs->st_pgc_memory, "index",   NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_clean    = rrddim_add(ptrs->st_pgc_memory, "clean",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_hot      = rrddim_add(ptrs->st_pgc_memory, "hot",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_dirty    = rrddim_add(ptrs->st_pgc_memory, "dirty",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_index    = rrddim_add(ptrs->st_pgc_memory, "index",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_evicting = rrddim_add(ptrs->st_pgc_memory, "evicting", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_memory_flushing = rrddim_add(ptrs->st_pgc_memory, "flushing", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             buffer_free(id);
             buffer_free(family);
@@ -1163,8 +1171,10 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_clean, (collected_number)pgc_stats->queues.clean.size);
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_hot, (collected_number)pgc_stats->queues.hot.size);
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_dirty, (collected_number)pgc_stats->queues.dirty.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_evicting, (collected_number)pgc_stats->evicting_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_flushing, (collected_number)pgc_stats->flushing_size);
         rrddim_set_by_pointer(ptrs->st_pgc_memory, ptrs->rd_pgc_memory_index,
-                              (collected_number)(pgc_stats->size - pgc_stats->queues.clean.size - pgc_stats->queues.hot.size - pgc_stats->queues.dirty.size));
+                              (collected_number)(pgc_stats->size - pgc_stats->queues.clean.size - pgc_stats->queues.hot.size - pgc_stats->queues.dirty.size - pgc_stats->evicting_size - pgc_stats->flushing_size));
 
         rrdset_done(ptrs->st_pgc_memory);
     }
@@ -1428,6 +1438,46 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->evict_spins);
 
         rrdset_done(ptrs->st_pgc_waste);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_workers)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_cache_workers", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Cache Workers", name);
+
+            ptrs->st_pgc_workers = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "workers",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            ptrs->rd_pgc_workers_evictors = rrddim_add(ptrs->st_pgc_workers, "evictors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_workers_flushers = rrddim_add(ptrs->st_pgc_workers, "flushers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_evictors, (collected_number)pgc_stats->evictors);
+        rrddim_set_by_pointer(ptrs->st_pgc_workers, ptrs->rd_pgc_workers_flushers, (collected_number)pgc_stats->flushers);
+
+        rrdset_done(ptrs->st_pgc_workers);
     }
 }
 

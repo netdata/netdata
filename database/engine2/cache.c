@@ -930,6 +930,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         // don't bother - not enough to do anything
         return false;
 
+    __atomic_add_fetch(&cache->stats.evictors, 1, __ATOMIC_RELAXED);
+
     internal_fatal(cache->clean.linked_list_in_sections_judy,
                    "wrong clean pages configuration - clean pages need to have a linked list, not a judy array");
 
@@ -940,19 +942,19 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         max_evict = SIZE_MAX;
 
     PGC_PAGE *to_evict[cache->config.partitions];
-    size_t pages_to_evict;
+    size_t pages_to_evict, pages_to_evict_size;
     size_t total_pages_evicted = 0;
     size_t total_pages_skipped = 0;
     size_t last_run_pages_skipped;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t pages_to_evict_per_run = (max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
+    size_t pages_to_evict_per_run = (max_evict == SIZE_MAX || max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
 
     do {
         spins++;
         last_run_pages_skipped = 0;
 
-        size_t max_size_to_evict = 0, size_to_evict = 0;
+        size_t max_size_to_evict = 0;
         if (all_of_them)
             max_size_to_evict = SIZE_MAX;
 
@@ -967,6 +969,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             to_evict[partition] = NULL;
 
         pages_to_evict = 0;
+        pages_to_evict_size = 0;
 
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
@@ -1002,11 +1005,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     break;
                 }
 
-                if(++pages_to_evict >= pages_to_evict_per_run && !all_of_them)
-                    break;
+                pages_to_evict++;
+                pages_to_evict_size += page->assumed_size;
 
-                size_to_evict += page->assumed_size;
-                if(size_to_evict >= max_size_to_evict && !all_of_them)
+                if((pages_to_evict >= pages_to_evict_per_run || pages_to_evict_size >= max_size_to_evict) && !all_of_them)
                     break;
             }
             else {
@@ -1025,6 +1027,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
         if(pages_to_evict) {
             // remove them from the index
+
+            __atomic_add_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
 
             // we don't want to just get the lock,
             // we want to try to get it, if we can
@@ -1079,6 +1084,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     free_this_page(cache, page);
                 }
             }
+
+            __atomic_sub_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
         }
 
     } while(pages_to_evict && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
@@ -1101,6 +1109,8 @@ premature_exit:
 
     if(unlikely(spins > 1))
         __atomic_add_fetch(&cache->stats.evict_spins, spins - 1, __ATOMIC_RELAXED);
+
+    __atomic_sub_fetch(&cache->stats.evictors, 1, __ATOMIC_RELAXED);
 
     return stopped_before_finishing;
 }
@@ -1356,6 +1366,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         return false;
     }
 
+    __atomic_add_fetch(&cache->stats.flushers, 1, __ATOMIC_RELAXED);
+
     bool have_dirty_lock = true;
 
     if(all_of_them || !max_flushes)
@@ -1469,6 +1481,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         pgc_ll_unlock(cache, &cache->dirty);
         have_dirty_lock = false;
 
+        __atomic_add_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
+
         // call the callback to save them
         // it may take some time, so let's release the lock
         cache->config.pgc_save_dirty_cb(cache, array, pages, added);
@@ -1491,6 +1506,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         }
 
         pgc_ll_unlock(cache, &cache->clean);
+        __atomic_sub_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
+
         __atomic_add_fetch(&cache->stats.flushes_completed, added, __ATOMIC_RELAXED);
         __atomic_add_fetch(&cache->stats.flushes_completed_size, added_size, __ATOMIC_RELAXED);
 
@@ -1514,6 +1532,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
     if(have_dirty_lock)
         pgc_ll_unlock(cache, &cache->dirty);
+
+    __atomic_sub_fetch(&cache->stats.flushers, 1, __ATOMIC_RELAXED);
 
     return stopped_before_finishing;
 }
@@ -1743,9 +1763,7 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
 
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
     // FIXME - get the statistics atomically
-    struct pgc_statistics stats = cache->stats;
-
-    return stats;
+    return cache->stats;
 }
 
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
