@@ -1452,12 +1452,12 @@ static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
     if (!network_viewer_opt.excluded_ips && !network_viewer_opt.included_ips)
         return 1;
 
-    uint32_t ipv4_test = ntohl(cmp->addr32[0]);
+    uint32_t ipv4_test = cmp->addr32[0];
     ebpf_network_viewer_ip_list_t *move = network_viewer_opt.excluded_ips;
     while (move) {
         if (family == AF_INET) {
-            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
-                ipv4_test <= ntohl(move->last.addr32[0]) )
+            if (move->first.addr32[0] <= ipv4_test &&
+                ipv4_test <= move->last.addr32[0])
                 return 0;
         } else {
             if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
@@ -1471,8 +1471,8 @@ static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
     move = network_viewer_opt.included_ips;
     while (move) {
         if (family == AF_INET) {
-            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
-                ntohl(move->last.addr32[0]) >= ipv4_test)
+            if (move->first.addr32[0] <= ipv4_test &&
+                move->last.addr32[0] >= ipv4_test)
                 return 1;
         } else {
             if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
