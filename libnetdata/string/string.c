@@ -268,7 +268,7 @@ STRING *string_strdupz(const char *str) {
 }
 
 void string_freez(STRING *string) {
-    if(unlikely(!string)) return;
+    if(unlikely(!string || netdata_exit)) return;
 
     REFCOUNT refcount = string_entry_release(string);
 
