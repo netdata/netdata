@@ -175,6 +175,7 @@ monitoring](/health/README.md).
 |           run at least every seconds           |                       `10`                       | Controls how often all alarm conditions should be evaluated.                                                                                                                                   |
 | postpone alarms during hibernation for seconds |                       `60`                       | Prevents false alarms. May need to be increased if you get alarms during hibernation.                                                                                                          |
 |             rotate log every lines             |                       2000                       | Controls the number of alarm log entries stored in `<lib directory>/health-log.db`, where `<lib directory>` is the one configured in the [\[global\] section](#global-section-options)         |
+|                enabled alarms                  |                       *                          | Defines which alarms to load from both user and stock directories. This is a [simple pattern](/libnetdata/simple_pattern/README.md) list of alarm or template names. Can be used to disable specific alarms. For example, `enabled alarms =  !oom_kill *` will load all alarms except `oom_kill`. |
 
 ### [web] section options
 

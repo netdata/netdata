@@ -553,33 +553,37 @@ static int health_readfile(const char *filename, void *data) {
                 rt = NULL;
             }
 
-            rc = callocz(1, sizeof(RRDCALC));
-            rc->next_event_id = 1;
+            if (simple_pattern_matches(conf_enabled_alarms, value)) {
+                rc = callocz(1, sizeof(RRDCALC));
+                rc->next_event_id = 1;
 
-            {
-                char *tmp = strdupz(value);
-                if(rrdvar_fix_name(tmp))
-                    error("Health configuration renamed alarm '%s' to '%s'", value, tmp);
+                {
+                    char *tmp = strdupz(value);
+                    if(rrdvar_fix_name(tmp))
+                        error("Health configuration renamed alarm '%s' to '%s'", value, tmp);
 
-                rc->name = string_strdupz(tmp);
-                freez(tmp);
+                    rc->name = string_strdupz(tmp);
+                    freez(tmp);
+                }
+
+                rc->source = health_source_file(line, filename);
+                rc->green = NAN;
+                rc->red = NAN;
+                rc->value = NAN;
+                rc->old_value = NAN;
+                rc->delay_multiplier = 1.0;
+                rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
+                rc->warn_repeat_every = host->health_default_warn_repeat_every;
+                rc->crit_repeat_every = host->health_default_crit_repeat_every;
+                if (alert_cfg)
+                    alert_config_free(alert_cfg);
+                alert_cfg = callocz(1, sizeof(struct alert_config));
+
+                alert_cfg->alarm = string_dup(rc->name);
+                ignore_this = 0;
+            } else {
+                rc = NULL;
             }
-
-            rc->source = health_source_file(line, filename);
-            rc->green = NAN;
-            rc->red = NAN;
-            rc->value = NAN;
-            rc->old_value = NAN;
-            rc->delay_multiplier = 1.0;
-            rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
-            rc->warn_repeat_every = host->health_default_warn_repeat_every;
-            rc->crit_repeat_every = host->health_default_crit_repeat_every;
-            if (alert_cfg)
-                alert_config_free(alert_cfg);
-            alert_cfg = callocz(1, sizeof(struct alert_config));
-
-            alert_cfg->alarm = string_dup(rc->name);
-            ignore_this = 0;
         }
         else if(hash == hash_template && !strcasecmp(key, HEALTH_TEMPLATE_KEY)) {
             if(rc) {
@@ -599,29 +603,33 @@ static int health_readfile(const char *filename, void *data) {
                     rrdcalctemplate_add_from_config(host, rt);
             }
 
-            rt = callocz(1, sizeof(RRDCALCTEMPLATE));
+            if (simple_pattern_matches(conf_enabled_alarms, value)) {
+                rt = callocz(1, sizeof(RRDCALCTEMPLATE));
 
-            {
-                char *tmp = strdupz(value);
-                if(rrdvar_fix_name(tmp))
-                    error("Health configuration renamed template '%s' to '%s'", value, tmp);
+                {
+                    char *tmp = strdupz(value);
+                    if(rrdvar_fix_name(tmp))
+                        error("Health configuration renamed template '%s' to '%s'", value, tmp);
 
-                rt->name = string_strdupz(tmp);
-                freez(tmp);
+                    rt->name = string_strdupz(tmp);
+                    freez(tmp);
+                }
+
+                rt->source = health_source_file(line, filename);
+                rt->green = NAN;
+                rt->red = NAN;
+                rt->delay_multiplier = (float)1.0;
+                rt->warn_repeat_every = host->health_default_warn_repeat_every;
+                rt->crit_repeat_every = host->health_default_crit_repeat_every;
+                if (alert_cfg)
+                    alert_config_free(alert_cfg);
+                alert_cfg = callocz(1, sizeof(struct alert_config));
+
+                alert_cfg->template_key = string_dup(rt->name);
+                ignore_this = 0;
+            } else {
+                rt = NULL;
             }
-
-            rt->source = health_source_file(line, filename);
-            rt->green = NAN;
-            rt->red = NAN;
-            rt->delay_multiplier = (float)1.0;
-            rt->warn_repeat_every = host->health_default_warn_repeat_every;
-            rt->crit_repeat_every = host->health_default_crit_repeat_every;
-            if (alert_cfg)
-                alert_config_free(alert_cfg);
-            alert_cfg = callocz(1, sizeof(struct alert_config));
-
-            alert_cfg->template_key = string_dup(rt->name);
-            ignore_this = 0;
         }
         else if(hash == hash_os && !strcasecmp(key, HEALTH_OS_KEY)) {
             char *os_match = value;

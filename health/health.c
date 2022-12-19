@@ -159,6 +159,7 @@ static bool prepare_command(BUFFER *wb,
 
 unsigned int default_health_enabled = 1;
 char *silencers_filename;
+SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 
 // the queue of executed alarm notifications that haven't been waited for yet
 static __thread struct {
@@ -768,6 +769,8 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     }
     else
         host->health_log.max = (unsigned int)n;
+
+    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
@@ -1553,7 +1556,6 @@ void *health_main(void *ptr) {
 
 void health_add_host_labels(void) {
     DICTIONARY *labels = localhost->rrdlabels;
-    enum rrdlabel_source src;
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
     // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
