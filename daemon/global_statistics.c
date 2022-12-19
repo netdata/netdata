@@ -1055,13 +1055,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             priority++;
         }
 
-        static size_t closest_percent = 100;
-        if(pgc_stats->searches_closest)
-            closest_percent = pgc_stats->searches_closest_hits * 100 * 10000 / pgc_stats->searches_closest;
+        size_t closest_percent = 100 * 10000;
+        if(pgc_stats->searches_closest > pgc_stats_old->searches_closest)
+            closest_percent = (pgc_stats->searches_closest_hits - pgc_stats_old->searches_closest_hits) * 100 * 10000 / (pgc_stats->searches_closest - pgc_stats_old->searches_closest);
 
-        static size_t exact_percent = 100;
-        if(pgc_stats->searches_exact)
-            exact_percent = pgc_stats->searches_exact_hits * 100 * 10000 / pgc_stats->searches_exact;
+        size_t exact_percent = 100 * 10000;
+        if(pgc_stats->searches_exact > pgc_stats_old->searches_exact)
+            exact_percent = (pgc_stats->searches_exact_hits - pgc_stats_old->searches_exact_hits) * 100 * 10000 / (pgc_stats->searches_exact - pgc_stats_old->searches_exact);
 
         rrddim_set_by_pointer(ptrs->st_cache_hit_ratio, ptrs->rd_hit_ratio_closest, (collected_number)closest_percent);
         rrddim_set_by_pointer(ptrs->st_cache_hit_ratio, ptrs->rd_hit_ratio_exact, (collected_number)exact_percent);
