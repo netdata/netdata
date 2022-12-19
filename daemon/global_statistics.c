@@ -1467,6 +1467,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDSET *st_pgc_memory = NULL;
         static RRDDIM *rd_pgc_memory_main = NULL;
         static RRDDIM *rd_pgc_memory_open = NULL;  // open journal memory
+        static RRDDIM *rd_pgc_memory_extent = NULL;  // extent compresses cache memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
 
         if (unlikely(!st_pgc_memory)) {
@@ -1484,8 +1485,9 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
-            rd_pgc_memory_main   = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_main    = rrddim_add(st_pgc_memory, "main cache", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             priority++;
@@ -1493,6 +1495,7 @@ static void dbengine2_statistics_charts(void) {
 
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_main, (collected_number)pgc_main_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_extent, (collected_number)pgc_extent_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
 
         rrdset_done(st_pgc_memory);
