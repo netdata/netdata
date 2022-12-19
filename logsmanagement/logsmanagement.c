@@ -439,7 +439,7 @@ static void logs_management_init(struct section *config_section){
         if(p_file_info->log_type == FLB_SYSLOG){
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
 
-            /* Read syslog socket path */
+            /* Read syslog format */
             syslog_config->log_format = appconfig_get(&log_management_config, config_section->name, "log format", NULL);
             info("[%s]: log format = %s", p_file_info->chart_name, syslog_config->log_format ? syslog_config->log_format : "NULL!");
             if(!syslog_config->log_format || !*syslog_config->log_format || !strcmp(syslog_config->log_format, "auto")){

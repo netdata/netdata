@@ -896,10 +896,12 @@ int flb_add_input(struct File_info *const p_file_info){
         DEFAULT_ERROR = -7
     };
 
+    const int tag_max_size = 5;
     static unsigned tag = 0; // incremental tag id to link flb inputs to outputs
-    char tag_s[5];
-    snprintfz(tag_s, 5, "%u", tag++);
+    char tag_s[tag_max_size];
+    snprintfz(tag_s, tag_max_size, "%u", tag++);
 
+    // TODO: freez(callback) on error
     struct flb_lib_out_cb *callback = mallocz(sizeof(struct flb_lib_out_cb));
 
     switch(p_file_info->log_type){
@@ -1020,8 +1022,13 @@ int flb_add_input(struct File_info *const p_file_info){
             debug(D_LOGS_MANAG, "Setting up FLB_SYSLOG collector");
 
             /* Set up syslog parser */
+            const char syslog_parser_prfx[] = "syslog_parser_";
+            size_t parser_name_size = sizeof(syslog_parser_prfx) + tag_max_size - 1;
+            char parser_name[parser_name_size];
+            snprintfz(parser_name, parser_name_size, "%s%u", syslog_parser_prfx, tag);
+
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) p_file_info->parser_config->gen_config;
-            if(flb_parser_create( "syslog", "regex", syslog_config->log_format,
+            if(flb_parser_create( parser_name, "regex", syslog_config->log_format,
                 FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
                 NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
         
@@ -1034,7 +1041,7 @@ int flb_add_input(struct File_info *const p_file_info){
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
                     "Path", p_file_info->filename,
-                    "Parser", "syslog",
+                    "Parser", parser_name,
                     "Mode", syslog_config->mode,
                     "Unix_Perm", syslog_config->unix_perm,
                     NULL) != 0) return FLB_INPUT_SET_ERROR;
@@ -1043,8 +1050,7 @@ int flb_add_input(struct File_info *const p_file_info){
                 m_assert(syslog_config->port, "port is not set");
                 if(flb_input_set(ctx, p_file_info->flb_input, 
                     "Tag", tag_s,
-                    "Path", p_file_info->filename,
-                    "Parser", "syslog",
+                    "Parser", parser_name,
                     "Mode", syslog_config->mode,
                     "Listen", syslog_config->listen,
                     "Port", syslog_config->port,
