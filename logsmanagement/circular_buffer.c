@@ -247,6 +247,12 @@ try_to_acquire_space:
     return available_text_space;
 }
 
+/**
+ * @brief Insert item from temporary input buffer to circular buffer.
+ * @param buff Circular buffer to insert the item into
+ * @return 0 in case of success or -1 in case there was an error (e.g. buff 
+ * is out of space).
+ */
 int circ_buff_insert(Circ_buff_t *const buff){
 
     // TODO: Probably can be changed to __ATOMIC_RELAXED, but ideally a mutex should be used here.
@@ -300,6 +306,12 @@ int circ_buff_insert(Circ_buff_t *const buff){
     return 0;
 }
 
+/**
+ * @brief Return pointer to next item to be read from the circular buffer.
+ * @param buff Circular buffer to get next item from.
+ * @return Pointer to the next circular buffer item to be read, or NULL
+ * if there are no more items to be read.
+ */
 Circ_buff_item_t *circ_buff_read_item(Circ_buff_t *const buff) {
 
     Circ_buff_item_t *item = &buff->items[buff->read % buff->num_of_items];
