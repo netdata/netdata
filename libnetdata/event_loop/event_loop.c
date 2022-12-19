@@ -22,6 +22,7 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_JOURNAL_INDEX, "journal v2 indexing");
     worker_register_job_name(UV_EVENT_SCHEDULE_CMD, "schedule command");
     worker_register_job_name(UV_EVENT_METADATA_CLEANUP, "metadata cleanup");
+    worker_register_job_name(UV_EVENT_EXTENT_CACHE, "extent cache");
     worker_register_job_name(UV_EVENT_EXTENT_MMAP, "extent mmap");
     worker_register_job_name(UV_EVENT_PAGE_DISPATCH, "dispatch page list");
     worker_register_job_name(UV_EVENT_FLUSH_CALLBACK, "flush callback");

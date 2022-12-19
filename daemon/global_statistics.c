@@ -1436,10 +1436,11 @@ static void dbengine2_statistics_charts(void) {
     if(!main_cache || !main_mrg)
         return;
 
-    static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {};
+    static struct dbengine2_cache_pointers main_cache_ptrs = {}, open_cache_ptrs = {}, extent_cache_ptrs = {};
     static struct rrdeng_cache_efficiency_stats cache_efficiency_stats = {}, cache_efficiency_stats_old = {};
     static struct pgc_statistics pgc_main_stats = {}, pgc_main_stats_old = {}; (void)pgc_main_stats_old;
     static struct pgc_statistics pgc_open_stats = {}, pgc_open_stats_old = {}; (void)pgc_open_stats_old;
+    static struct pgc_statistics pgc_extent_stats = {}, pgc_extent_stats_old = {}; (void)pgc_extent_stats_old;
     static struct mrg_statistics mrg_stats = {}, mrg_stats_old = {}; (void)mrg_stats_old;
 
     pgc_main_stats_old = pgc_main_stats;
@@ -1449,6 +1450,10 @@ static void dbengine2_statistics_charts(void) {
     pgc_open_stats_old = pgc_open_stats;
     pgc_open_stats = pgc_get_statistics(open_cache);
     dbengine2_cache_statistics_charts(&open_cache_ptrs, &pgc_open_stats, &pgc_open_stats_old, "open", 135200);
+
+    pgc_extent_stats_old = pgc_extent_stats;
+    pgc_extent_stats = pgc_get_statistics(extent_cache);
+    dbengine2_cache_statistics_charts(&extent_cache_ptrs, &pgc_extent_stats, &pgc_extent_stats_old, "extent", 135300);
 
     cache_efficiency_stats_old = cache_efficiency_stats;
     cache_efficiency_stats = rrdeng_get_cache_efficiency_stats();

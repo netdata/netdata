@@ -49,7 +49,7 @@ void extent_list_free(EXTENT_PD_LIST *epdl)
     freez(epdl);
 }
 
-static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS reason, size_t *statistics_counter)
+static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS tags, size_t *statistics_counter)
 {
     size_t pages_matched = 0;
 
@@ -65,7 +65,7 @@ static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl
             struct page_details *pd = *PValue;
 
             if(!pd->page) {
-                pdc_page_status_set(pd, PDC_PAGE_FAILED | reason);
+                pdc_page_status_set(pd, PDC_PAGE_FAILED | tags);
                 pages_matched++;
             }
         }
@@ -75,7 +75,7 @@ static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl
         __atomic_add_fetch(statistics_counter, pages_matched, __ATOMIC_RELAXED);
 }
 
-static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS reason)
+static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS tags)
 {
     size_t count_remaining = 0;
     size_t found = 0;
@@ -96,7 +96,7 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
             pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, pd->metric_id, pd->first_time_s, true);
             if (pd->page) {
                 found++;
-                pdc_page_status_set(pd, PDC_PAGE_READY | reason);
+                pdc_page_status_set(pd, PDC_PAGE_READY | tags);
             }
             else
                 count_remaining++;
@@ -420,7 +420,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 // DBENGINE2 extent processing
-static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx, void *data, size_t data_length, EXTENT_PD_LIST *extent_page_list, bool preload_all_pages, bool worker)
+static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx, void *data, size_t data_length, EXTENT_PD_LIST *extent_page_list, bool preload_all_pages, bool worker, PDC_PAGE_STATUS tags)
 {
     int ret;
     unsigned i, count;
@@ -598,7 +598,7 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx,
         if (pd) {
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            pdc_page_status_set(pd, PDC_PAGE_READY | PDC_PAGE_LOADED_FROM_DISK);
+            pdc_page_status_set(pd, PDC_PAGE_READY | tags);
         }
         else
             pgc_page_release(main_cache, page);
@@ -1083,10 +1083,11 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
-        if(!datafile_acquire_for_deletion(ctx->datafiles.first, false)) {
+        struct rrdengine_datafile *df = ctx->datafiles.first;
+        if(!datafile_acquire_for_deletion(df, false)) {
             error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, it is in use currently, but it has been marked as not available for queries to stop using it.",
-                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+                  " to reclaim space, it is in use currently by %d users, but it has been marked as not available for queries to stop using it.",
+                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
             return;
         }
         info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
@@ -1305,38 +1306,91 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
         goto cleanup;
 
     if(worker)
-        worker_is_busy(UV_EVENT_EXTENT_MMAP);
+        worker_is_busy(UV_EVENT_EXTENT_CACHE);
 
-    off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->extent_offset);
-    size_t length = ALIGN_BYTES_CEILING(extent_page_list->extent_offset + extent_page_list->extent_size) - map_start;
+    PDC_PAGE_STATUS not_loaded_pages_tag, loaded_pages_tag;
 
-    PDC_PAGE_STATUS not_loaded_pages_reason;
-    void *data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
-    if(data != MAP_FAILED) {
+    void *extent_compressed_data = NULL;
+    PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(extent_cache, (Word_t)ctx, (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset, true);
+    if(extent_cache_page) {
+        extent_compressed_data = pgc_page_data(extent_cache_page);
+        internal_fatal(extent_page_list->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+                       "DBENGINE: cache size does not match the expected size");
+
+        loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
+        not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
+    }
+    else {
+        if(worker)
+            worker_is_busy(UV_EVENT_EXTENT_MMAP);
+
+        off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->extent_offset);
+        size_t length = ALIGN_BYTES_CEILING(extent_page_list->extent_offset + extent_page_list->extent_size) - map_start;
+
+        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
+        if(mmap_data != MAP_FAILED) {
+            extent_compressed_data = mmap_data + (extent_page_list->extent_offset - map_start);
+
+            void *copied_extent_compressed_data = mallocz(extent_page_list->extent_size);
+            memcpy(copied_extent_compressed_data, extent_compressed_data, extent_page_list->extent_size);
+
+            int ret = munmap(mmap_data, length);
+            fatal_assert(0 == ret);
+
+            if(worker)
+                worker_is_busy(UV_EVENT_EXTENT_CACHE);
+
+            bool added = false;
+            extent_cache_page = pgc_page_add_and_acquire(extent_cache, (PGC_ENTRY) {
+                    .hot = false,
+                    .section = (Word_t) ctx,
+                    .metric_id = (Word_t) extent_page_list->datafile->fileno,
+                    .start_time_t = (time_t) extent_page_list->extent_offset,
+                    .size = extent_page_list->extent_size,
+                    .end_time_t = 0,
+                    .update_every = 0,
+                    .data = copied_extent_compressed_data,
+            }, &added);
+
+            if (!added) {
+                freez(copied_extent_compressed_data);
+                internal_fatal(extent_page_list->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+                               "DBENGINE: cache size does not match the expected size");
+            }
+
+            extent_compressed_data = pgc_page_data(extent_cache_page);
+
+            loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
+            not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
+        }
+    }
+
+    if(extent_compressed_data) {
         // Need to decompress and then process the pagelist
-        void *extent_data = data + (extent_page_list->extent_offset - map_start);
         bool extent_used = extent_uncompress_and_populate_pages(
-                ctx, extent_data, extent_page_list->extent_size,
+                ctx, extent_compressed_data, extent_page_list->extent_size,
                 extent_page_list, pdc->preload_all_extent_pages,
-                worker);
+                worker, loaded_pages_tag);
 
-        if(extent_used)
+        if(extent_used) {
             // since the extent was used, all the pages that are not
             // loaded from this extent, were not found in the extent
-            not_loaded_pages_reason = PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT;
+            not_loaded_pages_tag |= PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT;
+        }
         else
-            not_loaded_pages_reason = PDC_PAGE_FAILED_INVALID_EXTENT;
-
-        int ret = munmap(data, length);
-        fatal_assert(0 == ret);
+            not_loaded_pages_tag |= PDC_PAGE_FAILED_INVALID_EXTENT;
     }
     else
-        not_loaded_pages_reason = PDC_PAGE_FAILED_TO_MAP_EXTENT;
+        not_loaded_pages_tag |= PDC_PAGE_FAILED_TO_MAP_EXTENT;
+
 
     // mark all pending pages as failed
     extent_list_mark_all_not_loaded_pages_as_failed(
-            extent_page_list, not_loaded_pages_reason,
+            extent_page_list, not_loaded_pages_tag,
             &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+
+    if(extent_cache_page)
+        pgc_page_release(extent_cache, extent_cache_page);
 
 cleanup:
     if(extent_exclusive)

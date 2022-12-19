@@ -8,6 +8,7 @@
 extern struct mrg *main_mrg;
 extern struct pgc *main_cache;
 extern struct pgc *open_cache;
+extern struct pgc *extent_cache;
 
 /* Forward declarations */
 struct rrdengine_instance;

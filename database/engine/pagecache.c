@@ -3,9 +3,10 @@
 
 #include "rrdengine.h"
 
-struct mrg *main_mrg = NULL;
-struct pgc *main_cache = NULL;
-struct pgc *open_cache = NULL;
+MRG *main_mrg = NULL;
+PGC *main_cache = NULL;
+PGC *open_cache = NULL;
+PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
@@ -69,6 +70,17 @@ static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 {
     ;
 }
+
+static void extent_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
+{
+    freez(entry.data);
+}
+
+static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
+{
+    ;
+}
+
 
 static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     return page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s;
@@ -674,6 +686,19 @@ void init_page_cache(void)
                 PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
+        );
+
+        extent_cache = pgc_create(
+                10 * 1024 * 1024,
+                extent_cache_free_clean_page_callback,
+                1,
+                extent_cache_flush_dirty_page_callback,
+                100,                                //
+                100,                            //
+                1,                                          // don't delay too much other threads
+                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
+                0,                                                 // 0 = as many as the system cpus
+                0
         );
     }
     netdata_spinlock_unlock(&spinlock);

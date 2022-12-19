@@ -67,15 +67,16 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 7),
     PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 8),
 
-    PDC_PAGE_LOADED_FROM_DISK          = (1 << 10),
+    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 10),
+    PDC_PAGE_LOADED_FROM_DISK          = (1 << 11),
 
-    PDC_PAGE_PRELOADED_PASS1           = (1 << 11),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 12),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 13),
+    PDC_PAGE_PRELOADED_PASS1           = (1 << 12),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 13),
+    PDC_PAGE_PRELOADED_WORKER          = (1 << 14),
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 14),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 15),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 16),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 15),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 16),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 17),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),
