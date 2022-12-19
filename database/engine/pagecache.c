@@ -676,13 +676,13 @@ void init_page_cache(void)
         );
 
         open_cache = pgc_create(
-                0,                                          // the default is 1MB
+                0,                                            // the default is 1MB
                 open_cache_free_clean_page_callback,
                 1,
                 open_cache_flush_dirty_page_callback,
-                2,                                //
+                2,                                  //
                 1000,                           //
-                1,                                          // don't delay too much other threads
+                2,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
@@ -695,8 +695,8 @@ void init_page_cache(void)
                 extent_cache_flush_dirty_page_callback,
                 2,                                  //
                 100,                            //
-                1,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
+                2,                                          // don't delay too much other threads
+                PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 0
         );

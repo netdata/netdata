@@ -1526,16 +1526,25 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // public API
 
 PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
-                size_t max_dirty_pages_per_call, save_dirty_page_callback pgc_save_dirty_cb,
+                size_t max_dirty_pages_per_flush, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page) {
+
+    if(max_pages_per_inline_eviction < 2)
+        max_pages_per_inline_eviction = 2;
+
+    if(max_dirty_pages_per_flush < 1)
+        max_dirty_pages_per_flush = 1;
+    
+    if(max_flushes_inline * max_dirty_pages_per_flush < 2)
+        max_flushes_inline = 2;
 
     PGC *cache = callocz(1, sizeof(PGC));
     cache->config.options = options;
     cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
-    cache->config.max_dirty_pages_per_call = max_dirty_pages_per_call,
+    cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
     cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 1) ? 1 : max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 1) ? 1 : max_skip_pages_per_inline_eviction;
