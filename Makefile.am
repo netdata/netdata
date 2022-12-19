@@ -203,11 +203,6 @@ APPS_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-PROFILE_PLUGIN_FILES = \
-    collectors/profile.plugin/plugin_profile.cc \
-    collectors/profile.plugin/plugin_profile.h \
-    $(NULL)
-
 FREEBSD_PLUGIN_FILES = \
     collectors/freebsd.plugin/plugin_freebsd.c \
     collectors/freebsd.plugin/plugin_freebsd.h \
@@ -920,7 +915,6 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
-    $(PROFILE_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
