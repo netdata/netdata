@@ -926,8 +926,8 @@ static void delete_old_data(void *arg)
     struct rrdengine_journalfile *journalfile = ctx->datafiles.first->journalfile;
 
     struct journal_v2_header *journal_header = (struct journal_v2_header *) journalfile->journal_data;
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
-    time_t journal_start_time_t =  (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+    // struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+    // time_t journal_start_time_t =  (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
     for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
         //time_t metric_start_t = journal_start_time_t + uuid_list[index].delta_start;
         //time_t metric_end_t = journal_start_time_t + uuid_list[index].delta_end;

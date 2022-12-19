@@ -107,15 +107,19 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
             if(unlikely(!d->enabled)) continue;
 
             // fetch the first valid point for the dimension
-            int max_skip = 100;
-            while(d->sp.end_time < now && !ops->is_finished(&d->handle) && max_skip-- > 0) {
+            int max_skip = 1000;
+            while(d->sp.end_time < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
                 d->sp = ops->next_metric(&d->handle);
                 points_read++;
             }
 
-            internal_error(max_skip <= 0,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu",
-                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(d->rd), (unsigned long long) now);
+            if(max_skip <= 0) {
+                error_limit_static_global_var(erl, 1, 0);
+                error_limit(&erl,
+                               "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
+                               rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(d->rd),
+                               (unsigned long long) now);
+            }
 
             if(unlikely(d->sp.end_time < now || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
                 continue;

@@ -73,8 +73,6 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
 }
 
 void datafile_acquire_dup(struct rrdengine_datafile *df) {
-    bool ret;
-
     netdata_spinlock_lock(&df->users.spinlock);
 
     if(!df->users.lockers)
