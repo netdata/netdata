@@ -652,6 +652,8 @@ static inline void PGC_REFERENCED_PAGES_MINUS1(PGC *cache, size_t assumed_size) 
 // YOU HAVE TO HAVE THE QUEUE (hot, dirty, clean) THE PAGE IS IN, L O C K E D !
 // If you don't have it locked, NOTHING PREVENTS THIS PAGE FOR VANISHING WHILE THIS IS CALLED!
 static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
+    __atomic_add_fetch(&cache->stats.acquires, 1, __ATOMIC_RELAXED);
+
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
@@ -677,6 +679,8 @@ static inline bool page_acquire(PGC *cache, PGC_PAGE *page) {
 }
 
 static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necessary) {
+    __atomic_add_fetch(&cache->stats.releases, 1, __ATOMIC_RELAXED);
+
     size_t assumed_size = page->assumed_size; // take the size before we release it
     REFCOUNT expected, desired;
 
@@ -705,6 +709,8 @@ static inline void page_release(PGC *cache, PGC_PAGE *page, bool evict_if_necess
 }
 
 static inline bool non_acquired_page_get_for_deletion___while_having_clean_locked(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    __atomic_add_fetch(&cache->stats.acquires_for_deletion, 1, __ATOMIC_RELAXED);
+
     internal_fatal(!is_page_clean(page),
                    "DBENGINE CACHE: only clean pages can be deleted");
 
@@ -743,6 +749,8 @@ static inline bool non_acquired_page_get_for_deletion___while_having_clean_locke
 }
 
 static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __maybe_unused, PGC_PAGE *page) {
+    __atomic_add_fetch(&cache->stats.acquires_for_deletion, 1, __ATOMIC_RELAXED);
+
     size_t assumed_size = page->assumed_size; // take the size before we release it
 
     internal_fatal(!is_page_clean(page),

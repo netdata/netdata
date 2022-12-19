@@ -972,7 +972,11 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_searches_exact;
     RRDDIM *rd_add_hot;
     RRDDIM *rd_add_clean;
-    RRDDIM *rd_evict_clean;
+    RRDDIM *rd_evictions;
+    RRDDIM *rd_flushes;
+    RRDDIM *rd_acquires;
+    RRDDIM *rd_releases;
+    RRDDIM *rd_acquires_for_deletion;
 
     RRDSET *st_pgc_memory;
     RRDDIM *rd_pgc_memory_clean;
@@ -990,11 +994,6 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_new_hot;
     RRDDIM *rd_pgc_memory_new_clean;
     RRDDIM *rd_pgc_memory_clean_evictions;
-
-    RRDSET *st_pgc_pages_changes;
-    RRDDIM *rd_pgc_pages_new_hot;
-    RRDDIM *rd_pgc_pages_new_clean;
-    RRDDIM *rd_pgc_pages_clean_evictions;
 
     RRDSET *st_pgc_memory_migrations;
     RRDDIM *rd_pgc_memory_hot_to_dirty;
@@ -1099,7 +1098,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_searches_exact     = rrddim_add(ptrs->st_operations, "search exact", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_add_hot            = rrddim_add(ptrs->st_operations, "add hot", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_add_clean          = rrddim_add(ptrs->st_operations, "add clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_evict_clean        = rrddim_add(ptrs->st_operations, "evict clean", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_evictions          = rrddim_add(ptrs->st_operations, "evictions", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_flushes            = rrddim_add(ptrs->st_operations, "flushes", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_acquires           = rrddim_add(ptrs->st_operations, "acquires", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_releases           = rrddim_add(ptrs->st_operations, "releases", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_acquires_for_deletion = rrddim_add(ptrs->st_operations, "del acquires", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1111,7 +1114,11 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_searches_exact, (collected_number)pgc_stats->searches_exact);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_hot, (collected_number)pgc_stats->queues.hot.added_entries);
         rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_add_clean, (collected_number)(pgc_stats->added_entries - pgc_stats->queues.hot.added_entries));
-        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evict_clean, (collected_number)pgc_stats->queues.clean.removed_entries);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_evictions, (collected_number)pgc_stats->queues.clean.removed_entries);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_flushes, (collected_number)pgc_stats->flushes_completed);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_acquires, (collected_number)pgc_stats->acquires);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_releases, (collected_number)pgc_stats->releases);
+        rrddim_set_by_pointer(ptrs->st_operations, ptrs->rd_acquires_for_deletion, (collected_number)pgc_stats->acquires_for_deletion);
 
         rrdset_done(ptrs->st_operations);
     }

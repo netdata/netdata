@@ -75,6 +75,13 @@ struct pgc_statistics {
 
     PGC_CACHE_LINE_PADDING(4);
 
+    size_t acquires;
+    PGC_CACHE_LINE_PADDING(4a);
+    size_t releases;
+    PGC_CACHE_LINE_PADDING(4b);
+    size_t acquires_for_deletion;
+    PGC_CACHE_LINE_PADDING(4c);
+
     size_t referenced_entries;      // all the entries currently referenced
     size_t referenced_size;         // all the entries currently referenced
 

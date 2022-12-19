@@ -1248,10 +1248,10 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
             goto cleanup;
         }
         extent_exclusive = true;
-
-        if (extent_list_check_if_pages_are_already_in_cache(ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
-            goto cleanup;
     }
+
+    if (extent_list_check_if_pages_are_already_in_cache(ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
+        goto cleanup;
 
     if(worker)
         worker_is_busy(UV_EVENT_EXTENT_MMAP);
@@ -1287,7 +1287,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
             extent_page_list, not_loaded_pages_reason,
             &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
-    cleanup:
+cleanup:
     if(extent_exclusive)
         datafile_release_exclusive_access_to_extent(extent_page_list);
 
