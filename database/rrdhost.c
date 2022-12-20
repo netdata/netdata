@@ -3,6 +3,8 @@
 #define NETDATA_RRD_INTERNALS
 #include "rrd.h"
 
+static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
+
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 size_t storage_tiers = 3;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
@@ -211,7 +213,7 @@ static void rrdhost_initialize_rrdpush_sender(RRDHOST *host,
     if(rrdpush_enabled && rrdpush_destination && *rrdpush_destination && rrdpush_api_key && *rrdpush_api_key) {
         rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
 
-        sender_init(host);
+        rrdhost_streaming_sender_structures_init(host);
 
 #ifdef ENABLE_HTTPS
         host->sender->ssl.conn = NULL;
@@ -1051,9 +1053,34 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     }
 }
 
-void receiver_state_free(struct receiver_state *rpt);
+static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
+{
+    if (host->sender)
+        return;
 
-void stop_streaming_sender(RRDHOST *host)
+    host->sender = callocz(1, sizeof(*host->sender));
+    host->sender->host = host;
+    host->sender->buffer = cbuffer_new(1024, 1024 * 1024);
+    host->sender->capabilities = STREAM_OUR_CAPABILITIES;
+
+    host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
+    host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
+    host->sender->rrdpush_sender_socket  = -1;
+
+#ifdef ENABLE_COMPRESSION
+    if(default_compression_enabled) {
+        host->sender->flags |= SENDER_FLAG_COMPRESSION;
+        host->sender->compressor = create_compressor();
+    }
+    else
+        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
+#endif
+
+    netdata_mutex_init(&host->sender->mutex);
+    replication_init_sender(host->sender);
+}
+
+static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 {
     rrdhost_option_clear(host, RRDHOST_OPTION_SENDER_ENABLED);
 
@@ -1087,10 +1114,10 @@ void rrdhost_free(RRDHOST *host, bool force) {
     // ------------------------------------------------------------------------
     // clean up streaming
 
-    stop_streaming_sender(host);
+    rrdhost_streaming_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host, "HOST CLEANUP");
+        stop_streaming_receiver(host, "HOST CLEANUP", false);
 
 
     // ------------------------------------------------------------------------

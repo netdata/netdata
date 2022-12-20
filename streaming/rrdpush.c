@@ -603,9 +603,6 @@ void rrdpush_sender_thread_stop(RRDHOST *host) {
 
         // signal it to cancel
         netdata_thread_cancel(host->rrdpush_sender_thread);
-
-        // shutdown its socket
-        shutdown(host->sender->rrdpush_sender_socket, SHUT_RDWR);
     }
 
     netdata_mutex_unlock(&host->sender->mutex);
@@ -1028,7 +1025,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER")) {
+        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER", true)) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;

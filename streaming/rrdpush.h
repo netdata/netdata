@@ -227,6 +227,7 @@ struct receiver_state {
 
     struct {
         bool shutdown;      // signal the streaming parser to exit
+        bool new_receiver_waiting_dont_stop_sender;
         const char *reason; // the reason of disconnection to log
     } exit;
 
@@ -283,8 +284,6 @@ extern unsigned int remote_clock_resync_iterations;
 void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
-void sender_init(RRDHOST *host);
-
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
@@ -325,7 +324,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
-bool stop_streaming_receiver(RRDHOST *host, const char *reason);
+bool stop_streaming_receiver(RRDHOST *host, const char *reason, bool new_receiver_waiting);
 
 #include "replication.h"
 

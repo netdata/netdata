@@ -1055,33 +1055,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     freez(s);
 }
 
-void sender_init(RRDHOST *host)
-{
-    if (host->sender)
-        return;
-
-    host->sender = callocz(1, sizeof(*host->sender));
-    host->sender->host = host;
-    host->sender->buffer = cbuffer_new(1024, 1024 * 1024);
-    host->sender->capabilities = STREAM_OUR_CAPABILITIES;
-
-    host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
-    host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    host->sender->rrdpush_sender_socket  = -1;
-
-#ifdef ENABLE_COMPRESSION
-    if(default_compression_enabled) {
-        host->sender->flags |= SENDER_FLAG_COMPRESSION;
-        host->sender->compressor = create_compressor();
-    }
-    else
-        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
-#endif
-
-    netdata_mutex_init(&host->sender->mutex);
-    replication_init_sender(host->sender);
-}
-
 void *rrdpush_sender_thread(void *ptr) {
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");

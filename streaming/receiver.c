@@ -470,7 +470,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
     return set_this;
 }
 
-void rrdhost_clear_receiver(struct receiver_state *rpt) {
+static void rrdhost_clear_receiver(struct receiver_state *rpt) {
     RRDHOST *host = rpt->host;
     if(host) {
         netdata_mutex_lock(&host->receiver_lock);
@@ -484,7 +484,8 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health_enabled = 0;
 
-            rrdpush_sender_thread_stop(host);
+            if(!rpt->exit.new_receiver_waiting_dont_stop_sender)
+                rrdpush_sender_thread_stop(host);
 
             rrdcontext_host_child_disconnected(host);
             rrdpush_receiver_replication_reset(host);
@@ -499,7 +500,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt) {
     }
 }
 
-bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
+bool stop_streaming_receiver(RRDHOST *host, const char *reason, bool new_receiver_waiting) {
     bool ret = false;
 
     netdata_mutex_lock(&host->receiver_lock);
@@ -508,6 +509,7 @@ bool stop_streaming_receiver(RRDHOST *host, const char *reason) {
         if(!host->receiver->exit.shutdown) {
             host->receiver->exit.shutdown = true;
             host->receiver->exit.reason = reason;
+            host->receiver->exit.new_receiver_waiting_dont_stop_sender = new_receiver_waiting;
             shutdown(host->receiver->fd, SHUT_RDWR);
         }
 
