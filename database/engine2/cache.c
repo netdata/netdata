@@ -1033,19 +1033,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             // so that query and collection threads
             // will not be stopped because of us
 
-            bool partition_pending[cache->config.partitions];
-            memset(partition_pending, 0, sizeof(partition_pending));
-
-            // fill-in the status for each partition
-            for (size_t partition = 0; partition < cache->config.partitions; partition++) {
-                if (!to_evict[partition])
-                    partition_pending[partition] = false;
-                else
-                    partition_pending[partition] = true;
-            }
-
             // repeat until all partitions have been cleaned up
-            size_t repeats = cache->config.partitions * 2;
+            size_t repeats = 3;
             size_t pending = cache->config.partitions;
             bool force = (max_evict != SIZE_MAX || max_skip != SIZE_MAX || all_of_them) ? true : false;
             size_t pending_spins = 0;
@@ -1060,7 +1049,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 pending = 0;
 
                 for (size_t partition = 0; partition < cache->config.partitions; partition++) {
-                    if (!partition_pending[partition]) continue;
+                    if (!to_evict[partition]) continue;
 
                     if(force)
                         pgc_index_write_lock(cache, partition);
@@ -1069,34 +1058,34 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                         continue;
                     }
 
+                    size_t pages_removed_from_index_this_partition = 0;
+                    size_t pages_removed_from_index_this_partition_size = 0;
+
                     for (PGC_PAGE *page = to_evict[partition]; page; page = page->link.next) {
                         remove_this_page_from_index_unsafe(cache, page, partition);
-                        pages_removed_from_index++;
+                        pages_removed_from_index_this_partition++;
+                        pages_removed_from_index_this_partition_size += page->assumed_size;
                     }
 
+                    pages_removed_from_index += pages_removed_from_index_this_partition;
                     pgc_index_write_unlock(cache, partition);
-                    partition_pending[partition] = false;
-                }
-            }
 
-            // free memory, while we don't hold any locks
-            for (size_t partition = 0; partition < cache->config.partitions; partition++) {
-                if (!to_evict[partition]) continue;
+                    // free memory, while we don't hold any locks
+                    while (to_evict[partition]) {
+                        PGC_PAGE *page = to_evict[partition];
+                        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(to_evict[partition], page, link.prev, link.next);
+                        free_this_page(cache, page);
+                        pages_freed++;
+                    }
 
-                while (to_evict[partition]) {
-                    PGC_PAGE *page = to_evict[partition];
-                    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(to_evict[partition], page, link.prev, link.next);
-                    free_this_page(cache, page);
-                    pages_freed++;
+                    __atomic_sub_fetch(&cache->stats.evicting_entries, pages_removed_from_index_this_partition, __ATOMIC_RELAXED);
+                    __atomic_sub_fetch(&cache->stats.evicting_size, pages_removed_from_index_this_partition_size, __ATOMIC_RELAXED);
                 }
             }
 
             internal_fatal(pages_to_evict != pages_removed_from_index || pages_to_evict != pages_freed,
                            "DBENGINE CACHE: pages to evict %zu, pages removed from index %zu, pages freed %zu",
                            pages_to_evict, pages_removed_from_index, pages_freed);
-
-            __atomic_sub_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
         }
 
     } while(pages_to_evict && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
