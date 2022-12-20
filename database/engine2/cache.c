@@ -941,7 +941,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t pages_to_evict_per_run = (max_evict == SIZE_MAX || max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
 
     do {
-        if((++spins > 1))
+        if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
         last_run_pages_skipped = 0;
@@ -1048,8 +1048,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             size_t repeats = cache->config.partitions * 2;
             size_t pending = cache->config.partitions;
             bool force = (max_evict != SIZE_MAX || max_skip != SIZE_MAX || all_of_them) ? true : false;
+            size_t pending_spins = 0;
+
             while(pending) {
-                __atomic_add_fetch(&cache->stats.evict_cleanup_spins, 1, __ATOMIC_RELAXED);
+                if(++pending_spins > 1)
+                    __atomic_add_fetch(&cache->stats.evict_cleanup_spins, 1, __ATOMIC_RELAXED);
 
                 if(--repeats == 0 || pending == 1)
                     force = true;
@@ -1126,7 +1129,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     size_t spins = 0;
 
     do {
-        if(unlikely(++spins))
+        if(++spins > 1)
             __atomic_add_fetch(&cache->stats.insert_spins, 1, __ATOMIC_RELAXED);
 
         size_t partition = indexing_partition(cache, entry->metric_id);
