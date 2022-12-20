@@ -4248,7 +4248,7 @@ netdataDashboard.context = {
         info: 'The amount of memory obtained from the OS.'
     },
     'consul.gc_pause_time': {
-        info: 'The amount of time spent in stop-the-world garbage collection (GC) pauses.'
+        info: 'The amount of time spent in garbage collection (GC) pauses. GC pause is a "stop-the-world" event, meaning that all runtime threads are blocked until GC completes. If memory usage is high, the Go runtime may GC so frequently that it starts to slow down Consul.'
     },
     'consul.kvs_apply_time': {
         info: 'The time it takes to complete an update to the KV store.'
