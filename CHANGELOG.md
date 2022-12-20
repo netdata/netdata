@@ -8,6 +8,7 @@
 
 - Populate field values in send\_slack\(\) for Mattermost [\#14153](https://github.com/netdata/netdata/pull/14153) ([je2555](https://github.com/je2555))
 - bump go.d.plugin to v0.46.1 [\#14151](https://github.com/netdata/netdata/pull/14151) ([ilyam8](https://github.com/ilyam8))
+- Add a health configuration option of which alarms to load [\#14150](https://github.com/netdata/netdata/pull/14150) ([MrZammler](https://github.com/MrZammler))
 - Disable integration by default \(eBPF \<-\> APPS\) [\#14147](https://github.com/netdata/netdata/pull/14147) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "MQTT 5 publish topic alias support" [\#14145](https://github.com/netdata/netdata/pull/14145) ([MrZammler](https://github.com/MrZammler))
 - fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
@@ -26,6 +27,7 @@
 - add filtering options to functions table output [\#14108](https://github.com/netdata/netdata/pull/14108) ([ktsaou](https://github.com/ktsaou))
 - fix health emphemerality labels src [\#14105](https://github.com/netdata/netdata/pull/14105) ([ilyam8](https://github.com/ilyam8))
 - fix docker host editable config [\#14104](https://github.com/netdata/netdata/pull/14104) ([ilyam8](https://github.com/ilyam8))
+- Switch to self-hosted infrastructure for RPM package distribution. [\#14100](https://github.com/netdata/netdata/pull/14100) ([Ferroin](https://github.com/Ferroin))
 - Fix missing required package install of tar on FreeBSD [\#14095](https://github.com/netdata/netdata/pull/14095) ([Dim-P](https://github.com/Dim-P))
 - Add version to netdatacli [\#14094](https://github.com/netdata/netdata/pull/14094) ([MrZammler](https://github.com/MrZammler))
 - docs: add a note to set container nofile ulimit for Fedora users [\#14092](https://github.com/netdata/netdata/pull/14092) ([ilyam8](https://github.com/ilyam8))
