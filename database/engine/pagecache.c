@@ -665,9 +665,9 @@ void init_page_cache(void)
         main_mrg = mrg_create();
 
         size_t target_cache_size = default_rrdeng_page_cache_mb * 1024 * 1024;
-        size_t main_cache_size = target_cache_size * 19 / 20;
+        size_t main_cache_size = (target_cache_size / 100) * 95;
         size_t open_cache_size = 0;
-        size_t extent_cache_size = target_cache_size * 1 / 20;
+        size_t extent_cache_size = (target_cache_size / 100) * 5;
 
         if(extent_cache_size < 3 * 1024 * 1024) {
             extent_cache_size = 3 * 1024 * 1024;
