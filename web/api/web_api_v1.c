@@ -1068,15 +1068,13 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
             wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
             , host->machine_guid
             , rrdhost_hostname(host)
-            , (host->receiver || host == localhost) ? "true" : "false"
+            , (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "true" : "false"
             , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
             );
-        netdata_mutex_unlock(&host->receiver_lock);
 
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)

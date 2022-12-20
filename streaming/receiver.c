@@ -432,6 +432,7 @@ static void rrdpush_receiver_replication_reset(RRDHOST *host) {
 }
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
+    bool signal_rrdcontext = false;
     bool set_this = false;
 
     netdata_mutex_lock(&host->receiver_lock);
@@ -457,8 +458,8 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
             }
         }
 
+        signal_rrdcontext = true;
         rrdpush_receiver_replication_reset(host);
-        rrdcontext_host_child_connected(host);
 
         rrdhost_flag_clear(rpt->host, RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED);
 
@@ -467,10 +468,15 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
     netdata_mutex_unlock(&host->receiver_lock);
 
+    if(signal_rrdcontext)
+        rrdcontext_host_child_connected(host);
+
     return set_this;
 }
 
 static void rrdhost_clear_receiver(struct receiver_state *rpt) {
+    bool signal_rrdcontext = false;
+
     RRDHOST *host = rpt->host;
     if(host) {
         netdata_mutex_lock(&host->receiver_lock);
@@ -487,7 +493,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             if(!rpt->exit.new_receiver_waiting_dont_stop_sender)
                 rrdpush_sender_thread_stop(host);
 
-            rrdcontext_host_child_disconnected(host);
+            signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
 
             if (host->receiver == rpt)
@@ -497,6 +503,9 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
         }
 
         netdata_mutex_unlock(&host->receiver_lock);
+
+        if(signal_rrdcontext)
+            rrdcontext_host_child_disconnected(host);
     }
 }
 

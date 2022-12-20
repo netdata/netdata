@@ -762,7 +762,7 @@ typedef enum rrdhost_flags {
     // Metadata
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
 
-    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED = ( 1 << 26), // set when the receiver part is disconnected
+    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 26), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))

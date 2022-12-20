@@ -223,9 +223,7 @@ void analytics_mirrored_hosts(void)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        netdata_mutex_lock(&host->receiver_lock);
-        ((host->receiver || host == localhost) ? reachable++ : unreachable++);
-        netdata_mutex_unlock(&host->receiver_lock);
+        ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
 
         count++;
     }

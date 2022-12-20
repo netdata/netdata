@@ -283,9 +283,7 @@ int create_node_instance_result(const char *msg, size_t msg_len)
             node_state_update.live = 1;
             node_state_update.hops = 0;
         } else {
-            netdata_mutex_lock(&host->receiver_lock);
-            node_state_update.live = (host->receiver != NULL);
-            netdata_mutex_unlock(&host->receiver_lock);
+            node_state_update.live = (!rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN));
             node_state_update.hops = host->system_info->hops;
         }
     }
