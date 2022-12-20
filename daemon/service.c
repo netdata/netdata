@@ -242,7 +242,7 @@ restart_after_removal:
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-        rrdhost_free(host, 0);
+        rrdhost_free___while_having_rrd_wrlock(host, false);
         goto restart_after_removal;
     }
 

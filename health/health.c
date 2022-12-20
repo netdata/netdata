@@ -1014,9 +1014,7 @@ void *health_main(void *ptr) {
 
     bool health_running_logged = false;
 
-    rrdhost_rdlock(host); //CHECK
     rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(host);
-    rrdhost_unlock(host);
 
     unsigned int loop = 0;
 #ifdef ENABLE_ACLK

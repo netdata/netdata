@@ -552,7 +552,7 @@ void analytics_gather_mutable_meta_data(void)
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 6, "%zu", rrd_hosts_available);
+        snprintfz(b, 6, "%zu", rrdhost_hosts_available());
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
 }

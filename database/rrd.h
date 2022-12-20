@@ -1023,7 +1023,7 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // locks
 
-    netdata_rwlock_t rrdhost_rwlock;                // lock for this RRDHOST (protects rrdset_root linked list)
+    SPINLOCK rrdhost_update_lock;
 
     // ------------------------------------------------------------------------
     // ML handle
@@ -1071,10 +1071,6 @@ extern RRDHOST *localhost;
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
-#define rrdhost_rdlock(host) netdata_rwlock_rdlock(&((host)->rrdhost_rwlock))
-#define rrdhost_wrlock(host) netdata_rwlock_wrlock(&((host)->rrdhost_rwlock))
-#define rrdhost_unlock(host) netdata_rwlock_unlock(&((host)->rrdhost_rwlock))
-
 #define rrdhost_aclk_state_lock(host) netdata_mutex_lock(&((host)->aclk_state_lock))
 #define rrdhost_aclk_state_unlock(host) netdata_mutex_unlock(&((host)->aclk_state_lock))
 
@@ -1121,7 +1117,6 @@ void rrddim_index_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 
-extern size_t rrd_hosts_available;
 extern time_t rrdhost_free_orphan_time;
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
@@ -1153,31 +1148,6 @@ RRDHOST *rrdhost_find_or_create(
         , time_t rrdpush_replication_step
         , struct rrdhost_system_info *system_info
         , bool is_archived
-);
-
-void rrdhost_update(RRDHOST *host
-    , const char *hostname
-    , const char *registry_hostname
-    , const char *guid
-    , const char *os
-    , const char *timezone
-    , const char *abbrev_timezone
-    , int32_t utc_offset
-    , const char *tags
-    , const char *program_name
-    , const char *program_version
-    , int update_every
-    , long history
-    , RRD_MEMORY_MODE mode
-    , unsigned int health_enabled
-    , unsigned int rrdpush_enabled
-    , char *rrdpush_destination
-    , char *rrdpush_api_key
-    , char *rrdpush_send_charts_matching
-    , bool rrdpush_enable_replication
-    , time_t rrdpush_seconds_to_replicate
-    , time_t rrdpush_replication_step
-    , struct rrdhost_system_info *system_info
 );
 
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
@@ -1238,7 +1208,7 @@ void rrdhost_save_all(void);
 void rrdhost_cleanup_all(void);
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
-void rrdhost_free(RRDHOST *host, bool force);
+void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
 void rrdhost_save_charts(RRDHOST *host);
 void rrdhost_delete_charts(RRDHOST *host);
 
@@ -1373,14 +1343,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd);
 
 void rrdset_reset(RRDSET *st);
 void rrdset_delete_obsolete_dimensions(RRDSET *st);
-
-RRDHOST *rrdhost_create(
-    const char *hostname, const char *registry_hostname, const char *guid, const char *os, const char *timezone,
-    const char *abbrev_timezone, int32_t utc_offset,const char *tags, const char *program_name, const char *program_version,
-    int update_every, long entries, RRD_MEMORY_MODE memory_mode, unsigned int health_enabled, unsigned int rrdpush_enabled,
-    char *rrdpush_destination, char *rrdpush_api_key, char *rrdpush_send_charts_matching,
-    bool rrdpush_enable_replication, time_t rrdpush_seconds_to_replicate, time_t rrdpush_replication_step,
-    struct rrdhost_system_info *system_info, int is_localhost, bool is_archived);
 
 #endif /* NETDATA_RRD_INTERNALS */
 
