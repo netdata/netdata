@@ -1625,12 +1625,15 @@ static int ebpf_compare_sockets(void *a, void *b)
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
-static inline int build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
-                                               char *proto, int family)
+static inline int ebpf_build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
+                                                     char *proto, int family)
 {
-    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
-                    service_name, proto,
-                    hostname);
+    if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
+        return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
+                        service_name, proto, hostname);
+
+    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s_":"%s:[%s]_",
+                    proto, hostname);
 }
 
 /**
@@ -1686,7 +1689,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     }
 
     if (is_outbound)
-        size = build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
+        size = ebpf_build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
         size = build_inbound_dimension_name(dimname,service_name, protocol);
 
