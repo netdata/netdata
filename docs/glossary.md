@@ -74,6 +74,8 @@ Use the alphabatized list below to find the answer to your single-term questions
 
 - [**Flood Protection**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md#group-by-dimension-node-or-chart): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud does not send notifications about this node
 
+- [**Functions** or **Netdata Functions**](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+
 ## G
 
 - [**Guided Troubleshooting**](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/Overview.md): Troubleshooting with our Machine-Learning-powered tools designed to give you a cutting edge advantage in your troubleshooting battles.
@@ -123,6 +125,8 @@ metrics, troubleshoot complex performance problems, and make data interoperable 
 - [**Netdata Agent** or **Agent**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/overview.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
 - [**Netdata Cloud** or **Cloud**](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/overview.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alarms from all your nodes in a single web interface.
+
+- [**Netdata Functions** or **Functions**](https://github.com/netdata/netdata/blob/master/docs/concepts/guided-troubleshooting/netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can  bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 <!-- No link for this keyword - [**Netdata Logs**](https://github.com/netdata/netdata/blob/master/docs/tasks/miscellaneous/check-netdata-logs.md): The three log files - `error.log`, `access.log` and `debug.log` - used by Netdata -->
 
