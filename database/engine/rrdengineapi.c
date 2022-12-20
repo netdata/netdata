@@ -16,7 +16,7 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
-size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 3072, 1024, 1024, 1024};
+size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
 
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
