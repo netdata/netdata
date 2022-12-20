@@ -122,11 +122,16 @@ struct pgc_statistics {
     size_t release_spins;
     size_t acquire_spins;
     size_t delete_spins;
+    size_t flush_spins;
 
     PGC_CACHE_LINE_PADDING(10);
 
-    size_t evictors;
-    size_t flushers;
+    size_t workers_search;
+    size_t workers_add;
+    size_t workers_evict;
+    size_t workers_flush;
+    size_t workers_jv2_flush;
+    size_t workers_hot2dirty;
 
     size_t evict_skipped;
     size_t hot_empty_pages_evicted_immediately;
