@@ -676,9 +676,9 @@ declare -A pkg_flex=(
 declare -A pkg_fts_dev=(
   ['default']="NOTREQUIRED"
   ['alpine']="musl-fts-dev"
-  ['alpine-3.16']="fts-dev"
-  ['alpine-3.15']="fts-dev"
-  ['alpine-3.14']="fts-dev"
+  ['alpine-3.16.3']="fts-dev"
+  ['alpine-3.15.6']="fts-dev"
+  ['alpine-3.14.8']="fts-dev"
 )
 
 # cmake3 is required by Fluent-Bit to compile with --enable-logsmanagement on CentOS 7
