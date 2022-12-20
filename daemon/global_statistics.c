@@ -1419,7 +1419,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                     "stats",
                     priority,
                     localhost->rrd_update_every,
-                    RRDSET_TYPE_AREA);
+                    RRDSET_TYPE_LINE);
 
             ptrs->rd_pgc_waste_evictions_skipped = rrddim_add(ptrs->st_pgc_waste, "evictions skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_waste_flushes_cancelled = rrddim_add(ptrs->st_pgc_waste, "flushes cancelled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
