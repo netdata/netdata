@@ -1847,11 +1847,11 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
  */
 static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
 {
-    sock->recv_packets += lvalues->recv_packets;
-    sock->sent_packets += lvalues->sent_packets;
-    sock->recv_bytes   += lvalues->recv_bytes;
-    sock->sent_bytes   += lvalues->sent_bytes;
-    sock->retransmit   += lvalues->retransmit;
+    sock->recv_packets = lvalues->recv_packets;
+    sock->sent_packets = lvalues->sent_packets;
+    sock->recv_bytes   = lvalues->recv_bytes;
+    sock->sent_bytes   = lvalues->sent_bytes;
+    sock->retransmit   = lvalues->retransmit;
     sock->ct = lvalues->ct;
 }
 
