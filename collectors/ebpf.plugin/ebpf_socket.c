@@ -767,9 +767,11 @@ static inline void calculate_nv_plot()
     }
     outbound_vectors.max_plot = end;
 
+    /*
     // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
+                        */
     pthread_mutex_unlock(&nv_mutex);
 }
 
@@ -1584,20 +1586,24 @@ int is_socket_allowed(netdata_socket_idx_t *key, int family)
  *
  * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
  */
-static int compare_sockets(void *a, void *b)
+static int ebpf_compare_sockets(void *a, void *b)
 {
     struct netdata_socket_plot *val1 = a;
     struct netdata_socket_plot *val2 = b;
-    int cmp;
+    int cmp = 0;
 
     // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
-        cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+
         if (!cmp) {
             cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
         }
     } else {
-        cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+        if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
+            cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
+
         if (!cmp) {
             cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
         }
@@ -3919,8 +3925,8 @@ void *ebpf_socket_thread(void *ptr)
     if (network_viewer_opt.enabled) {
         memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
         memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
-        avl_init_lock(&inbound_vectors.tree, compare_sockets);
-        avl_init_lock(&outbound_vectors.tree, compare_sockets);
+        avl_init_lock(&inbound_vectors.tree, ebpf_compare_sockets);
+        avl_init_lock(&outbound_vectors.tree, ebpf_compare_sockets);
 
         initialize_inbound_outbound();
     }
