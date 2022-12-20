@@ -1203,7 +1203,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     int should_try_migration = 0;
 
     // Do not try to load the latest file (always rebuild and live migrate)
-    if (datafile->fileno != ctx->last_fileno && db_engine_journal_indexing) {
+    if (datafile->fileno != ctx->last_fileno) {
         if (!(should_try_migration = load_journal_file_v2(ctx, journalfile, datafile))) {
             return 0;
         }
@@ -1247,7 +1247,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
         netdata_munmap(journalfile->data, file_size);
 
     // Don't Index the last file
-    if (ctx->last_fileno == journalfile->datafile->fileno || !db_engine_journal_indexing)
+    if (ctx->last_fileno == journalfile->datafile->fileno)
         return 0;
 
     pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);

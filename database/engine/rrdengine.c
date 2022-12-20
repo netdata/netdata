@@ -284,22 +284,13 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_page_alloc() {
-    void *page = NULL;
-    if (unlikely(db_engine_use_malloc))
-        page = mallocz(RRDENG_BLOCK_SIZE);
-    else {
-        page = netdata_mmap(NULL, RRDENG_BLOCK_SIZE, MAP_PRIVATE, enable_ksm, false);
-        if(!page) fatal("Cannot allocate dbengine page cache page, with mmap()");
-    }
+void *dbengine_page_alloc(struct rrdengine_instance *ctx) {
+    void *page = mallocz(tier_page_size[ctx->tier]);
     return page;
 }
 
 void dbengine_page_free(void *page) {
-    if (unlikely(db_engine_use_malloc))
-        freez(page);
-    else
-        netdata_munmap(page, RRDENG_BLOCK_SIZE);
+    freez(page);
 }
 
 static void sanity_check(void)
@@ -1067,7 +1058,7 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
         if (likely(!ret)) {
             ++ctx->last_fileno;
-            if (likely(journalfile && db_engine_journal_indexing))
+            if (likely(journalfile))
                 wc->run_indexing = true;
         }
     }

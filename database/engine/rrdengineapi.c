@@ -16,6 +16,7 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 3072, 1024, 1024, 1024};
 
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
@@ -30,11 +31,9 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
     multidb_ctx[4] = &multidb_ctx_storage_tier4;
 }
 
-int db_engine_use_malloc = 0;
 int default_rrdeng_page_fetch_timeout = 3;
 int default_rrdeng_page_fetch_retries = 3;
 int default_rrdeng_page_cache_mb = 32;
-int db_engine_journal_indexing = 1;
 int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
@@ -278,7 +277,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .metric_id = mrg_metric_id(main_mrg, handle->metric),
             .start_time_t = point_in_time_s,
             .end_time_t = point_in_time_s,
-            .size = RRDENG_BLOCK_SIZE,
+            .size = tier_page_size[ctx->tier],
             .data = data,
             .update_every = update_every_s,
             .hot = true
@@ -299,7 +298,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         handle->page_entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
     }
     else
-        handle->page_entries_max = RRDENG_BLOCK_SIZE / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        handle->page_entries_max = tier_page_size[ctx->tier] / PAGE_POINT_CTX_SIZE_BYTES(ctx);
 
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
@@ -338,13 +337,13 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             handle->options &= ~RRDENG_CHO_UNALIGNED;
 
             rrdeng_store_metric_flush_current_page(collection_handle);
-            data = dbengine_page_alloc();
+            data = dbengine_page_alloc(ctx);
         }
         else
             data = pgc_page_data(handle->page);
     }
     else
-        data = dbengine_page_alloc();
+        data = dbengine_page_alloc(ctx);
 
     switch (ctx->page_type) {
         case PAGE_METRICS: {
@@ -1121,7 +1120,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
     stats.sizeof_point_data = page_type_size[ctx->page_type];
-    stats.sizeof_page_data = RRDENG_BLOCK_SIZE;
+    stats.sizeof_page_data = tier_page_size[ctx->tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
     stats.sizeof_extent = sizeof(struct extent_info);

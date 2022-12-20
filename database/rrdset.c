@@ -1513,29 +1513,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         first_entry = 1;
     }
 
-#ifdef ENABLE_DBENGINE
-    // check if we will re-write the entire page
-    if(unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE &&
-                dt_usec(&st->last_collected_time, &st->last_updated) > (RRDENG_BLOCK_SIZE / sizeof(storage_number)) * update_every_ut)) {
-        info(
-            "'%s': too old data (last updated at %" PRId64 ".%" PRId64 ", last collected at %" PRId64 ".%" PRId64 "). "
-            "Resetting it. Will not store the next entry.",
-            rrdset_id(st),
-            (int64_t)st->last_updated.tv_sec,
-            (int64_t)st->last_updated.tv_usec,
-            (int64_t)st->last_collected_time.tv_sec,
-            (int64_t)st->last_collected_time.tv_usec);
-        rrdset_reset(st);
-        rrdset_init_last_updated_time(st);
-
-        st->usec_since_last_update = update_every_ut;
-
-        // the first entry should not be stored
-        store_this_entry = 0;
-        first_entry = 1;
-    }
-#endif
-
     // these are the 3 variables that will help us in interpolation
     // last_stored_ut = the last time we added a value to the storage
     // now_collect_ut = the time the current value has been collected

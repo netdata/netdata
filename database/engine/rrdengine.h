@@ -336,7 +336,7 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
-void *dbengine_page_alloc(void);
+void *dbengine_page_alloc(struct rrdengine_instance *ctx);
 void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
