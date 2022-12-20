@@ -987,6 +987,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 // remove it from the clean list
                 pgc_ll_del(cache, &cache->clean, page, true);
 
+                __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
+
                 // append it to our eviction list
                 size_t partition = indexing_partition(cache, page->metric_id);
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(to_evict[partition], page, link.prev, link.next);
@@ -1024,9 +1027,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             pages_removed_from_index = 0;
             pages_freed = 0;
 
-            __atomic_add_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
-
             // we don't want to just get the lock,
             // we want to try to get it, if we can
             // and repeat until we do get it
@@ -1058,28 +1058,24 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                         continue;
                     }
 
-                    size_t pages_removed_from_index_this_partition = 0;
-                    size_t pages_removed_from_index_this_partition_size = 0;
-
                     for (PGC_PAGE *page = to_evict[partition]; page; page = page->link.next) {
                         remove_this_page_from_index_unsafe(cache, page, partition);
-                        pages_removed_from_index_this_partition++;
-                        pages_removed_from_index_this_partition_size += page->assumed_size;
+                        pages_removed_from_index++;
                     }
 
-                    pages_removed_from_index += pages_removed_from_index_this_partition;
                     pgc_index_write_unlock(cache, partition);
 
                     // free memory, while we don't hold any locks
                     while (to_evict[partition]) {
                         PGC_PAGE *page = to_evict[partition];
+
+                        __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                        __atomic_sub_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
+
                         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(to_evict[partition], page, link.prev, link.next);
                         free_this_page(cache, page);
                         pages_freed++;
                     }
-
-                    __atomic_sub_fetch(&cache->stats.evicting_entries, pages_removed_from_index_this_partition, __ATOMIC_RELAXED);
-                    __atomic_sub_fetch(&cache->stats.evicting_size, pages_removed_from_index_this_partition_size, __ATOMIC_RELAXED);
                 }
             }
 
@@ -1453,6 +1449,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
                 // mark it as being saved
                 page_flag_set(tpg, PGC_PAGE_IS_BEING_SAVED);
+
+                __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&cache->stats.flushing_size, page->assumed_size, __ATOMIC_RELAXED);
             }
 
             // next time, repeat the same section (tier)
@@ -1472,6 +1471,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 // page ptr may be invalid now
             }
 
+            __atomic_sub_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
+
             __atomic_add_fetch(&cache->stats.flushes_cancelled, added, __ATOMIC_RELAXED);
             __atomic_add_fetch(&cache->stats.flushes_cancelled_size, added_size, __ATOMIC_RELAXED);
 
@@ -1484,9 +1486,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         pgc_ll_unlock(cache, &cache->dirty);
         have_dirty_lock = false;
-
-        __atomic_add_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
 
         // call the callback to save them
         // it may take some time, so let's release the lock
@@ -1503,6 +1502,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
             page_set_clean(cache, tpg, true, true);
 
+            __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.flushing_size, page->assumed_size, __ATOMIC_RELAXED);
+
             page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
             page_transition_unlock(cache, tpg);
             page_release(cache, tpg, false);
@@ -1510,8 +1512,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         }
 
         pgc_ll_unlock(cache, &cache->clean);
-        __atomic_sub_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
 
         __atomic_add_fetch(&cache->stats.flushes_completed, added, __ATOMIC_RELAXED);
         __atomic_add_fetch(&cache->stats.flushes_completed_size, added_size, __ATOMIC_RELAXED);
