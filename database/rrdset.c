@@ -1339,10 +1339,10 @@ static inline size_t rrdset_done_interpolate(
                     break;
             }
 
-            time_t curr_t = (time_t)(next_store_ut / USEC_PER_SEC);
+            time_t current_time = (time_t) (next_store_ut / USEC_PER_SEC);
 
             if(unlikely(!store_this_entry)) {
-                (void) ml_is_anomalous(rd, curr_t, 0, false);
+                (void) ml_is_anomalous(rd, current_time, 0, false);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rrdcontext_collected_rrddim(rd);
@@ -1352,7 +1352,7 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, curr_t, new_value, true)) {
+                if (ml_is_anomalous(rd, current_time, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
@@ -1362,7 +1362,7 @@ static inline size_t rrdset_done_interpolate(
                 rd->last_stored_value = new_value;
             }
             else {
-                (void) ml_is_anomalous(rd, curr_t, 0, false);
+                (void) ml_is_anomalous(rd, current_time, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
