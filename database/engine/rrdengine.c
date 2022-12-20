@@ -895,9 +895,18 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
 struct uuid_first_time_s {
     uuid_t *uuid;
     time_t first_time_t;
+    time_t last_time_t;
+    METRIC *metric;
+    bool skip;
 };
 
-void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t *metric_unique_JudyHS)
+
+static int journal_metric_uuid_compare(const void *key, const void *metric)
+{
+    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
+}
+
+void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t metric_first_time_JudyL)
 {
     if (unlikely(!datafile))
         return;
@@ -911,20 +920,56 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         }
 
         time_t journal_start_time_t = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+        size_t journal_metric_count = (size_t)journal_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
 
-        for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
-            Pvoid_t *PValue = JudyHSGet(metric_unique_JudyHS, &uuid_list[index].uuid, sizeof(uuid_t));
-            if (!PValue || !*PValue)
-                continue;
-
+        Word_t index = 0;
+        bool first_then_next = true;
+        Pvoid_t *PValue;
+//        unsigned count = 0;
+        while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
             struct uuid_first_time_s *uuid_first_t_entry = *PValue;
-            time_t first_time_t = uuid_list[index].delta_start + journal_start_time_t;
+
+//            if (uuid_first_t_entry->skip)
+//                continue;
+
+            struct journal_metric_list *uuid_entry = bsearch(uuid_first_t_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
+
+            if (!uuid_entry) {
+                uuid_first_t_entry->skip = true;
+                continue;
+            }
+
+            time_t first_time_t = uuid_entry->delta_start + journal_start_time_t;
+            time_t last_time_t = uuid_entry->delta_end + journal_start_time_t;
             uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t , first_time_t);
+            uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t , last_time_t);
+//            count++;
         }
+        //if (0 == count)
+        //    break;
         datafile = datafile->next;
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    // Lets scan the open cache for almost exact match
+    bool first_then_next = true;
+    Pvoid_t *PValue;
+    Word_t index = 0;
+    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
+        struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+        if (uuid_first_t_entry->skip)
+            continue;
+
+        PGC_PAGE *page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_t, false);
+        if (page) {
+            time_t first_time_t = pgc_page_start_time_t(page);
+            time_t last_time_t = pgc_page_end_time_t(page);
+            uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t, first_time_t);
+            uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t, last_time_t);
+            pgc_page_release(open_cache, page);
+        }
+    }
 }
 
 
@@ -939,36 +984,39 @@ static void delete_old_data(void *arg)
     struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
 
     Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
-    Pvoid_t metric_unique_JudyHS = (Pvoid_t) NULL;
     Pvoid_t *PValue;
 
+    struct uuid_first_time_s *uuid_first_t_entry;
     for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
-        struct uuid_first_time_s *uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
+        METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
+        if (!metric)
+            continue;
+
         PValue = JudyLIns(&metric_first_time_JudyL, (Word_t) index, PJE0);
         fatal_assert(NULL != PValue);
         if (!*PValue) {
-            uuid_first_t_entry->uuid = &uuid_list[index].uuid;
-            uuid_first_t_entry->first_time_t = LONG_MAX;
+            uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
+            uuid_first_t_entry->metric = metric;
+            uuid_first_t_entry->first_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
+            uuid_first_t_entry->last_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
+            uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
+            *PValue = uuid_first_t_entry;
         }
-        PValue = JudyHSIns(&metric_unique_JudyHS, uuid_first_t_entry->uuid, sizeof(uuid_t), PJE0);
-        fatal_assert(NULL != PValue);
-        *PValue = uuid_first_t_entry;
     }
 
     // Update the first time for all metrics we plan to delete
-    find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_unique_JudyHS);
+    find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_first_time_JudyL);
 
     Word_t index = 0;
     bool first_then_next = true;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-        struct uuid_first_time_s *uuid_first_t_entry = *PValue;
-        // Update metric registry
-        // FIXME: Update metric registry here
+        uuid_first_t_entry = *PValue;
+        mrg_metric_set_first_time_t(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_t);
+        mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
 
-    JudyHSFreeArray(&metric_first_time_JudyL, PJE0);
-    JudyHSFreeArray(&metric_unique_JudyHS, PJE0);
+    JudyLFreeArray(&metric_first_time_JudyL, PJE0);
 
     wc->cleanup_thread_deleting_files = 1;
     /* wake up event loop */
