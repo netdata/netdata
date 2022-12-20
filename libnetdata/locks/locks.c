@@ -374,6 +374,7 @@ static void remove_rwlock_locker(const char *file __maybe_unused, const char *fu
         JudyLDel(&rwlock->lockers_pid_JudyL, locker->pid, PJE0);
         if (locker->lock == RWLOCK_REQUEST_READ || locker->lock == RWLOCK_REQUEST_TRYREAD) rwlock->readers--;
         else if (locker->lock == RWLOCK_REQUEST_WRITE || locker->lock == RWLOCK_REQUEST_TRYWRITE) rwlock->writers--;
+        freez(locker);
     }
     __netdata_mutex_unlock(&rwlock->lockers_mutex);
 }
