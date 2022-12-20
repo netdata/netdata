@@ -3,23 +3,6 @@
 #include "ADCharts.h"
 #include "Config.h"
 
-// [ml] chart priorities
-#define ML_CHART_PRIO_DIMENSIONS        39181
-#define ML_CHART_PRIO_ANOMALY_RATE      39182
-#define ML_CHART_PRIO_DETECTOR_EVENTS   39183
-
-// [netdata] chart priorities
-#define NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS 890001
-#define NETDATA_ML_CHART_PRIO_METRIC_TYPES            890002
-#define NETDATA_ML_CHART_PRIO_TRAINING_STATUS         890003
-
-#define NETDATA_ML_CHART_PRIO_PREDICTION_USAGE        890004
-#define NETDATA_ML_CHART_PRIO_TRAINING_USAGE          890005
-
-#define NETDATA_ML_CHART_PRIO_QUEUE_STATS             890006
-#define NETDATA_ML_CHART_PRIO_TRAINING_TIME_STATS     890007
-#define NETDATA_ML_CHART_PRIO_TRAINING_RESULTS        890008
-
 void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
     /*
      * Machine learning status
