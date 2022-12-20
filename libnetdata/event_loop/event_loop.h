@@ -28,6 +28,10 @@ enum event_loop_job {
     UV_EVENT_FLUSH_OPEN,
     UV_EVENT_EVICT_MAIN,
     UV_EVENT_PAGE_DISPATCH,
+    UV_EVENT_DELETING_FILE,
+    UV_EVENT_ANALYZE_V2,
+    UV_EVENT_RETENTION_V2,
+    UV_EVENT_RETENTION_UPDATE,
 };
 
 void register_libuv_worker_jobs();
