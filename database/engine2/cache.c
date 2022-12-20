@@ -1214,6 +1214,12 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
             pgc_index_write_unlock(cache, partition);
 
+            if(unlikely(!page)) {
+                // now that we don't have the lock,
+                // give it some time for the old page to go away
+                struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+                nanosleep(&ns, NULL);
+            }
         }
 
     } while(!page);
