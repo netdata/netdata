@@ -680,8 +680,9 @@ RRDHOST *rrdhost_find_or_create(
         host = NULL;
     }
 
+    rrd_wrlock();
+
     if(!host) {
-        rrd_wrlock();
 
         host = rrdhost_create(
                 hostname
@@ -710,9 +711,9 @@ RRDHOST *rrdhost_find_or_create(
                 , archived
         );
 
-        rrd_unlock();
     }
     else {
+
         rrdhost_update(host
            , hostname
            , registry_hostname
@@ -736,7 +737,10 @@ RRDHOST *rrdhost_find_or_create(
            , rrdpush_seconds_to_replicate
            , rrdpush_replication_step
            , system_info);
+
     }
+
+    rrd_unlock();
 
     return host;
 }
