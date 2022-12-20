@@ -123,6 +123,7 @@ struct pgc_statistics {
     size_t acquire_spins;
     size_t delete_spins;
     size_t flush_spins;
+    size_t evict_cleanup_spins;
 
     PGC_CACHE_LINE_PADDING(10);
 

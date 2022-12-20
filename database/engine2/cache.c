@@ -931,6 +931,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
     PGC_PAGE *to_evict[cache->config.partitions];
     size_t pages_to_evict, pages_to_evict_size;
+    size_t pages_removed_from_index;
+    size_t pages_freed;
     size_t total_pages_evicted = 0;
     size_t total_pages_skipped = 0;
     size_t last_run_pages_skipped;
@@ -989,14 +991,15 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 size_t partition = indexing_partition(cache, page->metric_id);
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(to_evict[partition], page, link.prev, link.next);
 
+                pages_to_evict++;
+                pages_to_evict_size += page->assumed_size;
+                total_pages_evicted++;
+
                 // check if we have to stop
-                if(++total_pages_evicted >= max_evict && !all_of_them) {
+                if(total_pages_evicted >= max_evict && !all_of_them) {
                     stopped_before_finishing = true;
                     break;
                 }
-
-                pages_to_evict++;
-                pages_to_evict_size += page->assumed_size;
 
                 if((pages_to_evict >= pages_to_evict_per_run || pages_to_evict_size >= max_size_to_evict) && !all_of_them)
                     break;
@@ -1018,6 +1021,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(pages_to_evict) {
             // remove them from the index
 
+            pages_removed_from_index = 0;
+            pages_freed = 0;
+
             __atomic_add_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
             __atomic_add_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
 
@@ -1027,40 +1033,46 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             // so that query and collection threads
             // will not be stopped because of us
 
-            bool partition_waiting[cache->config.partitions];
-            memset(partition_waiting, 0, sizeof(partition_waiting));
+            bool partition_pending[cache->config.partitions];
+            memset(partition_pending, 0, sizeof(partition_pending));
 
             // fill-in the status for each partition
             for (size_t partition = 0; partition < cache->config.partitions; partition++) {
                 if (!to_evict[partition])
-                    partition_waiting[partition] = false;
+                    partition_pending[partition] = false;
                 else
-                    partition_waiting[partition] = true;
+                    partition_pending[partition] = true;
             }
 
             // repeat until all partitions have been cleaned up
             size_t repeats = cache->config.partitions * 2;
-            size_t waiting = cache->config.partitions;
+            size_t pending = cache->config.partitions;
             bool force = (max_evict != SIZE_MAX || max_skip != SIZE_MAX || all_of_them) ? true : false;
-            while(waiting) {
-                if(--repeats == 0 || waiting == 1) force = true;
-                waiting = 0;
+            while(pending) {
+                __atomic_add_fetch(&cache->stats.evict_cleanup_spins, 1, __ATOMIC_RELAXED);
+
+                if(--repeats == 0 || pending == 1)
+                    force = true;
+
+                pending = 0;
 
                 for (size_t partition = 0; partition < cache->config.partitions; partition++) {
-                    if (!partition_waiting[partition]) continue;
+                    if (!partition_pending[partition]) continue;
 
                     if(force)
                         pgc_index_write_lock(cache, partition);
                     else if(!pgc_index_write_trylock(cache, partition)) {
-                        waiting++;
+                        pending++;
                         continue;
                     }
 
-                    for (PGC_PAGE *page = to_evict[partition]; page; page = page->link.next)
+                    for (PGC_PAGE *page = to_evict[partition]; page; page = page->link.next) {
                         remove_this_page_from_index_unsafe(cache, page, partition);
+                        pages_removed_from_index++;
+                    }
 
                     pgc_index_write_unlock(cache, partition);
-                    partition_waiting[partition] = false;
+                    partition_pending[partition] = false;
                 }
             }
 
@@ -1072,8 +1084,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     PGC_PAGE *page = to_evict[partition];
                     DOUBLE_LINKED_LIST_REMOVE_UNSAFE(to_evict[partition], page, link.prev, link.next);
                     free_this_page(cache, page);
+                    pages_freed++;
                 }
             }
+
+            internal_fatal(pages_to_evict != pages_removed_from_index || pages_to_evict != pages_freed,
+                           "DBENGINE CACHE: pages to evict %zu, pages removed from index %zu, pages freed %zu",
+                           pages_to_evict, pages_removed_from_index, pages_freed);
 
             __atomic_sub_fetch(&cache->stats.evicting_entries, pages_to_evict, __ATOMIC_RELAXED);
             __atomic_sub_fetch(&cache->stats.evicting_size, pages_to_evict_size, __ATOMIC_RELAXED);
@@ -1414,8 +1431,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                             .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
                             .hot = false,
                     };
-
-                    internal_fatal(array[added].size > RRDENG_BLOCK_SIZE, "page to flush has bad size");
 
                     added_size += array[added].size;
                     added++;
