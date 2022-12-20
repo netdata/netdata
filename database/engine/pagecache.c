@@ -664,8 +664,18 @@ void init_page_cache(void)
 
         main_mrg = mrg_create();
 
+        size_t target_cache_size = default_rrdeng_page_cache_mb * 1024 * 1024;
+        size_t main_cache_size = target_cache_size * 19 / 20;
+        size_t open_cache_size = 0;
+        size_t extent_cache_size = target_cache_size * 1 / 20;
+
+        if(extent_cache_size < 3 * 1024 * 1024) {
+            extent_cache_size = 3 * 1024 * 1024;
+            main_cache_size = target_cache_size - extent_cache_size;
+        }
+
         main_cache = pgc_create(
-                (size_t) default_rrdeng_page_cache_mb * 1024 * 1024,
+                main_cache_size,
                 main_cache_free_clean_page_callback,
                 (size_t) rrdeng_pages_per_extent,
                 main_cache_flush_dirty_page_callback,
@@ -678,7 +688,7 @@ void init_page_cache(void)
         );
 
         open_cache = pgc_create(
-                0,                                            // the default is 1MB
+                open_cache_size,                             // the default is 1MB
                 open_cache_free_clean_page_callback,
                 1,
                 open_cache_flush_dirty_page_callback,
@@ -690,14 +700,15 @@ void init_page_cache(void)
                 sizeof(struct extent_io_data)
         );
 
+
         extent_cache = pgc_create(
-                10 * 1024 * 1024,
+                extent_cache_size,
                 extent_cache_free_clean_page_callback,
                 1,
                 extent_cache_flush_dirty_page_callback,
-                3,                                  //
+                2,                                  //
                 100,                            //
-                3,                                          // don't delay too much other threads
+                2,                                          // don't delay too much other threads
                 PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 0

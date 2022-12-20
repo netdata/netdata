@@ -1392,10 +1392,13 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         PGC_ENTRY array[optimal_flush_size];
         PGC_PAGE *pages[optimal_flush_size];
-        size_t added = 0, added_size = 0;
+        size_t pages_added = 0, pages_added_size = 0;
+        size_t pages_removed_dirty = 0;
+        size_t pages_cancelled = 0;
+        size_t pages_made_clean = 0;
 
         PGC_PAGE *page = sdp->base;
-        while (page && added < optimal_flush_size) {
+        while (page && pages_added < optimal_flush_size) {
             PGC_PAGE *next = page->link.next;
 
             internal_fatal(page_get_status_flags(page) != PGC_PAGE_DIRTY,
@@ -1413,8 +1416,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                     // page ptr may be invalid now
                 }
                 else {
-                    pages[added] = page;
-                    array[added] = (PGC_ENTRY) {
+                    pages[pages_added] = page;
+                    array[pages_added] = (PGC_ENTRY) {
                             .section = page->section,
                             .metric_id = page->metric_id,
                             .start_time_t = page->start_time_t,
@@ -1426,8 +1429,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                             .hot = false,
                     };
 
-                    added_size += array[added].size;
-                    added++;
+                    pages_added_size += page->assumed_size;
+                    pages_added++;
                 }
             }
 
@@ -1435,10 +1438,10 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         }
 
         // do we have enough to save?
-        if(all_of_them || added == optimal_flush_size) {
+        if(all_of_them || pages_added == optimal_flush_size) {
             // we should do it
 
-            for (size_t i = 0; i < added; i++) {
+            for (size_t i = 0; i < pages_added; i++) {
                 PGC_PAGE *tpg = pages[i];
 
                 internal_fatal(page_get_status_flags(tpg) != PGC_PAGE_DIRTY,
@@ -1452,6 +1455,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
                 __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
+
+                pages_removed_dirty++;
             }
 
             // next time, repeat the same section (tier)
@@ -1460,7 +1465,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         else {
             // we can't do it
 
-            for (size_t i = 0; i < added; i++) {
+            for (size_t i = 0; i < pages_added; i++) {
                 PGC_PAGE *tpg = pages[i];
 
                 internal_fatal(page_get_status_flags(tpg) != PGC_PAGE_DIRTY,
@@ -1472,12 +1477,14 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 page_transition_unlock(cache, tpg);
                 page_release(cache, tpg, false);
                 // page ptr may be invalid now
+
+                pages_cancelled++;
             }
 
-            __atomic_add_fetch(&cache->stats.flushes_cancelled, added, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&cache->stats.flushes_cancelled_size, added_size, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.flushes_cancelled, pages_added, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.flushes_cancelled_size, pages_added_size, __ATOMIC_RELAXED);
 
-            added = 0;
+            pages_added = 0;
 
             // next time, continue to the next section (tier)
             first = false;
@@ -1489,15 +1496,15 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         // call the callback to save them
         // it may take some time, so let's release the lock
-        cache->config.pgc_save_dirty_cb(cache, array, pages, added);
+        cache->config.pgc_save_dirty_cb(cache, array, pages, pages_added);
         flushes_so_far++;
 
-        __atomic_add_fetch(&cache->stats.flushes_completed, added, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&cache->stats.flushes_completed_size, added_size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.flushes_completed, pages_added, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.flushes_completed_size, pages_added_size, __ATOMIC_RELAXED);
 
         pgc_ll_lock(cache, &cache->clean);
 
-        for (size_t i = 0; i < added; i++) {
+        for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
 
             internal_fatal(page_get_status_flags(tpg) != 0,
@@ -1512,9 +1519,16 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             page_transition_unlock(cache, tpg);
             page_release(cache, tpg, false);
             // tpg ptr may be invalid now
+
+            pages_made_clean++;
         }
 
         pgc_ll_unlock(cache, &cache->clean);
+
+        internal_fatal(
+                (pages_added != pages_cancelled) &&
+                (pages_added != pages_made_clean || pages_added != pages_removed_dirty)
+                , "DBENGINE CACHE: flushing pages mismatch");
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
