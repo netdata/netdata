@@ -729,9 +729,9 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
     if (handle->page)
         pgc_page_release(main_cache, handle->page);
 
-    struct page_details_control *pdc = handle->pdc;
-
-    pdc_release_and_destroy_if_unreferenced(pdc, false, false);
+    if(!pdc_release_and_destroy_if_unreferenced(handle->pdc, false, false)) {
+        __atomic_store_n(&handle->pdc->workers_should_stop, true, __ATOMIC_RELAXED);
+    }
 
     freez(handle);
     rrdimm_handle->handle = NULL;

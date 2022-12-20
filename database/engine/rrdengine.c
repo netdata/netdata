@@ -113,6 +113,8 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
 // page details list
 
 static void pdc_destroy(PDC *pdc) {
+    __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
+
     completion_destroy(&pdc->completion);
 
     Pvoid_t *PValue;
@@ -126,8 +128,12 @@ static void pdc_destroy(PDC *pdc) {
         // no need for atomics here - we are done...
         PDC_PAGE_STATUS status = pd->status;
 
-        if(status & PDC_PAGE_DATAFILE_ACQUIRED && pd->datafile.ptr)
+        if(status & PDC_PAGE_DATAFILE_ACQUIRED) {
             datafile_release(pd->datafile.ptr);
+            pd->datafile.ptr = NULL;
+        }
+
+        internal_fatal(pd->datafile.ptr, "DBENGINE: page details has a datafile.ptr that is not released.");
 
         if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED))) {
             // pdc_page_status_set(pd, PDC_PAGE_FAILED);
@@ -160,7 +166,7 @@ static void pdc_acquire(PDC *pdc) {
     netdata_spinlock_unlock(&pdc->refcount_spinlock);
 }
 
-bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router) {
+bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
     netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount <= 0)
@@ -168,14 +174,11 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router)
 
     pdc->refcount--;
 
-    if(!worker && !router)
-        pdc->query_thread_left = true;
-
     if (pdc->refcount <= 1 && worker) {
         // when 1 refcount is remaining, and we are a worker,
         // we can mark the job completed:
         // - if the remaining refcount is from the query caller, we will wake it up
-        // - if the remaining refcount is from a worker, the caller is already away
+        // - if the remaining refcount is from another worker, the query thread is already away
         completion_mark_complete(&pdc->completion);
     }
 
@@ -1084,8 +1087,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         struct rrdengine_datafile *df = ctx->datafiles.first;
         if(!datafile_acquire_for_deletion(df, false)) {
             error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it.",
-                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
+                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it. There are %zu inflight queries.",
+                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers, __atomic_load_n(&ctx->inflight_queries, __ATOMIC_RELAXED));
             return;
         }
         info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
@@ -1291,13 +1294,7 @@ static void datafile_release_exclusive_access_to_extent(EXTENT_PD_LIST *extent_p
 static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list, bool worker) {
     struct page_details_control *pdc = extent_page_list->pdc;
 
-    bool datafile_acquired = false, extent_exclusive = false;
-
-    if(!datafile_acquire(extent_page_list->datafile)) {
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
-        goto cleanup;
-    }
-    datafile_acquired = true;
+    bool extent_exclusive = false;
 
     if(pdc->preload_all_extent_pages) {
         if (!datafile_get_exclusive_access_to_extent(extent_page_list)) {
@@ -1308,6 +1305,9 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
     }
 
     if (extent_list_check_if_pages_are_already_in_cache(ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
+        goto cleanup;
+
+    if(__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED))
         goto cleanup;
 
     if(worker)
@@ -1400,9 +1400,6 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
 cleanup:
     if(extent_exclusive)
         datafile_release_exclusive_access_to_extent(extent_page_list);
-
-    if(datafile_acquired)
-        datafile_release(extent_page_list->datafile);
 
     completion_mark_complete_a_job(&extent_page_list->pdc->completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true, false);

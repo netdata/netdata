@@ -336,7 +336,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     bool lookup_continue = true;
     while (lookup_continue && datafile) {
         struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
-        if (!journal_header || !datafile->users.available) {
+        if (!journal_header || !datafile_acquire(datafile)) {
             datafile = datafile->next;
             continue;
         }
@@ -347,6 +347,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
             struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
 
             if (unlikely(!uuid_entry)) {
+                datafile_release(datafile);
                 datafile = datafile->next;
                 continue;
             }
@@ -403,36 +404,31 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 //                                page_first_time_s, page_last_time_s, page_update_every_s, page_length);
                     }
                     else {
-                        if(datafile_acquire(datafile)) {
-                            struct page_details *pd = callocz(1, sizeof(*pd));
-                            pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
-                            pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                            pd->datafile.file = datafile->file;
-                            pd->datafile.fileno = datafile->fileno;
-                            pd->first_time_s = page_first_time_s;
-                            pd->last_time_s = page_last_time_s;
-                            pd->datafile.ptr = datafile;
-                            pd->page_length = page_length;
-                            pd->update_every_s = page_update_every_s;
-                            pd->type = page_entry_in_journal->type;
-                            pd->metric_id = metric_id;
-                            pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
-                            uuid_copy(pd->datafile.extent.page_uuid, *uuid);
-                            *PValue = pd;
+                        struct page_details *pd = callocz(1, sizeof(*pd));
+                        pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
+                        pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
+                        pd->datafile.file = datafile->file;
+                        pd->datafile.fileno = datafile->fileno;
+                        pd->first_time_s = page_first_time_s;
+                        pd->last_time_s = page_last_time_s;
+                        pd->datafile.ptr = datafile;
+                        pd->page_length = page_length;
+                        pd->update_every_s = page_update_every_s;
+                        pd->type = page_entry_in_journal->type;
+                        pd->metric_id = metric_id;
+                        datafile_acquire_dup(datafile);
+                        pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
+                        uuid_copy(pd->datafile.extent.page_uuid, *uuid);
+                        *PValue = pd;
 
-                            pages_found_in_journals_v2++;
-                            pages_total++;
-                        }
-                        else {
-                            // we cannot add it
-                            if(!JudyLDel(&JudyL_page_array, page_first_time_s, PJE0))
-                                fatal("DBENGINE: cannot delete page from routing JudyL");
-                        }
+                        pages_found_in_journals_v2++;
+                        pages_total++;
                     }
                 }
             }
         }
 
+        datafile_release(datafile);
         datafile = datafile->next;
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -495,7 +491,9 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     time_t first_page_first_time_s = INVALID_TIME;
     size_t pages_to_load = 0;
 
+    __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = callocz(1, sizeof(struct page_details_control));
+    handle->pdc->ctx = ctx;
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);
     completion_init(&handle->pdc->completion);
 

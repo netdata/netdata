@@ -38,12 +38,14 @@ struct rrdengine_instance;
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
 typedef struct page_details_control {
+    struct rrdengine_instance *ctx;
+
     struct completion completion;   // sync between the query thread and the workers
 
     Pvoid_t page_list_JudyL;        // the list of page details
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
     bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
-    bool query_thread_left;         // true when the query thread went home...
+    bool workers_should_stop;       // true when the query thread left and the workers should stop
 
     SPINLOCK refcount_spinlock;     // spinlock to protect refcount
     int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
@@ -330,6 +332,7 @@ struct rrdengine_instance {
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
     uint8_t page_type; /* Default page type for this context */
 
+    size_t inflight_queries;
     struct rrdengine_statistics stats;
 };
 
