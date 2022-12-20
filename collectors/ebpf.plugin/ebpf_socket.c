@@ -726,7 +726,7 @@ static void ebpf_update_global_publish(
  */
 static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
 {
-    if (sock->ct > plot->last_time) {
+    if (sock->ct != plot->last_time) {
         plot->last_time         = sock->ct;
         plot->plot_recv_packets = sock->recv_packets;
         plot->plot_sent_packets = sock->sent_packets;
@@ -1887,7 +1887,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            if (lvalues->ct > w->plot.last_time) {
+            if (lvalues->ct != w->plot.last_time) {
                 update_socket_data(&w->sock, lvalues);
             }
             return;
@@ -1992,7 +1992,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         if (!protocol)
             protocol = w->protocol;
 
-        if (w->ct > ct)
+        if (w->ct != ct)
             ct = w->ct;
     }
 
