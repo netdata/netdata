@@ -1085,7 +1085,7 @@ extern RRDHOST *localhost;
 #define rrdhost_sender_replicating_charts_zero(host) (__atomic_store_n(&((host)->rrdpush_sender_replicating_charts), 0, __ATOMIC_RELAXED))
 
 extern DICTIONARY *rrdhost_root_index;
-long rrdhost_hosts_available(void);
+size_t rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
