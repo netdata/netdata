@@ -1466,13 +1466,13 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 internal_fatal(page_get_status_flags(tpg) != PGC_PAGE_DIRTY,
                                "DBENGINE CACHE: page should be in the dirty list before saved");
 
+                __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
+                __atomic_sub_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
+
                 page_transition_unlock(cache, tpg);
                 page_release(cache, tpg, false);
                 // page ptr may be invalid now
             }
-
-            __atomic_sub_fetch(&cache->stats.flushing_entries, added, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&cache->stats.flushing_size, added_size, __ATOMIC_RELAXED);
 
             __atomic_add_fetch(&cache->stats.flushes_cancelled, added, __ATOMIC_RELAXED);
             __atomic_add_fetch(&cache->stats.flushes_cancelled_size, added_size, __ATOMIC_RELAXED);
@@ -1491,6 +1491,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         // it may take some time, so let's release the lock
         cache->config.pgc_save_dirty_cb(cache, array, pages, added);
         flushes_so_far++;
+
+        __atomic_add_fetch(&cache->stats.flushes_completed, added, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&cache->stats.flushes_completed_size, added_size, __ATOMIC_RELAXED);
 
         pgc_ll_lock(cache, &cache->clean);
 
@@ -1512,9 +1515,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         }
 
         pgc_ll_unlock(cache, &cache->clean);
-
-        __atomic_add_fetch(&cache->stats.flushes_completed, added, __ATOMIC_RELAXED);
-        __atomic_add_fetch(&cache->stats.flushes_completed_size, added_size, __ATOMIC_RELAXED);
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
