@@ -1451,7 +1451,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 page_flag_set(tpg, PGC_PAGE_IS_BEING_SAVED);
 
                 __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
-                __atomic_add_fetch(&cache->stats.flushing_size, page->assumed_size, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
             }
 
             // next time, repeat the same section (tier)
@@ -1503,7 +1503,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             page_set_clean(cache, tpg, true, true);
 
             __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&cache->stats.flushing_size, page->assumed_size, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
 
             page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
             page_transition_unlock(cache, tpg);

@@ -535,10 +535,9 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
     usec_t start_ut = now_monotonic_usec();
 
-    bool waited = false;
+    bool waited = false, found_in_cache = false;
 
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
-    PGC_PAGE *page = NULL;
     struct page_details *pd;
     Word_t Index = start_time_t;
     Pvoid_t *PValue = JudyLFirst(handle->pdc->page_list_JudyL, &Index, PJE0);
@@ -551,20 +550,25 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     }
     pd = *PValue;
 
-    bool done = (pd->page != NULL);
-    while(!done && !pdc_page_status_check(pd, PDC_PAGE_READY | PDC_PAGE_FAILED)) {
+    PGC_PAGE *page = pd->page;
+    while(!page && !pdc_page_status_check(pd, PDC_PAGE_FAILED)) {
+        page = pd->page;
 
-        if(!completion_is_done(&handle->pdc->completion)) {
-            handle->pdc->completed_jobs =
-                    completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completed_jobs);
+        if(!page && !completion_is_done(&handle->pdc->completion)) {
+            page = pgc_page_get_and_acquire(main_cache, (Word_t)handle->pdc->ctx, pd->metric_id, pd->first_time_s, true);
+            if(page)
+                found_in_cache = true;
 
-            waited = true;
+            else {
+                handle->pdc->completed_jobs =
+                        completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completed_jobs);
+
+                page = pd->page;
+                waited = true;
+            }
         }
-        else
-            done = true;
     }
 
-    page = pd->page;
     if(page) {
         // this is for pdc_destroy() to not release the page again
         pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
