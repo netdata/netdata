@@ -81,6 +81,10 @@ operating systems.
     os="General Linux with one-line installer (recommended)"
     svg="linux" />
   <InstallBox
+    to="/docs/agent/packaging/installer/methods/packages"
+    os="Native DEB/RPM packages for Linux"
+    svg="linux" />
+  <InstallBox
     to="/docs/agent/packaging/docker"
     os="Run with Docker"
     svg="docker" />
