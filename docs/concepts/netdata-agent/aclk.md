@@ -1,6 +1,6 @@
 <!--
-title: "Agent-cloud link (ACLK)"
-sidebar_label: "Agent-cloud link (ACLK)"
+title: "Agent-cloud link"
+sidebar_label: "Agent-cloud link"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md"
 sidebar_position: "1400"
 learn_status: "Published"
