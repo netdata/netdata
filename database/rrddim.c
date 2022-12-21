@@ -172,7 +172,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-    ml_new_dimension(rd);
+    ml_dimension_new(rd);
 
     ctr->react_action = RRDDIM_REACT_NEW;
 
@@ -191,7 +191,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdcontext_removed_rrddim(rd);
 
-    ml_delete_dimension(rd);
+    ml_dimension_delete(rd);
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
@@ -420,7 +420,13 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 
 // ----------------------------------------------------------------------------
 
-// get the timestamp of the last entry in the round-robin database
+time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+        return 0;
+
+    return rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+}
+
 time_t rrddim_last_entry_t(RRDDIM *rd) {
     time_t latest = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
 

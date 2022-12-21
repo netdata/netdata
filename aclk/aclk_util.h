@@ -107,6 +107,8 @@ extern volatile int aclk_conversation_log_counter;
 unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, unsigned long int max);
 #define aclk_tbeb_reset(x) aclk_tbeb_delay(1, 0, 0, 0)
 
-void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type);
+void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt_wss_proxy_type *type);
+
+int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len);
 
 #endif /* ACLK_UTIL_H */

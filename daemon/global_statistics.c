@@ -52,6 +52,7 @@ static struct global_statistics {
     uint64_t ml_queries_made;
     uint64_t ml_db_points_read;
     uint64_t ml_result_points_generated;
+    uint64_t ml_models_consulted;
 
     uint64_t exporters_queries_made;
     uint64_t exporters_db_points_read;
@@ -86,6 +87,10 @@ void global_statistics_rrdset_done_chart_collection_completed(size_t *points_rea
 void global_statistics_ml_query_completed(size_t points_read) {
     __atomic_fetch_add(&global_statistics.ml_queries_made, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&global_statistics.ml_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_ml_models_consulted(size_t models_consulted) {
+    __atomic_fetch_add(&global_statistics.ml_models_consulted, models_consulted, __ATOMIC_RELAXED);
 }
 
 void global_statistics_exporters_query_completed(size_t points_read) {
@@ -193,6 +198,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->ml_queries_made              = __atomic_load_n(&global_statistics.ml_queries_made, __ATOMIC_RELAXED);
     gs->ml_db_points_read            = __atomic_load_n(&global_statistics.ml_db_points_read, __ATOMIC_RELAXED);
     gs->ml_result_points_generated   = __atomic_load_n(&global_statistics.ml_result_points_generated, __ATOMIC_RELAXED);
+    gs->ml_models_consulted          = __atomic_load_n(&global_statistics.ml_models_consulted, __ATOMIC_RELAXED);
 
     gs->exporters_queries_made       = __atomic_load_n(&global_statistics.exporters_queries_made, __ATOMIC_RELAXED);
     gs->exporters_db_points_read     = __atomic_load_n(&global_statistics.exporters_db_points_read, __ATOMIC_RELAXED);
@@ -652,6 +658,34 @@ static void global_statistics_charts(void) {
             rrddim_set_by_pointer(st_points_stored, rds[tier], (collected_number)gs.db_points_stored_per_tier[tier]);
 
         rrdset_done(st_points_stored);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_models_consulted" // id
+                    , NULL // name
+                    , "ml" // family
+                    , NULL // context
+                    , "KMeans models used for prediction" // title
+                    , "models" // units
+                    , "netdata" // plugin
+                    , "ml" // module
+                    , 131004 // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_STACKED // chart_type
+            );
+
+            rd = rrddim_add(st, "num_models_consulted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd, (collected_number) gs.ml_models_consulted);
+
+        rrdset_done(st);
     }
 }
 

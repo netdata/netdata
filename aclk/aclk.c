@@ -532,7 +532,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 
         struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
 
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",
@@ -630,7 +630,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         freez((char*)mqtt_conn_params.username);
 #endif
 
-        freez((char *)mqtt_conn_params.will_msg);
+        freez((char*)mqtt_conn_params.will_msg);
+        freez((char*)proxy_conf.host);
+        freez((char*)proxy_conf.username);
+        freez((char*)proxy_conf.password);
 
         if (!ret) {
             last_conn_time_mqtt = now_realtime_sec();
