@@ -3,16 +3,40 @@ title: "Agent-cloud link (ACLK)"
 sidebar_label: "Agent-cloud link (ACLK)"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md"
 sidebar_position: "1400"
-learn_status: "Unpublished"
+learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts/Netdata agent"
-learn_docs_purpose: "Explain that the ACLK is // a mechanism for secure connection between the Agent and the Hub/Cloud."
+learn_docs_purpose: "Explain what the ACLK is"
 -->
 
+### Claim process
 
-The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser
-through Netdata Cloud. The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port
-`443`. The ACLK is encrypted, safe, and _is only established if you connect your node_.
+Claim is the process where you initialize a request from an Agent to start monitoring it from your Netdata Cloud 
+environment. To achieve this, the Agent needs to be aware of some information (specific) for your space such as the 
+`NETDATA_CLAIM_TOKEN` of your space, the domain under the Netdata Cloud lives `NETDATA_CLAIM_URL` and optional, the 
+rooms in the particular space you want the node to be included `NETDATA_CLAIM_ROOMS` and/or any proxy endpoint
+`NETDATA_CLAIM_PROXY` to connect through. The setup process is completed by running the claiming process via the 
+Netdata Agent's command line, or the netdata-claim script or directly from the kickstart.sh script. On success; all the 
+necessary information to securely connect your Netdata Agent to the cloud end to end are stored under your 
+`<NETDATA_PREFIX>/var/lib/netdata/cloud.d` directory  (default: `/var/lib/netdata/cloud.d`)
+
+### ACLK
+
+The Agent-Cloud link (ACLK) is the mechanism responsible for secure communication between the Netdata Agent and the
+Netdata Cloud. ACLK is active by default but idle, after a successful [claim process](#claim-process) you expect to see
+a configuration file likes this one under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d`
+
+
+It waits for the necessary information to secure communicate with the 
+cloud to be present under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d`. 
+
+```conf
+[global]
+  enabled = yes
+  cloud base url = https://app.netdata.cloud
+```
+
+You can disable at any given moment this component if you need to either on installation process or during runtime. 
 
 The Cloud App lives at app.netdata.cloud which currently resolves to the following list of IPs:
 
@@ -20,27 +44,26 @@ The Cloud App lives at app.netdata.cloud which currently resolves to the followi
 - 44.207.131.212
 - 44.196.50.41
 
+As such the Agent needs to be able to access these IPs.
+
 :::caution
 
-This list of IPs can change without notice; we strongly advise you to whitelist the domain `app.netdata.cloud`, if this
-is not an option in your case, always verify the current domain resolution (e.g via the `host` command).
+This list of IPs can change without notice, we strongly advise you to whitelist following domains `api.netdata.cloud`, 
+`mqtt.netdata.cloud`, if this is not an option in your case always verify the current domain resolution 
+(e.g via the host command).
 
 :::
 
+The ACLK establishes an outgoing secure WebSocket (WSS) connection to Netdata Cloud on port `443`. The ACLK is encrypted,
+ and is only established if you successfully [claim](#claim-process) your node. Through the ACLK the Agent push
+information about:
 
-### Data privacy
+1. Metadata, of what metrics the Agent monitors.
+2. Alert status transitions.
 
-[Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to you.
-This is why **we don't store any metric data in Netdata Cloud**.
+Only when you are trying to see the actual charts/dashboards from your Netdata Cloud, the Cloud queries the Agent's data 
+(again though the ACLK) so you can see the actual metrics in your browser for a specific timeframe.
 
-All the data that you see in the web browser when using Netdata Cloud, is actually streamed directly from the Netdata
-Agent to the Netdata Cloud dashboard. The data passes through our systems, but it isn't stored.
-
-However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a
-limited number of _metadata_.
-
-Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy) in the
-documentation.
 
 <!-- TODO: Make the following sections tasks
 
@@ -50,11 +73,7 @@ The ACLK is enabled by default, with its settings automatically configured and s
 created at `/var/lib/netdata/cloud.d/cloud.conf` until you either connect a node or create it yourself. The default
 configuration uses two settings:
 
-```conf
-[global]
-  enabled = yes
-  cloud base url = https://app.netdata.cloud
-```
+
 
 If your Agent needs to use a proxy to access the internet, you
 must [set up a proxy for connecting to cloud](/claim/README.md#connect-through-a-proxy).
@@ -156,16 +175,3 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
 Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-node).
 
 -->
-
-### Related Concepts
-
-- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
-- [Registry](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/registry.md)
-- [Metrics streaming/replication](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-streaming-replication.md)
-- [Metrics exporting](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-exporting.md)
-- [Metrics collection](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-collection.md)
-- [Metrics storage](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/metrics-storage.md)
-
-### Related References
-
-- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
