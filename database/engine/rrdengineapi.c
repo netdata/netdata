@@ -976,7 +976,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     }
 
     struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
-    usec_t journal_start_time_ut = j2_header->start_time_ut;
+    time_t journal_start_time_t = j2_header->start_time_ut / USEC_PER_SEC;
 
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
@@ -984,21 +984,21 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
         struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
         for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
 
-            usec_t update_every_usec;
+            time_t update_every_s;
 
             size_t points = descr->page_length / PAGE_POINT_CTX_SIZE_BYTES(datafile->ctx);
 
-            usec_t start_time_ut = journal_start_time_ut + ((usec_t) descr->delta_start_s * USEC_PER_SEC);
-            usec_t end_time_ut = journal_start_time_ut + ((usec_t) descr->delta_end_s * USEC_PER_SEC);
+            time_t start_time_t = journal_start_time_t + descr->delta_start_s;
+            time_t end_time_t = journal_start_time_t + descr->delta_end_s;
 
             if(likely(points > 1))
-                update_every_usec = (end_time_ut - start_time_ut) / (points - 1);
+                update_every_s = (end_time_t - start_time_t) / (points - 1);
             else {
-                update_every_usec = default_rrd_update_every * get_tier_grouping(datafile->ctx->tier) * USEC_PER_SEC;
+                update_every_s = default_rrd_update_every * get_tier_grouping(datafile->ctx->tier);
                 stats->single_point_pages++;
             }
 
-            time_t duration_secs = (time_t)((end_time_ut - start_time_ut + update_every_usec)/USEC_PER_SEC);
+            time_t duration_secs = (time_t)((end_time_t - start_time_t + update_every_s));
 
             stats->pages_uncompressed_bytes += descr->page_length;
             stats->pages_duration_secs += duration_secs;
@@ -1009,11 +1009,11 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             stats->page_types[descr->type].pages_duration_secs += duration_secs;
             stats->page_types[descr->type].points += points;
 
-            if(!stats->first_t || (start_time_ut - update_every_usec) < stats->first_t)
-                stats->first_t = (start_time_ut - update_every_usec) / USEC_PER_SEC;
+            if(!stats->first_t || (start_time_t - update_every_s) < stats->first_t)
+                stats->first_t = (start_time_t - update_every_s);
 
-            if(!stats->last_t || end_time_ut > stats->last_t)
-                stats->last_t = end_time_ut / USEC_PER_SEC;
+            if(!stats->last_t || end_time_t > stats->last_t)
+                stats->last_t = end_time_t;
 
             descr++;
         }

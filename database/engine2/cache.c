@@ -1937,6 +1937,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;
             pi->extent_index = current_extent_index_id;
+            pi->custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL;
             *PValue = pi;
 
             count_of_unique_pages++;

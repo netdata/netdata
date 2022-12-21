@@ -730,7 +730,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
                 (time_t) (descr->end_time_ut / USEC_PER_SEC),
                 descr->update_every_s,
                 datafile,
-                xt_io_descr->pos, xt_io_descr->bytes);
+                xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
 
         pgc_page_release(main_cache, (PGC_PAGE *) descr->page);
         freez(descr);

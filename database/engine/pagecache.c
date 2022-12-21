@@ -635,7 +635,8 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     return page;
 }
 
-void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s, struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size) {
+void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s,
+           struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length) {
 
     if(!datafile_acquire(datafile))
         fatal("DBENGINE: cannot acquire datafile to put page in open cache");
@@ -645,6 +646,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
             .fileno = datafile->fileno,
             .pos = extent_offset,
             .bytes = extent_size,
+            .page_length = page_length
     };
 
     PGC_ENTRY page_entry = {

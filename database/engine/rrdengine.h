@@ -133,6 +133,7 @@ struct jv2_page_info {
     time_t update_every;
     size_t page_length;
     uint32_t extent_index;
+    void *custom_data;
 
     // private
     struct pgc_page *page;
