@@ -1629,11 +1629,11 @@ static void dbengine2_statistics_charts(void) {
         }
 
         if(pages_to_load) {
-            extent_hit_ratio = pages_hit_cached_extent * 10 * 10000 / pages_to_load;
-            parallel_load_hit_ratio = pages_hit_parallel_load * 10 * 10000 / pages_to_load;
-            parallel_query_hit_ratio = pages_hit_parallel_query * 10 * 10000 / pages_to_load;
-            before_allocation_hit_ratio = pages_hit_before_allocation * 10 * 10000 / pages_to_load;
-            insert_conflict_hit_ratio = pages_hit_insert_conflict * 10 * 10000 / pages_to_load;
+            extent_hit_ratio = pages_hit_cached_extent * 100 * 10000 / pages_to_load;
+            parallel_load_hit_ratio = pages_hit_parallel_load * 100 * 10000 / pages_to_load;
+            parallel_query_hit_ratio = pages_hit_parallel_query * 100 * 10000 / pages_to_load;
+            before_allocation_hit_ratio = pages_hit_before_allocation * 100 * 10000 / pages_to_load;
+            insert_conflict_hit_ratio = pages_hit_insert_conflict * 100 * 10000 / pages_to_load;
         }
 
         rrddim_set_by_pointer(st_cache_hit_ratio, rd_hit_ratio, (collected_number)overall_hit_ratio);
