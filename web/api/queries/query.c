@@ -1474,7 +1474,6 @@ static inline void rrd2rrdr_do_dimension(RRDR *r, size_t dim_id_in_rrdr) {
 // fill the gap of a tier
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
-void store_metric_collection_completed(void);
 
 void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) {
     if(unlikely(tier >= storage_tiers)) return;

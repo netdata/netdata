@@ -1357,6 +1357,7 @@ void set_host_properties(
     const char *program_name, const char *program_version);
 
 size_t get_tier_grouping(size_t tier);
+void store_metric_collection_completed(void);
 
 // ----------------------------------------------------------------------------
 // RRD DB engine declarations

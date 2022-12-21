@@ -1251,6 +1251,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     st->counter++;
     st->counter_done++;
+    store_metric_collection_completed();
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     st->replay.start_streaming = false;

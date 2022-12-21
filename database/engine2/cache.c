@@ -297,7 +297,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         wanted_cache_size = MIN(max_size1, max_size2);
 
         if(cache->config.dynamic_target_size_cb) {
-            size_t wanted_cache_size_cb = wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
+            size_t wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
             if(wanted_cache_size_cb > wanted_cache_size)
                 wanted_cache_size = wanted_cache_size_cb;
         }
