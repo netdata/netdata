@@ -1218,8 +1218,11 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
 
-            if(unlikely(!attempt_to_connect(s)))
+            if(!attempt_to_connect(s))
                 continue;
+
+            if(rrdhost_sender_should_exit(s))
+                break;
 
             s->last_traffic_seen_t = now_monotonic_sec();
             rrdpush_claimed_id(s->host);
@@ -1286,7 +1289,8 @@ void *rrdpush_sender_thread(void *ptr) {
         debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(rrdhost_sender_should_exit(s)))
+            break;
 
         internal_error(fds[Collector].fd != s->rrdpush_sender_pipe[PIPE_READ],
             "STREAM %s [send to %s]: pipe changed after poll().", rrdhost_hostname(s->host), s->connected_to);

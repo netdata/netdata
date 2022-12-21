@@ -301,7 +301,7 @@ void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
-void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason);
+void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
 void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);

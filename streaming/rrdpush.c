@@ -581,7 +581,7 @@ void rrdpush_destinations_free(RRDHOST *host) {
 
 // Either the receiver lost the connection or the host is being destroyed.
 // The sender mutex guards thread creation, any spurious data is wiped on reconnection.
-void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason) {
+void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait) {
     if (!host->sender)
         return;
 
@@ -597,6 +597,16 @@ void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason) {
     }
 
     netdata_mutex_unlock(&host->sender->mutex);
+
+    if(wait) {
+        netdata_mutex_lock(&host->sender->mutex);
+        while(host->sender->tid) {
+            netdata_mutex_unlock(&host->sender->mutex);
+            sleep_usec(10 * USEC_PER_MS);
+            netdata_mutex_lock(&host->sender->mutex);
+        }
+        netdata_mutex_unlock(&host->sender->mutex);
+    }
 }
 
 

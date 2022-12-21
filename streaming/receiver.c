@@ -490,7 +490,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
                 host->health_enabled = 0;
 
-            rrdpush_sender_thread_stop(host, "RECEIVER LEFT");
+            rrdpush_sender_thread_stop(host, "RECEIVER LEFT", false);
 
             signal_rrdcontext = true;
             rrdpush_receiver_replication_reset(host);
