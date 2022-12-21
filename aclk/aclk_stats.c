@@ -292,7 +292,7 @@ static void aclk_stats_mqtt_wss(struct mqtt_wss_stats *stats)
 
     if (unlikely(!st_txbuf_perc)) {
         st_txbuf_perc = rrdset_create_localhost(
-            "netdata", "aclk_mqtt_tx_perc", NULL, "aclk", NULL, "Activelly used percentage of MQTT Tx Buffer,", "%",
+            "netdata", "aclk_mqtt_tx_perc", NULL, "aclk", NULL, "Actively used percentage of MQTT Tx Buffer,", "%",
             "netdata", "stats", 200012, localhost->rrd_update_every, RRDSET_TYPE_LINE);
         
         rd_txbuf_perc = rrddim_add(st_txbuf_perc, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
