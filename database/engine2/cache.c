@@ -51,11 +51,10 @@ struct pgc_page {
     time_t start_time_t;
     time_t end_time_t;
     uint32_t update_every;
-    uint32_t accesses;              // counts the number of accesses on this page
+    uint32_t assumed_size;
 
-    void *data;
-    size_t assumed_size;
     REFCOUNT refcount;
+    uint16_t accesses;              // counts the number of accesses on this page
     PGC_PAGE_FLAGS flags;
     SPINLOCK transition_spinlock;   // when the page changes between HOT, DIRTY, CLEAN, we have to get this lock
 
@@ -64,6 +63,7 @@ struct pgc_page {
         struct pgc_page *prev;
     } link;
 
+    void *data;
     uint8_t custom_data[];
 };
 

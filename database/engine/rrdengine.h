@@ -212,6 +212,7 @@ struct extent_io_data {
     uv_file file;
     uint64_t pos;
     unsigned bytes;
+    uint16_t page_length;
 };
 
 struct extent_io_descriptor {
