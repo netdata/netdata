@@ -78,7 +78,6 @@ typedef struct rrdengine_size_statistics {
     size_t sizeof_metric_in_index;
     size_t sizeof_page;
     size_t sizeof_page_in_index;
-    size_t sizeof_extent;
     size_t sizeof_page_in_extent;
     size_t sizeof_datafile;
     size_t sizeof_page_in_cache;

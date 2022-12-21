@@ -26,22 +26,6 @@ struct rrdengine_instance;
 
 #define DATAFILE_IDEAL_IO_SIZE (1048576U)
 
-struct extent_info {
-    uint64_t offset;
-    uint32_t size;
-    uint8_t number_of_pages;
-    struct rrdengine_datafile *datafile;
-    struct extent_info *next;
-    uint32_t index;                    // This is the entent index for version 2
-    struct rrdeng_page_descr *pages[];
-};
-
-struct rrdengine_df_extents {
-    /* the extent list is sorted based on disk offset */
-    struct extent_info *first;
-    struct extent_info *last;
-};
-
 /* only one event loop is supported for now */
 struct rrdengine_datafile {
     unsigned tier;
@@ -50,7 +34,6 @@ struct rrdengine_datafile {
     uint64_t pos;
     uv_rwlock_t extent_rwlock;
     struct rrdengine_instance *ctx;
-    struct rrdengine_df_extents extents;
     struct rrdengine_journalfile *journalfile;
     struct rrdengine_datafile *prev;
     struct rrdengine_datafile *next;
@@ -79,7 +62,6 @@ struct rrdengine_datafile_list {
     struct rrdengine_datafile *first; /* oldest - the newest with ->first->prev */
 };
 
-void df_extent_insert(struct extent_info *extent);
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
@@ -90,6 +72,5 @@ int create_data_file(struct rrdengine_datafile *datafile);
 int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
-void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile);
 
 #endif /* NETDATA_DATAFILE_H */

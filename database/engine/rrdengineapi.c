@@ -1024,59 +1024,13 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     RRDENG_SIZE_STATS stats = { 0 };
 
-//    for(struct pg_cache_page_index *page_index = ctx->pg_cache.metrics_index.last_page_index;
-//        page_index != NULL ;page_index = page_index->prev) {
-//        stats.metrics++;
-//        stats.metrics_pages += page_index->page_count;
-//    }
-
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
 
         if (GET_JOURNAL_DATA(df->journalfile)) {
+            // FIXME: Rework statistics based only on V2
             populate_v2_statistics(df, &stats);
-        }
-        else
-        for(struct extent_info *ei = df->extents.first; ei ; ei = ei->next) {
-            stats.extents++;
-            stats.extents_compressed_bytes += ei->size;
-
-            for(int p = 0; p < ei->number_of_pages ;p++) {
-                struct rrdeng_page_descr *descr = ei->pages[p];
-
-                if (unlikely(!descr))
-                    continue;
-
-                usec_t update_every_usec;
-
-                size_t points = descr->page_length / PAGE_POINT_SIZE_BYTES(descr);
-
-                if(likely(points > 1))
-                    update_every_usec = (descr->end_time_ut - descr->start_time_ut) / (points - 1);
-                else {
-                    update_every_usec = default_rrd_update_every * get_tier_grouping(ctx->tier) * USEC_PER_SEC;
-                    stats.single_point_pages++;
-                }
-
-                time_t duration_secs = (time_t)((descr->end_time_ut - descr->start_time_ut + update_every_usec)/USEC_PER_SEC);
-
-                stats.extents_pages++;
-                stats.pages_uncompressed_bytes += descr->page_length;
-                stats.pages_duration_secs += duration_secs;
-                stats.points += points;
-
-                stats.page_types[descr->type].pages++;
-                stats.page_types[descr->type].pages_uncompressed_bytes += descr->page_length;
-                stats.page_types[descr->type].pages_duration_secs += duration_secs;
-                stats.page_types[descr->type].points += points;
-
-                if(!stats.first_t || (descr->start_time_ut - update_every_usec) < stats.first_t)
-                    stats.first_t = (descr->start_time_ut - update_every_usec) / USEC_PER_SEC;
-
-                if(!stats.last_t || descr->end_time_ut > stats.last_t)
-                    stats.last_t = descr->end_time_ut / USEC_PER_SEC;
-            }
         }
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -1123,7 +1077,6 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_page_data = tier_page_size[ctx->tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
-    stats.sizeof_extent = sizeof(struct extent_info);
     stats.sizeof_page_in_extent = sizeof(struct rrdeng_page_descr *);
 
     stats.sizeof_metric_in_index = 40;

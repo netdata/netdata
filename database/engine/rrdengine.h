@@ -340,7 +340,6 @@ void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
-void rrdeng_test_quota(struct rrdengine_worker_config *wc);
 void rrdeng_worker(void *arg);
 void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
