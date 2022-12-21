@@ -664,10 +664,10 @@ void sql_rrdset2json(RRDHOST *host, BUFFER *wb)
         , dimensions
         , (size_t) 0
         , (size_t) 0
-        , rrd_hosts_available
+        , rrdhost_hosts_available()
     );
 
-    if(unlikely(rrd_hosts_available > 1)) {
+    if(unlikely(rrdhost_hosts_available() > 1)) {
         rrd_rdlock();
 
         size_t found = 0;

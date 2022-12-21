@@ -133,7 +133,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t queries_open;
     size_t queries_journal_v2;
 
-    // pages of the queries
+    // query planner output of the queries
     size_t pages_total;
     size_t pages_to_load_from_disk;
 
@@ -149,8 +149,13 @@ struct rrdeng_cache_efficiency_stats {
     size_t page_next_nowait_failed;
     size_t page_next_nowait_loaded;
 
+    // cache hits at different points
+    size_t pages_load_ok_loaded_but_cache_hit_parallel_query; // found in cache by another parallel query
+    size_t pages_load_ok_loaded_but_cache_hit_before_allocation; // found in cache after loading, before allocating
+    size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
+    size_t pages_load_ok_cached_extent;              // loaded by a cached extent
+
     // loading
-    size_t pages_load_ok_loaded_but_found_in_cache;
     size_t pages_load_ok_uncompressed;
     size_t pages_load_ok_compressed;
     size_t pages_load_ok_preloaded;

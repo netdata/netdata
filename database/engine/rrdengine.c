@@ -413,8 +413,15 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     return vd;
 }
 
-// DBENGINE2 extent processing
-static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx, void *data, size_t data_length, EXTENT_PD_LIST *extent_page_list, bool preload_all_pages, bool worker, PDC_PAGE_STATUS tags)
+static bool extent_uncompress_and_populate_pages(
+                struct rrdengine_instance *ctx,
+                void *data,
+                size_t data_length,
+                EXTENT_PD_LIST *extent_page_list,
+                bool preload_all_pages,
+                bool worker,
+                PDC_PAGE_STATUS tags,
+                bool cached_extent)
 {
     int ret;
     unsigned i, count;
@@ -542,14 +549,16 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx,
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
+            int type;
+
             if (unlikely(!vd.data_on_disk_valid)) {
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
+                type = 3; // invalid
             }
 
             else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
                 memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_uncompressed, 1, __ATOMIC_RELAXED);
+                type = 2; // uncompressed
             }
 
             else {
@@ -560,11 +569,11 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx,
                                    i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
+                    type = 3; // invalid
                 }
                 else {
                     memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_compressed, 1, __ATOMIC_RELAXED);
+                    type = 1; // compressed
                 }
             }
 
@@ -583,11 +592,31 @@ static bool extent_uncompress_and_populate_pages(struct rrdengine_instance *ctx,
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
             if (false == added) {
                 freez(page_data);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_found_in_cache, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, 1, __ATOMIC_RELAXED);
+            }
+
+            if(cached_extent)
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_cached_extent, 1, __ATOMIC_RELAXED);
+
+            switch (type) {
+                case 1:
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_compressed, 1, __ATOMIC_RELAXED);
+                    break;
+
+                case 2:
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_uncompressed, 1, __ATOMIC_RELAXED);
+                    break;
+
+                case 3:
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
+                    break;
+
+                default:
+                    break;
             }
         }
         else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_found_in_cache, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation, 1, __ATOMIC_RELAXED);
 
         if (pd) {
             pd->page = page;
@@ -836,8 +865,11 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     return ALIGN_BYTES_CEILING(size_bytes);
 }
 
-static void after_delete_old_data(struct rrdengine_worker_config* wc)
+static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
 {
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+
     struct rrdengine_instance *ctx = wc->ctx;
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
@@ -874,22 +906,11 @@ static void after_delete_old_data(struct rrdengine_worker_config* wc)
 
     ctx->disk_space -= deleted_bytes;
     info("Reclaimed %u bytes of disk space.", deleted_bytes);
-
-    error = uv_thread_join(wc->now_deleting_files);
-    if (error) {
-        error("uv_thread_join(): %s", uv_strerror(error));
-    }
-    freez(wc->now_deleting_files);
-    /* unfreeze command processing */
-    wc->now_deleting_files = NULL;
-    wc->cleanup_thread_deleting_files = 0;
-
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     rrdcontext_db_rotation();
-
-    /* interrupt event loop */
-    uv_stop(wc->loop);
+    wc->now_deleting_files = 0;
+    freez(work_request);
 }
 
 struct uuid_first_time_s {
@@ -897,7 +918,6 @@ struct uuid_first_time_s {
     time_t first_time_t;
     time_t last_time_t;
     METRIC *metric;
-    bool skip;
 };
 
 
@@ -911,6 +931,8 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     if (unlikely(!datafile))
         return;
 
+    unsigned v2_count = 0;
+    unsigned journalfile_count = 0;
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     while (datafile) {
         struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
@@ -926,28 +948,21 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         Word_t index = 0;
         bool first_then_next = true;
         Pvoid_t *PValue;
-//        unsigned count = 0;
         while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
             struct uuid_first_time_s *uuid_first_t_entry = *PValue;
 
-//            if (uuid_first_t_entry->skip)
-//                continue;
-
             struct journal_metric_list *uuid_entry = bsearch(uuid_first_t_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
 
-            if (!uuid_entry) {
-                uuid_first_t_entry->skip = true;
+            if (unlikely(!uuid_entry))
                 continue;
-            }
 
             time_t first_time_t = uuid_entry->delta_start + journal_start_time_t;
             time_t last_time_t = uuid_entry->delta_end + journal_start_time_t;
             uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t , first_time_t);
             uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t , last_time_t);
-//            count++;
+            v2_count++;
         }
-        //if (0 == count)
-        //    break;
+        journalfile_count++;
         datafile = datafile->next;
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
@@ -956,10 +971,9 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     bool first_then_next = true;
     Pvoid_t *PValue;
     Word_t index = 0;
+    unsigned open_cache_count = 0;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         struct uuid_first_time_s *uuid_first_t_entry = *PValue;
-        if (uuid_first_t_entry->skip)
-            continue;
 
         PGC_PAGE *page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_t, false);
         if (page) {
@@ -968,15 +982,24 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t, first_time_t);
             uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t, last_time_t);
             pgc_page_release(open_cache, page);
+            open_cache_count++;
         }
     }
+    info("Processed %u journalfiles and matched %u metrics in v2 files and %u in open cache", journalfile_count,
+        v2_count, open_cache_count);
 }
 
-
-static void delete_old_data(void *arg)
+static void delete_old_data(uv_work_t *req)
 {
-    struct rrdengine_instance *ctx = arg;
-    struct rrdengine_worker_config *wc = &ctx->worker_config;
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    worker_is_busy(UV_EVENT_ANALYZE_V2);
+
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+    struct rrdengine_instance *ctx = wc->ctx;
 
     struct rrdengine_journalfile *journalfile = ctx->datafiles.first->journalfile;
 
@@ -986,6 +1009,7 @@ static void delete_old_data(void *arg)
     Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
     Pvoid_t *PValue;
 
+    unsigned count = 0;
     struct uuid_first_time_s *uuid_first_t_entry;
     for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
@@ -1001,26 +1025,46 @@ static void delete_old_data(void *arg)
             uuid_first_t_entry->last_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
             uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
             *PValue = uuid_first_t_entry;
+            count++;
         }
     }
-
-    // Update the first time for all metrics we plan to delete
+    info("Recalculating retention for %u metrics", count);
+    // Update the first time / last time for all metrics we plan to delete
+    worker_is_busy(UV_EVENT_RETENTION_V2);
     find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_first_time_JudyL);
+
+    info("Recalculating retention for %u metrics, done", count);
+    worker_is_busy(UV_EVENT_RETENTION_UPDATE);
 
     Word_t index = 0;
     bool first_then_next = true;
+    info("Updating metric registry retention for %u metrics", count);
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
         mrg_metric_set_first_time_t(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_t);
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
-
+    info("Updating metric registry retention for %u metrics, done", count);
     JudyLFreeArray(&metric_first_time_JudyL, PJE0);
+    worker_is_idle();
+}
 
-    wc->cleanup_thread_deleting_files = 1;
-    /* wake up event loop */
-    fatal_assert(0 == uv_async_send(&wc->async));
+
+static void do_delete_files(struct rrdengine_worker_config *wc )
+{
+    struct rrdeng_work *work_request;
+    work_request = callocz(1, sizeof(*work_request));
+    work_request->req.data = work_request;
+    work_request->wc = wc;
+    work_request->completion = NULL;
+    wc->now_deleting_files = 1;
+
+    int ret = uv_queue_work(wc->loop, &work_request->req, delete_old_data, after_delete_old_data);
+    if (ret) {
+        wc->now_deleting_files = 0;
+        freez(work_request);
+    }
 }
 
 static void after_do_cache_flush_and_evict(uv_work_t *req, int status __maybe_unused)
@@ -1132,15 +1176,8 @@ void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
         info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-        wc->now_deleting_files = mallocz(sizeof(*wc->now_deleting_files));
-        wc->cleanup_thread_deleting_files = 0;
 
-        error = uv_thread_create(wc->now_deleting_files, delete_old_data, ctx);
-        if (error) {
-            error("uv_thread_create(): %s", uv_strerror(error));
-            freez(wc->now_deleting_files);
-            wc->now_deleting_files = NULL;
-        }
+        do_delete_files(wc);
     }
 }
 
@@ -1156,9 +1193,9 @@ static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;
 
-    if (unlikely(wc->cleanup_thread_deleting_files)) {
-        after_delete_old_data(wc);
-    }
+//    if (unlikely(wc->cleanup_thread_deleting_files)) {
+//        after_delete_old_data(wc);
+//    }
 
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc) && !wc->outstanding_flush_requests)) {
         wal_flush_transaction_buffer(wc);
@@ -1353,6 +1390,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
         worker_is_busy(UV_EVENT_EXTENT_CACHE);
 
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
+    bool extent_found_in_cache = false;
 
     void *extent_compressed_data = NULL;
     PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(extent_cache, (Word_t)ctx, (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset, true);
@@ -1363,6 +1401,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
 
         loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
         not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
+        extent_found_in_cache = true;
     }
     else {
         if(worker)
@@ -1414,7 +1453,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
         bool extent_used = extent_uncompress_and_populate_pages(
                 ctx, extent_compressed_data, extent_page_list->extent_size,
                 extent_page_list, pdc->preload_all_extent_pages,
-                worker, loaded_pages_tag);
+                worker, loaded_pages_tag, extent_found_in_cache);
 
         if(extent_used) {
             // since the extent was used, all the pages that are not
@@ -1596,14 +1635,11 @@ void rrdeng_worker(void* arg)
     }
     wc->async.data = wc;
 
-    wc->now_deleting_files = NULL;
-    wc->cleanup_thread_deleting_files = 0;
+    wc->now_deleting_files = 0;
     wc->running_journal_migration = 0;
     wc->running_cache_flush_evictions = 0;
     wc->run_indexing = false;
     wc->cache_flush_can_run = true;
-
-    wc->cleanup_thread_deleting_files = 0;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);

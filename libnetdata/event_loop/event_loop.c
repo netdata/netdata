@@ -29,4 +29,8 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_FLUSH_MAIN, "flush main");
     worker_register_job_name(UV_EVENT_FLUSH_OPEN, "flush open");
     worker_register_job_name(UV_EVENT_EVICT_MAIN, "evict main");
+    worker_register_job_name(UV_EVENT_DELETING_FILE, "delete datafiles");
+    worker_register_job_name(UV_EVENT_ANALYZE_V2, "analyze journalfile");
+    worker_register_job_name(UV_EVENT_RETENTION_V2, "calculate retention");
+    worker_register_job_name(UV_EVENT_RETENTION_UPDATE, "update retention");
 }

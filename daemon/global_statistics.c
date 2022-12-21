@@ -1572,6 +1572,12 @@ static void dbengine2_statistics_charts(void) {
     {
         static RRDSET *st_cache_hit_ratio = NULL;
         static RRDDIM *rd_hit_ratio = NULL;
+        static RRDDIM *rd_preloaded_ratio = NULL;
+        static RRDDIM *rd_extent_ratio = NULL;
+        static RRDDIM *rd_parallel_load_ratio = NULL;
+        static RRDDIM *rd_parallel_query_ratio = NULL;
+        static RRDDIM *rd_before_allocation_ratio = NULL;
+        static RRDDIM *rd_insert_conflict_ratio = NULL;
 
         if (unlikely(!st_cache_hit_ratio)) {
             st_cache_hit_ratio = rrdset_create_localhost(
@@ -1588,21 +1594,55 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-            rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "hit", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "overall", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_preloaded_ratio = rrddim_add(st_cache_hit_ratio, "plan", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_extent_ratio = rrddim_add(st_cache_hit_ratio, "extent cache", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_parallel_load_ratio = rrddim_add(st_cache_hit_ratio, "parallel load", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_parallel_query_ratio = rrddim_add(st_cache_hit_ratio, "parallel query", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_before_allocation_ratio = rrddim_add(st_cache_hit_ratio, "before allocation", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_insert_conflict_ratio = rrddim_add(st_cache_hit_ratio, "insert conflict", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
 
             priority++;
         }
 
         size_t pages_to_load = cache_efficiency_stats.pages_to_load_from_disk - cache_efficiency_stats_old.pages_to_load_from_disk;
-        size_t pages_total = cache_efficiency_stats.pages_total - cache_efficiency_stats_old.pages_total;
-        size_t pages_from_cache = pages_total - pages_to_load;
-        static size_t percent = 100;
-        if(pages_total)
-            percent = pages_from_cache * 100 * 10000 / pages_total;
+        size_t pages_hit_parallel_query = cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_parallel_query - cache_efficiency_stats_old.pages_load_ok_loaded_but_cache_hit_parallel_query;
+        size_t pages_hit_parallel_load = cache_efficiency_stats.pages_load_ok_preloaded - cache_efficiency_stats_old.pages_load_ok_preloaded;
+        size_t pages_hit_before_allocation = cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation - cache_efficiency_stats_old.pages_load_ok_loaded_but_cache_hit_before_allocation;
+        size_t pages_hit_insert_conflict = cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting - cache_efficiency_stats_old.pages_load_ok_loaded_but_cache_hit_while_inserting;
+        size_t pages_hit_cached_extent = cache_efficiency_stats.pages_load_ok_cached_extent - cache_efficiency_stats_old.pages_load_ok_cached_extent;
+        size_t pages_hit_at_query_plan = cache_efficiency_stats.pages_found_in_cache - cache_efficiency_stats_old.pages_found_in_cache;
 
-        rrddim_set_by_pointer(st_cache_hit_ratio,
-                              rd_hit_ratio,
-                              (collected_number)percent);
+        size_t pages_total_hit = pages_hit_at_query_plan + pages_hit_parallel_query + pages_hit_before_allocation + pages_hit_insert_conflict + pages_hit_cached_extent;
+        size_t pages_total = cache_efficiency_stats.pages_total - cache_efficiency_stats_old.pages_total;
+
+        static size_t overall_hit_ratio = 100;
+        size_t preloaded_hit_ratio = 0, extent_hit_ratio = 0, parallel_query_hit_ratio = 0;
+        size_t before_allocation_hit_ratio = 0, insert_conflict_hit_ratio = 0, parallel_load_hit_ratio = 0;
+        if(pages_total) {
+            if(pages_total_hit > pages_total)
+                pages_total_hit = pages_total;
+
+            overall_hit_ratio = pages_total_hit * 100 * 10000 / pages_total;
+
+            preloaded_hit_ratio = pages_hit_at_query_plan * 100 * 10000 / pages_total;
+        }
+
+        if(pages_to_load) {
+            extent_hit_ratio = pages_hit_cached_extent * 100 * 10000 / pages_to_load;
+            parallel_load_hit_ratio = pages_hit_parallel_load * 100 * 10000 / pages_to_load;
+            parallel_query_hit_ratio = pages_hit_parallel_query * 100 * 10000 / pages_to_load;
+            before_allocation_hit_ratio = pages_hit_before_allocation * 100 * 10000 / pages_to_load;
+            insert_conflict_hit_ratio = pages_hit_insert_conflict * 100 * 10000 / pages_to_load;
+        }
+
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_hit_ratio, (collected_number)overall_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_preloaded_ratio, (collected_number)preloaded_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_extent_ratio, (collected_number)extent_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_parallel_query_ratio, (collected_number)parallel_query_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_parallel_load_ratio, (collected_number)parallel_load_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_before_allocation_ratio, (collected_number)before_allocation_hit_ratio);
+        rrddim_set_by_pointer(st_cache_hit_ratio, rd_insert_conflict_ratio, (collected_number)insert_conflict_hit_ratio);
 
         rrdset_done(st_cache_hit_ratio);
     }
@@ -1761,7 +1801,7 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid, (collected_number)cache_efficiency_stats.pages_load_fail_invalid_page_in_extent);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_uncompressed, (collected_number)cache_efficiency_stats.pages_load_ok_uncompressed);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_mmap_failed, (collected_number)cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
-        rrddim_set_by_pointer(st_query_pages_from_disk, rd_already_loaded, (collected_number)cache_efficiency_stats.pages_load_ok_loaded_but_found_in_cache);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_already_loaded, (collected_number)cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_unavailable, (collected_number)cache_efficiency_stats.pages_load_fail_datafile_not_available);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_preloaded, (collected_number)cache_efficiency_stats.pages_load_ok_preloaded);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_unroutable, (collected_number)cache_efficiency_stats.pages_load_fail_unroutable);

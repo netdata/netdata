@@ -246,9 +246,8 @@ struct rrdengine_worker_config {
     uv_loop_t *loop;
     uv_async_t async;
 
-    /* file deletion thread */
-    uv_thread_t *now_deleting_files;
-    unsigned long cleanup_thread_deleting_files; /* set to 0 when now_deleting_files is still running */
+    unsigned long now_deleting_files;
+
     unsigned long running_journal_migration;
     unsigned long running_cache_flush_evictions;
     unsigned outstanding_flush_requests;

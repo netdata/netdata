@@ -573,6 +573,9 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
         // this is for pdc_destroy() to not release the page again
         pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
 
+        if(found_in_cache)
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_parallel_query, 1, __ATOMIC_RELAXED);
+
         if(waited)
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);
         else
