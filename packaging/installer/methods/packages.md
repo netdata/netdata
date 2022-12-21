@@ -33,7 +33,7 @@ Within each top level group of repositories, there are directories for each supp
 - `opensuse`: Is for openSUSE and binary compatible distros.
 
 Under each of those directories is a directory for each supported release of that distribution, and under that a
-directory for each supported CPU architecture which contains tthe actual repository.
+directory for each supported CPU architecture which contains the actual repository.
 
 For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL for the repository would be
 https://repo.netdata.cloud/repos/stable/el/9/x86\_64/
