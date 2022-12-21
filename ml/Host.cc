@@ -150,7 +150,6 @@ public:
         RRDDIM_ACQUIRED *AcqRD = nullptr;
         Dimension *D = nullptr;
 
-        rrdhost_rdlock(RH);
         RRDSET *RS = rrdset_find(RH, string2str(ChartId));
         if (RS) {
             AcqRD = rrddim_find_and_acquire(RS, string2str(DimensionId));
@@ -160,7 +159,6 @@ public:
                     D = reinterpret_cast<Dimension *>(RD->ml_dimension);
             }
         }
-        rrdhost_unlock(RH);
 
         return AcquiredDimension(AcqRD, D);
     }
