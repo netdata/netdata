@@ -679,6 +679,26 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     pgc_page_release(open_cache, (PGC_PAGE *)page);
 }
 
+size_t dynamic_open_cache_size(void) {
+    size_t main_cache_size = pgc_get_wanted_cache_size(main_cache);
+    size_t target_size = main_cache_size / 1000 * 5;
+
+    if(target_size < 2 * 1024 * 1024)
+        target_size = 2 * 1024 * 1024;
+
+    return target_size;
+}
+
+size_t dynamic_extent_cache_size(void) {
+    size_t main_cache_size = pgc_get_wanted_cache_size(main_cache);
+    size_t target_size = main_cache_size / 1000 * 5;
+
+    if(target_size < 3 * 1024 * 1024)
+        target_size = 3 * 1024 * 1024;
+
+    return target_size;
+}
+
 void init_page_cache(void)
 {
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -725,7 +745,7 @@ void init_page_cache(void)
                 0,                                                 // 0 = as many as the system cpus
                 sizeof(struct extent_io_data)
         );
-
+        pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
 
         extent_cache = pgc_create(
                 extent_cache_size,
@@ -735,11 +755,12 @@ void init_page_cache(void)
                 2,                                  //
                 100,                            //
                 2,                                          // don't delay too much other threads
-                PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
+                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
                 0,                                                 // 0 = as many as the system cpus
                 0
         );
+        pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
     }
-    netdata_spinlock_unlock(&spinlock);
 
+    netdata_spinlock_unlock(&spinlock);
 }

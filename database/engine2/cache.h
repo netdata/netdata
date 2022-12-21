@@ -200,6 +200,9 @@ size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page);
 bool pgc_is_page_hot(PGC_PAGE *page);
 bool pgc_is_page_dirty(PGC_PAGE *page);
 bool pgc_is_page_clean(PGC_PAGE *page);
+void pgc_reset_hot_max(PGC *cache);
+size_t pgc_get_current_cache_size(PGC *cache);
+size_t pgc_get_wanted_cache_size(PGC *cache);
 
 // resetting the end time of a hot page
 void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
@@ -208,6 +211,9 @@ void pgc_page_hot_to_clean_empty_and_release(PGC *cache, PGC_PAGE *page);
 typedef void (*migrate_to_v2_callback)(Word_t section, int datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data);
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
+
+typedef size_t (*dynamic_target_cache_size_callback)(void);
+void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback);
 
 // return true when there is more work to do
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);

@@ -490,6 +490,7 @@ int init_data_files(struct rrdengine_instance *ctx)
         if (likely(!ret))
             ++ctx->last_fileno;
     }
+    pgc_reset_hot_max(open_cache);
     ctx->create_new_datafile_pair = false;
     __atomic_store_n(&ctx->journal_initialization, false, __ATOMIC_RELAXED);
     return 0;

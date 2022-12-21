@@ -98,6 +98,8 @@ struct pgc {
         size_t aggressive_evict_per1000;
         size_t healthy_size_per1000;
         size_t evict_low_threshold_per1000;
+
+        dynamic_target_cache_size_callback dynamic_target_size_cb;
     } config;
 
 #ifdef PGC_WITH_ARAL
@@ -294,7 +296,13 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         size_t max_size2 = hot_max + ((dirty_max < hot_max / 2) ? hot_max / 2 : dirty_max * 2);
         wanted_cache_size = MIN(max_size1, max_size2);
 
-        if(wanted_cache_size < hot + dirty + cache->config.clean_size)
+        if(cache->config.dynamic_target_size_cb) {
+            size_t wanted_cache_size_cb = wanted_cache_size_cb = cache->config.dynamic_target_size_cb();
+            if(wanted_cache_size_cb > wanted_cache_size)
+                wanted_cache_size_cb = wanted_cache_size;
+        }
+
+        if (wanted_cache_size < hot + dirty + cache->config.clean_size)
             wanted_cache_size = hot + dirty + cache->config.clean_size;
     }
     else {
@@ -1770,6 +1778,36 @@ bool pgc_is_page_dirty(PGC_PAGE *page) {
 
 bool pgc_is_page_clean(PGC_PAGE *page) {
     return is_page_clean(page);
+}
+
+void pgc_reset_hot_max(PGC *cache) {
+    size_t entries = __atomic_load_n(&cache->hot.stats->entries, __ATOMIC_RELAXED);
+    size_t size = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+
+    __atomic_store_n(&cache->hot.stats->max_entries, entries, __ATOMIC_RELAXED);
+    __atomic_store_n(&cache->hot.stats->max_size, size, __ATOMIC_RELAXED);
+
+    size_t size_to_evict = 0;
+    cache_usage_per1000(cache, &size_to_evict);
+    evict_pages(cache, 0, 0, true, false);
+}
+
+void pgc_set_dynamic_target_cache_size_callback(PGC *cache, dynamic_target_cache_size_callback callback) {
+    cache->config.dynamic_target_size_cb = callback;
+
+    size_t size_to_evict = 0;
+    cache_usage_per1000(cache, &size_to_evict);
+    evict_pages(cache, 0, 0, true, false);
+}
+
+size_t pgc_get_current_cache_size(PGC *cache) {
+    cache_usage_per1000(cache, NULL);
+    return __atomic_load_n(&cache->stats.current_cache_size, __ATOMIC_RELAXED);
+}
+
+size_t pgc_get_wanted_cache_size(PGC *cache) {
+    cache_usage_per1000(cache, NULL);
+    return __atomic_load_n(&cache->stats.wanted_cache_size, __ATOMIC_RELAXED);
 }
 
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
