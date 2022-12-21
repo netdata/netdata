@@ -4271,11 +4271,26 @@ netdataDashboard.context = {
     'consul.autopilot_health_status': {
         info: 'The overall health of the local server cluster. The status is healthy if <b>all servers</b> are considered healthy by Autopilot.'
     },
+    'consul.autopilot_server_health_status': {
+        info: 'Whether the server is healthy according to the current <a href="https://developer.hashicorp.com/consul/tutorials/datacenter-operations/autopilot-datacenter-operations#server-health-checking", target="_blank">Autopilot configuration</a>.'
+    },
+    'consul.autopilot_server_stable_time': {
+        info: 'The time this server has been in its current state.'
+    },
+    'consul.autopilot_server_serf_status': {
+        info: 'The SerfHealth check status for the server.'
+    },
+    'consul.autopilot_server_voter_status': {
+        info: 'Whether the server is a voting member of the Raft cluster.'
+    },
     'consul.autopilot_failure_tolerance': {
         info: 'The number of voting servers that the cluster can lose while continuing to function.'
     },
     'consul.raft_leader_last_contact_time': {
         info: 'The time since the leader was last able to contact the follower nodes when checking its leader lease.'
+    },
+    'consul.raft_follower_last_contact_leader_time': {
+        info: 'The time elapsed since this server last contacted the leader.'
     },
     'consul.raft_leader_elections_rate': {
         info: 'The number of leadership elections. Increments whenever a Consul server starts an election.'
