@@ -276,6 +276,7 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
                 else
                     exec_rest_extent_list(ctx, extent_page_list);
             }
+            JudyLFreeArray(&datafile_extent_list->extent_pd_list_by_extent_offset_JudyL, PJE0);
             freez(datafile_extent_list);
         }
         JudyLFreeArray(&JudyL_datafile_list, PJE0);
