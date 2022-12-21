@@ -17,7 +17,7 @@ environment. To achieve this, the Agent needs to be aware of some information (s
 rooms in the particular space you want the node to be included `NETDATA_CLAIM_ROOMS` and/or any proxy endpoint
 `NETDATA_CLAIM_PROXY` to connect through. The setup process is completed by running the claiming process via the 
 Netdata Agent's command line, or the netdata-claim script or directly from the kickstart.sh script. On success; all the 
-necessary information to securely connect your Netdata Agent to the cloud end to end are stored under your 
+necessary information to securely connect your Netdata Agent to the cloud end to end, are stored under your 
 `<NETDATA_PREFIX>/var/lib/netdata/cloud.d` directory  (default: `/var/lib/netdata/cloud.d`)
 
 ### ACLK
