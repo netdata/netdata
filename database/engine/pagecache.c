@@ -421,6 +421,34 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                         uuid_copy(pd->datafile.extent.page_uuid, *uuid);
                         *PValue = pd;
 
+                        // add this page to open cache
+                        {
+                            bool added = false;
+                            struct extent_io_data ei = {
+                                    .pos = pd->datafile.extent.pos,
+                                    .bytes = pd->datafile.extent.bytes,
+                                    .page_length = pd->page_length,
+                                    .file = pd->datafile.file,
+                                    .fileno = pd->datafile.fileno,
+                            };
+                            PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, (PGC_ENTRY) {
+                                    .hot = false,
+                                    .section = (Word_t) ctx,
+                                    .metric_id = metric_id,
+                                    .start_time_t = pd->first_time_s,
+                                    .end_time_t = pd->last_time_s,
+                                    .update_every = pd->update_every_s,
+                                    .data = datafile,
+                                    .size = 0,
+                                    .custom_data = (uint8_t * ) & ei,
+                            }, &added);
+
+                            if (added)
+                                datafile_acquire_dup(datafile);
+
+                            pgc_page_release(open_cache, page);
+                        }
+
                         pages_found_in_journals_v2++;
                         pages_total++;
                     }

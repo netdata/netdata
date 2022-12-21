@@ -1043,17 +1043,15 @@ static bool rrdhost_set_sender(RRDHOST *host) {
     return ret;
 }
 
-static void rrdhost_clear_sender(RRDHOST *host) {
+static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
     if(unlikely(!host->sender)) return;
 
-    netdata_mutex_lock(&host->sender->mutex);
     if(host->sender->tid == gettid()) {
         host->sender->tid = 0;
         host->sender->exit.shutdown = false;
         host->sender->exit.reason = NULL;
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
     }
-    netdata_mutex_unlock(&host->sender->mutex);
 }
 
 static bool rrdhost_sender_should_exit(struct sender_state *s) {
@@ -1101,7 +1099,7 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     rrdpush_sender_thread_close_socket(host);
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
-    rrdhost_clear_sender(host);
+    rrdhost_clear_sender___while_having_sender_mutex(host);
     netdata_mutex_unlock(&host->sender->mutex);
 
     freez(s->pipe_buffer);

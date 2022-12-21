@@ -1600,7 +1600,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
-    cache->config.max_workers_evict_inline    =    2;
+    cache->config.max_workers_evict_inline    =   10;
     cache->config.severe_pressure_per1000     = 1000;
     cache->config.aggressive_evict_per1000    =  995;
     cache->config.healthy_size_per1000        =  990;
