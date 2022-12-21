@@ -681,7 +681,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
 
 size_t dynamic_open_cache_size(void) {
     size_t main_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_cache_size / 1000 * 5;
+    size_t target_size = main_cache_size / 100 * 5;
 
     if(target_size < 2 * 1024 * 1024)
         target_size = 2 * 1024 * 1024;
@@ -691,7 +691,7 @@ size_t dynamic_open_cache_size(void) {
 
 size_t dynamic_extent_cache_size(void) {
     size_t main_cache_size = pgc_get_wanted_cache_size(main_cache);
-    size_t target_size = main_cache_size / 1000 * 5;
+    size_t target_size = main_cache_size / 100 * 5;
 
     if(target_size < 3 * 1024 * 1024)
         target_size = 3 * 1024 * 1024;
