@@ -1246,11 +1246,16 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     if (likely(journalfile->data))
         netdata_munmap(journalfile->data, file_size);
 
-    // Don't Index the last file
-    if (ctx->last_fileno == journalfile->datafile->fileno)
+    bool is_last_file = (ctx->last_fileno == journalfile->datafile->fileno);
+    if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
+        ctx->create_new_datafile_pair = false;
         return 0;
+    }
 
     pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
+
+    if (is_last_file)
+        ctx->create_new_datafile_pair = true;
 
     return 0;
 

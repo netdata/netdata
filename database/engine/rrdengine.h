@@ -329,6 +329,7 @@ struct rrdengine_instance {
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned long metric_API_max_producers;
 
+    bool create_new_datafile_pair;
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
     uint8_t page_type; /* Default page type for this context */
 
@@ -351,6 +352,8 @@ void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details
 void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
+
+unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx);
 
 typedef struct validated_page_descriptor {
     time_t start_time_s;

@@ -471,7 +471,7 @@ int init_data_files(struct rrdengine_instance *ctx)
     int ret;
 
     fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
-    ctx->journal_initialization = true;
+    __atomic_store_n(&ctx->journal_initialization, true, __ATOMIC_RELAXED);
     ret = scan_data_files(ctx);
     if (ret < 0) {
         error("Failed to scan path \"%s\".", ctx->dbfiles_path);
@@ -485,7 +485,13 @@ int init_data_files(struct rrdengine_instance *ctx)
         }
         ctx->last_fileno = 1;
     }
-    ctx->journal_initialization = false;
+    else if(ctx->create_new_datafile_pair) {
+        ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
+        if (likely(!ret))
+            ++ctx->last_fileno;
+    }
+    ctx->create_new_datafile_pair = false;
+    __atomic_store_n(&ctx->journal_initialization, false, __ATOMIC_RELAXED);
     return 0;
 }
 

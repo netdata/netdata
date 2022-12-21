@@ -1138,6 +1138,13 @@ static void cache_flush_and_evict(struct rrdengine_worker_config *wc)
     }
 }
 
+unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
+    unsigned target_size = ctx->max_disk_space / TARGET_DATAFILES;
+    target_size = MIN(target_size, MAX_DATAFILE_SIZE);
+    target_size = MAX(target_size, MIN_DATAFILE_SIZE);
+    return target_size;
+}
+
 static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1153,9 +1160,7 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
     }
     datafile = ctx->datafiles.first->prev;
     current_size = datafile->pos;
-    target_size = ctx->max_disk_space / TARGET_DATAFILES;
-    target_size = MIN(target_size, MAX_DATAFILE_SIZE);
-    target_size = MAX(target_size, MIN_DATAFILE_SIZE);
+    target_size = rrdeng_target_data_file_size(ctx);
     only_one_datafile = (datafile == ctx->datafiles.first) ? 1 : 0;
 
     if (unlikely(current_size >= target_size || (out_of_space && only_one_datafile))) {
@@ -1170,7 +1175,7 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == ctx->journal_initialization)) {
+    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == __atomic_load_n(&ctx->journal_initialization, __ATOMIC_RELAXED))) {
         /* delete old data */
         if (wc->now_deleting_files) {
             /* already deleting data */
