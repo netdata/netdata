@@ -103,8 +103,10 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
         }
     }
 
-    if(found)
+    if(found) {
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_preloaded, found, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, found, __ATOMIC_RELAXED);
+    }
 
     return count_remaining == 0;
 }
@@ -490,9 +492,16 @@ static bool extent_uncompress_and_populate_pages(
         debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
     }
 
-    time_t now_s = now_realtime_sec();
+    size_t stats_data_from_main_cache = 0;
+    size_t stats_data_from_extent = 0;
+    size_t stats_load_compressed = 0;
+    size_t stats_load_uncompressed = 0;
+    size_t stats_load_invalid_page = 0;
+    size_t stats_cache_hit_while_inserting = 0;
+    size_t stats_cache_hit_before_allocation = 0;
 
     uint32_t page_offset = 0, page_length;
+    time_t now_s = now_realtime_sec();
     for (i = 0; i < count; i++, page_offset += page_length) {
         page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
@@ -549,16 +558,14 @@ static bool extent_uncompress_and_populate_pages(
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
-            int type;
-
             if (unlikely(!vd.data_on_disk_valid)) {
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                type = 3; // invalid
+                stats_load_invalid_page++;
             }
 
             else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
                 memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
-                type = 2; // uncompressed
+                stats_load_uncompressed++;
             }
 
             else {
@@ -569,11 +576,11 @@ static bool extent_uncompress_and_populate_pages(
                                    i, page_offset, vd.page_length, uncompressed_payload_length);
 
                     fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                    type = 3; // invalid
+                    stats_load_invalid_page++;
                 }
                 else {
                     memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
-                    type = 1; // compressed
+                    stats_load_compressed++;
                 }
             }
 
@@ -592,33 +599,16 @@ static bool extent_uncompress_and_populate_pages(
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
             if (false == added) {
                 freez(page_data);
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, 1, __ATOMIC_RELAXED);
+                stats_cache_hit_while_inserting++;
+                stats_data_from_main_cache++;
             }
-
-            if(cached_extent)
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_extent_cache, 1, __ATOMIC_RELAXED);
             else
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_disk, 1, __ATOMIC_RELAXED);
-
-            switch (type) {
-                case 1:
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_compressed, 1, __ATOMIC_RELAXED);
-                    break;
-
-                case 2:
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_uncompressed, 1, __ATOMIC_RELAXED);
-                    break;
-
-                case 3:
-                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, 1, __ATOMIC_RELAXED);
-                    break;
-
-                default:
-                    break;
-            }
+                stats_data_from_extent++;
         }
-        else
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation, 1, __ATOMIC_RELAXED);
+        else {
+            stats_cache_hit_before_allocation++;
+            stats_data_from_main_cache++;
+        }
 
         if (pd) {
             pd->page = page;
@@ -628,6 +618,29 @@ static bool extent_uncompress_and_populate_pages(
         else
             pgc_page_release(main_cache, page);
     }
+
+    if(stats_data_from_main_cache)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, stats_data_from_main_cache, __ATOMIC_RELAXED);
+
+    if(cached_extent)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_extent_cache, stats_data_from_extent, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_disk, stats_data_from_extent, __ATOMIC_RELAXED);
+
+    if(stats_cache_hit_before_allocation)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation, stats_cache_hit_before_allocation, __ATOMIC_RELAXED);
+
+    if(stats_cache_hit_while_inserting)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, stats_cache_hit_while_inserting, __ATOMIC_RELAXED);
+
+    if(stats_load_compressed)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_compressed, stats_load_compressed, __ATOMIC_RELAXED);
+
+    if(stats_load_uncompressed)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_uncompressed, stats_load_uncompressed, __ATOMIC_RELAXED);
+
+    if(stats_load_invalid_page)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_invalid_page_in_extent, stats_load_invalid_page, __ATOMIC_RELAXED);
 
     if(worker)
         worker_is_idle();

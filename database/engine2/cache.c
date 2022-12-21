@@ -88,10 +88,16 @@ struct pgc {
         size_t max_pages_per_inline_eviction;
         size_t max_skip_pages_per_inline_eviction;
         size_t max_flushes_inline;
+        size_t max_workers_evict_inline;
         size_t additional_bytes_per_page;
         free_clean_page_callback pgc_free_clean_cb;
         save_dirty_page_callback pgc_save_dirty_cb;
         PGC_OPTIONS options;
+
+        size_t severe_pressure_per1000;
+        size_t aggressive_evict_per1000;
+        size_t healthy_size_per1000;
+        size_t evict_low_threshold_per1000;
     } config;
 
 #ifdef PGC_WITH_ARAL
@@ -307,7 +313,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
     if(size_to_evict) {
-        size_t target = wanted_cache_size * 9 / 10;
+        size_t target = wanted_cache_size / 1000 * cache->config.evict_low_threshold_per1000;
         if(current_cache_size > target)
             *size_to_evict = current_cache_size - target;
         else
@@ -319,7 +325,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 }
 
 static inline bool cache_under_severe_pressure(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache, NULL) >= 1000)) {
+    if(unlikely(cache_usage_per1000(cache, NULL) >= cache->config.severe_pressure_per1000)) {
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -328,7 +334,7 @@ static inline bool cache_under_severe_pressure(PGC *cache) {
 }
 
 static inline bool cache_needs_space_aggressively(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache, NULL) >= 995)) {
+    if(unlikely(cache_usage_per1000(cache, NULL) >= cache->config.aggressive_evict_per1000)) {
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
         return true;
     }
@@ -336,7 +342,7 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
     return false;
 }
 
-#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= 990)
+#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= cache->config.healthy_size_per1000)
 
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
 
@@ -918,7 +924,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         // don't bother - not enough to do anything
         return false;
 
-    __atomic_add_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
+    size_t workers_running = __atomic_add_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
+    if(!wait && !all_of_them && workers_running > cache->config.max_workers_evict_inline) {
+        __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
+        return false;
+    }
 
     internal_fatal(cache->clean.linked_list_in_sections_judy,
                    "wrong clean pages configuration - clean pages need to have a linked list, not a judy array");
@@ -1393,9 +1403,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         PGC_ENTRY array[optimal_flush_size];
         PGC_PAGE *pages[optimal_flush_size];
         size_t pages_added = 0, pages_added_size = 0;
-        size_t pages_removed_dirty = 0;
-        size_t pages_cancelled = 0;
-        size_t pages_made_clean = 0;
+        size_t pages_removed_dirty = 0, pages_removed_dirty_size = 0;
+        size_t pages_cancelled = 0, pages_cancelled_size = 0;
+        size_t pages_made_clean = 0, pages_made_clean_size = 0;
 
         PGC_PAGE *page = sdp->base;
         while (page && pages_added < optimal_flush_size) {
@@ -1456,6 +1466,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
 
+                pages_removed_dirty_size += tpg->assumed_size;
                 pages_removed_dirty++;
             }
 
@@ -1471,20 +1482,19 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 internal_fatal(page_get_status_flags(tpg) != PGC_PAGE_DIRTY,
                                "DBENGINE CACHE: page should be in the dirty list before saved");
 
-                __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
-                __atomic_sub_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
+                pages_cancelled_size += tpg->assumed_size;
+                pages_cancelled++;
 
                 page_transition_unlock(cache, tpg);
                 page_release(cache, tpg, false);
                 // page ptr may be invalid now
-
-                pages_cancelled++;
             }
 
-            __atomic_add_fetch(&cache->stats.flushes_cancelled, pages_added, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&cache->stats.flushes_cancelled_size, pages_added_size, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.flushes_cancelled, pages_cancelled, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&cache->stats.flushes_cancelled_size, pages_cancelled_size, __ATOMIC_RELAXED);
 
-            pages_added = 0;
+            internal_fatal(pages_added != pages_cancelled || pages_added_size != pages_cancelled_size,
+                           "DBENGINE CACHE: flushing cancel pages mismatch");
 
             // next time, continue to the next section (tier)
             first = false;
@@ -1515,20 +1525,20 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
             __atomic_sub_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
 
+            pages_made_clean_size += tpg->assumed_size;
+            pages_made_clean++;
+
             page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
             page_transition_unlock(cache, tpg);
             page_release(cache, tpg, false);
             // tpg ptr may be invalid now
-
-            pages_made_clean++;
         }
 
         pgc_ll_unlock(cache, &cache->clean);
 
-        internal_fatal(
-                (pages_added != pages_cancelled) &&
-                (pages_added != pages_made_clean || pages_added != pages_removed_dirty)
-                , "DBENGINE CACHE: flushing pages mismatch");
+        internal_fatal(pages_added != pages_made_clean || pages_added != pages_removed_dirty ||
+                       pages_added_size != pages_made_clean_size || pages_added_size != pages_removed_dirty_size
+                       , "DBENGINE CACHE: flushing pages mismatch");
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
@@ -1589,6 +1599,12 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
+
+    cache->config.max_workers_evict_inline    =    2;
+    cache->config.severe_pressure_per1000     = 1000;
+    cache->config.aggressive_evict_per1000    =  995;
+    cache->config.healthy_size_per1000        =  990;
+    cache->config.evict_low_threshold_per1000 =  970;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
