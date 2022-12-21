@@ -596,7 +596,9 @@ static bool extent_uncompress_and_populate_pages(
             }
 
             if(cached_extent)
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_cached_extent, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_extent_cache, 1, __ATOMIC_RELAXED);
+            else
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_disk, 1, __ATOMIC_RELAXED);
 
             switch (type) {
                 case 1:

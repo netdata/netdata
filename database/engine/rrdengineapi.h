@@ -137,10 +137,10 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_total;
     size_t pages_to_load_from_disk;
 
-    // pages sources
-    size_t pages_found_in_cache;
-    size_t pages_found_in_open;
-    size_t pages_found_in_jv2;
+    // pages metadata sources
+    size_t pages_meta_source_main_cache;
+    size_t pages_meta_source_open_cache;
+    size_t pages_meta_source_journal_v2;
 
     // preloading
     size_t pages_pending_found_in_cache_at_pass4;
@@ -149,11 +149,14 @@ struct rrdeng_cache_efficiency_stats {
     size_t page_next_nowait_failed;
     size_t page_next_nowait_loaded;
 
+    // pages data sources
+    size_t pages_data_source_main_cache;
+    size_t pages_data_source_disk;
+    size_t pages_data_source_extent_cache;              // loaded by a cached extent
+
     // cache hits at different points
-    size_t pages_load_ok_loaded_but_cache_hit_parallel_query; // found in cache by another parallel query
     size_t pages_load_ok_loaded_but_cache_hit_before_allocation; // found in cache after loading, before allocating
     size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
-    size_t pages_load_ok_cached_extent;              // loaded by a cached extent
 
     // loading
     size_t pages_load_ok_uncompressed;
