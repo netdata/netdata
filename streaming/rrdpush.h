@@ -167,6 +167,11 @@ struct sender_state {
 #endif
 
     struct {
+        bool shutdown;
+        const char *reason;
+    } exit;
+
+    struct {
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
 
         struct {
@@ -227,7 +232,6 @@ struct receiver_state {
 
     struct {
         bool shutdown;      // signal the streaming parser to exit
-        bool new_receiver_waiting_dont_stop_sender;
         const char *reason; // the reason of disconnection to log
     } exit;
 
@@ -297,7 +301,7 @@ void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
-void rrdpush_sender_thread_stop(RRDHOST *host);
+void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
 void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
@@ -324,7 +328,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
 void receiver_state_free(struct receiver_state *rpt);
-bool stop_streaming_receiver(RRDHOST *host, const char *reason, bool new_receiver_waiting);
+bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
 #include "replication.h"
 

@@ -581,38 +581,22 @@ void rrdpush_destinations_free(RRDHOST *host) {
 
 // Either the receiver lost the connection or the host is being destroyed.
 // The sender mutex guards thread creation, any spurious data is wiped on reconnection.
-void rrdpush_sender_thread_stop(RRDHOST *host) {
-
+void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason) {
     if (!host->sender)
         return;
 
     netdata_mutex_lock(&host->sender->mutex);
-    netdata_thread_t thr = 0;
 
     if(rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)) {
-        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
 
-        info("STREAM %s [send]: signaling sending thread to stop...", rrdhost_hostname(host));
-
-        // signal the thread that we want to join it
-        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
-
-        // copy the thread id, so that we will be waiting for the right one
-        // even if a new one has been spawn
-        thr = host->rrdpush_sender_thread;
+        host->sender->exit.shutdown = true;
+        host->sender->exit.reason = reason;
 
         // signal it to cancel
         netdata_thread_cancel(host->rrdpush_sender_thread);
     }
 
     netdata_mutex_unlock(&host->sender->mutex);
-
-    if(thr != 0) {
-        info("STREAM %s [send]: waiting for the sending thread to stop...", rrdhost_hostname(host));
-        void *result;
-        netdata_thread_join(thr, &result);
-        info("STREAM %s [send]: sending thread has exited.", rrdhost_hostname(host));
-    }
 }
 
 
@@ -631,7 +615,7 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host) {
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STREAM_SENDER[%s]", rrdhost_hostname(host));
 
-        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, rrdpush_sender_thread, (void *) host->sender))
+        if(netdata_thread_create(&host->rrdpush_sender_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, rrdpush_sender_thread, (void *) host->sender))
             error("STREAM %s [send]: failed to create new thread for client.", rrdhost_hostname(host));
         else
             rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
@@ -1025,7 +1009,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
         rrd_unlock();
 
-        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER", true)) {
+        if (receiver_stale && stop_streaming_receiver(host, "STALE RECEIVER")) {
             // we stopped the receiver
             // we can proceed with this connection
             receiver_stale = false;

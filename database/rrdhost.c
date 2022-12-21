@@ -1087,7 +1087,7 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
     if (unlikely(!host->sender))
         return;
 
-    rrdpush_sender_thread_stop(host); // stop a possibly running thread
+    rrdpush_sender_thread_stop(host, "HOST CLEANUP"); // stop a possibly running thread
     cbuffer_free(host->sender->buffer);
 #ifdef ENABLE_COMPRESSION
     if (host->sender->compressor)
@@ -1117,7 +1117,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     rrdhost_streaming_sender_structures_free(host);
 
     if (netdata_exit || force)
-        stop_streaming_receiver(host, "HOST CLEANUP", false);
+        stop_streaming_receiver(host, "HOST CLEANUP");
 
 
     // ------------------------------------------------------------------------

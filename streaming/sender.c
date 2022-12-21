@@ -1027,6 +1027,66 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
     }
 }
 
+static bool rrdhost_set_sender(RRDHOST *host) {
+    if(unlikely(!host->sender)) return false;
+
+    bool ret = false;
+    netdata_mutex_lock(&host->sender->mutex);
+    if(!host->sender->tid) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+        host->sender->tid = gettid();
+        ret = true;
+    }
+    netdata_mutex_unlock(&host->sender->mutex);
+
+    return ret;
+}
+
+static void rrdhost_clear_sender(RRDHOST *host) {
+    if(unlikely(!host->sender)) return;
+
+    netdata_mutex_lock(&host->sender->mutex);
+    if(host->sender->tid == gettid()) {
+        host->sender->tid = 0;
+        host->sender->exit.shutdown = false;
+        host->sender->exit.reason = NULL;
+        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    }
+    netdata_mutex_unlock(&host->sender->mutex);
+}
+
+static bool rrdhost_sender_should_exit(struct sender_state *s) {
+    // check for outstanding cancellation requests
+    netdata_thread_testcancel();
+
+    if(unlikely(netdata_exit)) {
+        if(!s->exit.reason)
+            s->exit.reason = "NETDATA EXIT";
+        return true;
+    }
+
+    if(unlikely(!rrdhost_has_rrdpush_sender_enabled(s->host))) {
+        if(!s->exit.reason)
+            s->exit.reason = "NON STREAMABLE HOST";
+        return true;
+    }
+
+    if(unlikely(s->exit.shutdown)) {
+        if(!s->exit.reason)
+            s->exit.reason = "SENDER SHUTDOWN REQUESTED";
+        return true;
+    }
+
+    if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_ORPHAN))) {
+        if(!s->exit.reason)
+            s->exit.reason = "RECEIVER LEFT";
+        return true;
+    }
+
+    return false;
+}
+
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     struct rrdpush_sender_thread_data *s = ptr;
     worker_unregister();
@@ -1034,21 +1094,14 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     RRDHOST *host = s->host;
 
     netdata_mutex_lock(&host->sender->mutex);
-
-    info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
+    info("STREAM %s [send]: sending thread exits %s",
+         rrdhost_hostname(host),
+         host->sender->exit.reason ? host->sender->exit.reason : "");
 
     rrdpush_sender_thread_close_socket(host);
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
-    if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN)) {
-        info("STREAM %s [send]: sending thread detaches itself.", rrdhost_hostname(host));
-        netdata_thread_detach(netdata_thread_self());
-    }
-
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
-
-    info("STREAM %s [send]: sending thread now exits.", rrdhost_hostname(host));
-
+    rrdhost_clear_sender(host);
     netdata_mutex_unlock(&host->sender->mutex);
 
     freez(s->pipe_buffer);
@@ -1084,13 +1137,18 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     struct sender_state *s = ptr;
-    s->tid = gettid();
 
     if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush_send_destination ||
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), s->tid);
+              rrdhost_hostname(s->host), gettid());
+        return NULL;
+    }
+
+    if(!rrdhost_set_sender(s->host)) {
+        error("STREAM %s [send]: thread created (task id %d), but there is another sender running for this host.",
+              rrdhost_hostname(s->host), gettid());
         return NULL;
     }
 
@@ -1106,7 +1164,7 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 #endif
 
-    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->tid);
+    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid());
 
     s->timeout = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 600);
@@ -1147,14 +1205,9 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->sender_state = s;
     thread_data->host = s->host;
 
-    // reset our cleanup flags
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
-
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
-    for(; rrdhost_has_rrdpush_sender_enabled(s->host) && !netdata_exit ;) {
-        // check for outstanding cancellation requests
-        netdata_thread_testcancel();
+    while(!rrdhost_sender_should_exit(s)) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
