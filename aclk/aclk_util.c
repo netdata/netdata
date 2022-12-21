@@ -346,43 +346,117 @@ unsigned long int aclk_tbeb_delay(int reset, int base, unsigned long int min, un
     return delay;
 }
 
+static inline int aclk_parse_pair(const char *src, const char c, char **a, char **b)
+{
+    const char *ptr = strchr(src, c);
+    if (ptr == NULL)
+        return 1;
+
+//  allow empty string
+/*    if (!*(ptr+1))
+        return 1;*/
+
+    *a = callocz(1, ptr - src + 1);
+    memcpy (*a, src, ptr - src);
+
+    *b = strdupz(ptr+1);
+
+    return 0;
+}
 
 #define HTTP_PROXY_PREFIX "http://"
-void aclk_set_proxy(char **ohost, int *port, enum mqtt_wss_proxy_type *type)
+void aclk_set_proxy(char **ohost, int *port, char **uname, char **pwd, enum mqtt_wss_proxy_type *type)
 {
     ACLK_PROXY_TYPE pt;
     const char *ptr = aclk_get_proxy(&pt);
     char *tmp;
-    char *host;
+
     if (pt != PROXY_TYPE_HTTP)
         return;
 
+    *uname = NULL;
+    *pwd = NULL;
     *port = 0;
+
+    char *proxy = strdupz(ptr);
+    ptr = proxy;
 
     if (!strncmp(ptr, HTTP_PROXY_PREFIX, strlen(HTTP_PROXY_PREFIX)))
         ptr += strlen(HTTP_PROXY_PREFIX);
 
-    if ((tmp = strchr(ptr, '@')))
-        ptr = tmp;
+    if ((tmp = strchr(ptr, '@'))) {
+        *tmp = 0;
+        if(aclk_parse_pair(ptr, ':', uname, pwd)) {
+            error_report("Failed to get username and password for proxy. Will attempt connection without authentication");
+        }
+        ptr = tmp+1;
+    }
 
-    if ((tmp = strchr(ptr, '/'))) {
-        host = mallocz((tmp - ptr) + 1);
-        memcpy(host, ptr, (tmp - ptr));
-        host[tmp - ptr] = 0;
-    } else
-        host = strdupz(ptr);
+    if (!*ptr) {
+        freez(proxy);
+        freez(*uname);
+        freez(*pwd);
+        return;
+    }
 
-    if ((tmp = strchr(host, ':'))) {
+    if ((tmp = strchr(ptr, ':'))) {
         *tmp = 0;
         tmp++;
-        *port = atoi(tmp);
+        if(*tmp)
+            *port = atoi(tmp);
     }
+    *ohost = strdupz(ptr);
 
     if (*port <= 0 || *port > 65535)
         *port = 8080;
 
-    *ohost = host;
-
     if (type)
         *type = MQTT_WSS_PROXY_HTTP;
+    else {
+        freez(*uname);
+        freez(*pwd);
+    }
+
+    freez(proxy);
+}
+
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110
+static EVP_ENCODE_CTX *EVP_ENCODE_CTX_new(void)
+{
+	EVP_ENCODE_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+
+	if (ctx != NULL) {
+		memset(ctx, 0, sizeof(*ctx));
+	}
+	return ctx;
+}
+static void EVP_ENCODE_CTX_free(EVP_ENCODE_CTX *ctx)
+{
+	OPENSSL_free(ctx);
+	return;
+}
+#endif
+
+int base64_encode_helper(unsigned char *out, int *outl, const unsigned char *in, int in_len)
+{
+    int len;
+    unsigned char *str = out;
+    EVP_ENCODE_CTX *ctx = EVP_ENCODE_CTX_new();
+    EVP_EncodeInit(ctx);
+    EVP_EncodeUpdate(ctx, str, outl, in, in_len);
+    str += *outl;
+    EVP_EncodeFinal(ctx, str, &len);
+    *outl += len;
+
+    str = out;
+    while(*str) {
+        if (*str != 0x0D && *str != 0x0A)
+            *out++ = *str++;
+        else
+            str++;
+    }
+    *out = 0;
+
+    EVP_ENCODE_CTX_free(ctx);
+    return 0;
 }
