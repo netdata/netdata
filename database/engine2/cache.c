@@ -1701,11 +1701,10 @@ void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
     }
 }
 
-void pgc_page_hot_to_clean_empty_and_release(PGC *cache, PGC_PAGE *page) {
-    __atomic_add_fetch(&cache->stats.workers_hot2dirty, 1, __ATOMIC_RELAXED);
+bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page) {
+    bool ret;
 
-    if(!is_page_hot(page))
-        fatal("DBENGINE CACHE: set empty on non-hot page");
+    __atomic_add_fetch(&cache->stats.workers_hot2dirty, 1, __ATOMIC_RELAXED);
 
     // prevent accesses from increasing the accesses counter
     page_flag_set(page, PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
@@ -1714,16 +1713,18 @@ void pgc_page_hot_to_clean_empty_and_release(PGC *cache, PGC_PAGE *page) {
     __atomic_store_n(&page->accesses, 0, __ATOMIC_RELEASE);
 
     // if there are no other references to it, evict it immediately
-    if(make_acquired_page_clean_and_evict_or_page_release(cache, page))
+    if(make_acquired_page_clean_and_evict_or_page_release(cache, page)) {
         __atomic_add_fetch(&cache->stats.hot_empty_pages_evicted_immediately, 1, __ATOMIC_RELAXED);
-    else
+        ret = true;
+    }
+    else {
         __atomic_add_fetch(&cache->stats.hot_empty_pages_evicted_later, 1, __ATOMIC_RELAXED);
+        ret = false;
+    }
 
     __atomic_sub_fetch(&cache->stats.workers_hot2dirty, 1, __ATOMIC_RELAXED);
 
-    // flush, if we have to
-    if(cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE)
-        flush_pages(cache, cache->config.max_flushes_inline, false, false);
+    return ret;
 }
 
 Word_t pgc_page_section(PGC_PAGE *page) {
@@ -2090,7 +2091,7 @@ void *unittest_stress_test_collector(void *ptr) {
         for (size_t i = metric_start; i < metric_end; i++) {
             if (pgc_uts.metrics[i]) {
                 if(i % 10 == 0)
-                    pgc_page_hot_to_clean_empty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
+                    pgc_page_to_clean_evict_or_release(pgc_uts.cache, pgc_uts.metrics[i]);
                 else
                     pgc_page_hot_to_dirty_and_release(pgc_uts.cache, pgc_uts.metrics[i]);
             }

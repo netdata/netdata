@@ -665,7 +665,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
     int tries = 100;
     while(!added && page_entry.end_time_t > pgc_page_end_time_t(page) && tries--) {
-        pgc_page_hot_to_clean_empty_and_release(open_cache, page);
+        pgc_page_to_clean_evict_or_release(open_cache, page);
         page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
     }
 

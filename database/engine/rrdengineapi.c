@@ -244,7 +244,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         if (page_is_empty) {
             if (pgc_is_page_hot(handle->page)) {
                 mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
-                pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
+                pgc_page_to_clean_evict_or_release(main_cache, handle->page);
             }
         }
         else {
@@ -257,7 +257,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     }
     else {
         mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
-        pgc_page_hot_to_clean_empty_and_release(main_cache, handle->page);
+        pgc_page_to_clean_evict_or_release(main_cache, handle->page);
     }
 
     handle->page = NULL;
