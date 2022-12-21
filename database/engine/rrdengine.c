@@ -889,7 +889,7 @@ static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
     unsigned deleted_bytes, journalfile_bytes, datafile_bytes;
-    int ret, error;
+    int ret;
     char path[RRDENG_PATH_MAX];
 
     uv_rwlock_wrlock(&ctx->datafiles.rwlock);
@@ -1138,13 +1138,13 @@ static void cache_flush_and_evict(struct rrdengine_worker_config *wc)
     }
 }
 
-void rrdeng_test_quota(struct rrdengine_worker_config* wc)
+static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     struct rrdengine_datafile *datafile;
     unsigned current_size, target_size;
     uint8_t out_of_space, only_one_datafile;
-    int ret, error;
+    int ret;
 
     out_of_space = 0;
     /* Do not allow the pinned pages to exceed the disk space quota to avoid deadlocks */
@@ -1207,10 +1207,6 @@ static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
 static void rrdeng_cleanup_finished_threads(struct rrdengine_worker_config* wc)
 {
     struct rrdengine_instance *ctx = wc->ctx;
-
-//    if (unlikely(wc->cleanup_thread_deleting_files)) {
-//        after_delete_old_data(wc);
-//    }
 
     if (unlikely(SET_QUIESCE == ctx->quiesce && !rrdeng_threads_alive(wc) && !wc->outstanding_flush_requests)) {
         wal_flush_transaction_buffer(wc);
@@ -1295,7 +1291,6 @@ void async_cb(uv_async_t *handle)
     debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
-/* Flushes dirty pages when timer expires */
 #define TIMER_PERIOD_MS (1000)
 
 void timer_cb(uv_timer_t* handle)

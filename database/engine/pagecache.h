@@ -12,7 +12,6 @@ extern struct pgc *extent_cache;
 
 /* Forward declarations */
 struct rrdengine_instance;
-struct extent_info;
 struct rrdeng_page_descr;
 
 #define INVALID_TIME (0)

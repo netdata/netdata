@@ -1521,7 +1521,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"sizeof_metric_in_index\":%zu"
                    ",\n\t\t\"sizeof_page\":%zu"
                    ",\n\t\t\"sizeof_page_in_index\":%zu"
-                   ",\n\t\t\"sizeof_extent\":%zu"
                    ",\n\t\t\"sizeof_page_in_extent\":%zu"
                    ",\n\t\t\"sizeof_datafile\":%zu"
                    ",\n\t\t\"sizeof_page_in_cache\":%zu"
@@ -1556,7 +1555,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.sizeof_metric_in_index
                    , stats.sizeof_page
                    , stats.sizeof_page_in_index
-                   , stats.sizeof_extent
                    , stats.sizeof_page_in_extent
                    , stats.sizeof_datafile
                    , stats.sizeof_page_in_cache

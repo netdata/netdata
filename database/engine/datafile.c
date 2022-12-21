@@ -1,41 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
-void df_extent_delete_all_unsafe(struct rrdengine_datafile *datafile)
-{
-    struct extent_info *extent = datafile->extents.first, *next_extent;
-
-    char path[RRDENG_PATH_MAX];
-
-    generate_journalfilepath_v2(datafile, path, sizeof(path));
-    internal_error(true, "Deleting extents of file %s", path);
-    unsigned count = 0;
-    while (extent) {
-        next_extent = extent->next;
-        freez(extent);
-        count++;
-        extent = next_extent;
-    }
-    datafile->extents.first = NULL;
-    internal_error(true, "Deleted %u extents of file %s", count, path);
-}
-
-void df_extent_insert(struct extent_info *extent)
-{
-    struct rrdengine_datafile *datafile = extent->datafile;
-    uv_rwlock_wrlock(&datafile->extent_rwlock);
-
-    if (likely(NULL != datafile->extents.last)) {
-        datafile->extents.last->next = extent;
-    }
-    if (unlikely(NULL == datafile->extents.first)) {
-        datafile->extents.first = extent;
-    }
-    datafile->extents.last = extent;
-
-    uv_rwlock_wrunlock(&datafile->extent_rwlock);
-}
-
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     uv_rwlock_wrlock(&ctx->datafiles.rwlock);
@@ -57,7 +22,6 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->fileno = fileno;
     datafile->file = (uv_file)0;
     datafile->pos = 0;
-    datafile->extents.first = datafile->extents.last = NULL; /* will be populated by journalfile */
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->journalfile = NULL;
     datafile->next = datafile->prev = NULL;
@@ -529,16 +493,11 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     struct rrdengine_datafile *datafile, *next_datafile;
     struct rrdengine_journalfile *journalfile;
-    struct extent_info *extent, *next_extent;
 
     for (datafile = ctx->datafiles.first ; datafile != NULL ; datafile = next_datafile) {
         journalfile = datafile->journalfile;
         next_datafile = datafile->next;
 
-        for (extent = datafile->extents.first ; extent != NULL ; extent = next_extent) {
-            next_extent = extent->next;
-            freez(extent);
-        }
         close_journal_file(journalfile, datafile);
         close_data_file(datafile);
         freez(journalfile);
