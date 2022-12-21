@@ -24,11 +24,8 @@ necessary information to securely connect your Netdata Agent to the cloud end to
 
 The Agent-Cloud link (ACLK) is the mechanism responsible for secure communication between the Netdata Agent and the
 Netdata Cloud. ACLK is active by default but idle, after a successful [claim process](#claim-process) you expect to see
-a configuration file likes this one under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d`
+a configuration under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d/cloud.conf` like the following
 
-
-It waits for the necessary information to secure communicate with the 
-cloud to be present under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d`. 
 
 ```conf
 [global]
