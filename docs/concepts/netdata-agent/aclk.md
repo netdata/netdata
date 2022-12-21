@@ -33,7 +33,7 @@ a configuration under your `<NETDATA_PREFIX>/var/lib/netdata/cloud.d/cloud.conf`
   cloud base url = https://app.netdata.cloud
 ```
 
-You can disable at any given moment this component if you need to either on installation process or during runtime. 
+You can disable it at any given moment this component if you need to either on installation process or during runtime. 
 
 The Cloud App lives at app.netdata.cloud which currently resolves to the following list of IPs:
 
@@ -59,7 +59,7 @@ information about:
 2. Alert status transitions.
 
 Only when you are trying to see the actual charts/dashboards from your Netdata Cloud, the Cloud queries the Agent's data 
-(again though the ACLK) so you can see the actual metrics in your browser for a specific timeframe.
+(again though the ACLK) so you can see the actual metrics in your browser for a timeframe you specified.
 
 
 <!-- TODO: Make the following sections tasks
