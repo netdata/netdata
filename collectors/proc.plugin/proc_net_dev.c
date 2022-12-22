@@ -516,8 +516,7 @@ static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *
     snprintfz(buffer, RRD_ID_LENGTH_MAX, "%scgroup.net_mtu", r->ctx_prefix);
     d->chart_ctx_net_mtu        = strdupz(buffer);
 
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "net %s", r->container_device);
-    d->chart_family = strdupz(buffer);
+    d->chart_family = strdupz("net");
 
     rrdlabels_copy(d->chart_labels, r->chart_labels);
 
