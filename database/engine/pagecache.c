@@ -565,7 +565,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
     usec_t start_ut = now_monotonic_usec();
 
-    bool waited = false;
+    bool waited = false, page_from_pd = true;
 
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
     struct page_details *pd;
@@ -586,7 +586,9 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
         if(!page && !completion_is_done(&handle->pdc->completion)) {
             page = pgc_page_get_and_acquire(main_cache, (Word_t)handle->pdc->ctx, pd->metric_id, pd->first_time_s, true);
-            if(!page) {
+            if(unlikely(page))
+                page_from_pd = false;
+            else {
                 handle->pdc->completed_jobs =
                         completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completed_jobs);
 
@@ -598,7 +600,10 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 
     if(page) {
         // this is for pdc_destroy() to not release the page again
-        pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
+        if(page_from_pd)
+            pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
+        else
+            pdc_page_status_set(pd, PDC_PAGE_PROCESSED);
 
         if(waited)
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_next_wait_loaded, 1, __ATOMIC_RELAXED);
