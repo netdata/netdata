@@ -930,9 +930,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
     if(unlikely(!max_skip))
         max_skip = SIZE_MAX;
+    else if(unlikely(max_skip < 2))
+        max_skip = 2;
 
     if(unlikely(!max_evict))
         max_evict = SIZE_MAX;
+    else if(unlikely(max_evict < 2))
+        max_evict = 2;
 
     PGC_PAGE *to_evict[cache->config.partitions];
     size_t pages_to_evict = 0, pages_to_evict_size; // per round/spin
@@ -1623,8 +1627,8 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.pgc_free_clean_cb = pgc_free_cb;
     cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush,
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
-    cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 1) ? 1 : max_pages_per_inline_eviction;
-    cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 1) ? 1 : max_skip_pages_per_inline_eviction;
+    cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 2) ? 2 : max_pages_per_inline_eviction;
+    cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
     cache->config.max_flushes_inline = (max_flushes_inline < 1) ? 1 : max_flushes_inline;
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
@@ -1633,7 +1637,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.severe_pressure_per1000     = 1000;
     cache->config.aggressive_evict_per1000    =  995;
     cache->config.healthy_size_per1000        =  990;
-    cache->config.evict_low_threshold_per1000 =  970;
+    cache->config.evict_low_threshold_per1000 =  985;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 

@@ -318,10 +318,18 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
         handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
         size_t max_size = tier_page_size[ctx->tier];
         size_t max_slots = max_size / PAGE_POINT_CTX_SIZE_BYTES(ctx);
-        size_t min_slots = max_slots / 4;
+        size_t min_slots = max_slots / 5;
         size_t distribution = max_slots - min_slots;
-        size_t this_page_slots = indexing_partition((Word_t)handle->alignment, distribution);
-        size_t final_slots = min_slots + this_page_slots;
+        size_t this_page_end_slot = indexing_partition((Word_t)handle->alignment, distribution);
+
+        size_t current_end_slot = (size_t)now_monotonic_sec() % distribution;
+
+        if(current_end_slot < this_page_end_slot)
+            this_page_end_slot -= current_end_slot;
+        else if(current_end_slot > this_page_end_slot)
+            this_page_end_slot = (max_slots - current_end_slot) + this_page_end_slot;
+
+        size_t final_slots = min_slots + this_page_end_slot;
 
         if(final_slots > max_slots)
             final_slots = max_slots;
