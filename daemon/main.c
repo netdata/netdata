@@ -54,6 +54,8 @@ void netdata_cleanup_and_exit(int ret) {
         cancel_main_threads();
 
         // free the database
+        metadata_sync_shutdown_prepare();
+        rrdhost_free_all();
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
@@ -66,8 +68,6 @@ void netdata_cleanup_and_exit(int ret) {
             }
         }
 #endif
-        metadata_sync_shutdown_prepare();
-        rrdhost_free_all();
         metadata_sync_shutdown();
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {

@@ -976,11 +976,13 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
     }
 
     struct journal_metric_list *metric = (void *) (data_start + j2_header->metric_offset);
-    time_t journal_start_time_t = j2_header->start_time_ut / USEC_PER_SEC;
+    time_t journal_start_time_t = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
+    stats->metrics += j2_header->metric_count;
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        stats->metrics_pages += metric_list_header->entries;
         struct journal_page_list *descr =  (void *) (data_start + metric->page_offset + sizeof(struct journal_page_header));
         for (uint32_t idx=0; idx < metric_list_header->entries; idx++) {
 
@@ -992,9 +994,9 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             time_t end_time_t = journal_start_time_t + descr->delta_end_s;
 
             if(likely(points > 1))
-                update_every_s = (end_time_t - start_time_t) / (points - 1);
+                update_every_s = (time_t) ((end_time_t - start_time_t) / (points - 1));
             else {
-                update_every_s = default_rrd_update_every * get_tier_grouping(datafile->ctx->tier);
+                update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->tier));
                 stats->single_point_pages++;
             }
 
@@ -1069,7 +1071,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
         }
     }
 
-    stats.sizeof_metric = 0;
+//    stats.sizeof_metric = 0;
     stats.sizeof_page = struct_natural_alignment(sizeof(struct rrdeng_page_descr));
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
@@ -1077,10 +1079,8 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     stats.sizeof_page_data = tier_page_size[ctx->tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
-    stats.sizeof_page_in_extent = sizeof(struct rrdeng_page_descr *);
-
-    stats.sizeof_metric_in_index = 40;
-    stats.sizeof_page_in_index = 24;
+//    stats.sizeof_metric_in_index = 40;
+//    stats.sizeof_page_in_index = 24;
 
     stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->tier);
 

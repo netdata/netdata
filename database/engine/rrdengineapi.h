@@ -75,10 +75,7 @@ typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
 
     size_t sizeof_metric;
-    size_t sizeof_metric_in_index;
     size_t sizeof_page;
-    size_t sizeof_page_in_index;
-    size_t sizeof_page_in_extent;
     size_t sizeof_datafile;
     size_t sizeof_page_in_cache;
     size_t sizeof_point_data;
@@ -106,8 +103,8 @@ typedef struct rrdengine_size_statistics {
 
     size_t single_point_pages;
 
-    usec_t first_t;
-    usec_t last_t;
+    time_t first_t;
+    time_t last_t;
 
     size_t currently_collected_metrics;
     size_t max_concurrently_collected_metrics;
