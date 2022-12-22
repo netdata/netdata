@@ -339,8 +339,6 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
 
 #define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= cache->config.healthy_size_per1000)
 
-static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page);
-
 typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
@@ -750,9 +748,6 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
 
     size_t assumed_size = page->assumed_size; // take the size before we release it
 
-    internal_fatal(!is_page_clean(page),
-                   "DBENGINE CACHE: only clean pages can be deleted");
-
     REFCOUNT expected, desired;
 
     expected = __atomic_load_n(&page->refcount, __ATOMIC_RELAXED);
@@ -884,6 +879,14 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
     pointer_del(cache, page);
 }
 
+static void remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(PGC *cache, PGC_PAGE *page) {
+    size_t partition = pgc_indexing_partition(cache, page->metric_id);
+    pgc_index_write_lock(cache, partition);
+    remove_this_page_from_index_unsafe(cache, page, partition);
+    pgc_index_write_unlock(cache, partition);
+    free_this_page(cache, page);
+}
+
 static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
     pointer_check(cache, page);
 
@@ -904,11 +907,7 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
     pgc_ll_unlock(cache, &cache->clean);
     page_transition_unlock(cache, page);
 
-    size_t partition = pgc_indexing_partition(cache, page->metric_id);
-    pgc_index_write_lock(cache, partition);
-    remove_this_page_from_index_unsafe(cache, page, partition);
-    pgc_index_write_unlock(cache, partition);
-    free_this_page(cache, page);
+    remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(cache, page);
 
     return true;
 }
@@ -1550,10 +1549,10 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
 
+            page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
+
             internal_fatal(page_get_status_flags(tpg) != 0,
                            "DBENGINE CACHE: page should not be in any list while it is being saved");
-
-            page_set_clean(cache, tpg, true, true);
 
             __atomic_sub_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
             __atomic_sub_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
@@ -1561,9 +1560,33 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             pages_made_clean_size += tpg->assumed_size;
             pages_made_clean++;
 
-            page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
-            page_transition_unlock(cache, tpg);
-            page_release(cache, tpg, false);
+            // for accounting reasons, we have to put it in the clean queue
+            page_set_clean(cache, tpg, true, true);
+
+            if(!tpg->accesses) {
+                // we can delete this page immediately - it has never been accessed
+
+                if(acquired_page_get_for_deletion_or_release_it(cache, tpg)) {
+                    // page is acquired for deletion
+                    // we can remove it immediately
+
+                    pgc_ll_del(cache, &cache->clean, tpg, true);
+                    page_transition_unlock(cache, tpg);
+                    remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(cache, tpg);
+                }
+                else {
+                    // page is released
+                    // let it be in the clean queue...
+
+                    page_transition_unlock(cache, tpg);
+                }
+            }
+            else {
+                // keep in page in the clean queue
+
+                page_transition_unlock(cache, tpg);
+                page_release(cache, tpg, false);
+            }
             // tpg ptr may be invalid now
         }
 
