@@ -115,8 +115,6 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
 // page details list
 
 static void pdc_destroy(PDC *pdc) {
-    __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
-
     completion_destroy(&pdc->completion);
 
     Pvoid_t *PValue;
@@ -152,6 +150,7 @@ static void pdc_destroy(PDC *pdc) {
 
     JudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
+    __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     freez(pdc);
 
     if(unroutable)

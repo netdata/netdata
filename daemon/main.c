@@ -59,6 +59,16 @@ void netdata_cleanup_and_exit(int ret) {
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+
+            size_t in_flight_queries = 1, tries = 100;
+            while (in_flight_queries && --tries > 0) {
+                if (tries < 99)
+                    sleep_usec(10000);
+                in_flight_queries = 0;
+                for (size_t tier = 0; tier < storage_tiers; tier++)
+                    in_flight_queries += __atomic_load_n(&multidb_ctx[tier]->inflight_queries, __ATOMIC_RELAXED);
+            }
+
             for (size_t tier = 0; tier < storage_tiers; tier++) {
                 if (tier == 0) {
                     // Destroy main cache
