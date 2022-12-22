@@ -1246,6 +1246,11 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+        if(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
+            size_t max = s->host->sender->buffer->max_size;
+            cbuffer_free(s->host->sender->buffer);
+            s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
+        }
         netdata_mutex_unlock(&s->mutex);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);

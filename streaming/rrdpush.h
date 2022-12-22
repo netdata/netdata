@@ -9,6 +9,7 @@
 #include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100
+#define CBUFFER_INITIAL_SIZE (16 * 1024)
 
 // ----------------------------------------------------------------------------
 // obsolete versions - do not use anymore

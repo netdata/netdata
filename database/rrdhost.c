@@ -1029,7 +1029,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     host->sender = callocz(1, sizeof(*host->sender));
     host->sender->host = host;
-    host->sender->buffer = cbuffer_new(1024, 1024 * 1024);
+    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024);
     host->sender->capabilities = STREAM_OUR_CAPABILITIES;
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
