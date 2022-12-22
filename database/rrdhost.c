@@ -1071,17 +1071,18 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
-    if (netdata_exit || force)
+    if (netdata_exit || force) {
         info("Freeing all memory for host '%s'...", rrdhost_hostname(host));
 
-    // ------------------------------------------------------------------------
-    // first remove it from the indexes, so that it will not be discoverable
+        // ------------------------------------------------------------------------
+        // first remove it from the indexes, so that it will not be discoverable
 
-    rrdhost_index_del_hostname(host);
-    rrdhost_index_del_by_guid(host);
+        rrdhost_index_del_hostname(host);
+        rrdhost_index_del_by_guid(host);
 
-    if(host->prev)
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(localhost, host, prev, next);
+        if (host->prev)
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(localhost, host, prev, next);
+    }
 
     // ------------------------------------------------------------------------
 
