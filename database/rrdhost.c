@@ -518,7 +518,7 @@ int is_legacy = 1;
 
     rrdhost_load_rrdcontext_data(host);
     if (!archived)
-        ml_host_new(host);
+        ml_new_host(host);
     else
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
 
@@ -629,7 +629,7 @@ void rrdhost_update(RRDHOST *host
         host->rrdpush_replication_step = rrdpush_replication_step;
 
         rrd_hosts_available++;
-        ml_host_new(host);
+        ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
@@ -1089,7 +1089,7 @@ void rrdhost_free(RRDHOST *host, bool force) {
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
     rrdhost_wrlock(host);
-    ml_host_delete(host);
+    ml_delete_host(host);
     rrdhost_unlock(host);
 
     // ------------------------------------------------------------------------

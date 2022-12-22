@@ -178,8 +178,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->red = NAN;
 
     ctr->react_action = RRDSET_REACT_NEW;
-
-    ml_chart_new(st);
 }
 
 // the destructor - the dictionary is write locked while this runs
@@ -233,9 +231,6 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // 7. destroy the chart labels
     rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
-
-    // 8. destroy the ml handle
-    ml_chart_delete(st);
 
     rrdset_memory_file_free(st);                // remove files of db mode save and map
 
@@ -1258,8 +1253,6 @@ static inline size_t rrdset_done_interpolate(
 
         last_ut = next_store_ut;
 
-        ml_chart_update_begin(st);
-
         struct rda_item *rda;
         size_t dim_id;
         for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
@@ -1339,11 +1332,8 @@ static inline size_t rrdset_done_interpolate(
                     break;
             }
 
-            time_t current_time = (time_t) (next_store_ut / USEC_PER_SEC);
-
             if(unlikely(!store_this_entry)) {
-                (void) ml_is_anomalous(rd, current_time, 0, false);
-
+                (void) ml_is_anomalous(rd, 0, false);
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rrdcontext_collected_rrddim(rd);
                 continue;
@@ -1352,7 +1342,7 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, current_time, new_value, true)) {
+                if (ml_is_anomalous(rd, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
@@ -1362,7 +1352,7 @@ static inline size_t rrdset_done_interpolate(
                 rd->last_stored_value = new_value;
             }
             else {
-                (void) ml_is_anomalous(rd, current_time, 0, false);
+                (void) ml_is_anomalous(rd, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
@@ -1373,8 +1363,6 @@ static inline size_t rrdset_done_interpolate(
 
             stored_entries++;
         }
-
-        ml_chart_update_end(st);
 
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;

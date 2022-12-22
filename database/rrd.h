@@ -30,9 +30,8 @@ typedef struct rrdhost_acquired RRDHOST_ACQUIRED;
 typedef struct rrdset_acquired RRDSET_ACQUIRED;
 typedef struct rrddim_acquired RRDDIM_ACQUIRED;
 
-typedef struct ml_host ml_host_t;
-typedef struct ml_chart ml_chart_t;
-typedef struct ml_dimension ml_dimension_t;
+typedef void *ml_host_t;
+typedef void *ml_dimension_t;
 
 typedef enum {
     QUERY_SOURCE_UNKNOWN,
@@ -297,7 +296,7 @@ struct rrddim {
     // ------------------------------------------------------------------------
     // operational state members
 
-    ml_dimension_t *ml_dimension;                   // machine learning data about this dimension
+    ml_dimension_t ml_dimension;                    // machine learning data about this dimension
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -595,8 +594,6 @@ struct rrdset {
     DICTIONARY *rrdsetvar_root_index;               // chart variables
     DICTIONARY *rrddimvar_root_index;               // dimension variables
                                                     // we use this dictionary to manage their allocation
-
-    ml_chart_t *ml_chart;
 
     // ------------------------------------------------------------------------
     // operational state members
@@ -1031,7 +1028,7 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // ML handle
-    ml_host_t *ml_host;
+    ml_host_t ml_host;
 
     // ------------------------------------------------------------------------
     // Support for host-level labels
@@ -1304,12 +1301,9 @@ void rrdset_isnot_obsolete(RRDSET *st);
 time_t rrddim_first_entry_t(RRDDIM *rd);
 time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier);
 time_t rrddim_last_entry_t(RRDDIM *rd);
-time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier);
-
-time_t rrdset_first_entry_t(RRDSET *st);
-time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
 time_t rrdset_last_entry_t(RRDSET *st);
-
+time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
+time_t rrdset_first_entry_t(RRDSET *st);
 time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
