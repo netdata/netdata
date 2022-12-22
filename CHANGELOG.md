@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Revert "Refactor ML code and add support for multiple KMeans models. … [\#14172](https://github.com/netdata/netdata/pull/14172) ([vkalintiris](https://github.com/vkalintiris))
+- fix a typo in debian postinst [\#14171](https://github.com/netdata/netdata/pull/14171) ([ilyam8](https://github.com/ilyam8))
+- feat\(packaging\): add netdata to www-data group on Proxmox [\#14168](https://github.com/netdata/netdata/pull/14168) ([ilyam8](https://github.com/ilyam8))
+- minor - fix localhost nodeinstance fnc caps [\#14166](https://github.com/netdata/netdata/pull/14166) ([underhood](https://github.com/underhood))
+- minor - Adds query type "function\[s\]" for aclk chart [\#14165](https://github.com/netdata/netdata/pull/14165) ([underhood](https://github.com/underhood))
 - Fix race on query thread startup [\#14164](https://github.com/netdata/netdata/pull/14164) ([underhood](https://github.com/underhood))
+- Ensure --claim-url for the claim script is a URL [\#14160](https://github.com/netdata/netdata/pull/14160) ([ralphm](https://github.com/ralphm))
 - Finish switch to self-hosted RPM repositories. [\#14158](https://github.com/netdata/netdata/pull/14158) ([Ferroin](https://github.com/Ferroin))
 - fix nodejs app detection [\#14156](https://github.com/netdata/netdata/pull/14156) ([ilyam8](https://github.com/ilyam8))
 - Populate field values in send\_slack\(\) for Mattermost [\#14153](https://github.com/netdata/netdata/pull/14153) ([je2555](https://github.com/je2555))
@@ -347,10 +353,6 @@
 - fix\(cgroups.plugin\): use Docker API for name resolution when Docker is a snap package [\#13523](https://github.com/netdata/netdata/pull/13523) ([ilyam8](https://github.com/ilyam8))
 - remove reference to charts now in netdata monitoring [\#13521](https://github.com/netdata/netdata/pull/13521) ([andrewm4894](https://github.com/andrewm4894))
 - fix\(ci\): fix fetching tags in Build workflow [\#13517](https://github.com/netdata/netdata/pull/13517) ([ilyam8](https://github.com/ilyam8))
-- docs\(postfix\): add a note about `authorized_mailq_users` [\#13515](https://github.com/netdata/netdata/pull/13515) ([ilyam8](https://github.com/ilyam8))
-- Remove extra U from log message [\#13514](https://github.com/netdata/netdata/pull/13514) ([uplime](https://github.com/uplime))
-- Print rrdcontexts versions with PRIu64 [\#13511](https://github.com/netdata/netdata/pull/13511) ([MrZammler](https://github.com/MrZammler))
-- Calculate name hash after rrdvar\_fix\_name [\#13509](https://github.com/netdata/netdata/pull/13509) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
