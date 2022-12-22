@@ -457,6 +457,9 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         sdp->entries++;
         sdp->size += page->assumed_size;
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(sdp->base, page, link.prev, link.next);
+
+        if((sdp->entries % cache->config.max_dirty_pages_per_call) == 0)
+            ll->version++;
     }
     else {
         // HOT and CLEAN pages end up here.
@@ -469,9 +472,9 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
             DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
         else
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
-    }
 
-    ll->version++;
+        ll->version++;
+    }
 
     page_flag_set(page, ll->flags);
 
@@ -529,9 +532,8 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     }
     else {
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ll->base, page, link.prev, link.next);
+        ll->version++;
     }
-
-    ll->version++;
 
     if(!having_lock)
         pgc_ll_unlock(cache, ll);
@@ -1421,6 +1423,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
     bool first = true;
 
     while (have_dirty_lock && (dirty_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
+        struct section_dirty_pages *sdp = *dirty_pages_pptr;
+        if(!all_of_them && sdp->entries < optimal_flush_size)
+            continue;
 
         if(!all_of_them && flushes_so_far > max_flushes) {
             stopped_before_finishing = true;
@@ -1429,8 +1434,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.flush_spins, 1, __ATOMIC_RELAXED);
-
-        struct section_dirty_pages *sdp = *dirty_pages_pptr;
 
         PGC_ENTRY array[optimal_flush_size];
         PGC_PAGE *pages[optimal_flush_size];
@@ -1611,11 +1614,12 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         }
     }
 
-    if(!stopped_before_finishing)
-        cache->dirty.last_version_checked = dirty_version_at_entry;
+    if(have_dirty_lock) {
+        if(!stopped_before_finishing && dirty_version_at_entry > cache->dirty.last_version_checked)
+            cache->dirty.last_version_checked = dirty_version_at_entry;
 
-    if(have_dirty_lock)
         pgc_ll_unlock(cache, &cache->dirty);
+    }
 
     __atomic_sub_fetch(&cache->stats.workers_flush, 1, __ATOMIC_RELAXED);
 
