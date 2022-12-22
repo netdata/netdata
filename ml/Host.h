@@ -3,6 +3,7 @@
 #ifndef ML_HOST_H
 #define ML_HOST_H
 
+#include "Mutex.h"
 #include "Config.h"
 #include "Dimension.h"
 #include "Chart.h"
@@ -15,13 +16,16 @@ namespace ml
 {
 
 class Host {
+
+friend void* train_main(void *);
+friend void *detect_main(void *);
+
 public:
     Host(RRDHOST *RH) :
         RH(RH),
         MLS(),
         TS(),
-        HostAnomalyRate(0.0)
-    { }
+        HostAnomalyRate(0.0) {}
 
     void addChart(Chart *C);
     void removeChart(Chart *C);
@@ -47,11 +51,11 @@ private:
 
     Queue<TrainingRequest> TrainingQueue;
 
-    std::mutex Mutex;
+    Mutex M;
     std::unordered_map<RRDSET *, Chart *> Charts;
 
-    std::thread TrainingThread;
-    std::thread DetectionThread;
+    netdata_thread_t TrainingThread;
+    netdata_thread_t DetectionThread;
 };
 
 } // namespace ml

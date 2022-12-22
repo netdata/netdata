@@ -3,6 +3,7 @@
 #ifndef ML_DIMENSION_H
 #define ML_DIMENSION_H
 
+#include "Mutex.h"
 #include "Stats.h"
 #include "Query.h"
 #include "Config.h"
@@ -188,7 +189,7 @@ public:
 
     std::vector<CalculatedNumber> CNs;
     std::vector<KMeans> Models;
-    std::mutex Mutex;
+    Mutex M;
 };
 
 } // namespace ml

@@ -149,7 +149,7 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
     TrainingResponse TrainingResp = P.second;
 
     if (TrainingResp.Result != TrainingResult::Ok) {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
 
         MT = MetricType::Constant;
 
@@ -182,7 +182,7 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
     KM.train(Samples, Cfg.MaxKMeansIters);
 
     {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
 
         if (Models.size() < Cfg.NumModelsToUse) {
             Models.push_back(std::move(KM));
@@ -270,8 +270,8 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
      * Lock to predict and possibly schedule the dimension for training
     */
 
-    std::unique_lock<std::mutex> Lock(Mutex, std::defer_lock);
-    if (!Lock.try_lock()) {
+    std::unique_lock<Mutex> L(M, std::defer_lock);
+    if (!L.try_lock()) {
         return false;
     }
 
@@ -318,7 +318,7 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
 }
 
 std::vector<KMeans> Dimension::getModels() {
-    std::unique_lock<std::mutex> Lock(Mutex);
+    std::unique_lock<Mutex> L(M);
     return Models;
 }
 

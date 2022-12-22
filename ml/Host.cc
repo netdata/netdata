@@ -10,12 +10,12 @@
 using namespace ml;
 
 void Host::addChart(Chart *C) {
-    std::lock_guard<std::mutex> Lock(Mutex);
+    std::lock_guard<Mutex> L(M);
     Charts[C->getRS()] = C;
 }
 
 void Host::removeChart(Chart *C) {
-    std::lock_guard<std::mutex> Lock(Mutex);
+    std::lock_guard<Mutex> L(M);
     Charts.erase(C->getRS());
 }
 
@@ -46,7 +46,7 @@ void Host::getConfigAsJson(nlohmann::json &Json) const {
 }
 
 void Host::getModelsAsJson(nlohmann::json &Json) {
-    std::lock_guard<std::mutex> Lock(Mutex);
+    std::lock_guard<Mutex> L(M);
 
     for (auto &CP : Charts) {
         Chart *C = CP.second;
@@ -60,7 +60,7 @@ void Host::detectOnce() {
     TrainingStats TSCopy = {};
 
     {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
 
         /*
          * prediction/detection stats
@@ -192,8 +192,6 @@ void Host::scheduleForTraining(TrainingRequest TR) {
 
 void Host::train() {
     while (!netdata_exit) {
-        netdata_thread_disable_cancelability();
-
         auto P = TrainingQueue.pop();
         TrainingRequest TrainingReq = P.first;
         size_t Size = P.second;
@@ -217,7 +215,7 @@ void Host::train() {
             RemainingUT = AllottedUT - ConsumedUT;
 
         {
-            std::lock_guard<std::mutex> Lock(Mutex);
+            std::lock_guard<Mutex> L(M);
 
             if (TS.AllottedUT == 0) {
                 struct rusage TRU;
@@ -251,7 +249,6 @@ void Host::train() {
             }
         }
 
-        netdata_thread_enable_cancelability();
         std::this_thread::sleep_for(std::chrono::microseconds{RemainingUT});
     }
 }
@@ -262,10 +259,7 @@ void Host::detect() {
 
     while (!netdata_exit) {
         heartbeat_next(&HB, RH->rrd_update_every * USEC_PER_SEC);
-
-        netdata_thread_disable_cancelability();
         detectOnce();
-        netdata_thread_enable_cancelability();
     }
 }
 
@@ -277,15 +271,34 @@ void Host::getDetectionInfoAsJson(nlohmann::json &Json) const {
     Json["trained-dimensions"] = MLS.NumTrainingStatusTrained + MLS.NumTrainingStatusPendingWithModel;
 }
 
+void *train_main(void *Arg) {
+    Host *H = reinterpret_cast<Host *>(Arg);
+    H->train();
+    return nullptr;
+}
+
+void *detect_main(void *Arg) {
+    Host *H = reinterpret_cast<Host *>(Arg);
+    H->detect();
+    return nullptr;
+}
+
 void Host::startAnomalyDetectionThreads() {
-    TrainingThread = std::thread(&Host::train, this);
-    DetectionThread = std::thread(&Host::detect, this);
+    char Tag[NETDATA_THREAD_TAG_MAX + 1];
+
+    snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%s]", rrdhost_hostname(RH));
+    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, train_main, static_cast<void *>(this));
+
+    snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "DETECT[%s]", rrdhost_hostname(RH));
+    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, detect_main, static_cast<void *>(this));
 }
 
 void Host::stopAnomalyDetectionThreads() {
-    netdata_thread_cancel(TrainingThread.native_handle());
-    TrainingThread.join();
+    // Signal the training queue to stop popping-items
+    TrainingQueue.signal();
+    netdata_thread_cancel(TrainingThread);
+    netdata_thread_join(TrainingThread, nullptr);
 
-    netdata_thread_cancel(DetectionThread.native_handle());
-    DetectionThread.join();
+    netdata_thread_cancel(DetectionThread);
+    netdata_thread_join(DetectionThread, nullptr);
 }

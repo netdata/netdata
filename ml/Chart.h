@@ -28,17 +28,17 @@ public:
     }
 
     void addDimension(Dimension *D) {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
         Dimensions[D->getRD()] = D;
     }
 
     void removeDimension(Dimension *D) {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
         Dimensions.erase(D->getRD());
     }
 
     void getModelsAsJson(nlohmann::json &Json) {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
 
         for (auto &DP : Dimensions) {
             Dimension *D = DP.second;
@@ -54,7 +54,7 @@ public:
     }
 
     void updateBegin() {
-        Mutex.lock();
+        M.lock();
         MLS = {};
     }
 
@@ -107,11 +107,11 @@ public:
     }
 
     void updateEnd() {
-        Mutex.unlock();
+        M.unlock();
     }
 
     MachineLearningStats getMLS() {
-        std::lock_guard<std::mutex> Lock(Mutex);
+        std::lock_guard<Mutex> L(M);
         return MLS;
     }
 
@@ -119,7 +119,7 @@ private:
     RRDSET *RS;
     MachineLearningStats MLS;
 
-    std::mutex Mutex;
+    Mutex M;
     std::unordered_map<RRDDIM *, Dimension *> Dimensions;
 };
 
