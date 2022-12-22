@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -218,7 +220,7 @@ struct topic_aliases_data {
     c_rhash stoi_dict;
     uint32_t idx_max;
     uint32_t idx_assigned;
-    int used;
+    pthread_rwlock_t rwlock;
 };
 
 struct mqtt_ng_client {
@@ -612,16 +614,31 @@ void transaction_buffer_transaction_rollback(struct transaction_buffer *buf, str
     UNLOCK_HDR_BUFFER(buf);
 }
 
+#define TX_ALIASES_INITIALIZE() c_rhash_new(0)
+#define RX_ALIASES_INITIALIZE() c_rhash_new(UINT16_MAX >> 8)
 struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
 {
     struct mqtt_ng_client *client = mw_calloc(1, sizeof(struct mqtt_ng_client));
     if (client == NULL)
         return NULL;
 
-    if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE)) {
-        mw_free(client);
-        return NULL;
-    }
+    if (transaction_buffer_init(&client->main_buffer, HEADER_BUFFER_SIZE))
+        goto err_free_client;
+
+    client->rx_aliases = RX_ALIASES_INITIALIZE();
+    if (client->rx_aliases == NULL)
+        goto err_free_trx_buf;
+
+    if (pthread_mutex_init(&client->stats_mutex, NULL))
+        goto err_free_rx_alias;
+
+    client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
+    if (client->tx_topic_aliases.stoi_dict == NULL)
+        goto err_free_stats_mutex;
+    client->tx_topic_aliases.idx_max = UINT16_MAX;
+
+    if (pthread_rwlock_init(&client->tx_topic_aliases.rwlock, NULL))
+        goto err_free_tx_alias;
 
     // TODO just embed the struct into mqtt_ng_client
     client->parser.received_data = settings->data_in;
@@ -634,13 +651,19 @@ struct mqtt_ng_client *mqtt_ng_init(struct mqtt_ng_init *settings)
     client->connack_callback = settings->connack_callback;
     client->msg_callback = settings->msg_callback;
 
-    pthread_mutex_init(&client->stats_mutex, NULL);
-    client->tx_topic_aliases.stoi_dict = c_rhash_new(0);
-    client->tx_topic_aliases.idx_max = UINT16_MAX;
-
-    client->rx_aliases = c_rhash_new(UINT16_MAX >> 8);
-
     return client;
+
+err_free_tx_alias:
+    c_rhash_destroy(client->tx_topic_aliases.stoi_dict);
+err_free_stats_mutex:
+    pthread_mutex_destroy(&client->stats_mutex);
+err_free_rx_alias:
+    c_rhash_destroy(client->rx_aliases);
+err_free_trx_buf:
+    transaction_buffer_destroy(&client->main_buffer);
+err_free_client:
+    mw_free(client);
+    return NULL;
 }
 
 static inline uint8_t get_control_packet_type(uint8_t first_hdr_byte)
@@ -648,16 +671,28 @@ static inline uint8_t get_control_packet_type(uint8_t first_hdr_byte)
     return first_hdr_byte >> 4;
 }
 
-static inline void mqtt_ng_destroy_rx_alias_hash(struct mqtt_ng_client *client)
+static void mqtt_ng_destroy_rx_alias_hash(c_rhash hash)
 {
     c_rhash_iter_t i = C_RHASH_ITER_T_INITIALIZER;
     uint64_t stored_key;
     void *to_free;
-    while(!c_rhash_iter_uint64_keys(client->rx_aliases, &i, &stored_key)) {
-        c_rhash_get_ptr_by_uint64(client->rx_aliases, stored_key, &to_free);
+    while(!c_rhash_iter_uint64_keys(hash, &i, &stored_key)) {
+        c_rhash_get_ptr_by_uint64(hash, stored_key, &to_free);
         mw_free(to_free);
     }
-    c_rhash_destroy(client->rx_aliases);
+    c_rhash_destroy(hash);
+}
+
+static void mqtt_ng_destroy_tx_alias_hash(c_rhash hash)
+{
+    c_rhash_iter_t i = C_RHASH_ITER_T_INITIALIZER;
+    const char *stored_key;
+    void *to_free;
+    while(!c_rhash_iter_str_keys(hash, &i, &stored_key)) {
+        c_rhash_get_ptr_by_str(hash, stored_key, &to_free);
+        mw_free(to_free);
+    }
+    c_rhash_destroy(hash);
 }
 
 void mqtt_ng_destroy(struct mqtt_ng_client *client)
@@ -665,9 +700,9 @@ void mqtt_ng_destroy(struct mqtt_ng_client *client)
     transaction_buffer_destroy(&client->main_buffer);
     pthread_mutex_destroy(&client->stats_mutex);
 
-    c_rhash_destroy(client->tx_topic_aliases.stoi_dict);
-
-    mqtt_ng_destroy_rx_alias_hash(client);
+    mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
+    pthread_rwlock_destroy(&client->tx_topic_aliases.rwlock);
+    mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
 
     mw_free(client);
 }
@@ -984,22 +1019,37 @@ int mqtt_ng_connect(struct mqtt_ng_client *client,
 
     LOCK_HDR_BUFFER(&client->main_buffer);
     client->main_buffer.sending_frag = NULL;
-
     if (clean_start)
         buffer_purge(&client->main_buffer.hdr_buffer);
-
     UNLOCK_HDR_BUFFER(&client->main_buffer);
 
-    client->connect_msg = mqtt_ng_generate_connect(&client->main_buffer, client->log, auth, lwt, clean_start, keep_alive);
-    if (client->connect_msg == NULL) {
+    pthread_rwlock_wrlock(&client->tx_topic_aliases.rwlock);
+    // according to MQTT spec topic aliases should not be persisted
+    // even if clean session is true
+    mqtt_ng_destroy_tx_alias_hash(client->tx_topic_aliases.stoi_dict);
+    client->tx_topic_aliases.stoi_dict = TX_ALIASES_INITIALIZE();
+    if (client->tx_topic_aliases.stoi_dict == NULL) {
+        pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
         return 1;
     }
+    client->tx_topic_aliases.idx_assigned = 0;
+    pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
+
+    mqtt_ng_destroy_rx_alias_hash(client->rx_aliases);
+    client->rx_aliases = RX_ALIASES_INITIALIZE();
+    if (client->rx_aliases == NULL)
+        return 1;
+
+    client->connect_msg = mqtt_ng_generate_connect(&client->main_buffer, client->log, auth, lwt, clean_start, keep_alive);
+    if (client->connect_msg == NULL)
+        return 1;
 
     pthread_mutex_lock(&client->stats_mutex);
     if (clean_start)
-        client->stats.tx_messages_queued++;
-    else
         client->stats.tx_messages_queued = 1;
+    else
+        client->stats.tx_messages_queued++;
+
     client->stats.tx_messages_sent = 0;
     client->stats.rx_messages_rcvd = 0;
     pthread_mutex_unlock(&client->stats_mutex);
@@ -1117,13 +1167,16 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
                     uint16_t *packet_id)
 {
     struct topic_alias_data *alias = NULL;
+    pthread_rwlock_rdlock(&client->tx_topic_aliases.rwlock);
     c_rhash_get_ptr_by_str(client->tx_topic_aliases.stoi_dict, topic, (void**)&alias);
+    pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
 
     uint16_t topic_id = 0;
 
     if (alias != NULL) {
         topic_id = alias->idx;
-        if (alias->usage_count++) {
+        uint32_t cnt = __atomic_fetch_add(&alias->usage_count, 1, __ATOMIC_SEQ_CST);
+        if (cnt) {
             topic = NULL;
             topic_free = NULL;
         }
@@ -2133,15 +2186,32 @@ void mqtt_ng_get_stats(struct mqtt_ng_client *client, struct mqtt_ng_stats *stat
 
 int mqtt_ng_set_topic_alias(struct mqtt_ng_client *client, const char *topic)
 {
+    uint16_t idx;
+    pthread_rwlock_wrlock(&client->tx_topic_aliases.rwlock);
+
     if (client->tx_topic_aliases.idx_assigned >= client->tx_topic_aliases.idx_max) {
+        pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
         mws_error(client->log, "Tx topic alias indexes were exhausted (current version of the library doesn't support reassigning yet. Feel free to contribute.");
         return 0; //0 is not a valid topic alias
     }
-    struct topic_alias_data *alias = mw_malloc(sizeof(struct topic_alias_data));
-    alias->idx = ++client->tx_topic_aliases.idx_assigned;
-    alias->usage_count = 0;
+
+    struct topic_alias_data *alias;
+    if (!c_rhash_get_ptr_by_str(client->tx_topic_aliases.stoi_dict, topic, (void**)&alias)) {
+        // this is not a problem for library but might be helpful to warn user
+        // as it might indicate bug in their program (but also might be expected)
+        idx = alias->idx;
+        pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
+        mws_debug(client->log, "%s topic \"%s\" already has alias set. Ignoring.", __FUNCTION__, topic);
+        return idx;
+    }
+
+    alias = mw_malloc(sizeof(struct topic_alias_data));
+    idx = ++client->tx_topic_aliases.idx_assigned;
+    alias->idx = idx;
+    __atomic_store_n(&alias->usage_count, 0, __ATOMIC_SEQ_CST);
 
     c_rhash_insert_str_ptr(client->tx_topic_aliases.stoi_dict, topic, (void*)alias);
 
-    return alias->idx;
+    pthread_rwlock_unlock(&client->tx_topic_aliases.rwlock);
+    return idx;
 }
