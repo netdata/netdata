@@ -286,8 +286,8 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_page_alloc(struct rrdengine_instance *ctx) {
-    void *page = mallocz(tier_page_size[ctx->tier]);
+void *dbengine_page_alloc(struct rrdengine_instance *ctx __maybe_unused, size_t size) {
+    void *page = mallocz(size);
     return page;
 }
 

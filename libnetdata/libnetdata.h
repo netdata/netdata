@@ -510,6 +510,24 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
     return JudyLNext(PArray, PIndex, PJE0);
 }
 
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+    size_t total = 0;
+
+    total += (ptr & 0xff) >> 0;
+    total += (ptr & 0xff00) >> 8;
+    total += (ptr & 0xff0000) >> 16;
+    total += (ptr & 0xff000000) >> 24;
+
+    if(sizeof(Word_t) > 4) {
+        total += (ptr & 0xff00000000) >> 32;
+        total += (ptr & 0xff0000000000) >> 40;
+        total += (ptr & 0xff000000000000) >> 48;
+        total += (ptr & 0xff00000000000000) >> 56;
+    }
+
+    return (total % modulo);
+}
+
 # ifdef __cplusplus
 }
 # endif

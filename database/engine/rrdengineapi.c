@@ -268,7 +268,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
                    "DBENGINE: the collection handle update every and the metric registry update every are not the same");
 }
 
-static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle, struct rrdengine_instance *ctx, usec_t point_in_time_ut, void *data) {
+static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle, struct rrdengine_instance *ctx, usec_t point_in_time_ut, void *data, size_t data_size) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
@@ -277,7 +277,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .metric_id = mrg_metric_id(main_mrg, handle->metric),
             .start_time_t = point_in_time_s,
             .end_time_t = point_in_time_s,
-            .size = tier_page_size[ctx->tier],
+            .size = data_size,
             .data = data,
             .update_every = update_every_s,
             .hot = true
@@ -298,11 +298,42 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         handle->page_entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
     }
     else
-        handle->page_entries_max = tier_page_size[ctx->tier] / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        handle->page_entries_max = data_size / PAGE_POINT_CTX_SIZE_BYTES(ctx);
 
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
     handle->page = page;
+}
+
+static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size) {
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    size_t size;
+
+    if(handle->options & RRDENG_FIRST_PAGE_ALLOCATED) {
+        // any page except the first
+        size = tier_page_size[ctx->tier];
+    }
+    else {
+        // the first page
+        handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
+        size_t max_size = tier_page_size[ctx->tier];
+        size_t max_slots = max_size / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        size_t min_slots = max_slots / 4;
+        size_t distribution = max_slots - min_slots;
+        size_t this_page_slots = indexing_partition((Word_t)handle->alignment, distribution);
+        size_t final_slots = min_slots + this_page_slots;
+
+        if(final_slots > max_slots)
+            final_slots = max_slots;
+
+        if(final_slots < min_slots)
+            final_slots = min_slots;
+
+        size = final_slots * PAGE_POINT_CTX_SIZE_BYTES(ctx);
+    }
+
+    *data_size = size;
+    return dbengine_page_alloc(ctx, size);
 }
 
 static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection_handle,
@@ -319,6 +350,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
 
     bool perfect_page_alignment = false;
     void *data;
+    size_t data_size;
 
     if(likely(handle->page)) {
         /* Make alignment decisions */
@@ -337,13 +369,16 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
             handle->options &= ~RRDENG_CHO_UNALIGNED;
 
             rrdeng_store_metric_flush_current_page(collection_handle);
-            data = dbengine_page_alloc(ctx);
+
+            data = rrdeng_alloc_new_metric_data(handle, &data_size);
         }
-        else
+        else {
             data = pgc_page_data(handle->page);
+            data_size = pgc_page_data_size(main_cache, handle->page);
+        }
     }
     else
-        data = dbengine_page_alloc(ctx);
+        data = rrdeng_alloc_new_metric_data(handle, &data_size);
 
     switch (ctx->page_type) {
         case PAGE_METRICS: {
@@ -375,7 +410,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
     }
 
     if(unlikely(!handle->page)){
-        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data);
+        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);
         // handle->position is set to 1 already
 
         if (0 == handle->alignment->page_position) {

@@ -205,28 +205,15 @@ static inline void pointer_del(PGC *cache __maybe_unused, PGC_PAGE *page __maybe
 // ----------------------------------------------------------------------------
 // locking
 
-static size_t indexing_partition(PGC *cache, Word_t metric_id) {
+static size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
     static __thread Word_t last_metric_id = 0;
     static __thread size_t last_partition = 0;
 
     if(metric_id == last_metric_id || cache->config.partitions == 1)
         return last_partition;
 
-    size_t total = 0;
-    total += (metric_id & 0xff) >> 0;
-    total += (metric_id & 0xff00) >> 8;
-    total += (metric_id & 0xff0000) >> 16;
-    total += (metric_id & 0xff000000) >> 24;
-
-    if(sizeof(Word_t) > 4) {
-        total += (metric_id & 0xff00000000) >> 32;
-        total += (metric_id & 0xff0000000000) >> 40;
-        total += (metric_id & 0xff000000000000) >> 48;
-        total += (metric_id & 0xff00000000000000) >> 56;
-    }
-
     last_metric_id = metric_id;
-    last_partition = total % cache->config.partitions;
+    last_partition = indexing_partition(metric_id, cache->config.partitions);
 
     return last_partition;
 }
@@ -851,7 +838,7 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
     internal_fatal(!page_flag_check(page, PGC_PAGE_IS_BEING_DELETED),
                    "DBENGINE CACHE: page to be removed from the index, is not marked for deletion");
 
-    internal_fatal(partition != indexing_partition(cache, page->metric_id),
+    internal_fatal(partition != pgc_indexing_partition(cache, page->metric_id),
                    "DBENGINE CACHE: attempted to remove this page from the wrong partition of the cache");
 
     Pvoid_t *metrics_judy_pptr = JudyLGet(cache->index[partition].sections_judy, page->section, PJE0);
@@ -917,7 +904,7 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
     pgc_ll_unlock(cache, &cache->clean);
     page_transition_unlock(cache, page);
 
-    size_t partition = indexing_partition(cache, page->metric_id);
+    size_t partition = pgc_indexing_partition(cache, page->metric_id);
     pgc_index_write_lock(cache, partition);
     remove_this_page_from_index_unsafe(cache, page, partition);
     pgc_index_write_unlock(cache, partition);
@@ -948,7 +935,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         max_evict = SIZE_MAX;
 
     PGC_PAGE *to_evict[cache->config.partitions];
-    size_t pages_to_evict, pages_to_evict_size;
+    size_t pages_to_evict = 0, pages_to_evict_size; // per round/spin
     size_t pages_removed_from_index;
     size_t pages_freed;
     size_t total_pages_evicted = 0;
@@ -958,9 +945,25 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t spins = 0;
     size_t pages_to_evict_per_run = (max_evict == SIZE_MAX || max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
 
+    size_t spins_without_pages_to_evict = 0;      // complete scans without any evictions
+    PGC_PAGE *last_page_we_couldnt_delete = NULL; // remember where we left it at the last round
     do {
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
+
+        if(last_page_we_couldnt_delete && !pages_to_evict) {
+            // we did a complete scan of all clean pages,
+            // and we still need to evict more
+            // so do 1 more round only
+
+            page_release(cache, last_page_we_couldnt_delete, false);
+            last_page_we_couldnt_delete = NULL;
+
+            if(spins_without_pages_to_evict > 0)
+                break;
+
+            spins_without_pages_to_evict++;
+        }
 
         last_run_pages_skipped = 0;
 
@@ -993,13 +996,21 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             pgc_ll_lock(cache, &cache->clean);
 
         PGC_PAGE *next = NULL;
-        for(PGC_PAGE *page = cache->clean.base; page ; page = next) {
+        for(PGC_PAGE *page = (last_page_we_couldnt_delete) ? last_page_we_couldnt_delete : cache->clean.base; page ; page = next) {
             next = page->link.next;
 
             if(unlikely(filter && !filter(page, data)))
                 continue;
 
-            if(non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page)) {
+            bool got_page_for_deletion;
+            if(unlikely(page == last_page_we_couldnt_delete)) {
+                got_page_for_deletion = acquired_page_get_for_deletion_or_release_it(cache, page);
+                last_page_we_couldnt_delete = NULL;
+            }
+            else
+                got_page_for_deletion = non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page);
+
+            if(got_page_for_deletion) {
                 // we can delete this page
 
                 // remove it from the clean list
@@ -1009,7 +1020,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
 
                 // append it to our eviction list
-                size_t partition = indexing_partition(cache, page->metric_id);
+                size_t partition = pgc_indexing_partition(cache, page->metric_id);
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(to_evict[partition], page, link.prev, link.next);
 
                 pages_to_evict++;
@@ -1027,6 +1038,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             }
             else {
                 // we can't delete this page
+
+                if(page_acquire(cache, page)) {
+                    if(last_page_we_couldnt_delete)
+                        page_release(cache, last_page_we_couldnt_delete, false);
+
+                    last_page_we_couldnt_delete = page;
+                }
 
                 last_run_pages_skipped++;
 
@@ -1102,7 +1120,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                            pages_to_evict, pages_removed_from_index, pages_freed);
         }
 
-    } while(pages_to_evict && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while((pages_to_evict || last_page_we_couldnt_delete) && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && last_run_pages_skipped) {
         error_limit_static_global_var(erl, 1, 0);
@@ -1117,6 +1135,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     }
 
 premature_exit:
+    if(last_page_we_couldnt_delete)
+        page_release(cache, last_page_we_couldnt_delete, false);
+
     if(unlikely(total_pages_skipped))
         __atomic_add_fetch(&cache->stats.evict_skipped, total_pages_skipped, __ATOMIC_RELAXED);
 
@@ -1135,7 +1156,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.insert_spins, 1, __ATOMIC_RELAXED);
 
-        size_t partition = indexing_partition(cache, entry->metric_id);
+        size_t partition = pgc_indexing_partition(cache, entry->metric_id);
         pgc_index_write_lock(cache, partition);
 
         size_t mem_before_judyl = 0, mem_after_judyl = 0;
@@ -1257,7 +1278,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
     }
 
     PGC_PAGE *page = NULL;
-    size_t partition = indexing_partition(cache, metric_id);
+    size_t partition = pgc_indexing_partition(cache, metric_id);
 
     pgc_index_read_lock(cache, partition);
 
