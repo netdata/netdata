@@ -1089,6 +1089,11 @@ if [ "$(id -u)" -eq 0 ]; then
     # shellcheck disable=SC2086
     portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
   done
+  # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/* 
+  # for reading VMs/containers names, CPU and memory limits on Proxmox.
+  if [ -d "/etc/pve" ]; then
+    portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
+  fi
 else
   run_failed "The installer does not run as root. Nothing to do for user and groups"
 fi

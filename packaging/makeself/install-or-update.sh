@@ -121,6 +121,11 @@ if portable_add_group netdata; then
         run_failed "Failed to add netdata user to secondary groups"
       fi
     done
+    # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/*
+    # for reading VMs/containers names, CPU and memory limits on Proxmox.
+    if [ -d "/etc/pve" ]; then
+      portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
+    fi
     NETDATA_USER="netdata"
     NETDATA_GROUP="netdata"
   else
