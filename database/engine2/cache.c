@@ -2043,6 +2043,17 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafil
     evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
 }
 
+size_t pgc_count_pages_having_data_ptr(PGC *cache, void *ptr) {
+    size_t found = 0;
+    pgc_ll_lock(cache, &cache->clean);
+
+    for(PGC_PAGE *page = cache->clean.base; page ;page = page->link.next)
+        found += (page->data == ptr) ? 1 : 0;
+
+    pgc_ll_unlock(cache, &cache->clean);
+    return found;
+}
+
 // ----------------------------------------------------------------------------
 // unittest
 
