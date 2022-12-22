@@ -731,7 +731,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
                 datafile,
                 xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
 
-        pgc_page_release(main_cache, (PGC_PAGE *) descr->page);
+        freez(descr->page);
         freez(descr);
     }
 
@@ -833,7 +833,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     }
     for (i = 0 ; i < count ; ++i) {
         descr = xt_io_descr->descr_array[i];
-        (void) memcpy(xt_io_descr->buf + pos, pgc_page_data(descr->page), descr->page_length);
+        (void) memcpy(xt_io_descr->buf + pos, descr->page, descr->page_length);
         pos += descr->page_length;
     }
 

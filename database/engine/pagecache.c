@@ -45,7 +45,8 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
             error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
-        descr->page = pgc_page_dup(main_cache, pages_array[Index]);
+        descr->page = mallocz(descr->page_length);
+        memcpy(descr->page, pgc_page_data(pages_array[Index]), descr->page_length);
         PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
         fatal_assert( NULL != PValue);
         *PValue = descr;
