@@ -3236,12 +3236,17 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
  *
  * @param out a pointer to the link list.
  * @param in the structure that will be linked.
+ * @param table the modified table.
  */
-void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
+void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
 {
 #ifndef NETDATA_INTERNAL_CHECKS
     UNUSED(table);
 #endif
+    if (in->ver == AF_INET) { // It is simpler to compare using host order
+        in->first.addr32[0] = ntohl(in->first.addr32[0]);
+        in->last.addr32[0] = ntohl(in->last.addr32[0]);
+    }
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
@@ -3262,14 +3267,12 @@ void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_li
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    char first[512], last[512];
+    char first[256], last[512];
     if (in->ver == AF_INET) {
-        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
-            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
-                 first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
-                 table);
+        info("Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
+             in->value, in->first.addr32[0], in->last.addr32[0],
+             (*out == network_viewer_opt.included_ips)?"included":"excluded",
+             table);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
@@ -3445,7 +3448,7 @@ storethisip:
     memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
-    fill_ip_list(list, store, "socket");
+    ebpf_fill_ip_list(list, store, "socket");
     return;
 
 cleanipdup:

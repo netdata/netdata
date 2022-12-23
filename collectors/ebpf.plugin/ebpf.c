@@ -1317,7 +1317,7 @@ static void read_local_addresses()
             }
         }
 
-        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
+        ebpf_fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
                      w,
                      "selector");
     }
