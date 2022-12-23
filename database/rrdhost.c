@@ -645,7 +645,6 @@ static void rrdhost_update(RRDHOST *host
         host->rrdpush_seconds_to_replicate = rrdpush_seconds_to_replicate;
         host->rrdpush_replication_step = rrdpush_replication_step;
 
-        rrd_hosts_available++;
         ml_new_host(host);
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
