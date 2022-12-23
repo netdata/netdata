@@ -29,6 +29,8 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
 
     datafile->users.spinlock = NETDATA_SPINLOCK_INITIALIZER;
     datafile->users.lockers = 0;
+    datafile->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE] = 0;
+    datafile->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS] = 0;
     datafile->users.available = true;
     datafile->users.time_to_evict = 0;
 
