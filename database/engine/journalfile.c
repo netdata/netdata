@@ -4,23 +4,29 @@
 
 // DBENGINE2: Helper
 
-void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *uuid, time_t last_time)
-{
-    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
-    if (!metric)
-        return;
-
-    if(!mrg_metric_get_first_time_t(main_mrg, metric))
-        mrg_metric_set_first_time_t(main_mrg, metric, last_time);
-
-    mrg_metric_set_clean_latest_time_t(main_mrg, metric, last_time);
-}
-
 static void update_metric_retention_and_granularity_by_uuid(
         struct rrdengine_instance *ctx, uuid_t *uuid,
                 time_t first_time, time_t last_time,
-                time_t update_every)
+                time_t update_every, time_t now_s)
 {
+    if(first_time > last_time ||
+        last_time == 0 ||
+        first_time > now_s) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: invalid on-disk timestamps (%ld - %ld, now %ld), "
+                          "ignoring values",
+                          first_time, last_time, now_s);
+        return;
+    }
+
+    if(last_time > now_s) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE: future on-disk timestamps (%ld - %ld, now %ld), "
+                          "fixing last time to now",
+                          first_time, last_time, now_s);
+        last_time = now_s;
+    }
+
     MRG_ENTRY entry = {
             .section = (Word_t)ctx,
             .first_time_t = first_time,
@@ -820,12 +826,13 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     time_t header_start_time_t  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
+    time_t now_s = now_realtime_sec();
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_t + metric->delta_start;
         time_t end_time_s = header_start_time_t + metric->delta_end;
         time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
         update_metric_retention_and_granularity_by_uuid(
-                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s);
+                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
 
 #ifdef NETDATA_INTERNAL_CHECKS
         struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);

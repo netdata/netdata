@@ -371,8 +371,6 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
-
-
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC),
@@ -385,6 +383,9 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
 
     bool is_valid = true;
+
+    // another such set of checks exists in
+    // update_metric_retention_and_granularity_by_uuid()
 
     if( have_read_error                                         ||
         vd.page_length == 0                                     ||

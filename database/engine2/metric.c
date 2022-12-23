@@ -220,6 +220,10 @@ void mrg_destroy(MRG *mrg __maybe_unused) {
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
     // FIXME - support refcounting
+
+//    internal_fatal(entry.latest_time_t > now_realtime_sec(),
+//        "DBENGINE METRIC: metric latest time is in the future");
+
     return metric_add(mrg, &entry, ret);
 }
 
@@ -256,6 +260,9 @@ Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_first_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
+//    internal_fatal(first_time_t > now_realtime_sec(),
+//                   "DBENGINE METRIC: metric first time is in the future");
+
     netdata_spinlock_lock(&metric->timestamps_lock);
     metric->first_time_t = first_time_t;
     netdata_spinlock_unlock(&metric->timestamps_lock);
@@ -302,6 +309,9 @@ time_t mrg_metric_get_first_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
 bool mrg_metric_set_clean_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
+//    internal_fatal(latest_time_t > now_realtime_sec(),
+//                   "DBENGINE METRIC: metric latest time is in the future");
+
     internal_fatal(metric->latest_time_t_clean > latest_time_t,
                    "DBENGINE METRIC: metric new clean latest time is older than the previous one");
 
@@ -318,6 +328,9 @@ bool mrg_metric_set_clean_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric,
 }
 
 bool mrg_metric_set_hot_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
+//    internal_fatal(latest_time_t > now_realtime_sec(),
+//                   "DBENGINE METRIC: metric latest time is in the future");
+
     netdata_spinlock_lock(&metric->timestamps_lock);
     metric->latest_time_t_hot = latest_time_t;
 
