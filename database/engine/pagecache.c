@@ -124,7 +124,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
 
     size_t pages_found_in_cache = 0;
-    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t current_start_time_s = wanted_start_time_s;
@@ -428,7 +427,6 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     }
 
     Word_t metric_id = pgc_page_metric(page);
-    METRIC *metric = (METRIC *)pgc_page_metric(page);
 
     // let's add it to the judy
     struct extent_io_data *ei = pgc_page_custom_data(open_cache, page);
