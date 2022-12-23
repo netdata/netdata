@@ -550,6 +550,8 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
  */
 void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
 {
+    netdata_thread_disable_cancelability();
+
     METRIC *metric = (METRIC *)db_metric_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
     struct rrdeng_query_handle *handle;
@@ -777,6 +779,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
 
     freez(handle);
     rrdimm_handle->handle = NULL;
+    netdata_thread_enable_cancelability();
 }
 
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
