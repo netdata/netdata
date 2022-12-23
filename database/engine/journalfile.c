@@ -13,7 +13,7 @@ void update_metric_latest_time_by_uuid(struct rrdengine_instance *ctx, uuid_t *u
     if(!mrg_metric_get_first_time_t(main_mrg, metric))
         mrg_metric_set_first_time_t(main_mrg, metric, last_time);
 
-    mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
+    mrg_metric_set_clean_latest_time_t(main_mrg, metric, last_time);
 }
 
 static void update_metric_retention_and_granularity_by_uuid(
@@ -43,7 +43,7 @@ static void update_metric_retention_and_granularity_by_uuid(
             if(update_every)
                 mrg_metric_set_update_every(main_mrg, metric, update_every);
 
-            mrg_metric_set_latest_time_t(main_mrg, metric, last_time);
+            mrg_metric_set_clean_latest_time_t(main_mrg, metric, last_time);
         }
     }
 
@@ -458,7 +458,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
                 if(vd.update_every_s)
                     mrg_metric_set_update_every(main_mrg, metric, vd.update_every_s);
 
-                mrg_metric_set_latest_time_t(main_mrg, metric, vd.end_time_s);
+                mrg_metric_set_clean_latest_time_t(main_mrg, metric, vd.end_time_s);
             }
         }
         mrg_metric_release(main_mrg, metric);

@@ -4,13 +4,13 @@ typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
 struct metric {
-    uuid_t uuid;
-    Word_t section;
-    time_t first_time_t;
-    time_t latest_time_t;           // the max of clean and hot latest time
+    uuid_t uuid;                    // never changes
+    Word_t section;                 // never changes
+    time_t first_time_t;            //
     time_t latest_time_t_clean;     // archived pages latest time
     time_t latest_time_t_hot;       // currently collected page latest time
-    uint32_t latest_update_every;
+    uint32_t latest_update_every;   //
+    SPINLOCK timestamps_lock;       // protects the 3 timestamps
 };
 
 struct mrg {
@@ -70,24 +70,6 @@ static void mrg_index_write_lock(MRG *mrg) {
 }
 static void mrg_index_write_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
-}
-
-static inline void atomic_set_max_latest_time_t(METRIC *metric) {
-    time_t expected, desired;
-
-    expected = __atomic_load_n(&metric->latest_time_t, __ATOMIC_RELAXED);
-
-    do {
-
-        time_t clean = __atomic_load_n(&metric->latest_time_t_clean, __ATOMIC_RELAXED);
-        time_t hot   = __atomic_load_n(&metric->latest_time_t_hot,   __ATOMIC_RELAXED);
-        desired = MAX(clean, hot);
-
-        if(expected == desired)
-            return;
-
-    } while(!__atomic_compare_exchange_n(&metric->latest_time_t, &expected, desired,
-                                         false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
 static bool metric_validate(MRG *mrg __maybe_unused, METRIC *metric __maybe_unused, bool having_lock __maybe_unused) {
@@ -330,7 +312,6 @@ void mrg_metric_release(MRG *mrg, METRIC *metric) {
 
 }
 
-
 Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
@@ -356,23 +337,66 @@ bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t) 
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    __atomic_store_n(&metric->first_time_t, first_time_t, __ATOMIC_RELEASE);
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    metric->first_time_t = first_time_t;
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
     return true;
+}
+
+bool mrg_metric_set_first_time_t_if_zero(MRG *mrg, METRIC *metric, time_t first_time_t) {
+    if(unlikely(!metric_validate(mrg, metric, false)))
+        return false;
+
+    bool ret = false;
+
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    if(!metric->first_time_t) {
+        metric->first_time_t = first_time_t;
+
+        if(unlikely(metric->latest_time_t_clean < metric->first_time_t))
+            metric->latest_time_t_clean = metric->first_time_t;
+
+        if(unlikely(metric->latest_time_t_hot < metric->first_time_t))
+            metric->latest_time_t_hot = metric->first_time_t;
+
+        ret = true;
+    }
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
+    return ret;
 }
 
 time_t mrg_metric_get_first_time_t(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
-    return __atomic_load_n(&metric->first_time_t, __ATOMIC_ACQUIRE);
+    time_t first_time_t;
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    first_time_t = metric->first_time_t;
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
+    return first_time_t;
 }
 
-bool mrg_metric_set_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
+bool mrg_metric_set_clean_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    __atomic_store_n(&metric->latest_time_t_clean, latest_time_t, __ATOMIC_RELEASE);
-    atomic_set_max_latest_time_t(metric);
+    netdata_spinlock_lock(&metric->timestamps_lock);
+
+    internal_fatal(metric->latest_time_t_clean > latest_time_t,
+                   "DBENGINE METRIC: metric new clean latest time is older than the previous one");
+
+    metric->latest_time_t_clean = latest_time_t;
+
+    if(unlikely(!metric->first_time_t))
+        metric->first_time_t = latest_time_t;
+
+    if(unlikely(metric->first_time_t > latest_time_t))
+        metric->first_time_t = latest_time_t;
+
+    netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
 }
 
@@ -380,8 +404,16 @@ bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_ti
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    __atomic_store_n(&metric->latest_time_t_hot, latest_time_t, __ATOMIC_RELEASE);
-    atomic_set_max_latest_time_t(metric);
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    metric->latest_time_t_hot = latest_time_t;
+
+    if(unlikely(!metric->first_time_t))
+        metric->first_time_t = latest_time_t;
+
+    if(unlikely(metric->first_time_t > latest_time_t))
+        metric->first_time_t = latest_time_t;
+
+    netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
 }
 
@@ -389,8 +421,11 @@ time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
     if(unlikely(!metric_validate(mrg, metric, false)))
         return 0;
 
-    atomic_set_max_latest_time_t(metric);
-    return __atomic_load_n(&metric->latest_time_t, __ATOMIC_ACQUIRE);
+    time_t max;
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    max = MAX(metric->latest_time_t_clean, metric->latest_time_t_hot);
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+    return max;
 }
 
 bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) {
@@ -405,20 +440,9 @@ bool mrg_metric_set_update_every_if_zero(MRG *mrg, METRIC *metric, time_t update
     if(unlikely(!metric_validate(mrg, metric, false)))
         return false;
 
-    uint32_t expected, desired;
-
-    expected = __atomic_load_n(&metric->latest_update_every, __ATOMIC_RELAXED);
-    desired = update_every;
-
-    do {
-
-        if(expected != 0)
-            return false;
-
-    } while(!__atomic_compare_exchange_n(&metric->latest_update_every, &expected, desired,
-                                       false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
-
-    return true;
+    uint32_t expected = 0;
+    return __atomic_compare_exchange_n(&metric->latest_update_every, &expected, update_every,
+                                        false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
 }
 
 time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric) {
@@ -490,7 +514,7 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
 
             if(!mrg_metric_set_first_time_t(mrg, array[i][section], (time_t)(i * 2)))
                 fatal("DBENGINE METRIC: cannot set first time");
-            if(!mrg_metric_set_latest_time_t(mrg, array[i][section], (time_t)(i * 3)))
+            if(!mrg_metric_set_clean_latest_time_t(mrg, array[i][section], (time_t) (i * 3)))
                 fatal("DBENGINE METRIC: cannot set latest time");
             if(!mrg_metric_set_update_every(mrg, array[i][section], (time_t)(i * 4)))
                 fatal("DBENGINE METRIC: cannot set update every");
@@ -518,7 +542,7 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
                 fatal("DBENGINE METRIC: got updated every on deleted metric");
             if(mrg_metric_set_first_time_t(mrg, array[i][section], 1))
                 fatal("DBENGINE METRIC: set first time on deleted metric");
-            if(mrg_metric_set_latest_time_t(mrg, array[i][section], 1))
+            if(mrg_metric_set_clean_latest_time_t(mrg, array[i][section], 1))
                 fatal("DBENGINE METRIC: set latest time on deleted metric");
             if(mrg_metric_set_update_every(mrg, array[i][section], 1))
                 fatal("DBENGINE METRIC: set update every on deleted metric");

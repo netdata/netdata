@@ -1734,8 +1734,11 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page) {
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
     __atomic_add_fetch(&cache->stats.workers_hot2dirty, 1, __ATOMIC_RELAXED);
 
-    if(!is_page_hot(page))
-        fatal("DBENGINE CACHE: called %s() but page is not hot", __FUNCTION__ );
+#ifdef NETDATA_INTERNAL_CHECKS
+    page_transition_lock(cache, page);
+    internal_fatal(!is_page_hot(page), "DBENGINE CACHE: called %s() but page is not hot", __FUNCTION__ );
+    page_transition_unlock(cache, page);
+#endif
 
     // make page dirty
     page_set_dirty(cache, page, false);

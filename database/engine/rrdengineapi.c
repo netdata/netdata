@@ -186,9 +186,6 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
 
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
-    if(!mrg_metric_get_first_time_t(main_mrg, metric))
-        handle->options |= RRDENG_CHO_SET_FIRST_TIME_T;
-
     handle->alignment = (struct pg_alignment *)smg;
     rrdeng_page_alignment_acquire(handle->alignment);
 
@@ -237,28 +234,15 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     if (unlikely(!handle->page))
         return;
 
-    if (likely(handle->page_position)) {
-        int page_is_empty;
-
-        page_is_empty = page_has_only_empty_metrics(handle);
-        if (page_is_empty) {
-            if (pgc_is_page_hot(handle->page)) {
-                mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
-                pgc_page_to_clean_evict_or_release(main_cache, handle->page);
-            }
-        }
-        else {
-            if (pgc_is_page_hot(handle->page)) {
-                mrg_metric_set_latest_time_t(main_mrg, handle->metric, pgc_page_end_time_t(handle->page));
-                pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
-                mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
-            }
-        }
-    }
-    else {
-        mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
+    if(!handle->page_position || page_has_only_empty_metrics(handle))
         pgc_page_to_clean_evict_or_release(main_cache, handle->page);
+
+    else {
+        mrg_metric_set_clean_latest_time_t(main_mrg, handle->metric, pgc_page_end_time_t(handle->page));
+        pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
     }
+
+    mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, 0);
 
     handle->page = NULL;
     handle->page_position = 0;
@@ -441,12 +425,6 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
         handle->alignment->page_position = handle->page_position;
 
     // update the metric information
-
-    if(unlikely(handle->options & RRDENG_CHO_SET_FIRST_TIME_T)) {
-        handle->options &= ~RRDENG_CHO_SET_FIRST_TIME_T;
-        mrg_metric_set_first_time_t(main_mrg, handle->metric, (time_t)(point_in_time_ut / USEC_PER_SEC));
-    }
-
     mrg_metric_set_hot_latest_time_t(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
 }
 
