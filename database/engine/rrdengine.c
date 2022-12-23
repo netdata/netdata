@@ -161,7 +161,7 @@ static void pdc_acquire(PDC *pdc) {
     netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount < 1)
-        fatal("PDC is not referenced and cannot be acquired");
+        fatal("DBENGINE: pdc is not referenced and cannot be acquired");
 
     pdc->refcount++;
     netdata_spinlock_unlock(&pdc->refcount_spinlock);
@@ -171,7 +171,7 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
     netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount <= 0)
-        fatal("PDC is not referenced and cannot be released");
+        fatal("DBENGINE: pdc is not referenced and cannot be released");
 
     pdc->refcount--;
 
@@ -726,7 +726,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     if (req->result < 0) {
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
-        error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     }
     datafile = xt_io_descr->datafile;
 
@@ -815,7 +815,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     }
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
     memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
@@ -912,27 +912,27 @@ static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
     journalfile_bytes = journalfile->pos;
     deleted_bytes = GET_JOURNAL_DATA_SIZE(journalfile);
 
-    info("Deleting data and journal files");
+    info("DBENGINE: deleting data and journal files to maintain disk quota");
     datafile_list_delete_unsafe(ctx, datafile);
     ret = destroy_journal_file_unsafe(journalfile, datafile);
     if (!ret) {
         generate_journalfilepath(datafile, path, sizeof(path));
-        info("Deleted journal file \"%s\".", path);
+        info("DBENGINE: deleted journal file \"%s\".", path);
         generate_journalfilepath_v2(datafile, path, sizeof(path));
-        info("Deleted journal file \"%s\".", path);
+        info("DBENGINE: deleted journal file \"%s\".", path);
         deleted_bytes += journalfile_bytes;
     }
     ret = destroy_data_file_unsafe(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
-        info("Deleted data file \"%s\".", path);
+        info("DBENGINE: deleted data file \"%s\".", path);
         deleted_bytes += datafile_bytes;
     }
     freez(journalfile);
     freez(datafile);
 
     ctx->disk_space -= deleted_bytes;
-    info("Reclaimed %u bytes of disk space.", deleted_bytes);
+    info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
     uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     rrdcontext_db_rotation();
@@ -1012,7 +1012,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             open_cache_count++;
         }
     }
-    info("Processed %u journalfiles and matched %u metrics in v2 files and %u in open cache", journalfile_count,
+    info("DBENGINE: processed %u journalfiles and matched %u metrics in v2 files and %u in open cache", journalfile_count,
         v2_count, open_cache_count);
 }
 
@@ -1055,24 +1055,24 @@ static void delete_old_data(uv_work_t *req)
             count++;
         }
     }
-    info("Recalculating retention for %u metrics", count);
+    info("DBENGINE: recalculating retention for %u metrics", count);
     // Update the first time / last time for all metrics we plan to delete
     worker_is_busy(UV_EVENT_RETENTION_V2);
     find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_first_time_JudyL);
 
-    info("Recalculating retention for %u metrics, done", count);
+    info("DBENGINE: recalculating retention for %u metrics, done", count);
     worker_is_busy(UV_EVENT_RETENTION_UPDATE);
 
     Word_t index = 0;
     bool first_then_next = true;
-    info("Updating metric registry retention for %u metrics", count);
+    info("DBENGINE: updating metric registry retention for %u metrics", count);
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
         mrg_metric_set_first_time_t(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_t);
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
-    info("Updating metric registry retention for %u metrics, done", count);
+    info("DBENGINE: updating metric registry retention for %u metrics, done", count);
     JudyLFreeArray(&metric_first_time_JudyL, PJE0);
     worker_is_idle();
 }
@@ -1194,19 +1194,19 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             return;
         }
         if (NULL == ctx->datafiles.first->next) {
-            error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
+            error("DBENGINE: cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
                   " to reclaim space, there are no other file pairs left.",
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
             return;
         }
         struct rrdengine_datafile *df = ctx->datafiles.first;
         if(!datafile_acquire_for_deletion(df)) {
-            error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
+            error("DBENGINE: cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
                   " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it.",
                   ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
             return;
         }
-        info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
+        info("DBENGINE: deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
 
         do_delete_files(wc);
@@ -1650,14 +1650,14 @@ void rrdeng_worker(void* arg)
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
-        error("uv_loop_init(): %s", uv_strerror(ret));
+        error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
         goto error_after_loop_init;
     }
     loop->data = wc;
 
     ret = uv_async_init(wc->loop, &wc->async, async_cb);
     if (ret) {
-        error("uv_async_init(): %s", uv_strerror(ret));
+        error("DBENGINE: uv_async_init(): %s", uv_strerror(ret));
         goto error_after_async_init;
     }
     wc->async.data = wc;
@@ -1671,7 +1671,7 @@ void rrdeng_worker(void* arg)
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
     if (ret) {
-        error("uv_timer_init(): %s", uv_strerror(ret));
+        error("DBENGINE: uv_timer_init(): %s", uv_strerror(ret));
         goto error_after_timer_init;
     }
     timer_req.data = wc;
@@ -1716,7 +1716,7 @@ void rrdeng_worker(void* arg)
                     break;
                 case RRDENG_QUIESCE:
                     ctx->quiesce = SET_QUIESCE;
-                    info("Shutdown command received. Flushing all pages to disk. %u flush requests pending", wc->outstanding_flush_requests);
+                    info("DBENGINE: shutdown command received, flushing all pages to disk: %u flush requests pending", wc->outstanding_flush_requests);
                     wal_flush_transaction_buffer(wc);
                     if (!rrdeng_threads_alive(wc) && !wc->outstanding_flush_requests) {
                         wal_flush_transaction_buffer(wc);
@@ -1751,7 +1751,7 @@ void rrdeng_worker(void* arg)
     }
 
     /* cleanup operations of the event loop */
-    info("Shutting down RRD engine event loop for tier %d", ctx->tier);
+    info("DBENGINE: shutting down RRD engine event loop for tier %d", ctx->tier);
 
     /*
      * uv_async_send after uv_close does not seem to crash in linux at the moment,
@@ -1767,7 +1767,7 @@ void rrdeng_worker(void* arg)
     wal_flush_transaction_buffer(wc);
     uv_run(loop, UV_RUN_DEFAULT);
 
-    info("Shutting down RRD engine event loop for tier %d complete", ctx->tier);
+    info("DBENGINE: shutting down RRD engine event loop for tier %d complete", ctx->tier);
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
 /*  uv_mutex_destroy(&wc->cmd_mutex); */

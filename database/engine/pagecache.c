@@ -12,7 +12,6 @@ struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
-    //info("FREE clean page section %lu, metric %lu, start_time %ld, end_time %ld", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
     freez(entry.data);
 }
 
@@ -51,7 +50,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         fatal_assert( NULL != PValue);
         *PValue = descr;
 
-        internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "faulty page length calculation");
+        internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
      }
 
      struct rrdeng_cmd cmd;

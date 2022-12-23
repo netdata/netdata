@@ -160,7 +160,7 @@ int close_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -180,7 +180,7 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -202,7 +202,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
     if (ret < 0) {
-        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -210,7 +210,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -218,7 +218,7 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -251,7 +251,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ);
@@ -263,7 +263,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
-        error("uv_fs_write: %s", uv_strerror(ret));
+        error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
@@ -290,13 +290,13 @@ static int check_data_file_superblock(uv_file file)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        error("uv_fs_read: %s", uv_strerror(ret));
+        error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -306,7 +306,7 @@ static int check_data_file_superblock(uv_file file)
     if (strncmp(superblock->magic_number, RRDENG_DF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_DF_VER, RRDENG_VER_SZ) ||
         superblock->tier != 1) {
-        error("File has invalid superblock.");
+        error("DBENGINE: file has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -332,7 +332,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
         rrd_stat_atomic_add(&global_fs_errors, 1);
         return fd;
     }
-    info("Initializing data file \"%s\".", path);
+    info("DBENGINE: initializing data file \"%s\".", path);
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
     if (ret)
@@ -348,14 +348,14 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     datafile->file = file;
     datafile->pos = file_size;
 
-    info("Data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
+    info("DBENGINE: data file \"%s\" initialized (size:%"PRIu64").", path, file_size);
     return 0;
 
     error:
     error = ret;
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -389,12 +389,12 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     if (ret < 0) {
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
-        error("uv_fs_scandir(%s): %s", ctx->dbfiles_path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_scandir(%s): %s", ctx->dbfiles_path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         return ret;
     }
-    info("Found %d files in path %s", ret, ctx->dbfiles_path);
+    info("DBENGINE: found %d files in path %s", ret, ctx->dbfiles_path);
 
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
@@ -412,7 +412,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         return 0;
     }
     if (matched_files == MAX_DATAFILES) {
-        error("Warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
+        error("DBENGINE: warning: hit maximum database engine file limit of %d files", MAX_DATAFILES);
     }
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
     /* TODO: change this when tiering is implemented */
@@ -438,16 +438,16 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
-            error("Deleting invalid data and journal file pair.");
+            error("DBENGINE: deleting invalid data and journal file pair.");
             ret = unlink_journal_file(journalfile);
             if (!ret) {
                 generate_journalfilepath(datafile, path, sizeof(path));
-                info("Deleted journal file \"%s\".", path);
+                info("DBENGINE: deleted journal file \"%s\".", path);
             }
             ret = unlink_data_file(datafile);
             if (!ret) {
                 generate_datafilepath(datafile, path, sizeof(path));
-                info("Deleted data file \"%s\".", path);
+                info("DBENGINE: deleted data file \"%s\".", path);
             }
             freez(journalfile);
             freez(datafile);
@@ -472,13 +472,13 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    info("Creating new data and journal files in path %s", ctx->dbfiles_path);
+    info("DBENGINE: creating new data and journal files in path %s", ctx->dbfiles_path);
     datafile = mallocz(sizeof(*datafile));
     datafile_init(datafile, ctx, tier, fileno);
     ret = create_data_file(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
-        info("Created data file \"%s\".", path);
+        info("DBENGINE: created data file \"%s\".", path);
     } else {
         goto error_after_datafile;
     }
@@ -489,7 +489,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     ret = create_journal_file(journalfile, datafile);
     if (!ret) {
         generate_journalfilepath(datafile, path, sizeof(path));
-        info("Created journal file \"%s\".", path);
+        info("DBENGINE: created journal file \"%s\".", path);
     } else {
         goto error_after_journalfile;
     }
@@ -517,13 +517,13 @@ int init_data_files(struct rrdengine_instance *ctx)
     __atomic_store_n(&ctx->journal_initialization, true, __ATOMIC_RELAXED);
     ret = scan_data_files(ctx);
     if (ret < 0) {
-        error("Failed to scan path \"%s\".", ctx->dbfiles_path);
+        error("DBENGINE: failed to scan path \"%s\".", ctx->dbfiles_path);
         return ret;
     } else if (0 == ret) {
-        info("Data files not found, creating in path \"%s\".", ctx->dbfiles_path);
+        info("DBENGINE: data files not found, creating in path \"%s\".", ctx->dbfiles_path);
         ret = create_new_datafile_pair(ctx, 1, 1);
         if (ret) {
-            error("Failed to create data and journal files in path \"%s\".", ctx->dbfiles_path);
+            error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->dbfiles_path);
             return ret;
         }
         ctx->last_fileno = 1;

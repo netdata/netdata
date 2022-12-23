@@ -80,7 +80,7 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     if (req->result < 0) {
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
-        error("%s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
     } else {
         debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     }
@@ -152,7 +152,7 @@ void *wal_get_transaction_buffer(struct rrdengine_worker_config *wc, unsigned si
         buf_size = ALIGN_BYTES_CEILING(size);
         ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
         if (unlikely(ret)) {
-            fatal("posix_memalign:%s", strerror(ret));
+            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         }
         memset(ctx->commit_log.buf, 0, buf_size);
         buf_pos = ctx->commit_log.buf_pos = 0;
@@ -194,7 +194,7 @@ static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
     generate_journalfilepath(datafile, path, sizeof(path));
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ++datafile->ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -213,7 +213,7 @@ int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengi
     if (likely(journal_data)) {
         if (munmap(journal_data, journal_data_size)) {
             generate_journalfilepath_v2(datafile, path, sizeof(path));
-            error("Failed to unmap journal index file for %s", path);
+            error("DBENGINE: failed to unmap journal index file for %s", path);
             ++ctx->stats.fs_errors;
             rrd_stat_atomic_add(&global_fs_errors, 1);
         }
@@ -237,7 +237,7 @@ int unlink_journal_file(struct rrdengine_journalfile *journalfile)
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -262,7 +262,7 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
     if (journalfile->file) {
     ret = uv_fs_ftruncate(NULL, &req, journalfile->file, 0, NULL);
     if (ret < 0) {
-        error("uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -273,7 +273,7 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
     // This is the new journal v2 index file
     ret = uv_fs_unlink(NULL, &req, path_v2, NULL);
     if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -281,7 +281,7 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
-        error("uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -295,7 +295,7 @@ int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struc
 
     if (journal_data) {
         if (munmap(journal_data, journal_data_size)) {
-            error("Failed to unmap index file %s", path_v2);
+            error("DBENGINE: failed to unmap index file %s", path_v2);
         }
     }
 
@@ -324,7 +324,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     memset(superblock, 0, sizeof(*superblock));
     (void) strncpy(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ);
@@ -335,7 +335,7 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
     ret = uv_fs_write(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
-        error("uv_fs_write: %s", uv_strerror(ret));
+        error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
     }
@@ -362,13 +362,13 @@ static int check_journal_file_superblock(uv_file file)
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     iov = uv_buf_init((void *)superblock, sizeof(*superblock));
 
     ret = uv_fs_read(NULL, &req, file, &iov, 1, 0, NULL);
     if (ret < 0) {
-        error("uv_fs_read: %s", uv_strerror(ret));
+        error("DBENGINE: uv_fs_read: %s", uv_strerror(ret));
         uv_fs_req_cleanup(&req);
         goto error;
     }
@@ -377,7 +377,7 @@ static int check_journal_file_superblock(uv_file file)
 
     if (strncmp(superblock->magic_number, RRDENG_JF_MAGIC, RRDENG_MAGIC_SZ) ||
         strncmp(superblock->version, RRDENG_JF_VER, RRDENG_VER_SZ)) {
-        error("File has invalid superblock.");
+        error("DBENGINE: File has invalid superblock.");
         ret = UV_EINVAL;
     } else {
         ret = 0;
@@ -398,7 +398,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
     descr_size = sizeof(*jf_metric_data->descr) * count;
     payload_length = sizeof(*jf_metric_data) + descr_size;
     if (payload_length > max_size) {
-        error("Corrupted transaction payload.");
+        error("DBENGINE: corrupted transaction payload.");
         return;
     }
 
@@ -409,7 +409,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         if (page_type > PAGE_TYPE_MAX) {
             if (!bitmap256_get_bit(&page_error_map, page_type)) {
-                error("Unknown page type %d encountered.", page_type);
+                error("DBENGINE: unknown page type %d encountered.", page_type);
                 bitmap256_set_bit(&page_error_map, page_type, 1);
             }
             continue;
@@ -487,14 +487,14 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
-        error("Corrupted transaction record, skipping.");
+        error("DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     *id = jf_header->id;
     payload_length = jf_header->payload_length;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
     if (size_bytes > max_size) {
-        error("Corrupted transaction record, skipping.");
+        error("DBENGINE: corrupted transaction record, skipping.");
         return 0;
     }
     jf_trailer = buf + sizeof(*jf_header) + payload_length;
@@ -503,7 +503,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
     ret = crc32cmp(jf_trailer->checksum, crc);
     debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
-        error("Transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
+        error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
@@ -512,7 +512,7 @@ static unsigned replay_transaction(struct rrdengine_instance *ctx, struct rrdeng
         restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:
-        error("Unknown transaction type. Skipping record.");
+        error("DBENGINE: unknown transaction type, skipping record.");
         break;
     }
 
@@ -546,7 +546,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
     if (unlikely(!journal_is_mmapped)) {
         ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
         if (unlikely(ret))
-            fatal("posix_memalign:%s", strerror(ret));
+            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
     else
         buf = journalfile->data +  sizeof(struct rrdeng_jf_sb);
@@ -556,7 +556,7 @@ static uint64_t iterate_transactions(struct rrdengine_instance *ctx, struct rrde
             iov = uv_buf_init(buf, size_bytes);
             ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
             if (ret < 0) {
-                error("uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+                error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
                 uv_fs_req_cleanup(&req);
                 goto skip_file;
             }
@@ -600,7 +600,7 @@ static int check_journal_v2_extent_list (void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->extent_offset, j2_header->extent_count * sizeof(struct journal_extent_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        error("Extent list CRC32 check: FAILED");
+        error("DBENGINE: extent list CRC32 check: FAILED");
         return 1;
     }
 
@@ -620,7 +620,7 @@ static int check_journal_v2_metric_list(void *data_start, size_t file_size)
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, (uint8_t *) data_start + j2_header->metric_offset, j2_header->metric_count * sizeof(struct journal_metric_list));
     if (unlikely(crc32cmp(journal_v2_trailer->checksum, crc))) {
-        error("Metric list CRC32 check: FAILED");
+        error("DBENGINE: metric list CRC32 check: FAILED");
         return 1;
     }
     return 0;
@@ -664,7 +664,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
 
     rc = crc32cmp(journal_v2_trailer->checksum, crc);
     if (unlikely(rc)) {
-        error("File CRC32 check: FAILED");
+        error("DBENGINE: file CRC32 check: FAILED");
         return 1;
     }
 
@@ -685,7 +685,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
     unsigned entries;
     unsigned total_pages = 0;
 
-    info("Checking %u metrics that exist in the journal", j2_header->metric_count);
+    info("DBENGINE: checking %u metrics that exist in the journal", j2_header->metric_count);
     for (entries = 0; entries < j2_header->metric_count; entries++) {
 
         char uuid_str[UUID_STR_LEN];
@@ -706,7 +706,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));
             rc = crc32cmp(journal_trailer->checksum, crc);
-            internal_error(rc, "Index %u : %s entries %u at offset %u verified, DATA CRC computed %lu, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
+            internal_error(rc, "DBENGINE: index %u : %s entries %u at offset %u verified, DATA CRC computed %lu, stored %u", entries, uuid_str, metric->entries, metric->page_offset,
                            crc, metric_list_header->crc);
             if (!rc) {
                 total_pages += metric_list_header->entries;
@@ -716,16 +716,16 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
 
         metric++;
         if (((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) file_size) {
-            info("Verification failed EOF reached -- total entries %u, verified %u", entries, verified);
+            info("DBENGINE: verification failed EOF reached -- total entries %u, verified %u", entries, verified);
             return 1;
         }
     }
 
     if (entries != verified) {
-        info("Verification failed -- total entries %u, verified %u", entries, verified);
+        info("DBENGINE: verification failed -- total entries %u, verified %u", entries, verified);
         return 1;
     }
-    info("Verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
+    info("DBENGINE: verification succeeded -- total entries %u, verified %u (%u total pages)", entries, verified, total_pages);
 
     return 0;
 }
@@ -751,13 +751,13 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
             return 1;
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
-        error("Failed to open %s", path);
+        error("DBENGINE: failed to open '%s'", path);
         return 1;
     }
 
     ret = fstat(fd, &statbuf);
     if (ret) {
-        error("Failed to get file information for %s", path);
+        error("DBENGINE: failed to get file information for '%s'", path);
         close(fd);
         return 1;
     }
@@ -778,7 +778,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     }
     close(fd);
 
-    info("Checking integrity of %s", path);
+    info("DBENGINE: checking integrity of '%s'", path);
     int rc = check_journal_v2_file(data_start, file_size, original_file_size);
     if (unlikely(rc)) {
         if (rc == 2)
@@ -789,7 +789,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
             error_report("File %s is invalid and it will be rebuilt", path);
 
         if (unlikely(munmap(data_start, file_size)))
-            error("Failed to unmap %s", path);
+            error("DBENGINE: failed to unmap '%s'", path);
 
         return rc;
     }
@@ -799,18 +799,18 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
 
     if (unlikely(!entries)) {
         if (unlikely(munmap(data_start, file_size)))
-            error("Failed to unmap %s", path);
+            error("DBENGINE: failed to unmap '%s'", path);
 
         return 1;
     }
 
     rc = madvise(data_start, file_size, MADV_DONTFORK);
     if (unlikely(rc))
-        error("MADV_DONTFORK: setting failed");
+        error("DBENGINE: MADV_DONTFORK: setting failed");
 
     rc = madvise(data_start, file_size, MADV_DONTDUMP);
     if (unlikely(rc))
-        error("MADV_DONTDUMP: setting failed");
+        error("DBENGINE: MADV_DONTDUMP: setting failed");
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
 
@@ -835,7 +835,7 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         metric++;
     }
 
-    info("Journal file \"%s\" loaded (size:%"PRIu64") with %u metrics in %d ms", path, file_size, entries,
+    info("DBENGINE: journal file '%s' loaded (size:%"PRIu64") with %u metrics in %d ms", path, file_size, entries,
          (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
 
     // File is OK load it
@@ -992,7 +992,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
 
-    info("Indexing file %s: Extents %lu, Metrics %lu, Pages %lu",
+    info("DBENGINE: indexing file '%s': extents %lu, metrics %lu, pages %lu",
         path,
         number_of_extents,
         number_of_metrics,
@@ -1055,7 +1055,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
     struct journal_v2_block_trailer *journal_v2_trailer;
 
     data = journal_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
-    internal_error(true, "Write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     fatal_assert(data == data_start + extent_offset_trailer);
 
@@ -1066,7 +1066,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
     crc = crc32(crc, (uint8_t *) data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
     crc32set(journal_v2_trailer->checksum, crc);
 
-    internal_error(true, "CALCULATE CRC FOR EXTENT %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
     // Skip the trailer, point to the metrics off
     data += sizeof(struct journal_v2_block_trailer);
 
@@ -1093,7 +1093,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
     j2_header.end_time_ut = max_time_t * USEC_PER_SEC;
 
     qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journal_metric_compare);
-    internal_error(true, "Traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
     uint32_t resize_file_to = total_file_size;
 
@@ -1137,7 +1137,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
     }
 
     if (data == data_start + metric_offset_trailer) {
-        internal_error(true, "WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
         // Calculate CRC for metrics
         journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + metric_offset_trailer);
@@ -1145,7 +1145,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
         crc =
             crc32(crc, (uint8_t *)data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
         crc32set(journal_v2_trailer->checksum, crc);
-        internal_error(true, "CALCULATE CRC FOR UUIDs  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
         // Prepare to write checksum for the file
         j2_header.data = NULL;
@@ -1157,20 +1157,20 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
         // Write header to the file
         memcpy(data_start, &j2_header, sizeof(j2_header));
 
-        internal_error(true, "FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
-        info("Migrated journal file %s, File size %lu", path, total_file_size);
+        info("DBENGINE: migrated journal file '%s', file size %lu", path, total_file_size);
 
         SET_JOURNAL_DATA(journalfile, data_start);
         SET_JOURNAL_DATA_SIZE(journalfile, total_file_size);
 
-        internal_error(true, "ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
         ctx->disk_space += total_file_size;
         freez(uuid_list);
         return;
     }
     else {
-        info("Failed to build index %s. File will be skipped", path);
+        info("DBENGINE: failed to build index '%s', file will be skipped", path);
         j2_header.data = NULL;
         j2_header.magic = JOURVAL_V2_SKIP_MAGIC;
         memcpy(data_start, &j2_header, sizeof(j2_header));
@@ -1188,7 +1188,7 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
         ctx->disk_space += total_file_size;
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
-        error("Failed to resize file %s", path);
+        error("DBENGINE: failed to resize file '%s'", path);
     }
     else
         ctx->disk_space += sizeof(struct journal_v2_header);
@@ -1228,7 +1228,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
 
     ret = check_journal_file_superblock(file);
     if (ret) {
-        info("Invalid journal file \"%s\" ; superblock check failed.", path);
+        info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
         goto error;
     }
     ctx->stats.io_read_bytes += sizeof(struct rrdeng_jf_sb);
@@ -1238,13 +1238,13 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     journalfile->pos = file_size;
 
     journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx->last_fileno));
-    info("Loading journal file \"%s\" using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
+    info("DBENGINE: loading journal file '%s' using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
 
     max_id = iterate_transactions(ctx, journalfile);
 
     ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
 
-    info("Journal file \"%s\" loaded (size:%"PRIu64").", path, file_size);
+    info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
     if (likely(journalfile->data))
         netdata_munmap(journalfile->data, file_size);
 
@@ -1265,7 +1265,7 @@ error:
     error = ret;
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
-        error("uv_fs_close(%s): %s", path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
     }
@@ -1281,7 +1281,7 @@ void after_journal_indexing(uv_work_t *req, int status)
     if (likely(status != UV_ECANCELED)) {
         errno = 0;
         if (likely(work_request->count))
-            internal_error(true, "Journal indexing done; %u files processed", work_request->count);
+            internal_error(true, "DBENGINE: journal indexing done; %u files processed", work_request->count);
     }
     wc->running_journal_migration = 0;
     wc->run_indexing= work_request->rerun;
@@ -1313,7 +1313,7 @@ void start_journal_indexing(uv_work_t *req)
     worker_is_busy(UV_EVENT_JOURNAL_INDEX);
     while (datafile && datafile->fileno != ctx->last_fileno) {
         if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
-            info("Journal file %u is ready to be indexed", datafile->fileno);
+            info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
             pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
            ++work_request->count;
         }
