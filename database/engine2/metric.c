@@ -188,10 +188,12 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
         mrg_stats_size_judyhs_removed_uuid(mrg);
     }
 
+    // arrayalloc is running lockless here
+    arrayalloc_freez(mrg->index.aral, metric);
+
     mrg_index_write_unlock(mrg);
 
     MRG_STATS_DELETED_METRIC(mrg);
-    arrayalloc_freez(mrg->index.aral, metric);
 
     return true;
 }
