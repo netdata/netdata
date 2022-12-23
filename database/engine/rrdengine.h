@@ -103,7 +103,6 @@ struct page_details {
     time_t last_time_s;
     uint32_t update_every_s;
     uint16_t page_length;
-    uint8_t type;
     PDC_PAGE_STATUS status;
 };
 

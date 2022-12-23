@@ -195,7 +195,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= ((pd->page) ? (PDC_PAGE_READY | PDC_PAGE_PRELOADED) : 0) | tags;
-            pd->type = ctx->page_type;
 
             if(open_cache_mode) {
                 struct rrdengine_datafile *datafile = pgc_page_data(page);
