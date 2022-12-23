@@ -30,6 +30,7 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->users.spinlock = NETDATA_SPINLOCK_INITIALIZER;
     datafile->users.lockers = 0;
     datafile->users.available = true;
+    datafile->users.time_to_evict = 0;
 
     datafile->extent_exclusive_access.spinlock = NETDATA_SPINLOCK_INITIALIZER;
     datafile->extent_exclusive_access.lockers = 0;
@@ -73,10 +74,8 @@ void datafile_release(struct rrdengine_datafile *df) {
     netdata_spinlock_unlock(&df->users.spinlock);
 }
 
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait) {
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
     bool can_be_deleted = false;
-
-    pgc_open_evict_clean_pages_of_datafile(open_cache, df);
 
     while(!can_be_deleted) {
         netdata_spinlock_lock(&df->users.spinlock);
@@ -84,17 +83,56 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait) {
 
         if(!df->users.lockers)
             can_be_deleted = true;
+        else {
+            // there are lockers
 
-        netdata_spinlock_unlock(&df->users.spinlock);
+            // evict any pages referencing this in the open cache
+            netdata_spinlock_unlock(&df->users.spinlock);
+            pgc_open_evict_clean_pages_of_datafile(open_cache, df);
+            netdata_spinlock_lock(&df->users.spinlock);
 
-        if(!can_be_deleted) {
-            if(wait) {
-                static const struct timespec ns = {.tv_sec = 0, .tv_nsec = 1};
-                nanosleep(&ns, NULL);
+            if(df->users.lockers) {
+                // there are lockers still
+
+                // count the number of pages referencing this in the open cache
+                netdata_spinlock_unlock(&df->users.spinlock);
+                size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, df);
+                size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, df);
+                netdata_spinlock_lock(&df->users.spinlock);
+
+                if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
+                    // no pages in the open cache related to this datafile
+
+                    time_t now = now_monotonic_sec();
+
+                    if(!df->users.time_to_evict) {
+                        // first time we did the above
+                        df->users.time_to_evict = now + 120;
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u lockers - will be deleted shortly",
+                                       df->fileno,
+                                       df->users.lockers);
+                    }
+
+                    else if(now < df->users.time_to_evict) {
+                        // time expired, lets remove it
+                        can_be_deleted = true;
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u lockers - will be deleted now",
+                                       df->fileno,
+                                       df->users.lockers);
+                    }
+                }
+                else
+                    internal_error(true, "DBENGINE: datafile %u should be deleted, but it has %u lockers, %zu clean and %zu hot open cache pages",
+                                   df->fileno,
+                                   df->users.lockers,
+                                   clean_pages_in_open_cache,
+                                   hot_pages_in_open_cache);
             }
             else
-                break;
+                can_be_deleted = true;
         }
+
+        netdata_spinlock_unlock(&df->users.spinlock);
     }
 
     return can_be_deleted;

@@ -49,13 +49,14 @@ struct rrdengine_datafile {
         SPINLOCK spinlock;
         unsigned lockers;
         bool available;
+        time_t time_to_evict;
     } users;
 };
 
 void datafile_acquire_dup(struct rrdengine_datafile *df);
 bool datafile_acquire(struct rrdengine_datafile *df);
 void datafile_release(struct rrdengine_datafile *df);
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool wait);
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
 struct rrdengine_datafile_list {
     uv_rwlock_t rwlock;
