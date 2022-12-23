@@ -219,8 +219,20 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
         while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
             pd = *PValue;
 
-            if (!pd || pd->page)
+            internal_fatal(!pd,
+                           "DBENGINE: pdc page list has an empty page details entry");
+
+            if (!(pd->status & PDC_PAGE_DISK_PENDING))
                 continue;
+
+            internal_fatal(!(pd->status & PDC_PAGE_DATAFILE_ACQUIRED),
+                           "DBENGINE: page details has not acquired the datafile");
+
+            internal_fatal((pd->status & (PDC_PAGE_READY | PDC_PAGE_FAILED)),
+                           "DBENGINE: page details has disk pending flag but it is ready/failed");
+
+            internal_fatal(pd->page,
+                           "DBENGINE: page details has a page linked to it, but it is marked for loading");
 
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
             if (PValue1 && !*PValue1) {

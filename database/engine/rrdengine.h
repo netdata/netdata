@@ -68,6 +68,7 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 6),
     PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 7),
     PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 8),
+    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 9),
 
     PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 10),
     PDC_PAGE_LOADED_FROM_DISK          = (1 << 11),

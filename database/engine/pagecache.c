@@ -173,15 +173,20 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->type = ctx->page_type;
 
             if(open_cache_mode) {
-                struct extent_io_data *xio = (struct extent_io_data *)pgc_page_custom_data(cache, page);
-                uuid_copy(pd->datafile.extent.page_uuid, *uuid);
-                pd->datafile.ptr = pgc_page_data(page);
-                pd->datafile.file = xio->file;
-                pd->datafile.extent.pos = xio->pos;
-                pd->datafile.extent.bytes = xio->bytes;
-                pd->datafile.fileno = pd->datafile.ptr->fileno;
-                datafile_acquire_dup(pd->datafile.ptr); // has to be done before releasing the page
-                pd->status |= PDC_PAGE_DATAFILE_ACQUIRED;
+                struct rrdengine_datafile *datafile = pgc_page_data(page);
+                if(datafile_acquire(datafile)) { // for pd
+                    struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
+                    uuid_copy(pd->datafile.extent.page_uuid, *uuid);
+                    pd->datafile.ptr = pgc_page_data(page);
+                    pd->datafile.file = xio->file;
+                    pd->datafile.extent.pos = xio->pos;
+                    pd->datafile.extent.bytes = xio->bytes;
+                    pd->datafile.fileno = pd->datafile.ptr->fileno;
+                    pd->status |= PDC_PAGE_DATAFILE_ACQUIRED | PDC_PAGE_DISK_PENDING;
+                }
+                else {
+                    pd->status |= PDC_PAGE_FAILED | PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE;
+                }
                 pgc_page_release(cache, page);
             }
 
@@ -247,12 +252,16 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
             }
             else {
                 (*pages_pending)++;
-                pd->status |= PDC_PAGE_DISK_PENDING;
 
-                internal_fatal(!pd->datafile.ptr, "datafile is NULL");
-                internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
-                internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
-                internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
+                if(pd->status & PDC_PAGE_DISK_PENDING) {
+                    internal_fatal(!pd->datafile.ptr, "datafile is NULL");
+                    internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
+                    internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
+                    internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
+                }
+                else
+                    internal_fatal(!(pd->status & PDC_PAGE_FAILED),
+                                   "DBENGINE: pdc has a disk pending page, without proper tagging");
             }
 
             internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
@@ -341,7 +350,7 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                     if (first_page_starting_time_s == INVALID_TIME || page_first_time_s < first_page_starting_time_s)
                         first_page_starting_time_s = page_first_time_s;
 
-                    if(datafile_acquire(datafile)) {
+                    if(datafile_acquire(datafile)) { //for open cache item
                         // add this page to open cache
                         bool added = false;
                         struct extent_io_data ei = {
@@ -379,12 +388,19 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
 }
 
 void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
+    struct rrdengine_datafile *datafile = pgc_page_data(page);
+
+    if(!datafile_acquire(datafile)) // for pd
+        return;
+
     Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_t(page), PJE0);
     if (!PValue || PValue == PJERR)
         fatal("DBENGINE: corrupted judy array");
 
-    if (unlikely(*PValue))
+    if (unlikely(*PValue)) {
+        datafile_release(datafile);
         return;
+    }
 
     Word_t metric_id = pgc_page_metric(page);
     METRIC *metric = (METRIC *)pgc_page_metric(page);
@@ -400,14 +416,12 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->datafile.fileno = ei->fileno;
     pd->first_time_s = pgc_page_start_time_t(page);
     pd->last_time_s = pgc_page_end_time_t(page);
-    pd->datafile.ptr = pgc_page_data(page);
+    pd->datafile.ptr = datafile;
     pd->page_length = ei->page_length;
     pd->update_every_s = pgc_page_update_every(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
     uuid_copy(pd->datafile.extent.page_uuid, *mrg_metric_uuid(main_mrg, metric));
-
-    datafile_acquire_dup(pd->datafile.ptr);
 }
 
 // Return a judyL will all pages that have start_time_ut and end_time_ut
@@ -648,7 +662,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s,
            struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length) {
 
-    if(!datafile_acquire(datafile))
+    if(!datafile_acquire(datafile)) // for open cache item
         fatal("DBENGINE: cannot acquire datafile to put page in open cache");
 
     struct extent_io_data ext_io_data = {
