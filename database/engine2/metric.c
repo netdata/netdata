@@ -17,7 +17,6 @@ struct mrg {
     struct pgc_index {
         netdata_rwlock_t rwlock;
         Pvoid_t uuid_judy;          // each UUID has a JudyL of sections (tiers)
-        Pvoid_t ptr_judy;           // reverse pointer lookup
     } index;
 
     struct mrg_statistics stats;
@@ -51,14 +50,6 @@ static inline void MRG_STATS_DELETE_MISS(MRG *mrg) {
     __atomic_add_fetch(&mrg->stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
-static inline void MRG_STATS_POINTER_VALIDATION_HIT(MRG *mrg) {
-    __atomic_add_fetch(&mrg->stats.pointer_validation_hits, 1, __ATOMIC_RELAXED);
-}
-
-static inline void MRG_STATS_POINTER_VALIDATION_MISS(MRG *mrg) {
-    __atomic_add_fetch(&mrg->stats.pointer_validation_misses, 1, __ATOMIC_RELAXED);
-}
-
 static void mrg_index_read_lock(MRG *mrg) {
     netdata_rwlock_rdlock(&mrg->index.rwlock);
 }
@@ -70,30 +61,6 @@ static void mrg_index_write_lock(MRG *mrg) {
 }
 static void mrg_index_write_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
-}
-
-static bool metric_validate(MRG *mrg __maybe_unused, METRIC *metric __maybe_unused, bool having_lock __maybe_unused) {
-#ifdef MRG_WITH_VALIDATION
-    if(!having_lock)
-        mrg_index_read_lock(mrg);
-
-    Pvoid_t *PValue = JudyLGet(mrg->index.ptr_judy, (Word_t)metric, PJE0);
-    if(PValue == PJERR)
-        fatal("DBENGINE METRIC: corrupted ptr judy array");
-
-    METRIC *found = (PValue) ? *PValue : NULL;
-
-    if(!having_lock)
-        mrg_index_read_unlock(mrg);
-
-    if(found != metric) {
-        MRG_STATS_POINTER_VALIDATION_MISS(mrg);
-        return false;
-    }
-
-    MRG_STATS_POINTER_VALIDATION_HIT(mrg);
-#endif
-    return true;
 }
 
 static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl, size_t mem_after_judyl) {
@@ -148,24 +115,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->first_time_t = entry->first_time_t;
     metric->latest_time_t_clean = entry->latest_time_t;
     metric->latest_update_every = entry->latest_update_every;
-
     *PValue = metric;
-
-    mem_before_judyl = JudyLMemUsed(mrg->index.ptr_judy);
-    PValue = JudyLIns(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
-    mem_after_judyl = JudyLMemUsed(mrg->index.ptr_judy);
-    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
-
-    if(!PValue || PValue == PJERR)
-        fatal("DBENGINE METRIC: corrupted pointers JudyL array");
-
-    if(*PValue != NULL)
-        fatal("DBENGINE METRIC: pointer already exists in registry.");
-
-    *PValue = metric;
-
-    internal_fatal(!metric_validate(mrg, metric, true),
-                   "DBENGINE CACHE: metric validation on insertion fails");
 
     mrg_index_write_unlock(mrg);
 
@@ -196,9 +146,6 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
 
     METRIC *metric = *PValue;
 
-    internal_fatal(!metric_validate(mrg, metric, true),
-                   "DBENGINE CACHE: metric validation on lookup fails");
-
     mrg_index_read_unlock(mrg);
 
     MRG_STATS_SEARCH_HIT(mrg);
@@ -211,31 +158,29 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
     if(!having_write_lock)
         mrg_index_write_lock(mrg);
 
-    int rc;
-    mem_before_judyl = JudyLMemUsed(mrg->index.ptr_judy);
-    rc = JudyLDel(&mrg->index.ptr_judy, (Word_t)metric, PJE0);
-    mem_after_judyl = JudyLMemUsed(mrg->index.ptr_judy);
-    mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
+    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t));
+    if(!sections_judy_pptr || !*sections_judy_pptr) {
+        MRG_STATS_DELETE_MISS(mrg);
 
-    if(!rc) {
         if(!having_write_lock)
             mrg_index_write_unlock(mrg);
 
-        MRG_STATS_DELETE_MISS(mrg);
         return false;
     }
 
-    Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t));
-    if(!sections_judy_pptr || !*sections_judy_pptr)
-        fatal("DBENGINE METRIC: uuid should be in judy but it is not.");
-
     mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
-    rc = JudyLDel(sections_judy_pptr, metric->section, PJE0);
+    int rc = JudyLDel(sections_judy_pptr, metric->section, PJE0);
     mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
 
-    if(!rc)
-        fatal("DBENGINE METRIC: metric not found in sections JudyL");
+    if(!rc) {
+        MRG_STATS_DELETE_MISS(mrg);
+
+        if(!having_write_lock)
+            mrg_index_write_unlock(mrg);
+
+        return false;
+    }
 
     if(!*sections_judy_pptr) {
         rc = JudyHSDel(&mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0);
@@ -263,28 +208,13 @@ MRG *mrg_create(void) {
     return mrg;
 }
 
-void mrg_destroy(MRG *mrg) {
-    bool first = true;
-    Pvoid_t *PValue;
-    Word_t index = 0;
+void mrg_destroy(MRG *mrg __maybe_unused) {
+    // no destruction possible
+    // we can't traverse the metrics list
 
-    mrg_index_write_lock(mrg);
+    // to delete entries, the caller needs to keep pointers to METRICs
 
-    while((PValue = JudyLFirstThenNext(mrg->index.ptr_judy, &index, &first))) {
-        METRIC *metric = *PValue;
-        if(!metric_del(mrg, metric, true))
-            fatal("DBENGINE METRIC: failed to delete metric");
-    }
-
-    if(mrg->index.ptr_judy)
-        fatal("DBENGINE METRIC: pointer judy should be empty, but it is not.");
-
-    if(mrg->index.uuid_judy)
-        fatal("DBENGINE METRIC: uuid judy array should be empty, but it is not.");
-
-    mrg_index_write_unlock(mrg);
-
-    freez(mrg);
+    ;
 }
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
@@ -302,41 +232,29 @@ bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
     return metric_del(mrg, metric, false);
 }
 
-METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
+METRIC *mrg_metric_dup(MRG *mrg __maybe_unused, METRIC *metric) {
     // FIXME - duplicate refcount
     return metric;
 }
 
-void mrg_metric_release(MRG *mrg, METRIC *metric) {
+void mrg_metric_release(MRG *mrg __maybe_unused, METRIC *metric __maybe_unused) {
     // FIXME - release refcount
 
 }
 
-Word_t mrg_metric_id(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return 0;
-
+Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
     return (Word_t)metric;
 }
 
-uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return NULL;
-
+uuid_t *mrg_metric_uuid(MRG *mrg __maybe_unused, METRIC *metric) {
     return &metric->uuid;
 }
 
-Word_t mrg_metric_section(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return 0;
-
+Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
     return metric->section;
 }
 
-bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_first_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
     netdata_spinlock_lock(&metric->timestamps_lock);
     metric->first_time_t = first_time_t;
     netdata_spinlock_unlock(&metric->timestamps_lock);
@@ -344,10 +262,7 @@ bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t) 
     return true;
 }
 
-bool mrg_metric_set_first_time_t_if_zero(MRG *mrg, METRIC *metric, time_t first_time_t) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_first_time_t_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
     bool ret = false;
 
     netdata_spinlock_lock(&metric->timestamps_lock);
@@ -367,22 +282,23 @@ bool mrg_metric_set_first_time_t_if_zero(MRG *mrg, METRIC *metric, time_t first_
     return ret;
 }
 
-time_t mrg_metric_get_first_time_t(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return 0;
-
+time_t mrg_metric_get_first_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t first_time_t;
     netdata_spinlock_lock(&metric->timestamps_lock);
     first_time_t = metric->first_time_t;
+    if(!first_time_t) {
+        if(metric->latest_time_t_clean)
+            first_time_t = metric->latest_time_t_clean;
+
+        if(!first_time_t || metric->latest_time_t_hot < metric->latest_time_t_clean)
+            first_time_t = metric->latest_time_t_hot;
+    }
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
     return first_time_t;
 }
 
-bool mrg_metric_set_clean_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_clean_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
     internal_fatal(metric->latest_time_t_clean > latest_time_t,
@@ -400,10 +316,7 @@ bool mrg_metric_set_clean_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_
     return true;
 }
 
-bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_hot_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
     netdata_spinlock_lock(&metric->timestamps_lock);
     metric->latest_time_t_hot = latest_time_t;
 
@@ -417,10 +330,7 @@ bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_ti
     return true;
 }
 
-time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return 0;
-
+time_t mrg_metric_get_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t max;
     netdata_spinlock_lock(&metric->timestamps_lock);
     max = MAX(metric->latest_time_t_clean, metric->latest_time_t_hot);
@@ -428,27 +338,18 @@ time_t mrg_metric_get_latest_time_t(MRG *mrg, METRIC *metric) {
     return max;
 }
 
-bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
     __atomic_store_n(&metric->latest_update_every, update_every, __ATOMIC_RELEASE);
     return true;
 }
 
-bool mrg_metric_set_update_every_if_zero(MRG *mrg, METRIC *metric, time_t update_every) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return false;
-
+bool mrg_metric_set_update_every_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
     uint32_t expected = 0;
     return __atomic_compare_exchange_n(&metric->latest_update_every, &expected, update_every,
                                         false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
 }
 
-time_t mrg_metric_get_update_every(MRG *mrg, METRIC *metric) {
-    if(unlikely(!metric_validate(mrg, metric, false)))
-        return 0;
-
+time_t mrg_metric_get_update_every(MRG *mrg __maybe_unused, METRIC *metric) {
     return __atomic_load_n(&metric->latest_update_every, __ATOMIC_ACQUIRE);
 }
 
@@ -648,9 +549,6 @@ int mrg_unittest(void) {
 
     if(mrg->stats.entries != 0)
         fatal("DBENGINE METRIC: invalid entries counter");
-
-    if(mrg->index.uuid_judy != NULL || mrg->index.ptr_judy != NULL)
-        fatal("DBENGINE METRIC: judy arrays should be empty but they are not");
 
     usec_t started_ut = now_realtime_usec();
     pthread_t thread1;
