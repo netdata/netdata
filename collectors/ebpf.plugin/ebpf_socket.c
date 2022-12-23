@@ -2016,11 +2016,10 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * @param fd                 the hash table with data.
  * @param family             the family associated to the hash table
- * @param network_connection Status of network connection monitoring ( 0 - disabled; 1 - enabled)
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd, int family, uint32_t network_connection)
+static void ebpf_read_socket_hash_table(int fd, int family)
 {
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
@@ -2040,9 +2039,7 @@ static void read_socket_hash_table(int fd, int family, uint32_t network_connecti
             continue;
         }
 
-        if (network_connection) {
-            hash_accumulator(values, &key, family, end);
-        }
+        hash_accumulator(values, &key, family, end);
 
         key = next_key;
     }
@@ -2166,8 +2163,10 @@ void *ebpf_socket_read_hash(void *ptr)
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
-        read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
-        read_socket_hash_table(fd_ipv6, AF_INET6, network_connection);
+        if (network_connection) {
+            ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
+            ebpf_read_socket_hash_table(fd_ipv6, AF_INET6);
+        }
         pthread_mutex_unlock(&nv_mutex);
     }
 
