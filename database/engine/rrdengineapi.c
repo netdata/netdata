@@ -522,6 +522,29 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
 // ----------------------------------------------------------------------------
 // query ops
 
+#ifdef NETDATA_INTERNAL_CHECKS
+SPINLOCK global_query_handle_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+static struct rrdeng_query_handle *global_query_handle_ll = NULL;
+static void register_query_handle(struct rrdeng_query_handle *handle) {
+    handle->query_pid = gettid();
+    netdata_spinlock_lock(&global_query_handle_spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(global_query_handle_ll, handle, prev, next);
+    netdata_spinlock_unlock(&global_query_handle_spinlock);
+}
+static void unregister_query_handle(struct rrdeng_query_handle *handle) {
+    netdata_spinlock_lock(&global_query_handle_spinlock);
+    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(global_query_handle_ll, handle, prev, next);
+    netdata_spinlock_unlock(&global_query_handle_spinlock);
+}
+#else
+static void register_query_handle(struct rrdeng_query_handle *handle __maybe_unused) {
+    ;
+}
+static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_unused) {
+    ;
+}
+#endif
+
 /*
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
@@ -537,12 +560,11 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     mrg_metric_set_update_every_if_zero(main_mrg, metric, default_rrd_update_every);
 
     handle = callocz(1, sizeof(struct rrdeng_query_handle));
+    register_query_handle(handle);
+
     handle->ctx = ctx;
     handle->metric = metric;
     handle->now_s = start_time_s;
-    handle->position = 0;
-    handle->page = NULL;
-    handle->pdc = NULL;
 
     handle->dt_s = mrg_metric_get_update_every(main_mrg, metric);
     if(!handle->dt_s)
@@ -755,6 +777,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
         __atomic_store_n(&handle->pdc->workers_should_stop, true, __ATOMIC_RELAXED);
     }
 
+    unregister_query_handle(handle);
     freez(handle);
     rrdimm_handle->handle = NULL;
     pthread_setspecific(query_key, NULL);

@@ -169,6 +169,11 @@ struct rrdeng_query_handle {
 
     unsigned position;
     unsigned entries;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    pid_t query_pid;
+    struct rrdeng_query_handle *prev, *next;
+#endif
 };
 
 enum rrdeng_opcode {
