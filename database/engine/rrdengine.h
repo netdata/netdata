@@ -171,6 +171,7 @@ struct rrdeng_query_handle {
     unsigned entries;
 
 #ifdef NETDATA_INTERNAL_CHECKS
+    usec_t started_time_t;
     pid_t query_pid;
     struct rrdeng_query_handle *prev, *next;
 #endif

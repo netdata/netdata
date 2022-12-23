@@ -59,11 +59,13 @@ struct replication_dimension {
 
 static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before, bool enable_streaming, time_t wall_clock_time) {
     size_t dimensions = rrdset_number_of_dimensions(st);
+    if(!dimensions)
+        return before;
+
     size_t points_read = 0, points_generated = 0;
 
     struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
-    struct replication_dimension data[dimensions];
-    memset(data, 0, sizeof(data));
+    struct replication_dimension *data = callocz(dimensions, sizeof(struct replication_dimension));
 
     if(enable_streaming && st->last_updated.tv_sec > before) {
         internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
@@ -78,9 +80,6 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
     {
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
-            if(unlikely(!rd || !rd_dfe.item || !rd->exposed))
-                continue;
-
             if (unlikely(rd_dfe.counter >= dimensions)) {
                 internal_error(true, "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
@@ -89,12 +88,14 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
 
             struct replication_dimension *d = &data[rd_dfe.counter];
 
-            d->dict = rd_dfe.dict;
-            d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
-            d->rd = rd;
+            if(likely(rd && rd_dfe.item && rd->exposed)) {
+                d->dict = rd_dfe.dict;
+                d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
+                d->rd = rd;
 
-            ops->init(rd->tiers[0]->db_metric_handle, &d->handle, after, before);
-            d->enabled = true;
+                ops->init(rd->tiers[0]->db_metric_handle, &d->handle, after, before);
+                d->enabled = true;
+            }
         }
         rrddim_foreach_done(rd);
     }
@@ -220,6 +221,8 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
         // update global statistics
         queries++;
     }
+
+    freez(data);
 
     netdata_spinlock_lock(&replication_queries.spinlock);
     replication_queries.queries_started += queries;
