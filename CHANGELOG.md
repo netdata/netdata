@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- docs: explicitly set the `nofile` limit for Netdata container and document the reason for this [\#14178](https://github.com/netdata/netdata/pull/14178) ([ilyam8](https://github.com/ilyam8))
 - Revert "Refactor ML code and add support for multiple KMeans models. … [\#14172](https://github.com/netdata/netdata/pull/14172) ([vkalintiris](https://github.com/vkalintiris))
 - fix a typo in debian postinst [\#14171](https://github.com/netdata/netdata/pull/14171) ([ilyam8](https://github.com/ilyam8))
 - feat\(packaging\): add netdata to www-data group on Proxmox [\#14168](https://github.com/netdata/netdata/pull/14168) ([ilyam8](https://github.com/ilyam8))
