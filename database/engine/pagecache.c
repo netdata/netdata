@@ -277,16 +277,155 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     return query_gaps;
 }
 
-#define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
+typedef void (*page_found_callback)(PGC_PAGE *page, void *data);
+size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback callback, void *callback_data) {
+    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
+    Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+    time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
+    time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
+    time_t first_page_starting_time_s = INVALID_TIME;
+
+    size_t pages_found = 0;
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    struct rrdengine_datafile *datafile;
+    bool lookup_continue = true;
+    for(datafile = ctx->datafiles.first; lookup_continue && datafile ; datafile = datafile->next) {
+        if(!datafile_acquire(datafile))
+            continue;
+
+        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
+        if (!journal_header) {
+            datafile_release(datafile);
+            continue;
+        }
+
+        // is the datafile within our time-range?
+        if (start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  {
+            // the datafile possibly contains useful data for this query
+
+            size_t journal_metric_count = (size_t)journal_header->metric_count;
+            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+            struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
+
+            if (unlikely(!uuid_entry)) {
+                // our UUID is not in this datafile
+                datafile_release(datafile);
+                continue;
+            }
+
+            uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            uint32_t delta_end_time = (end_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
+            time_t journal_start_time_s = (time_t)(journal_header->start_time_ut / USEC_PER_SEC);
+
+            struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
+            struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
+            struct journal_extent_list *extent_list = (void *)((uint8_t *)journal_header + journal_header->extent_offset);
+            uint32_t uuid_page_entries = page_list_header->entries;
+
+            for (uint32_t index = 0; index < uuid_page_entries; index++) {
+                struct journal_page_list *page_entry_in_journal = &page_list[index];
+
+                if (delta_start_time > page_entry_in_journal->delta_end_s)
+                    continue;
+
+                if (delta_end_time < page_entry_in_journal->delta_start_s) {
+                    // we passed the end time of the query
+                    // there is no point to continue to the next datafile
+                    lookup_continue = false;
+                    break;
+                }
+
+                time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
+                time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
+                time_t page_update_every_s = page_entry_in_journal->update_every_s;
+                size_t page_length = page_entry_in_journal->page_length;
+
+                if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
+
+                    if (first_page_starting_time_s == INVALID_TIME || page_first_time_s < first_page_starting_time_s)
+                        first_page_starting_time_s = page_first_time_s;
+
+                    // add this page to open cache
+                    bool added = false;
+                    struct extent_io_data ei = {
+                            .pos = extent_list[page_entry_in_journal->extent_index].datafile_offset,
+                            .bytes = extent_list[page_entry_in_journal->extent_index].datafile_size,
+                            .page_length = page_length,
+                            .file = datafile->file,
+                            .fileno = datafile->fileno,
+                    };
+                    PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, (PGC_ENTRY) {
+                            .hot = false,
+                            .section = (Word_t) ctx,
+                            .metric_id = metric_id,
+                            .start_time_t = page_first_time_s,
+                            .end_time_t = page_last_time_s,
+                            .update_every = page_update_every_s,
+                            .data = datafile,
+                            .size = 0,
+                            .custom_data = (uint8_t * ) &ei,
+                    }, &added);
+
+                    if (added)
+                        datafile_acquire_dup(datafile);
+
+                    callback(page, callback_data);
+
+                    pgc_page_release(open_cache, page);
+
+                    pages_found++;
+                } // page is in query time-range
+            } // for each page entry in datafile journal
+        } // datafile is in query time-range
+
+        datafile_release(datafile);
+    }
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    return pages_found;
+}
+
+void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
+    Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_t(page), PJE0);
+    if (!PValue || PValue == PJERR)
+        fatal("DBENGINE: corrupted judy array");
+
+    if (unlikely(*PValue))
+        return;
+
+    Word_t metric_id = pgc_page_metric(page);
+    METRIC *metric = (METRIC *)pgc_page_metric(page);
+
+    // let's add it to the judy
+    struct extent_io_data *ei = pgc_page_custom_data(open_cache, page);
+    struct page_details *pd = callocz(1, sizeof(*pd));
+    *PValue = pd;
+
+    pd->datafile.extent.pos = ei->pos;
+    pd->datafile.extent.bytes = ei->bytes;
+    pd->datafile.file = ei->file;
+    pd->datafile.fileno = ei->fileno;
+    pd->first_time_s = pgc_page_start_time_t(page);
+    pd->last_time_s = pgc_page_end_time_t(page);
+    pd->datafile.ptr = pgc_page_data(page);
+    pd->page_length = ei->page_length;
+    pd->update_every_s = pgc_page_update_every(page);
+    pd->metric_id = metric_id;
+    pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
+    uuid_copy(pd->datafile.extent.page_uuid, *mrg_metric_uuid(main_mrg, metric));
+
+    datafile_acquire_dup(pd->datafile.ptr);
+}
 
 // Return a judyL will all pages that have start_time_ut and end_time_ut
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
+#define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
 Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s, size_t *pages_to_load) {
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
-    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
-    Word_t metric_id = mrg_metric_id(main_mrg, metric);
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
@@ -332,135 +471,9 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     // PASS 3: Check Journal v2 to fill the gaps
 
     pass3_ut = now_monotonic_usec();
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    bool lookup_continue = true;
-    while (lookup_continue && datafile) {
-        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
-        if (!journal_header || !datafile_acquire(datafile)) {
-            datafile = datafile->next;
-            continue;
-        }
-
-        if (start_time_ut >= journal_header->start_time_ut && start_time_ut <= journal_header->end_time_ut)  {
-            size_t journal_metric_count = (size_t)journal_header->metric_count;
-            struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
-            struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
-
-            if (unlikely(!uuid_entry)) {
-                datafile_release(datafile);
-                datafile = datafile->next;
-                continue;
-            }
-
-            uint32_t delta_start_time = (start_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
-            uint32_t delta_end_time = (end_time_ut - journal_header->start_time_ut) / USEC_PER_SEC;
-            time_t journal_start_time_s = (time_t)(journal_header->start_time_ut / USEC_PER_SEC);
-
-            struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
-            struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
-
-            struct journal_extent_list *extent_list = (void *)((uint8_t *)journal_header + journal_header->extent_offset);
-
-            uint32_t entries = page_list_header->entries;
-
-            for (uint32_t index = 0; index < entries; index++) {
-                struct journal_page_list *page_entry_in_journal = &page_list[index];
-
-                if (delta_start_time > page_entry_in_journal->delta_end_s)
-                    continue;
-
-                if (delta_end_time < page_entry_in_journal->delta_start_s) {
-                    lookup_continue = false;
-                    break;
-                }
-
-                time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
-                time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
-                time_t page_update_every_s = page_entry_in_journal->update_every_s;
-                size_t page_length = page_entry_in_journal->page_length;
-
-                if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
-
-                    if (first_page_starting_time_s == INVALID_TIME || page_first_time_s < first_page_starting_time_s)
-                        first_page_starting_time_s = page_first_time_s;
-
-                    Pvoid_t *PValue = JudyLIns(&JudyL_page_array, page_first_time_s, PJE0);
-                    if (!PValue || PValue == PJERR)
-                        fatal("DBENGINE: corrupted judy array");
-
-                    if (unlikely(*PValue)) {
-                        // it is already in the judy
-
-                        struct page_details *pd = *PValue; (void)pd;
-//                        internal_error(
-//                                pd->first_time_s != page_first_time_s ||
-//                                pd->last_time_s != page_last_time_s ||
-//                                pd->update_every_s != page_update_every_s,
-//                                "DBENGINE: duplicate page with different retention in journal v2 "
-//                                "1st: %ld to %ld, ue %u, size %u "
-//                                "2nd: %ld to %ld, ue %ld size %zu "
-//                                "- ignoring the second",
-//                                pd->first_time_s, pd->last_time_s, pd->update_every_s, pd->page_length,
-//                                page_first_time_s, page_last_time_s, page_update_every_s, page_length);
-                    }
-                    else {
-                        struct page_details *pd = callocz(1, sizeof(*pd));
-                        pd->datafile.extent.pos = extent_list[page_entry_in_journal->extent_index].datafile_offset;
-                        pd->datafile.extent.bytes = extent_list[page_entry_in_journal->extent_index].datafile_size;
-                        pd->datafile.file = datafile->file;
-                        pd->datafile.fileno = datafile->fileno;
-                        pd->first_time_s = page_first_time_s;
-                        pd->last_time_s = page_last_time_s;
-                        pd->datafile.ptr = datafile;
-                        pd->page_length = page_length;
-                        pd->update_every_s = page_update_every_s;
-                        pd->type = page_entry_in_journal->type;
-                        pd->metric_id = metric_id;
-                        datafile_acquire_dup(datafile);
-                        pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
-                        uuid_copy(pd->datafile.extent.page_uuid, *uuid);
-                        *PValue = pd;
-
-                        // add this page to open cache
-                        {
-                            bool added = false;
-                            struct extent_io_data ei = {
-                                    .pos = pd->datafile.extent.pos,
-                                    .bytes = pd->datafile.extent.bytes,
-                                    .page_length = pd->page_length,
-                                    .file = pd->datafile.file,
-                                    .fileno = pd->datafile.fileno,
-                            };
-                            PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, (PGC_ENTRY) {
-                                    .hot = false,
-                                    .section = (Word_t) ctx,
-                                    .metric_id = metric_id,
-                                    .start_time_t = pd->first_time_s,
-                                    .end_time_t = pd->last_time_s,
-                                    .update_every = pd->update_every_s,
-                                    .data = datafile,
-                                    .size = 0,
-                                    .custom_data = (uint8_t * ) & ei,
-                            }, &added);
-
-                            if (added)
-                                datafile_acquire_dup(datafile);
-
-                            pgc_page_release(open_cache, page);
-                        }
-
-                        pages_found_in_journals_v2++;
-                        pages_total++;
-                    }
-                }
-            }
-        }
-
-        datafile_release(datafile);
-        datafile = datafile->next;
-    }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    size_t pages_jv2 = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
+                                                     add_page_from_journal_v2, &JudyL_page_array);
+    pages_total += pages_jv2;
     done_v2 = true;
 
     // --------------------------------------------------------------

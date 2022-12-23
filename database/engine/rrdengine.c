@@ -1190,11 +1190,8 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         struct rrdengine_datafile *df = ctx->datafiles.first;
         if(!datafile_acquire_for_deletion(df, false)) {
             error("Cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it."
-                  " There are %zu inflight queries and %zu open cache pages reference this datafile.",
-                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers,
-                  __atomic_load_n(&ctx->inflight_queries, __ATOMIC_RELAXED),
-                  pgc_count_pages_having_data_ptr(open_cache, datafile));
+                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it.",
+                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
             return;
         }
         info("Deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
