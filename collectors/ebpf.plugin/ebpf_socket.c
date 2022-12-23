@@ -3214,12 +3214,11 @@ static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in,
  *
  * @return It returns 1 if the IP is inside the range and 0 otherwise
  */
-static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
-                              union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
+static int ebpf_is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
+                                   union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
 {
     if (family == AF_INET) {
-        if (ntohl(rfirst->addr32[0]) <= ntohl(cmpfirst->addr32[0]) &&
-            ntohl(rlast->addr32[0]) >= ntohl(cmplast->addr32[0]))
+        if ((rfirst->addr32[0] <= cmpfirst->addr32[0]) && (rlast->addr32[0] >= cmplast->addr32[0]))
             return 1;
     } else {
         if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
@@ -3250,7 +3249,8 @@ void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
-            if (in->ver == move->ver && is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+            if (in->ver == move->ver &&
+                ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
                 info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                      in->value, move->value);
                 freez(in->value);
