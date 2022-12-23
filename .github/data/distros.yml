@@ -51,6 +51,9 @@ include:
     packages: &alma_packages
       type: rpm
       repo_distro: el/9
+      alt_links:
+        - el/9Server
+        - el/9Client
       arches:
         - x86_64
         - aarch64
@@ -61,12 +64,18 @@ include:
     packages:
       <<: *alma_packages
       repo_distro: el/8
+      alt_links:
+        - el/8Server
+        - el/8Client
 
   - distro: centos
     version: "7"
     packages:
       type: rpm
       repo_distro: el/7
+      alt_links:
+        - el/7Server
+        - el/7Client
       arches:
         - x86_64
     test:
