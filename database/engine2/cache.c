@@ -18,7 +18,7 @@ typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
 // to use arrayalloc uncomment the following line:
-// #define PGC_WITH_ARAL 1
+#define PGC_WITH_ARAL 1
 
 typedef enum __attribute__ ((__packed__)) {
     // mutually exclusive flags
@@ -1154,6 +1154,9 @@ premature_exit:
 static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
+#ifdef PGC_WITH_ARAL
+    PGC_PAGE *allocation = arrayalloc_mallocz(cache->aral);
+#endif
     PGC_PAGE *page;
     size_t spins = 0;
 
@@ -1190,7 +1193,8 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
         if (likely(!page)) {
 #ifdef PGC_WITH_ARAL
-            page = arrayalloc_mallocz(cache->aral);
+            page = allocation;
+            allocation = NULL;
 #else
             page = callocz(1, sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
@@ -1252,6 +1256,11 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         }
 
     } while(!page);
+
+#ifdef PGC_WITH_ARAL
+    if(allocation)
+        arrayalloc_freez(cache->aral, allocation);
+#endif
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
@@ -1686,7 +1695,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = arrayalloc_create(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page, max_clean_size / sizeof(PGC_PAGE) / 3,
+    cache->aral = arrayalloc_create(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page, 65536 / sizeof(PGC_PAGE),
                                     NULL, NULL, false, false);
 #endif
 
