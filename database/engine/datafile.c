@@ -139,9 +139,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                hot_pages_in_open_cache,
                                time_to_scan_ut);
         }
-
-        netdata_spinlock_unlock(&df->users.spinlock);
     }
+    netdata_spinlock_unlock(&df->users.spinlock);
 
     return can_be_deleted;
 }
