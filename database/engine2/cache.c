@@ -1918,13 +1918,24 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         struct extent_io_data *xio = (struct extent_io_data *)page->custom_data;
         if(xio->fileno != datafile_fileno) continue;
 
-        if(!page_acquire(cache, page))
+        if(page_flag_check(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2)) {
+            internal_fatal(true, "Migration to journal v2: page has already been migrated to v2");
             continue;
+        }
 
-        if(page_flag_check(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2))
+        if(!page_transition_trylock(cache, page)) {
+            internal_fatal(true, "Migration to journal v2: cannot get page transition lock");
             continue;
+        }
+
+        if(!page_acquire(cache, page)) {
+            internal_fatal(true, "Migration to journal v2: cannot acquire page for migration to v2");
+            continue;
+        }
 
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+
+        pgc_ll_unlock(cache, &cache->hot);
 
         // update the extents JudyL
 
@@ -1994,8 +2005,15 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
             count_of_unique_pages++;
         }
-        else
-            fatal("Page is already in JudyL metric pages");
+        else {
+            // impossible situation
+            internal_fatal(true, "Page is already in JudyL metric pages");
+            page_flag_clear(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
+            page_transition_unlock(cache, page);
+            page_release(cache, page, false);
+        }
+
+        pgc_ll_lock(cache, &cache->hot);
     }
     pgc_ll_unlock(cache, &cache->hot);
 
@@ -2014,6 +2032,7 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
             Word_t start_time = 0;
             while ((PValue2 = JudyLFirstThenNext(mi->JudyL_pages_by_start_time, &start_time, &start_time_first))) {
                 struct jv2_page_info *pi = *PValue2;
+                page_transition_unlock(cache, pi->page);
                 pgc_page_hot_to_dirty_and_release(cache, pi->page);
                 // make_acquired_page_clean_and_evict_or_page_release(cache, pi->page);
                 freez(pi);
