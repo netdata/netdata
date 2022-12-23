@@ -377,6 +377,7 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                         .file = datafile->file,
                         .fileno = datafile->fileno,
                 };
+
                 PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, (PGC_ENTRY) {
                         .hot = false,
                         .section = (Word_t) ctx,
@@ -388,6 +389,9 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                         .size = 0,
                         .custom_data = (uint8_t *) &ei,
                 }, &added);
+
+                if(!added)
+                    datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
 
                 callback(page, callback_data);
 
