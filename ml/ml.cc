@@ -2,7 +2,6 @@
 
 #include "Config.h"
 #include "Dimension.h"
-#include "Chart.h"
 #include "Host.h"
 
 #include <random>
@@ -46,18 +45,18 @@ void ml_init(void) {
         Cfg.RandomNums.push_back(Gen());
 }
 
-void ml_host_new(RRDHOST *RH) {
+void ml_new_host(RRDHOST *RH) {
     if (!ml_enabled(RH))
         return;
 
     Host *H = new Host(RH);
-    RH->ml_host = reinterpret_cast<ml_host_t *>(H);
+    RH->ml_host = static_cast<ml_host_t>(H);
 
     H->startAnomalyDetectionThreads();
 }
 
-void ml_host_delete(RRDHOST *RH) {
-    Host *H = reinterpret_cast<Host *>(RH->ml_host);
+void ml_delete_host(RRDHOST *RH) {
+    Host *H = static_cast<Host *>(RH->ml_host);
     if (!H)
         return;
 
@@ -67,46 +66,34 @@ void ml_host_delete(RRDHOST *RH) {
     RH->ml_host = nullptr;
 }
 
-void ml_chart_new(RRDSET *RS) {
-    Host *H = reinterpret_cast<Host *>(RS->rrdhost->ml_host);
+void ml_new_dimension(RRDDIM *RD) {
+    RRDSET *RS = RD->rrdset;
+
+    Host *H = static_cast<Host *>(RD->rrdset->rrdhost->ml_host);
     if (!H)
         return;
 
-    Chart *C = new Chart(RS);
-    RS->ml_chart = reinterpret_cast<ml_chart_t *>(C);
-
-    H->addChart(C);
-}
-
-void ml_chart_delete(RRDSET *RS) {
-    Host *H = reinterpret_cast<Host *>(RS->rrdhost->ml_host);
-    if (!H)
+    if (static_cast<unsigned>(RD->update_every) != H->updateEvery())
         return;
 
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    H->removeChart(C);
-
-    delete C;
-    RS->ml_chart = nullptr;
-}
-
-void ml_dimension_new(RRDDIM *RD) {
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
-    if (!C)
+    if (simple_pattern_matches(Cfg.SP_ChartsToSkip, rrdset_name(RS)))
         return;
 
     Dimension *D = new Dimension(RD);
-    RD->ml_dimension = reinterpret_cast<ml_dimension_t *>(D);
-    C->addDimension(D);
+    RD->ml_dimension = static_cast<ml_dimension_t>(D);
+    H->addDimension(D);
 }
 
-void ml_dimension_delete(RRDDIM *RD) {
-    Dimension *D = reinterpret_cast<Dimension *>(RD->ml_dimension);
+void ml_delete_dimension(RRDDIM *RD) {
+    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return;
 
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
-    C->removeDimension(D);
+    Host *H = static_cast<Host *>(RD->rrdset->rrdhost->ml_host);
+    if (!H)
+        delete D;
+    else
+        H->removeDimension(D);
 
     RD->ml_dimension = nullptr;
 }
@@ -115,7 +102,7 @@ char *ml_get_host_info(RRDHOST *RH) {
     nlohmann::json ConfigJson;
 
     if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
+        Host *H = static_cast<Host *>(RH->ml_host);
         H->getConfigAsJson(ConfigJson);
     } else {
         ConfigJson["enabled"] = false;
@@ -128,7 +115,7 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
     nlohmann::json ConfigJson;
 
     if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
+        Host *H = static_cast<Host *>(RH->ml_host);
         H->getDetectionInfoAsJson(ConfigJson);
     } else {
         return nullptr;
@@ -141,7 +128,7 @@ char *ml_get_host_models(RRDHOST *RH) {
     nlohmann::json ModelsJson;
 
     if (RH && RH->ml_host) {
-        Host *H = reinterpret_cast<Host *>(RH->ml_host);
+        Host *H = static_cast<Host *>(RH->ml_host);
         H->getModelsAsJson(ModelsJson);
         return strdup(ModelsJson.dump(2, '\t').c_str());
     }
@@ -149,36 +136,30 @@ char *ml_get_host_models(RRDHOST *RH) {
     return nullptr;
 }
 
-void ml_chart_update_begin(RRDSET *RS) {
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    if (!C)
-        return;
-
-    C->updateBegin();
-}
-
-void ml_chart_update_end(RRDSET *RS) {
-    Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
-    if (!C)
-        return;
-
-    C->updateEnd();
-}
-
-bool ml_is_anomalous(RRDDIM *RD, time_t CurrT, double Value, bool Exists) {
-    Dimension *D = reinterpret_cast<Dimension *>(RD->ml_dimension);
+bool ml_is_anomalous(RRDDIM *RD, double Value, bool Exists) {
+    Dimension *D = static_cast<Dimension *>(RD->ml_dimension);
     if (!D)
         return false;
 
-    Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
-
-    bool IsAnomalous = D->predict(CurrT, Value, Exists);
-    C->updateDimension(D, IsAnomalous);
-    return IsAnomalous;
+    return D->predict(Value, Exists);
 }
 
 bool ml_streaming_enabled() {
     return Cfg.StreamADCharts;
 }
+
+#if defined(ENABLE_ML_TESTS)
+
+#include "gtest/gtest.h"
+
+int test_ml(int argc, char *argv[]) {
+    (void) argc;
+    (void) argv;
+
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
+
+#endif // ENABLE_ML_TESTS
 
 #include "ml-private.h"
