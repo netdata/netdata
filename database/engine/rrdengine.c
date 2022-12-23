@@ -114,7 +114,7 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
 // ----------------------------------------------------------------------------
 // page details list
 
-static void pdc_destroy(PDC *pdc) {
+void pdc_destroy(PDC *pdc) {
     completion_destroy(&pdc->completion);
 
     Pvoid_t *PValue;
