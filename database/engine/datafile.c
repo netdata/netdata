@@ -48,7 +48,7 @@ void datafile_acquire_dup(struct rrdengine_datafile *df) {
     netdata_spinlock_unlock(&df->users.spinlock);
 }
 
-bool datafile_acquire(struct rrdengine_datafile *df) {
+bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     bool ret;
 
     netdata_spinlock_lock(&df->users.spinlock);
@@ -56,6 +56,7 @@ bool datafile_acquire(struct rrdengine_datafile *df) {
     if(df->users.available) {
         ret = true;
         df->users.lockers++;
+        df->users.lockers_by_reason[reason]++;
     }
     else
         ret = false;
@@ -65,12 +66,13 @@ bool datafile_acquire(struct rrdengine_datafile *df) {
     return ret;
 }
 
-void datafile_release(struct rrdengine_datafile *df) {
+void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason) {
     netdata_spinlock_lock(&df->users.spinlock);
     if(!df->users.lockers)
         fatal("DBENGINE DATAFILE: cannot release a datafile that is not acquired");
 
     df->users.lockers--;
+    df->users.lockers_by_reason[reason]--;
     netdata_spinlock_unlock(&df->users.spinlock);
 }
 
@@ -116,25 +118,46 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 if(!df->users.time_to_evict) {
                     // first time we did the above
                     df->users.time_to_evict = now + 120;
-                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers, 0 clean/hot open cache pages - will be deleted shortly (scanned open cache in %llu usecs)",
+                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "
+                                         "but it has %u stale lockers (oc:%u, pd:%u), "
+                                         "%zu clean and %zu hot open cache pages "
+                                         "- will be deleted shortly "
+                                         "(scanned open cache in %llu usecs)",
                                    df->fileno,
                                    df->users.lockers,
+                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+                                   clean_pages_in_open_cache,
+                                   hot_pages_in_open_cache,
                                    time_to_scan_ut);
                 }
 
                 else if(now > df->users.time_to_evict) {
                     // time expired, lets remove it
                     can_be_deleted = true;
-                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers, 0 clean/hot open cache pages - will be deleted now (scanned open cache in %llu usecs)",
+                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "
+                                         "but it has %u stale lockers (oc:%u, pd:%u), "
+                                         "%zu clean and %zu hot open cache pages "
+                                         "- will be deleted now "
+                                         "(scanned open cache in %llu usecs)",
                                    df->fileno,
                                    df->users.lockers,
+                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+                                   df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
+                                   clean_pages_in_open_cache,
+                                   hot_pages_in_open_cache,
                                    time_to_scan_ut);
                 }
             }
             else
-                internal_error(true, "DBENGINE: datafile %u should be deleted, but it has %u lockers, %zu clean and %zu hot open cache pages (scanned open cache in %llu usecs)",
+                internal_error(true, "DBENGINE: datafile %u should be deleted, "
+                                     "but it has %u stale lockers (oc:%u, pd:%u), "
+                                     "%zu clean and %zu hot open cache pages "
+                                     "(scanned open cache in %llu usecs)",
                                df->fileno,
                                df->users.lockers,
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
+                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
                                clean_pages_in_open_cache,
                                hot_pages_in_open_cache,
                                time_to_scan_ut);

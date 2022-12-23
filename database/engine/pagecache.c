@@ -90,7 +90,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     struct rrdengine_datafile *datafile = entry.data;
-    datafile_release(datafile);
+    datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
 }
 
 static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
@@ -198,7 +198,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
             if(open_cache_mode) {
                 struct rrdengine_datafile *datafile = pgc_page_data(page);
-                if(datafile_acquire(datafile)) { // for pd
+                if(datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
                     pd->datafile.ptr = pgc_page_data(page);
                     pd->datafile.file = xio->file;
@@ -367,7 +367,7 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
             time_t page_update_every_s = page_entry_in_journal->update_every_s;
             size_t page_length = page_entry_in_journal->page_length;
 
-            if(datafile_acquire(datafile)) { //for open cache item
+            if(datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) { //for open cache item
                 // add this page to open cache
                 bool added = false;
                 struct extent_io_data ei = {
@@ -402,10 +402,10 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
     return pages_found;
 }
 
-void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
+void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     struct rrdengine_datafile *datafile = pgc_page_data(page);
 
-    if(!datafile_acquire(datafile)) // for pd
+    if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) // for pd
         return;
 
     Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_t(page), PJE0);
@@ -413,7 +413,7 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
         fatal("DBENGINE: corrupted judy array");
 
     if (unlikely(*PValue)) {
-        datafile_release(datafile);
+        datafile_release(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS);
         return;
     }
 
@@ -490,7 +490,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     pass3_ut = now_monotonic_usec();
     size_t pages_jv2 = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
-                                                     add_page_from_journal_v2, &JudyL_page_array);
+                                                     add_page_details_from_journal_v2, &JudyL_page_array);
     pages_total += pages_jv2;
     done_v2 = true;
 
@@ -678,7 +678,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
 void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s,
            struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length) {
 
-    if(!datafile_acquire(datafile)) // for open cache item
+    if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_OPEN_CACHE)) // for open cache item
         fatal("DBENGINE: cannot acquire datafile to put page in open cache");
 
     struct extent_io_data ext_io_data = {
@@ -712,7 +712,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     }
 
     if(!added) {
-        datafile_release(datafile);
+        datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
 
         internal_fatal(page_entry.end_time_t > pgc_page_end_time_t(page),
                        "DBENGINE: cannot add longer page to open cache");

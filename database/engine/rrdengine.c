@@ -129,7 +129,7 @@ void pdc_destroy(PDC *pdc) {
         PDC_PAGE_STATUS status = pd->status;
 
         if(status & PDC_PAGE_DATAFILE_ACQUIRED) {
-            datafile_release(pd->datafile.ptr);
+            datafile_release(pd->datafile.ptr, DATAFILE_ACQUIRE_PAGE_DETAILS);
             pd->datafile.ptr = NULL;
         }
 

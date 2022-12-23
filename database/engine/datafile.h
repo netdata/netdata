@@ -48,14 +48,20 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         unsigned lockers;
+        unsigned lockers_by_reason[2];
         bool available;
         time_t time_to_evict;
     } users;
 };
 
+typedef enum {
+    DATAFILE_ACQUIRE_OPEN_CACHE = 0,
+    DATAFILE_ACQUIRE_PAGE_DETAILS = 1,
+} DATAFILE_ACQUIRE_REASONS;
+
 void datafile_acquire_dup(struct rrdengine_datafile *df);
-bool datafile_acquire(struct rrdengine_datafile *df);
-void datafile_release(struct rrdengine_datafile *df);
+bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
+void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
 struct rrdengine_datafile_list {
