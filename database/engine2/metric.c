@@ -11,10 +11,14 @@ struct metric {
     time_t latest_time_t_hot;       // currently collected page latest time
     uint32_t latest_update_every;   //
     SPINLOCK timestamps_lock;       // protects the 3 timestamps
+
+    // THIS IS MALLOC'd
+    // YOU HAVE TO INITIALIZE IT YOURSELF !
 };
 
 struct mrg {
     struct pgc_index {
+        ARAL *aral;
         netdata_rwlock_t rwlock;
         Pvoid_t uuid_judy;          // each UUID has a JudyL of sections (tiers)
     } index;
@@ -109,12 +113,14 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         return metric;
     }
 
-    METRIC *metric = callocz(1, sizeof(METRIC));
+    METRIC *metric = arrayalloc_mallocz(mrg->index.aral);
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
     metric->first_time_t = entry->first_time_t;
     metric->latest_time_t_clean = entry->latest_time_t;
+    metric->latest_time_t_hot = 0;
     metric->latest_update_every = entry->latest_update_every;
+    metric->timestamps_lock = NETDATA_SPINLOCK_INITIALIZER;
     *PValue = metric;
 
     mrg_index_write_unlock(mrg);
@@ -152,19 +158,15 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
     return metric;
 }
 
-static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
+static bool metric_del(MRG *mrg, METRIC *metric) {
     size_t mem_before_judyl, mem_after_judyl;
 
-    if(!having_write_lock)
-        mrg_index_write_lock(mrg);
+    mrg_index_write_lock(mrg);
 
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t));
     if(!sections_judy_pptr || !*sections_judy_pptr) {
+        mrg_index_write_unlock(mrg);
         MRG_STATS_DELETE_MISS(mrg);
-
-        if(!having_write_lock)
-            mrg_index_write_unlock(mrg);
-
         return false;
     }
 
@@ -174,11 +176,8 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
 
     if(!rc) {
+        mrg_index_write_unlock(mrg);
         MRG_STATS_DELETE_MISS(mrg);
-
-        if(!having_write_lock)
-            mrg_index_write_unlock(mrg);
-
         return false;
     }
 
@@ -189,12 +188,11 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
         mrg_stats_size_judyhs_removed_uuid(mrg);
     }
 
-    if(!having_write_lock)
-        mrg_index_write_unlock(mrg);
-
-    freez(metric);
+    mrg_index_write_unlock(mrg);
 
     MRG_STATS_DELETED_METRIC(mrg);
+    arrayalloc_freez(mrg->index.aral, metric);
+
     return true;
 }
 
@@ -204,6 +202,7 @@ static bool metric_del(MRG *mrg, METRIC *metric, bool having_write_lock) {
 MRG *mrg_create(void) {
     MRG *mrg = callocz(1, sizeof(MRG));
     netdata_rwlock_init(&mrg->index.rwlock);
+    mrg->index.aral = arrayalloc_create(sizeof(METRIC), 65536 / sizeof(METRIC), NULL, NULL, false, true);
     mrg->stats.size = sizeof(MRG);
     return mrg;
 }
@@ -229,7 +228,7 @@ METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
 
 bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
     // FIXME - support refcounting
-    return metric_del(mrg, metric, false);
+    return metric_del(mrg, metric);
 }
 
 METRIC *mrg_metric_dup(MRG *mrg __maybe_unused, METRIC *metric) {
