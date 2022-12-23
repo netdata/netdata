@@ -310,7 +310,7 @@ int security_process_accept(SSL *ssl,int msg) {
                  int counter = 0;
                  while ((err = ERR_get_error()) != 0) {
                      ERR_error_string_n(err, buf, sizeof(buf));
-                     info("%d SSL Handshake error (%s) on socket %d ", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
+                     error("%d SSL Handshake error (%s) on socket %d", counter++, ERR_error_string((long)SSL_get_error(ssl, test), NULL), sock);
 			     }
                  return NETDATA_SSL_NO_HANDSHAKE;
 			 }

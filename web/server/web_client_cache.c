@@ -11,7 +11,12 @@
 static void web_client_reuse_ssl(struct web_client *w) {
     if (netdata_ssl_srv_ctx) {
         if (w->ssl.conn) {
-            SSL_clear(w->ssl.conn);
+            SSL_SESSION *session = SSL_get_session(w->ssl.conn);
+            SSL *old = w->ssl.conn;
+            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
+            if (SSL_SESSION_is_resumable(session))
+                SSL_set_session(w->ssl.conn, session);
+            SSL_free(old);
         }
     }
 }
