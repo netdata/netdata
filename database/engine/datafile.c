@@ -83,6 +83,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 
         if(!df->users.lockers)
             can_be_deleted = true;
+
         else {
             // there are lockers
 
@@ -91,7 +92,10 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
             pgc_open_evict_clean_pages_of_datafile(open_cache, df);
             netdata_spinlock_lock(&df->users.spinlock);
 
-            if(df->users.lockers) {
+            if(!df->users.lockers)
+                can_be_deleted = true;
+
+            else {
                 // there are lockers still
 
                 // count the number of pages referencing this in the open cache
@@ -100,7 +104,10 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, df);
                 netdata_spinlock_lock(&df->users.spinlock);
 
-                if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
+                if(!df->users.lockers)
+                    can_be_deleted = true;
+
+                else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
                     // no pages in the open cache related to this datafile
 
                     time_t now = now_monotonic_sec();
@@ -108,15 +115,15 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                     if(!df->users.time_to_evict) {
                         // first time we did the above
                         df->users.time_to_evict = now + 120;
-                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u lockers - will be deleted shortly",
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers - will be deleted shortly",
                                        df->fileno,
                                        df->users.lockers);
                     }
 
-                    else if(now < df->users.time_to_evict) {
+                    else if(now > df->users.time_to_evict) {
                         // time expired, lets remove it
                         can_be_deleted = true;
-                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u lockers - will be deleted now",
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers - will be deleted now",
                                        df->fileno,
                                        df->users.lockers);
                     }
@@ -128,8 +135,6 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                    clean_pages_in_open_cache,
                                    hot_pages_in_open_cache);
             }
-            else
-                can_be_deleted = true;
         }
 
         netdata_spinlock_unlock(&df->users.spinlock);
