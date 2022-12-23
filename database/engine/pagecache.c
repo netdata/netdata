@@ -261,6 +261,13 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         struct page_details *pd = *PValue;
 
+        if(pd->last_time_s < previous_page_last_time_s) {
+           // we don't need this page
+           pd->status |= PDC_PAGE_SKIP;
+           pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
+           continue;
+        }
+
         if(unlikely(*first_page_starting_time_s == INVALID_TIME || (time_t)this_page_start_time < *first_page_starting_time_s))
             *first_page_starting_time_s = (time_t)this_page_start_time;
 
@@ -608,15 +615,20 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx __maybe_unu
     // Caller will request the next page which will be end_time + update_every so search inclusive from Index
     struct page_details *pd;
     Word_t Index = start_time_t;
-    Pvoid_t *PValue = JudyLFirst(handle->pdc->page_list_JudyL, &Index, PJE0);
-    if (!PValue || !*PValue) {
+    bool first = true;
 
-        if(next_page_start_time_s)
-            *next_page_start_time_s = INVALID_TIME;
+    do {
+        Pvoid_t *PValue = JudyLFirstThenNext(handle->pdc->page_list_JudyL, &Index, &first);
+        if (!PValue || !*PValue) {
 
-        return NULL;
-    }
-    pd = *PValue;
+            if (next_page_start_time_s)
+                *next_page_start_time_s = INVALID_TIME;
+
+            return NULL;
+        }
+        pd = *PValue;
+
+    } while(pdc_page_status_check(pd, PDC_PAGE_SKIP));
 
     PGC_PAGE *page = pd->page;
     while(!page && !pdc_page_status_check(pd, PDC_PAGE_FAILED)) {

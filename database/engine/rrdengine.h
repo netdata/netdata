@@ -57,29 +57,30 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_FAILED    = (1 << 1),                  // failed to be loaded (pd->page is null)
     PDC_PAGE_PROCESSED = (1 << 2),                  // processed by the query caller
     PDC_PAGE_RELEASED  = (1 << 3),                  // already released
+    PDC_PAGE_SKIP      = (1 << 4),                  // don't use this page
 
     // other statuses for tracking issues
 
     // data found in cache (preloaded) or on disk?
-    PDC_PAGE_PRELOADED                 = (1 << 4),  // data found in memory
-    PDC_PAGE_DISK_PENDING              = (1 << 5),  // data need to be loaded from disk
+    PDC_PAGE_PRELOADED                 = (1 << 5),  // data found in memory
+    PDC_PAGE_DISK_PENDING              = (1 << 6),  // data need to be loaded from disk
 
     // worker related statuses
-    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 6),
-    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 7),
-    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 8),
-    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 9),
+    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 7),
+    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 8),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 9),
+    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 10),
 
-    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 10),
-    PDC_PAGE_LOADED_FROM_DISK          = (1 << 11),
+    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 11),
+    PDC_PAGE_LOADED_FROM_DISK          = (1 << 12),
 
-    PDC_PAGE_PRELOADED_PASS1           = (1 << 12),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 13),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 14),
+    PDC_PAGE_PRELOADED_PASS1           = (1 << 13),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 14),
+    PDC_PAGE_PRELOADED_WORKER          = (1 << 15),
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 15),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 16),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 17),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 16),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 17),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 18),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),
