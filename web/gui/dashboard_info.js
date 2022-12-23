@@ -4286,6 +4286,9 @@ netdataDashboard.context = {
     'consul.autopilot_failure_tolerance': {
         info: 'The number of voting servers that the cluster can lose while continuing to function.'
     },
+    'consul.network_lan_rtt': {
+        info: '<a href="https://developer.hashicorp.com/consul/docs/architecture/coordinates#working-with-coordinates" target="_blank">Estimated</a> network round-trip time between this node and other nodes of the cluster.'
+    },
     'consul.raft_leader_last_contact_time': {
         info: 'The time since the leader was last able to contact the follower nodes when checking its leader lease.'
     },
