@@ -100,8 +100,10 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 
                 // count the number of pages referencing this in the open cache
                 netdata_spinlock_unlock(&df->users.spinlock);
+                usec_t time_to_scan_ut = now_monotonic_usec();
                 size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, df);
                 size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, df);
+                time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
                 netdata_spinlock_lock(&df->users.spinlock);
 
                 if(!df->users.lockers)
@@ -115,25 +117,28 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                     if(!df->users.time_to_evict) {
                         // first time we did the above
                         df->users.time_to_evict = now + 120;
-                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers - will be deleted shortly",
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers, 0 clean/hot open cache pages - will be deleted shortly (scanned open cache in %llu usecs)",
                                        df->fileno,
-                                       df->users.lockers);
+                                       df->users.lockers,
+                                       time_to_scan_ut);
                     }
 
                     else if(now > df->users.time_to_evict) {
                         // time expired, lets remove it
                         can_be_deleted = true;
-                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers - will be deleted now",
+                        internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, but it has %u stale lockers, 0 clean/hot open cache pages - will be deleted now (scanned open cache in %llu usecs)",
                                        df->fileno,
-                                       df->users.lockers);
+                                       df->users.lockers,
+                                       time_to_scan_ut);
                     }
                 }
                 else
-                    internal_error(true, "DBENGINE: datafile %u should be deleted, but it has %u lockers, %zu clean and %zu hot open cache pages",
+                    internal_error(true, "DBENGINE: datafile %u should be deleted, but it has %u lockers, %zu clean and %zu hot open cache pages (scanned open cache in %llu usecs)",
                                    df->fileno,
                                    df->users.lockers,
                                    clean_pages_in_open_cache,
-                                   hot_pages_in_open_cache);
+                                   hot_pages_in_open_cache,
+                                   time_to_scan_ut);
             }
         }
 
