@@ -354,11 +354,11 @@ bool mrg_metric_set_first_time_t_if_zero(MRG *mrg, METRIC *metric, time_t first_
     if(!metric->first_time_t) {
         metric->first_time_t = first_time_t;
 
-        if(unlikely(metric->latest_time_t_clean < metric->first_time_t))
-            metric->latest_time_t_clean = metric->first_time_t;
-
-        if(unlikely(metric->latest_time_t_hot < metric->first_time_t))
-            metric->latest_time_t_hot = metric->first_time_t;
+//        if(unlikely(metric->latest_time_t_clean < metric->first_time_t))
+//            metric->latest_time_t_clean = metric->first_time_t;
+//
+//        if(unlikely(metric->latest_time_t_hot < metric->first_time_t))
+//            metric->latest_time_t_hot = metric->first_time_t;
 
         ret = true;
     }
@@ -393,8 +393,8 @@ bool mrg_metric_set_clean_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_
     if(unlikely(!metric->first_time_t))
         metric->first_time_t = latest_time_t;
 
-    if(unlikely(metric->first_time_t > latest_time_t))
-        metric->first_time_t = latest_time_t;
+//    if(unlikely(metric->first_time_t > latest_time_t))
+//        metric->first_time_t = latest_time_t;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
@@ -410,8 +410,8 @@ bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_ti
     if(unlikely(!metric->first_time_t))
         metric->first_time_t = latest_time_t;
 
-    if(unlikely(metric->first_time_t > latest_time_t))
-        metric->first_time_t = latest_time_t;
+//    if(unlikely(metric->first_time_t > latest_time_t))
+//        metric->first_time_t = latest_time_t;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
