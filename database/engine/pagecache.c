@@ -202,7 +202,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
                 struct rrdengine_datafile *datafile = pgc_page_data(page);
                 if(datafile_acquire(datafile)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
-                    uuid_copy(pd->datafile.extent.page_uuid, *uuid);
                     pd->datafile.ptr = pgc_page_data(page);
                     pd->datafile.file = xio->file;
                     pd->datafile.extent.pos = xio->pos;
@@ -447,7 +446,6 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->update_every_s = pgc_page_update_every(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
-    uuid_copy(pd->datafile.extent.page_uuid, *mrg_metric_uuid(main_mrg, metric));
 }
 
 // Return a judyL will all pages that have start_time_ut and end_time_ut

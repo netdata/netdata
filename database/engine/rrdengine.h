@@ -92,7 +92,6 @@ struct page_details {
         unsigned fileno;
 
         struct {
-            uuid_t page_uuid; // metric UUID in extent
             uint64_t pos;
             uint32_t bytes;
         } extent;
