@@ -92,7 +92,6 @@ struct page_details {
         unsigned fileno;
 
         struct {
-            uuid_t page_uuid; // metric UUID in extent
             uint64_t pos;
             uint32_t bytes;
         } extent;
@@ -349,6 +348,7 @@ void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
 struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
 void after_journal_indexing(uv_work_t *req, int status);
 void start_journal_indexing(uv_work_t *req);
+void pdc_destroy(PDC *pdc);
 
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc);

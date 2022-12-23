@@ -9,6 +9,33 @@ PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
+pthread_key_t query_key;
+
+// To check if threads are terminatiing with pending pdc to clear
+static void query_key_release(void *data)
+{
+    info("Thread %d: Cleaning query data, but it should have been cleared", gettid());
+    struct rrdeng_query_handle *handle = data;
+    struct page_details_control *pdc = handle->pdc;
+
+    // Quick loop to verify that the datafile is still acquired
+    struct page_details *pd;
+    Pvoid_t *PValue;
+    bool first_then_next = true;
+    Word_t time_index = 0;
+    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
+        pd = *PValue;
+        PDC_PAGE_STATUS status = pd->status;
+        if(status & PDC_PAGE_DATAFILE_ACQUIRED) {
+            struct rrdengine_datafile *datafile = pd->datafile.ptr;
+            info("QUERY: Datafile %u is still acquired", datafile->fileno);
+        }
+    }
+
+    pdc_destroy(pdc);
+    pthread_setspecific(query_key, NULL);
+}
+
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
@@ -97,7 +124,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
 
     size_t pages_found_in_cache = 0;
-    uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t current_start_time_s = wanted_start_time_s;
@@ -175,7 +201,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
                 struct rrdengine_datafile *datafile = pgc_page_data(page);
                 if(datafile_acquire(datafile)) { // for pd
                     struct extent_io_data *xio = (struct extent_io_data *) pgc_page_custom_data(cache, page);
-                    uuid_copy(pd->datafile.extent.page_uuid, *uuid);
                     pd->datafile.ptr = pgc_page_data(page);
                     pd->datafile.file = xio->file;
                     pd->datafile.extent.pos = xio->pos;
@@ -402,7 +427,6 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     }
 
     Word_t metric_id = pgc_page_metric(page);
-    METRIC *metric = (METRIC *)pgc_page_metric(page);
 
     // let's add it to the judy
     struct extent_io_data *ei = pgc_page_custom_data(open_cache, page);
@@ -420,7 +444,6 @@ void add_page_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->update_every_s = pgc_page_update_every(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
-    uuid_copy(pd->datafile.extent.page_uuid, *mrg_metric_uuid(main_mrg, metric));
 }
 
 // Return a judyL will all pages that have start_time_ut and end_time_ut
@@ -547,6 +570,9 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
                                                  &first_page_first_time_s, &pages_to_load);
+
+    int ret = pthread_setspecific(query_key, handle);
+    fatal_assert(0 == ret);
 
     if (pages_to_load && handle->pdc->page_list_JudyL) {
         handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
@@ -733,6 +759,7 @@ void init_page_cache(void)
     if (!initialized) {
         initialized = true;
 
+        (void)pthread_key_create(&query_key, query_key_release);
         main_mrg = mrg_create();
 
         size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;

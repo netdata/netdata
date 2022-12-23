@@ -1078,11 +1078,11 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
 
     Word_t Index = 0;
     size_t count = 0;
-    for (PValue = JudyLFirst(JudyL_metrics, &Index, PJE0),
-        metric_info = unlikely(NULL == PValue) ? NULL : *PValue;
-         metric_info != NULL;
-         PValue = JudyLNext(JudyL_metrics, &Index, PJE0),
-        metric_info = unlikely(NULL == PValue) ? NULL : *PValue) {
+    bool first_then_next = true;
+    while ((PValue = JudyLFirstThenNext(JudyL_metrics, &Index, &first_then_next))) {
+        metric_info = *PValue;
+
+        fatal_assert(count < number_of_metrics);
         uuid_list[count++].metric_info = metric_info;
         min_time_t = MIN(min_time_t, metric_info->first_time_t);
         max_time_t = MAX(max_time_t, metric_info->last_time_t);
@@ -1202,13 +1202,11 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
     int ret, fd, error;
     uint64_t file_size, max_id;
     char path[RRDENG_PATH_MAX];
-    int should_try_migration = 0;
 
     // Do not try to load the latest file (always rebuild and live migrate)
     if (datafile->fileno != ctx->last_fileno) {
-        if (!(should_try_migration = load_journal_file_v2(ctx, journalfile, datafile))) {
+        if (!load_journal_file_v2(ctx, journalfile, datafile))
             return 0;
-        }
     }
 
     generate_journalfilepath(datafile, path, sizeof(path));

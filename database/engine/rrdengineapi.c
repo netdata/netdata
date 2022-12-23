@@ -757,6 +757,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
 
     freez(handle);
     rrdimm_handle->handle = NULL;
+    pthread_setspecific(query_key, NULL);
     netdata_thread_enable_cancelability();
 }
 
