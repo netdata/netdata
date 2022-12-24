@@ -90,38 +90,60 @@ struct replication_query {
     struct replication_dimension *data; // array of struct replication_dimension
 };
 
-static struct replication_query *replicate_chart_timeframe_init(RRDSET *st, time_t after, time_t before, bool enable_streaming, time_t wall_clock_time) {
-    size_t dimensions = rrdset_number_of_dimensions(st);
-    if (!dimensions)
-        return NULL;
+static struct replication_query *replication_query_prepare(
+        RRDSET *st,
+        time_t db_first_entry,
+        time_t db_last_entry,
+        time_t requested_after,
+        time_t requested_before,
+        time_t query_after,
+        time_t query_before,
+        bool enable_streaming,
+        time_t wall_clock_time
+) {
+    struct replication_query *q = callocz(1, sizeof(struct replication_query));
+    q->dimensions = rrdset_number_of_dimensions(st);
+    q->st = st;
 
-    if(enable_streaming && st->last_updated.tv_sec > before) {
-        internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long)before,
-                       (unsigned long long)st->last_updated.tv_sec
-        );
-        before = st->last_updated.tv_sec;
+    q->db.first_entry_t = db_first_entry;
+    q->db.last_entry_t = db_last_entry;
+
+    q->request.after = requested_after,
+    q->request.before = requested_before,
+    q->request.enable_streaming = enable_streaming,
+
+    q->query.after = query_after;
+    q->query.before = query_before;
+    q->query.enable_streaming = enable_streaming;
+
+    q->wall_clock_time = wall_clock_time;
+
+    if (!q->dimensions || !q->query.after || !q->query.before) {
+        q->query.execute = false;
+        q->dimensions = 0;
+        return q;
     }
 
-    struct replication_query *q = callocz(1, sizeof(struct replication_query));
-    q->dimensions = dimensions;
-    q->st = st;
-    q->query.after = after;
-    q->query.before = before;
-    q->query.enable_streaming = enable_streaming;
-    q->wall_clock_time = wall_clock_time;
+    if(q->query.enable_streaming && st->last_updated.tv_sec > q->query.before) {
+        internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       (unsigned long long)q->query.before,
+                       (unsigned long long)st->last_updated.tv_sec
+        );
+        q->query.before = st->last_updated.tv_sec;
+    }
+
     q->ops = &st->rrdhost->db[0].eng->api.query_ops;
-    q->data = callocz(dimensions, sizeof(struct replication_dimension));
+    q->data = callocz(q->dimensions, sizeof(struct replication_dimension));
 
     // prepare our array of dimensions
     size_t count = 0;
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st){
+    rrddim_foreach_read(rd, st) {
         if (unlikely(!rd || !rd_dfe.item || !rd->exposed))
             continue;
 
-        if (unlikely(rd_dfe.counter >= dimensions)) {
+        if (unlikely(rd_dfe.counter >= q->dimensions)) {
             internal_error(true,
                            "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st));
@@ -134,25 +156,22 @@ static struct replication_query *replicate_chart_timeframe_init(RRDSET *st, time
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, after, before);
+        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before);
         d->enabled = true;
         count++;
     }
     rrddim_foreach_done(rd);
 
-    if(!count) {
-        freez(q->data);
-        freez(q);
-        return NULL;
-    }
-
-    q->query.execute = true;
+    if(!count)
+        q->query.execute = false;
+    else
+        q->query.execute = true;
 
     return q;
 }
 
-static time_t replicate_chart_timeframe_finalize(struct replication_query *q) {
-    time_t before = q->query.before;
+static time_t replication_query_finalize(struct replication_query *q) {
+    time_t query_before = q->query.before;
     size_t dimensions = q->dimensions;
 
     // release all the dictionary items acquired
@@ -181,10 +200,10 @@ static time_t replicate_chart_timeframe_finalize(struct replication_query *q) {
     freez(q->data);
     freez(q);
 
-    return before;
+    return query_before;
 }
 
-static time_t replicate_chart_timeframe_execute_and_finalize(BUFFER *wb, struct replication_query *q) {
+static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q) {
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
@@ -192,8 +211,8 @@ static time_t replicate_chart_timeframe_execute_and_finalize(BUFFER *wb, struct 
     time_t wall_clock_time = q->wall_clock_time;
     time_t update_every = q->st->update_every;
 
-    if(!after || !before || !q->ops || !q->data)
-        return replicate_chart_timeframe_finalize(q);
+    if(!q->query.execute)
+        return replication_query_finalize(q);
 
     size_t points_read = q->points_read, points_generated = q->points_generated;
 
@@ -306,10 +325,10 @@ static time_t replicate_chart_timeframe_execute_and_finalize(BUFFER *wb, struct 
 
     q->points_read = points_read;
     q->points_generated = points_generated;
-    return replicate_chart_timeframe_finalize(q);
+    return replication_query_finalize(q);
 }
 
-static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
+static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(!rd->exposed) continue;
@@ -330,56 +349,56 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     );
 }
 
-static struct replication_query *replicate_chart_response_prepare(RRDSET *st, bool start_streaming, time_t after, time_t before) {
-    time_t query_after = after;
-    time_t query_before = before;
-    time_t now = now_realtime_sec();
+static struct replication_query *replication_response_prepare(RRDSET *st, bool start_streaming, time_t requested_after, time_t requested_before) {
+    time_t query_after = requested_after;
+    time_t query_before = requested_before;
+    time_t wall_clock_time = now_realtime_sec();
     time_t tolerance = 2;   // sometimes from the time we get this value, to the time we check,
-    // a data collection has been made
-    // so, we give this tolerance to detect invalid timestamps
+                            // a data collection has been made
+                            // so, we give this tolerance to detect invalid timestamps
 
     // find the first entry we have
-    time_t first_entry_local = rrdset_first_entry_t(st);
-    if (first_entry_local > now + tolerance) {
+    time_t db_first_entry = rrdset_first_entry_t(st);
+    if (db_first_entry > wall_clock_time + tolerance) {
         internal_error(true,
                        "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db first time %llu is in the future (now is %llu)",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long) first_entry_local, (unsigned long long) now);
-        first_entry_local = now;
+                       (unsigned long long) db_first_entry, (unsigned long long) wall_clock_time);
+        db_first_entry = wall_clock_time;
     }
 
-    if (query_after < first_entry_local)
-        query_after = first_entry_local;
+    if (query_after < db_first_entry)
+        query_after = db_first_entry;
 
     // find the latest entry we have
-    time_t last_entry_local = st->last_updated.tv_sec;
-    if (!last_entry_local) {
+    time_t db_last_entry = st->last_updated.tv_sec;
+    if (!db_last_entry) {
         internal_error(true,
                        "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' RRDSET reports last updated time zero.",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st));
-        last_entry_local = rrdset_last_entry_t(st);
-        if (!last_entry_local) {
+        db_last_entry = rrdset_last_entry_t(st);
+        if (!db_last_entry) {
             internal_error(true,
                            "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db reports last time zero.",
                            rrdhost_hostname(st->rrdhost), rrdset_id(st));
-            last_entry_local = now;
+            db_last_entry = wall_clock_time;
         }
     }
 
-    if (last_entry_local > now + tolerance) {
+    if (db_last_entry > wall_clock_time + tolerance) {
         internal_error(true,
                        "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' last updated time %llu is in the future (now is %llu)",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long) last_entry_local, (unsigned long long) now);
-        last_entry_local = now;
+                       (unsigned long long) db_last_entry, (unsigned long long) wall_clock_time);
+        db_last_entry = wall_clock_time;
     }
 
-    if (query_before > last_entry_local)
-        query_before = last_entry_local;
+    if (query_before > db_last_entry)
+        query_before = db_last_entry;
 
     // if the parent asked us to start streaming, then fill the rest with the data that we have
     if (start_streaming)
-        query_before = last_entry_local;
+        query_before = db_last_entry;
 
     if (query_after > query_before) {
         time_t tmp = query_before;
@@ -387,36 +406,17 @@ static struct replication_query *replicate_chart_response_prepare(RRDSET *st, bo
         query_after = tmp;
     }
 
-    bool enable_streaming = (start_streaming || query_before == last_entry_local || !after || !before) ? true : false;
+    bool enable_streaming = (start_streaming || query_before == db_last_entry || !requested_after || !requested_before) ? true : false;
 
-    struct replication_query *q = NULL;
-    if (after != 0 && before != 0)
-        q = replicate_chart_timeframe_init(st, query_after, query_before, enable_streaming, now);
-
-    if (!q) {
-        after = 0;
-        before = 0;
-        enable_streaming = true;
-
-        q = callocz(1, sizeof(struct replication_query));
-        q->query.execute = false;
-        q->query.before = before;
-        q->query.after = after;
-        q->query.enable_streaming = enable_streaming;
-        q->wall_clock_time = now;
-    }
-
-    q->st = st;
-    q->request.after = after;
-    q->request.before = before;
-    q->request.enable_streaming = enable_streaming;
-    q->db.first_entry_t = first_entry_local;
-    q->db.last_entry_t = last_entry_local;
-
-    return q;
+    return replication_query_prepare(
+            st,
+            db_first_entry, db_last_entry,
+            requested_after, requested_before,
+            query_after, query_before, enable_streaming,
+            wall_clock_time);
 }
 
-bool replicate_chart_response_execute_and_finalize(struct replication_query *q) {
+bool replication_response_execute_and_finalize(struct replication_query *q) {
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
     time_t after = q->request.after;
@@ -433,10 +433,7 @@ bool replicate_chart_response_execute_and_finalize(struct replication_query *q) 
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
-    if(q->query.execute)
-        before = replicate_chart_timeframe_execute_and_finalize(wb, q);
-    else
-        freez(q);
+    before = replication_query_execute_and_finalize(wb, q);
 
     // IMPORTANT: q is invalid now
     q = NULL;
@@ -450,7 +447,7 @@ bool replicate_chart_response_execute_and_finalize(struct replication_query *q) 
             enable_streaming = false;
         }
         else
-            replicate_chart_collection_state(wb, st);
+            replication_send_chart_collection_state(wb, st);
     }
 
     // end with first/last entries we have, and the first start time and
@@ -1139,14 +1136,14 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(likely(workers))
             worker_is_busy(WORKER_JOB_PREPARE_QUERY);
 
-        rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+        rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
     }
 
     if(likely(workers))
         worker_is_busy(WORKER_JOB_QUERYING);
 
     // send the replication data
-    bool start_streaming = replicate_chart_response_execute_and_finalize(rq->q);
+    bool start_streaming = replication_response_execute_and_finalize(rq->q);
 
     netdata_thread_enable_cancelability();
 
@@ -1360,7 +1357,7 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-#define REQUESTS_PREPARE_AHEAD (50)
+#define REQUESTS_PREPARE_AHEAD (100)
 
 static int replication_execute_next_pending_request(void) {
     static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
@@ -1390,7 +1387,7 @@ static int replication_execute_next_pending_request(void) {
 
             if (rq->st && !rq->q) {
                 worker_is_busy(WORKER_JOB_PREPARE_QUERY);
-                rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+                rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
             }
         }
 

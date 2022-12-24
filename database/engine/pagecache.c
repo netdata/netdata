@@ -458,7 +458,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
-    size_t pages_found_in_cache = 0, pages_found_in_open = 0, pages_found_in_journals_v2 = 0, pages_found_pass4 = 0, pages_pending = 0, pages_total = 0;
+    size_t pages_found_in_main_cache = 0, pages_found_in_open_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass4 = 0, pages_pending = 0, pages_total = 0;
     size_t cache_gaps = 0, query_gaps = 0;
     bool done_v2 = false, done_open = false;
 
@@ -475,10 +475,10 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                                                 &first_page_starting_time_s, false,
                                                 PDC_PAGE_PRELOADED_PASS1 | PDC_PAGE_SOURCE_MAIN_CACHE);
     query_gaps += cache_gaps;
-    pages_found_in_cache += pages_pass1;
+    pages_found_in_main_cache += pages_pass1;
     pages_total += pages_pass1;
 
-    if(pages_found_in_cache && !cache_gaps)
+    if(pages_found_in_main_cache && !cache_gaps)
         goto we_are_done;
 
 
@@ -492,7 +492,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
                                                 &first_page_starting_time_s, true,
                                                 PDC_PAGE_SOURCE_OPEN_CACHE);
     query_gaps += cache_gaps;
-    pages_found_in_open += pages_pass2;
+    pages_found_in_open_cache += pages_pass2;
     pages_total += pages_pass2;
     done_open = true;
 
@@ -500,9 +500,10 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     // PASS 3: Check Journal v2 to fill the gaps
 
     pass3_ut = now_monotonic_usec();
-    size_t pages_jv2 = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
-                                                     add_page_details_from_journal_v2, &JudyL_page_array);
-    pages_total += pages_jv2;
+    size_t pages_pass3 = get_page_list_from_journal_v2(ctx, metric, start_time_ut, end_time_ut,
+                                                       add_page_details_from_journal_v2, &JudyL_page_array);
+    pages_found_in_journals_v2 += pages_pass3;
+    pages_total += pages_pass3;
     done_v2 = true;
 
     // --------------------------------------------------------------
@@ -538,10 +539,10 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_open, done_open ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_journal_v2, done_v2 ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_main_cache, pages_found_in_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_cache, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_found_in_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
 

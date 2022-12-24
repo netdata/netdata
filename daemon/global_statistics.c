@@ -1629,7 +1629,7 @@ static void dbengine2_statistics_charts(void) {
                     "stats",
                     priority,
                     localhost->rrd_update_every,
-                    RRDSET_TYPE_STACKED);
+                    RRDSET_TYPE_LINE);
 
             rd_queries = rrddim_add(st_queries_running, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
