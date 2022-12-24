@@ -1355,37 +1355,36 @@ static void replication_initialize_workers(bool master) {
 
 static int replication_execute_next_pending_request(void) {
     static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
-    static __thread int rqs_last_executed = REQUESTS_PREPARE_AHEAD - 1, rqs_last_got = -1;
+    static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
+    struct replication_request *rq;
 
-    while(rqs_last_got != rqs_last_executed) {
-        if(++rqs_last_got >= REQUESTS_PREPARE_AHEAD)
-            rqs_last_got = 0;
+    // fill the queue
+    do {
+        if(++rqs_last_prepared >= REQUESTS_PREPARE_AHEAD)
+            rqs_last_prepared = 0;
 
         worker_is_busy(WORKER_JOB_FIND_NEXT);
-        rqs[rqs_last_got] = replication_request_get_first_available();
-        struct replication_request *rq = &rqs[rqs_last_got];
+        rqs[rqs_last_prepared] = replication_request_get_first_available();
+        rq = &rqs[rqs_last_prepared];
 
-        if(!rq->found)
-            break;
+        if(rq->found) {
+            if (!rq->st)
+                rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
 
-        if(!rq->st)
-            rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+            if (rq->st && !rq->q)
+                rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+        }
 
-        if(rq->st && !rq->q)
-            rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
-    }
+    } while(rq->found && rqs_last_prepared != rqs_last_executed);
 
-    if(++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
-        rqs_last_executed = 0;
-
-    struct replication_request *rq = &rqs[rqs_last_executed];
-
-    while(!rq->found && rqs_last_executed != rqs_last_got) {
-        if(++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
+    // pick the first usable
+    do {
+        if (++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
             rqs_last_executed = 0;
 
         rq = &rqs[rqs_last_executed];
-    }
+
+    } while(!rq->found && rqs_last_executed != rqs_last_prepared);
 
     if(unlikely(!rq->found)) {
         worker_is_idle();
