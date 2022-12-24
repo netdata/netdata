@@ -260,14 +260,29 @@ Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_first_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
-//    internal_fatal(first_time_t > now_realtime_sec(),
-//                   "DBENGINE METRIC: metric first time is in the future");
-
     netdata_spinlock_lock(&metric->timestamps_lock);
     metric->first_time_t = first_time_t;
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
     return true;
+}
+
+void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t, time_t last_time_t, time_t update_every) {
+    netdata_spinlock_lock(&metric->timestamps_lock);
+
+    if(first_time_t && (!metric->first_time_t || first_time_t < metric->first_time_t))
+        metric->first_time_t = first_time_t;
+
+    if(last_time_t && (!metric->latest_time_t_clean || last_time_t > metric->latest_time_t_clean)) {
+        metric->latest_time_t_clean = last_time_t;
+
+        if(update_every)
+            metric->latest_update_every = update_every;
+    }
+    else if(!metric->latest_update_every && update_every)
+        metric->latest_update_every = update_every;
+
+    netdata_spinlock_unlock(&metric->timestamps_lock);
 }
 
 bool mrg_metric_set_first_time_t_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
@@ -353,18 +368,36 @@ time_t mrg_metric_get_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
-    __atomic_store_n(&metric->latest_update_every, update_every, __ATOMIC_RELEASE);
+    if(!update_every)
+        return false;
+
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    metric->latest_update_every = update_every;
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
     return true;
 }
 
 bool mrg_metric_set_update_every_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
-    uint32_t expected = 0;
-    return __atomic_compare_exchange_n(&metric->latest_update_every, &expected, update_every,
-                                        false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+    if(!update_every)
+        return false;
+
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    if(!metric->latest_update_every)
+        metric->latest_update_every = update_every;
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
+    return true;
 }
 
 time_t mrg_metric_get_update_every(MRG *mrg __maybe_unused, METRIC *metric) {
-    return __atomic_load_n(&metric->latest_update_every, __ATOMIC_ACQUIRE);
+    time_t update_every;
+
+    netdata_spinlock_lock(&metric->timestamps_lock);
+    update_every = metric->latest_update_every;
+    netdata_spinlock_unlock(&metric->timestamps_lock);
+
+    return update_every;
 }
 
 struct mrg_statistics mrg_get_statistics(MRG *mrg) {

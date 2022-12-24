@@ -9,22 +9,30 @@ static void update_metric_retention_and_granularity_by_uuid(
                 time_t first_time, time_t last_time,
                 time_t update_every, time_t now_s)
 {
-    if(first_time > last_time ||
-        last_time == 0 ||
-        first_time > now_s) {
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: invalid on-disk timestamps (%ld - %ld, now %ld), "
-                          "ignoring values",
-                          first_time, last_time, now_s);
-        return;
-    }
-
     if(last_time > now_s) {
         error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: future on-disk timestamps (%ld - %ld, now %ld), "
+        error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
                           "fixing last time to now",
                           first_time, last_time, now_s);
         last_time = now_s;
+    }
+
+    if(first_time > last_time) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
+                          "fixing first time to last time",
+                          first_time, last_time, now_s);
+
+        first_time = last_time;
+    }
+
+    if( first_time == 0 ||
+        last_time == 0
+        ) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
+                          "using them as-is",
+                          first_time, last_time, now_s);
     }
 
     MRG_ENTRY entry = {
@@ -35,23 +43,11 @@ static void update_metric_retention_and_granularity_by_uuid(
     };
     uuid_copy(entry.uuid, *uuid);
 
-    bool just_added;
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &just_added);
+    bool added;
+    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
 
-    if (likely(!just_added)) {
-        time_t oldest_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
-        time_t latest_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
-
-        if (oldest_time_t > first_time)
-            mrg_metric_set_first_time_t(main_mrg, metric, first_time);
-
-        if (latest_time_t < last_time) {
-            if(update_every)
-                mrg_metric_set_update_every(main_mrg, metric, update_every);
-
-            mrg_metric_set_clean_latest_time_t(main_mrg, metric, last_time);
-        }
-    }
+    if (likely(!added))
+        mrg_metric_expand_retention(main_mrg, metric, first_time, last_time, update_every);
 
     mrg_metric_release(main_mrg, metric);
 }
@@ -436,37 +432,29 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         bool update_metric_time = true;
         if (!metric) {
-            MRG_ENTRY entry;
+            MRG_ENTRY entry = {
+                    .section = (Word_t)ctx,
+                    .first_time_t = vd.start_time_s,
+                    .latest_time_t = vd.end_time_s,
+                    .latest_update_every = vd.update_every_s,
+            };
             uuid_copy(entry.uuid, *temp_id);
-            entry.section = (Word_t)ctx;
-            entry.first_time_t = vd.start_time_s;
-            entry.latest_time_t =  vd.end_time_s;
-            entry.latest_update_every = vd.update_every_s;
-            metric = mrg_metric_add_and_acquire(main_mrg, entry, NULL);
-            update_metric_time = false;
+
+            bool added;
+            metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+            if(added)
+                update_metric_time = false;
         }
         Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+        if (update_metric_time)
+            mrg_metric_expand_retention(main_mrg, metric, vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
         pgc_open_add_hot_page(
                 (Word_t)ctx, metric_id, vd.start_time_s, vd.end_time_s, vd.update_every_s,
                 journalfile->datafile,
                 jf_metric_data->extent_offset, jf_metric_data->extent_size, jf_metric_data->descr[i].page_length);
 
-        if (update_metric_time) {
-            time_t metric_first_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
-            time_t metric_last_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
-
-            if (metric_first_time_t > vd.start_time_s)
-                mrg_metric_set_first_time_t(main_mrg, metric, vd.start_time_s);
-
-            if (metric_last_time_t < vd.end_time_s) {
-
-                if(vd.update_every_s)
-                    mrg_metric_set_update_every(main_mrg, metric, vd.update_every_s);
-
-                mrg_metric_set_clean_latest_time_t(main_mrg, metric, vd.end_time_s);
-            }
-        }
         mrg_metric_release(main_mrg, metric);
     }
 }

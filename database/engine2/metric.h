@@ -44,6 +44,7 @@ Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 bool mrg_metric_set_first_time_t(MRG *mrg, METRIC *metric, time_t first_time_t);
 bool mrg_metric_set_first_time_t_if_zero(MRG *mrg, METRIC *metric, time_t first_time_t);
 time_t mrg_metric_get_first_time_t(MRG *mrg, METRIC *metric);
+void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t, time_t last_time_t, time_t update_every);
 
 bool mrg_metric_set_clean_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t);
 bool mrg_metric_set_hot_latest_time_t(MRG *mrg, METRIC *metric, time_t latest_time_t);
