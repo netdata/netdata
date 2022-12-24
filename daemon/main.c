@@ -23,7 +23,105 @@ struct config netdata_config = {
         }
 };
 
+//typedef enum {
+//    SERVICE_MAINTENANCE   = (1 << 0),
+//    SERVICE_COLLECTORS    = (1 << 1),
+//    SERVICE_ML_TRAINING   = (1 << 2),
+//    SERVICE_ML_PREDICTION = (1 << 3),
+//    SERVICE_REPLICATION   = (1 << 4),
+//    SERVICE_QUERIES       = (1 << 5),
+//    SERVICE_WEB           = (1 << 6),
+//    SERVICE_ACLK          = (1 << 7),
+//    SERVICE_HEALTH        = (1 << 8),
+//    SERVICE_STREAMING     = (1 << 9),
+//    SERVICE_METASYNC      = (1 << 10),
+//    SERVICE_DBENGINE      = (1 << 11),
+//    SERVICE_CONTEXT       = (1 << 12),
+//} SERVICE_TYPE;
+//
+//typedef enum {
+//    SERVICE_THREAD_TYPE_NETDATA,
+//    SERVICE_THREAD_TYPE_LIBUV,
+//} SERVICE_THREAD_TYPE;
+//
+//typedef void (*force_quit_t)(void *data);
+//
+//typedef struct service_thread {
+//    pid_t tid;
+//    SERVICE_THREAD_TYPE type;
+//    const char *tag;
+//
+//    union {
+//        netdata_thread_t *netdata_thread;
+//        uv_thread_t *uv_thread;
+//    };
+//
+//    force_quit_t force_quit_callback;
+//    void *data;
+//} SERVICE_THREAD;
+//
+//void service_register(SERVICE_THREAD_TYPE thread_type, force_quit_t force_quit_callback, void *data) {
+//
+//}
+//
+//bool service_running(SERVICE_TYPE service) {
+//    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL);
+//}
+//
+//void service_exits(void) {
+//
+//}
+//
+//bool service_is_running(SERVICE_TYPE service) {
+//
+//}
+//
+//void service_signal_exit(SERVICE_TYPE service) {
+//
+//}
+//
+//void service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
+//
+//}
+
 void netdata_cleanup_and_exit(int ret) {
+
+//    service_signal_exit(
+//            SERVICE_MAINTENANCE
+//            | SERVICE_COLLECTORS
+//            | SERVICE_REPLICATION
+//            | SERVICE_QUERIES
+//            | SERVICE_HEALTH
+//            | SERVICE_WEB
+//            | SERVICE_STREAMING
+//            | SERVICE_ML_TRAINING
+//            );
+//
+//    service_wait_exit(SERVICE_COLLECTORS, 10 * USEC_PER_SEC);
+//
+//    service_signal_exit(
+//            SERVICE_ML_PREDICTION
+//            | SERVICE_ACLK
+//            );
+//
+//    service_wait_exit(SERVICE_ACLK, 10 * USEC_PER_SEC);
+//    service_signal_exit(SERVICE_CONTEXT);
+//
+//    metadata_sync_shutdown_prepare();
+//
+//    rrdhost_cleanup_all();
+//
+//    rrdhost_free_all();
+//
+//    service_signal_exit(
+//            SERVICE_METASYNC
+//            | SERVICE_DBENGINE
+//    );
+//
+//    service_wait_exit(~0, 10 * USEC_PER_SEC);
+
+
+
     // enabling this, is wrong
     // because the threads will be cancelled while cleaning up
     // netdata_exit = 1;
