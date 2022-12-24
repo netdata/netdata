@@ -732,6 +732,12 @@ netdataDashboard.menu = {
         title: 'Cassandra',
         icon: '<i class="fas fa-database"></i>',
         info: 'Performance metrics for Cassandra, the open source distributed NoSQL database management system'
+    },
+
+    'consul': {
+        title: 'Consul',
+        icon: '<i class="fas fa-circle-notch"></i>',
+        info: 'Consul performance and health metrics. For details, see <a href="https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics" target="_blank">Key Metrics</a>.'
     }
 };
 
@@ -4216,6 +4222,111 @@ netdataDashboard.context = {
     },
     'cassandra.storage_exceptions_rate': {
         info: 'Requests for which a storage exception was encountered.'
+    },
+
+    // ------------------------------------------------------------------------
+    // Consul
+    'consul.node_health_check_status': {
+        info: 'The current status of the <a href="https://developer.hashicorp.com/consul/tutorials/developer-discovery/service-registration-health-checks#monitor-a-node" target="_blank">node health check</a>. A node health check monitors the health of the entire node. If the node health check fails, Consul marks the node as unhealthy.'
+    },
+    'consul.service_health_check_status': {
+        info: 'The current status of the <a href="https://developer.hashicorp.com/consul/tutorials/developer-discovery/service-registration-health-checks#monitor-a-service" target="_blank">service health check</a>. A service check only affects the health of the service it is associated with. If the service health check fails, the DNS interface stops returning that service.'
+    },
+    'consul.client_rpc_requests_rate': {
+        info: 'The number of RPC requests to a Consul server.'
+    },
+    'consul.client_rpc_requests_exceeded_rate': {
+        info: 'The number of rate-limited RPC requests to a Consul server. An Increase of this metric either indicates the load is getting high enough to limit the rate or a <a href="https://developer.hashicorp.com/consul/docs/agent/config/config-files#limits" target="_blank">incorrectly configured</a> Consul agent.'
+    },
+    'consul.client_rpc_requests_failed_rate': {
+        info: 'The number of failed RPC requests to a Consul server.'
+    },
+    'consul.memory_allocated': {
+        info: 'The amount of memory allocated by the Consul process.'
+    },
+    'consul.memory_sys': {
+        info: 'The amount of memory obtained from the OS.'
+    },
+    'consul.gc_pause_time': {
+        info: 'The amount of time spent in garbage collection (GC) pauses. GC pause is a "stop-the-world" event, meaning that all runtime threads are blocked until GC completes. If memory usage is high, the Go runtime may GC so frequently that it starts to slow down Consul.'
+    },
+    'consul.kvs_apply_time': {
+        info: 'The time it takes to complete an update to the KV store.'
+    },
+    'consul.kvs_apply_operations_rate': {
+        info: 'The number of KV store updates.'
+    },
+    'consul.txn_apply_time': {
+        info: 'The time spent applying a transaction operation.'
+    },
+    'consul.txn_apply_operations_rate': {
+        info: 'The number of applied transaction operations.'
+    },
+    'consul.raft_commit_time': {
+        info: 'The time it takes to commit a new entry to the Raft log on the leader.'
+    },
+    'consul.raft_commits_rate': {
+        info: 'The number of applied Raft transactions.'
+    },
+    'consul.autopilot_health_status': {
+        info: 'The overall health of the local server cluster. The status is healthy if <b>all servers</b> are considered healthy by Autopilot.'
+    },
+    'consul.autopilot_server_health_status': {
+        info: 'Whether the server is healthy according to the current <a href="https://developer.hashicorp.com/consul/tutorials/datacenter-operations/autopilot-datacenter-operations#server-health-checking", target="_blank">Autopilot configuration</a>.'
+    },
+    'consul.autopilot_server_stable_time': {
+        info: 'The time this server has been in its current state.'
+    },
+    'consul.autopilot_server_serf_status': {
+        info: 'The SerfHealth check status for the server.'
+    },
+    'consul.autopilot_server_voter_status': {
+        info: 'Whether the server is a voting member of the Raft cluster.'
+    },
+    'consul.autopilot_failure_tolerance': {
+        info: 'The number of voting servers that the cluster can lose while continuing to function.'
+    },
+    'consul.network_lan_rtt': {
+        info: '<a href="https://developer.hashicorp.com/consul/docs/architecture/coordinates#working-with-coordinates" target="_blank">Estimated</a> network round-trip time between this node and other nodes of the cluster.'
+    },
+    'consul.raft_leader_last_contact_time': {
+        info: 'The time since the leader was last able to contact the follower nodes when checking its leader lease.'
+    },
+    'consul.raft_follower_last_contact_leader_time': {
+        info: 'The time elapsed since this server last contacted the leader.'
+    },
+    'consul.raft_leader_elections_rate': {
+        info: 'The number of leadership elections. Increments whenever a Consul server starts an election.'
+    },
+    'consul.raft_leadership_transitions_rate': {
+        info: 'The number of leadership elections. Increments whenever a Consul server becomes a leader.'
+    },
+    'consul.server_leadership_status': {
+        info: 'The Consul server leadership status.'
+    },
+    'consul.raft_thread_main_saturation_perc': {
+        info: 'An approximate measurement of the proportion of time the main Raft goroutine is busy and unavailable to accept new work.'
+    },
+    'consul.raft_thread_fsm_saturation_perc': {
+        info: 'An approximate measurement of the proportion of time the Raft FSM goroutine is busy and unavailable to accept new work.'
+    },
+    'consul.raft_fsm_last_restore_duration': {
+        info: 'The time taken to restore the FSM from a snapshot on an agent restart or from the leader calling <i>installSnapshot</i>.'
+    },
+    'consul.raft_leader_oldest_log_age': {
+        info: 'The time elapsed since the oldest journal was written to the leader\'s journal storage. This can be important for the health of replication when the write rate is high and the snapshot is large, because followers may not be able to recover from a restart if recovery takes longer than the minimum for the current leader.'
+    },
+    'consul.raft_rpc_install_snapshot_time': {
+        info: 'The time it takes to process the <i>installSnapshot</i> RPC call.'
+    },
+    'consul.raft_boltdb_freelist_bytes': {
+        info: 'The number of bytes necessary to encode the freelist metadata. When <a href="https://developer.hashicorp.com/consul/docs/agent/config/config-files#NoFreelistSync" target="_blank">raft_boltdb.NoFreelistSync</a> is set to <i>false</i> these metadata bytes must also be written to disk for each committed log.'
+    },
+    'consul.raft_boltdb_logs_per_batch_rate': {
+        info: 'The number of logs written per batch to the database.'
+    },
+    'consul.raft_boltdb_store_logs_time': {
+        info: 'The amount of time spent writing logs to the database.'
     },
 
     // ------------------------------------------------------------------------

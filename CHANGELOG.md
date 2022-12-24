@@ -6,13 +6,18 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.47.0 [\#14182](https://github.com/netdata/netdata/pull/14182) ([ilyam8](https://github.com/ilyam8))
+- fix logrotate postrotate [\#14180](https://github.com/netdata/netdata/pull/14180) ([ilyam8](https://github.com/ilyam8))
 - docs: explicitly set the `nofile` limit for Netdata container and document the reason for this [\#14178](https://github.com/netdata/netdata/pull/14178) ([ilyam8](https://github.com/ilyam8))
+- remove interface name from cgroup net family [\#14174](https://github.com/netdata/netdata/pull/14174) ([ilyam8](https://github.com/ilyam8))
+- use specific charts labels instead of family in alarms [\#14173](https://github.com/netdata/netdata/pull/14173) ([ilyam8](https://github.com/ilyam8))
 - Revert "Refactor ML code and add support for multiple KMeans models. … [\#14172](https://github.com/netdata/netdata/pull/14172) ([vkalintiris](https://github.com/vkalintiris))
 - fix a typo in debian postinst [\#14171](https://github.com/netdata/netdata/pull/14171) ([ilyam8](https://github.com/ilyam8))
 - feat\(packaging\): add netdata to www-data group on Proxmox [\#14168](https://github.com/netdata/netdata/pull/14168) ([ilyam8](https://github.com/ilyam8))
 - minor - fix localhost nodeinstance fnc caps [\#14166](https://github.com/netdata/netdata/pull/14166) ([underhood](https://github.com/underhood))
 - minor - Adds query type "function\[s\]" for aclk chart [\#14165](https://github.com/netdata/netdata/pull/14165) ([underhood](https://github.com/underhood))
 - Fix race on query thread startup [\#14164](https://github.com/netdata/netdata/pull/14164) ([underhood](https://github.com/underhood))
+- add alarms and dashboard info for Consul [\#14163](https://github.com/netdata/netdata/pull/14163) ([ilyam8](https://github.com/ilyam8))
 - Ensure --claim-url for the claim script is a URL [\#14160](https://github.com/netdata/netdata/pull/14160) ([ralphm](https://github.com/ralphm))
 - Finish switch to self-hosted RPM repositories. [\#14158](https://github.com/netdata/netdata/pull/14158) ([Ferroin](https://github.com/Ferroin))
 - fix nodejs app detection [\#14156](https://github.com/netdata/netdata/pull/14156) ([ilyam8](https://github.com/ilyam8))
@@ -351,9 +356,6 @@
 - fix\(health\): set default curl connection timeout if not set [\#13529](https://github.com/netdata/netdata/pull/13529) ([ilyam8](https://github.com/ilyam8))
 - Update FreeIPMI and CUPS plugin documentation. [\#13526](https://github.com/netdata/netdata/pull/13526) ([Ferroin](https://github.com/Ferroin))
 - Use LVM UUIDs in chart ids for logical volumes [\#13525](https://github.com/netdata/netdata/pull/13525) ([vlvkobal](https://github.com/vlvkobal))
-- fix\(cgroups.plugin\): use Docker API for name resolution when Docker is a snap package [\#13523](https://github.com/netdata/netdata/pull/13523) ([ilyam8](https://github.com/ilyam8))
-- remove reference to charts now in netdata monitoring [\#13521](https://github.com/netdata/netdata/pull/13521) ([andrewm4894](https://github.com/andrewm4894))
-- fix\(ci\): fix fetching tags in Build workflow [\#13517](https://github.com/netdata/netdata/pull/13517) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
