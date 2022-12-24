@@ -329,7 +329,7 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     );
 }
 
-static struct replication_query *replicate_chart_response_init(RRDSET *st, bool start_streaming, time_t after, time_t before) {
+static struct replication_query *replicate_chart_response_prepare(RRDSET *st, bool start_streaming, time_t after, time_t before) {
     time_t query_after = after;
     time_t query_before = before;
     time_t now = now_realtime_sec();
@@ -711,6 +711,8 @@ struct replication_request {
     bool indexed_in_judy;               // true when the request is indexed in judy
     bool not_indexed_buffer_full;       // true when the request is not indexed because the sender is full
 
+    // prepare ahead members
+    RRDSET *st;
     struct replication_query *q;
 };
 
@@ -1117,8 +1119,10 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     if(likely(workers))
         worker_is_busy(WORKER_JOB_FIND_CHART);
 
-    RRDSET *st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
-    if(!st) {
+    if(!rq->st)
+        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+
+    if(!rq->st) {
         internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' not found",
                        rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
 
@@ -1131,7 +1135,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     netdata_thread_disable_cancelability();
 
     if(!rq->q)
-        rq->q = replicate_chart_response_init(st, rq->start_streaming, rq->after, rq->before);
+        rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
 
     // send the replication data
     bool start_streaming = replicate_chart_response_execute_and_finalize(rq->q);
@@ -1142,19 +1146,19 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         // enable normal streaming if we have to
         // but only if the sender buffer has not been flushed since we started
 
-        if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-            rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+        if(rrdset_flag_check(rq->st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+            rrdset_flag_clear(rq->st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+            rrdset_flag_set(rq->st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+            rrdhost_sender_replicating_charts_minus_one(rq->st->rrdhost);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
             internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
+                           rrdhost_hostname(rq->st->rrdhost), rrdset_id(rq->st));
 #endif
         }
         else
             internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
-                           rrdhost_hostname(st->rrdhost), string2str(rq->chart_id));
+                           rrdhost_hostname(rq->st->rrdhost), string2str(rq->chart_id));
     }
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
@@ -1347,24 +1351,56 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-static int replication_execute_next_pending_request(void) {
-    worker_is_busy(WORKER_JOB_FIND_NEXT);
-    struct replication_request rq = replication_request_get_first_available();
+#define REQUESTS_PREPARE_AHEAD (100)
 
-    if(unlikely(!rq.found)) {
+static int replication_execute_next_pending_request(void) {
+    static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
+    static __thread int rqs_last_executed = REQUESTS_PREPARE_AHEAD - 1, rqs_last_got = -1;
+
+    while(rqs_last_got != rqs_last_executed) {
+        if(++rqs_last_got >= REQUESTS_PREPARE_AHEAD)
+            rqs_last_got = 0;
+
+        worker_is_busy(WORKER_JOB_FIND_NEXT);
+        rqs[rqs_last_got] = replication_request_get_first_available();
+        struct replication_request *rq = &rqs[rqs_last_got];
+
+        if(!rq->found)
+            break;
+
+        if(!rq->st)
+            rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+
+        if(rq->st && !rq->q)
+            rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+    }
+
+    if(++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
+        rqs_last_executed = 0;
+
+    struct replication_request *rq = &rqs[rqs_last_executed];
+
+    while(!rq->found && rqs_last_executed != rqs_last_got) {
+        if(++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
+            rqs_last_executed = 0;
+
+        rq = &rqs[rqs_last_executed];
+    }
+
+    if(unlikely(!rq->found)) {
         worker_is_idle();
         return REQUEST_QUEUE_EMPTY;
     }
 
     // delete the request from the dictionary
     worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-    if(!dictionary_del(rq.sender->replication.requests, string2str(rq.chart_id)))
+    if(!dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id)))
         error("REPLAY ERROR: 'host:%s/chart:%s' failed to be deleted from sender pending charts index",
-              rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
+              rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
 
-    replication_set_latest_first_time(rq.after);
+    replication_set_latest_first_time(rq->after);
 
-    if(unlikely(!replication_execute_request(&rq, true))) {
+    if(unlikely(!replication_execute_request(rq, true))) {
         worker_is_idle();
         return REQUEST_CHART_NOT_FOUND;
     }
