@@ -11,20 +11,21 @@
 #define WORKER_JOB_QUERYING                             2
 #define WORKER_JOB_DELETE_ENTRY                         3
 #define WORKER_JOB_FIND_CHART                           4
-#define WORKER_JOB_CHECK_CONSISTENCY                    5
-#define WORKER_JOB_BUFFER_COMMIT                        6
-#define WORKER_JOB_CLEANUP                              7
-#define WORKER_JOB_WAIT                                 8
+#define WORKER_JOB_PREPARE_QUERY                        5
+#define WORKER_JOB_CHECK_CONSISTENCY                    6
+#define WORKER_JOB_BUFFER_COMMIT                        7
+#define WORKER_JOB_CLEANUP                              8
+#define WORKER_JOB_WAIT                                 9
 
 // master thread worker jobs
-#define WORKER_JOB_STATISTICS                           9
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       10
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        11
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             12
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  13
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   14
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          15
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            16
+#define WORKER_JOB_STATISTICS                           10
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       11
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             13
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  14
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   15
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          16
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            17
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -1116,11 +1117,12 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
 
-    if(likely(workers))
-        worker_is_busy(WORKER_JOB_FIND_CHART);
+    if(!rq->st) {
+        if(likely(workers))
+            worker_is_busy(WORKER_JOB_FIND_CHART);
 
-    if(!rq->st)
         rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+    }
 
     if(!rq->st) {
         internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' not found",
@@ -1129,13 +1131,17 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         goto cleanup;
     }
 
-    if(likely(workers))
-        worker_is_busy(WORKER_JOB_QUERYING);
-
     netdata_thread_disable_cancelability();
 
-    if(!rq->q)
+    if(!rq->q) {
+        if(likely(workers))
+            worker_is_busy(WORKER_JOB_PREPARE_QUERY);
+
         rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+    }
+
+    if(likely(workers))
+        worker_is_busy(WORKER_JOB_QUERYING);
 
     // send the replication data
     bool start_streaming = replicate_chart_response_execute_and_finalize(rq->q);
@@ -1330,6 +1336,7 @@ static void replication_initialize_workers(bool master) {
     worker_register_job_name(WORKER_JOB_QUERYING, "querying");
     worker_register_job_name(WORKER_JOB_DELETE_ENTRY, "dict delete");
     worker_register_job_name(WORKER_JOB_FIND_CHART, "find chart");
+    worker_register_job_name(WORKER_JOB_PREPARE_QUERY, "prepare query");
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
     worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
@@ -1351,7 +1358,7 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-#define REQUESTS_PREPARE_AHEAD (100)
+#define REQUESTS_PREPARE_AHEAD (10)
 
 static int replication_execute_next_pending_request(void) {
     static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
@@ -1368,11 +1375,15 @@ static int replication_execute_next_pending_request(void) {
         rq = &rqs[rqs_last_prepared];
 
         if(rq->found) {
-            if (!rq->st)
+            if (!rq->st) {
+                worker_is_busy(WORKER_JOB_FIND_CHART);
                 rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+            }
 
-            if (rq->st && !rq->q)
+            if (rq->st && !rq->q) {
+                worker_is_busy(WORKER_JOB_PREPARE_QUERY);
                 rq->q = replicate_chart_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+            }
         }
 
     } while(rq->found && rqs_last_prepared != rqs_last_executed);
