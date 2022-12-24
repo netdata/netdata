@@ -65,6 +65,9 @@ struct pgc_page {
 
     void *data;
     uint8_t custom_data[];
+
+    // IMPORTANT!
+    // THIS STRUCTURE NEEDS TO BE INITIALIZED BY HAND!
 };
 
 struct pgc_linked_list {
@@ -1196,7 +1199,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             page = allocation;
             allocation = NULL;
 #else
-            page = callocz(1, sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
+            page = mallocz(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page);
 #endif
             page->refcount = 1;
             page->accesses = (entry->hot) ? 0 : 1;
@@ -1209,10 +1212,15 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             page->data = entry->data;
             page->assumed_size = page_assumed_size(cache, entry->size);
             netdata_spinlock_init(&page->transition_spinlock);
-            page->link.prev = page->link.next = NULL;
+            page->link.prev = NULL;
+            page->link.next = NULL;
 
-            if(cache->config.additional_bytes_per_page && entry->custom_data)
-                memcpy(page->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
+            if(cache->config.additional_bytes_per_page) {
+                if(entry->custom_data)
+                    memcpy(page->custom_data, entry->custom_data, cache->config.additional_bytes_per_page);
+                else
+                    memset(page->custom_data, 0, cache->config.additional_bytes_per_page);
+            }
 
             // put it in the index
             *page_ptr = page;

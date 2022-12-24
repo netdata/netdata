@@ -129,6 +129,8 @@ struct rrdeng_cache_efficiency_stats {
     size_t queries_open;
     size_t queries_journal_v2;
 
+    size_t currently_running_queries;
+
     // query planner output of the queries
     size_t pages_total;
     size_t pages_to_load_from_disk;

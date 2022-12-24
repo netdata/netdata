@@ -704,15 +704,17 @@ struct replication_request {
     STRING *chart_id;                   // the chart of the request
     time_t after;                       // the start time of the query (maybe zero) key for sorting (JudyL)
     time_t before;                      // the end time of the query (maybe zero)
-    bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
 
     usec_t sender_last_flush_ut;        // the timestamp of the sender, at the time we indexed this request
     Word_t unique_id;                   // auto-increment, later requests have bigger
+
+    bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
     bool found;                         // used as a result boolean for the find call
     bool indexed_in_judy;               // true when the request is indexed in judy
     bool not_indexed_buffer_full;       // true when the request is not indexed because the sender is full
 
     // prepare ahead members
+    bool executed;
     RRDSET *st;
     struct replication_query *q;
 };
@@ -1358,17 +1360,23 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-#define REQUESTS_PREPARE_AHEAD (10)
+#define REQUESTS_PREPARE_AHEAD (50)
 
 static int replication_execute_next_pending_request(void) {
     static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
     static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
+    static __thread size_t queue_rounds = 0; (void)queue_rounds;
     struct replication_request *rq;
 
     // fill the queue
     do {
-        if(++rqs_last_prepared >= REQUESTS_PREPARE_AHEAD)
+        if(++rqs_last_prepared >= REQUESTS_PREPARE_AHEAD) {
             rqs_last_prepared = 0;
+            queue_rounds++;
+        }
+
+        internal_fatal(queue_rounds > 1 && !rqs[rqs_last_prepared].executed,
+                       "REPLAY FATAL: query has not been executed!");
 
         worker_is_busy(WORKER_JOB_FIND_NEXT);
         rqs[rqs_last_prepared] = replication_request_get_first_available();
@@ -1394,6 +1402,7 @@ static int replication_execute_next_pending_request(void) {
             rqs_last_executed = 0;
 
         rq = &rqs[rqs_last_executed];
+        rq->executed = true;
 
     } while(!rq->found && rqs_last_executed != rqs_last_prepared);
 

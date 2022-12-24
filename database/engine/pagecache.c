@@ -564,6 +564,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
     size_t pages_to_load = 0;
 
     __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = callocz(1, sizeof(struct page_details_control));
     handle->pdc->ctx = ctx;
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);

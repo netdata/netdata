@@ -1586,9 +1586,20 @@ static void dbengine2_statistics_charts(void) {
 
         if(pages_to_load) {
             extent_hit_ratio = pages_hit_cached_extent * 100 * 10000 / pages_to_load;
+            if(extent_hit_ratio > 100 * 10000)
+                extent_hit_ratio = 100 * 10000;
+
             parallel_load_hit_ratio = pages_hit_parallel_load * 100 * 10000 / pages_to_load;
+            if(parallel_load_hit_ratio > 100 * 10000)
+                parallel_load_hit_ratio = 100 * 10000;
+
             before_allocation_hit_ratio = pages_hit_before_allocation * 100 * 10000 / pages_to_load;
+            if(before_allocation_hit_ratio > 100 * 10000)
+                before_allocation_hit_ratio = 100 * 10000;
+
             insert_conflict_hit_ratio = pages_hit_insert_conflict * 100 * 10000 / pages_to_load;
+            if(insert_conflict_hit_ratio > 100 * 10000)
+                insert_conflict_hit_ratio = 100 * 10000;
         }
 
         rrddim_set_by_pointer(st_cache_hit_ratio, rd_hit_ratio, (collected_number)overall_hit_ratio);
@@ -1599,6 +1610,35 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_cache_hit_ratio, rd_insert_conflict_ratio, (collected_number)insert_conflict_hit_ratio);
 
         rrdset_done(st_cache_hit_ratio);
+    }
+
+    {
+        static RRDSET *st_queries_running = NULL;
+        static RRDDIM *rd_queries = NULL;
+
+        if (unlikely(!st_queries_running)) {
+            st_queries_running = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_queries_running",
+                    NULL,
+                    "dbengine query router",
+                    NULL,
+                    "Netdata Queries Running",
+                    "queries",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_queries = rrddim_add(st_queries_running, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            priority++;
+        }
+
+        rrddim_set_by_pointer(st_queries_running, rd_queries, (collected_number)cache_efficiency_stats.currently_running_queries);
+
+        rrdset_done(st_queries_running);
     }
 
     {

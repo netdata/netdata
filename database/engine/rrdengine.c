@@ -150,6 +150,7 @@ void pdc_destroy(PDC *pdc) {
 
     JudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
+    __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     freez(pdc);
 
