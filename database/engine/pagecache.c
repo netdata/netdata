@@ -108,9 +108,22 @@ static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PG
     ;
 }
 
+typedef enum {
+    PAGE_IS_IN_THE_PAST   = -1,
+    PAGE_IS_IN_RANGE      =  0,
+    PAGE_IS_IN_THE_FUTURE =  1,
+} TIME_RANGE_COMPARE;
 
-static inline bool is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
-    return page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s;
+static inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
+    // page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s
+
+    if(page_last_time_s < wanted_start_time_s)
+        return PAGE_IS_IN_THE_PAST;
+
+    if(page_first_time_s > wanted_end_time_s)
+        return PAGE_IS_IN_THE_FUTURE;
+
+    return PAGE_IS_IN_RANGE;
 }
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
@@ -146,7 +159,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         time_t page_update_every_s = pgc_page_update_every(page);
         size_t page_length = pgc_page_data_size(cache, page);
 
-        if(!is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
+        if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
             // not a useful page for this query
             pgc_page_release(cache, page);
             page = NULL;
@@ -261,6 +274,13 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
     while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         struct page_details *pd = *PValue;
 
+        if(is_page_in_time_range(pd->first_time_s, pd->last_time_s, wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
+            // we don't need this page
+            pd->status |= PDC_PAGE_SKIP;
+            pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
+            continue;
+        }
+
         if(pd->last_time_s < previous_page_last_time_s) {
            // we don't need this page
            pd->status |= PDC_PAGE_SKIP;
@@ -338,7 +358,8 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
         time_t journal_end_time_s = (time_t)(journal_header->end_time_ut / USEC_PER_SEC);
 
         // is the datafile within our time-range?
-        if(!is_page_in_time_range(journal_start_time_s, journal_end_time_s, wanted_start_time_s, wanted_end_time_s))
+        TIME_RANGE_COMPARE jrc = is_page_in_time_range(journal_start_time_s, journal_end_time_s, wanted_start_time_s, wanted_end_time_s);
+        if(jrc != PAGE_IS_IN_RANGE)
             continue;
 
         // the datafile possibly contains useful data for this query
@@ -356,23 +377,18 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
         struct journal_extent_list *extent_list = (void *)((uint8_t *)journal_header + journal_header->extent_offset);
         uint32_t uuid_page_entries = page_list_header->entries;
 
-        size_t pages_used_from_journal = 0;
         for (uint32_t index = 0; index < uuid_page_entries; index++) {
             struct journal_page_list *page_entry_in_journal = &page_list[index];
 
             time_t page_first_time_s = page_entry_in_journal->delta_start_s + journal_start_time_s;
             time_t page_last_time_s = page_entry_in_journal->delta_end_s + journal_start_time_s;
 
-            if(!is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s)) {
-                if(pages_used_from_journal)
-                    // stop this journal - we don't need it anymore
-                    break;
-                else
-                    // continue on this journal - it may have pages we need
-                    continue;
-            }
+            TIME_RANGE_COMPARE prc = is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s);
+            if(prc == PAGE_IS_IN_THE_PAST)
+                continue;
 
-            pages_used_from_journal++;
+            if(prc == PAGE_IS_IN_THE_FUTURE)
+                break;
 
             time_t page_update_every_s = page_entry_in_journal->update_every_s;
             size_t page_length = page_entry_in_journal->page_length;
