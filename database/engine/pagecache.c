@@ -367,6 +367,9 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                 if(pages_used_from_journal)
                     // stop this journal - we don't need it anymore
                     break;
+                else
+                    // continue on this journal - it may have pages we need
+                    continue;
             }
 
             pages_used_from_journal++;
