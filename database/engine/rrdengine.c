@@ -888,6 +888,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
     datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
+    ctx->last_flush_fileno = datafile->fileno;
 
     if (completion)
         completion_mark_complete(completion);

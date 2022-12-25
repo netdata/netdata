@@ -334,6 +334,7 @@ struct rrdengine_instance {
     uint64_t max_disk_space;
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
+    unsigned last_flush_fileno;
     unsigned long metric_API_max_producers;
 
     bool create_new_datafile_pair;

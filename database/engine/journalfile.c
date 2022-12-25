@@ -1304,12 +1304,14 @@ void start_journal_indexing(uv_work_t *req)
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
     worker_is_busy(UV_EVENT_JOURNAL_INDEX);
-    while (datafile && datafile->fileno != ctx->last_fileno) {
+    while (datafile && datafile->fileno != ctx->last_fileno && datafile->fileno != ctx->last_flush_fileno) {
+
         if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
             info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
             pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
            ++work_request->count;
         }
+
         datafile = datafile->next;
         if (unlikely(NO_QUIESCE != ctx->quiesce))
             break;
