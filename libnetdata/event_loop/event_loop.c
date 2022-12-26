@@ -33,4 +33,6 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_ANALYZE_V2, "analyze journalfile");
     worker_register_job_name(UV_EVENT_RETENTION_V2, "calculate retention");
     worker_register_job_name(UV_EVENT_RETENTION_UPDATE, "update retention");
+    worker_register_job_name(UV_EVENT_DATAFILE_ACQUIRE, "datafile acquire");
+    worker_register_job_name(UV_EVENT_DATAFILE_DELETE, "datafile deletion");
 }

@@ -899,46 +899,6 @@ static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdeng_work  *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
-
-    struct rrdengine_instance *ctx = wc->ctx;
-    struct rrdengine_datafile *datafile;
-    struct rrdengine_journalfile *journalfile;
-    unsigned deleted_bytes, journalfile_bytes, datafile_bytes;
-    int ret;
-    char path[RRDENG_PATH_MAX];
-
-    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
-
-    datafile = ctx->datafiles.first;
-    journalfile = datafile->journalfile;
-    datafile_bytes = datafile->pos;
-    journalfile_bytes = journalfile->pos;
-    deleted_bytes = GET_JOURNAL_DATA_SIZE(journalfile);
-
-    info("DBENGINE: deleting data and journal files to maintain disk quota");
-    datafile_list_delete_unsafe(ctx, datafile);
-    ret = destroy_journal_file_unsafe(journalfile, datafile);
-    if (!ret) {
-        generate_journalfilepath(datafile, path, sizeof(path));
-        info("DBENGINE: deleted journal file \"%s\".", path);
-        generate_journalfilepath_v2(datafile, path, sizeof(path));
-        info("DBENGINE: deleted journal file \"%s\".", path);
-        deleted_bytes += journalfile_bytes;
-    }
-    ret = destroy_data_file_unsafe(datafile);
-    if (!ret) {
-        generate_datafilepath(datafile, path, sizeof(path));
-        info("DBENGINE: deleted data file \"%s\".", path);
-        deleted_bytes += datafile_bytes;
-    }
-    freez(journalfile);
-    freez(datafile);
-
-    ctx->disk_space -= deleted_bytes;
-    info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
-
-    rrdcontext_db_rotation();
     wc->now_deleting_files = 0;
     freez(work_request);
 }
@@ -1023,21 +983,12 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         v2_count, open_cache_count);
 }
 
-static void delete_old_data(uv_work_t *req)
-{
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+static void update_metrics_first_time_t(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+    if(worker)
+        worker_is_busy(UV_EVENT_ANALYZE_V2);
 
-    worker_is_busy(UV_EVENT_ANALYZE_V2);
-
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    struct rrdengine_journalfile *journalfile = ctx->datafiles.first->journalfile;
-
-    struct journal_v2_header *journal_header = (struct journal_v2_header *)GET_JOURNAL_DATA(journalfile);
+    struct rrdengine_journalfile *journal_file = datafile_to_delete->journalfile;
+    struct journal_v2_header *journal_header = (struct journal_v2_header *)GET_JOURNAL_DATA(journal_file);
     struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
 
     Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
@@ -1062,28 +1013,111 @@ static void delete_old_data(uv_work_t *req)
             count++;
         }
     }
-    info("DBENGINE: recalculating retention for %u metrics", count);
-    // Update the first time / last time for all metrics we plan to delete
-    worker_is_busy(UV_EVENT_RETENTION_V2);
-    find_uuid_first_time(ctx, ctx->datafiles.first->next, metric_first_time_JudyL);
 
-    info("DBENGINE: recalculating retention for %u metrics, done", count);
-    worker_is_busy(UV_EVENT_RETENTION_UPDATE);
+    info("DBENGINE: recalculating retention for %u metrics", count);
+
+    // Update the first time / last time for all metrics we plan to delete
+
+    if(worker)
+        worker_is_busy(UV_EVENT_RETENTION_V2);
+
+    find_uuid_first_time(ctx, first_datafile_remaining, metric_first_time_JudyL);
+
+    if(worker)
+        worker_is_busy(UV_EVENT_RETENTION_UPDATE);
+
+    info("DBENGINE: updating metric registry retention for %u metrics", count);
 
     Word_t index = 0;
     bool first_then_next = true;
-    info("DBENGINE: updating metric registry retention for %u metrics", count);
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
         mrg_metric_set_first_time_t(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_t);
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
-    info("DBENGINE: updating metric registry retention for %u metrics, done", count);
+
     JudyLFreeArray(&metric_first_time_JudyL, PJE0);
-    worker_is_idle();
+
+    if(worker)
+        worker_is_idle();
 }
 
+static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool worker) {
+    if(worker)
+        worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+
+    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
+
+    update_metrics_first_time_t(ctx, datafile, datafile->next, worker);
+
+    while (!datafile_got_for_deletion) {
+        if(worker)
+            worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+
+        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
+
+        if (!datafile_got_for_deletion) {
+            info("DBENGINE: waiting for datafile %u of tier %u to be available for deletion, "
+                 "it is in use currently by %u users.",
+                 datafile->fileno, datafile->tier, datafile->users.lockers);
+
+            sleep_usec(1 * USEC_PER_SEC);
+        }
+    }
+
+    if(worker)
+        worker_is_busy(UV_EVENT_DATAFILE_DELETE);
+
+    struct rrdengine_journalfile *journal_file;
+    unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
+    int ret;
+    char path[RRDENG_PATH_MAX];
+
+    uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+
+    journal_file = datafile->journalfile;
+    datafile_bytes = datafile->pos;
+    journal_file_bytes = journal_file->pos;
+    deleted_bytes = GET_JOURNAL_DATA_SIZE(journal_file);
+
+    info("DBENGINE: deleting data and journal files to maintain disk quota");
+    datafile_list_delete_unsafe(ctx, datafile);
+    ret = destroy_journal_file_unsafe(journal_file, datafile);
+    if (!ret) {
+        generate_journalfilepath(datafile, path, sizeof(path));
+        info("DBENGINE: deleted journal file \"%s\".", path);
+        generate_journalfilepath_v2(datafile, path, sizeof(path));
+        info("DBENGINE: deleted journal file \"%s\".", path);
+        deleted_bytes += journal_file_bytes;
+    }
+    ret = destroy_data_file_unsafe(datafile);
+    if (!ret) {
+        generate_datafilepath(datafile, path, sizeof(path));
+        info("DBENGINE: deleted data file \"%s\".", path);
+        deleted_bytes += datafile_bytes;
+    }
+    freez(journal_file);
+    freez(datafile);
+
+    ctx->disk_space -= deleted_bytes;
+    info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
+    rrdcontext_db_rotation();
+}
+
+static void delete_old_data(uv_work_t *req) {
+    static __thread int worker = -1;
+    if (unlikely(worker == -1))
+        register_libuv_worker_jobs();
+
+    struct rrdeng_work *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+    struct rrdengine_instance *ctx = wc->ctx;
+
+    datafile_delete(ctx, ctx->datafiles.first, true);
+}
 
 static void do_delete_files(struct rrdengine_worker_config *wc )
 {
@@ -1204,13 +1238,6 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
             error("DBENGINE: cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
                   " to reclaim space, there are no other file pairs left.",
                   ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-            return;
-        }
-        struct rrdengine_datafile *df = ctx->datafiles.first;
-        if(!datafile_acquire_for_deletion(df)) {
-            error("DBENGINE: cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, it is in use currently by %u users, but it has been marked as not available for queries to stop using it.",
-                  ctx->dbfiles_path, df->tier, df->fileno, df->users.lockers);
             return;
         }
         info("DBENGINE: deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
