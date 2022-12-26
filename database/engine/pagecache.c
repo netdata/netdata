@@ -730,12 +730,13 @@ static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_
 }
 
 struct pgc_page *pg_cache_lookup_next(
-        struct rrdengine_instance *ctx __maybe_unused,
-        struct rrdeng_query_handle *handle,
+        struct rrdengine_instance *ctx,
+        PDC *pdc,
         time_t now_s,
+        time_t last_update_every_s,
         size_t *entries
 ) {
-    if (unlikely(!handle || !handle->pdc || !handle->pdc->page_list_JudyL))
+    if (unlikely(!pdc || !pdc->page_list_JudyL))
         return NULL;
 
     usec_t start_ut = now_monotonic_usec();
@@ -745,7 +746,7 @@ struct pgc_page *pg_cache_lookup_next(
         bool page_from_pd = false;
         preloaded = false;
 
-        struct page_details *pd = pdc_find_page_for_time(handle->pdc->page_list_JudyL, now_s);
+        struct page_details *pd = pdc_find_page_for_time(pdc->page_list_JudyL, now_s);
         if (!pd)
             break;
 
@@ -753,16 +754,16 @@ struct pgc_page *pg_cache_lookup_next(
         page_from_pd = true;
         preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
         if(!page) {
-            if(!completion_is_done(&handle->pdc->completion)) {
-                page = pgc_page_get_and_acquire(main_cache, (Word_t) handle->pdc->ctx,
+            if(!completion_is_done(&pdc->completion)) {
+                page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx,
                                                 pd->metric_id, pd->first_time_s, true);
                 page_from_pd = false;
                 preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
             }
 
             if(!page) {
-                handle->pdc->completed_jobs =
-                        completion_wait_for_a_job(&handle->pdc->completion, handle->pdc->completed_jobs);
+                pdc->completed_jobs =
+                        completion_wait_for_a_job(&pdc->completion, pdc->completed_jobs);
 
                 page = pd->page;
                 page_from_pd = true;
@@ -800,7 +801,7 @@ struct pgc_page *pg_cache_lookup_next(
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
-                page_update_every_s = pgc_page_fix_update_every(page, handle->dt_s);
+                page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
             }
 
             size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);

@@ -593,7 +593,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
         return false;
 
     size_t entries;
-    handle->page = pg_cache_lookup_next(ctx, handle, handle->now_s, &entries);
+    handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
     if (unlikely(!handle->page))
         return false;
 
