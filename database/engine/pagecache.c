@@ -901,9 +901,9 @@ struct pgc_page *pg_cache_lookup_next(
             pdc_page_status_set(pd, PDC_PAGE_PROCESSED);
     }
 
-    pdc->executed_with_gaps = gaps;
-    if(gaps)
+    if(gaps && !pdc->executed_with_gaps)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_executed_with_gaps, 1, __ATOMIC_RELAXED);
+    pdc->executed_with_gaps = +gaps;
 
     if(page) {
         if(waited)
