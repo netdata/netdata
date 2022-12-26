@@ -1357,17 +1357,24 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-#define REQUESTS_PREPARE_AHEAD (100)
-
 static int replication_execute_next_pending_request(void) {
-    static __thread struct replication_request rqs[REQUESTS_PREPARE_AHEAD] = {};
+    static __thread int max_requests_ahead = 0;
+    static __thread struct replication_request *rqs = NULL;
     static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
     static __thread size_t queue_rounds = 0; (void)queue_rounds;
     struct replication_request *rq;
 
+    if(unlikely(!rqs)) {
+        max_requests_ahead = libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS;
+        if(max_requests_ahead < 2)
+            max_requests_ahead = 2;
+
+        rqs = callocz(max_requests_ahead, sizeof(struct replication_request));
+    }
+
     // fill the queue
     do {
-        if(++rqs_last_prepared >= REQUESTS_PREPARE_AHEAD) {
+        if(++rqs_last_prepared >= max_requests_ahead) {
             rqs_last_prepared = 0;
             queue_rounds++;
         }
@@ -1395,7 +1402,7 @@ static int replication_execute_next_pending_request(void) {
 
     // pick the first usable
     do {
-        if (++rqs_last_executed >= REQUESTS_PREPARE_AHEAD)
+        if (++rqs_last_executed >= max_requests_ahead)
             rqs_last_executed = 0;
 
         rq = &rqs[rqs_last_executed];

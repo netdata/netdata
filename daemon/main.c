@@ -8,6 +8,8 @@ bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
+int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
 struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
@@ -1475,9 +1477,24 @@ int main(int argc, char **argv) {
         // initialize the system clocks
         clocks_init();
 
-        // prepare configuration environment variables for the plugins
+        // set libuv worker threads
+        libuv_worker_threads = get_system_cpus();
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 
-        setenv("UV_THREADPOOL_SIZE", config_get(CONFIG_SECTION_GLOBAL, "libuv worker threads", "16"), 1);
+        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        }
+
+        {
+            char buf[20 + 1];
+            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            setenv("UV_THREADPOOL_SIZE", buf, 1);
+        }
+
+        // prepare configuration environment variables for the plugins
         get_netdata_configured_variables();
         set_global_environment();
 

@@ -128,6 +128,10 @@ extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time;
 
+#define MIN_LIBUV_WORKER_THREADS 8
+#define RESERVED_LIBUV_WORKER_THREADS 3
+extern int libuv_worker_threads;
+
 #define RRD_ID_LENGTH_MAX 200
 
 typedef long long total_number;
