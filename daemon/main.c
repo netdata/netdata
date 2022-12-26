@@ -1478,7 +1478,7 @@ int main(int argc, char **argv) {
         clocks_init();
 
         // set libuv worker threads
-        libuv_worker_threads = get_system_cpus();
+        libuv_worker_threads = get_system_cpus() + RESERVED_LIBUV_WORKER_THREADS;
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
 
@@ -1572,6 +1572,8 @@ int main(int argc, char **argv) {
 
         // setup threads configs
         default_stacksize = netdata_threads_init();
+        if(default_stacksize > 1 * 1024 * 1024)
+            default_stacksize = 1 * 1024 * 1024;
 
 
         // --------------------------------------------------------------------
