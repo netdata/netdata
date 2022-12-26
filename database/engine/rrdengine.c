@@ -1361,7 +1361,7 @@ void timer_cb(uv_timer_t* handle)
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
 
-    if (true == wc->run_indexing && !wc->now_deleting_files && !wc->running_cache_flush_evictions) {
+    if (true == wc->run_indexing && !wc->now_deleting_files /* && !wc->running_cache_flush_evictions */) {
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }
