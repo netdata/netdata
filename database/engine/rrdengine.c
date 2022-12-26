@@ -135,7 +135,7 @@ void pdc_destroy(PDC *pdc) {
 
         internal_fatal(pd->datafile.ptr, "DBENGINE: page details has a datafile.ptr that is not released.");
 
-        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP))) {
+        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP | PDC_PAGE_INVALID))) {
             // pdc_page_status_set(pd, PDC_PAGE_FAILED);
             unroutable++;
         }

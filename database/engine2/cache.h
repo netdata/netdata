@@ -194,6 +194,7 @@ time_t pgc_page_start_time_t(PGC_PAGE *page);
 time_t pgc_page_end_time_t(PGC_PAGE *page);
 time_t pgc_page_update_every(PGC_PAGE *page);
 time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every);
+time_t pgc_page_fix_end_time_t(PGC_PAGE *page, time_t end_time_t);
 void *pgc_page_data(PGC_PAGE *page);
 void *pgc_page_custom_data(PGC *cache, PGC_PAGE *page);
 size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page);

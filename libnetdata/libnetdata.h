@@ -510,6 +510,15 @@ static inline PPvoid_t JudyLFirstThenNext(Pcvoid_t PArray, Word_t * PIndex, bool
     return JudyLNext(PArray, PIndex, PJE0);
 }
 
+static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool *first) {
+    if(unlikely(*first)) {
+        *first = false;
+        return JudyLLast(PArray, PIndex, PJE0);
+    }
+
+    return JudyLPrev(PArray, PIndex, PJE0);
+}
+
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     size_t total = 0;
 

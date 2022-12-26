@@ -49,7 +49,7 @@ struct pg_alignment {
 struct rrdeng_query_handle;
 
 time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t);
-struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, time_t *next_page_start_s);
+struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t now_s, size_t *entries);
 void init_page_cache(void);
 
 void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s, struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length);

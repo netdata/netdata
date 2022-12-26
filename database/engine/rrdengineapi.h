@@ -178,6 +178,12 @@ struct rrdeng_cache_efficiency_stats {
     size_t time_to_fast_disk_next_page;
     size_t time_to_slow_preload_next_page;
     size_t time_to_fast_preload_next_page;
+
+    size_t page_zero_time_skipped;
+    size_t page_past_time_skipped;
+    size_t page_invalid_size_skipped;
+    size_t page_invalid_update_every_fixed;
+    size_t page_invalid_entries_fixed;
 };
 
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);

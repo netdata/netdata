@@ -52,35 +52,37 @@ typedef struct page_details_control {
 } PDC;
 
 typedef enum __attribute__ ((__packed__)) {
-    // all pages must pass through these states
+    // final status for all pages
+    // if a page does not have one of these, it is considered unroutable
     PDC_PAGE_READY     = (1 << 0),                  // ready to be processed (pd->page is not null)
     PDC_PAGE_FAILED    = (1 << 1),                  // failed to be loaded (pd->page is null)
-    PDC_PAGE_PROCESSED = (1 << 2),                  // processed by the query caller
-    PDC_PAGE_RELEASED  = (1 << 3),                  // already released
-    PDC_PAGE_SKIP      = (1 << 4),                  // don't use this page
+    PDC_PAGE_SKIP      = (1 << 2),                  // don't use this page, it is not good for us
+    PDC_PAGE_INVALID   = (1 << 3),                  // don't use this page, it is invalid
 
     // other statuses for tracking issues
+    PDC_PAGE_PROCESSED                 = (1 << 4),  // processed by the query caller
+    PDC_PAGE_RELEASED                  = (1 << 5),  // already released
 
     // data found in cache (preloaded) or on disk?
-    PDC_PAGE_PRELOADED                 = (1 << 5),  // data found in memory
-    PDC_PAGE_DISK_PENDING              = (1 << 6),  // data need to be loaded from disk
+    PDC_PAGE_PRELOADED                 = (1 << 6),  // data found in memory
+    PDC_PAGE_DISK_PENDING              = (1 << 7),  // data need to be loaded from disk
 
     // worker related statuses
-    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 7),
-    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 8),
-    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 9),
-    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 10),
+    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 8),
+    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 9),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 10),
+    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 11),
 
-    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 11),
-    PDC_PAGE_LOADED_FROM_DISK          = (1 << 12),
+    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 12),
+    PDC_PAGE_LOADED_FROM_DISK          = (1 << 13),
 
-    PDC_PAGE_PRELOADED_PASS1           = (1 << 13),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 14),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 15),
+    PDC_PAGE_PRELOADED_PASS1           = (1 << 14),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 15),
+    PDC_PAGE_PRELOADED_WORKER          = (1 << 16),
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 16),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 17),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 18),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 17),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 18),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 19),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),
@@ -164,7 +166,6 @@ struct rrdeng_query_handle {
     storage_number *metric_data;
     struct page_details_control *pdc;
 
-    time_t wanted_next_page_start_time_s;
     time_t now_s;
     time_t dt_s;
 

@@ -576,7 +576,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     rrdimm_handle->start_time_s = start_time_s;
     rrdimm_handle->end_time_s = end_time_s;
 
-    handle->wanted_next_page_start_time_s = pg_cache_preload(ctx, handle, start_time_s, end_time_s);
+    pg_cache_preload(ctx, handle, start_time_s, end_time_s);
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
@@ -585,89 +585,21 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
 
     if (likely(handle->page)) {
         // we have a page to release
-
-        handle->wanted_next_page_start_time_s = (time_t)(pgc_page_end_time_t(handle->page) + handle->dt_s);
-
         pgc_page_release(main_cache, handle->page);
         handle->page = NULL;
-
-        if (unlikely(handle->wanted_next_page_start_time_s > rrdimm_handle->end_time_s)) {
-            handle->wanted_next_page_start_time_s = INVALID_TIME;
-            return false;
-        }
     }
 
-    if (unlikely(handle->wanted_next_page_start_time_s == INVALID_TIME))
+    if (unlikely(handle->now_s > rrdimm_handle->end_time_s))
         return false;
 
-    time_t page_start_time_s;
-    time_t page_end_time_s;
-    time_t page_update_every_s;
-    size_t page_length;
     size_t entries;
-
-    while(!handle->page && handle->wanted_next_page_start_time_s != INVALID_TIME) {
-        handle->page = pg_cache_lookup_next(ctx, handle,
-                                            handle->wanted_next_page_start_time_s,
-                                            rrdimm_handle->end_time_s,
-                                            &handle->wanted_next_page_start_time_s);
-
-        if(handle->page) {
-            page_start_time_s = pgc_page_start_time_t((PGC_PAGE *) handle->page);
-            page_end_time_s = pgc_page_end_time_t((PGC_PAGE *) handle->page);
-            page_update_every_s = pgc_page_update_every((PGC_PAGE *) handle->page);
-            page_length = pgc_page_data_size(main_cache, handle->page);
-
-            if( page_start_time_s == INVALID_TIME ||
-                page_end_time_s   == INVALID_TIME ||
-                page_length > RRDENG_BLOCK_SIZE
-            ) {
-
-                internal_error(true, "DBENGINE: page from %ld to %ld (update every %ld, page length %zu) is invalid for our target time %ld",
-                               page_start_time_s, page_end_time_s, page_update_every_s, page_length,
-                               handle->now_s);
-
-                pgc_page_release(main_cache, handle->page);
-                handle->page = NULL;
-                continue;
-            }
-            else {
-                if (page_update_every_s <= 0 || page_update_every_s > 86400)
-                    page_update_every_s = pgc_page_fix_update_every(handle->page, handle->dt_s);
-
-                size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
-                size_t entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
-                if(entries_by_size < entries_by_time) {
-                    time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
-                    internal_error(true,
-                                   "DBENGINE: page from %ld to %ld (update every %ld) by size has %zu entries, but by time has %zu entries, adjusting its end time to %ld",
-                                   page_start_time_s, page_end_time_s, page_update_every_s,
-                                   entries_by_size, entries_by_time,
-                                   fixed_page_end_time_s);
-
-                    page_end_time_s = fixed_page_end_time_s;
-
-                    entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
-                    internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
-                }
-                entries = entries_by_time;
-
-                if(page_end_time_s < handle->now_s) {
-
-                    internal_error(true, "DBENGINE: page from %ld to %ld (update every %ld) is not acceptable for our target time %ld, skipping it.",
-                                   page_start_time_s, page_end_time_s, page_update_every_s,
-                                   handle->now_s);
-
-                    pgc_page_release(main_cache, handle->page);
-                    handle->page = NULL;
-                    continue;
-                }
-            }
-        }
-    }
-
+    handle->page = pg_cache_lookup_next(ctx, handle, handle->now_s, &entries);
     if (unlikely(!handle->page))
         return false;
+
+    time_t page_start_time_s = pgc_page_start_time_t(handle->page);
+    time_t page_end_time_s = pgc_page_end_time_t(handle->page);
+    time_t page_update_every_s = pgc_page_update_every(handle->page);
 
     unsigned position;
     if(likely(handle->now_s >= page_start_time_s && handle->now_s <= page_end_time_s)) {
