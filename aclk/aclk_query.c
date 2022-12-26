@@ -336,7 +336,7 @@ void *aclk_query_main_thread(void *ptr)
 
     struct aclk_query_thread *query_thr = ptr;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ACLK|SERVICE_QUERIES)) {
         aclk_query_process_msgs(query_thr);
 
         worker_is_idle();

@@ -120,7 +120,7 @@ void *pluginsd_worker_thread(void *arg)
     cd->obsolete = 0;
     size_t count = 0;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         FILE *fp_child_input = NULL;
         FILE *fp_child_output = netdata_popen(cd->cmd, &cd->pid, &fp_child_input);
         if (unlikely(!fp_child_input || !fp_child_output)) {
@@ -186,12 +186,12 @@ void *pluginsd_main(void *ptr)
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] = { 0 };
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         int idx;
         const char *directory_name;
 
         for (idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && (directory_name = plugin_directories[idx]); idx++) {
-            if (unlikely(netdata_exit))
+            if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
             errno = 0;
@@ -206,7 +206,7 @@ void *pluginsd_main(void *ptr)
 
             struct dirent *file = NULL;
             while (likely((file = readdir(dir)))) {
-                if (unlikely(netdata_exit))
+                if (unlikely(!service_running(SERVICE_COLLECTORS)))
                     break;
 
                 debug(D_PLUGINSD, "examining file '%s'", file->d_name);

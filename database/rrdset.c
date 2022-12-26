@@ -1421,7 +1421,7 @@ void rrdset_done(RRDSET *st) {
 }
 
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
-    if(unlikely(netdata_exit)) return;
+    if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
     if (pending_rrdset_next)
         rrdset_timed_next(st, now, 0ULL);

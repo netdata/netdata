@@ -585,12 +585,12 @@ void *analytics_main(void *ptr)
     debug(D_ANALYTICS, "Analytics thread starts");
 
     //first delay after agent start
-    while (!netdata_exit && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
+    while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
         heartbeat_next(&hb, step_ut);
         sec++;
     }
 
-    if (unlikely(netdata_exit))
+    if (unlikely(!service_running(SERVICE_ANALYTICS)))
         goto cleanup;
 
     analytics_gather_immutable_meta_data();
@@ -603,7 +603,7 @@ void *analytics_main(void *ptr)
         heartbeat_next(&hb, step_ut * 2);
         sec += 2;
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_ANALYTICS)))
             break;
 
         if (likely(sec < ANALYTICS_HEARTBEAT))

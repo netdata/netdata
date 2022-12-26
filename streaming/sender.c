@@ -1058,7 +1058,7 @@ static bool rrdhost_sender_should_exit(struct sender_state *s) {
     // check for outstanding cancellation requests
     netdata_thread_testcancel();
 
-    if(unlikely(netdata_exit)) {
+    if(unlikely(!service_running(SERVICE_STREAMING))) {
         if(!s->exit.reason)
             s->exit.reason = "NETDATA EXIT";
         return true;

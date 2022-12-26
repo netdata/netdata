@@ -929,7 +929,7 @@ void *tc_main(void *ptr) {
     snprintfz(command, TC_LINE_MAX, "%s/tc-qos-helper.sh", netdata_configured_primary_plugins_dir);
     char *tc_script = config_get("plugin:tc", "script to run to get tc values", command);
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         FILE *fp_child_input, *fp_child_output;
         struct tc_device *device = NULL;
         struct tc_class *class = NULL;
@@ -945,7 +945,7 @@ void *tc_main(void *ptr) {
 
         char buffer[TC_LINE_MAX+1] = "";
         while(fgets(buffer, TC_LINE_MAX, fp_child_output) != NULL) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
             buffer[TC_LINE_MAX] = '\0';
             // debug(D_TC_LOOP, "TC: read '%s'", buffer);
@@ -1162,7 +1162,7 @@ void *tc_main(void *ptr) {
             class = NULL;
         }
 
-        if(unlikely(netdata_exit))
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
             goto cleanup;
 
         if(code == 1 || code == 127) {

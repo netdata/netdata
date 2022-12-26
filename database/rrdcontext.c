@@ -3189,7 +3189,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
     RRDCONTEXT *rc;
     dfe_start_reentrant((DICTIONARY *)host->rrdctx, rc) {
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         if(worker_jobs) worker_is_busy(WORKER_JOB_CLEANUP);
 
@@ -3197,7 +3197,7 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
 
         RRDINSTANCE *ri;
         dfe_start_reentrant(rc->rrdinstances, ri) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
             RRDMETRIC *rm;
             dfe_start_write(ri->rrdmetrics, rm) {
@@ -3313,7 +3313,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
             RRD_FLAGS reason_to_pass = reason;
             if(rrd_flag_check(ri, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
@@ -3420,7 +3420,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
         dfe_start_reentrant(rc->rrdinstances, ri) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
             RRD_FLAGS reason_to_pass = reason;
             if(rrd_flag_check(rc, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
@@ -3592,7 +3592,7 @@ static void rrdcontext_post_process_queued_contexts(RRDHOST *host) {
 
     RRDCONTEXT *rc;
     dfe_start_reentrant((DICTIONARY *)host->rrdctx_post_processing_queue, rc) {
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         rrdcontext_dequeue_from_post_processing(rc);
         rrdcontext_post_process_updates(rc, false, RRD_FLAG_NONE, true);
@@ -3773,7 +3773,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
 
     RRDCONTEXT *rc;
     dfe_start_reentrant((DICTIONARY *)host->rrdctx_hub_queue, rc) {
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         if(unlikely(messages_added >= MESSAGES_PER_BUNDLE_TO_SEND_TO_HUB_PER_HOST))
             break;
@@ -3840,7 +3840,7 @@ static void rrdcontext_dispatch_queued_contexts_to_hub(RRDHOST *host, usec_t now
     dfe_done(rc);
 
 #ifdef ENABLE_ACLK
-    if(!netdata_exit && bundle) {
+    if(service_running(SERVICE_CONTEXT) && bundle) {
         // we have a bundle to send messages
 
         // update the version hash
@@ -3891,11 +3891,11 @@ void *rrdcontext_main(void *ptr) {
     heartbeat_init(&hb);
     usec_t step = RRDCONTEXT_WORKER_THREAD_HEARTBEAT_USEC;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_CONTEXT)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
         usec_t now_ut = now_realtime_usec();
 
@@ -3911,7 +3911,7 @@ void *rrdcontext_main(void *ptr) {
         rrd_rdlock();
         RRDHOST *host;
         rrdhost_foreach_read(host) {
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_CONTEXT))) break;
 
             worker_is_busy(WORKER_JOB_HOSTS);
 

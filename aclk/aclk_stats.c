@@ -314,13 +314,13 @@ void *aclk_stats_main_thread(void *ptr)
     struct aclk_metrics_per_sample per_sample;
     struct aclk_metrics permanent;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ACLK | SERVICE_COLLECTORS)) {
         netdata_thread_testcancel();
         // ------------------------------------------------------------------------
         // Wait for the next iteration point.
 
         heartbeat_next(&hb, step_ut);
-        if (netdata_exit) break;
+        if (!service_running(SERVICE_ACLK | SERVICE_COLLECTORS)) break;
 
         ACLK_STATS_LOCK;
         // to not hold lock longer than necessary, especially not to hold it

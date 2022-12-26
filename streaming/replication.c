@@ -1441,7 +1441,7 @@ static void *replication_worker_thread(void *ptr) {
 
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_REPLICATION)) {
         if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1504,7 +1504,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     size_t last_executed = 0;
     size_t last_sender_resets = 0;
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_REPLICATION)) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();

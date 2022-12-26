@@ -106,9 +106,10 @@ void netdata_threads_init_after_fork(size_t stacksize) {
 // ----------------------------------------------------------------------------
 // netdata_thread_create
 
-extern void rrdset_thread_rda_free(void);
-extern void sender_thread_buffer_free(void);
-extern void query_target_free(void);
+void rrdset_thread_rda_free(void);
+void sender_thread_buffer_free(void);
+void query_target_free(void);
+void service_exits(void);
 
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
@@ -123,6 +124,7 @@ static void thread_cleanup(void *ptr) {
     rrdset_thread_rda_free();
     query_target_free();
     thread_cache_destroy();
+    service_exits();
 
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;

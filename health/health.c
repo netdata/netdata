@@ -840,7 +840,7 @@ static void health_sleep(time_t next_run, unsigned int loop __maybe_unused, RRDH
     if(now < next_run) {
         worker_is_idle();
         debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
-        while (now < next_run && host->health_enabled && !netdata_exit) {
+        while (now < next_run && host->health_enabled && service_running(SERVICE_HEALTH)) {
             sleep_usec(USEC_PER_SEC);
             now = now_realtime_sec();
         }
@@ -1020,7 +1020,7 @@ void *health_main(void *ptr) {
 #ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
-    while(!netdata_exit && host->health_enabled) {
+    while(service_running(SERVICE_HEALTH) && host->health_enabled) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -1257,7 +1257,7 @@ void *health_main(void *ptr) {
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
 
-        if (unlikely(runnable && !netdata_exit)) {
+        if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
                 if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
                     continue;
@@ -1510,7 +1510,7 @@ void *health_main(void *ptr) {
             foreach_rrdcalc_in_rrdhost_done(rc);
         }
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
         // execute notifications
@@ -1518,7 +1518,7 @@ void *health_main(void *ptr) {
         worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_PROCESS);
         health_alarm_log_process(host);
 
-        if (unlikely(netdata_exit)) {
+        if (unlikely(!service_running(SERVICE_HEALTH))) {
             // wait for all notifications to finish before allowing health to be cleaned up
             ALARM_ENTRY *ae;
             while (NULL != (ae = alarm_notifications_in_progress.head)) {
@@ -1541,7 +1541,7 @@ void *health_main(void *ptr) {
         }
 #endif
 
-        if(unlikely(netdata_exit))
+        if(unlikely(!service_running(SERVICE_HEALTH)))
             break;
 
         health_sleep(next_run, loop, host);

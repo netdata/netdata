@@ -2777,7 +2777,7 @@ void cgroup_discovery_worker(void *ptr)
         NULL,
         SIMPLE_PATTERN_EXACT);
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         uv_mutex_lock(&discovery_thread.mutex);
@@ -2786,7 +2786,7 @@ void cgroup_discovery_worker(void *ptr)
         discovery_thread.start_discovery = 0;
         uv_mutex_unlock(&discovery_thread.mutex);
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         discovery_find_all_cgroups();
@@ -4853,11 +4853,11 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         find_dt += hb_dt;
         if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {

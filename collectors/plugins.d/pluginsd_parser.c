@@ -1340,7 +1340,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     user.parser = parser;
 
     while (likely(!parser_next(parser))) {
-        if (unlikely(netdata_exit || parser_action(parser,  NULL)))
+        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  NULL)))
             break;
     }
 

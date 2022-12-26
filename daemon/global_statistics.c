@@ -3610,7 +3610,7 @@ void *global_statistics_main(void *ptr)
     // to make sure we are not close to any other thread
     hb.randomness = 0;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
@@ -3678,7 +3678,7 @@ void *global_statistics_workers_main(void *ptr)
             heartbeat_t hb;
             heartbeat_init(&hb);
 
-            while (!netdata_exit) {
+            while (service_running(SERVICE_COLLECTORS)) {
                 worker_is_idle();
                 heartbeat_next(&hb, step);
 
@@ -3720,7 +3720,7 @@ void *global_statistics_sqlite3_main(void *ptr)
             heartbeat_t hb;
             heartbeat_init(&hb);
 
-            while (!netdata_exit) {
+            while (service_running(SERVICE_COLLECTORS)) {
                 worker_is_idle();
                 heartbeat_next(&hb, step);
 

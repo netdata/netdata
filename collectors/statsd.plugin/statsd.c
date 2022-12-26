@@ -1114,6 +1114,10 @@ void statsd_collector_thread_cleanup(void *data) {
     worker_unregister();
 }
 
+static bool statsd_should_stop(void) {
+    return !service_running(SERVICE_COLLECTORS);
+}
+
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
     status->status = 1;
@@ -1152,6 +1156,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_rcv_callback
             , statsd_snd_callback
             , NULL
+            , statsd_should_stop
             , NULL                     // No access control pattern
             , 0                        // No dns lookups for access control pattern
             , (void *)d
@@ -2753,7 +2758,7 @@ void *statsd_main(void *ptr) {
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
@@ -2781,7 +2786,7 @@ void *statsd_main(void *ptr) {
         worker_is_busy(WORKER_STATSD_FLUSH_STATS);
         statsd_update_all_app_charts();
 
-        if(unlikely(netdata_exit))
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         if(global_statistics_enabled) {

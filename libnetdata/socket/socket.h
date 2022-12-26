@@ -202,6 +202,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , void  (*tmr_callback)(void *timer_data)
+        , bool  (*check_to_stop_callback)(void)
         , SIMPLE_PATTERN *access_list
         , int allow_dns
         , void *data

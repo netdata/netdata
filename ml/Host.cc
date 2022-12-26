@@ -119,7 +119,7 @@ void TrainableHost::train() {
     worker_register_job_name(0, "dimensions");
 
     worker_is_busy(0);
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ML_TRAINING)) {
         netdata_thread_testcancel();
         netdata_thread_disable_cancelability();
 
@@ -143,7 +143,7 @@ void TrainableHost::train() {
         SleepFor = std::min(AllottedDuration - RealDuration, MaxSleepFor);
         TimePoint Now = SteadyClock::now();
         auto Until = Now + SleepFor;
-        while (Now < Until && !netdata_exit) {
+        while (Now < Until && service_running(SERVICE_ML_TRAINING)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             Now = SteadyClock::now();
         }
@@ -219,7 +219,7 @@ void DetectableHost::detect() {
     heartbeat_t HB;
     heartbeat_init(&HB);
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ML_PREDICTION)) {
         netdata_thread_testcancel();
         worker_is_idle();
         heartbeat_next(&HB, updateEvery() * USEC_PER_SEC);

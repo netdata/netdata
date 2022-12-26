@@ -292,7 +292,7 @@ void *service_main(void *ptr)
 
     debug(D_SYSTEM, "Service thread starts");
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 

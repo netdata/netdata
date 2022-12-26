@@ -25,80 +25,217 @@ struct config netdata_config = {
         }
 };
 
-//typedef enum {
-//    SERVICE_MAINTENANCE   = (1 << 0),
-//    SERVICE_COLLECTORS    = (1 << 1),
-//    SERVICE_ML_TRAINING   = (1 << 2),
-//    SERVICE_ML_PREDICTION = (1 << 3),
-//    SERVICE_REPLICATION   = (1 << 4),
-//    SERVICE_QUERIES       = (1 << 5),
-//    SERVICE_WEB           = (1 << 6),
-//    SERVICE_ACLK          = (1 << 7),
-//    SERVICE_HEALTH        = (1 << 8),
-//    SERVICE_STREAMING     = (1 << 9),
-//    SERVICE_METASYNC      = (1 << 10),
-//    SERVICE_DBENGINE      = (1 << 11),
-//    SERVICE_CONTEXT       = (1 << 12),
-//} SERVICE_TYPE;
-//
-//typedef enum {
-//    SERVICE_THREAD_TYPE_NETDATA,
-//    SERVICE_THREAD_TYPE_LIBUV,
-//} SERVICE_THREAD_TYPE;
-//
-//typedef void (*force_quit_t)(void *data);
-//
-//typedef struct service_thread {
-//    pid_t tid;
-//    SERVICE_THREAD_TYPE type;
-//    const char *tag;
-//
-//    union {
-//        netdata_thread_t *netdata_thread;
-//        uv_thread_t *uv_thread;
-//    };
-//
-//    force_quit_t force_quit_callback;
-//    void *data;
-//} SERVICE_THREAD;
-//
-//void service_register(SERVICE_THREAD_TYPE thread_type, force_quit_t force_quit_callback, void *data) {
-//
-//}
-//
-//bool service_running(SERVICE_TYPE service) {
-//    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL);
-//}
-//
-//void service_exits(void) {
-//
-//}
-//
-//bool service_is_running(SERVICE_TYPE service) {
-//
-//}
-//
-//void service_signal_exit(SERVICE_TYPE service) {
-//
-//}
-//
-//void service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
-//
-//}
+typedef struct service_thread {
+    pid_t tid;
+    SERVICE_THREAD_TYPE type;
+    SERVICE_TYPE services;
+    char name[NETDATA_THREAD_NAME_MAX + 1];
+
+    union {
+        netdata_thread_t netdata_thread;
+        uv_thread_t uv_thread;
+    };
+
+    force_quit_t force_quit_callback;
+    void *data;
+} SERVICE_THREAD;
+
+struct service_globals {
+    SERVICE_TYPE running;
+    SPINLOCK lock;
+    Pvoid_t pid_judy;
+} service_globals = {
+        .running = ~0,
+        .pid_judy = NULL,
+};
+
+SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
+    SERVICE_THREAD *sth = NULL;
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
+    if(!*PValue) {
+        sth = callocz(1, sizeof(SERVICE_THREAD));
+        sth->tid = tid;
+        sth->type = thread_type;
+        sth->force_quit_callback = force_quit_callback;
+        sth->data = data;
+        os_thread_get_current_name_np(sth->name);
+        *PValue = sth;
+
+        switch(thread_type) {
+            case SERVICE_THREAD_TYPE_NETDATA:
+                sth->netdata_thread = netdata_thread_self();
+                break;
+
+            case SERVICE_THREAD_TYPE_LIBUV:
+                sth->uv_thread = uv_thread_self();
+                break;
+        }
+    }
+    else {
+        sth = *PValue;
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+
+    return sth;
+}
+
+void service_exits(void) {
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
+    if(PValue) {
+        freez(*PValue);
+        JudyLDel(&service_globals.pid_judy, tid, PJE0);
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+bool service_running(SERVICE_TYPE service) {
+    static __thread SERVICE_THREAD *sth = NULL;
+
+    if(unlikely(!sth))
+        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, false);
+
+    if(netdata_exit)
+        __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
+
+    if(service == 0)
+        service = sth->services;
+
+    sth->services |= service;
+
+    return ((__atomic_load_n(&service_globals.running, __ATOMIC_RELAXED) & service) == service);
+}
+
+void service_signal_exit(SERVICE_TYPE service) {
+    __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
+}
+
+static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
+    service_signal_exit(service);
+
+    BUFFER *wb = buffer_create(1024);
+    usec_t started_ut = now_monotonic_usec(), ended_ut;
+    size_t running;
+
+    do {
+        running = 0;
+        buffer_flush(wb);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid()) {
+                if(running)
+                    buffer_strcat(wb, ", ");
+
+                buffer_sprintf(wb, "'%s' (tid: %d)", sth->name, sth->tid);
+
+                running++;
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+
+        if(running) {
+            info("SERVICE CONTROL: waiting for the following %zu services to exit: %s",
+                 running, buffer_tostring(wb));
+            sleep_usec(500 * USEC_PER_MS);
+        }
+
+        ended_ut = now_monotonic_usec();
+    } while(running && ended_ut - started_ut < timeout_ut);
+
+    if(running) {
+        info("SERVICE CONTROL: timeout while waiting for services to exit, "
+             "the following %zu service(s) are still running: %s; "
+             "sending cancellation to them...",
+             running, buffer_tostring(wb));
+
+
+        running = 0;
+        {
+            buffer_flush(wb);
+
+            netdata_spinlock_lock(&service_globals.lock);
+
+            Pvoid_t *PValue;
+            Word_t tid = 0;
+            bool first = true;
+            while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+                SERVICE_THREAD *sth = *PValue;
+                if(sth->services & service && sth->tid != gettid()) {
+                    switch(sth->type) {
+                        case SERVICE_THREAD_TYPE_NETDATA:
+                            netdata_thread_cancel(sth->netdata_thread);
+                            break;
+
+                        case SERVICE_THREAD_TYPE_LIBUV:
+                            break;
+                    }
+
+                    if(sth->force_quit_callback)
+                        sth->force_quit_callback(sth->data);
+
+                    if(running)
+                        buffer_strcat(wb, ", ");
+
+                    buffer_sprintf(wb, "'%s' (tid: %d)", sth->name, sth->tid);
+
+                    running++;
+                }
+            }
+
+            netdata_spinlock_unlock(&service_globals.lock);
+        }
+
+        if(running)
+            info("SERVICE CONTROL: cancelled "
+                 "the following %zu service(s): %s; "
+                 "giving up on them...",
+                 running, buffer_tostring(wb));
+    }
+
+    buffer_free(wb);
+
+    return (running == 0);
+}
 
 void netdata_cleanup_and_exit(int ret) {
 
-//    service_signal_exit(
-//            SERVICE_MAINTENANCE
-//            | SERVICE_COLLECTORS
-//            | SERVICE_REPLICATION
-//            | SERVICE_QUERIES
-//            | SERVICE_HEALTH
-//            | SERVICE_WEB
-//            | SERVICE_STREAMING
-//            | SERVICE_ML_TRAINING
-//            );
-//
+    SERVICE_TYPE pass1 =   SERVICE_MAINTENANCE
+                         | SERVICE_COLLECTORS
+                         | SERVICE_REPLICATION
+                         | SERVICE_QUERIES
+                         | SERVICE_HEALTH
+                         | SERVICE_WEB
+                         | SERVICE_STREAMING
+                         | SERVICE_ML_TRAINING
+                         | SERVICE_EXPORTERS
+                         ;
+
+    service_signal_exit(pass1);
+    service_wait_exit(pass1, 10 * USEC_PER_SEC);
+
+    SERVICE_TYPE pass2 = SERVICE_ML_PREDICTION
+                         | SERVICE_ACLK
+                         | SERVICE_CONTEXT
+                         ;
+
+    service_signal_exit(pass2);
+    service_wait_exit(pass2, 10 * USEC_PER_SEC);
+
+    // stop everything else
+    service_wait_exit(~0, 10 * USEC_PER_SEC);
+
 //    service_wait_exit(SERVICE_COLLECTORS, 10 * USEC_PER_SEC);
 //
 //    service_signal_exit(

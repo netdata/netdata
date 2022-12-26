@@ -27,4 +27,32 @@ int killpid(pid_t pid);
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 
+typedef enum {
+    SERVICE_MAINTENANCE   = (1 << 0), // 1
+    SERVICE_COLLECTORS    = (1 << 1), // 1
+    SERVICE_ML_TRAINING   = (1 << 2), // 1
+    SERVICE_ML_PREDICTION = (1 << 3), // 2
+    SERVICE_REPLICATION   = (1 << 4), // 1
+    SERVICE_QUERIES       = (1 << 5), // 1
+    SERVICE_WEB           = (1 << 6), // 1
+    SERVICE_ACLK          = (1 << 7), // 2
+    SERVICE_HEALTH        = (1 << 8), // 1
+    SERVICE_STREAMING     = (1 << 9), // 1
+    SERVICE_METASYNC      = (1 << 10),
+    SERVICE_DBENGINE      = (1 << 11),
+    SERVICE_CONTEXT       = (1 << 12), // 2
+    SERVICE_ANALYTICS     = (1 << 13), // 2
+    SERVICE_EXPORTERS     = (1 << 14), // 1
+} SERVICE_TYPE;
+
+typedef enum {
+    SERVICE_THREAD_TYPE_NETDATA,
+    SERVICE_THREAD_TYPE_LIBUV,
+} SERVICE_THREAD_TYPE;
+
+typedef void (*force_quit_t)(void *data);
+
+void service_exits(void);
+bool service_running(SERVICE_TYPE service);
+
 #endif /* NETDATA_MAIN_H */

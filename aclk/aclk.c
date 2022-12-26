@@ -157,7 +157,7 @@ static int wait_till_cloud_enabled()
     info("Waiting for Cloud to be enabled");
     while (!netdata_cloud_setting) {
         sleep_usec(USEC_PER_SEC * 1);
-        if (netdata_exit)
+        if (!service_running(SERVICE_ACLK))
             return 1;
     }
     return 0;
@@ -176,7 +176,7 @@ static int wait_till_agent_claimed(void)
     char *agent_id = get_agent_claimid();
     while (likely(!agent_id)) {
         sleep_usec(USEC_PER_SEC * 1);
-        if (netdata_exit)
+        if (!service_running(SERVICE_ACLK))
             return 1;
         agent_id = get_agent_claimid();
     }
@@ -196,7 +196,7 @@ static int wait_till_agent_claimed(void)
 static int wait_till_agent_claim_ready()
 {
     url_t url;
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ACLK)) {
         if (wait_till_agent_claimed())
             return 1;
 
@@ -330,7 +330,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client);
 static int handle_connection(mqtt_wss_client client)
 {
     time_t last_periodic_query_wakeup = now_monotonic_sec();
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ACLK)) {
         // timeout 1000 to check at least once a second
         // for netdata_exit
         if (mqtt_wss_service(client, 1000) < 0){
@@ -459,7 +459,7 @@ static int aclk_block_till_recon_allowed() {
     // we want to wake up from time to time to check netdata_exit
     while (recon_delay)
     {
-        if (netdata_exit)
+        if (!service_running(SERVICE_ACLK))
             return 1;
         if (recon_delay > NETDATA_EXIT_POLL_MS) {
             sleep_usec(NETDATA_EXIT_POLL_MS * USEC_PER_MS);
@@ -469,7 +469,7 @@ static int aclk_block_till_recon_allowed() {
         sleep_usec(recon_delay * USEC_PER_MS);
         recon_delay = 0;
     }
-    return netdata_exit;
+    return !service_running(SERVICE_ACLK);
 }
 
 #ifndef ACLK_DISABLE_CHALLENGE
@@ -512,7 +512,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
     url_t mqtt_url;
 #endif
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_ACLK)) {
         char *cloud_base_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", NULL);
         if (cloud_base_url == NULL) {
             error_report("Do not move the cloud base url out of post_conf_load!!");
@@ -560,7 +560,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
             continue;
         }
 
-        if (netdata_exit)
+        if (!service_running(SERVICE_ACLK))
             return 1;
 
         if (aclk_env->encoding != ACLK_ENC_PROTO) {
@@ -744,7 +744,7 @@ void *aclk_main(void *ptr)
             aclk_connected = 0;
             log_access("ACLK DISCONNECTED");
         }
-    } while (!netdata_exit);
+    } while (service_running(SERVICE_ACLK));
 
     aclk_graceful_disconnect(mqttwss_client);
 
