@@ -46,9 +46,11 @@ typedef struct page_details_control {
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
     bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
     bool workers_should_stop;       // true when the query thread left and the workers should stop
+    bool executed_with_gap;
 
     SPINLOCK refcount_spinlock;     // spinlock to protect refcount
     int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
+
 } PDC;
 
 typedef enum __attribute__ ((__packed__)) {

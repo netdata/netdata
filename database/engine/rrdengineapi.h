@@ -125,7 +125,8 @@ typedef struct rrdengine_size_statistics {
 
 struct rrdeng_cache_efficiency_stats {
     size_t queries;
-    size_t queries_with_gaps;
+    size_t queries_planned_with_gaps;
+    size_t queries_executed_with_gaps;
     size_t queries_open;
     size_t queries_journal_v2;
 

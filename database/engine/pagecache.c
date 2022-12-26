@@ -554,7 +554,7 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_in_pass4_lookup, pass4_ut, __ATOMIC_RELAXED);
 
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_with_gaps, (query_gaps)?1:0, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_planned_with_gaps, (query_gaps) ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_open, done_open ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_journal_v2, done_v2 ? 1 : 0, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_total, pages_total, __ATOMIC_RELAXED);
@@ -619,11 +619,12 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
  * If index is NULL lookup by UUID (id).
  */
 
-static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_t wanted_time) {
+static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_t wanted_time, bool *gap) {
     Word_t PIndexF = wanted_time, PIndexL = wanted_time;
     Pvoid_t *PValueF, *PValueL;
     struct page_details *pdF = NULL, *pdL = NULL;
     bool firstF = true, firstL = true;
+    *gap = true;
 
     while ((PValueF = JudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
         pdF = *PValueF;
@@ -651,23 +652,26 @@ static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_
         pdL = NULL;
     }
 
+    TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_FUTURE;
+    TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_PAST;
+
     if (pdF == pdL || !pdL) {
         // they are the same, or L is missing
         // return the F
+        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
         return pdF;
     }
 
-    if (pdF == NULL) {
+    if (!pdF) {
         // F is missing
         // return L
+        *gap = (rcL == PAGE_IS_IN_RANGE) ? false : true;
         return pdL;
     }
 
-    TIME_RANGE_COMPARE rcF = is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time);
-    TIME_RANGE_COMPARE rcL = is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time);
-
     if (rcF == rcL) {
         // both are in range
+        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
 
         if (rcF == PAGE_IS_IN_THE_PAST)
             // both are in the past
@@ -713,19 +717,28 @@ static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_
         }
     }
 
-    if(rcF == PAGE_IS_IN_RANGE)
+    if(rcF == PAGE_IS_IN_RANGE) {
+        *gap = false;
         return pdF;
+    }
 
-    if(rcL == PAGE_IS_IN_RANGE)
+    if(rcL == PAGE_IS_IN_RANGE) {
+        *gap = false;
         return pdL;
+    }
 
-    if(rcF == PAGE_IS_IN_THE_FUTURE)
+    if(rcF == PAGE_IS_IN_THE_FUTURE) {
+        *gap = true;
         return pdF;
+    }
 
-    if(rcL == PAGE_IS_IN_THE_FUTURE)
+    if(rcL == PAGE_IS_IN_THE_FUTURE) {
+        *gap = true;
         return pdL;
+    }
 
     // impossible case
+    *gap = true;
     return NULL;
 }
 
@@ -740,13 +753,13 @@ struct pgc_page *pg_cache_lookup_next(
         return NULL;
 
     usec_t start_ut = now_monotonic_usec();
-    bool waited = false, preloaded;
+    bool waited = false, gap = false, preloaded;
     PGC_PAGE *page = NULL;
     while(!page) {
         bool page_from_pd = false;
         preloaded = false;
 
-        struct page_details *pd = pdc_find_page_for_time(pdc->page_list_JudyL, now_s);
+        struct page_details *pd = pdc_find_page_for_time(pdc->page_list_JudyL, now_s, &gap);
         if (!pd)
             break;
 
@@ -831,6 +844,11 @@ struct pgc_page *pg_cache_lookup_next(
             pdc_page_status_set(pd, PDC_PAGE_RELEASED | PDC_PAGE_PROCESSED);
         else
             pdc_page_status_set(pd, PDC_PAGE_PROCESSED);
+    }
+
+    if(gap && !pdc->executed_with_gap) {
+        pdc->executed_with_gap = gap;
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_executed_with_gaps, 1, __ATOMIC_RELAXED);
     }
 
     if(page) {

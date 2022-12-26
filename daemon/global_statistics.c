@@ -1613,6 +1613,47 @@ static void dbengine2_statistics_charts(void) {
     }
 
     {
+        static RRDSET *st_queries = NULL;
+        static RRDDIM *rd_total = NULL;
+        static RRDDIM *rd_open = NULL;
+        static RRDDIM *rd_jv2 = NULL;
+        static RRDDIM *rd_planned_with_gaps = NULL;
+        static RRDDIM *rd_executed_with_gaps = NULL;
+
+        if (unlikely(!st_queries)) {
+            st_queries = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_queries",
+                    NULL,
+                    "dbengine query router",
+                    NULL,
+                    "Netdata Queries",
+                    "queries/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_total = rrddim_add(st_queries, "total", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_open = rrddim_add(st_queries, "open cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_jv2 = rrddim_add(st_queries, "journal v2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_planned_with_gaps = rrddim_add(st_queries, "planned with gaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_executed_with_gaps = rrddim_add(st_queries, "executed with gaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+            priority++;
+        }
+
+        rrddim_set_by_pointer(st_queries, rd_total, (collected_number)cache_efficiency_stats.queries);
+        rrddim_set_by_pointer(st_queries, rd_open, (collected_number)cache_efficiency_stats.queries_open);
+        rrddim_set_by_pointer(st_queries, rd_jv2, (collected_number)cache_efficiency_stats.queries_journal_v2);
+        rrddim_set_by_pointer(st_queries, rd_planned_with_gaps, (collected_number)cache_efficiency_stats.queries_planned_with_gaps);
+        rrddim_set_by_pointer(st_queries, rd_executed_with_gaps, (collected_number)cache_efficiency_stats.queries_executed_with_gaps);
+
+        rrdset_done(st_queries);
+    }
+
+    {
         static RRDSET *st_queries_running = NULL;
         static RRDDIM *rd_queries = NULL;
 
