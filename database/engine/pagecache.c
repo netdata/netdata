@@ -131,9 +131,138 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
 
+static inline struct page_details *pdc_find_page_for_time(
+        Pcvoid_t PArray,
+        time_t wanted_time,
+        bool *gap,
+        PDC_PAGE_STATUS skip_these,
+        PDC_PAGE_STATUS stop_at_these
+) {
+    Word_t PIndexF = wanted_time, PIndexL = wanted_time;
+    Pvoid_t *PValueF, *PValueL;
+    struct page_details *pdF = NULL, *pdL = NULL;
+    bool firstF = true, firstL = true;
+    *gap = true;
+
+    while ((PValueF = JudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
+        pdF = *PValueF;
+
+        PDC_PAGE_STATUS status = __atomic_load_n(&pdF->status, __ATOMIC_ACQUIRE);
+        if (!(status & (skip_these | stop_at_these)))
+            break;
+
+        pdF = NULL;
+    }
+
+    while ((PValueL = JudyLLastThenPrev(PArray, &PIndexL, &firstL))) {
+        pdL = *PValueL;
+
+        PDC_PAGE_STATUS status = __atomic_load_n(&pdL->status, __ATOMIC_ACQUIRE);
+        if(status & stop_at_these) {
+            // don't go all the way back to the beginning - stop at the last processed
+            pdL = NULL;
+            break;
+        }
+
+        if (!(status & skip_these))
+            break;
+
+        pdL = NULL;
+    }
+
+    TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_FUTURE;
+    TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_PAST;
+
+    if (pdF == pdL || !pdL) {
+        // they are the same, or L is missing
+        // return the F
+        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
+        return pdF;
+    }
+
+    if (!pdF) {
+        // F is missing
+        // return L
+        *gap = (rcL == PAGE_IS_IN_RANGE) ? false : true;
+        return pdL;
+    }
+
+    if (rcF == rcL) {
+        // both are in range
+        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
+
+        if (rcF == PAGE_IS_IN_THE_PAST)
+            // both are in the past
+            return NULL;
+
+        // pick the higher resolution
+        if (pdF->update_every_s < pdL->update_every_s)
+            return pdF;
+
+        if (pdL->update_every_s < pdF->update_every_s)
+            return pdL;
+
+        // they have the same resolution
+        switch (rcF) {
+            case PAGE_IS_IN_RANGE:
+                // pick the one with the smaller duration
+                if (pdF->last_time_s - pdF->first_time_s < pdL->last_time_s - pdL->last_time_s)
+                    return pdF;
+
+                if (pdF->last_time_s - pdF->first_time_s > pdL->last_time_s - pdL->last_time_s)
+                    return pdL;
+
+                // they have the same duration
+                // pick the one that starts closer to wanted_time
+                if (pdF->first_time_s >= pdL->first_time_s)
+                    return pdF;
+                else
+                    return pdL;
+                break;
+
+            case PAGE_IS_IN_THE_FUTURE:
+                // pick the one that starts closer to wanted_time
+                if (pdF->first_time_s <= pdL->first_time_s)
+                    return pdF;
+                else
+                    return pdL;
+                break;
+
+            default:
+            case PAGE_IS_IN_THE_PAST:
+                return NULL;
+                break;
+        }
+    }
+
+    if(rcF == PAGE_IS_IN_RANGE) {
+        *gap = false;
+        return pdF;
+    }
+
+    if(rcL == PAGE_IS_IN_RANGE) {
+        *gap = false;
+        return pdL;
+    }
+
+    if(rcF == PAGE_IS_IN_THE_FUTURE) {
+        *gap = true;
+        return pdF;
+    }
+
+    if(rcL == PAGE_IS_IN_THE_FUTURE) {
+        *gap = true;
+        return pdL;
+    }
+
+    // impossible case
+    *gap = true;
+    return NULL;
+}
+
 static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengine_instance *ctx,
         time_t wanted_start_time_s, time_t wanted_end_time_s,
-        Pvoid_t *JudyL_page_array, size_t *cache_gaps, time_t *first_page_starting_time_s,
+        Pvoid_t *JudyL_page_array, size_t *cache_gaps,
         bool open_cache_mode, PDC_PAGE_STATUS tags) {
 
     size_t pages_found_in_cache = 0;
@@ -148,7 +277,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     time_t previous_page_last_time_s = current_start_time_s - previous_page_update_every_s;
 
     do {
-        PGC_PAGE *page = pgc_page_get_and_acquire(cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, false);
+        PGC_PAGE *page = pgc_page_get_and_acquire(cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, PGC_SEARCH_CLOSEST);
         if(!page) {
             (*cache_gaps)++;
             break;
@@ -169,9 +298,6 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
         if (page_first_time_s - previous_page_last_time_s > previous_page_update_every_s)
             (*cache_gaps)++;
-
-        if(*first_page_starting_time_s == INVALID_TIME || page_first_time_s < *first_page_starting_time_s)
-            *first_page_starting_time_s = page_first_time_s;
 
         Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_first_time_s, PJE0);
         if (!PValue || PValue == PJERR)
@@ -247,63 +373,77 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     return pages_found_in_cache;
 }
 
-static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric, Pvoid_t JudyL_page_array,
-                                 time_t wanted_start_time_s, time_t wanted_end_time_s,
-                                 time_t *first_page_starting_time_s,
-                                 size_t *pages_total, size_t *pages_found_pass4, size_t *pages_pending,
-                                 bool lookup_pending_in_open_cache) {
+static size_t list_has_time_gaps(
+        struct rrdengine_instance *ctx,
+        METRIC *metric,
+        Pvoid_t JudyL_page_array,
+        time_t wanted_start_time_s,
+        time_t wanted_end_time_s,
+        size_t *pages_total,
+        size_t *pages_found_pass4,
+        size_t *pages_pending
+) {
 
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+    time_t now_s = wanted_start_time_s;
+    time_t dt_s = mrg_metric_get_update_every(main_mrg, metric);
+    if(!dt_s)
+        dt_s = default_rrd_update_every;
+
+    size_t gaps = 0;
+    struct page_details *pd;
+    bool gap = false;
+    size_t pages_pass1 = 0, pages_pass2 = 0;
+    while((pd = pdc_find_page_for_time(
+            JudyL_page_array, now_s, &gap,
+            PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED,
+            PDC_PAGE_PREPROCESSED))) {
+
+        if(gap)
+            gaps++;
+
+        if(pd->update_every_s)
+            dt_s = pd->update_every_s;
+
+        now_s = pd->last_time_s + dt_s;
+
+        pd->status |= PDC_PAGE_PREPROCESSED;
+        pages_pass1++;
+
+        if(now_s > wanted_end_time_s)
+            break;
+    }
 
     bool first = true;
     Word_t this_page_start_time = 0;
     Pvoid_t *PValue;
-    size_t query_gaps = 0;
-
-    *first_page_starting_time_s = INVALID_TIME;
-    *pages_pending = 0;
-    *pages_total = 0;
-
-    time_t previous_page_update_every_s = mrg_metric_get_update_every(main_mrg, metric);
-
-    if(!previous_page_update_every_s)
-        previous_page_update_every_s = default_rrd_update_every;
-
-    time_t previous_page_last_time_s = wanted_start_time_s - previous_page_update_every_s;
-
     while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
-        struct page_details *pd = *PValue;
+        pd = *PValue;
 
-        if(is_page_in_time_range(pd->first_time_s, pd->last_time_s, wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
-            // we don't need this page
+        internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
+
+        if(!(pd->status & PDC_PAGE_PREPROCESSED)) {
             pd->status |= PDC_PAGE_SKIP;
             pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
             continue;
         }
 
-        if(pd->last_time_s < previous_page_last_time_s) {
-           // we don't need this page
-           pd->status |= PDC_PAGE_SKIP;
-           pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
-           continue;
-        }
-
-        if(unlikely(*first_page_starting_time_s == INVALID_TIME || (time_t)this_page_start_time < *first_page_starting_time_s))
-            *first_page_starting_time_s = (time_t)this_page_start_time;
+        pages_pass2++;
 
         if(!pd->page) {
-            if(lookup_pending_in_open_cache)
-                pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, true);
+            pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
 
             if(pd->page) {
                 (*pages_found_pass4)++;
+
                 pd->status &= ~PDC_PAGE_DISK_PENDING;
                 pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED | PDC_PAGE_PRELOADED_PASS4;
             }
             else {
                 (*pages_pending)++;
 
-                if(pd->status & PDC_PAGE_DISK_PENDING) {
+                if (pd->status & PDC_PAGE_DISK_PENDING) {
                     internal_fatal(!pd->datafile.ptr, "datafile is NULL");
                     internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
                     internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
@@ -313,27 +453,19 @@ static size_t list_has_time_gaps(struct rrdengine_instance *ctx, METRIC *metric,
                     internal_fatal(!(pd->status & PDC_PAGE_FAILED),
                                    "DBENGINE: pdc has a disk pending page, without proper tagging");
             }
-
-            internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
         }
         else {
             pd->status &= ~PDC_PAGE_DISK_PENDING;
             pd->status |= (PDC_PAGE_READY | PDC_PAGE_PRELOADED);
         }
-
-        if(previous_page_last_time_s + previous_page_update_every_s < pd->first_time_s)
-            query_gaps++;
-
-        previous_page_last_time_s = pd->last_time_s;
-        previous_page_update_every_s = (pd->update_every_s) ? pd->update_every_s : previous_page_update_every_s;
-
-        (*pages_total)++;
     }
 
-    if(previous_page_last_time_s < wanted_end_time_s)
-        query_gaps++;
+    internal_fatal(pages_pass1 != pages_pass2,
+                   "DBENGINE: page count does not match");
 
-    return query_gaps;
+    *pages_total = pages_pass1;
+
+    return gaps;
 }
 
 typedef void (*page_found_callback)(PGC_PAGE *page, void *data);
@@ -471,7 +603,13 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
 // Pvalue of the judy will be the end time for that page
 // DBENGINE2:
 #define time_delta(finish, pass) do { if(pass) { usec_t t = pass; (pass) = (finish) - (pass); (finish) = t; } } while(0)
-Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, time_t *first_page_first_time_s, size_t *pages_to_load) {
+static Pvoid_t get_page_list(
+        struct rrdengine_instance *ctx,
+        METRIC *metric,
+        usec_t start_time_ut,
+        usec_t end_time_ut,
+        size_t *pages_to_load
+) {
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
@@ -481,8 +619,6 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     size_t cache_gaps = 0, query_gaps = 0;
     bool done_v2 = false, done_open = false;
 
-    time_t first_page_starting_time_s = INVALID_TIME;
-
     usec_t pass1_ut = 0, pass2_ut = 0, pass3_ut = 0, pass4_ut = 0;
 
     // --------------------------------------------------------------
@@ -491,8 +627,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     pass1_ut = now_monotonic_usec();
     size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, false,
-                                                PDC_PAGE_PRELOADED_PASS1 | PDC_PAGE_SOURCE_MAIN_CACHE);
+                                                false, PDC_PAGE_PRELOADED_PASS1 | PDC_PAGE_SOURCE_MAIN_CACHE);
     query_gaps += cache_gaps;
     pages_found_in_main_cache += pages_pass1;
     pages_total += pages_pass1;
@@ -508,8 +643,7 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
     pass2_ut = now_monotonic_usec();
     size_t pages_pass2 = get_page_list_from_pgc(open_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                &first_page_starting_time_s, true,
-                                                PDC_PAGE_SOURCE_OPEN_CACHE);
+                                                true, PDC_PAGE_SOURCE_OPEN_CACHE);
     query_gaps += cache_gaps;
     pages_found_in_open_cache += pages_pass2;
     pages_total += pages_pass2;
@@ -532,13 +666,9 @@ Pvoid_t get_page_list(struct rrdengine_instance *ctx, METRIC *metric, usec_t sta
 
     pass4_ut = now_monotonic_usec();
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                    &first_page_starting_time_s, &pages_total, &pages_found_pass4, &pages_pending,
-                                    true);
+                                    &pages_total, &pages_found_pass4, &pages_pending);
 
 we_are_done:
-
-    if(first_page_first_time_s)
-        *first_page_first_time_s = first_page_starting_time_s;
 
     if(pages_to_load)
         *pages_to_load = pages_pending;
@@ -576,11 +706,10 @@ we_are_done:
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t) {
+void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t) {
     if (unlikely(!handle || !handle->metric))
-        return 0;
+        return;
 
-    time_t first_page_first_time_s = INVALID_TIME;
     size_t pages_to_load = 0;
 
     __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
@@ -592,7 +721,7 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
 
     handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
-                                                 &first_page_first_time_s, &pages_to_load);
+                                                 &pages_to_load);
 
     int ret = pthread_setspecific(query_key, handle);
     fatal_assert(0 == ret);
@@ -609,8 +738,6 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
         handle->pdc->refcount = 1; // we are alone in this query - no need for any worker
         completion_mark_complete(&handle->pdc->completion);
     }
-
-    return first_page_first_time_s;
 }
 
 /*
@@ -618,130 +745,6 @@ time_t pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_hand
  * start_time and end_time are inclusive.
  * If index is NULL lookup by UUID (id).
  */
-
-static inline struct page_details *pdc_find_page_for_time(Pcvoid_t PArray, time_t wanted_time, bool *gap) {
-    Word_t PIndexF = wanted_time, PIndexL = wanted_time;
-    Pvoid_t *PValueF, *PValueL;
-    struct page_details *pdF = NULL, *pdL = NULL;
-    bool firstF = true, firstL = true;
-    *gap = true;
-
-    while ((PValueF = JudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
-        pdF = *PValueF;
-
-        PDC_PAGE_STATUS status = __atomic_load_n(&pdF->status, __ATOMIC_ACQUIRE);
-        if (!(status & (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_PROCESSED | PDC_PAGE_RELEASED)))
-            break;
-
-        pdF = NULL;
-    }
-
-    while ((PValueL = JudyLLastThenPrev(PArray, &PIndexL, &firstL))) {
-        pdL = *PValueL;
-
-        PDC_PAGE_STATUS status = __atomic_load_n(&pdL->status, __ATOMIC_ACQUIRE);
-        if(status & PDC_PAGE_PROCESSED) {
-            // don't go all the way back to the beginning - stop at the last processed
-            pdL = NULL;
-            break;
-        }
-
-        if (!(status & (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)))
-            break;
-
-        pdL = NULL;
-    }
-
-    TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_FUTURE;
-    TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_PAST;
-
-    if (pdF == pdL || !pdL) {
-        // they are the same, or L is missing
-        // return the F
-        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
-        return pdF;
-    }
-
-    if (!pdF) {
-        // F is missing
-        // return L
-        *gap = (rcL == PAGE_IS_IN_RANGE) ? false : true;
-        return pdL;
-    }
-
-    if (rcF == rcL) {
-        // both are in range
-        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
-
-        if (rcF == PAGE_IS_IN_THE_PAST)
-            // both are in the past
-            return NULL;
-
-        // pick the higher resolution
-        if (pdF->update_every_s < pdL->update_every_s)
-            return pdF;
-
-        if (pdL->update_every_s < pdF->update_every_s)
-            return pdL;
-
-        // they have the same resolution
-        switch (rcF) {
-            case PAGE_IS_IN_RANGE:
-                // pick the one with the smaller duration
-                if (pdF->last_time_s - pdF->first_time_s < pdL->last_time_s - pdL->last_time_s)
-                    return pdF;
-
-                if (pdF->last_time_s - pdF->first_time_s > pdL->last_time_s - pdL->last_time_s)
-                    return pdL;
-
-                // they have the same duration
-                // pick the one that starts closer to wanted_time
-                if (pdF->first_time_s >= pdL->first_time_s)
-                    return pdF;
-                else
-                    return pdL;
-                break;
-
-            case PAGE_IS_IN_THE_FUTURE:
-                // pick the one that starts closer to wanted_time
-                if (pdF->first_time_s <= pdL->first_time_s)
-                    return pdF;
-                else
-                    return pdL;
-                break;
-
-            default:
-            case PAGE_IS_IN_THE_PAST:
-                return NULL;
-                break;
-        }
-    }
-
-    if(rcF == PAGE_IS_IN_RANGE) {
-        *gap = false;
-        return pdF;
-    }
-
-    if(rcL == PAGE_IS_IN_RANGE) {
-        *gap = false;
-        return pdL;
-    }
-
-    if(rcF == PAGE_IS_IN_THE_FUTURE) {
-        *gap = true;
-        return pdF;
-    }
-
-    if(rcL == PAGE_IS_IN_THE_FUTURE) {
-        *gap = true;
-        return pdL;
-    }
-
-    // impossible case
-    *gap = true;
-    return NULL;
-}
-
 struct pgc_page *pg_cache_lookup_next(
         struct rrdengine_instance *ctx,
         PDC *pdc,
@@ -752,14 +755,22 @@ struct pgc_page *pg_cache_lookup_next(
     if (unlikely(!pdc || !pdc->page_list_JudyL))
         return NULL;
 
+    size_t gaps = 0;
     usec_t start_ut = now_monotonic_usec();
     bool waited = false, gap = false, preloaded;
     PGC_PAGE *page = NULL;
     while(!page) {
         bool page_from_pd = false;
         preloaded = false;
+        gap = false;
+        struct page_details *pd = pdc_find_page_for_time(
+                pdc->page_list_JudyL, now_s, &gap,
+                PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED,
+                PDC_PAGE_PROCESSED);
 
-        struct page_details *pd = pdc_find_page_for_time(pdc->page_list_JudyL, now_s, &gap);
+        if(gap)
+            gaps++;
+
         if (!pd)
             break;
 
@@ -769,7 +780,7 @@ struct pgc_page *pg_cache_lookup_next(
         if(!page) {
             if(!completion_is_done(&pdc->completion)) {
                 page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx,
-                                                pd->metric_id, pd->first_time_s, true);
+                                                pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
                 page_from_pd = false;
                 preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
             }
@@ -846,10 +857,9 @@ struct pgc_page *pg_cache_lookup_next(
             pdc_page_status_set(pd, PDC_PAGE_PROCESSED);
     }
 
-    if(gap && !pdc->executed_with_gap) {
-        pdc->executed_with_gap = gap;
+    pdc->executed_with_gaps = gaps;
+    if(gaps)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.queries_executed_with_gaps, 1, __ATOMIC_RELAXED);
-    }
 
     if(page) {
         if(waited)

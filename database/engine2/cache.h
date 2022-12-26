@@ -185,7 +185,16 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page);
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page);
 
 // find a page from the cache
-PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, bool exact);
+typedef enum {
+    PGC_SEARCH_EXACT,
+    PGC_SEARCH_CLOSEST,
+    PGC_SEARCH_FIRST,
+    PGC_SEARCH_NEXT,
+    PGC_SEARCH_LAST,
+    PGC_SEARCH_PREV,
+} PGC_SEARCH;
+
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, PGC_SEARCH method);
 
 // get information from an acquired page
 Word_t pgc_page_section(PGC_PAGE *page);

@@ -93,7 +93,7 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
             if (pd->page)
                 continue;
 
-            pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, pd->metric_id, pd->first_time_s, true);
+            pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
             if (pd->page) {
                 found++;
                 pdc_page_status_set(pd, PDC_PAGE_READY | tags);
@@ -568,7 +568,7 @@ static bool extent_uncompress_and_populate_pages(
         if(worker)
             worker_is_busy(UV_EVENT_PAGE_POPULATION);
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, start_time_s, true);
+        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, start_time_s, PGC_SEARCH_EXACT);
         if (!page) {
             void *page_data = mallocz((size_t) vd.page_length);
 
@@ -1005,7 +1005,11 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         struct uuid_first_time_s *uuid_first_t_entry = *PValue;
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(open_cache, (Word_t)ctx, (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_t, false);
+        PGC_PAGE *page = pgc_page_get_and_acquire(
+                open_cache, (Word_t)ctx,
+                (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_t,
+                PGC_SEARCH_CLOSEST);
+
         if (page) {
             time_t first_time_t = pgc_page_start_time_t(page);
             time_t last_time_t = pgc_page_end_time_t(page);
@@ -1423,7 +1427,11 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
     bool extent_found_in_cache = false;
 
     void *extent_compressed_data = NULL;
-    PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(extent_cache, (Word_t)ctx, (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset, true);
+    PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(
+            extent_cache, (Word_t)ctx,
+            (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset,
+            PGC_SEARCH_EXACT);
+
     if(extent_cache_page) {
         extent_compressed_data = pgc_page_data(extent_cache_page);
         internal_fatal(extent_page_list->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),

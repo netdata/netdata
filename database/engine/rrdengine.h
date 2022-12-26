@@ -46,11 +46,10 @@ typedef struct page_details_control {
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
     bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
     bool workers_should_stop;       // true when the query thread left and the workers should stop
-    bool executed_with_gap;
 
     SPINLOCK refcount_spinlock;     // spinlock to protect refcount
     int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
-
+    size_t executed_with_gaps;
 } PDC;
 
 typedef enum __attribute__ ((__packed__)) {
@@ -62,29 +61,30 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_INVALID   = (1 << 3),                  // don't use this page, it is invalid
 
     // other statuses for tracking issues
-    PDC_PAGE_PROCESSED                 = (1 << 4),  // processed by the query caller
-    PDC_PAGE_RELEASED                  = (1 << 5),  // already released
+    PDC_PAGE_PREPROCESSED              = (1 << 4),  // used during preprocessing
+    PDC_PAGE_PROCESSED                 = (1 << 5),  // processed by the query caller
+    PDC_PAGE_RELEASED                  = (1 << 6),  // already released
 
     // data found in cache (preloaded) or on disk?
-    PDC_PAGE_PRELOADED                 = (1 << 6),  // data found in memory
-    PDC_PAGE_DISK_PENDING              = (1 << 7),  // data need to be loaded from disk
+    PDC_PAGE_PRELOADED                 = (1 << 7),  // data found in memory
+    PDC_PAGE_DISK_PENDING              = (1 << 8),  // data need to be loaded from disk
 
     // worker related statuses
-    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 8),
-    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 9),
-    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 10),
-    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 11),
+    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 9),
+    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 10),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 11),
+    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 12),
 
-    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 12),
-    PDC_PAGE_LOADED_FROM_DISK          = (1 << 13),
+    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 13),
+    PDC_PAGE_LOADED_FROM_DISK          = (1 << 14),
 
-    PDC_PAGE_PRELOADED_PASS1           = (1 << 14),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 15),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 16),
+    PDC_PAGE_PRELOADED_PASS1           = (1 << 15),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 16),
+    PDC_PAGE_PRELOADED_WORKER          = (1 << 17),
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 17),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 18),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 19),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 19),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 19),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 20),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),
