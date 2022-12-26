@@ -800,7 +800,7 @@ struct pgc_page *pg_cache_lookup_next(
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
-                page_update_every_s = pgc_page_fix_update_every(handle->page, handle->dt_s);
+                page_update_every_s = pgc_page_fix_update_every(page, handle->dt_s);
             }
 
             size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
