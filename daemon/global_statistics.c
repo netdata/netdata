@@ -1800,6 +1800,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pages_invalid_size = NULL;
         static RRDDIM *rd_pages_fixed_update_every = NULL;
         static RRDDIM *rd_pages_fixed_entries = NULL;
+        static RRDDIM *rd_pages_overlapping = NULL;
 
         if (unlikely(!st_query_page_issues)) {
             st_query_page_issues = rrdset_create_localhost(
@@ -1819,17 +1820,19 @@ static void dbengine2_statistics_charts(void) {
             rd_pages_zero_time = rrddim_add(st_query_page_issues, "zero timestamp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_invalid_size = rrddim_add(st_query_page_issues, "invalid size", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_past_time = rrddim_add(st_query_page_issues, "past time", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_pages_overlapping = rrddim_add(st_query_page_issues, "overlapping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_fixed_update_every = rrddim_add(st_query_page_issues, "update every fixed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_fixed_entries = rrddim_add(st_query_page_issues, "entries fixed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             priority++;
         }
 
-        rrddim_set_by_pointer(st_query_page_issues, rd_pages_zero_time, (collected_number)cache_efficiency_stats.page_zero_time_skipped);
-        rrddim_set_by_pointer(st_query_page_issues, rd_pages_invalid_size, (collected_number)cache_efficiency_stats.page_invalid_size_skipped);
-        rrddim_set_by_pointer(st_query_page_issues, rd_pages_past_time, (collected_number)cache_efficiency_stats.page_past_time_skipped);
-        rrddim_set_by_pointer(st_query_page_issues, rd_pages_fixed_update_every, (collected_number)cache_efficiency_stats.page_invalid_update_every_fixed);
-        rrddim_set_by_pointer(st_query_page_issues, rd_pages_fixed_entries, (collected_number)cache_efficiency_stats.page_invalid_entries_fixed);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_zero_time, (collected_number)cache_efficiency_stats.pages_zero_time_skipped);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_invalid_size, (collected_number)cache_efficiency_stats.pages_invalid_size_skipped);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_past_time, (collected_number)cache_efficiency_stats.pages_past_time_skipped);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_overlapping, (collected_number)cache_efficiency_stats.pages_overlapping_skipped);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_fixed_update_every, (collected_number)cache_efficiency_stats.pages_invalid_update_every_fixed);
+        rrddim_set_by_pointer(st_query_page_issues, rd_pages_fixed_entries, (collected_number)cache_efficiency_stats.pages_invalid_entries_fixed);
 
         rrdset_done(st_query_page_issues);
     }

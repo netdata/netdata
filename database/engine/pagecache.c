@@ -272,7 +272,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     if(!dt_s)
         dt_s = default_rrd_update_every;
 
-    time_t previous_page_last_time_s = now_s - dt_s;
+    time_t previous_page_end_time_s = now_s - dt_s;
     bool first = true;
 
     do {
@@ -283,27 +283,35 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         first = false;
 
         if(!page) {
-            (*cache_gaps)++;
+            if(previous_page_end_time_s < wanted_end_time_s)
+                (*cache_gaps)++;
+
             break;
         }
 
-        time_t page_first_time_s = pgc_page_start_time_t(page);
-        time_t page_last_time_s = pgc_page_end_time_t(page);
+        time_t page_start_time_s = pgc_page_start_time_t(page);
+        time_t page_end_time_s = pgc_page_end_time_t(page);
         time_t page_update_every_s = pgc_page_update_every(page);
         size_t page_length = pgc_page_data_size(cache, page);
 
-        if(is_page_in_time_range(page_first_time_s, page_last_time_s, wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
+        if(!page_update_every_s)
+            page_update_every_s = dt_s;
+
+        if(is_page_in_time_range(page_start_time_s, page_end_time_s, wanted_start_time_s, wanted_end_time_s) != PAGE_IS_IN_RANGE) {
             // not a useful page for this query
             pgc_page_release(cache, page);
             page = NULL;
-            (*cache_gaps)++;
+
+            if(previous_page_end_time_s < wanted_end_time_s)
+                (*cache_gaps)++;
+
             break;
         }
 
-        if (page_first_time_s - previous_page_last_time_s > dt_s)
+        if (page_start_time_s - previous_page_end_time_s > dt_s)
             (*cache_gaps)++;
 
-        Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_first_time_s, PJE0);
+        Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_start_time_s, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: corrupted judy array in %s()", __FUNCTION__ );
 
@@ -332,8 +340,8 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 
             struct page_details *pd = callocz(1, sizeof(*pd));
             pd->metric_id = metric_id;
-            pd->first_time_s = page_first_time_s;
-            pd->last_time_s = page_last_time_s;
+            pd->first_time_s = page_start_time_s;
+            pd->last_time_s = page_end_time_s;
             pd->page_length = page_length;
             pd->update_every_s = page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
@@ -362,19 +370,16 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         }
 
         // prepare for the next iteration
-        previous_page_last_time_s = page_last_time_s;
+        previous_page_end_time_s = page_end_time_s;
 
         if(page_update_every_s > 0)
             dt_s = page_update_every_s;
 
         // we are going to as for the NEXT page
         // so, set this to our first time
-        now_s = page_first_time_s;
+        now_s = page_start_time_s;
 
     } while(now_s <= wanted_end_time_s);
-
-    if(previous_page_last_time_s < wanted_end_time_s)
-        cache_gaps++;
 
     return pages_found_in_cache;
 }
@@ -387,10 +392,12 @@ static size_t list_has_time_gaps(
         time_t wanted_end_time_s,
         size_t *pages_total,
         size_t *pages_found_pass4,
-        size_t *pages_pending
+        size_t *pages_pending,
+        size_t *pages_overlapping
 ) {
-    // we will recalculate this, so zero it
+    // we will recalculate these, so zero them
     *pages_pending = 0;
+    *pages_overlapping = 0;
 
     bool first;
     Pvoid_t *PValue;
@@ -423,15 +430,14 @@ static size_t list_has_time_gaps(
             JudyL_page_array, now_s, &gaps,
             PDC_PAGE_PREPROCESSED))) {
 
+        pd->status |= PDC_PAGE_PREPROCESSED;
+        pages_pass2++;
+
         if(pd->update_every_s)
             dt_s = pd->update_every_s;
 
         now_s = pd->last_time_s + dt_s;
-
-        pd->status |= PDC_PAGE_PREPROCESSED;
-        pages_pass2++;
-
-        if(now_s > wanted_end_time_s)
+        if(now_s >= wanted_end_time_s)
             break;
     }
 
@@ -446,6 +452,7 @@ static size_t list_has_time_gaps(
         internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
 
         if(!(pd->status & PDC_PAGE_PREPROCESSED)) {
+            (*pages_overlapping)++;
             pd->status |= PDC_PAGE_SKIP;
             pd->status &= ~(PDC_PAGE_READY | PDC_PAGE_DISK_PENDING);
             continue;
@@ -637,7 +644,14 @@ static Pvoid_t get_page_list(
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
     time_t wanted_end_time_s = (time_t)(end_time_ut / USEC_PER_SEC);
 
-    size_t pages_found_in_main_cache = 0, pages_found_in_open_cache = 0, pages_found_in_journals_v2 = 0, pages_found_pass4 = 0, pages_pending = 0, pages_total = 0;
+    size_t  pages_found_in_main_cache = 0,
+            pages_found_in_open_cache = 0,
+            pages_found_in_journals_v2 = 0,
+            pages_found_pass4 = 0,
+            pages_pending = 0,
+            pages_overlapping = 0,
+            pages_total = 0;
+
     size_t cache_gaps = 0, query_gaps = 0;
     bool done_v2 = false, done_open = false;
 
@@ -656,7 +670,7 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_main_cache && !cache_gaps) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending);
+                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -677,7 +691,7 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_open_cache) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending);
+                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -700,7 +714,7 @@ static Pvoid_t get_page_list(
 
     pass4_ut = now_monotonic_usec();
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                    &pages_total, &pages_found_pass4, &pages_pending);
+                                    &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
 
 we_are_done:
 
@@ -728,6 +742,7 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_found_in_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
 
     return JudyL_page_array;
 }
@@ -838,14 +853,14 @@ struct pgc_page *pg_cache_lookup_next(
         size_t page_length = pgc_page_data_size(main_cache, page);
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_zero_time_skipped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_to_clean_evict_or_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
             continue;
         }
         else if(page_length > RRDENG_BLOCK_SIZE) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_invalid_size_skipped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_size_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_to_clean_evict_or_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
@@ -853,7 +868,7 @@ struct pgc_page *pg_cache_lookup_next(
         }
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
                 page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
             }
 
@@ -866,13 +881,13 @@ struct pgc_page *pg_cache_lookup_next(
 
                 internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
 
-                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_invalid_entries_fixed, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_entries_fixed, 1, __ATOMIC_RELAXED);
             }
             *entries = entries_by_time;
         }
 
         if(unlikely(page_end_time_s < now_s)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.page_past_time_skipped, 1, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_past_time_skipped, 1, __ATOMIC_RELAXED);
             pgc_page_release(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_SKIP | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
