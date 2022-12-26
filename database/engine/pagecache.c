@@ -134,21 +134,19 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 static inline struct page_details *pdc_find_page_for_time(
         Pcvoid_t PArray,
         time_t wanted_time,
-        bool *gap,
-        PDC_PAGE_STATUS skip_these,
-        PDC_PAGE_STATUS stop_at_these
+        size_t *gaps,
+        PDC_PAGE_STATUS stop_at
 ) {
     Word_t PIndexF = wanted_time, PIndexL = wanted_time;
     Pvoid_t *PValueF, *PValueL;
     struct page_details *pdF = NULL, *pdL = NULL;
     bool firstF = true, firstL = true;
-    *gap = true;
 
     while ((PValueF = JudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
         pdF = *PValueF;
 
         PDC_PAGE_STATUS status = __atomic_load_n(&pdF->status, __ATOMIC_ACQUIRE);
-        if (!(status & (skip_these | stop_at_these)))
+        if (!(status & (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED | stop_at)))
             break;
 
         pdF = NULL;
@@ -158,13 +156,13 @@ static inline struct page_details *pdc_find_page_for_time(
         pdL = *PValueL;
 
         PDC_PAGE_STATUS status = __atomic_load_n(&pdL->status, __ATOMIC_ACQUIRE);
-        if(status & stop_at_these) {
+        if(status & stop_at) {
             // don't go all the way back to the beginning - stop at the last processed
             pdL = NULL;
             break;
         }
 
-        if (!(status & skip_these))
+        if (!(status & (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)))
             break;
 
         pdL = NULL;
@@ -176,20 +174,20 @@ static inline struct page_details *pdc_find_page_for_time(
     if (pdF == pdL || !pdL) {
         // they are the same, or L is missing
         // return the F
-        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
+        (*gaps) += (rcF == PAGE_IS_IN_RANGE) ? 0 : 1;
         return pdF;
     }
 
     if (!pdF) {
         // F is missing
         // return L
-        *gap = (rcL == PAGE_IS_IN_RANGE) ? false : true;
+        (*gaps) += (rcL == PAGE_IS_IN_RANGE) ? 0 : 1;
         return pdL;
     }
 
     if (rcF == rcL) {
         // both are in range
-        *gap = (rcF == PAGE_IS_IN_RANGE) ? false : true;
+        (*gaps) += (rcF == PAGE_IS_IN_RANGE) ? 0 : 1;
 
         if (rcF == PAGE_IS_IN_THE_PAST)
             // both are in the past
@@ -236,27 +234,27 @@ static inline struct page_details *pdc_find_page_for_time(
     }
 
     if(rcF == PAGE_IS_IN_RANGE) {
-        *gap = false;
+        // (*gaps) += 0;
         return pdF;
     }
 
     if(rcL == PAGE_IS_IN_RANGE) {
-        *gap = false;
+        // (*gaps) += 0;
         return pdL;
     }
 
     if(rcF == PAGE_IS_IN_THE_FUTURE) {
-        *gap = true;
+        (*gaps)++;
         return pdF;
     }
 
     if(rcL == PAGE_IS_IN_THE_FUTURE) {
-        *gap = true;
+        (*gaps)++;
         return pdL;
     }
 
     // impossible case
-    *gap = true;
+    (*gaps)++;
     return NULL;
 }
 
@@ -268,16 +266,22 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     size_t pages_found_in_cache = 0;
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
-    time_t current_start_time_s = wanted_start_time_s;
-    time_t previous_page_update_every_s = mrg_metric_get_update_every(main_mrg, metric);
+    time_t now_s = wanted_start_time_s;
+    time_t dt_s = mrg_metric_get_update_every(main_mrg, metric);
 
-    if(!previous_page_update_every_s)
-        previous_page_update_every_s = default_rrd_update_every;
+    if(!dt_s)
+        dt_s = default_rrd_update_every;
 
-    time_t previous_page_last_time_s = current_start_time_s - previous_page_update_every_s;
+    time_t previous_page_last_time_s = now_s - dt_s;
+    bool first = true;
 
     do {
-        PGC_PAGE *page = pgc_page_get_and_acquire(cache, (Word_t)ctx, (Word_t)metric_id, current_start_time_s, PGC_SEARCH_CLOSEST);
+        PGC_PAGE *page = pgc_page_get_and_acquire(
+                cache, (Word_t)ctx, (Word_t)metric_id, now_s,
+                (first) ? PGC_SEARCH_CLOSEST : PGC_SEARCH_NEXT);
+
+        first = false;
+
         if(!page) {
             (*cache_gaps)++;
             break;
@@ -296,7 +300,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             break;
         }
 
-        if (page_first_time_s - previous_page_last_time_s > previous_page_update_every_s)
+        if (page_first_time_s - previous_page_last_time_s > dt_s)
             (*cache_gaps)++;
 
         Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_first_time_s, PJE0);
@@ -361,11 +365,13 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         previous_page_last_time_s = page_last_time_s;
 
         if(page_update_every_s > 0)
-            previous_page_update_every_s = page_update_every_s;
+            dt_s = page_update_every_s;
 
-        current_start_time_s = previous_page_last_time_s + previous_page_update_every_s;
+        // we are going to as for the NEXT page
+        // so, set this to our first time
+        now_s = page_first_time_s;
 
-    } while(current_start_time_s <= wanted_end_time_s);
+    } while(now_s <= wanted_end_time_s);
 
     if(previous_page_last_time_s < wanted_end_time_s)
         cache_gaps++;
@@ -383,25 +389,39 @@ static size_t list_has_time_gaps(
         size_t *pages_found_pass4,
         size_t *pages_pending
 ) {
+    // we will recalculate this, so zero it
+    *pages_pending = 0;
 
+    bool first;
+    Pvoid_t *PValue;
+    Word_t this_page_start_time;
+    struct page_details *pd;
+
+    size_t gaps = 0;
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
+
+    // ------------------------------------------------------------------------
+    // PASS 1: remove the preprocessing flags from the pages in PDC
+
+    first = true;
+    this_page_start_time = 0;
+    while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
+        pd = *PValue;
+        pd->status &= ~(PDC_PAGE_SKIP|PDC_PAGE_PREPROCESSED);
+    }
+
+    // ------------------------------------------------------------------------
+    // PASS 2: emulate processing to find the useful pages
 
     time_t now_s = wanted_start_time_s;
     time_t dt_s = mrg_metric_get_update_every(main_mrg, metric);
     if(!dt_s)
         dt_s = default_rrd_update_every;
 
-    size_t gaps = 0;
-    struct page_details *pd;
-    bool gap = false;
-    size_t pages_pass1 = 0, pages_pass2 = 0;
+    size_t pages_pass2 = 0, pages_pass3 = 0;
     while((pd = pdc_find_page_for_time(
-            JudyL_page_array, now_s, &gap,
-            PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED,
+            JudyL_page_array, now_s, &gaps,
             PDC_PAGE_PREPROCESSED))) {
-
-        if(gap)
-            gaps++;
 
         if(pd->update_every_s)
             dt_s = pd->update_every_s;
@@ -409,15 +429,17 @@ static size_t list_has_time_gaps(
         now_s = pd->last_time_s + dt_s;
 
         pd->status |= PDC_PAGE_PREPROCESSED;
-        pages_pass1++;
+        pages_pass2++;
 
         if(now_s > wanted_end_time_s)
             break;
     }
 
-    bool first = true;
-    Word_t this_page_start_time = 0;
-    Pvoid_t *PValue;
+    // ------------------------------------------------------------------------
+    // PASS 3: mark as skipped all the pages not useful
+
+    first = true;
+    this_page_start_time = 0;
     while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         pd = *PValue;
 
@@ -429,7 +451,7 @@ static size_t list_has_time_gaps(
             continue;
         }
 
-        pages_pass2++;
+        pages_pass3++;
 
         if(!pd->page) {
             pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
@@ -460,10 +482,10 @@ static size_t list_has_time_gaps(
         }
     }
 
-    internal_fatal(pages_pass1 != pages_pass2,
+    internal_fatal(pages_pass2 != pages_pass3,
                    "DBENGINE: page count does not match");
 
-    *pages_total = pages_pass1;
+    *pages_total = pages_pass2;
 
     return gaps;
 }
@@ -632,9 +654,13 @@ static Pvoid_t get_page_list(
     pages_found_in_main_cache += pages_pass1;
     pages_total += pages_pass1;
 
-    if(pages_found_in_main_cache && !cache_gaps)
-        goto we_are_done;
+    if(pages_found_in_main_cache && !cache_gaps) {
+        query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
+                                        &pages_total, &pages_found_pass4, &pages_pending);
 
+        if (pages_total && !query_gaps)
+            goto we_are_done;
+    }
 
     // --------------------------------------------------------------
     // PASS 2: Check what the open journal page cache has available
@@ -648,6 +674,14 @@ static Pvoid_t get_page_list(
     pages_found_in_open_cache += pages_pass2;
     pages_total += pages_pass2;
     done_open = true;
+
+    if(pages_found_in_open_cache) {
+        query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
+                                        &pages_total, &pages_found_pass4, &pages_pending);
+
+        if (pages_total && !query_gaps)
+            goto we_are_done;
+    }
 
     // --------------------------------------------------------------
     // PASS 3: Check Journal v2 to fill the gaps
@@ -757,19 +791,14 @@ struct pgc_page *pg_cache_lookup_next(
 
     size_t gaps = 0;
     usec_t start_ut = now_monotonic_usec();
-    bool waited = false, gap = false, preloaded;
+    bool waited = false, preloaded;
     PGC_PAGE *page = NULL;
     while(!page) {
         bool page_from_pd = false;
         preloaded = false;
-        gap = false;
         struct page_details *pd = pdc_find_page_for_time(
-                pdc->page_list_JudyL, now_s, &gap,
-                PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED,
+                pdc->page_list_JudyL, now_s, &gaps,
                 PDC_PAGE_PROCESSED);
-
-        if(gap)
-            gaps++;
 
         if (!pd)
             break;
