@@ -951,7 +951,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t last_run_pages_skipped;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t pages_to_evict_per_run = (max_evict == SIZE_MAX || max_skip == SIZE_MAX) ? SIZE_MAX : cache->config.partitions * 10;
+    size_t pages_to_evict_per_run = cache->config.partitions * 10;
 
     size_t spins_without_pages_to_evict = 0;      // complete scans without any evictions
     PGC_PAGE *last_page_we_couldnt_delete = NULL; // remember where we left it at the last round
