@@ -22,17 +22,15 @@ typedef int32_t REFCOUNT;
 
 typedef enum __attribute__ ((__packed__)) {
     // mutually exclusive flags
-    PGC_PAGE_CLEAN     = (1 << 0), // none of the following
-    PGC_PAGE_DIRTY     = (1 << 1), // contains unsaved data
-    PGC_PAGE_HOT       = (1 << 2), // currently being collected
+    PGC_PAGE_CLEAN                       = (1 << 0), // none of the following
+    PGC_PAGE_DIRTY                       = (1 << 1), // contains unsaved data
+    PGC_PAGE_HOT                         = (1 << 2), // currently being collected
 
     // flags related to various actions on each page
-    PGC_PAGE_IS_BEING_CREATED            = (1 << 3),
-    PGC_PAGE_IS_BEING_DELETED            = (1 << 4),
-    PGC_PAGE_IS_BEING_SAVED              = (1 << 5),
-    PGC_PAGE_IS_BEING_MIGRATED_TO_V2     = (1 << 6),
-    PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 7),
-    PGC_PAGE_HAS_BEEN_ACCESSED           = (1 << 8),
+    PGC_PAGE_IS_BEING_DELETED            = (1 << 3),
+    PGC_PAGE_IS_BEING_MIGRATED_TO_V2     = (1 << 4),
+    PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 5),
+    PGC_PAGE_HAS_BEEN_ACCESSED           = (1 << 6),
 } PGC_PAGE_FLAGS;
 
 #define page_flag_check(page, flag) (__atomic_load_n(&((page)->flags), __ATOMIC_ACQUIRE) & (flag))
@@ -340,7 +338,7 @@ static inline bool cache_needs_space_aggressively(PGC *cache) {
     return false;
 }
 
-#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= cache->config.healthy_size_per1000)
+#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= (cache)->config.healthy_size_per1000)
 
 typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
@@ -949,15 +947,16 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         max_evict = 2;
 
     PGC_PAGE *to_evict[cache->config.partitions];
-    size_t pages_to_evict = 0, pages_to_evict_size; // per round/spin
-    size_t pages_removed_from_index;
-    size_t pages_freed;
+    size_t pages_to_evict_this_run = 0;
+    size_t pages_to_evict_size_this_run = 0;
+    size_t pages_removed_from_index_this_run = 0;
+    size_t pages_freed_this_run = 0;
+    size_t pages_skipped_this_run = 0;
     size_t total_pages_evicted = 0;
     size_t total_pages_skipped = 0;
-    size_t last_run_pages_skipped;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t pages_to_evict_per_run = cache->config.partitions * 10;
+    size_t max_pages_to_evict_per_run = cache->config.partitions * 10;
 
     size_t spins_without_pages_to_evict = 0;      // complete scans without any evictions
     PGC_PAGE *last_page_we_couldnt_delete = NULL; // remember where we left it at the last round
@@ -965,7 +964,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
-        if(last_page_we_couldnt_delete && !pages_to_evict) {
+        if(last_page_we_couldnt_delete && !pages_to_evict_this_run) {
             // we did a complete scan of all clean pages,
             // and we still need to evict more
             // so do 1 more round only
@@ -979,7 +978,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             spins_without_pages_to_evict++;
         }
 
-        last_run_pages_skipped = 0;
+        pages_skipped_this_run = 0;
 
         size_t max_size_to_evict = 0;
         if (all_of_them)
@@ -995,8 +994,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         for (size_t partition = 0; partition < cache->config.partitions; partition++)
             to_evict[partition] = NULL;
 
-        pages_to_evict = 0;
-        pages_to_evict_size = 0;
+        pages_to_evict_this_run = 0;
+        pages_to_evict_size_this_run = 0;
 
         if(!all_of_them && !wait) {
             if(!pgc_ll_trylock(cache, &cache->clean)) {
@@ -1044,8 +1043,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 size_t partition = pgc_indexing_partition(cache, page->metric_id);
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(to_evict[partition], page, link.prev, link.next);
 
-                pages_to_evict++;
-                pages_to_evict_size += page->assumed_size;
+                pages_to_evict_this_run++;
+                pages_to_evict_size_this_run += page->assumed_size;
                 total_pages_evicted++;
 
                 // check if we have to stop
@@ -1054,7 +1053,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     break;
                 }
 
-                if((pages_to_evict >= pages_to_evict_per_run || pages_to_evict_size >= max_size_to_evict) && !all_of_them)
+                if((pages_to_evict_this_run >= max_pages_to_evict_per_run || pages_to_evict_size_this_run >= max_size_to_evict) && !all_of_them)
                     break;
             }
             else {
@@ -1067,7 +1066,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     last_page_we_couldnt_delete = page;
                 }
 
-                last_run_pages_skipped++;
+                pages_skipped_this_run++;
 
                 // check if we have to stop
                 if(++total_pages_skipped >= max_skip && !all_of_them) {
@@ -1078,11 +1077,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         }
         pgc_ll_unlock(cache, &cache->clean);
 
-        if(pages_to_evict) {
+        if(pages_to_evict_this_run) {
             // remove them from the index
 
-            pages_removed_from_index = 0;
-            pages_freed = 0;
+            pages_removed_from_index_this_run = 0;
+            pages_freed_this_run = 0;
 
             // we don't want to just get the lock,
             // we want to try to get it, if we can
@@ -1117,7 +1116,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                     for (PGC_PAGE *page = to_evict[partition]; page; page = page->link.next) {
                         remove_this_page_from_index_unsafe(cache, page, partition);
-                        pages_removed_from_index++;
+                        pages_removed_from_index_this_run++;
                     }
 
                     pgc_index_write_unlock(cache, partition);
@@ -1131,28 +1130,28 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(to_evict[partition], page, link.prev, link.next);
                         free_this_page(cache, page);
-                        pages_freed++;
+                        pages_freed_this_run++;
                     }
                 }
             }
 
-            internal_fatal(pages_to_evict != pages_removed_from_index || pages_to_evict != pages_freed,
+            internal_fatal(pages_to_evict_this_run != pages_removed_from_index_this_run || pages_to_evict_this_run != pages_freed_this_run,
                            "DBENGINE CACHE: pages to evict %zu, pages removed from index %zu, pages freed %zu",
-                           pages_to_evict, pages_removed_from_index, pages_freed);
+                           pages_to_evict_this_run, pages_removed_from_index_this_run, pages_freed_this_run);
         }
 
-    } while((pages_to_evict || last_page_we_couldnt_delete) && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while((pages_to_evict_this_run || last_page_we_couldnt_delete) && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
-    if(all_of_them && last_run_pages_skipped) {
+    if(all_of_them && pages_skipped_this_run) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE CACHE: cannot free all clean pages, %zu are still referenced",
-                    last_run_pages_skipped);
+                    pages_skipped_this_run);
     }
-    else if(max_evict == SIZE_MAX && last_run_pages_skipped && cache_under_severe_pressure(cache)) {
+    else if(max_evict == SIZE_MAX && pages_skipped_this_run && cache_under_severe_pressure(cache)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl,
                     "DBENGINE CACHE: cache is %zu %% full, but %zu clean pages are currently referenced and cannot be evicted",
-                    cache_usage_per1000(cache, NULL) / 10, last_run_pages_skipped);
+                    cache_usage_per1000(cache, NULL) / 10, pages_skipped_this_run);
     }
 
 premature_exit:
@@ -1216,7 +1215,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #endif
             page->refcount = 1;
             page->accesses = (entry->hot) ? 0 : 1;
-            page->flags = PGC_PAGE_IS_BEING_CREATED;
+            page->flags = 0;
             page->section = entry->section;
             page->metric_id = entry->metric_id;
             page->start_time_t = entry->start_time_t;
@@ -1244,8 +1243,6 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
                 page_set_hot(cache, page);
             else
                 page_set_clean(cache, page, false, false);
-
-            page_flag_clear(page, PGC_PAGE_IS_BEING_CREATED);
 
             PGC_REFERENCED_PAGES_PLUS1(cache, page);
 
@@ -1584,9 +1581,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                 // remove it from the dirty list
                 pgc_ll_del(cache, &cache->dirty, tpg, true);
 
-                // mark it as being saved
-                page_flag_set(tpg, PGC_PAGE_IS_BEING_SAVED);
-
                 __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
 
@@ -1640,8 +1634,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
-
-            page_flag_clear(tpg, PGC_PAGE_IS_BEING_SAVED);
 
             internal_fatal(page_get_status_flags(tpg) != 0,
                            "DBENGINE CACHE: page should not be in any list while it is being saved");
