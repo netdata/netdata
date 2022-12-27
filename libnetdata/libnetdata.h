@@ -537,7 +537,7 @@ static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
     return (total % modulo);
 }
 
-uint32_t murmur32(uint32_t h) {
+static uint32_t murmur32(uint32_t h) {
     h ^= h >> 16;
     h *= 0x85ebca6b;
     h ^= h >> 13;
@@ -547,7 +547,7 @@ uint32_t murmur32(uint32_t h) {
     return h;
 }
 
-uint64_t murmur64(uint64_t k) {
+static uint64_t murmur64(uint64_t k) {
     k ^= k >> 33;
     k *= 0xff51afd7ed558ccdUL;
     k ^= k >> 33;
