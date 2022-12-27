@@ -519,7 +519,7 @@ static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool 
     return JudyLPrev(PArray, PIndex, PJE0);
 }
 
-static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
     size_t total = 0;
 
     total += (ptr & 0xff) >> 0;
@@ -535,6 +535,37 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     }
 
     return (total % modulo);
+}
+
+uint32_t murmur32(uint32_t h) {
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+
+    return h;
+}
+
+uint64_t murmur64(uint64_t k) {
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccdUL;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53UL;
+    k ^= k >> 33;
+
+    return k;
+}
+
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+    if(sizeof(Word_t) == 8) {
+        uint64_t hash = murmur64(ptr);
+        return hash % modulo;
+    }
+    else {
+        uint32_t hash = murmur32(ptr);
+        return hash % modulo;
+    }
 }
 
 # ifdef __cplusplus
