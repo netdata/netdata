@@ -1314,7 +1314,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 }
 
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
-    if(!service_running(SERVICE_WEB))
+    if(unlikely(!service_running(SERVICE_WEB_REQUESTS)))
         return web_client_permission_denied(w);
 
     static uint32_t
@@ -1451,7 +1451,7 @@ void web_client_process_request(struct web_client *w) {
         case HTTP_VALIDATION_OK:
             switch(w->mode) {
                 case WEB_CLIENT_MODE_STREAM:
-                    if(unlikely(!web_client_can_access_stream(w) || !service_running(SERVICE_STREAMING))) {
+                    if(unlikely(!web_client_can_access_stream(w))) {
                         web_client_permission_denied(w);
                         return;
                     }

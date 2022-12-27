@@ -652,6 +652,10 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 
 void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
+
+    if(!service_running(SERVICE_STREAMING_CONNECTIONS))
+        return rrdpush_receiver_too_busy_now(w);
+
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
     rpt->last_msg_t = now_realtime_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
