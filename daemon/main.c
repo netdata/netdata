@@ -115,16 +115,51 @@ void service_signal_exit(SERVICE_TYPE service) {
     __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
 }
 
+static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
+    if(service & SERVICE_MAINTENANCE)
+        buffer_strcat(wb, "MAINTENANCE ");
+    if(service & SERVICE_COLLECTORS)
+        buffer_strcat(wb, "COLLECTORS ");
+    if(service & SERVICE_ML_TRAINING)
+        buffer_strcat(wb, "ML_TRAINING ");
+    if(service & SERVICE_ML_PREDICTION)
+        buffer_strcat(wb, "ML_PREDICTION ");
+    if(service & SERVICE_REPLICATION)
+        buffer_strcat(wb, "REPLICATION ");
+    if(service & SERVICE_DATA_QUERIES)
+        buffer_strcat(wb, "DATA_QUERIES ");
+    if(service & SERVICE_WEB_REQUESTS)
+        buffer_strcat(wb, "WEB_REQUESTS ");
+    if(service & SERVICE_WEB_SERVER)
+        buffer_strcat(wb, "WEB_SERVER ");
+    if(service & SERVICE_ACLK)
+        buffer_strcat(wb, "ACLK ");
+    if(service & SERVICE_HEALTH)
+        buffer_strcat(wb, "HEALTH ");
+    if(service & SERVICE_STREAMING)
+        buffer_strcat(wb, "STREAMING ");
+    if(service & SERVICE_STREAMING_CONNECTIONS)
+        buffer_strcat(wb, "STREAMING_CONNECTIONS ");
+    if(service & SERVICE_CONTEXT)
+        buffer_strcat(wb, "CONTEXT ");
+    if(service & SERVICE_ANALYTICS)
+        buffer_strcat(wb, "ANALYTICS ");
+    if(service & SERVICE_EXPORTERS)
+        buffer_strcat(wb, "EXPORTERS ");
+}
+
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     service_signal_exit(service);
 
-    BUFFER *wb = buffer_create(1024);
+    BUFFER *service_list = buffer_create(1024);
+    BUFFER *thread_list = buffer_create(1024);
     usec_t started_ut = now_monotonic_usec(), ended_ut;
     size_t running;
+    SERVICE_TYPE running_services = 0;
 
     do {
         running = 0;
-        buffer_flush(wb);
+        buffer_flush(thread_list);
 
         netdata_spinlock_lock(&service_globals.lock);
 
@@ -135,10 +170,11 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
             SERVICE_THREAD *sth = *PValue;
             if(sth->services & service && sth->tid != gettid()) {
                 if(running)
-                    buffer_strcat(wb, ", ");
+                    buffer_strcat(thread_list, ", ");
 
-                buffer_sprintf(wb, "'%s' (tid: %d)", sth->name, sth->tid);
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
 
+                running_services |= sth->services & service;
                 running++;
             }
         }
@@ -146,9 +182,12 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         netdata_spinlock_unlock(&service_globals.lock);
 
         if(running) {
-            info("SERVICE CONTROL: waiting for the following %zu services to exit: %s",
-                 running, buffer_tostring(wb));
-            sleep_usec(500 * USEC_PER_MS);
+            buffer_flush(service_list);
+            service_to_buffer(service_list, running_services);
+            info("SERVICE CONTROL: waiting for the following %zu services %s to exit: %s",
+                 running, buffer_tostring(service_list),
+                 running <= 10 ? buffer_tostring(thread_list) : "");
+            sleep_usec(1000 * USEC_PER_MS);
         }
 
         ended_ut = now_monotonic_usec();
@@ -156,14 +195,16 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
     if(running) {
         info("SERVICE CONTROL: timeout while waiting for services to exit, "
-             "the following %zu service(s) are still running: %s; "
+             "the following %zu service(s) %s are still running: %s; "
              "sending cancellation to them...",
-             running, buffer_tostring(wb));
+             running, buffer_tostring(service_list),
+             buffer_tostring(thread_list));
 
 
         running = 0;
+        running_services = 0;
         {
-            buffer_flush(wb);
+            buffer_flush(thread_list);
 
             netdata_spinlock_lock(&service_globals.lock);
 
@@ -186,85 +227,36 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                         sth->force_quit_callback(sth->data);
 
                     if(running)
-                        buffer_strcat(wb, ", ");
+                        buffer_strcat(thread_list, ", ");
 
-                    buffer_sprintf(wb, "'%s' (tid: %d)", sth->name, sth->tid);
+                    buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
 
                     running++;
+                    running_services |= sth->services & service;
                 }
             }
 
             netdata_spinlock_unlock(&service_globals.lock);
         }
 
-        if(running)
+        if(running) {
+            buffer_flush(service_list);
+            service_to_buffer(service_list, running_services);
             info("SERVICE CONTROL: cancelled "
-                 "the following %zu service(s): %s; "
+                 "the following %zu service(s): %s %s; "
                  "giving up on them...",
-                 running, buffer_tostring(wb));
+                 running, buffer_tostring(service_list),
+                 buffer_tostring(thread_list));
+        }
     }
 
-    buffer_free(wb);
+    buffer_free(thread_list);
+    buffer_free(service_list);
 
     return (running == 0);
 }
 
 void netdata_cleanup_and_exit(int ret) {
-
-    SERVICE_TYPE pass1 =   SERVICE_MAINTENANCE
-                         | SERVICE_COLLECTORS
-                         | SERVICE_REPLICATION
-                         | SERVICE_QUERIES
-                         | SERVICE_HEALTH
-                         | SERVICE_WEB
-                         | SERVICE_STREAMING
-                         | SERVICE_ML_TRAINING
-                         | SERVICE_EXPORTERS
-                         ;
-
-    service_signal_exit(pass1);
-    service_wait_exit(pass1, 10 * USEC_PER_SEC);
-
-    SERVICE_TYPE pass2 = SERVICE_ML_PREDICTION
-                         | SERVICE_ACLK
-                         | SERVICE_CONTEXT
-                         ;
-
-    service_signal_exit(pass2);
-    service_wait_exit(pass2, 10 * USEC_PER_SEC);
-
-    // stop everything else
-    service_wait_exit(~0, 10 * USEC_PER_SEC);
-
-//    service_wait_exit(SERVICE_COLLECTORS, 10 * USEC_PER_SEC);
-//
-//    service_signal_exit(
-//            SERVICE_ML_PREDICTION
-//            | SERVICE_ACLK
-//            );
-//
-//    service_wait_exit(SERVICE_ACLK, 10 * USEC_PER_SEC);
-//    service_signal_exit(SERVICE_CONTEXT);
-//
-//    metadata_sync_shutdown_prepare();
-//
-//    rrdhost_cleanup_all();
-//
-//    rrdhost_free_all();
-//
-//    service_signal_exit(
-//            SERVICE_METASYNC
-//            | SERVICE_DBENGINE
-//    );
-//
-//    service_wait_exit(~0, 10 * USEC_PER_SEC);
-
-
-
-    // enabling this, is wrong
-    // because the threads will be cancelled while cleaning up
-    // netdata_exit = 1;
-
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
@@ -276,23 +268,72 @@ void netdata_cleanup_and_exit(int ret) {
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
-    // cleanup/save the database and exit
+    service_signal_exit(
+            SERVICE_MAINTENANCE
+            | SERVICE_DATA_QUERIES
+            | SERVICE_WEB_REQUESTS
+            | SERVICE_STREAMING_CONNECTIONS
+            );
+
+    service_wait_exit(
+            SERVICE_REPLICATION
+            | SERVICE_EXPORTERS
+            | SERVICE_ML_TRAINING
+            | SERVICE_HEALTH
+            | SERVICE_WEB_SERVER
+            , 2 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_COLLECTORS
+            | SERVICE_STREAMING
+            , 15 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_ML_PREDICTION
+            | SERVICE_CONTEXT
+            , 3 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_MAINTENANCE
+            , 1 * USEC_PER_SEC);
+
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
+
+    info("EXIT: metasync shutdown prepare...");
+    metadata_sync_shutdown_prepare();
+
+#ifdef ENABLE_ACLK
+    aclk_sync_exit_all();
+#endif
+
+    service_wait_exit(
+            SERVICE_ACLK
+            , 3 * USEC_PER_SEC);
+
+    // stop everything else
+    service_wait_exit(~0, 10 * USEC_PER_SEC);
+
+    info("EXIT: stopping static threads...");
+    cancel_main_threads();
+
+//    rrdhost_free_all();
+//
+//    service_signal_exit(
+//            SERVICE_METASYNC
+//            | SERVICE_DBENGINE
+//    );
+//
+//    service_wait_exit(~0, 10 * USEC_PER_SEC);
 
     if(!ret) {
         // exit cleanly
 
         // stop everything
-        info("EXIT: stopping static threads...");
-#ifdef ENABLE_ACLK
-        aclk_sync_exit_all();
-#endif
-        cancel_main_threads();
 
         // free the database
-        metadata_sync_shutdown_prepare();
         rrdhost_free_all();
+
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
@@ -306,13 +347,9 @@ void netdata_cleanup_and_exit(int ret) {
                     in_flight_queries += __atomic_load_n(&multidb_ctx[tier]->inflight_queries, __ATOMIC_RELAXED);
             }
 
-            for (size_t tier = 0; tier < storage_tiers; tier++) {
-                if (tier == 0) {
-                    // Destroy main cache
-                    pgc_destroy(main_cache);
-                }
+            pgc_destroy(main_cache);
+            for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
-            }
         }
 #endif
         metadata_sync_shutdown();
@@ -323,6 +360,7 @@ void netdata_cleanup_and_exit(int ret) {
         }
 #endif
     }
+
     sql_close_context_database();
     sql_close_database();
 

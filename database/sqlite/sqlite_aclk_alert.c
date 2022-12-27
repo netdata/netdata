@@ -133,6 +133,9 @@ done:
 // and handle both cases
 int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
 {
+    if(!service_running(SERVICE_ACLK))
+        return 0;
+
     if (!claimed())
         return 0;
 

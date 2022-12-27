@@ -409,7 +409,7 @@ static void socket_listen_main_static_threaded_worker_cleanup(void *ptr) {
 }
 
 static bool web_server_should_stop(void) {
-    return !service_running(SERVICE_WEB);
+    return !service_running(SERVICE_WEB_SERVER);
 }
 
 void *socket_listen_main_static_threaded_worker(void *ptr) {
