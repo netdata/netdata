@@ -958,27 +958,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t spins = 0;
     size_t max_pages_to_evict_per_run = cache->config.partitions * 10;
 
-    size_t spins_without_pages_to_evict = 0;      // complete scans without any evictions
-    PGC_PAGE *last_page_we_couldnt_delete = NULL; // remember where we left it at the last round
     do {
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
-
-        if(last_page_we_couldnt_delete && !pages_to_evict_this_run) {
-            // we did a complete scan of all clean pages,
-            // and we still need to evict more
-            // so do 1 more round only
-
-            page_release(cache, last_page_we_couldnt_delete, false);
-            last_page_we_couldnt_delete = NULL;
-
-            if(spins_without_pages_to_evict > 0)
-                break;
-
-            spins_without_pages_to_evict++;
-        }
-
-        pages_skipped_this_run = 0;
 
         size_t max_size_to_evict = 0;
         if (all_of_them)
@@ -994,6 +976,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         for (size_t partition = 0; partition < cache->config.partitions; partition++)
             to_evict[partition] = NULL;
 
+        pages_skipped_this_run = 0;
         pages_to_evict_this_run = 0;
         pages_to_evict_size_this_run = 0;
 
@@ -1008,11 +991,15 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         else
             pgc_ll_lock(cache, &cache->clean);
 
-        PGC_PAGE *next = NULL;
-        for(PGC_PAGE *page = (last_page_we_couldnt_delete) ? last_page_we_couldnt_delete : cache->clean.base; page ; page = next) {
+        PGC_PAGE *next = NULL, *first_page_we_relocated = NULL;
+        for(PGC_PAGE *page = cache->clean.base; page ; page = next) {
             next = page->link.next;
 
-            if(page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+            if(unlikely(page == first_page_we_relocated))
+                // we did a complete run
+                break;
+
+            if(unlikely(page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED)) {
                 DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
@@ -1022,15 +1009,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             if(unlikely(filter && !filter(page, data)))
                 continue;
 
-            bool got_page_for_deletion;
-            if(unlikely(page == last_page_we_couldnt_delete)) {
-                got_page_for_deletion = acquired_page_get_for_deletion_or_release_it(cache, page);
-                last_page_we_couldnt_delete = NULL;
-            }
-            else
-                got_page_for_deletion = non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page);
-
-            if(got_page_for_deletion) {
+            if(non_acquired_page_get_for_deletion___while_having_clean_locked(cache, page)) {
                 // we can delete this page
 
                 // remove it from the clean list
@@ -1059,12 +1038,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             else {
                 // we can't delete this page
 
-                if(page_acquire(cache, page)) {
-                    if(last_page_we_couldnt_delete)
-                        page_release(cache, last_page_we_couldnt_delete, false);
+                if(!first_page_we_relocated)
+                    first_page_we_relocated = page;
 
-                    last_page_we_couldnt_delete = page;
-                }
+                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
                 pages_skipped_this_run++;
 
@@ -1140,7 +1118,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                            pages_to_evict_this_run, pages_removed_from_index_this_run, pages_freed_this_run);
         }
 
-    } while((pages_to_evict_this_run || last_page_we_couldnt_delete) && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
+    } while(pages_to_evict_this_run && (all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip)));
 
     if(all_of_them && pages_skipped_this_run) {
         error_limit_static_global_var(erl, 1, 0);
@@ -1155,9 +1133,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     }
 
 premature_exit:
-    if(last_page_we_couldnt_delete)
-        page_release(cache, last_page_we_couldnt_delete, false);
-
     if(unlikely(total_pages_skipped))
         __atomic_add_fetch(&cache->stats.evict_skipped, total_pages_skipped, __ATOMIC_RELAXED);
 
