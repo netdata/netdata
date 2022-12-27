@@ -27,12 +27,12 @@ typedef enum __attribute__ ((__packed__)) {
     PGC_PAGE_HOT       = (1 << 2), // currently being collected
 
     // flags related to various actions on each page
-    PGC_PAGE_IS_BEING_CREATED = (1 << 3),
-    PGC_PAGE_IS_BEING_DELETED = (1 << 4),
-    PGC_PAGE_IS_BEING_SAVED   = (1 << 5),
-    PGC_PAGE_IS_BEING_MIGRATED_TO_V2 = (1 << 6),
-
-    PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 6),
+    PGC_PAGE_IS_BEING_CREATED            = (1 << 3),
+    PGC_PAGE_IS_BEING_DELETED            = (1 << 4),
+    PGC_PAGE_IS_BEING_SAVED              = (1 << 5),
+    PGC_PAGE_IS_BEING_MIGRATED_TO_V2     = (1 << 6),
+    PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES = (1 << 7),
+    PGC_PAGE_HAS_BEEN_ACCESSED           = (1 << 8),
 } PGC_PAGE_FLAGS;
 
 #define page_flag_check(page, flag) (__atomic_load_n(&((page)->flags), __ATOMIC_ACQUIRE) & (flag))
@@ -471,10 +471,12 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
-        if(!page->accesses)
-            DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
-        else
+        if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
+            page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+        }
+        else
+            DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
 
         ll->version++;
     }
@@ -549,10 +551,14 @@ static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
         __atomic_add_fetch(&page->accesses, 1, __ATOMIC_RELAXED);
 
         if (flags & PGC_PAGE_CLEAN) {
-            pgc_ll_lock(cache, &cache->clean);
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
-            pgc_ll_unlock(cache, &cache->clean);
+            if(pgc_ll_trylock(cache, &cache->clean)) {
+                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                pgc_ll_unlock(cache, &cache->clean);
+                page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+            }
+            else
+                page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
         }
     }
 }
@@ -1006,6 +1012,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         PGC_PAGE *next = NULL;
         for(PGC_PAGE *page = (last_page_we_couldnt_delete) ? last_page_we_couldnt_delete : cache->clean.base; page ; page = next) {
             next = page->link.next;
+
+            if(page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
+                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+                continue;
+            }
 
             if(unlikely(filter && !filter(page, data)))
                 continue;
