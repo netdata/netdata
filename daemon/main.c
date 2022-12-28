@@ -1744,9 +1744,6 @@ int main(int argc, char **argv) {
 
         // setup threads configs
         default_stacksize = netdata_threads_init();
-        if(default_stacksize > 1 * 1024 * 1024)
-            default_stacksize = 1 * 1024 * 1024;
-
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
