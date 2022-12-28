@@ -443,7 +443,7 @@ struct storage_engine_query_handle {
 // function pointers that handle database queries
 struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, int priority);
 
     // run this to load each metric number from the database
     STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);

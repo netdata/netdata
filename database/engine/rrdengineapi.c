@@ -551,7 +551,7 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s, int priority)
 {
     netdata_thread_disable_cancelability();
 
@@ -576,7 +576,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     rrdimm_handle->start_time_s = start_time_s;
     rrdimm_handle->end_time_s = end_time_s;
 
-    pg_cache_preload(ctx, handle, start_time_s, end_time_s);
+    pg_cache_preload(ctx, handle, start_time_s, end_time_s, priority);
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {

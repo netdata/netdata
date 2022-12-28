@@ -1656,7 +1656,7 @@ void load_pages_from_an_extent_list_directly(struct rrdengine_instance *ctx, EXT
 }
 
 void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
-    pdc_to_extent_page_details_list(ctx, pdc, load_pages_from_an_extent_list_directly, queue_extent_list);
+    pdc_to_extent_page_details_list(ctx, pdc, load_pages_from_an_extent_list_directly, load_pages_from_an_extent_list_directly);
 }
 
 #define MAX_CMD_BATCH_SIZE (256)
