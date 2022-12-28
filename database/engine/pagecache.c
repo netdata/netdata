@@ -171,63 +171,53 @@ static inline struct page_details *pdc_find_page_for_time(
     TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_FUTURE;
     TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_PAST;
 
-    if (pdF == pdL || !pdL) {
-        // they are the same, or L is missing
-        // return the F
-        (*gaps) += (rcF == PAGE_IS_IN_RANGE) ? 0 : 1;
-        return pdF;
-    }
-
-    if (!pdF) {
-        // F is missing
+    if (!pdF || pdF == pdL) {
+        // F is missing, or they are the same
         // return L
         (*gaps) += (rcL == PAGE_IS_IN_RANGE) ? 0 : 1;
         return pdL;
     }
 
-    if (rcF == rcL) {
-        // both are in range
+    if (!pdL) {
+        // L is missing
+        // return F
         (*gaps) += (rcF == PAGE_IS_IN_RANGE) ? 0 : 1;
+        return pdF;
+    }
 
-        if (rcF == PAGE_IS_IN_THE_PAST)
-            // both are in the past
-            return NULL;
+    if (rcF == rcL) {
+        // both are on the same side,
+        // but they are different pages
 
-        // pick the higher resolution
-        if (pdF->update_every_s < pdL->update_every_s)
-            return pdF;
-
-        if (pdL->update_every_s < pdF->update_every_s)
-            return pdL;
-
-        // they have the same resolution
         switch (rcF) {
             case PAGE_IS_IN_RANGE:
-                // pick the one with the smaller duration
-                if (pdF->last_time_s - pdF->first_time_s < pdL->last_time_s - pdL->last_time_s)
+                // pick the higher resolution
+                if (pdF->update_every_s && pdF->update_every_s < pdL->update_every_s)
                     return pdF;
 
-                if (pdF->last_time_s - pdF->first_time_s > pdL->last_time_s - pdL->last_time_s)
+                if (pdL->update_every_s && pdL->update_every_s < pdF->update_every_s)
                     return pdL;
 
-                // they have the same duration
-                // pick the one that starts closer to wanted_time
-                if (pdF->first_time_s >= pdL->first_time_s)
-                    return pdF;
-                else
+                // same resolution - pick the one that starts earlier
+                if (pdL->first_time_s < pdF->first_time_s)
                     return pdL;
+
+                return pdF;
                 break;
 
             case PAGE_IS_IN_THE_FUTURE:
-                // pick the one that starts closer to wanted_time
-                if (pdF->first_time_s <= pdL->first_time_s)
-                    return pdF;
-                else
+                (*gaps)++;
+
+                // pick the one that starts earlier
+                if (pdL->first_time_s < pdF->first_time_s)
                     return pdL;
+
+                return pdF;
                 break;
 
             default:
             case PAGE_IS_IN_THE_PAST:
+                (*gaps)++;
                 return NULL;
                 break;
         }
@@ -869,14 +859,14 @@ struct pgc_page *pg_cache_lookup_next(
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
-                page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
+                pd->update_every_s = page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
             }
 
             size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
             size_t entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
             if(unlikely(entries_by_size < entries_by_time)) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
-                page_end_time_s = pgc_page_fix_end_time_t(page, fixed_page_end_time_s);
+                pd->last_time_s = page_end_time_s = pgc_page_fix_end_time_t(page, fixed_page_end_time_s);
                 entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
 
                 internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
