@@ -745,7 +745,7 @@ we_are_done:
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, int priority) {
+void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, int priority __maybe_unused) {
     if (unlikely(!handle || !handle->metric))
         return;
 
@@ -769,10 +769,10 @@ void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
         handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
         handle->pdc->preload_all_extent_pages = false;
         usec_t start_ut = now_monotonic_usec();
-        if(likely(priority >= 0))
+        //if(likely(priority >= 0))
             dbengine_load_page_list(ctx, handle->pdc);
-        else
-            dbengine_load_page_list_directly(ctx, handle->pdc);
+        //else
+        //    dbengine_load_page_list_directly(ctx, handle->pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else {
