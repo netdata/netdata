@@ -285,6 +285,10 @@ void netdata_spinlock_init(SPINLOCK *spinlock) {
 void netdata_spinlock_lock(SPINLOCK *spinlock) {
     static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t spins = 0;
+#endif
+
     netdata_thread_disable_cancelability();
 
     for(int i = 1;
@@ -292,12 +296,21 @@ void netdata_spinlock_lock(SPINLOCK *spinlock) {
         __atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)
         ; i++
         ) {
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        spins++;
+#endif
         if(unlikely(i == 8)) {
             i = 0;
             nanosleep(&ns, NULL);
         }
     }
+
     // we have the lock
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    spinlock->spins += spins;
+#endif
 }
 
 void netdata_spinlock_unlock(SPINLOCK *spinlock) {
