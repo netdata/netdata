@@ -170,7 +170,7 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-static time_t replication_query_finalize(struct replication_query *q) {
+static time_t replication_query_finalize(struct replication_query *q, bool executed) {
     time_t query_before = q->query.before;
     size_t dimensions = q->dimensions;
 
@@ -190,12 +190,14 @@ static time_t replication_query_finalize(struct replication_query *q) {
         queries++;
     }
 
-    netdata_spinlock_lock(&replication_queries.spinlock);
-    replication_queries.queries_started += queries;
-    replication_queries.queries_finished += queries;
-    replication_queries.points_read += q->points_read;
-    replication_queries.points_generated += q->points_generated;
-    netdata_spinlock_unlock(&replication_queries.spinlock);
+    if(executed) {
+        netdata_spinlock_lock(&replication_queries.spinlock);
+        replication_queries.queries_started += queries;
+        replication_queries.queries_finished += queries;
+        replication_queries.points_read += q->points_read;
+        replication_queries.points_generated += q->points_generated;
+        netdata_spinlock_unlock(&replication_queries.spinlock);
+    }
 
     freez(q->data);
     freez(q);
@@ -212,7 +214,7 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
     time_t update_every = q->st->update_every;
 
     if(!q->query.execute)
-        return replication_query_finalize(q);
+        return replication_query_finalize(q, false);
 
     size_t points_read = q->points_read, points_generated = q->points_generated;
 
@@ -325,7 +327,7 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 
     q->points_read = points_read;
     q->points_generated = points_generated;
-    return replication_query_finalize(q);
+    return replication_query_finalize(q, true);
 }
 
 static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
@@ -414,6 +416,10 @@ static struct replication_query *replication_response_prepare(RRDSET *st, bool s
             requested_after, requested_before,
             query_after, query_before, enable_streaming,
             wall_clock_time);
+}
+
+void replication_response_cancel_and_finalize(struct replication_query *q) {
+    replication_query_finalize(q, false);
 }
 
 bool replication_response_execute_and_finalize(struct replication_query *q) {
@@ -1390,6 +1396,10 @@ static int replication_execute_next_pending_request(void) {
             if (!rq->st) {
                 worker_is_busy(WORKER_JOB_FIND_CHART);
                 rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+
+                // delete the request from the dictionary
+                worker_is_busy(WORKER_JOB_DELETE_ENTRY);
+                dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id));
             }
 
             if (rq->st && !rq->q) {
@@ -1408,18 +1418,17 @@ static int replication_execute_next_pending_request(void) {
         rq = &rqs[rqs_last_executed];
         rq->executed = true;
 
+        if(rq->found && rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
+            replication_response_cancel_and_finalize(rq->q);
+            rq->found = false;
+        }
+
     } while(!rq->found && rqs_last_executed != rqs_last_prepared);
 
     if(unlikely(!rq->found)) {
         worker_is_idle();
         return REQUEST_QUEUE_EMPTY;
     }
-
-    // delete the request from the dictionary
-    worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-    if(!dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id)))
-        error("REPLAY ERROR: 'host:%s/chart:%s' failed to be deleted from sender pending charts index",
-              rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
 
     replication_set_latest_first_time(rq->after);
 
