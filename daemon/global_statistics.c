@@ -3439,6 +3439,9 @@ static void worker_utilization_charts_callback(void *ptr
     // find the worker_thread in the list
     struct worker_thread *wt = worker_thread_find_or_create(wu, pid);
 
+    if(utilization_usec > duration_usec)
+        utilization_usec = duration_usec;
+
     wt->enabled = true;
     wt->busy_time = utilization_usec;
     wt->jobs_started = jobs_started;
