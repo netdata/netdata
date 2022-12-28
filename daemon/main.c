@@ -200,7 +200,13 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     }
 
     // signal them to stop
+    size_t last_running = running;
+    size_t stale_time_ut = 0;
+    usec_t sleep_ut = 500 * USEC_PER_MS;
     do {
+        if(running != last_running)
+            stale_time_ut = 0;
+
         running = 0;
         running_services = 0;
         buffer_flush(thread_list);
@@ -228,20 +234,21 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         if(running) {
             buffer_flush(service_list);
             service_to_buffer(service_list, running_services);
-            info("SERVICE CONTROL: waiting for the following %zu services %s to exit: %s",
+            info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
                  running, buffer_tostring(service_list),
                  running <= 10 ? buffer_tostring(thread_list) : "");
-            sleep_usec(1000 * USEC_PER_MS);
+            sleep_usec(sleep_ut);
+            stale_time_ut += sleep_ut;
         }
 
         ended_ut = now_monotonic_usec();
-    } while(running && ended_ut - started_ut < timeout_ut);
+    } while(running && (ended_ut - started_ut < timeout_ut || stale_time_ut < timeout_ut));
 
     if(running) {
         buffer_flush(service_list);
         service_to_buffer(service_list, running_services);
-        info("SERVICE CONTROL: cancelled "
-             "the following %zu service(s): %s %s; "
+        info("SERVICE CONTROL: "
+             "the following %zu service(s) [ %s] take too long to exit: %s; "
              "giving up on them...",
              running, buffer_tostring(service_list),
              buffer_tostring(thread_list));
@@ -278,21 +285,21 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ML_TRAINING
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
-            , 2 * USEC_PER_SEC);
+            , 5 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
-            , 15 * USEC_PER_SEC);
+            , 10 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_ML_PREDICTION
             | SERVICE_CONTEXT
-            , 3 * USEC_PER_SEC);
+            , 5 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_MAINTENANCE
-            , 1 * USEC_PER_SEC);
+            , 5 * USEC_PER_SEC);
 
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
