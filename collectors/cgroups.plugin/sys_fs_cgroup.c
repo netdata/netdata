@@ -2754,9 +2754,19 @@ static inline void discovery_find_all_cgroups() {
     debug(D_CGROUP, "done searching for cgroups");
 }
 
+static void cgroup_discovery_cleanup(void *ptr) {
+    UNUSED(ptr);
+
+    discovery_thread.exited = 1;
+    worker_unregister();
+    service_exits();
+}
+
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
+
+    netdata_thread_cleanup_push(cgroup_discovery_cleanup, ptr);
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");
@@ -2781,7 +2791,7 @@ void cgroup_discovery_worker(void *ptr)
         worker_is_idle();
 
         uv_mutex_lock(&discovery_thread.mutex);
-        while (!discovery_thread.start_discovery)
+        while (!discovery_thread.start_discovery && service_running(SERVICE_COLLECTORS))
             uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
         discovery_thread.start_discovery = 0;
         uv_mutex_unlock(&discovery_thread.mutex);
@@ -2792,9 +2802,8 @@ void cgroup_discovery_worker(void *ptr)
         discovery_find_all_cgroups();
     }
 
-    discovery_thread.exited = 1;
-    worker_unregister();
-} 
+    netdata_thread_cleanup_pop(1);
+}
 
 // ----------------------------------------------------------------------------
 // generate charts
@@ -4872,9 +4881,11 @@ void *cgroups_main(void *ptr) {
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);

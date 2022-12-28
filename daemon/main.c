@@ -30,6 +30,7 @@ typedef struct service_thread {
     SERVICE_THREAD_TYPE type;
     SERVICE_TYPE services;
     char name[NETDATA_THREAD_NAME_MAX + 1];
+    bool cancelled;
 
     union {
         netdata_thread_t netdata_thread;
@@ -157,8 +158,51 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     size_t running;
     SERVICE_TYPE running_services = 0;
 
+    // cancel the threads
+    running = 0;
+    running_services = 0;
+    {
+        buffer_flush(thread_list);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid() && !sth->cancelled) {
+                sth->cancelled = true;
+
+                switch(sth->type) {
+                    case SERVICE_THREAD_TYPE_NETDATA:
+                        netdata_thread_cancel(sth->netdata_thread);
+                        break;
+
+                    case SERVICE_THREAD_TYPE_LIBUV:
+                        break;
+                }
+
+                if(sth->force_quit_callback)
+                    sth->force_quit_callback(sth->data);
+
+                if(running)
+                    buffer_strcat(thread_list, ", ");
+
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+
+                running++;
+                running_services |= sth->services & service;
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+    }
+
+    // signal them to stop
     do {
         running = 0;
+        running_services = 0;
         buffer_flush(thread_list);
 
         netdata_spinlock_lock(&service_globals.lock);
@@ -194,60 +238,13 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     } while(running && ended_ut - started_ut < timeout_ut);
 
     if(running) {
-        info("SERVICE CONTROL: timeout while waiting for services to exit, "
-             "the following %zu service(s) %s are still running: %s; "
-             "sending cancellation to them...",
+        buffer_flush(service_list);
+        service_to_buffer(service_list, running_services);
+        info("SERVICE CONTROL: cancelled "
+             "the following %zu service(s): %s %s; "
+             "giving up on them...",
              running, buffer_tostring(service_list),
              buffer_tostring(thread_list));
-
-
-        running = 0;
-        running_services = 0;
-        {
-            buffer_flush(thread_list);
-
-            netdata_spinlock_lock(&service_globals.lock);
-
-            Pvoid_t *PValue;
-            Word_t tid = 0;
-            bool first = true;
-            while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
-                SERVICE_THREAD *sth = *PValue;
-                if(sth->services & service && sth->tid != gettid()) {
-                    switch(sth->type) {
-                        case SERVICE_THREAD_TYPE_NETDATA:
-                            netdata_thread_cancel(sth->netdata_thread);
-                            break;
-
-                        case SERVICE_THREAD_TYPE_LIBUV:
-                            break;
-                    }
-
-                    if(sth->force_quit_callback)
-                        sth->force_quit_callback(sth->data);
-
-                    if(running)
-                        buffer_strcat(thread_list, ", ");
-
-                    buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
-
-                    running++;
-                    running_services |= sth->services & service;
-                }
-            }
-
-            netdata_spinlock_unlock(&service_globals.lock);
-        }
-
-        if(running) {
-            buffer_flush(service_list);
-            service_to_buffer(service_list, running_services);
-            info("SERVICE CONTROL: cancelled "
-                 "the following %zu service(s): %s %s; "
-                 "giving up on them...",
-                 running, buffer_tostring(service_list),
-                 buffer_tostring(thread_list));
-        }
     }
 
     buffer_free(thread_list);
