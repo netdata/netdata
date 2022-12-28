@@ -100,7 +100,7 @@ void netdata_threads_init_after_fork(size_t stacksize) {
             debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", stacksize);
     }
     else
-        error("Invalid pthread stacksize %u", stacksize);
+        error("Invalid pthread stacksize %zu", stacksize);
 }
 
 
