@@ -2,8 +2,7 @@
 
 #include "../libnetdata.h"
 
-static size_t default_stacksize = 0, wanted_stacksize = 0;
-static pthread_attr_t *attr = NULL;
+static pthread_attr_t *netdata_threads_attr = NULL;
 
 // ----------------------------------------------------------------------------
 // per thread data
@@ -69,37 +68,39 @@ size_t netdata_threads_init(void) {
     // --------------------------------------------------------------------
     // get the required stack size of the threads of netdata
 
-    attr = callocz(1, sizeof(pthread_attr_t));
-    i = pthread_attr_init(attr);
+    netdata_threads_attr = callocz(1, sizeof(pthread_attr_t));
+    i = pthread_attr_init(netdata_threads_attr);
     if(i != 0)
         fatal("pthread_attr_init() failed with code %d.", i);
 
-    i = pthread_attr_getstacksize(attr, &default_stacksize);
+    size_t stacksize = 0;
+    i = pthread_attr_getstacksize(netdata_threads_attr, &stacksize);
     if(i != 0)
         fatal("pthread_attr_getstacksize() failed with code %d.", i);
     else
-        debug(D_OPTIONS, "initial pthread stack size is %zu bytes", default_stacksize);
+        debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
 
-    return default_stacksize;
+    return stacksize;
 }
 
 // ----------------------------------------------------------------------------
 // late initialization
 
 void netdata_threads_init_after_fork(size_t stacksize) {
-    wanted_stacksize = stacksize;
     int i;
 
     // ------------------------------------------------------------------------
     // set default pthread stack size
 
-    if(attr && default_stacksize < wanted_stacksize && wanted_stacksize > 0) {
-        i = pthread_attr_setstacksize(attr, wanted_stacksize);
+    if(netdata_threads_attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
+        i = pthread_attr_setstacksize(netdata_threads_attr, stacksize);
         if(i != 0)
-            fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
+            error("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
-            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
+            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", stacksize);
     }
+    else
+        error("Invalid pthread stacksize %u", stacksize);
 }
 
 
@@ -216,7 +217,7 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
     info->start_routine = start_routine;
     info->options = options;
 
-    int ret = pthread_create(thread, attr, thread_start, info);
+    int ret = pthread_create(thread, netdata_threads_attr, thread_start, info);
     if(ret != 0)
         error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
