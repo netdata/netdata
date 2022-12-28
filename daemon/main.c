@@ -200,13 +200,14 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     }
 
     // signal them to stop
-    size_t last_running = running;
+    size_t last_running = 0;
     size_t stale_time_ut = 0;
     usec_t sleep_ut = 500 * USEC_PER_MS;
     do {
         if(running != last_running)
             stale_time_ut = 0;
 
+        last_running = running;
         running = 0;
         running_services = 0;
         buffer_flush(thread_list);
