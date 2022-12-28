@@ -90,19 +90,18 @@ void netdata_threads_init_after_fork(size_t stacksize) {
     int i;
 
     // ------------------------------------------------------------------------
-    // set default pthread stack size
+    // set pthread stack size
 
     if(netdata_threads_attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
         i = pthread_attr_setstacksize(netdata_threads_attr, stacksize);
         if(i != 0)
             error("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
-            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", stacksize);
+            info("Set threads stack size to %zu bytes", stacksize);
     }
     else
         error("Invalid pthread stacksize %zu", stacksize);
 }
-
 
 // ----------------------------------------------------------------------------
 // netdata_thread_create

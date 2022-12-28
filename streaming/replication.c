@@ -712,14 +712,15 @@ struct replication_request {
     Word_t unique_id;                   // auto-increment, later requests have bigger
 
     bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
-    bool found;                         // used as a result boolean for the find call
     bool indexed_in_judy;               // true when the request is indexed in judy
     bool not_indexed_buffer_full;       // true when the request is not indexed because the sender is full
+    bool not_indexed_preprocessing;     // true when the request is not indexed, but it is pending in preprocessing
 
-    // prepare ahead members
-    bool executed;
-    RRDSET *st;
-    struct replication_query *q;
+    // prepare ahead members - preprocessing
+    bool found;                         // used as a result boolean for the find call
+    bool executed;                      // used to detect if we have skipped requests while preprocessing
+    RRDSET *st;                         // caching of the chart during preprocessing
+    struct replication_query *q;        // the preprocessing query initialization
 };
 
 // replication sort entry in JudyL array
@@ -862,6 +863,7 @@ static struct replication_sort_entry *replication_sort_entry_create_unsafe(struc
     rq->unique_id = rse->unique_id;
     rq->indexed_in_judy = false;
     rq->not_indexed_buffer_full = false;
+    rq->not_indexed_preprocessing = false;
     return rse;
 }
 
@@ -875,6 +877,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
+        rq->not_indexed_preprocessing = false;
         replication_globals.unsafe.pending_no_room++;
         replication_recursive_unlock();
         return;
@@ -908,6 +911,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     *item = rse;
     rq->indexed_in_judy = true;
     rq->not_indexed_buffer_full = false;
+    rq->not_indexed_preprocessing = false;
 
     if(!replication_globals.unsafe.first_time_t || rq->after < replication_globals.unsafe.first_time_t)
         replication_globals.unsafe.first_time_t = rq->after;
@@ -915,7 +919,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     replication_recursive_unlock();
 }
 
-static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr) {
+static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr, bool preprocessing) {
     fatal_when_replication_is_not_locked_for_me();
 
     bool inner_judy_deleted = false;
@@ -926,6 +930,7 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     rrdpush_sender_pending_replication_requests_minus_one(rse->rq->sender);
 
     rse->rq->indexed_in_judy = false;
+    rse->rq->not_indexed_preprocessing = preprocessing;
 
     // delete it from the inner judy
     JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
@@ -954,7 +959,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
             Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_pptr, rq->unique_id, PJE0);
             if (our_item_pptr) {
                 rse_to_delete = *our_item_pptr;
-                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr);
+                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr, false);
 
                 if(buffer_full) {
                     replication_globals.unsafe.pending_no_room++;
@@ -1019,7 +1024,7 @@ static struct replication_request replication_request_get_first_available() {
                 // set the return result to found
                 rq_to_return.found = true;
 
-                if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
+                if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr, true))
                     // we removed the item from the outer JudyL
                     break;
             }
@@ -1063,7 +1068,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 
     replication_recursive_lock();
 
-    if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+    if(!rq->indexed_in_judy && rq->not_indexed_buffer_full && !rq->not_indexed_preprocessing) {
         // we can replace this command
         internal_error(
                 true,
@@ -1076,7 +1081,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         rq->before = rq_new->before;
         rq->start_streaming = rq_new->start_streaming;
     }
-    else if(!rq->indexed_in_judy) {
+    else if(!rq->indexed_in_judy && !rq->not_indexed_preprocessing) {
         replication_sort_entry_add(rq);
         internal_error(
                 true,
@@ -1195,6 +1200,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
             .indexed_in_judy = false,
             .not_indexed_buffer_full = false,
+            .not_indexed_preprocessing = false,
     };
 
     if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
@@ -1234,9 +1240,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(rq->indexed_in_judy && !rq->not_indexed_buffer_full) {
+            if(rq->indexed_in_judy)
                 replication_sort_entry_del(rq, true);
-            }
         }
         dfe_done(rq);
 
@@ -1249,9 +1254,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+            if(!rq->indexed_in_judy && (rq->not_indexed_buffer_full || rq->not_indexed_preprocessing))
                 replication_sort_entry_add(rq);
-            }
         }
         dfe_done(rq);
 
@@ -1396,10 +1400,6 @@ static int replication_execute_next_pending_request(void) {
             if (!rq->st) {
                 worker_is_busy(WORKER_JOB_FIND_CHART);
                 rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
-
-                // delete the request from the dictionary
-                worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-                dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id));
             }
 
             if (rq->st && !rq->q) {
@@ -1418,9 +1418,27 @@ static int replication_execute_next_pending_request(void) {
         rq = &rqs[rqs_last_executed];
         rq->executed = true;
 
-        if(rq->found && rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
-            replication_response_cancel_and_finalize(rq->q);
-            rq->found = false;
+        if(rq->found) {
+            if (rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
+                // the sender has reconnected since this request was queued,
+                // we can safely throw it away, since the parent will resend it
+                replication_response_cancel_and_finalize(rq->q);
+                rq->found = false;
+            }
+            else if (rrdpush_sender_replication_buffer_full_get(rq->sender)) {
+                // the sender buffer is full, so we can ignore this request,
+                // it has already been marked as 'preprocessed' in the dictionary,
+                // and the sender will put it back in when there is
+                // enough room in the buffer for processing replication requests
+                replication_response_cancel_and_finalize(rq->q);
+                rq->found = false;
+            }
+            else {
+                // we can execute this,
+                // delete it from the dictionary
+                worker_is_busy(WORKER_JOB_DELETE_ENTRY);
+                dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id));
+            }
         }
 
     } while(!rq->found && rqs_last_executed != rqs_last_prepared);
