@@ -1612,7 +1612,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         pgc_ll_lock(cache, &cache->clean);
 
-        size_t pages_to_evict = 0;
         for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
 
@@ -1625,12 +1624,33 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             pages_made_clean_size += tpg->assumed_size;
             pages_made_clean++;
 
-            if(!tpg->accesses)
-                pages_to_evict++;
-
+            // for accounting reasons, we have to put it in the clean queue
             page_set_clean(cache, tpg, true, true);
-            page_transition_unlock(cache, tpg);
-            page_release(cache, tpg, false);
+
+            if(!tpg->accesses) {
+                // we can delete this page immediately - it has never been accessed
+
+                if(acquired_page_get_for_deletion_or_release_it(cache, tpg)) {
+                    // page is acquired for deletion
+                    // we can remove it immediately
+
+                    pgc_ll_del(cache, &cache->clean, tpg, true);
+                    page_transition_unlock(cache, tpg);
+                    remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(cache, tpg);
+                }
+                else {
+                    // page is released
+                    // let it be in the clean queue...
+
+                    page_transition_unlock(cache, tpg);
+                }
+            }
+            else {
+                // keep in page in the clean queue
+
+                page_transition_unlock(cache, tpg);
+                page_release(cache, tpg, false);
+            }
             // tpg ptr may be invalid now
         }
 
@@ -1639,9 +1659,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         internal_fatal(pages_added != pages_made_clean || pages_added != pages_removed_dirty ||
                        pages_added_size != pages_made_clean_size || pages_added_size != pages_removed_dirty_size
                        , "DBENGINE CACHE: flushing pages mismatch");
-
-        if(pages_to_evict)
-            evict_pages(cache, pages_to_evict, pages_to_evict, false, false);
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
