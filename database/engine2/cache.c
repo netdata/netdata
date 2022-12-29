@@ -1635,11 +1635,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                     // we can remove it immediately
 
                     pgc_ll_del(cache, &cache->clean, tpg, true);
-
-                    pgc_ll_unlock(cache, &cache->clean);
                     page_transition_unlock(cache, tpg);
                     remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(cache, tpg);
-                    pgc_ll_lock(cache, &cache->clean);
                 }
                 else {
                     // page is released
