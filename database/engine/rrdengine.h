@@ -170,6 +170,7 @@ struct rrdeng_query_handle {
 
     time_t now_s;
     time_t dt_s;
+    time_t optimal_end_time_s;
 
     unsigned position;
     unsigned entries;

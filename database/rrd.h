@@ -459,6 +459,10 @@ struct storage_engine_query_ops {
 
     // get the timestamp of the first entry of this metric
     time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
+
+    // adapt 'before' timestamp to the optimal for the query
+    // can only move 'before' ahead (to the future)
+    time_t (*align_to_optimal_before)(struct storage_engine_query_handle *handle);
 };
 
 typedef struct storage_engine STORAGE_ENGINE;

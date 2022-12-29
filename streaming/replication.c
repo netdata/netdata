@@ -136,6 +136,8 @@ static struct replication_query *replication_query_prepare(
     q->ops = &st->rrdhost->db[0].eng->api.query_ops;
     q->data = callocz(q->dimensions, sizeof(struct replication_dimension));
 
+    time_t expanded_before = 0;
+
     // prepare our array of dimensions
     size_t count = 0;
     RRDDIM *rd;
@@ -159,8 +161,17 @@ static struct replication_query *replication_query_prepare(
         q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before, 0);
         d->enabled = true;
         count++;
+
+        if(!q->query.enable_streaming) {
+            time_t new_before = q->ops->align_to_optimal_before(&d->handle);
+            if (!expanded_before || new_before < expanded_before)
+                expanded_before = new_before;
+        }
     }
     rrddim_foreach_done(rd);
+
+    if(!q->query.enable_streaming && expanded_before > q->query.before)
+        q->query.before = expanded_before;
 
     if(!count)
         q->query.execute = false;

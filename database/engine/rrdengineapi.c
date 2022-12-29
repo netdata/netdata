@@ -551,7 +551,7 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle, time_t start_time_s, time_t end_time_s, int priority)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle, time_t start_time_s, time_t end_time_s, int priority)
 {
     netdata_thread_disable_cancelability();
 
@@ -567,20 +567,21 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle->ctx = ctx;
     handle->metric = metric;
     handle->now_s = start_time_s;
+    handle->optimal_end_time_s = end_time_s;
 
     handle->dt_s = mrg_metric_get_update_every(main_mrg, metric);
     if(!handle->dt_s)
         handle->dt_s = default_rrd_update_every;
 
-    rrdimm_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    rrdimm_handle->start_time_s = start_time_s;
-    rrdimm_handle->end_time_s = end_time_s;
+    rrddim_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
+    rrddim_handle->start_time_s = start_time_s;
+    rrddim_handle->end_time_s = end_time_s;
 
     pg_cache_preload(ctx, handle, start_time_s, end_time_s, priority);
 }
 
-static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_handle, bool debug_this __maybe_unused) {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
+static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
     struct rrdengine_instance *ctx = handle->ctx;
 
     if (likely(handle->page)) {
@@ -589,7 +590,7 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrdimm_han
         handle->page = NULL;
     }
 
-    if (unlikely(handle->now_s > rrdimm_handle->end_time_s))
+    if (unlikely(handle->now_s > rrddim_handle->end_time_s))
         return false;
 
     size_t entries;
@@ -700,9 +701,9 @@ int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_ha
 /*
  * Releases the database reference from the handle for loading metrics.
  */
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle)
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle)
 {
-    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrdimm_handle->handle;
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
 
     if (handle->page)
         pgc_page_release(main_cache, handle->page);
@@ -713,9 +714,18 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_hand
 
     unregister_query_handle(handle);
     freez(handle);
-    rrdimm_handle->handle = NULL;
+    rrddim_handle->handle = NULL;
     pthread_setspecific(query_key, NULL);
     netdata_thread_enable_cancelability();
+}
+
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
+    struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
+
+    if(handle->optimal_end_time_s > rrddim_handle->end_time_s)
+        rrddim_handle->end_time_s = handle->optimal_end_time_s;
+
+    return rrddim_handle->end_time_s;
 }
 
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {

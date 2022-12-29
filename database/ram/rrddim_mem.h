@@ -45,5 +45,6 @@ int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
 void rrddim_query_finalize(struct storage_engine_query_handle *handle);
 time_t rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
 
 #endif

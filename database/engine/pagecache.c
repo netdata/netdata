@@ -383,11 +383,13 @@ static size_t list_has_time_gaps(
         size_t *pages_total,
         size_t *pages_found_pass4,
         size_t *pages_pending,
-        size_t *pages_overlapping
+        size_t *pages_overlapping,
+        time_t *optimal_end_time_s
 ) {
     // we will recalculate these, so zero them
     *pages_pending = 0;
     *pages_overlapping = 0;
+    *optimal_end_time_s = 0;
 
     bool first;
     Pvoid_t *PValue;
@@ -427,8 +429,10 @@ static size_t list_has_time_gaps(
             dt_s = pd->update_every_s;
 
         now_s = pd->last_time_s + dt_s;
-        if(now_s >= wanted_end_time_s)
+        if(now_s > wanted_end_time_s) {
+            *optimal_end_time_s = pd->last_time_s;
             break;
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -627,8 +631,11 @@ static Pvoid_t get_page_list(
         METRIC *metric,
         usec_t start_time_ut,
         usec_t end_time_ut,
-        size_t *pages_to_load
+        size_t *pages_to_load,
+        time_t *optimal_end_time_s
 ) {
+    *optimal_end_time_s = 0;
+
     Pvoid_t JudyL_page_array = (Pvoid_t) NULL;
 
     time_t wanted_start_time_s = (time_t)(start_time_ut / USEC_PER_SEC);
@@ -660,7 +667,8 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_main_cache && !cache_gaps) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
+                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
+                                        optimal_end_time_s);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -681,7 +689,8 @@ static Pvoid_t get_page_list(
 
     if(pages_found_in_open_cache) {
         query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
+                                        &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
+                                        optimal_end_time_s);
 
         if (pages_total && !query_gaps)
             goto we_are_done;
@@ -704,7 +713,8 @@ static Pvoid_t get_page_list(
 
     pass4_ut = now_monotonic_usec();
     query_gaps = list_has_time_gaps(ctx, metric, JudyL_page_array, wanted_start_time_s, wanted_end_time_s,
-                                    &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping);
+                                    &pages_total, &pages_found_pass4, &pages_pending, &pages_overlapping,
+                                    optimal_end_time_s);
 
 we_are_done:
 
@@ -760,7 +770,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
 
     handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
                                      start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
-                                                 &pages_to_load);
+                                                 &pages_to_load, &handle->optimal_end_time_s);
 
     int ret = pthread_setspecific(query_key, handle);
     fatal_assert(0 == ret);

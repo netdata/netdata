@@ -266,6 +266,10 @@ void rrddim_query_finalize(struct storage_engine_query_handle *handle) {
     freez(handle->handle);
 }
 
+time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
+    return rrddim_handle->end_time_s;
+}
+
 time_t rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     return rd->rrdset->last_updated.tv_sec;
