@@ -1008,7 +1008,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 pgc_ll_del(cache, &cache->clean, page, true);
 
                 __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
-                __atomic_add_fetch(&cache->stats.evicting_size, page_to_evict->assumed_size, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
 
                 page_to_evict = page;
                 break;
