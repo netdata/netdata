@@ -69,7 +69,7 @@ struct pgc_page {
 };
 
 struct pgc_linked_list {
-    netdata_mutex_t mutex;
+    SPINLOCK spinlock;
     union {
         PGC_PAGE *base;
         Pvoid_t sections_judy;
@@ -236,15 +236,15 @@ static void pgc_index_write_unlock(PGC *cache, size_t partition) {
 }
 
 static inline bool pgc_ll_trylock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    return !netdata_mutex_trylock(&ll->mutex);
+    return netdata_spinlock_trylock(&ll->spinlock);
 }
 
 static inline void pgc_ll_lock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    netdata_mutex_lock(&ll->mutex);
+    netdata_spinlock_lock(&ll->spinlock);
 }
 
 static inline void pgc_ll_unlock(PGC *cache __maybe_unused, struct pgc_linked_list *ll) {
-    netdata_mutex_unlock(&ll->mutex);
+    netdata_spinlock_unlock(&ll->spinlock);
 }
 
 static inline bool page_transition_trylock(PGC *cache __maybe_unused, PGC_PAGE *page) {
@@ -1715,9 +1715,9 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     for(size_t part = 0; part < cache->config.partitions ; part++)
         netdata_rwlock_init(&cache->index[part].rwlock);
 
-    netdata_mutex_init(&cache->hot.mutex);
-    netdata_mutex_init(&cache->dirty.mutex);
-    netdata_mutex_init(&cache->clean.mutex);
+    netdata_spinlock_init(&cache->hot.spinlock);
+    netdata_spinlock_init(&cache->dirty.spinlock);
+    netdata_spinlock_init(&cache->clean.spinlock);
 
     cache->hot.flags = PGC_PAGE_HOT;
     cache->hot.linked_list_in_sections_judy = true;
