@@ -104,8 +104,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
             // count the number of pages referencing this in the open cache
             netdata_spinlock_unlock(&df->users.spinlock);
             usec_t time_to_scan_ut = now_monotonic_usec();
-            size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, df);
-            size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, df);
+            size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
+            size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)df->ctx, df);
             time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
             netdata_spinlock_lock(&df->users.spinlock);
 

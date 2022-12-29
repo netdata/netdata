@@ -404,7 +404,8 @@ static inline void atomic_set_max(size_t *max, size_t desired) {
                                          false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-struct section_dirty_pages {
+struct section_pages {
+    SPINLOCK migration_to_v2_spinlock;
     size_t entries;
     size_t size;
     PGC_PAGE *base;
@@ -443,29 +444,27 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         size_t mem_before_judyl, mem_after_judyl;
 
         mem_before_judyl = JudyLMemUsed(ll->sections_judy);
-        Pvoid_t *dirty_pages_pptr = JudyLIns(&ll->sections_judy, page->section, PJE0);
+        Pvoid_t *section_pages_pptr = JudyLIns(&ll->sections_judy, page->section, PJE0);
         mem_after_judyl = JudyLMemUsed(ll->sections_judy);
 
-        struct section_dirty_pages *sdp = *dirty_pages_pptr;
-        if(!sdp) {
-            sdp = callocz(1, sizeof(struct section_dirty_pages));
-            *dirty_pages_pptr = sdp;
+        struct section_pages *sp = *section_pages_pptr;
+        if(!sp) {
+            sp = callocz(1, sizeof(struct section_pages));
+            *section_pages_pptr = sp;
 
-            mem_after_judyl += sizeof(struct section_dirty_pages);
+            mem_after_judyl += sizeof(struct section_pages);
         }
         pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
 
-        sdp->entries++;
-        sdp->size += page->assumed_size;
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(sdp->base, page, link.prev, link.next);
+        sp->entries++;
+        sp->size += page->assumed_size;
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(sp->base, page, link.prev, link.next);
 
-        if((sdp->entries % cache->config.max_dirty_pages_per_call) == 0)
+        if((sp->entries % cache->config.max_dirty_pages_per_call) == 0)
             ll->version++;
     }
     else {
-        // HOT and CLEAN pages end up here.
-        // HOT pages never have accesses when they are created, so they are always prepended.
-        // CLEAN pages may or may not have accesses, depending on how they have been created:
+        // CLEAN pages end up here.
         // - New pages created as CLEAN, always have 1 access.
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
@@ -510,15 +509,15 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
     page_flag_clear(page, ll->flags);
 
     if(ll->linked_list_in_sections_judy) {
-        Pvoid_t *dirty_pages_pptr = JudyLGet(ll->sections_judy, page->section, PJE0);
-        internal_fatal(!dirty_pages_pptr, "DBENGINE CACHE: page should be in Judy LL, but it is not");
+        Pvoid_t *section_pages_pptr = JudyLGet(ll->sections_judy, page->section, PJE0);
+        internal_fatal(!section_pages_pptr, "DBENGINE CACHE: page should be in Judy LL, but it is not");
 
-        struct section_dirty_pages *sdp = *dirty_pages_pptr;
-        sdp->entries--;
-        sdp->size -= page->assumed_size;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sdp->base, page, link.prev, link.next);
+        struct section_pages *sp = *section_pages_pptr;
+        sp->entries--;
+        sp->size -= page->assumed_size;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sp->base, page, link.prev, link.next);
 
-        if(!sdp->base) {
+        if(!sp->base) {
             size_t mem_before_judyl, mem_after_judyl;
 
             mem_before_judyl = JudyLMemUsed(ll->sections_judy);
@@ -528,8 +527,8 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
             if(!rc)
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
-            freez(sdp);
-            mem_after_judyl -= sizeof(struct section_dirty_pages);
+            freez(sp);
+            mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
         }
     }
@@ -1427,19 +1426,25 @@ cleanup:
 static void all_hot_pages_to_dirty(PGC *cache) {
     pgc_ll_lock(cache, &cache->hot);
 
-    PGC_PAGE *page = cache->hot.base;
-    while(page) {
-        PGC_PAGE *next = page->link.next;
+    bool first = true;
+    Word_t last_section = 0;
+    Pvoid_t *section_pages_pptr;
+    while ((section_pages_pptr = JudyLFirstThenNext(cache->hot.sections_judy, &last_section, &first))) {
+        struct section_pages *sp = *section_pages_pptr;
 
-        if(page_acquire(cache, page)) {
-            page_set_dirty(cache, page, true);
-            page_release(cache, page, false);
-            // page ptr may be invalid now
+        PGC_PAGE *page = sp->base;
+        while(page) {
+            PGC_PAGE *next = page->link.next;
+
+            if(page_acquire(cache, page)) {
+                page_set_dirty(cache, page, true);
+                page_release(cache, page, false);
+                // page ptr may be invalid now
+            }
+
+            page = next;
         }
-
-        page = next;
     }
-
     pgc_ll_unlock(cache, &cache->hot);
 }
 
@@ -1478,14 +1483,14 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
     Word_t last_section = 0;
     size_t flushes_so_far = 0;
-    Pvoid_t *dirty_pages_pptr;
+    Pvoid_t *section_pages_pptr;
     bool stopped_before_finishing = false;
     size_t spins = 0;
     bool first = true;
 
-    while (have_dirty_lock && (dirty_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
-        struct section_dirty_pages *sdp = *dirty_pages_pptr;
-        if(!all_of_them && sdp->entries < optimal_flush_size)
+    while (have_dirty_lock && (section_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
+        struct section_pages *sp = *section_pages_pptr;
+        if(!all_of_them && sp->entries < optimal_flush_size)
             continue;
 
         if(!all_of_them && flushes_so_far > max_flushes) {
@@ -1503,7 +1508,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         size_t pages_cancelled = 0, pages_cancelled_size = 0;
         size_t pages_made_clean = 0, pages_made_clean_size = 0;
 
-        PGC_PAGE *page = sdp->base;
+        PGC_PAGE *page = sp->base;
         while (page && pages_added < optimal_flush_size) {
             PGC_PAGE *next = page->link.next;
 
@@ -1731,14 +1736,16 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     netdata_mutex_init(&cache->dirty.mutex);
     netdata_mutex_init(&cache->clean.mutex);
 
-    cache->dirty.linked_list_in_sections_judy = true;
-
     cache->hot.flags = PGC_PAGE_HOT;
-    cache->dirty.flags = PGC_PAGE_DIRTY;
-    cache->clean.flags = PGC_PAGE_CLEAN;
-
+    cache->hot.linked_list_in_sections_judy = true;
     cache->hot.stats = &cache->stats.queues.hot;
+
+    cache->dirty.flags = PGC_PAGE_DIRTY;
+    cache->dirty.linked_list_in_sections_judy = true;
     cache->dirty.stats = &cache->stats.queues.dirty;
+
+    cache->clean.flags = PGC_PAGE_CLEAN;
+    cache->clean.linked_list_in_sections_judy = false;
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
@@ -1976,9 +1983,20 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
     size_t master_extent_index_id = 0;
 
-    for(PGC_PAGE *page = cache->hot.base; page ; page = page->link.next) {
-        if(page->section != section) continue;
+    Pvoid_t *section_pages_pptr = JudyLGet(cache->hot.sections_judy, section, PJE0);
+    if(!section_pages_pptr) {
+        pgc_ll_unlock(cache, &cache->hot);
+        return;
+    }
 
+    struct section_pages *sp = *section_pages_pptr;
+    if(!netdata_spinlock_trylock(&sp->migration_to_v2_spinlock)) {
+        internal_fatal(true, "DBENGINE: migration to journal v2 is already running for this section");
+        pgc_ll_unlock(cache, &cache->hot);
+        return;
+    }
+
+    for(PGC_PAGE *page = sp->base; page ; page = page->link.next) {
         struct extent_io_data *xio = (struct extent_io_data *)page->custom_data;
         if(xio->fileno != datafile_fileno) continue;
 
@@ -2079,6 +2097,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
 
         pgc_ll_lock(cache, &cache->hot);
     }
+
+    netdata_spinlock_unlock(&sp->migration_to_v2_spinlock);
     pgc_ll_unlock(cache, &cache->hot);
 
     // callback
@@ -2130,23 +2150,27 @@ void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafil
     evict_pages_with_filter(cache, 0, 0, true, true, match_page_data, datafile);
 }
 
-size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, void *ptr) {
+size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr) {
     size_t found = 0;
 
     pgc_ll_lock(cache, &cache->clean);
     for(PGC_PAGE *page = cache->clean.base; page ;page = page->link.next)
-        found += (page->data == ptr) ? 1 : 0;
+        found += (page->data == ptr && page->section == section) ? 1 : 0;
     pgc_ll_unlock(cache, &cache->clean);
 
     return found;
 }
 
-size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, void *ptr) {
+size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr) {
     size_t found = 0;
 
     pgc_ll_lock(cache, &cache->hot);
-    for(PGC_PAGE *page = cache->hot.base; page ;page = page->link.next)
-        found += (page->data == ptr) ? 1 : 0;
+    Pvoid_t *section_pages_pptr = JudyLGet(cache->hot.sections_judy, section, PJE0);
+    if(section_pages_pptr) {
+        struct section_pages *sp = *section_pages_pptr;
+        for(PGC_PAGE *page = sp->base; page ;page = page->link.next)
+            found += (page->data == ptr) ? 1 : 0;
+    }
     pgc_ll_unlock(cache, &cache->hot);
 
     return found;
