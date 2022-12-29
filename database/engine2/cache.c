@@ -1610,8 +1610,6 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
         __atomic_add_fetch(&cache->stats.flushes_completed, pages_added, __ATOMIC_RELAXED);
         __atomic_add_fetch(&cache->stats.flushes_completed_size, pages_added_size, __ATOMIC_RELAXED);
 
-        pgc_ll_lock(cache, &cache->clean);
-
         size_t pages_to_evict = 0; (void)pages_to_evict;
         for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
@@ -1628,20 +1626,15 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
             if(!tpg->accesses)
                 pages_to_evict++;
 
-            page_set_clean(cache, tpg, true, true);
+            page_set_clean(cache, tpg, true, false);
             page_transition_unlock(cache, tpg);
             page_release(cache, tpg, false);
             // tpg ptr may be invalid now
         }
 
-        pgc_ll_unlock(cache, &cache->clean);
-
         internal_fatal(pages_added != pages_made_clean || pages_added != pages_removed_dirty ||
                        pages_added_size != pages_made_clean_size || pages_added_size != pages_removed_dirty_size
                        , "DBENGINE CACHE: flushing pages mismatch");
-
-//        if(pages_to_evict)
-//            evict_pages(cache, pages_to_evict, pages_to_evict, false, false);
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
