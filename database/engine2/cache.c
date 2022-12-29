@@ -1612,7 +1612,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
 
         pgc_ll_lock(cache, &cache->clean);
 
-        size_t pages_to_evict = 0;
+        size_t pages_to_evict = 0; (void)pages_to_evict;
         for (size_t i = 0; i < pages_added; i++) {
             PGC_PAGE *tpg = pages[i];
 
@@ -1640,8 +1640,8 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
                        pages_added_size != pages_made_clean_size || pages_added_size != pages_removed_dirty_size
                        , "DBENGINE CACHE: flushing pages mismatch");
 
-        if(pages_to_evict)
-            evict_pages(cache, pages_to_evict, pages_to_evict, false, false);
+//        if(pages_to_evict)
+//            evict_pages(cache, pages_to_evict, pages_to_evict, false, false);
 
         if(!all_of_them && !wait) {
             if(pgc_ll_trylock(cache, &cache->dirty))
