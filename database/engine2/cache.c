@@ -1007,6 +1007,9 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 // remove it from the clean list
                 pgc_ll_del(cache, &cache->clean, page, true);
 
+                __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                __atomic_add_fetch(&cache->stats.evicting_size, page_to_evict->assumed_size, __ATOMIC_RELAXED);
+
                 page_to_evict = page;
                 break;
             }
@@ -1031,14 +1034,16 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(likely(page_to_evict)) {
             // remove them from the index
 
+            size_t page_size = page_to_evict->assumed_size;
+
             size_t partition = pgc_indexing_partition(cache, page_to_evict->metric_id);
             pgc_index_write_lock(cache, partition);
             remove_this_page_from_index_unsafe(cache, page_to_evict, partition);
             pgc_index_write_unlock(cache, partition);
             free_this_page(cache, page_to_evict);
 
-            __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
-            __atomic_add_fetch(&cache->stats.evicting_size, page_to_evict->assumed_size, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
 
             total_pages_evicted++;
         }
