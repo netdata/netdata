@@ -955,7 +955,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     size_t total_pages_skipped = 0;
     bool stopped_before_finishing = false;
     size_t spins = 0;
-    size_t max_pages_to_evict_per_run = cache->config.partitions * 10;
+    size_t max_pages_to_evict_per_run = (cache->config.partitions) < 2 ? 2 : cache->config.partitions;
 
     do {
         if(++spins > 1)
