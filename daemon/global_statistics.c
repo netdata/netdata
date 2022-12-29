@@ -1024,7 +1024,6 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_waste_acquire_spins;
     RRDDIM *rd_pgc_waste_delete_spins;
     RRDDIM *rd_pgc_waste_flush_spins;
-    RRDDIM *rd_pgc_waste_evict_cleanup_spins;
 
 };
 
@@ -1387,8 +1386,7 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
             ptrs->rd_pgc_waste_insert_spins      = rrddim_add(ptrs->st_pgc_waste, "insert spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_waste_delete_spins      = rrddim_add(ptrs->st_pgc_waste, "delete spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             ptrs->rd_pgc_waste_evict_spins       = rrddim_add(ptrs->st_pgc_waste, "evict spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_evict_cleanup_spins = rrddim_add(ptrs->st_pgc_waste, "evict cleanup spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            ptrs->rd_pgc_waste_flush_spins         = rrddim_add(ptrs->st_pgc_waste, "flush spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            ptrs->rd_pgc_waste_flush_spins       = rrddim_add(ptrs->st_pgc_waste, "flush spins", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             buffer_free(id);
             buffer_free(family);
@@ -1403,7 +1401,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_insert_spins, (collected_number)pgc_stats->insert_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_delete_spins, (collected_number)pgc_stats->delete_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_spins, (collected_number)pgc_stats->evict_spins);
-        rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_evict_cleanup_spins, (collected_number)pgc_stats->evict_cleanup_spins);
         rrddim_set_by_pointer(ptrs->st_pgc_waste, ptrs->rd_pgc_waste_flush_spins, (collected_number)pgc_stats->flush_spins);
 
         rrdset_done(ptrs->st_pgc_waste);
