@@ -1550,7 +1550,7 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_LINE);
 
             rd_hit_ratio = rrddim_add(st_cache_hit_ratio, "overall", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-            rd_preloaded_ratio = rrddim_add(st_cache_hit_ratio, "plan", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
+            rd_preloaded_ratio = rrddim_add(st_cache_hit_ratio, "main cache", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             rd_extent_ratio = rrddim_add(st_cache_hit_ratio, "extent cache", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             rd_parallel_load_ratio = rrddim_add(st_cache_hit_ratio, "parallel load", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             rd_before_allocation_ratio = rrddim_add(st_cache_hit_ratio, "before allocation", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
