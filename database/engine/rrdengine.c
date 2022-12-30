@@ -1183,11 +1183,9 @@ static void do_cache_evict(uv_work_t *req)
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
 
-    if (0 == wc->ctx->tier) {
-        if (main_cache) {
-            worker_is_busy(UV_EVENT_EVICT_MAIN);
-            pgc_evict_pages(main_cache, 0, 0);
-        }
+    if (main_cache) {
+        worker_is_busy(UV_EVENT_EVICT_MAIN);
+        pgc_evict_pages(main_cache, 0, 0);
     }
 
     worker_is_idle();
@@ -1400,8 +1398,10 @@ void timer_cb(uv_timer_t* handle)
         queue_journalfile_v2_migration(wc);
     }
 
-    cache_flush(wc);
-    cache_evict(wc);
+    if(wc->ctx->tier == 0) {
+        cache_flush(wc);
+        cache_evict(wc);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     {
