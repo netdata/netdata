@@ -1634,12 +1634,10 @@ void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
 }
 
 static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list) {
-//    struct rrdeng_cmd cmd;
-//    cmd.opcode = RRDENG_READ_EXTENT;
-//    cmd.data = extent_page_list;
-//    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
-
-    do_read_extent(&ctx->worker_config, extent_page_list);
+    struct rrdeng_cmd cmd;
+    cmd.opcode = RRDENG_READ_EXTENT;
+    cmd.data = extent_page_list;
+    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
 
 //static void do_read_page_list_work(uv_work_t *req)
