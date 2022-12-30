@@ -945,7 +945,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
     else if(unlikely(max_evict < 2))
         max_evict = 2;
 
-    PGC_PAGE *page_to_evict = NULL;
+    PGC_PAGE *pages_to_evict = NULL;
     size_t total_pages_evicted = 0;
     size_t total_pages_skipped = 0;
     bool stopped_before_finishing = false;
@@ -983,7 +983,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             pgc_ll_lock(cache, &cache->clean);
 
         // find a page to evict
-        page_to_evict = NULL;
+        pages_to_evict = NULL;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
 
@@ -1010,8 +1010,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
 
-                page_to_evict = page;
-                break;
+                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
+
+                if(!all_of_them)
+                    // we do it one-by-one to avoid locking clean queue for way too long
+                    break;
             }
             else {
                 // we can't delete this page
@@ -1031,21 +1034,25 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         }
         pgc_ll_unlock(cache, &cache->clean);
 
-        if(likely(page_to_evict)) {
+        if(likely(pages_to_evict)) {
             // remove them from the index
 
-            size_t page_size = page_to_evict->assumed_size;
+            for(PGC_PAGE *page = pages_to_evict, *next = NULL; page ; page = next) {
+                next = page->link.next;
 
-            size_t partition = pgc_indexing_partition(cache, page_to_evict->metric_id);
-            pgc_index_write_lock(cache, partition);
-            remove_this_page_from_index_unsafe(cache, page_to_evict, partition);
-            pgc_index_write_unlock(cache, partition);
-            free_this_page(cache, page_to_evict);
+                size_t page_size = page->assumed_size;
 
-            __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
+                size_t partition = pgc_indexing_partition(cache, page->metric_id);
+                pgc_index_write_lock(cache, partition);
+                remove_this_page_from_index_unsafe(cache, page, partition);
+                pgc_index_write_unlock(cache, partition);
+                free_this_page(cache, page);
 
-            total_pages_evicted++;
+                __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
+
+                total_pages_evicted++;
+            }
         }
         else
             break;

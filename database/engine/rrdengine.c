@@ -1066,13 +1066,20 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
         if (!datafile_got_for_deletion) {
-            info("DBENGINE: waiting for datafile %u of tier %u to be available for deletion, "
-                 "it is in use currently by %u users.",
-                 datafile->fileno, datafile->tier, datafile->users.lockers);
+            info("DBENGINE: waiting for data file '%s/"
+                         DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
+                         "' to be available for deletion, "
+                         "it is in use currently by %u users.",
+                 ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno, datafile->users.lockers);
 
             sleep_usec(1 * USEC_PER_SEC);
         }
     }
+
+    info("DBENGINE: deleting data file '%s/"
+         DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
+         "'.",
+         ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
 
     if(worker)
         worker_is_busy(UV_EVENT_DATAFILE_DELETE);
@@ -1127,12 +1134,26 @@ static void delete_old_data(uv_work_t *req) {
 
 static void do_delete_files(struct rrdengine_worker_config *wc)
 {
+    struct rrdengine_instance *ctx = wc->ctx;
+
+    if(wc->now_deleting_files)
+        return;
+
+    if (NULL == ctx->datafiles.first->next) {
+        info("DBENGINE: cannot delete data file '%s/"
+              DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
+              "' to reclaim space, there are no other file pairs left.",
+              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+        return;
+    }
+
+    wc->now_deleting_files = 1;
+
     struct rrdeng_work *work_request;
     work_request = callocz(1, sizeof(*work_request));
     work_request->req.data = work_request;
     work_request->wc = wc;
     work_request->completion = NULL;
-    wc->now_deleting_files = 1;
 
     int ret = uv_queue_work(wc->loop, &work_request->req, delete_old_data, after_delete_old_data);
     if (ret) {
@@ -1252,23 +1273,8 @@ static void rrdeng_test_quota(struct rrdengine_worker_config* wc)
         }
     }
 
-    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == __atomic_load_n(&ctx->journal_initialization, __ATOMIC_RELAXED))) {
-        /* delete old data */
-        if (wc->now_deleting_files) {
-            /* already deleting data */
-            return;
-        }
-        if (NULL == ctx->datafiles.first->next) {
-            error("DBENGINE: cannot delete data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\""
-                  " to reclaim space, there are no other file pairs left.",
-                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-            return;
-        }
-        info("DBENGINE: deleting data file \"%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION "\".",
-             ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
-
+    if (unlikely(out_of_space && NO_QUIESCE == ctx->quiesce && false == __atomic_load_n(&ctx->journal_initialization, __ATOMIC_RELAXED)))
         do_delete_files(wc);
-    }
 }
 
 static inline int rrdeng_threads_alive(struct rrdengine_worker_config* wc)
@@ -1701,7 +1707,7 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_SHUTDOWN,                        "shutdown");
     worker_register_job_name(RRDENG_QUIESCE,                         "quiesce");
     worker_register_job_name(RRDENG_MAX_OPCODE,                      "cleanup");
-    
+
 //    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
 //    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
 
