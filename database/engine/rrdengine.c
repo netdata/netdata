@@ -1180,9 +1180,6 @@ static void do_cache_evict(uv_work_t *req)
 {
     register_libuv_worker_jobs();
 
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-
     if (main_cache) {
         worker_is_busy(UV_EVENT_EVICT_MAIN);
         pgc_evict_pages(main_cache, 0, 0);
