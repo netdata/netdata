@@ -201,7 +201,12 @@ enum rrdeng_opcode {
 // RRDENG_MAX_OPCODE                     : reserved for the cleanup
 // RRDENG_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
 // RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE : reserved for the timer
-#define RRDENG_FLUSH_TRANSACTION_BUFFER_CB (RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE + 1)
+#define RRDENG_TIMER_CB (RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE)
+#define RRDENG_TIMER_CB_TEST_QUOTA             (RRDENG_TIMER_CB + 1)
+#define RRDENG_TIMER_CB_QUEUE_INDEXING         (RRDENG_TIMER_CB + 2)
+#define RRDENG_TIMER_CB_FLUSH_AND_EVICT        (RRDENG_TIMER_CB + 3)
+#define RRDENG_TIMER_CB_STATS                  (RRDENG_TIMER_CB + 4)
+#define RRDENG_FLUSH_TRANSACTION_BUFFER_CB     (RRDENG_TIMER_CB + 5)
 
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;

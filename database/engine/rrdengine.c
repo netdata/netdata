@@ -1370,7 +1370,7 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE);
+    worker_is_busy(RRDENG_TIMER_CB);
 
     struct rrdengine_worker_config *wc = handle->data;
     uv_stop(handle->loop);
@@ -1381,22 +1381,26 @@ void timer_cb(uv_timer_t* handle)
         return;
     }
 
+    worker_is_busy(RRDENG_TIMER_CB_TEST_QUOTA);
     rrdeng_test_quota(wc);
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
 
     if (true == wc->run_indexing && !wc->now_deleting_files && !wc->running_cache_flushing) {
+        worker_is_busy(RRDENG_TIMER_CB_QUEUE_INDEXING);
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }
 
     if(wc->ctx->tier == 0) {
+        worker_is_busy(RRDENG_TIMER_CB_FLUSH_AND_EVICT);
         cache_flush(wc);
         cache_evict(wc);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     {
+        worker_is_busy(RRDENG_TIMER_CB_STATS);
         char buf[4096];
         debug(D_RRDENGINE, "%s", get_rrdeng_statistics(wc->ctx, buf, sizeof(buf)));
     }
@@ -1689,19 +1693,28 @@ void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct pag
 void rrdeng_worker(void* arg)
 {
     worker_register("DBENGINE");
-    worker_register_job_name(RRDENG_NOOP,                          "noop");
-    worker_register_job_name(RRDENG_READ_EXTENT,                   "extent read");
-//    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
-    worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
-    worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
-    worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
-//    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
-    worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
 
+    // opcode jobs
+    worker_register_job_name(RRDENG_NOOP,                            "noop");
+    worker_register_job_name(RRDENG_READ_EXTENT,                     "extent read");
+    worker_register_job_name(RRDENG_FLUSH_PAGES,                     "flush");
+    worker_register_job_name(RRDENG_SHUTDOWN,                        "shutdown");
+    worker_register_job_name(RRDENG_QUIESCE,                         "quiesce");
+    worker_register_job_name(RRDENG_MAX_OPCODE,                      "cleanup");
+    
+//    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
+//    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
+
+    // callback jobs
     worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT, "extent read cb");
     worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES, "flush cb");
-    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE,  "timer");
 
+    // special jobs
+    worker_register_job_name(RRDENG_TIMER_CB,                        "timer");
+    worker_register_job_name(RRDENG_TIMER_CB_TEST_QUOTA,             "timer quota");
+    worker_register_job_name(RRDENG_TIMER_CB_QUEUE_INDEXING,         "timer indexing");
+    worker_register_job_name(RRDENG_TIMER_CB_FLUSH_AND_EVICT,        "timer flush evict");
+    worker_register_job_name(RRDENG_TIMER_CB_STATS,                  "timer stats");
     worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,     "transaction buffer flush cb");
 
     struct rrdengine_worker_config* wc = arg;
