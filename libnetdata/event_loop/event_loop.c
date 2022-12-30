@@ -41,6 +41,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_RETENTION_UPDATE, "update retention");
     worker_register_job_name(UV_EVENT_DATAFILE_ACQUIRE, "datafile acquire");
     worker_register_job_name(UV_EVENT_DATAFILE_DELETE, "datafile deletion");
+    worker_register_job_name(UV_EVENT_FLUSHED_TO_OPEN, "flushed to open");
 
     uv_thread_set_name_np(pthread_self(), "LIBUV_WORKER");
 }

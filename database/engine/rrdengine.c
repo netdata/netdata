@@ -843,23 +843,32 @@ static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t ty
     }
 }
 
-// Main event loop callback
-static void do_flush_extent_cb(uv_fs_t *req)
+static void after_do_flush_extent_post_work(uv_work_t *req, int status __maybe_unused)
 {
-    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES);
+    worker_is_busy(RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB);
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+    wc->outstanding_flush_requests--;
+    work_request_release(work_request);
+    worker_is_idle();
+}
 
-    struct rrdengine_worker_config *wc = req->loop->data;
+static void do_flush_extent_post_work(uv_work_t *uv_work_req) {
+    worker_is_busy(UV_EVENT_FLUSHED_TO_OPEN);
+
+    struct rrdeng_work *work_request = uv_work_req->data;
+    uv_fs_t *uv_fs_request = work_request->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
     struct rrdengine_instance *ctx = wc->ctx;
-    struct extent_io_descriptor *xt_io_descr;
+    struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct page_descr_with_data *descr;
     struct rrdengine_datafile *datafile;
     unsigned i;
 
-    xt_io_descr = req->data;
-    if (req->result < 0) {
-        ++ctx->stats.io_errors;
+    if (uv_fs_request->result < 0) {
+        __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
         rrd_stat_atomic_add(&global_io_errors, 1);
-        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)req->result));
+        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)uv_fs_request->result));
     }
     datafile = xt_io_descr->datafile;
 
@@ -879,10 +888,23 @@ static void do_flush_extent_cb(uv_fs_t *req)
         page_descriptor_release(descr);
     }
 
-    uv_fs_req_cleanup(req);
+    uv_fs_req_cleanup(uv_fs_request);
     posix_memfree(xt_io_descr->buf);
     extent_io_descriptor_release(xt_io_descr);
-    wc->outstanding_flush_requests--;
+
+    worker_is_idle();
+}
+
+// Main event loop callback
+static void do_flush_extent_cb(uv_fs_t *uv_fs_request)
+{
+    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES);
+
+    struct rrdengine_worker_config *wc = uv_fs_request->loop->data;
+    struct rrdeng_work *work_request = work_request_get(wc, uv_fs_request, NULL);
+    int r = uv_queue_work(wc->loop, &work_request->req, do_flush_extent_post_work, after_do_flush_extent_post_work);
+    if (r) work_request_release(work_request);
+    fatal_assert(r == 0);
 
     worker_is_idle();
 }
@@ -1001,7 +1023,10 @@ static unsigned do_flush_extent(struct rrdengine_worker_config *wc, struct page_
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
-    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, xt_io_descr->pos, do_flush_extent_cb);
+
+    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov,
+                      1, xt_io_descr->pos, do_flush_extent_cb);
+
     fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
     ++ctx->stats.io_write_requests;
@@ -1022,7 +1047,7 @@ static unsigned do_flush_extent(struct rrdengine_worker_config *wc, struct page_
 
 static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
 {
-    struct rrdeng_work  *work_request = req->data;
+    struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     wc->now_deleting_files = 0;
     work_request_release(work_request);
@@ -1712,15 +1737,6 @@ static void do_read_extent_work(uv_work_t *req)
     load_pages_from_an_extent_list(ctx, extent_page_list, true);
 }
 
-static void do_read_extent(struct rrdengine_worker_config *wc, void *data)
-{
-    struct rrdeng_work *work_request = work_request_get(wc, data, NULL);
-    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_extent_work, after_do_read_extent_work);
-    if (ret) work_request_release(work_request);
-
-    fatal_assert(ret == 0);
-}
-
 //static void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
 //{
 //    struct rrdeng_work  *work_request = req->data;
@@ -1814,6 +1830,7 @@ void rrdeng_worker(void* arg)
     worker_register_job_name(RRDENG_TIMER_CB_FLUSH_AND_EVICT,        "timer flush evict");
     worker_register_job_name(RRDENG_TIMER_CB_STATS,                  "timer stats");
     worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,     "transaction buffer flush cb");
+    worker_register_job_name(RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB,      "flushed to open cb");
 
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1878,9 +1895,13 @@ void rrdeng_worker(void* arg)
                 worker_is_busy(opcode);
 
             switch (opcode) {
-                case RRDENG_READ_EXTENT:
-                    do_read_extent(wc, cmd.data);
+                case RRDENG_READ_EXTENT: {
+                    struct rrdeng_work *work_request = work_request_get(wc, cmd.data, NULL);
+                    int r = uv_queue_work(wc->loop, &work_request->req, do_read_extent_work, after_do_read_extent_work);
+                    if (r) work_request_release(work_request);
+                    fatal_assert(r == 0);
                     break;
+                }
 
                 case RRDENG_FLUSH_PAGES:
                     wc->outstanding_flush_requests++;

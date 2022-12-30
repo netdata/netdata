@@ -207,6 +207,7 @@ enum rrdeng_opcode {
 #define RRDENG_TIMER_CB_FLUSH_AND_EVICT        (RRDENG_TIMER_CB + 3)
 #define RRDENG_TIMER_CB_STATS                  (RRDENG_TIMER_CB + 4)
 #define RRDENG_FLUSH_TRANSACTION_BUFFER_CB     (RRDENG_TIMER_CB + 5)
+#define RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB      (RRDENG_TIMER_CB + 6)
 
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
