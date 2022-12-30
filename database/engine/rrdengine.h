@@ -223,6 +223,8 @@ struct rrdeng_work {
     uint32_t count;
     bool rerun;
     struct completion *completion;
+
+    struct rrdeng_work *prev, *next;
 };
 
 struct rrdeng_cmdqueue {

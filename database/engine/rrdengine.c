@@ -298,6 +298,52 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 }
 
 // ----------------------------------------------------------------------------
+// work request
+
+static struct {
+    SPINLOCK spinlock;
+    struct rrdeng_work *base;
+    size_t allocated;
+    size_t available;
+} work_request_globals = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .base = NULL,
+};
+
+static struct rrdeng_work *work_request_get(struct rrdengine_worker_config *wc, void *data, struct completion *completion) {
+    struct rrdeng_work *work_request;
+
+    netdata_spinlock_lock(&work_request_globals.spinlock);
+
+    if(!work_request_globals.base) {
+        work_request = mallocz(sizeof(*work_request));
+        work_request_globals.allocated++;
+    }
+    else {
+        work_request = work_request_globals.base;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.base, work_request, prev, next);
+        work_request_globals.available--;
+    }
+
+    netdata_spinlock_unlock(&work_request_globals.spinlock);
+
+    memset(work_request, 0, sizeof(struct rrdeng_work));
+    work_request->req.data = work_request;
+    work_request->wc = wc;
+    work_request->data = data;
+    work_request->completion = completion;
+
+    return work_request;
+}
+
+static void work_request_release(struct rrdeng_work *work_request) {
+    netdata_spinlock_lock(&work_request_globals.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.base, work_request, prev, next);
+    work_request_globals.available++;
+    netdata_spinlock_unlock(&work_request_globals.spinlock);
+}
+
+// ----------------------------------------------------------------------------
 
 void *dbengine_page_alloc(struct rrdengine_instance *ctx __maybe_unused, size_t size) {
     void *page = mallocz(size);
@@ -908,7 +954,7 @@ static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
     struct rrdeng_work  *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
     wc->now_deleting_files = 0;
-    freez(work_request);
+    work_request_release(work_request);
 }
 
 struct uuid_first_time_s {
@@ -1149,16 +1195,11 @@ static void do_delete_files(struct rrdengine_worker_config *wc)
 
     wc->now_deleting_files = 1;
 
-    struct rrdeng_work *work_request;
-    work_request = callocz(1, sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->completion = NULL;
-
+    struct rrdeng_work *work_request = work_request_get(wc, NULL, NULL);
     int ret = uv_queue_work(wc->loop, &work_request->req, delete_old_data, after_delete_old_data);
     if (ret) {
         wc->now_deleting_files = 0;
-        freez(work_request);
+        work_request_release(work_request);
     }
 }
 
@@ -1168,7 +1209,7 @@ static void after_do_cache_flush(uv_work_t *req, int status __maybe_unused)
     struct rrdengine_worker_config *wc = work_request->wc;
 
     wc->running_cache_flushing = 0;
-    freez(work_request);
+    work_request_release(work_request);
 }
 
 static void do_cache_flush(uv_work_t *req __maybe_unused)
@@ -1189,7 +1230,7 @@ static void after_do_cache_evict(uv_work_t *req, int status __maybe_unused)
     struct rrdengine_worker_config *wc = work_request->wc;
 
     wc->running_cache_evictions = 0;
-    freez(work_request);
+    work_request_release(work_request);
 }
 
 static void do_cache_evict(uv_work_t *req __maybe_unused)
@@ -1209,13 +1250,10 @@ static void cache_flush(struct rrdengine_worker_config *wc)
     if (unlikely(wc->running_cache_flushing))
         return;
 
-    struct rrdeng_work *work_request;
-    work_request = callocz(1, sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
+    struct rrdeng_work *work_request = work_request_get(wc, NULL, NULL);
     wc->running_cache_flushing = 1;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_flush, after_do_cache_flush))) {
-        freez(work_request);
+        work_request_release(work_request);
         wc->running_cache_flushing = 0;
     }
 }
@@ -1225,13 +1263,10 @@ static void cache_evict(struct rrdengine_worker_config *wc)
     if (unlikely(wc->running_cache_evictions))
         return;
 
-    struct rrdeng_work *work_request;
-    work_request = callocz(1, sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
+    struct rrdeng_work *work_request = work_request_get(wc, NULL, NULL);
     wc->running_cache_evictions = 1;
     if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_evict, after_do_cache_evict))) {
-        freez(work_request);
+        work_request_release(work_request);
         wc->running_cache_evictions = 0;
     }
 }
@@ -1418,7 +1453,7 @@ static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
 {
     worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT);
     struct rrdeng_work  *work_request = req->data;
-    freez(work_request);
+    work_request_release(work_request);
     worker_is_idle();
 }
 
@@ -1608,30 +1643,23 @@ static void do_read_extent_work(uv_work_t *req)
 
 static void do_read_extent(struct rrdengine_worker_config *wc, void *data)
 {
-    struct rrdeng_work *work_request;
-
-    work_request = mallocz(sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->data = data;
-    work_request->completion = NULL;
-
+    struct rrdeng_work *work_request = work_request_get(wc, data, NULL);
     int ret = uv_queue_work(wc->loop, &work_request->req, do_read_extent_work, after_do_read_extent_work);
-    if (ret)
-        freez(work_request);
+    if (ret) work_request_release(work_request);
+
     fatal_assert(ret == 0);
 }
 
-void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
-{
-    struct rrdeng_work  *work_request = req->data;
-
-    // Execute callback
-    if (work_request->completion)
-        completion_mark_complete(work_request->completion);
-
-    freez(work_request);
-}
+//static void after_do_read_page_list_work(uv_work_t *req, int status __maybe_unused)
+//{
+//    struct rrdeng_work  *work_request = req->data;
+//
+//    // Execute callback
+//    if (work_request->completion)
+//        completion_mark_complete(work_request->completion);
+//
+//    work_request_release(work_request);
+//}
 
 static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list) {
     struct rrdeng_cmd cmd;
@@ -1659,17 +1687,10 @@ static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *ex
 //
 //static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
 //{
-//    struct rrdeng_work *work_request;
-//
-//    work_request = mallocz(sizeof(*work_request));
-//    work_request->req.data = work_request;
-//    work_request->wc = wc;
-//    work_request->data = pdc;
-//    work_request->completion = completion;
-//
+//    struct rrdeng_work *work_request = work_request_get(wc, pdc, completion);
 //    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_page_list_work, after_do_read_page_list_work);
 //    if (ret)
-//        freez(work_request);
+//        work_request_release(work_request);
 //
 //    fatal_assert(0 == ret);
 //}
