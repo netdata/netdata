@@ -37,6 +37,8 @@ static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_
     datafile->extent_exclusive_access.spinlock = NETDATA_SPINLOCK_INITIALIZER;
     datafile->extent_exclusive_access.lockers = 0;
     datafile->extent_exclusive_access.extents_JudyL = NULL;
+
+    datafile->write_extent_spinlock = NETDATA_SPINLOCK_INITIALIZER;
 }
 
 void datafile_acquire_dup(struct rrdengine_datafile *df) {

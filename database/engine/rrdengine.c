@@ -754,7 +754,6 @@ static void do_flush_extent_cb(uv_fs_t *req)
     uv_fs_req_cleanup(req);
     posix_memfree(xt_io_descr->buf);
     freez(xt_io_descr);
-    wc->cache_flush_can_run = true;
     wc->outstanding_flush_requests--;
 
     worker_is_idle();
@@ -834,9 +833,6 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     header->number_of_pages = count;
     pos += sizeof(*header);
 
-    datafile = ctx->datafiles.first->prev;  /* TODO: check for exceeded size quota */
-    xt_io_descr->datafile = datafile;
-
     for (i = 0 ; i < count ; ++i) {
         /* This is here for performance reasons */
         xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
@@ -871,6 +867,11 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
             header->payload_length = compressed_size;
         break;
     }
+
+    datafile = ctx->datafiles.first->prev;  /* TODO: check for exceeded size quota */
+    netdata_spinlock_lock(&datafile->write_extent_spinlock);
+
+    xt_io_descr->datafile = datafile;
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = datafile->pos;
     xt_io_descr->req.data = xt_io_descr;
@@ -883,7 +884,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
-    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, datafile->pos, do_flush_extent_cb);
+    ret = uv_fs_write(wc->loop, &xt_io_descr->req, datafile->file, &xt_io_descr->iov, 1, xt_io_descr->pos, do_flush_extent_cb);
     fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
     ++ctx->stats.io_write_requests;
@@ -894,8 +895,11 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
     ctx->last_flush_fileno = datafile->fileno;
 
+    netdata_spinlock_unlock(&datafile->write_extent_spinlock);
+
     if (completion)
         completion_mark_complete(completion);
+
     return ALIGN_BYTES_CEILING(size_bytes);
 }
 
@@ -1121,7 +1125,7 @@ static void delete_old_data(uv_work_t *req) {
     datafile_delete(ctx, ctx->datafiles.first, true);
 }
 
-static void do_delete_files(struct rrdengine_worker_config *wc )
+static void do_delete_files(struct rrdengine_worker_config *wc)
 {
     struct rrdeng_work *work_request;
     work_request = callocz(1, sizeof(*work_request));
@@ -1146,22 +1150,13 @@ static void after_do_cache_flush(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-static void do_cache_flush(uv_work_t *req)
+static void do_cache_flush(uv_work_t *req __maybe_unused)
 {
     register_libuv_worker_jobs();
 
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-
-    if (wc->cache_flush_can_run) {
-        if (main_cache) {
-            worker_is_busy(UV_EVENT_FLUSH_MAIN);
-            pgc_flush_pages(main_cache, 0);
-        }
-        if (open_cache) {
-            worker_is_busy(UV_EVENT_FLUSH_OPEN);
-            pgc_flush_pages(open_cache, 0);
-        }
+    if (main_cache) {
+        worker_is_busy(UV_EVENT_FLUSH_MAIN);
+        pgc_flush_pages(main_cache, 0);
     }
 
     worker_is_idle();
@@ -1176,7 +1171,7 @@ static void after_do_cache_evict(uv_work_t *req, int status __maybe_unused)
     freez(work_request);
 }
 
-static void do_cache_evict(uv_work_t *req)
+static void do_cache_evict(uv_work_t *req __maybe_unused)
 {
     register_libuv_worker_jobs();
 
@@ -1739,7 +1734,6 @@ void rrdeng_worker(void* arg)
     wc->running_journal_migration = 0;
     wc->running_cache_flushing = 0;
     wc->run_indexing = false;
-    wc->cache_flush_can_run = true;
 
     /* dirty page flushing timer */
     ret = uv_timer_init(loop, &timer_req);
@@ -1778,7 +1772,6 @@ void rrdeng_worker(void* arg)
                     break;
 
                 case RRDENG_FLUSH_PAGES:
-                    wc->cache_flush_can_run = false;
                     wc->outstanding_flush_requests++;
                     do_flush_extent(wc, cmd.data, cmd.completion);
                     break;

@@ -272,7 +272,6 @@ struct rrdengine_worker_config {
     unsigned long running_cache_evictions;
     unsigned outstanding_flush_requests;
     bool run_indexing;
-    bool cache_flush_can_run;
 
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
