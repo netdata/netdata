@@ -13,7 +13,6 @@ extern pthread_key_t query_key;
 
 /* Forward declarations */
 struct rrdengine_instance;
-struct rrdeng_page_descr;
 
 #define INVALID_TIME (0)
 #define MAX_PAGE_CACHE_FETCH_RETRIES (3)
@@ -21,15 +20,25 @@ struct rrdeng_page_descr;
 
 extern struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats;
 
-struct rrdeng_page_descr {
-    uuid_t *id; /* never changes */
+struct page_descr_with_data {
+    uuid_t *id;
     Word_t metric_id;
     usec_t start_time_ut;
     usec_t end_time_ut;
     uint8_t type;
-    uint32_t update_every_s:24;
+    uint32_t update_every_s;
     uint32_t page_length;
-    void *page;                 // Metrics are stored here
+    uint8_t page[RRDENG_BLOCK_SIZE];
+
+    struct {
+        struct page_descr_with_data *prev;
+        struct page_descr_with_data *next;
+    } link;
+
+    struct {
+        struct page_descr_with_data *prev;
+        struct page_descr_with_data *next;
+    } cache;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)

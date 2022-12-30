@@ -1517,7 +1517,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 
     buffer_sprintf(wb,
                    "\n\t\t\"default_granularity_secs\":%zu"
-                   ",\n\t\t\"sizeof_page\":%zu"
                    ",\n\t\t\"sizeof_datafile\":%zu"
                    ",\n\t\t\"sizeof_page_in_cache\":%zu"
                    ",\n\t\t\"sizeof_point_data\":%zu"
@@ -1547,7 +1546,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"disk_space\":%zu"
                    ",\n\t\t\"max_disk_space\":%zu"
                    , stats.default_granularity_secs
-                   , stats.sizeof_page
                    , stats.sizeof_datafile
                    , stats.sizeof_page_in_cache
                    , stats.sizeof_point_data

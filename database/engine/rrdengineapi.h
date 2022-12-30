@@ -75,8 +75,6 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
 
-    size_t sizeof_metric;
-    size_t sizeof_page;
     size_t sizeof_datafile;
     size_t sizeof_page_in_cache;
     size_t sizeof_point_data;

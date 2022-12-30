@@ -224,7 +224,10 @@ struct rrdeng_work {
     bool rerun;
     struct completion *completion;
 
-    struct rrdeng_work *prev, *next;
+    struct {
+        struct rrdeng_work *prev;
+        struct rrdeng_work *next;
+    } cache;
 };
 
 struct rrdeng_cmdqueue {
@@ -249,10 +252,14 @@ struct extent_io_descriptor {
     unsigned bytes;
     struct completion *completion;
     unsigned descr_count;
-    struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
+    struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
-    Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
+
+    struct {
+        struct extent_io_descriptor *prev;
+        struct extent_io_descriptor *next;
+    } cache;
 };
 
 struct generic_io_descriptor {
@@ -381,6 +388,9 @@ void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct pag
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
 
 unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx);
+
+struct page_descr_with_data *page_descriptor_get(void);
+void page_descriptor_release(struct page_descr_with_data *descr);
 
 typedef struct validated_page_descriptor {
     time_t start_time_s;

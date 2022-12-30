@@ -298,7 +298,7 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 }
 
 // ----------------------------------------------------------------------------
-// work request
+// work request cache
 
 static struct {
     SPINLOCK spinlock;
@@ -321,7 +321,7 @@ static struct rrdeng_work *work_request_get(struct rrdengine_worker_config *wc, 
     }
     else {
         work_request = work_request_globals.base;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.base, work_request, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.base, work_request, cache.prev, cache.next);
         work_request_globals.available--;
     }
 
@@ -338,10 +338,93 @@ static struct rrdeng_work *work_request_get(struct rrdengine_worker_config *wc, 
 
 static void work_request_release(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.base, work_request, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.base, work_request, cache.prev, cache.next);
     work_request_globals.available++;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 }
+
+// ----------------------------------------------------------------------------
+// page descriptor cache
+
+static struct {
+    SPINLOCK spinlock;
+    struct page_descr_with_data *base;
+    size_t allocated;
+    size_t available;
+} page_descriptor_globals = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .base = NULL,
+};
+
+struct page_descr_with_data *page_descriptor_get(void) {
+    struct page_descr_with_data *descr;
+
+    netdata_spinlock_lock(&page_descriptor_globals.spinlock);
+
+    if(!page_descriptor_globals.base) {
+        descr = mallocz(sizeof(*descr));
+        page_descriptor_globals.allocated++;
+    }
+    else {
+        descr = page_descriptor_globals.base;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.base, descr, cache.prev, cache.next);
+        page_descriptor_globals.available--;
+    }
+
+    netdata_spinlock_unlock(&page_descriptor_globals.spinlock);
+
+    memset(descr, 0, sizeof(struct page_descr_with_data));
+    return descr;
+}
+
+void page_descriptor_release(struct page_descr_with_data *descr) {
+    netdata_spinlock_lock(&page_descriptor_globals.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.base, descr, cache.prev, cache.next);
+    page_descriptor_globals.available++;
+    netdata_spinlock_unlock(&page_descriptor_globals.spinlock);
+}
+
+// ----------------------------------------------------------------------------
+// extent io descriptor cache
+
+static struct {
+    SPINLOCK spinlock;
+    struct extent_io_descriptor *base;
+    size_t allocated;
+    size_t available;
+} extent_io_descriptor_globals = {
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+        .base = NULL,
+};
+
+static struct extent_io_descriptor *extent_io_descriptor_get(void) {
+    struct extent_io_descriptor *xt_io_descr;
+
+    netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
+
+    if(!extent_io_descriptor_globals.base) {
+        xt_io_descr = mallocz(sizeof(*xt_io_descr));
+        extent_io_descriptor_globals.allocated++;
+    }
+    else {
+        xt_io_descr = extent_io_descriptor_globals.base;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.base, xt_io_descr, cache.prev, cache.next);
+        extent_io_descriptor_globals.available--;
+    }
+
+    netdata_spinlock_unlock(&extent_io_descriptor_globals.spinlock);
+
+    memset(xt_io_descr, 0, sizeof(struct extent_io_descriptor));
+    return xt_io_descr;
+}
+
+static void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
+    netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.base, xt_io_descr, cache.prev, cache.next);
+    extent_io_descriptor_globals.available++;
+    netdata_spinlock_unlock(&extent_io_descriptor_globals.spinlock);
+}
+
 
 // ----------------------------------------------------------------------------
 
@@ -751,12 +834,12 @@ static void commit_data_extent(struct rrdengine_worker_config* wc, struct extent
 static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t type, void *data)
 {
     switch (type) {
-    case STORE_DATA:
-        commit_data_extent(wc, (struct extent_io_descriptor *)data);
-        break;
-    default:
-        fatal_assert(type == STORE_DATA);
-        break;
+        case STORE_DATA:
+            commit_data_extent(wc, (struct extent_io_descriptor *)data);
+            break;
+        default:
+            fatal_assert(type == STORE_DATA);
+            break;
     }
 }
 
@@ -768,7 +851,7 @@ static void do_flush_extent_cb(uv_fs_t *req)
     struct rrdengine_worker_config *wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
-    struct rrdeng_page_descr *descr;
+    struct page_descr_with_data *descr;
     struct rrdengine_datafile *datafile;
     unsigned i;
 
@@ -793,13 +876,12 @@ static void do_flush_extent_cb(uv_fs_t *req)
                 datafile,
                 xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
 
-        freez(descr->page);
-        freez(descr);
+        page_descriptor_release(descr);
     }
 
     uv_fs_req_cleanup(req);
     posix_memfree(xt_io_descr->buf);
-    freez(xt_io_descr);
+    extent_io_descriptor_release(xt_io_descr);
     wc->outstanding_flush_requests--;
 
     worker_is_idle();
@@ -808,18 +890,16 @@ static void do_flush_extent_cb(uv_fs_t *req)
 /*
  * Take a page list in a judy array and write them
  */
-static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page_list, struct completion *completion)
+static unsigned do_flush_extent(struct rrdengine_worker_config *wc, struct page_descr_with_data *base, struct completion *completion)
 {
     struct rrdengine_instance *ctx = wc->ctx;
     int ret;
     int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
     uint32_t uncompressed_payload_length, payload_offset;
-    struct rrdeng_page_descr *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
+    struct page_descr_with_data *descr, *eligible_pages[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *xt_io_descr;
     void *compressed_buf = NULL;
-    Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
-    Pvoid_t *PValue;
     Word_t Index;
     uint8_t compression_algorithm = ctx->global_compress_alg;
     struct rrdengine_datafile *datafile;
@@ -828,21 +908,13 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     struct rrdeng_df_extent_trailer *trailer;
     uLong crc;
 
-    for (Index = 0, count = 0, uncompressed_payload_length = 0,
-         PValue = JudyLFirst(Judy_page_list, &Index, PJE0),
-         descr = unlikely(NULL == PValue) ? NULL : *PValue ;
+    for(descr = base, Index = 0, count = 0, uncompressed_payload_length = 0;
+        descr && count != rrdeng_pages_per_extent;
+        descr = descr->link.next, Index++) {
 
-         descr != NULL && count != rrdeng_pages_per_extent;
+        uncompressed_payload_length += descr->page_length;
+        eligible_pages[count++] = descr;
 
-         PValue = JudyLNext(Judy_page_list, &Index, PJE0),
-         descr = unlikely(NULL == PValue) ? NULL : *PValue) {
-
-         uncompressed_payload_length += descr->page_length;
-         descr_commit_idx_array[count] = Index;
-         eligible_pages[count++] = descr;
-
-         ret = JudyLDel(&Judy_page_list, Index, PJE0);
-         fatal_assert(1 == ret);
     }
 
     if (!count) {
@@ -851,26 +923,28 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
         return 0;
     }
 
-    xt_io_descr = mallocz(sizeof(*xt_io_descr));
+    xt_io_descr = extent_io_descriptor_get();
     payload_offset = sizeof(*header) + count * sizeof(header->descr[0]);
     switch (compression_algorithm) {
         case RRD_NO_COMPRESSION:
             size_bytes = payload_offset + uncompressed_payload_length + sizeof(*trailer);
-        break;
+            break;
+
         default: /* Compress */
             fatal_assert(uncompressed_payload_length < LZ4_MAX_INPUT_SIZE);
             max_compressed_size = LZ4_compressBound(uncompressed_payload_length);
             compressed_buf = mallocz(max_compressed_size);
             size_bytes = payload_offset + MAX(uncompressed_payload_length, (unsigned)max_compressed_size) + sizeof(*trailer);
-        break;
+            break;
     }
+
     ret = posix_memalign((void *)&xt_io_descr->buf, RRDFILE_ALIGNMENT, ALIGN_BYTES_CEILING(size_bytes));
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
         /* freez(xt_io_descr);*/
     }
     memset(xt_io_descr->buf, 0, ALIGN_BYTES_CEILING(size_bytes));
-    (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct rrdeng_page_descr *) * count);
+    (void) memcpy(xt_io_descr->descr_array, eligible_pages, sizeof(struct page_descr_with_data *) * count);
     xt_io_descr->descr_count = count;
 
     pos = 0;
@@ -880,9 +954,6 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     pos += sizeof(*header);
 
     for (i = 0 ; i < count ; ++i) {
-        /* This is here for performance reasons */
-        xt_io_descr->descr_commit_idx_array[i] = descr_commit_idx_array[i];
-
         descr = xt_io_descr->descr_array[i];
         header->descr[i].type = descr->type;
         uuid_copy(*(uuid_t *)header->descr[i].uuid, *descr->id);
@@ -937,8 +1008,8 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     ctx->stats.io_write_extent_bytes += real_io_size;
     ++ctx->stats.io_write_extents;
     do_commit_transaction(wc, STORE_DATA, xt_io_descr);
-    datafile->pos += ALIGN_BYTES_CEILING(size_bytes);
-    ctx->disk_space += ALIGN_BYTES_CEILING(size_bytes);
+    datafile->pos += real_io_size;
+    ctx->disk_space += real_io_size;
     ctx->last_flush_fileno = datafile->fileno;
 
     netdata_spinlock_unlock(&datafile->write_extent_spinlock);
@@ -946,7 +1017,7 @@ static int do_flush_extent(struct rrdengine_worker_config *wc, Pvoid_t Judy_page
     if (completion)
         completion_mark_complete(completion);
 
-    return ALIGN_BYTES_CEILING(size_bytes);
+    return real_io_size;
 }
 
 static void after_delete_old_data(uv_work_t *req, int status __maybe_unused)
@@ -1011,7 +1082,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    // Lets scan the open cache for almost exact match
+    // Let's scan the open cache for almost exact match
     bool first_then_next = true;
     Pvoid_t *PValue;
     Word_t index = 0;

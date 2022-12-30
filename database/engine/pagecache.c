@@ -44,16 +44,15 @@ static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_E
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
-     Pvoid_t JudyL_flush = NULL;
-     Pvoid_t *PValue;
-
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
      size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
+
+    struct page_descr_with_data *base = NULL;
 
      for (size_t Index = 0 ; Index < entries; Index++) {
         time_t start_time_t = entries_array[Index].start_time_t;
         time_t end_time_t = entries_array[Index].end_time_t;
-        struct rrdeng_page_descr *descr = callocz(1, sizeof(*descr));
+        struct page_descr_with_data *descr = page_descriptor_get();
 
         descr->id = mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id);
         descr->metric_id = entries_array[Index].metric_id;
@@ -71,18 +70,15 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
             error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
-        descr->page = mallocz(descr->page_length);
         memcpy(descr->page, pgc_page_data(pages_array[Index]), descr->page_length);
-        PValue = JudyLIns(&JudyL_flush, (Word_t) Index, PJE0);
-        fatal_assert( NULL != PValue);
-        *PValue = descr;
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
      }
 
      struct rrdeng_cmd cmd;
      cmd.opcode = RRDENG_FLUSH_PAGES;
-     cmd.data = JudyL_flush;
+     cmd.data = base;
      cmd.completion = NULL;
      rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
