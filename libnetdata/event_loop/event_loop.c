@@ -4,8 +4,14 @@
 #include "event_loop.h"
 
 // Register workers
-void register_libuv_worker_jobs()
-{
+void register_libuv_worker_jobs() {
+    static __thread bool registered = false;
+
+    if(likely(registered))
+        return;
+
+    registered = true;
+
     worker_register("LIBUV");
     worker_register_job_name(UV_EVENT_READ_PAGE_CB, "read page cb");
     worker_register_job_name(UV_EVENT_READ_EXTENT_CB, "read extent cb");
@@ -35,4 +41,6 @@ void register_libuv_worker_jobs()
     worker_register_job_name(UV_EVENT_RETENTION_UPDATE, "update retention");
     worker_register_job_name(UV_EVENT_DATAFILE_ACQUIRE, "datafile acquire");
     worker_register_job_name(UV_EVENT_DATAFILE_DELETE, "datafile deletion");
+
+    uv_thread_set_name_np(pthread_self(), "LIBUV_WORKER");
 }

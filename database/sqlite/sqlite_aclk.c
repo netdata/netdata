@@ -374,8 +374,6 @@ static void timer_cb(uv_timer_t* handle)
 #endif
 }
 
-#define MAX_CMD_BATCH_SIZE (256)
-
 void aclk_database_worker(void *arg)
 {
     worker_register("ACLKSYNC");
@@ -451,8 +449,6 @@ void aclk_database_worker(void *arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
-                break;
             cmd = aclk_database_deq_cmd(wc);
 
             if (netdata_exit)
@@ -564,7 +560,7 @@ void aclk_database_worker(void *arg)
             }
             if (cmd.completion)
                 aclk_complete(cmd.completion);
-        } while (opcode != ACLK_DATABASE_NOOP);
+        } while (opcode != ACLK_DATABASE_NOOP && cmd_batch_size < (unsigned)(libuv_worker_threads / 2));
     }
 
     if (!uv_timer_stop(&timer_req))

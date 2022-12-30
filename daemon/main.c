@@ -352,7 +352,7 @@ void netdata_cleanup_and_exit(int ret) {
                     in_flight_queries += __atomic_load_n(&multidb_ctx[tier]->inflight_queries, __ATOMIC_RELAXED);
             }
 
-            pgc_destroy(main_cache);
+            pgc_flush_all_hot_and_dirty_pages(main_cache);
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }

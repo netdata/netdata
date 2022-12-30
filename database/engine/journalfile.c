@@ -74,6 +74,8 @@ void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
 
 static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
+    worker_is_busy(RRDENG_FLUSH_TRANSACTION_BUFFER_CB);
+
     struct generic_io_descriptor *io_descr = req->data;
     struct rrdengine_worker_config* wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -90,6 +92,8 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     uv_fs_req_cleanup(req);
     posix_memfree(io_descr->buf);
     freez(io_descr);
+
+    worker_is_idle();
 }
 
 /* Careful to always call this before creating a new journal file */
@@ -1284,9 +1288,7 @@ void after_journal_indexing(uv_work_t *req, int status)
 #define MAX_RETRIES_TO_START_INDEX (100)
 void start_journal_indexing(uv_work_t *req)
 {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;

@@ -717,6 +717,8 @@ static void do_commit_transaction(struct rrdengine_worker_config* wc, uint8_t ty
 // Main event loop callback
 static void do_flush_extent_cb(uv_fs_t *req)
 {
+    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES);
+
     struct rrdengine_worker_config *wc = req->loop->data;
     struct rrdengine_instance *ctx = wc->ctx;
     struct extent_io_descriptor *xt_io_descr;
@@ -754,6 +756,8 @@ static void do_flush_extent_cb(uv_fs_t *req)
     freez(xt_io_descr);
     wc->cache_flush_can_run = true;
     wc->outstanding_flush_requests--;
+
+    worker_is_idle();
 }
 
 /*
@@ -1108,9 +1112,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 }
 
 static void delete_old_data(uv_work_t *req) {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
@@ -1135,20 +1137,18 @@ static void do_delete_files(struct rrdengine_worker_config *wc )
     }
 }
 
-static void after_do_cache_flush_and_evict(uv_work_t *req, int status __maybe_unused)
+static void after_do_cache_flush(uv_work_t *req, int status __maybe_unused)
 {
     struct rrdeng_work  *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
 
-    wc->running_cache_flush_evictions = 0;
+    wc->running_cache_flushing = 0;
     freez(work_request);
 }
 
-static void do_cache_flush_and_evict(uv_work_t *req)
+static void do_cache_flush(uv_work_t *req)
 {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
@@ -1164,6 +1164,25 @@ static void do_cache_flush_and_evict(uv_work_t *req)
         }
     }
 
+    worker_is_idle();
+}
+
+static void after_do_cache_evict(uv_work_t *req, int status __maybe_unused)
+{
+    struct rrdeng_work  *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+
+    wc->running_cache_evictions = 0;
+    freez(work_request);
+}
+
+static void do_cache_evict(uv_work_t *req)
+{
+    register_libuv_worker_jobs();
+
+    struct rrdeng_work *work_request = req->data;
+    struct rrdengine_worker_config *wc = work_request->wc;
+
     if (0 == wc->ctx->tier) {
         if (main_cache) {
             worker_is_busy(UV_EVENT_EVICT_MAIN);
@@ -1174,20 +1193,35 @@ static void do_cache_flush_and_evict(uv_work_t *req)
     worker_is_idle();
 }
 
-static void cache_flush_and_evict(struct rrdengine_worker_config *wc)
+static void cache_flush(struct rrdengine_worker_config *wc)
 {
-    struct rrdeng_work *work_request;
-
-    if (unlikely(wc->running_cache_flush_evictions))
+    if (unlikely(wc->running_cache_flushing))
         return;
 
+    struct rrdeng_work *work_request;
     work_request = callocz(1, sizeof(*work_request));
     work_request->req.data = work_request;
     work_request->wc = wc;
-    wc->running_cache_flush_evictions = 1;
-    if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_flush_and_evict, after_do_cache_flush_and_evict))) {
+    wc->running_cache_flushing = 1;
+    if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_flush, after_do_cache_flush))) {
         freez(work_request);
-        wc->running_cache_flush_evictions = 0;
+        wc->running_cache_flushing = 0;
+    }
+}
+
+static void cache_evict(struct rrdengine_worker_config *wc)
+{
+    if (unlikely(wc->running_cache_evictions))
+        return;
+
+    struct rrdeng_work *work_request;
+    work_request = callocz(1, sizeof(*work_request));
+    work_request->req.data = work_request;
+    work_request->wc = wc;
+    wc->running_cache_evictions = 1;
+    if (unlikely(uv_queue_work(wc->loop, &work_request->req, do_cache_evict, after_do_cache_evict))) {
+        freez(work_request);
+        wc->running_cache_evictions = 0;
     }
 }
 
@@ -1346,7 +1380,7 @@ void async_cb(uv_async_t *handle)
 
 void timer_cb(uv_timer_t* handle)
 {
-    worker_is_busy(RRDENG_MAX_OPCODE + 1);
+    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE);
 
     struct rrdengine_worker_config *wc = handle->data;
     uv_stop(handle->loop);
@@ -1361,12 +1395,13 @@ void timer_cb(uv_timer_t* handle)
 
     debug(D_RRDENGINE, "%s: timeout reached.", __func__);
 
-    if (true == wc->run_indexing && !wc->now_deleting_files && !wc->running_cache_flush_evictions) {
+    if (true == wc->run_indexing && !wc->now_deleting_files && !wc->running_cache_flushing) {
         wc->run_indexing = false;
         queue_journalfile_v2_migration(wc);
     }
 
-    cache_flush_and_evict(wc);
+    cache_flush(wc);
+    cache_evict(wc);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     {
@@ -1379,8 +1414,10 @@ void timer_cb(uv_timer_t* handle)
 
 static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
 {
+    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT);
     struct rrdeng_work  *work_request = req->data;
     freez(work_request);
+    worker_is_idle();
 }
 
 static bool datafile_get_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_list) {
@@ -1556,9 +1593,7 @@ cleanup:
 
 static void do_read_extent_work(uv_work_t *req)
 {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
     struct rrdengine_worker_config *wc = work_request->wc;
@@ -1603,39 +1638,39 @@ static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *ex
     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
 }
 
-static void do_read_page_list_work(uv_work_t *req)
-{
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
-
-    worker_is_busy(UV_EVENT_PAGE_DISPATCH);
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-    struct rrdengine_instance *ctx = wc->ctx;
-    struct page_details_control *pdc = work_request->data;
-
-    pdc_to_extent_page_details_list(ctx, pdc, queue_extent_list, queue_extent_list);
-    worker_is_idle();
-}
-
-static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
-{
-    struct rrdeng_work *work_request;
-
-    work_request = mallocz(sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->data = pdc;
-    work_request->completion = completion;
-
-    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_page_list_work, after_do_read_page_list_work);
-    if (ret)
-        freez(work_request);
-
-    fatal_assert(0 == ret);
-}
+//static void do_read_page_list_work(uv_work_t *req)
+//{
+//    static __thread int worker = -1;
+//    if (unlikely(worker == -1))
+//        register_libuv_worker_jobs();
+//
+//    worker_is_busy(UV_EVENT_PAGE_DISPATCH);
+//
+//    struct rrdeng_work *work_request = req->data;
+//    struct rrdengine_worker_config *wc = work_request->wc;
+//    struct rrdengine_instance *ctx = wc->ctx;
+//    struct page_details_control *pdc = work_request->data;
+//
+//    pdc_to_extent_page_details_list(ctx, pdc, queue_extent_list, queue_extent_list);
+//    worker_is_idle();
+//}
+//
+//static void do_read_page_list(struct rrdengine_worker_config *wc, struct page_details_control *pdc, struct completion *completion)
+//{
+//    struct rrdeng_work *work_request;
+//
+//    work_request = mallocz(sizeof(*work_request));
+//    work_request->req.data = work_request;
+//    work_request->wc = wc;
+//    work_request->data = pdc;
+//    work_request->completion = completion;
+//
+//    int ret = uv_queue_work(wc->loop, &work_request->req, do_read_page_list_work, after_do_read_page_list_work);
+//    if (ret)
+//        freez(work_request);
+//
+//    fatal_assert(0 == ret);
+//}
 
 // List of pages to preload
 // Just queue to dbengine
@@ -1659,20 +1694,23 @@ void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct pag
     pdc_to_extent_page_details_list(ctx, pdc, load_pages_from_an_extent_list_directly, load_pages_from_an_extent_list_directly);
 }
 
-#define MAX_CMD_BATCH_SIZE (256)
-
 void rrdeng_worker(void* arg)
 {
     worker_register("DBENGINE");
     worker_register_job_name(RRDENG_NOOP,                          "noop");
     worker_register_job_name(RRDENG_READ_EXTENT,                   "extent read");
-    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
+//    worker_register_job_name(RRDENG_COMMIT_PAGE,                   "commit");
     worker_register_job_name(RRDENG_FLUSH_PAGES,                   "flush");
     worker_register_job_name(RRDENG_SHUTDOWN,                      "shutdown");
     worker_register_job_name(RRDENG_QUIESCE,                       "quiesce");
-    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
+//    worker_register_job_name(RRDENG_READ_PAGE_LIST,                "query page list");
     worker_register_job_name(RRDENG_MAX_OPCODE,                    "cleanup");
-    worker_register_job_name(RRDENG_MAX_OPCODE + 1,                "timer");
+
+    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT, "extent read cb");
+    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES, "flush cb");
+    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE,  "timer");
+
+    worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,     "transaction buffer flush cb");
 
     struct rrdengine_worker_config* wc = arg;
     struct rrdengine_instance *ctx = wc->ctx;
@@ -1702,7 +1740,7 @@ void rrdeng_worker(void* arg)
 
     wc->now_deleting_files = 0;
     wc->running_journal_migration = 0;
-    wc->running_cache_flush_evictions = 0;
+    wc->running_cache_flushing = 0;
     wc->run_indexing = false;
     wc->cache_flush_can_run = true;
 
@@ -1720,7 +1758,6 @@ void rrdeng_worker(void* arg)
 
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
-    int set_name = 0;
     wc->outstanding_flush_requests = 0;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         worker_is_idle();
@@ -1731,13 +1768,6 @@ void rrdeng_worker(void* arg)
         /* wait for commands */
         cmd_batch_size = 0;
         do {
-            /*
-             * Avoid starving the loop when there are too many commands coming in.
-             * timer_cb will interrupt the loop again to allow serving more commands.
-             */
-            if (unlikely(cmd_batch_size >= MAX_CMD_BATCH_SIZE))
-                break;
-
             cmd = rrdeng_deq_cmd(wc);
             opcode = cmd.opcode;
             ++cmd_batch_size;
@@ -1746,12 +1776,16 @@ void rrdeng_worker(void* arg)
                 worker_is_busy(opcode);
 
             switch (opcode) {
-                case RRDENG_NOOP:
-                    /* the command queue was empty, do nothing */
+                case RRDENG_READ_EXTENT:
+                    do_read_extent(wc, cmd.data);
                     break;
-                case RRDENG_SHUTDOWN:
-                    shutdown = 1;
+
+                case RRDENG_FLUSH_PAGES:
+                    wc->cache_flush_can_run = false;
+                    wc->outstanding_flush_requests++;
+                    do_flush_extent(wc, cmd.data, cmd.completion);
                     break;
+
                 case RRDENG_QUIESCE:
                     ctx->quiesce = SET_QUIESCE;
                     info("DBENGINE: shutdown command received, flushing all pages to disk: %u flush requests pending", wc->outstanding_flush_requests);
@@ -1762,30 +1796,29 @@ void rrdeng_worker(void* arg)
                         completion_mark_complete(&ctx->rrdengine_completion);
                     }
                     break;
-                case RRDENG_COMMIT_PAGE:
-                    do_commit_transaction(wc, STORE_DATA, NULL);
+
+                case RRDENG_SHUTDOWN:
+                    shutdown = 1;
                     break;
-                case RRDENG_FLUSH_PAGES: {
-                    wc->cache_flush_can_run = false;
-                    wc->outstanding_flush_requests++;
-                    (void)do_flush_extent(wc, cmd.data, cmd.completion);
+
+//                case RRDENG_COMMIT_PAGE:
+//                    do_commit_transaction(wc, STORE_DATA, NULL);
+//                    break;
+
+//                case RRDENG_READ_PAGE_LIST:
+//                    do_read_page_list(wc, cmd.data, cmd.completion);
+//                    break;
+
+                case RRDENG_NOOP:
+                    /* the command queue was empty, do nothing */
                     break;
-                }
-                case RRDENG_READ_EXTENT:
-                    if (unlikely(!set_name)) {
-                        set_name = 1;
-                        uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
-                    }
-                    do_read_extent(wc, cmd.data);
-                    break;
-                case RRDENG_READ_PAGE_LIST:
-                    do_read_page_list(wc, cmd.data, cmd.completion);
-                    break;
+
                 default:
                     debug(D_RRDENGINE, "%s: default.", __func__);
                     break;
             }
-        } while (opcode != RRDENG_NOOP);
+
+        } while (opcode != RRDENG_NOOP && cmd_batch_size < (unsigned)(libuv_worker_threads / 2));
     }
 
     /* cleanup operations of the event loop */

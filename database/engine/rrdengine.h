@@ -187,14 +187,21 @@ enum rrdeng_opcode {
     RRDENG_NOOP = 0,
 
     RRDENG_READ_EXTENT,
-    RRDENG_COMMIT_PAGE,
     RRDENG_FLUSH_PAGES,
     RRDENG_SHUTDOWN,
     RRDENG_QUIESCE,
-    RRDENG_READ_PAGE_LIST,
+
+//    RRDENG_COMMIT_PAGE,
+//    RRDENG_READ_PAGE_LIST,
 
     RRDENG_MAX_OPCODE
 };
+
+// WORKERS IDS:
+// RRDENG_MAX_OPCODE                     : reserved for the cleanup
+// RRDENG_MAX_OPCODE + opcode            : reserved for the callbacks of each opcode
+// RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE : reserved for the timer
+#define RRDENG_FLUSH_TRANSACTION_BUFFER_CB (RRDENG_MAX_OPCODE + RRDENG_MAX_OPCODE + 1)
 
 struct rrdeng_cmd {
     enum rrdeng_opcode opcode;
@@ -261,7 +268,8 @@ struct rrdengine_worker_config {
     unsigned long now_deleting_files;
 
     unsigned long running_journal_migration;
-    unsigned long running_cache_flush_evictions;
+    unsigned long running_cache_flushing;
+    unsigned long running_cache_evictions;
     unsigned outstanding_flush_requests;
     bool run_indexing;
     bool cache_flush_can_run;

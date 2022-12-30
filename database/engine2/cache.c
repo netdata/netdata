@@ -1665,12 +1665,16 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     return cache;
 }
 
-void pgc_destroy(PGC *cache) {
+void pgc_flush_all_hot_and_dirty_pages(PGC *cache) {
     // convert all hot pages to dirty
     all_hot_pages_to_dirty(cache);
 
     // save all dirty pages to make them clean
     flush_pages(cache, 0, true, true);
+}
+
+void pgc_destroy(PGC *cache) {
+    pgc_flush_all_hot_and_dirty_pages(cache);
 
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);

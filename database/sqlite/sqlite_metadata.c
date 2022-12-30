@@ -894,9 +894,7 @@ static void after_metadata_cleanup(uv_work_t *req, int status)
 }
 static void start_metadata_cleanup(uv_work_t *req)
 {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     worker_is_busy(UV_EVENT_METADATA_CLEANUP);
     struct metadata_wc *wc = req->data;
@@ -996,9 +994,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 {
-    static __thread int worker = -1;
-    if (unlikely(worker == -1))
-        register_libuv_worker_jobs();
+    register_libuv_worker_jobs();
 
     RRDHOST *host;
 
