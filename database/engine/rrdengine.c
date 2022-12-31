@@ -1877,10 +1877,12 @@ void rrdeng_worker(void* arg)
 
     fatal_assert(0 == uv_timer_start(&timer_req, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
     shutdown = 0;
-    wc->outstanding_flush_requests = 0;
+    wc->outstanding_flush_requests = true;
+    bool having_pending_opcodes = true;
     while (likely(shutdown == 0 || rrdeng_threads_alive(wc))) {
         worker_is_idle();
-        uv_run(loop, UV_RUN_DEFAULT);
+        uv_run(loop, having_pending_opcodes ? UV_RUN_NOWAIT : UV_RUN_DEFAULT);
+        having_pending_opcodes = true;
         worker_is_busy(RRDENG_MAX_OPCODE);
         rrdeng_cleanup_finished_threads(wc);
 
@@ -1933,6 +1935,7 @@ void rrdeng_worker(void* arg)
 
                 case RRDENG_NOOP:
                     /* the command queue was empty, do nothing */
+                    having_pending_opcodes = false;
                     break;
 
                 default:

@@ -442,9 +442,12 @@ void aclk_database_worker(void *arg)
 
     debug(D_ACLK_SYNC,"Node %s reports pending message count = %u", wc->node_id, wc->chart_payload_count);
 
+    bool having_pending_opcodes = true;
+
     while (likely(!netdata_exit)) {
         worker_is_idle();
-        uv_run(loop, UV_RUN_DEFAULT);
+        uv_run(loop, having_pending_opcodes ? UV_RUN_NOWAIT : UV_RUN_DEFAULT);
+        having_pending_opcodes = true;
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -463,6 +466,7 @@ void aclk_database_worker(void *arg)
             switch (opcode) {
                 case ACLK_DATABASE_NOOP:
                     /* the command queue was empty, do nothing */
+                    having_pending_opcodes = false;
                     break;
 
 // MAINTENANCE
