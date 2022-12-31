@@ -20,7 +20,6 @@ fi
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
-PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
 PACKAGES_IPRANGE=${PACKAGES_IPRANGE-0}
 PACKAGES_FIREHOL=${PACKAGES_FIREHOL-0}
@@ -104,8 +103,6 @@ Supported packages (you can append many of them):
     - python         install python
 
     - python3        install python3
-
-    - python-pymongo install python-pymongo (or python3-pymongo for python3)
 
     - sensors        install lm_sensors for monitoring h/w sensors
 
@@ -935,41 +932,6 @@ declare -A pkg_python3_pip=(
   ['default']="python3-pip"
 )
 
-declare -A pkg_python_pymongo=(
-  ['alpine']="WARNING|"
-  ['arch']="python2-pymongo"
-  ['centos']="WARNING|"
-  ['debian']="python-pymongo"
-  ['gentoo']="dev-python/pymongo"
-  ['suse']="python-pymongo"
-  ['clearlinux']="WARNING|"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="python-pymongo"
-)
-
-declare -A pkg_python3_pymongo=(
-  ['alpine']="WARNING|"
-  ['arch']="python-pymongo"
-  ['centos']="WARNING|"
-  ['debian']="python3-pymongo"
-  ['gentoo']="dev-python/pymongo"
-  ['suse']="python3-pymongo"
-  ['clearlinux']="WARNING|"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['freebsd']="py37-pymongo"
-  ['macos']="WARNING|"
-  ['default']="python3-pymongo"
-
-  ['centos-7']="python36-pymongo"
-  ['centos-8']="python3-pymongo"
-  ['rhel-7']="python36-pymongo"
-  ['rhel-8']="python3-pymongo"
-  ['ol-8']="python3-pymongo"
-)
-
 declare -A pkg_python_requests=(
   ['alpine']="py-requests"
   ['arch']="python2-requests"
@@ -1294,7 +1256,6 @@ packages() {
   if [ "${PACKAGES_NETDATA_PYTHON}" -ne 0 ]; then
     require_cmd python || suitable_package python
 
-    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python-pymongo
     # suitable_package python-requests
     # suitable_package python-pip
   fi
@@ -1305,7 +1266,6 @@ packages() {
   if [ "${PACKAGES_NETDATA_PYTHON3}" -ne 0 ]; then
     require_cmd python3 || suitable_package python3
 
-    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python3-pymongo
     # suitable_package python3-requests
     # suitable_package python3-pip
   fi
@@ -1847,7 +1807,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -1910,10 +1870,8 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
@@ -1935,16 +1893,6 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_PYTHON3=1
       ;;
 
-    python-pymongo)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
-      fi
-      ;;
-
     sensors | netdata-sensors)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
@@ -1964,10 +1912,8 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_DEBUG=1
       PACKAGES_IPRANGE=1
