@@ -6,6 +6,8 @@
 from bases.FrameworkServices.MySQLService import MySQLService
 
 
+disabled_by_default = True
+
 def query(table, *params):
     return 'SELECT {params} FROM {table}'.format(table=table, params=', '.join(params))
 

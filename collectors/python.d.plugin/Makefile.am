@@ -62,7 +62,6 @@ include ipfs/Makefile.inc
 include litespeed/Makefile.inc
 include megacli/Makefile.inc
 include memcached/Makefile.inc
-include mongodb/Makefile.inc
 include monit/Makefile.inc
 include nvidia_smi/Makefile.inc
 include nsd/Makefile.inc

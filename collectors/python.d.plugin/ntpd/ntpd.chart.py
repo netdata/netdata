@@ -9,6 +9,8 @@ import struct
 
 from bases.FrameworkServices.SocketService import SocketService
 
+disabled_by_default = True
+
 # NTP Control Message Protocol constants
 MODE = 6
 HEADER_FORMAT = '!BBHHHHH'
