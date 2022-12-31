@@ -951,7 +951,7 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
 
     ops->tier = ops->plan.data[plan_id].tier;
     ops->tier_ptr = &ops->qm->tiers[ops->tier];
-    ops->tier_ptr->eng->api.query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before, 2);
+    ops->tier_ptr->eng->api.query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before, STORAGE_PRIORITY_NORMAL);
     ops->next_metric = ops->tier_ptr->eng->api.query_ops.next_metric;
     ops->is_finished = ops->tier_ptr->eng->api.query_ops.is_finished;
     ops->finalize = ops->tier_ptr->eng->api.query_ops.finalize;
@@ -1504,7 +1504,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = rd->tiers[read_tier];
-        tmp->query_ops->init(tmp->db_metric_handle, &handle, after_wanted, before_wanted, 3);
+        tmp->query_ops->init(tmp->db_metric_handle, &handle, after_wanted, before_wanted, STORAGE_PRIORITY_HIGH);
 
         size_t points_read = 0;
 

@@ -49,7 +49,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
 void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle,
-                                    time_t start_time_s, time_t end_time_s, int priority);
+                                    time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
 
 

@@ -158,7 +158,7 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before, 0);
+        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before, STORAGE_PRIORITY_LOW);
         d->enabled = true;
         count++;
 

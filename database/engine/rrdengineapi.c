@@ -551,7 +551,7 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  * Gets a handle for loading metrics from the database.
  * The handle must be released with rrdeng_load_metric_final().
  */
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle, time_t start_time_s, time_t end_time_s, int priority)
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority)
 {
     netdata_thread_disable_cancelability();
 
@@ -872,36 +872,24 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     ctx->host = host;
 
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
-    ctx->worker_config.ctx = ctx;
     init_page_cache();
     init_commit_log(ctx);
     error = init_rrd_files(ctx);
-    if (error) {
-        goto error_after_init_rrd_files;
+    if (!error) {
+
+        if(rrdeng_dbengine_spawn(ctx))
+            // success - we run this ctx too
+            return 0;
+
+        finalize_rrd_files(ctx);
     }
 
-    completion_init(&ctx->rrdengine_completion);
-    fatal_assert(0 == uv_thread_create(&ctx->worker_config.thread, rrdeng_worker, &ctx->worker_config));
-    /* wait for worker thread to initialize */
-    completion_wait_for(&ctx->rrdengine_completion);
-    completion_destroy(&ctx->rrdengine_completion);
-    uv_thread_set_name_np(ctx->worker_config.thread, "DBENGINE");
-    if (ctx->worker_config.error) {
-        goto error_after_rrdeng_worker;
-    }
-
-    return 0;
-
-error_after_rrdeng_worker:
-    finalize_rrd_files(ctx);
-error_after_init_rrd_files:
-    // FIXME: DBENGINE2 must shutodwn the page cache
-//    free_page_cache(ctx);
     if (!is_storage_engine_shared((STORAGE_INSTANCE *)ctx)) {
         freez(ctx);
         if (ctxp)
             *ctxp = NULL;
     }
+
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;
 }
@@ -909,19 +897,21 @@ error_after_init_rrd_files:
 /*
  * Returns 0 on success, 1 on error
  */
-int rrdeng_exit(struct rrdengine_instance *ctx)
-{
-    struct rrdeng_cmd cmd;
-
-    if (NULL == ctx) {
+int rrdeng_exit(struct rrdengine_instance *ctx) {
+    if (NULL == ctx)
         return 1;
-    }
 
-    /* TODO: add page to page cache */
-    cmd.opcode = RRDENG_SHUTDOWN;
-    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+    // FIXME - ktsaou - properly cleanup ctx
+    // 1. make sure all collectors are stopped
+    // 2. make new queries will not be accepted
+    // 3. flush this section of the main cache
+    // 4. then wait for completion
 
-    fatal_assert(0 == uv_thread_join(&ctx->worker_config.thread));
+    struct completion completion = {};
+    completion_init(&completion);
+    rrdeng_enq_cmd(ctx, RRDENG_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
 
     finalize_rrd_files(ctx);
 
@@ -932,21 +922,14 @@ int rrdeng_exit(struct rrdengine_instance *ctx)
     return 0;
 }
 
-void rrdeng_prepare_exit(struct rrdengine_instance *ctx)
-{
-    struct rrdeng_cmd cmd;
-
-    if (NULL == ctx) {
+void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
+    if (NULL == ctx)
         return;
-    }
 
-    completion_init(&ctx->rrdengine_completion);
-    cmd.opcode = RRDENG_QUIESCE;
-    rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+    // FIXME - ktsaou - properly cleanup ctx
+    // 1. make sure all collectors are stopped
 
-    /* wait for dbengine to quiesce */
-    completion_wait_for(&ctx->rrdengine_completion);
-    completion_destroy(&ctx->rrdengine_completion);
+    rrdeng_enq_cmd(ctx, RRDENG_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)

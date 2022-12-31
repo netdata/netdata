@@ -52,33 +52,12 @@ static void update_metric_retention_and_granularity_by_uuid(
     mrg_metric_release(main_mrg, metric);
 }
 
-void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc)
-{
-    struct rrdeng_work *work_request;
-
-    if (unlikely(wc->running_journal_migration))
-        return;
-
-    work_request = mallocz(sizeof(*work_request));
-    work_request->req.data = work_request;
-    work_request->wc = wc;
-    work_request->count = 0;
-    work_request->rerun = false;
-    work_request->completion = NULL;
-    wc->running_journal_migration = 1;
-    if (unlikely(uv_queue_work(wc->loop, &work_request->req, start_journal_indexing, after_journal_indexing))) {
-        freez(work_request);
-        wc->running_journal_migration = 0;
-    }
-}
-
 static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
     worker_is_busy(RRDENG_FLUSH_TRANSACTION_BUFFER_CB);
 
     struct generic_io_descriptor *io_descr = req->data;
-    struct rrdengine_worker_config* wc = req->loop->data;
-    struct rrdengine_instance *ctx = wc->ctx;
+    struct rrdengine_instance *ctx = io_descr->ctx;
 
     debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
     if (req->result < 0) {
@@ -97,9 +76,8 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
 }
 
 /* Careful to always call this before creating a new journal file */
-void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
+void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, uv_loop_t *loop)
 {
-    struct rrdengine_instance *ctx = wc->ctx;
     int ret;
     struct generic_io_descriptor *io_descr;
     unsigned pos, size;
@@ -109,9 +87,10 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
         return;
     }
     /* care with outstanding transactions when switching journal files */
-    journalfile = ctx->datafiles.first->prev->journalfile;
+    journalfile = datafile->journalfile;
 
     io_descr = mallocz(sizeof(*io_descr));
+    io_descr->ctx = ctx;
     pos = ctx->commit_log.buf_pos;
     size = ctx->commit_log.buf_size;
     if (pos < size) {
@@ -126,7 +105,7 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
     io_descr->completion = NULL;
 
     io_descr->iov = uv_buf_init((void *)io_descr->buf, size);
-    ret = uv_fs_write(wc->loop, &io_descr->req, journalfile->file, &io_descr->iov, 1,
+    ret = uv_fs_write(loop, &io_descr->req, journalfile->file, &io_descr->iov, 1,
                       journalfile->pos, flush_transaction_buffer_cb);
     fatal_assert(-1 != ret);
     journalfile->pos += RRDENG_BLOCK_SIZE;
@@ -136,34 +115,21 @@ void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc)
     ++ctx->stats.io_write_requests;
 }
 
-void *wal_get_transaction_buffer(struct rrdengine_worker_config *wc, unsigned size)
-{
-    struct rrdengine_instance *ctx = wc->ctx;
+void *wal_get_transaction_buffer(struct rrdengine_instance *ctx, unsigned size) {
     int ret;
     unsigned buf_pos = 0, buf_size;
 
     fatal_assert(size);
-    if (ctx->commit_log.buf) {
-        unsigned remaining;
+    internal_fatal(ctx->commit_log.buf, "Commit log is already used");
 
-        buf_pos = ctx->commit_log.buf_pos;
-        buf_size = ctx->commit_log.buf_size;
-        remaining = buf_size - buf_pos;
-        if (size > remaining) {
-            /* we need a new buffer */
-            wal_flush_transaction_buffer(wc);
-        }
+    buf_size = ALIGN_BYTES_CEILING(size);
+    ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
+    if (unlikely(ret)) {
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
-    if (NULL == ctx->commit_log.buf) {
-        buf_size = ALIGN_BYTES_CEILING(size);
-        ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
-        if (unlikely(ret)) {
-            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-        }
-        memset(ctx->commit_log.buf, 0, buf_size);
-        buf_pos = ctx->commit_log.buf_pos = 0;
-        ctx->commit_log.buf_size =  buf_size;
-    }
+    memset(ctx->commit_log.buf, 0, buf_size);
+    buf_pos = ctx->commit_log.buf_pos = 0;
+    ctx->commit_log.buf_size =  buf_size;
     ctx->commit_log.buf_pos += size;
 
     return ctx->commit_log.buf + buf_pos;
@@ -1268,57 +1234,6 @@ error:
     }
     uv_fs_req_cleanup(&req);
     return error;
-}
-
-void after_journal_indexing(uv_work_t *req, int status)
-{
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-
-    if (likely(status != UV_ECANCELED)) {
-        errno = 0;
-        if (likely(work_request->count))
-            internal_error(true, "DBENGINE: journal indexing done; %u files processed", work_request->count);
-    }
-    wc->running_journal_migration = 0;
-    wc->run_indexing= work_request->rerun;
-    freez(work_request);
-}
-
-#define MAX_RETRIES_TO_START_INDEX (100)
-void start_journal_indexing(uv_work_t *req)
-{
-    register_libuv_worker_jobs();
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_worker_config *wc = work_request->wc;
-    struct rrdengine_instance *ctx = wc->ctx;
-
-    unsigned count = 0;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
-    while (wc->now_deleting_files && count++ < MAX_RETRIES_TO_START_INDEX)
-        sleep_usec(100 * USEC_PER_MS);
-
-    if (count == MAX_RETRIES_TO_START_INDEX) {
-        worker_is_idle();
-        return;
-    }
-
-    struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX);
-    while (datafile && datafile->fileno != ctx->last_fileno && datafile->fileno != ctx->last_flush_fileno) {
-
-        if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
-            info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
-            pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
-           ++work_request->count;
-        }
-
-        datafile = datafile->next;
-        if (unlikely(NO_QUIESCE != ctx->quiesce))
-            break;
-    }
-    worker_is_idle();
 }
 
 void init_commit_log(struct rrdengine_instance *ctx)

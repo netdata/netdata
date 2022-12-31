@@ -39,7 +39,7 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle);
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, int priority);
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, STORAGE_PRIORITY priority);
 STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handle);
 int rrddim_query_is_finished(struct storage_engine_query_handle *handle);
 void rrddim_query_finalize(struct storage_engine_query_handle *handle);

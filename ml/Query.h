@@ -20,7 +20,7 @@ public:
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, -1);
+        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, STORAGE_PRIORITY_BEST_EFFORT);
         Initialized = true;
         points_read = 0;
     }

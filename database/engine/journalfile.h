@@ -116,8 +116,8 @@ struct transaction_commit_log {
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void generate_journalfilepath_v2(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-void *wal_get_transaction_buffer(struct rrdengine_worker_config* wc, unsigned size);
-void wal_flush_transaction_buffer(struct rrdengine_worker_config* wc);
+void *wal_get_transaction_buffer(struct rrdengine_instance *ctx, unsigned size);
+void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, uv_loop_t *loop);
 int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int unlink_journal_file(struct rrdengine_journalfile *journalfile);
 int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
@@ -125,6 +125,9 @@ int create_journal_file(struct rrdengine_journalfile *journalfile, struct rrdeng
 int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                              struct rrdengine_datafile *datafile);
 void init_commit_log(struct rrdengine_instance *ctx);
-void queue_journalfile_v2_migration(struct rrdengine_worker_config *wc);
+
+void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
+                               Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
+                               size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data);
 
 #endif /* NETDATA_JOURNALFILE_H */

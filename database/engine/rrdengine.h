@@ -50,6 +50,8 @@ typedef struct page_details_control {
     SPINLOCK refcount_spinlock;     // spinlock to protect refcount
     int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
     size_t executed_with_gaps;
+
+    STORAGE_PRIORITY priority;
 } PDC;
 
 typedef enum __attribute__ ((__packed__)) {
@@ -188,11 +190,11 @@ enum rrdeng_opcode {
 
     RRDENG_READ_EXTENT,
     RRDENG_FLUSH_PAGES,
+    RRDENG_CREATE_DATAFILE,
+    RRDENG_INDEX_JOURNAL_FILE,
+    RRDENG_ROTATE_DATABASE,
     RRDENG_SHUTDOWN,
     RRDENG_QUIESCE,
-
-//    RRDENG_COMMIT_PAGE,
-//    RRDENG_READ_PAGE_LIST,
 
     RRDENG_MAX_OPCODE
 };
@@ -209,33 +211,6 @@ enum rrdeng_opcode {
 #define RRDENG_FLUSH_TRANSACTION_BUFFER_CB     (RRDENG_TIMER_CB + 5)
 #define RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB      (RRDENG_TIMER_CB + 6)
 
-struct rrdeng_cmd {
-    enum rrdeng_opcode opcode;
-    void *data;
-    struct completion *completion;
-};
-
-#define RRDENG_CMD_Q_MAX_SIZE (8192)
-
-struct rrdeng_work {
-    uv_work_t req;
-    struct rrdengine_worker_config *wc;
-    void *data;
-    uint32_t count;
-    bool rerun;
-    struct completion *completion;
-
-    struct {
-        struct rrdeng_work *prev;
-        struct rrdeng_work *next;
-    } cache;
-};
-
-struct rrdeng_cmdqueue {
-    unsigned head, tail;
-    struct rrdeng_cmd cmd_array[RRDENG_CMD_Q_MAX_SIZE];
-};
-
 struct extent_io_data {
     unsigned fileno;
     uv_file file;
@@ -245,7 +220,8 @@ struct extent_io_data {
 };
 
 struct extent_io_descriptor {
-    uv_fs_t req;
+    struct rrdengine_instance *ctx;
+    uv_fs_t uv_fs_request;
     uv_buf_t iov;
     uv_file file;
     void *buf;
@@ -264,6 +240,7 @@ struct extent_io_descriptor {
 };
 
 struct generic_io_descriptor {
+    struct rrdengine_instance *ctx;
     uv_fs_t req;
     uv_buf_t iov;
     void *buf;
@@ -274,26 +251,8 @@ struct generic_io_descriptor {
 };
 
 struct rrdengine_worker_config {
-    struct rrdengine_instance *ctx;
-
-    uv_thread_t thread;
-    uv_loop_t *loop;
-    uv_async_t async;
-
     unsigned long now_deleting_files;
-
-    unsigned long running_journal_migration;
-    unsigned long running_cache_flushing;
-    unsigned long running_cache_evictions;
     unsigned outstanding_flush_requests;
-    bool run_indexing;
-
-    /* FIFO command queue */
-    uv_mutex_t cmd_mutex;
-    uv_cond_t cmd_cond;
-    volatile unsigned queue_size;
-    struct rrdeng_cmdqueue cmd_queue;
-    int error;
 };
 
 /*
@@ -376,11 +335,9 @@ void dbengine_page_free(void *page);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
+bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void rrdeng_worker(void *arg);
-void rrdeng_enq_cmd(struct rrdengine_worker_config *wc, struct rrdeng_cmd *cmd);
-struct rrdeng_cmd rrdeng_deq_cmd(struct rrdengine_worker_config *wc);
-void after_journal_indexing(uv_work_t *req, int status);
-void start_journal_indexing(uv_work_t *req);
+void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, enum storage_priority priority);
 void pdc_destroy(PDC *pdc);
 
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);

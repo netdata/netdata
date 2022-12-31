@@ -43,6 +43,16 @@ typedef enum {
     QUERY_SOURCE_UNITTEST,
 } QUERY_SOURCE;
 
+typedef enum storage_priority {
+    STORAGE_PRIORITY_CRITICAL = 0,
+    STORAGE_PRIORITY_HIGH,
+    STORAGE_PRIORITY_NORMAL,
+    STORAGE_PRIORITY_LOW,
+    STORAGE_PRIORITY_BEST_EFFORT,
+
+    STORAGE_PRIO_MAX_DONT_USE,
+} STORAGE_PRIORITY;
+
 // forward declarations
 struct rrddim_tier;
 
@@ -128,7 +138,7 @@ extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time;
 
-#define MIN_LIBUV_WORKER_THREADS 12
+#define MIN_LIBUV_WORKER_THREADS 16
 #define RESERVED_LIBUV_WORKER_THREADS 6
 extern int libuv_worker_threads;
 
@@ -443,7 +453,7 @@ struct storage_engine_query_handle {
 // function pointers that handle database queries
 struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, int priority);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, STORAGE_PRIORITY priority);
 
     // run this to load each metric number from the database
     STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);

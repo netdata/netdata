@@ -191,7 +191,7 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, int priority __maybe_unused) {
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, STORAGE_PRIORITY priority __maybe_unused) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;

@@ -76,11 +76,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
      }
 
-     struct rrdeng_cmd cmd;
-     cmd.opcode = RRDENG_FLUSH_PAGES;
-     cmd.data = base;
-     cmd.completion = NULL;
-     rrdeng_enq_cmd(&ctx->worker_config, &cmd);
+     rrdeng_enq_cmd(ctx, RRDENG_FLUSH_PAGES, base, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
@@ -751,7 +747,7 @@ we_are_done:
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, int priority __maybe_unused) {
+void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, STORAGE_PRIORITY priority) {
     if (unlikely(!handle || !handle->metric))
         return;
 
@@ -760,6 +756,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
     __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = callocz(1, sizeof(struct page_details_control));
+    handle->pdc->priority = priority;
     handle->pdc->ctx = ctx;
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);
     completion_init(&handle->pdc->completion);
@@ -775,10 +772,10 @@ void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
         handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
         handle->pdc->preload_all_extent_pages = false;
         usec_t start_ut = now_monotonic_usec();
-        //if(likely(priority >= 0))
+        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
+            dbengine_load_page_list_directly(ctx, handle->pdc);
+        else
             dbengine_load_page_list(ctx, handle->pdc);
-        //else
-        //    dbengine_load_page_list_directly(ctx, handle->pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else {
