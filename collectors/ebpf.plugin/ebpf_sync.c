@@ -77,7 +77,7 @@ static inline void ebpf_sync_disable_probe(struct sync_bpf *obj)
 }
 
 /**
- * Disable tramppoline
+ * Disable trampoline
  *
  * Disable trampoline to use another method.
  *
@@ -140,7 +140,7 @@ static void ebpf_sync_set_hash_tables(struct sync_bpf *obj, sync_syscalls_index_
  * @param target the syscall that we are attaching a tracer.
  * @param idx    the index for the main structure
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_sync_load_and_attach(struct sync_bpf *obj, ebpf_module_t *em, char *target,
                                             sync_syscalls_index_t idx)

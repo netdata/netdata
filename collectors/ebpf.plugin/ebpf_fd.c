@@ -238,7 +238,7 @@ static inline void ebpf_fd_fill_address(ebpf_addresses_t *address, char **target
 /**
  * Set target values
  *
- * Set pointers used to laod data.
+ * Set pointers used to load data.
  *
  * @return It returns 0 on success and -1 otherwise.
  */
@@ -312,7 +312,7 @@ static void ebpf_fd_disable_release_task(struct fd_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
 {

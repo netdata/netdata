@@ -52,7 +52,7 @@ If you see a line starting with `--- Would attempt to update existing installati
 located at:`, then our [regular update method](#updates-for-most-systems) will work for you.
 
 Otherwise, it should either indicate that the installation type is not supported (which probably means you either
-have a `custom` instal or built Netdata manually) or indicate that it would create a new install (which means that
+have a `custom` install or built Netdata manually) or indicate that it would create a new install (which means that
 you either used a non-standard install path, or that you don’t actually have Netdata installed).
 
 ## Updates for most systems
