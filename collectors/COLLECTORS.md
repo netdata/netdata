@@ -126,8 +126,8 @@ configure any of these collectors according to your setup and infrastructure.
 - [CouchDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchdb): Monitor database health and
   performance metrics
   (reads/writes, HTTP traffic, replication status, etc).
-- [MongoDB](/collectors/python.d.plugin/mongodb/README.md): Collect memory-caching system performance metrics and
-  reads the server's response to `stats` command (stats interface).
+- [MongoDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mongodb): Collect server, database,
+  replication and sharding performance and health metrics.
 - [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
   replication and per user statistics.
 - [OracleDB](/collectors/python.d.plugin/oracledb/README.md): Monitor database performance and health metrics.
