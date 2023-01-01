@@ -1059,7 +1059,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
     } while(all_of_them || (total_pages_evicted < max_evict && total_pages_skipped < max_skip));
 
-    if(all_of_them) {
+    if(all_of_them && !filter) {
         pgc_ll_lock(cache, &cache->clean);
         if(cache->clean.stats->entries) {
             error_limit_static_global_var(erl, 1, 0);
