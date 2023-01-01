@@ -21,6 +21,9 @@ to build and run successfully:
 -   zlib
 -   GNU autoconf
 -   GNU automake
+-   GNU autogen
+-   GNU libtool
+-   pkg-config
 -   GCC or Xcode (Clang is known to have issues in certain configurations, see [Using Clang](#using-clang))
 -   A version of `make` compatible with GNU automake
 -   Git (we use git in the build system to generate version info, don't need a full install, just a working `git show` command)
@@ -31,13 +34,31 @@ Additionally, the following build time features require additional dependencies:
     -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
 -   dbengine metric storage:
     -   liblz4 r129 or newer
-    -   OpenSSL 1.0 or newer (LibreSSL _amy_ work, but is largely untested).
+    -   OpenSSL 1.0 or newer _or_ LibreSSL 3.0.0 or newer.
 -   Netdata Cloud support:
     -   A working internet connection
     -   A recent version of CMake
     -   OpenSSL 1.0.2 or newer _or_ LibreSSL 3.0.0 or newer.
     -   JSON-C (may be provided by the user as shown below, or by the system)
     -   protobuf (Google Protocol Buffers) and protoc compiler
+-   Machine Learning support:
+    -   A working C++ compiler
+-   eBPF monitoring support on Linux:
+    -   libelf 0.0.6 or newer (for legacy eBPF) _or_ libelf 0.5 or newer (for CO-RE)
+
+## If using a git checkout
+
+### Submodules
+
+Our git repository uses submodules for certain copoments. To obtain a complete build when using a git checkout,
+make sure you either clone the repository with the `--recursive` option, or that you run `git submodule update
+--init --recursive` in your local copy of our GitHub repository before attempting to build Netdata.
+
+### Handling version numbers with git checkouts
+
+When building from a git checkout, our build systems requires the git history at least as far back as the most
+recent tag to ensure that the correct version number is used. In most cases, this means that a shallow clone
+created with `--depth=1` will only work if you are building a stable version and cloned the associated tag directly.
 
 ## Preparing the source tree
 
@@ -46,7 +67,8 @@ which the the build system will link statically into Netdata. These
 libraries and their header files must be copied into specific locations
 in the source tree to be used.
 
-### Netdata cloud
+### Netdata cloud support
+
 #### JSON-C
 
 Netdata requires the use of JSON-C for JSON parsing when using Netdata
@@ -57,7 +79,7 @@ you can do the following to prepare a copy for the build system:
 1.  Verify the tag that Netdata expects to be used by checking the contents
     of `packaging/jsonc.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/json-c/json-c and downloading
+    -   Navigating to <https://github.com/json-c/json-c> and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Prepare the JSON-C sources by running `cmake -DBUILD_SHARED_LIBS=OFF .`
@@ -70,89 +92,74 @@ you can do the following to prepare a copy for the build system:
 7.  Copy all of the header files (`*.h`) from the JSON-C source directory
     to `externaldeps/jsonc/json-c` in the Netdata source tree.
 
-## Building Netdata
+### eBPF support
+
+#### libbpf
+
+Netdata requires a custom version of libbpf for eBPF support on Linux, which will be statically linked by the
+build system. You can do the following to prepare a copy for the build system:
+
+1.  Verify the tag that Netdata expects to be used by checking the contents of `packaging/libbpf_current.version`
+    in your Netdata sources.
+2.  Obtain the sources for that version by either:
+    -   Navigating to <https://github.com/netdata/libbpf> and downloading and unpacking the source code archive for
+        that release.
+    -   Cloning the repository with `git` and checking out the required tag.
+3.  Prepare the libbpf sources by running `make -p src/root src/build` in the libbpf source tree.
+4.  Build libbpf by running `BUILD_STATIC_ONLY=y OBJDIR=build DESTDIR=.. make install` in the `src/` subdirectory
+    of the libbpf source tree.
+5.  In the Netdata source directory, create a directory called `externaldeps/libbpf`
+6.  Copy `libbpf.a` from the libbpf source directory to `externaldeps/libbpf/libbpf.a` in the Netdata source tree.
+    -   On 32-bit hosts, `libbpf.a` is located at `usr/lib/libbpf.a` in the libbpf source tree.
+    -   On 64-bit hosts, `libbpf.a` is located at `usr/lib64/libbpf.a` in the libbpf source tree.
+7.  Copy the `usr/include` directory from the libbpf source tree to `externaldeps/libbpf/include` in the Netdata
+    source tree.
+8.  Copy the `include/uapi` directory from the libbpf source tree to `externaldeps/libbpf/include/uapi` in the
+    Netdata source tree.
+
+## Build Netdata
 
 Once the source tree has been prepared, Netdata is ready to be configured
 and built. Netdata currently uses GNU autotools as it's primary build
 system. To build Netdata this way:
 
-1.  Run `autoreconf -ivf` in the Netdata source tree.
-2.  Run `./configure` in the Netdata source tree.
-3.  Run `make` in the Netdata source tree.
+:::info
 
-### Configure options
-
-Netdata provides a number of build time configure options. This section
+Netdata provides a number of build time configure options for the `./configure` script. This section
 lists some of the ones you are most likely to need:
 
--   `--prefix`: Specify the prefix under which Netdata will be installed.
--   `--with-webdir`: Specify a path relative to the prefix in which to
-    install the web UI files.
--   `--disable-cloud`: Disables all Netdata Cloud functionality for
-    this build.
+-   `--prefix`: Specify the prefix under which Netdata will be installed. (default: `/usr/local`)
+-   `--with-webdir`: Specify a path relative to the prefix in which to install the web UI files.
+-   `--disable-cloud`: Disables all Netdata Cloud functionality for this build.
+-   `--disable-ml`: Disable ML support in Netdata (results in a much faster and smaller build).
 
-### Using Clang
+:::
 
-Netdata is primarily developed using GCC, but in most cases we also
-build just fine using Clang. Under some build configurations of Clang
-itself, you may see build failures with the linker reporting errors
-about `nonrepresentable section on output`. We currently do not have a
-conclusive fix for this issue (the obvious fix leads to other issues which
-we haven't been able to fix yet), and unfortunately the only workaround
-is to use a different build of Clang or to use GCC.
+**Inside the Netdata source tree**:
 
-### Linking errors relating to OpenSSL
+1.  Generate the configuration files of Netdata
 
-Netdata's build system currently does not reliably support building
-on systems which have multiple ABI incompatible versions of OpenSSL
-installed. In such situations, you may encounter linking errors due to
-Netdata trying to build against headers for one version but link to a
-different version.
+    ```bash
+    autoreconf -ivf
+    ```
 
-## Additional components
+2.  Set up the build process
+
+    ```bash
+    ./configure
+    ```
+
+3.  Build Netdata
+
+    ```bash
+    make
+    ```
+
+## Additional Netdata components
 
 A full featured install of Netdata requires some additional components
 which must be built and installed separately from the main Netdata
 agent. All of these should be handled _after_ installing Netdata itself.
-
-### React dashboard
-
-The above build steps include a deprecated web UI for Netdata that lacks
-support for Netdata Cloud. To get a fully featured dashboard, you must
-install our new React dashboard.
-
-#### Installing the pre-built React dashboard
-
-We provide pre-built archives of the React dashboard for each release
-(these are also used during our normal install process). To use one
-of these:
-
-1.  Verify the release version that Netdata expects to be used by checking
-    the contents of `packaging/dashboard.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/dashboard/releases and download the
-    `dashboard.tar.gz` file for the required release.
-3.  Unpack the downloaded archive to a temporary directory.
-4.  Copy the contents of the `build` directory from the extracted
-    archive to `/usr/share/netdata/web` or the equivalent location for
-    your build of Netdata. This _will_ overwrite some files in the target
-    location.
-
-#### Building the React dashboard locally
-
-Alternatively, you may wish to build the React dashboard locally. Doing
-so requires a recent version of Node.JS with a working install of
-NPM. Once you have the required tools, do the following:
-
-1.  Verify the release version that Netdata expects to be used by checking
-    the contents of `packaging/dashboard.version` in your Netdata sources.
-2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/dashboard and downloading
-        and unpacking the source code archive for that release.
-    -   Cloning the repository with `git` and checking out the required tag.
-3.  Run `npm install` in the dashboard source tree.
-4.  Run `npm run build` in the dashboard source tree.
-5.  Copy the contents of the `build` directory just like step 4 of
-    installing the pre-built React dashboard.
 
 ### Go collectors
 
@@ -170,7 +177,7 @@ we officially support. To use one of these:
 
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/go.d.plugin/releases, select the
+2.  Go to <https://github.com/netdata/go.d.plugin/releases>, select the
     required release, and download the `go.d.plugin-*.tar.gz` file
     for your system type and CPu architecture and the `config.tar.gz`
     configuration file archive.
@@ -191,7 +198,7 @@ newer. Once you have the required tools, do the following:
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/go.d.version` in your Netdata sources.
 2.  Obtain the sources for that version by either:
-    -   Navigating to https://github.com/netdata/go.d.plugin and downloading
+    -   Navigating to <https://github.com/netdata/go.d.plugin> and downloading
         and unpacking the source code archive for that release.
     -   Cloning the repository with `git` and checking out the required tag.
 3.  Run `make` in the go.d.plugin source tree.
@@ -217,7 +224,7 @@ using glibc or musl. To use one of these:
 
 1.  Verify the release version that Netdata expects to be used by checking
     the contents of `packaging/ebpf.version` in your Netdata sources.
-2.  Go to https://github.com/netdata/kernel-collector/releases, select the
+2.  Go to <https://github.com/netdata/kernel-collector/releases>, select the
     required release, and download the `netdata-kernel-collector-*.tar.xz`
     file for the libc variant your system uses (either rmusl or glibc).
 3.  Extract the contents of the archive to a temporary location, and then
@@ -233,4 +240,22 @@ repository](https://github.com/netdata/kernel-collector/blob/master/README.md),
 which outlines both the required dependencies, as well as multiple
 options for building the code.
 
+## Known issues
 
+### Using Clang
+
+Netdata is primarily developed using GCC, but in most cases we also
+build just fine using Clang. Under some build configurations of Clang
+itself, you may see build failures with the linker reporting errors
+about `nonrepresentable section on output`. We currently do not have a
+conclusive fix for this issue (the obvious fix leads to other issues which
+we haven't been able to fix yet), and unfortunately the only workaround
+is to use a different build of Clang or to use GCC.
+
+### Linking errors relating to OpenSSL
+
+Netdata's build system currently does not reliably support building
+on systems which have multiple ABI incompatible versions of OpenSSL
+installed. In such situations, you may encounter linking errors due to
+Netdata trying to build against headers for one version but link to a
+different version.
