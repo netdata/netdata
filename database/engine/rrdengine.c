@@ -366,6 +366,8 @@ static struct {
     struct rrdeng_work *base;
     size_t allocated;
     size_t available;
+    size_t dispatched;
+    size_t executing;
 } work_request_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .base = NULL,
@@ -375,16 +377,20 @@ static void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.base, work_request, cache.prev, cache.next);
     work_request_globals.available++;
+    work_request_globals.dispatched--;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 }
 
 void work_standard_worker(uv_work_t *req) {
+    __atomic_add_fetch(&work_request_globals.executing, 1, __ATOMIC_RELAXED);
     register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
     // worker_is_busy(work_request->opcode); // this is the wrong job id to the threadpool
     work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
+
+    __atomic_sub_fetch(&work_request_globals.executing, 1, __ATOMIC_RELAXED);
 }
 
 void after_work_standard_callback(uv_work_t* req, int status) {
@@ -415,6 +421,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
         work_request_globals.available--;
     }
 
+    work_request_globals.dispatched++;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 
     memset(work_request, 0, sizeof(struct rrdeng_work));
@@ -1714,6 +1721,10 @@ void timer_cb(uv_timer_t* handle) {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 
+    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.waiting);
+    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)work_request_globals.dispatched);
+    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)work_request_globals.executing);
+
     worker_is_idle();
 }
 
@@ -1792,6 +1803,10 @@ void rrdeng_worker(void* arg) {
     // special jobs
     worker_register_job_name(RRDENG_TIMER_CB,                                        "timer");
     worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,                     "transaction buffer flush cb");
+
+    worker_register_job_custom_metric(RRDENG_OPCODES_WAITING,  "opcodes waiting",  "opcodes", WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
+    worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
