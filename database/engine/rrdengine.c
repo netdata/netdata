@@ -427,6 +427,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     work_request->opcode = opcode;
 
     if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {
+        internal_fatal(true, "DBENGINE: cannot queue work");
         work_done(work_request);
         return false;
     }
@@ -1767,7 +1768,8 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_NOOP,                                     "noop");
 
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
-    worker_register_job_name(RRDENG_OPCODE_FLUSH_PAGES,                              "flush pages");
+    worker_register_job_name(RRD                        fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
+ENG_OPCODE_FLUSH_PAGES,                              "flush pages");
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
@@ -1819,8 +1821,7 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_EXTENT_READ: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     EXTENT_PD_LIST *extent_page_list = cmd.data;
-                    if(!work_dispatch(ctx, extent_page_list, NULL, opcode, extent_read_tp_worker, after_extent_read))
-                        fatal("DBENGINE: cannot dispatch work to read extent");
+                    work_dispatch(ctx, extent_page_list, NULL, opcode, extent_read_tp_worker, after_extent_read);
                     break;
                 }
 
@@ -1836,19 +1837,20 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_FLUSHED_TO_OPEN: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     uv_fs_t *uv_fs_request = cmd.data;
-                    if(!work_dispatch(ctx, uv_fs_request, NULL, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open))
-                        fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
+                    work_dispatch(ctx, uv_fs_request, NULL, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open);
                     break;
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(!rrdeng_main.flush_running && work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
+                    if(!rrdeng_main.flush_running &&
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
                         rrdeng_main.flush_running = true;
                     break;
                 }
 
                 case RRDENG_OPCODE_EVICT_INIT: {
-                    if(!rrdeng_main.evict_running && work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
+                    if(!rrdeng_main.evict_running &&
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
                         rrdeng_main.evict_running = true;
                     break;
                 }
