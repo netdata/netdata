@@ -371,7 +371,14 @@ static struct {
 } work_request_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .available_items = NULL,
+        .allocated = 0,
+        .available = 0,
+        .executing = 0,
 };
+
+static inline bool work_request_full(void) {
+    return __atomic_load_n(&work_request_globals.executing, __ATOMIC_RELAXED) > (size_t)libuv_worker_threads;
+}
 
 static void work_request_cleanup(void) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
@@ -385,7 +392,7 @@ static void work_request_cleanup(void) {
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 }
 
-static void work_done(struct rrdeng_work *work_request) {
+static inline void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.available_items, work_request, cache.prev, cache.next);
     work_request_globals.available++;
@@ -403,6 +410,9 @@ void work_standard_worker(uv_work_t *req) {
     worker_is_idle();
 
     __atomic_sub_fetch(&work_request_globals.executing, 1, __ATOMIC_RELAXED);
+
+    // signal the event loop a worker is available
+    fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
 void after_work_standard_callback(uv_work_t* req, int status) {
@@ -465,6 +475,8 @@ static struct {
 } page_descriptor_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .available_items = NULL,
+        .allocated = 0,
+        .available = 0,
 };
 
 static void page_descriptor_cleanup(void) {
@@ -500,7 +512,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
     return descr;
 }
 
-void page_descriptor_release(struct page_descr_with_data *descr) {
+static inline void page_descriptor_release(struct page_descr_with_data *descr) {
     netdata_spinlock_lock(&page_descriptor_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.available_items, descr, cache.prev, cache.next);
     page_descriptor_globals.available++;
@@ -518,6 +530,8 @@ static struct {
 } extent_io_descriptor_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .available_items = NULL,
+        .allocated = 0,
+        .available = 0,
 };
 
 static void extent_io_descriptor_cleanup(void) {
@@ -553,7 +567,7 @@ static struct extent_io_descriptor *extent_io_descriptor_get(void) {
     return xt_io_descr;
 }
 
-static void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
+static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
     netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.available_items, xt_io_descr, cache.prev, cache.next);
     extent_io_descriptor_globals.available++;
@@ -640,7 +654,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
-static struct rrdeng_cmd rrdeng_deq_cmd(void) {
+static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     struct rrdeng_cmd ret = {
             .ctx = NULL,
             .opcode = RRDENG_OPCODE_NOOP,
@@ -649,9 +663,11 @@ static struct rrdeng_cmd rrdeng_deq_cmd(void) {
             .data = NULL,
     };
 
+    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_CRITICAL : STORAGE_PRIORITY_BEST_EFFORT;
+
     netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
 
-    for(enum storage_priority priority = STORAGE_PRIORITY_CRITICAL; priority < STORAGE_PRIO_MAX_DONT_USE ; priority++) {
+    for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_CRITICAL; priority <= max_priority ; priority++) {
         struct rrdeng_cmd *cmd = rrdeng_cmd_globals.waiting_items_by_priority[priority];
         if(cmd) {
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
