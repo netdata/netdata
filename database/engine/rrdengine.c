@@ -1193,7 +1193,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
 }
 
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ctx->worker_config.now_deleting_files = 0;
+    ctx->worker_config.now_deleting_files = false;
 }
 
 struct uuid_first_time_s {
@@ -1701,7 +1701,7 @@ static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, voi
 }
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ;
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 void timer_cb(uv_timer_t* handle) {
@@ -1749,7 +1749,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx) {
         spawned = true;
     }
 
-    ctx->worker_config.now_deleting_files = 0;
+    ctx->worker_config.now_deleting_files = false;
     ctx->worker_config.outstanding_flush_requests = 0;
 
     return true;
@@ -1815,19 +1815,26 @@ void rrdeng_worker(void* arg) {
 
             switch (opcode) {
                 case RRDENG_OPCODE_EXTENT_READ: {
-                    if(!work_dispatch(cmd.ctx, cmd.data, NULL, opcode, extent_read_tp_worker, after_extent_read))
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    EXTENT_PD_LIST *extent_page_list = cmd.data;
+                    if(!work_dispatch(ctx, extent_page_list, NULL, opcode, extent_read_tp_worker, after_extent_read))
                         fatal("DBENGINE: cannot dispatch work to read extent");
                     break;
                 }
 
                 case RRDENG_OPCODE_FLUSH_PAGES: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    struct page_descr_with_data *base = cmd.data;
+                    struct completion *completion = cmd.completion; // optional
                     cmd.ctx->worker_config.outstanding_flush_requests++;
-                    do_flush_extent(cmd.ctx, cmd.data, cmd.completion);
+                    do_flush_extent(ctx, base, completion);
                     break;
                 }
 
                 case RRDENG_OPCODE_FLUSHED_TO_OPEN: {
-                    if(!work_dispatch(cmd.ctx, cmd.data, cmd.completion, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open))
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    uv_fs_t *uv_fs_request = cmd.data;
+                    if(!work_dispatch(ctx, uv_fs_request, NULL, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open))
                         fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
                     break;
                 }
@@ -1847,7 +1854,8 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_DATAFILE_CREATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = ctx->datafiles.first->prev;
-                    if(datafile->pos > rrdeng_target_data_file_size(ctx) && create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
+                    if(datafile->pos > rrdeng_target_data_file_size(ctx) &&
+                       create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
                         ++ctx->last_fileno;
                         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
                     }
@@ -1855,19 +1863,21 @@ void rrdeng_worker(void* arg) {
                 }
 
                 case RRDENG_OPCODE_JOURNAL_FILE_INDEX: {
-                    if(!work_dispatch(cmd.ctx, cmd.data, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    struct rrdengine_datafile *datafile = cmd.data;
+                    if(!work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
                         fatal("DBENGINE: cannot dispatch work to index journal file");
                     break;
                 }
 
                 case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
-                    if(ctx->worker_config.now_deleting_files || ctx->datafiles.first->next == NULL)
-                        return;
-
-                    if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE))) {
-                        if(work_dispatch(ctx, cmd.data, NULL, opcode, database_rotate_tp_worker, after_database_rotate))
-                            ctx->worker_config.now_deleting_files = 1;
+                    if (!ctx->worker_config.now_deleting_files &&
+                         ctx->datafiles.first->next != NULL &&
+                         ctx->datafiles.first->next->next != NULL &&
+                         ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE)) {
+                        if(work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate))
+                            ctx->worker_config.now_deleting_files = true;
                     }
                     break;
                 }
@@ -1882,14 +1892,16 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_CTX_SHUTDOWN: {
                     // a ctx is shutting down
                     struct rrdengine_instance *ctx = cmd.ctx;
+                    struct completion *completion = cmd.completion;
+
                     // FIXME - ktsaou - make sure we cleanup all requests for this ctx
 
                     if(ctx->worker_config.outstanding_flush_requests)
                         // spin
-                        rrdeng_enq_cmd(ctx, opcode, cmd.data, cmd.completion, STORAGE_PRIORITY_BEST_EFFORT);
+                        rrdeng_enq_cmd(ctx, opcode, NULL, completion, STORAGE_PRIORITY_BEST_EFFORT);
                     else
                         // done
-                        completion_mark_complete(cmd.completion);
+                        completion_mark_complete(completion);
 
                     break;
                 }

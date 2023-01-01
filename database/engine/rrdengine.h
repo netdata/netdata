@@ -249,7 +249,7 @@ struct generic_io_descriptor {
 };
 
 struct rrdengine_worker_config {
-    unsigned long now_deleting_files;
+    bool now_deleting_files;
     unsigned outstanding_flush_requests;
 };
 
