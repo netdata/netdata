@@ -1701,6 +1701,7 @@ static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, voi
 }
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ctx->worker_config.migration_to_v2_running = false;
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
@@ -1750,6 +1751,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx) {
     }
 
     ctx->worker_config.now_deleting_files = false;
+    ctx->worker_config.migration_to_v2_running = false;
     ctx->worker_config.outstanding_flush_requests = 0;
 
     return true;
@@ -1865,8 +1867,9 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_JOURNAL_FILE_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
-                    if(!work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
-                        fatal("DBENGINE: cannot dispatch work to index journal file");
+                    if(!ctx->worker_config.migration_to_v2_running &&
+                        work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
+                        ctx->worker_config.migration_to_v2_running = true;
                     break;
                 }
 

@@ -250,6 +250,7 @@ struct generic_io_descriptor {
 
 struct rrdengine_worker_config {
     bool now_deleting_files;
+    bool migration_to_v2_running;
     unsigned outstanding_flush_requests;
 };
 
