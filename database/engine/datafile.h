@@ -38,7 +38,11 @@ struct rrdengine_datafile {
     struct rrdengine_datafile *prev;
     struct rrdengine_datafile *next;
 
-    SPINLOCK write_extent_spinlock;
+    struct {
+        SPINLOCK spinlock;
+        size_t running;
+        size_t flushed_to_open_running;
+    } writers;
 
     // exclusive access to extents
     struct {

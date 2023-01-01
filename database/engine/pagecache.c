@@ -76,7 +76,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
      }
 
-     rrdeng_enq_cmd(ctx, RRDENG_FLUSH_PAGES, base, NULL, STORAGE_PRIORITY_CRITICAL);
+     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)

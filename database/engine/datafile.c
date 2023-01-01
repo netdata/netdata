@@ -14,31 +14,25 @@ void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengin
 }
 
 
-static void datafile_init(struct rrdengine_datafile *datafile, struct rrdengine_instance *ctx,
-                          unsigned tier, unsigned fileno)
+static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
 {
     fatal_assert(tier == 1);
+
+    struct rrdengine_datafile *datafile = callocz(1, sizeof(struct rrdengine_datafile));
+
     datafile->tier = tier;
     datafile->fileno = fileno;
-    datafile->file = (uv_file)0;
-    datafile->pos = 0;
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
-    datafile->journalfile = NULL;
-    datafile->next = datafile->prev = NULL;
     datafile->ctx = ctx;
 
     datafile->users.spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    datafile->users.lockers = 0;
-    datafile->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE] = 0;
-    datafile->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS] = 0;
     datafile->users.available = true;
-    datafile->users.time_to_evict = 0;
 
     datafile->extent_exclusive_access.spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    datafile->extent_exclusive_access.lockers = 0;
-    datafile->extent_exclusive_access.extents_JudyL = NULL;
 
-    datafile->write_extent_spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    datafile->writers.spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    return datafile;
 }
 
 void datafile_acquire_dup(struct rrdengine_datafile *df) {
@@ -429,8 +423,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &no);
         if (2 == ret) {
-            datafile = mallocz(sizeof(*datafile));
-            datafile_init(datafile, ctx, tier, no);
+            datafile = datafile_alloc_and_init(ctx, tier, no);
             datafiles[matched_files++] = datafile;
         }
     }
@@ -502,8 +495,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     char path[RRDENG_PATH_MAX];
 
     info("DBENGINE: creating new data and journal files in path %s", ctx->dbfiles_path);
-    datafile = mallocz(sizeof(*datafile));
-    datafile_init(datafile, ctx, tier, fileno);
+    datafile = datafile_alloc_and_init(ctx, tier, fileno);
     ret = create_data_file(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));

@@ -29,7 +29,7 @@ struct rrdeng_main {
 
 static void sanity_check(void)
 {
-    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2));
+    BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2));
 
     /* Magic numbers must fit in the super-blocks */
     BUILD_BUG_ON(strlen(RRDENG_DF_MAGIC) > RRDENG_MAGIC_SZ);
@@ -70,7 +70,7 @@ typedef struct extent_page_list_s {
     struct rrdengine_datafile *datafile;
 } EXTENT_PD_LIST;
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_MAX_OPCODE + 2)
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2)
 #error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
 #endif
 
@@ -343,11 +343,17 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 // ----------------------------------------------------------------------------
 // work request cache
 
+typedef void (*work_cb)(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_t* req);
+typedef void (*after_work_cb)(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_t* req, int status);
+
 struct rrdeng_work {
     uv_work_t req;
     struct rrdengine_instance *ctx;
     void *data;
     struct completion *completion;
+    work_cb work_cb;
+    after_work_cb after_work_cb;
+    enum rrdeng_opcode opcode;
 
     struct {
         struct rrdeng_work *prev;
@@ -372,7 +378,29 @@ static void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 }
 
-static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_cb work_cb, uv_after_work_cb after_work_cb) {
+void work_standard_worker(uv_work_t *req) {
+    register_libuv_worker_jobs();
+
+    struct rrdeng_work *work_request = req->data;
+    // worker_is_busy(work_request->opcode); // this is the wrong job id to the threadpool
+    work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
+    worker_is_idle();
+}
+
+void after_work_standard_callback(uv_work_t* req, int status) {
+    struct rrdeng_work *work_request = req->data;
+
+    worker_is_busy(RRDENG_OPCODE_MAX + work_request->opcode);
+
+    if(work_request->after_work_cb)
+        work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
+
+    work_done(work_request);
+
+    worker_is_idle();
+}
+
+static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb work_cb, after_work_cb after_work_cb) {
     struct rrdeng_work *work_request;
 
     netdata_spinlock_lock(&work_request_globals.spinlock);
@@ -394,8 +422,11 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     work_request->ctx = ctx;
     work_request->data = data;
     work_request->completion = completion;
+    work_request->work_cb = work_cb;
+    work_request->after_work_cb = after_work_cb;
+    work_request->opcode = opcode;
 
-    if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_cb, after_work_cb)) {
+    if(uv_queue_work(&rrdeng_main.loop, &work_request->req, work_standard_worker, after_work_standard_callback)) {
         work_done(work_request);
         return false;
     }
@@ -507,11 +538,15 @@ static struct {
     size_t allocated;
     size_t available;
 
+    size_t waiting;
     struct rrdeng_cmd *priorities[STORAGE_PRIO_MAX_DONT_USE];
 
 } rrdeng_cmd_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .base = NULL,
+        .allocated = 0,
+        .available = 0,
+        .waiting = 0,
 };
 
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, STORAGE_PRIORITY priority) {
@@ -542,6 +577,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->priority = priority;
 
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.priorities[priority], cmd, cache.prev, cache.next);
+    rrdeng_cmd_globals.waiting++;
 
     netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
 
@@ -551,7 +587,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
 static struct rrdeng_cmd rrdeng_deq_cmd(void) {
     struct rrdeng_cmd ret = {
             .ctx = NULL,
-            .opcode = RRDENG_NOOP,
+            .opcode = RRDENG_OPCODE_NOOP,
             .priority = STORAGE_PRIORITY_BEST_EFFORT,
             .completion = NULL,
             .data = NULL,
@@ -562,10 +598,12 @@ static struct rrdeng_cmd rrdeng_deq_cmd(void) {
     for(enum storage_priority priority = STORAGE_PRIORITY_CRITICAL; priority < STORAGE_PRIO_MAX_DONT_USE ; priority++) {
         struct rrdeng_cmd *cmd = rrdeng_cmd_globals.priorities[priority];
         if(cmd) {
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.priorities[cmd->priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.priorities[priority], cmd, cache.prev, cache.next);
             ret = *cmd;
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.base, cmd, cache.prev, cache.next);
             rrdeng_cmd_globals.available++;
+            rrdeng_cmd_globals.waiting--;
+            break;
         }
     }
 
@@ -953,22 +991,14 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
     wal_flush_transaction_buffer(ctx, xt_io_descr->datafile, &rrdeng_main.loop);
 }
 
-static void after_do_flush_extent_post_work(uv_work_t *req, int status __maybe_unused)
-{
-    worker_is_busy(RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB);
-    struct rrdeng_work  *work_request = req->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
+static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ctx->worker_config.outstanding_flush_requests--;
-    work_done(work_request);
-    worker_is_idle();
 }
 
-static void do_flush_extent_post_work(uv_work_t *uv_work_req) {
+static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_FLUSHED_TO_OPEN);
 
-    struct rrdeng_work *work_request = uv_work_req->data;
-    uv_fs_t *uv_fs_request = work_request->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
+    uv_fs_t *uv_fs_request = data;
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct page_descr_with_data *descr;
     struct rrdengine_datafile *datafile;
@@ -1001,17 +1031,27 @@ static void do_flush_extent_post_work(uv_work_t *uv_work_req) {
     posix_memfree(xt_io_descr->buf);
     extent_io_descriptor_release(xt_io_descr);
 
-    worker_is_idle();
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.flushed_to_open_running--;
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
 }
 
 // Main event loop callback
-static void do_flush_extent_cb(uv_fs_t *uv_fs_request)
-{
-    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES);
+static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
+    worker_is_busy(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES);
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
+    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
 
-    if(!work_dispatch(xt_io_descr->ctx, uv_fs_request, NULL, do_flush_extent_post_work, after_do_flush_extent_post_work))
-        fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.running--;
+
+    datafile->writers.flushed_to_open_running++;
+    rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, NULL, STORAGE_PRIORITY_CRITICAL);
+
+    if(datafile->pos > rrdeng_target_data_file_size(datafile->ctx))
+        rrdeng_enq_cmd(datafile->ctx, RRDENG_OPCODE_DATAFILE_CREATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
 
     worker_is_idle();
 }
@@ -1114,7 +1154,8 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     }
 
     datafile = ctx->datafiles.first->prev;
-    netdata_spinlock_lock(&datafile->write_extent_spinlock);
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.running++;
 
     xt_io_descr->datafile = datafile;
     xt_io_descr->bytes = size_bytes;
@@ -1131,7 +1172,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
 
     ret = uv_fs_write(&rrdeng_main.loop, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov,
-                      1, xt_io_descr->pos, do_flush_extent_cb);
+                      1, xt_io_descr->pos, extent_flush_io_callback);
 
     fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
@@ -1143,10 +1184,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     ctx->disk_space += real_io_size;
     ctx->last_flush_fileno = datafile->fileno;
 
-    if(datafile->pos > rrdeng_target_data_file_size(ctx))
-        rrdeng_enq_cmd(ctx, RRDENG_CREATE_DATAFILE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
-
-    netdata_spinlock_unlock(&datafile->write_extent_spinlock);
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
 
     if (completion)
         completion_mark_complete(completion);
@@ -1154,11 +1192,8 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     return real_io_size;
 }
 
-static void after_delete_old_data(uv_work_t *req, int status __maybe_unused) {
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
+static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ctx->worker_config.now_deleting_files = 0;
-    work_done(work_request);
 }
 
 struct uuid_first_time_s {
@@ -1372,52 +1407,24 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     rrdcontext_db_rotation();
 }
 
-static void delete_old_data(uv_work_t *req) {
-    register_libuv_worker_jobs();
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
+static void database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     datafile_delete(ctx, ctx->datafiles.first, true);
 }
 
-static void do_delete_files(struct rrdengine_instance *ctx) {
-    if(ctx->worker_config.now_deleting_files)
+static void cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    if (!main_cache)
         return;
 
-    if (NULL == ctx->datafiles.first->next) {
-        info("DBENGINE: cannot delete data file '%s/"
-              DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
-              "' to reclaim space, there are no other file pairs left.",
-              ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
+    worker_is_busy(UV_EVENT_FLUSH_MAIN);
+    pgc_flush_pages(main_cache, 0);
+}
+
+static void cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+    if (!main_cache)
         return;
-    }
 
-    if(work_dispatch(ctx, NULL, NULL, delete_old_data, after_delete_old_data))
-        ctx->worker_config.now_deleting_files = 1;
-}
-
-static void cache_flush_tp_worker(uv_work_t *req __maybe_unused)
-{
-    register_libuv_worker_jobs();
-
-    if (main_cache) {
-        worker_is_busy(UV_EVENT_FLUSH_MAIN);
-        pgc_flush_pages(main_cache, 0);
-    }
-
-    worker_is_idle();
-}
-
-static void cache_evict_tp_worker(uv_work_t *req __maybe_unused)
-{
-    register_libuv_worker_jobs();
-
-    if (main_cache) {
-        worker_is_busy(UV_EVENT_EVICT_MAIN);
-        pgc_evict_pages(main_cache, 0, 0);
-    }
-
-    worker_is_idle();
+    worker_is_busy(UV_EVENT_EVICT_MAIN);
+    pgc_evict_pages(main_cache, 0, 0);
 }
 
 unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
@@ -1446,14 +1453,6 @@ void async_cb(uv_async_t *handle)
 }
 
 #define TIMER_PERIOD_MS (1000)
-
-static void after_do_read_extent_work(uv_work_t *req, int status __maybe_unused)
-{
-    worker_is_busy(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT);
-    struct rrdeng_work  *work_request = req->data;
-    work_done(work_request);
-    worker_is_idle();
-}
 
 static bool datafile_get_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_list) {
     struct rrdengine_datafile *df = extent_page_list->datafile;
@@ -1626,18 +1625,13 @@ cleanup:
         worker_is_idle();
 }
 
-static void do_read_extent_work(uv_work_t *req) {
-    register_libuv_worker_jobs();
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
-
-    EXTENT_PD_LIST *extent_page_list = work_request->data;
+static void extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    EXTENT_PD_LIST *extent_page_list = data;
     load_pages_from_an_extent_list(ctx, extent_page_list, true);
 }
 
 static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list, STORAGE_PRIORITY priority) {
-    rrdeng_enq_cmd(ctx, RRDENG_READ_EXTENT, extent_page_list, NULL, priority);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_READ, extent_page_list, NULL, priority);
 }
 
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
@@ -1652,20 +1646,11 @@ void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct pag
     pdc_to_extent_page_details_list(ctx, pdc, load_pages_from_an_extent_list_directly, load_pages_from_an_extent_list_directly);
 }
 
-static void work_request_release(uv_work_t *req, int status __maybe_unused) {
-    struct rrdeng_work  *work_request = req->data;
-    work_done(work_request);
-}
-
 #define MAX_RETRIES_TO_START_INDEX (100)
-static void start_journal_indexing(uv_work_t *req) {
-    register_libuv_worker_jobs();
-
-    struct rrdeng_work *work_request = req->data;
-    struct rrdengine_instance *ctx = work_request->ctx;
-
+static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
     worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
+
     while (ctx->worker_config.now_deleting_files && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
 
@@ -1678,6 +1663,13 @@ static void start_journal_indexing(uv_work_t *req) {
     worker_is_busy(UV_EVENT_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx->last_fileno && datafile->fileno != ctx->last_flush_fileno) {
+
+        netdata_spinlock_lock(&datafile->writers.spinlock);
+        bool available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+        if(!available)
+            continue;
 
         if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
             info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
@@ -1696,32 +1688,20 @@ static void start_journal_indexing(uv_work_t *req) {
     worker_is_idle();
 }
 
-static void after_do_cache_flush(uv_work_t *req, int status __maybe_unused) {
-    struct rrdeng_work *work_request = req->data;
-    work_done(work_request);
+static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     rrdeng_main.flush_running = false;
 }
 
-static void after_do_cache_evict(uv_work_t *req, int status __maybe_unused) {
-    struct rrdeng_work *work_request = req->data;
-    work_done(work_request);
+static void after_do_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     rrdeng_main.evict_running = false;
 }
 
-static void queue_cache_flush(void) {
-    if (unlikely(rrdeng_main.flush_running))
-        return;
-
-    if(work_dispatch(NULL, NULL, NULL, cache_flush_tp_worker, after_do_cache_flush))
-        rrdeng_main.flush_running = true;
+static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
 }
 
-static void queue_cache_evict(void) {
-    if (unlikely(rrdeng_main.evict_running))
-        return;
-
-    if(work_dispatch(NULL, NULL, NULL, cache_evict_tp_worker, after_do_cache_evict))
-        rrdeng_main.evict_running = true;
+static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
 }
 
 void timer_cb(uv_timer_t* handle) {
@@ -1729,9 +1709,8 @@ void timer_cb(uv_timer_t* handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    worker_is_busy(RRDENG_TIMER_CB_FLUSH_AND_EVICT);
-    queue_cache_flush();
-    queue_cache_evict();
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 
     worker_is_idle();
 }
@@ -1783,28 +1762,33 @@ void rrdeng_worker(void* arg) {
     worker_register("DBENGINE");
 
     // opcode jobs
-    worker_register_job_name(RRDENG_NOOP,                            "noop");
-    worker_register_job_name(RRDENG_READ_EXTENT,                     "extent read");
-    worker_register_job_name(RRDENG_FLUSH_PAGES,                     "flush");
-    worker_register_job_name(RRDENG_CREATE_DATAFILE,                 "create datafile");
-    worker_register_job_name(RRDENG_INDEX_JOURNAL_FILE,              "index journal file");
-    worker_register_job_name(RRDENG_ROTATE_DATABASE,                 "rotate db");
-    worker_register_job_name(RRDENG_SHUTDOWN,                        "shutdown");
-    worker_register_job_name(RRDENG_QUIESCE,                         "quiesce");
-    worker_register_job_name(RRDENG_MAX_OPCODE,                      "cleanup");
+    worker_register_job_name(RRDENG_OPCODE_NOOP,                                     "noop");
 
-    // callback jobs
-    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_READ_EXTENT, "extent read cb");
-    worker_register_job_name(RRDENG_MAX_OPCODE + RRDENG_FLUSH_PAGES, "flush cb");
+    worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
+    worker_register_job_name(RRDENG_OPCODE_FLUSH_PAGES,                              "flush pages");
+    worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
+    worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
+    worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
+    worker_register_job_name(RRDENG_OPCODE_DATAFILE_CREATE,                          "datafile create");
+    worker_register_job_name(RRDENG_OPCODE_JOURNAL_FILE_INDEX,                       "journal file index");
+    worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
+    worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
+    worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
+
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_READ,          "extent read cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES,          "flush pages cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_INIT,           "flush init cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EVICT_INIT,           "evict init cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATAFILE_CREATE,      "datafile create cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_FILE_INDEX,   "journal file index cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
 
     // special jobs
-    worker_register_job_name(RRDENG_TIMER_CB,                        "timer");
-    worker_register_job_name(RRDENG_TIMER_CB_TEST_QUOTA,             "timer quota");
-    worker_register_job_name(RRDENG_TIMER_CB_QUEUE_INDEXING,         "timer indexing");
-    worker_register_job_name(RRDENG_TIMER_CB_FLUSH_AND_EVICT,        "timer flush evict");
-    worker_register_job_name(RRDENG_TIMER_CB_STATS,                  "timer stats");
-    worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,     "transaction buffer flush cb");
-    worker_register_job_name(RRDENG_PUBLISH_FLUSHED_TO_OPEN_CB,      "flushed to open cb");
+    worker_register_job_name(RRDENG_TIMER_CB,                                        "timer");
+    worker_register_job_name(RRDENG_FLUSH_TRANSACTION_BUFFER_CB,                     "transaction buffer flush cb");
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
@@ -1830,56 +1814,79 @@ void rrdeng_worker(void* arg) {
             worker_is_busy(opcode);
 
             switch (opcode) {
-                case RRDENG_READ_EXTENT: {
-                    if(!work_dispatch(cmd.ctx, cmd.data, NULL, do_read_extent_work, after_do_read_extent_work))
+                case RRDENG_OPCODE_EXTENT_READ: {
+                    if(!work_dispatch(cmd.ctx, cmd.data, NULL, opcode, extent_read_tp_worker, after_extent_read))
                         fatal("DBENGINE: cannot dispatch work to read extent");
                     break;
                 }
 
-                case RRDENG_FLUSH_PAGES: {
+                case RRDENG_OPCODE_FLUSH_PAGES: {
                     cmd.ctx->worker_config.outstanding_flush_requests++;
                     do_flush_extent(cmd.ctx, cmd.data, cmd.completion);
                     break;
                 }
 
-                case RRDENG_CREATE_DATAFILE: {
+                case RRDENG_OPCODE_FLUSHED_TO_OPEN: {
+                    if(!work_dispatch(cmd.ctx, cmd.data, cmd.completion, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open))
+                        fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
+                    break;
+                }
+
+                case RRDENG_OPCODE_FLUSH_INIT: {
+                    if(!rrdeng_main.flush_running && work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
+                        rrdeng_main.flush_running = true;
+                    break;
+                }
+
+                case RRDENG_OPCODE_EVICT_INIT: {
+                    if(!rrdeng_main.evict_running && work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
+                        rrdeng_main.evict_running = true;
+                    break;
+                }
+
+                case RRDENG_OPCODE_DATAFILE_CREATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = ctx->datafiles.first->prev;
                     if(datafile->pos > rrdeng_target_data_file_size(ctx) && create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
                         ++ctx->last_fileno;
-                        rrdeng_enq_cmd(ctx, RRDENG_INDEX_JOURNAL_FILE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+                        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
                     }
                     break;
                 }
 
-                case RRDENG_INDEX_JOURNAL_FILE: {
-                    if(!work_dispatch(cmd.ctx, NULL, NULL, start_journal_indexing, work_request_release))
+                case RRDENG_OPCODE_JOURNAL_FILE_INDEX: {
+                    if(!work_dispatch(cmd.ctx, cmd.data, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
                         fatal("DBENGINE: cannot dispatch work to index journal file");
                     break;
                 }
 
-                case RRDENG_ROTATE_DATABASE: {
+                case RRDENG_OPCODE_DATABASE_ROTATE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
-                    if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE)))
-                        do_delete_files(cmd.ctx);
+                    if(ctx->worker_config.now_deleting_files || ctx->datafiles.first->next == NULL)
+                        return;
+
+                    if (unlikely(ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE))) {
+                        if(work_dispatch(ctx, cmd.data, NULL, opcode, database_rotate_tp_worker, after_database_rotate))
+                            ctx->worker_config.now_deleting_files = 1;
+                    }
                     break;
                 }
 
-                case RRDENG_QUIESCE: {
+                case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx; (void)ctx;
                     // FIXME - ktsaou - flush all pages of this ctx (section)
                     break;
                 }
 
-                case RRDENG_SHUTDOWN: {
+                case RRDENG_OPCODE_CTX_SHUTDOWN: {
                     // a ctx is shutting down
                     struct rrdengine_instance *ctx = cmd.ctx;
                     // FIXME - ktsaou - make sure we cleanup all requests for this ctx
 
                     if(ctx->worker_config.outstanding_flush_requests)
                         // spin
-                        rrdeng_enq_cmd(ctx, RRDENG_SHUTDOWN, NULL, cmd.completion, STORAGE_PRIORITY_BEST_EFFORT);
+                        rrdeng_enq_cmd(ctx, opcode, cmd.data, cmd.completion, STORAGE_PRIORITY_BEST_EFFORT);
                     else
                         // done
                         completion_mark_complete(cmd.completion);
@@ -1887,19 +1894,21 @@ void rrdeng_worker(void* arg) {
                     break;
                 }
 
-                case RRDENG_NOOP: {
+                case RRDENG_OPCODE_NOOP: {
                     /* the command queue was empty, do nothing */
                     having_pending_opcodes = false;
                     break;
                 }
 
+                // not opcodes
+                case RRDENG_OPCODE_MAX:
                 default: {
-                    debug(D_RRDENGINE, "%s: default.", __func__);
+                    internal_fatal(true, "DBENGINE: unknown opcode");
                     break;
                 }
             }
 
-        } while (opcode != RRDENG_NOOP && cmd_batch_size < (unsigned)(libuv_worker_threads / 2));
+        } while (opcode != RRDENG_OPCODE_NOOP && cmd_batch_size < (unsigned)(libuv_worker_threads / 2));
     }
 
     /* cleanup operations of the event loop */
