@@ -1894,11 +1894,9 @@ void rrdeng_worker(void* arg) {
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
     bool shutdown = false;
-    bool having_pending_opcodes = true;
     while (likely(!shutdown)) {
         worker_is_idle();
-        uv_run(&main->loop, having_pending_opcodes ? UV_RUN_NOWAIT : UV_RUN_DEFAULT);
-        having_pending_opcodes = true;
+        uv_run(&main->loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -2005,7 +2003,6 @@ void rrdeng_worker(void* arg) {
 
                 case RRDENG_OPCODE_NOOP: {
                     /* the command queue was empty, do nothing */
-                    having_pending_opcodes = false;
                     break;
                 }
 
@@ -2017,7 +2014,7 @@ void rrdeng_worker(void* arg) {
                 }
             }
 
-        } while (opcode != RRDENG_OPCODE_NOOP && cmd_batch_size < (unsigned)(libuv_worker_threads / 2));
+        } while (opcode != RRDENG_OPCODE_NOOP);
     }
 
     /* cleanup operations of the event loop */

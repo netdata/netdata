@@ -1088,7 +1088,6 @@ static void metadata_event_loop(void *arg)
     wc->row_id = 0;
     completion_mark_complete(&wc->init_complete);
 
-    bool having_pending_opcodes = true;
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         RRDDIM *rd = NULL;
         RRDSET *st = NULL;
@@ -1099,8 +1098,7 @@ static void metadata_event_loop(void *arg)
         int rc;
 
         worker_is_idle();
-        uv_run(loop, having_pending_opcodes ? UV_RUN_NOWAIT : UV_RUN_DEFAULT);
-        having_pending_opcodes = true;
+        uv_run(loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
         cmd_batch_size = 0;
@@ -1135,9 +1133,6 @@ static void metadata_event_loop(void *arg)
 
             switch (opcode) {
                 case METADATA_DATABASE_NOOP:
-                    having_pending_opcodes = false;
-                    break;
-
                 case METADATA_DATABASE_TIMER:
                     break;
 
