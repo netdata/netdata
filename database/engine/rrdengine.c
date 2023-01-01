@@ -363,19 +363,31 @@ struct rrdeng_work {
 
 static struct {
     SPINLOCK spinlock;
-    struct rrdeng_work *base;
+    struct rrdeng_work *available_items;
     size_t allocated;
     size_t available;
     size_t dispatched;
     size_t executing;
 } work_request_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
+        .available_items = NULL,
 };
+
+static void work_request_cleanup(void) {
+    netdata_spinlock_lock(&work_request_globals.spinlock);
+    while(work_request_globals.available_items && work_request_globals.available > (size_t)libuv_worker_threads) {
+        struct rrdeng_work *item = work_request_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.available_items, item, cache.prev, cache.next);
+        freez(item);
+        work_request_globals.allocated--;
+        work_request_globals.available--;
+    }
+    netdata_spinlock_unlock(&work_request_globals.spinlock);
+}
 
 static void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.base, work_request, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.available_items, work_request, cache.prev, cache.next);
     work_request_globals.available++;
     work_request_globals.dispatched--;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
@@ -411,13 +423,13 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     netdata_spinlock_lock(&work_request_globals.spinlock);
 
-    if(!work_request_globals.base) {
+    if(!work_request_globals.available_items) {
         work_request = mallocz(sizeof(struct rrdeng_work));
         work_request_globals.allocated++;
     }
     else {
-        work_request = work_request_globals.base;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.base, work_request, cache.prev, cache.next);
+        work_request = work_request_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.available_items, work_request, cache.prev, cache.next);
         work_request_globals.available--;
     }
 
@@ -447,26 +459,38 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
 static struct {
     SPINLOCK spinlock;
-    struct page_descr_with_data *base;
+    struct page_descr_with_data *available_items;
     size_t allocated;
     size_t available;
 } page_descriptor_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
+        .available_items = NULL,
 };
+
+static void page_descriptor_cleanup(void) {
+    netdata_spinlock_lock(&page_descriptor_globals.spinlock);
+    while(page_descriptor_globals.available_items && page_descriptor_globals.available > MAX_PAGES_PER_EXTENT) {
+        struct page_descr_with_data *item = page_descriptor_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.available_items, item, cache.prev, cache.next);
+        freez(item);
+        page_descriptor_globals.allocated--;
+        page_descriptor_globals.available--;
+    }
+    netdata_spinlock_unlock(&page_descriptor_globals.spinlock);
+}
 
 struct page_descr_with_data *page_descriptor_get(void) {
     struct page_descr_with_data *descr;
 
     netdata_spinlock_lock(&page_descriptor_globals.spinlock);
 
-    if(!page_descriptor_globals.base) {
+    if(!page_descriptor_globals.available_items) {
         descr = mallocz(sizeof(struct page_descr_with_data));
         page_descriptor_globals.allocated++;
     }
     else {
-        descr = page_descriptor_globals.base;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.base, descr, cache.prev, cache.next);
+        descr = page_descriptor_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.available_items, descr, cache.prev, cache.next);
         page_descriptor_globals.available--;
     }
 
@@ -478,7 +502,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 
 void page_descriptor_release(struct page_descr_with_data *descr) {
     netdata_spinlock_lock(&page_descriptor_globals.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.base, descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.available_items, descr, cache.prev, cache.next);
     page_descriptor_globals.available++;
     netdata_spinlock_unlock(&page_descriptor_globals.spinlock);
 }
@@ -488,26 +512,38 @@ void page_descriptor_release(struct page_descr_with_data *descr) {
 
 static struct {
     SPINLOCK spinlock;
-    struct extent_io_descriptor *base;
+    struct extent_io_descriptor *available_items;
     size_t allocated;
     size_t available;
 } extent_io_descriptor_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
+        .available_items = NULL,
 };
+
+static void extent_io_descriptor_cleanup(void) {
+    netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
+    while(extent_io_descriptor_globals.available_items && extent_io_descriptor_globals.available > 10) {
+        struct extent_io_descriptor *item = extent_io_descriptor_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.available_items, item, cache.prev, cache.next);
+        freez(item);
+        extent_io_descriptor_globals.allocated--;
+        extent_io_descriptor_globals.available--;
+    }
+    netdata_spinlock_unlock(&extent_io_descriptor_globals.spinlock);
+}
 
 static struct extent_io_descriptor *extent_io_descriptor_get(void) {
     struct extent_io_descriptor *xt_io_descr;
 
     netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
 
-    if(!extent_io_descriptor_globals.base) {
+    if(!extent_io_descriptor_globals.available_items) {
         xt_io_descr = mallocz(sizeof(struct extent_io_descriptor));
         extent_io_descriptor_globals.allocated++;
     }
     else {
-        xt_io_descr = extent_io_descriptor_globals.base;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.base, xt_io_descr, cache.prev, cache.next);
+        xt_io_descr = extent_io_descriptor_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.available_items, xt_io_descr, cache.prev, cache.next);
         extent_io_descriptor_globals.available--;
     }
 
@@ -519,7 +555,7 @@ static struct extent_io_descriptor *extent_io_descriptor_get(void) {
 
 static void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
     netdata_spinlock_lock(&extent_io_descriptor_globals.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.base, xt_io_descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.available_items, xt_io_descr, cache.prev, cache.next);
     extent_io_descriptor_globals.available++;
     netdata_spinlock_unlock(&extent_io_descriptor_globals.spinlock);
 }
@@ -542,20 +578,32 @@ struct rrdeng_cmd {
 
 static struct {
     SPINLOCK spinlock;
-    struct rrdeng_cmd *base;
+    struct rrdeng_cmd *available_items;
     size_t allocated;
     size_t available;
 
     size_t waiting;
-    struct rrdeng_cmd *priorities[STORAGE_PRIO_MAX_DONT_USE];
+    struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIO_MAX_DONT_USE];
 
 } rrdeng_cmd_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .base = NULL,
+        .available_items = NULL,
         .allocated = 0,
         .available = 0,
         .waiting = 0,
 };
+
+static void rrdeng_cmd_cleanup(void) {
+    netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
+    while(rrdeng_cmd_globals.available_items && rrdeng_cmd_globals.available > 10) {
+        struct rrdeng_cmd *item = rrdeng_cmd_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.available_items, item, cache.prev, cache.next);
+        freez(item);
+        rrdeng_cmd_globals.allocated--;
+        rrdeng_cmd_globals.available--;
+    }
+    netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
+}
 
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, STORAGE_PRIORITY priority) {
     struct rrdeng_cmd *cmd;
@@ -565,15 +613,15 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
 
     netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
 
-    if(!rrdeng_cmd_globals.base) {
+    if(!rrdeng_cmd_globals.available_items) {
         cmd = mallocz(sizeof(struct rrdeng_cmd));
         cmd->cache.prev = NULL;
         cmd->cache.next = NULL;
         rrdeng_cmd_globals.allocated++;
     }
     else {
-        cmd = rrdeng_cmd_globals.base;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.base, cmd, cache.prev, cache.next);
+        cmd = rrdeng_cmd_globals.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.available_items, cmd, cache.prev, cache.next);
         rrdeng_cmd_globals.available--;
     }
 
@@ -584,7 +632,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->completion = completion;
     cmd->priority = priority;
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.priorities[priority], cmd, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
     rrdeng_cmd_globals.waiting++;
 
     netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
@@ -604,11 +652,11 @@ static struct rrdeng_cmd rrdeng_deq_cmd(void) {
     netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
 
     for(enum storage_priority priority = STORAGE_PRIORITY_CRITICAL; priority < STORAGE_PRIO_MAX_DONT_USE ; priority++) {
-        struct rrdeng_cmd *cmd = rrdeng_cmd_globals.priorities[priority];
+        struct rrdeng_cmd *cmd = rrdeng_cmd_globals.waiting_items_by_priority[priority];
         if(cmd) {
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.priorities[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             ret = *cmd;
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.base, cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.available_items, cmd, cache.prev, cache.next);
             rrdeng_cmd_globals.available++;
             rrdeng_cmd_globals.waiting--;
             break;
@@ -1718,12 +1766,19 @@ void timer_cb(uv_timer_t* handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
-
     worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.waiting);
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)work_request_globals.dispatched);
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)work_request_globals.executing);
+
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+
+    if(now_monotonic_sec() % 600 == 0) {
+        work_request_cleanup();
+        page_descriptor_cleanup();
+        extent_io_descriptor_cleanup();
+        rrdeng_cmd_cleanup();
+    }
 
     worker_is_idle();
 }
