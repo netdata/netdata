@@ -366,18 +366,24 @@ static struct {
     struct rrdeng_work *available_items;
     size_t allocated;
     size_t available;
-    size_t dispatched;
-    size_t executing;
+
+    struct {
+        size_t dispatched;
+        size_t executing;
+    } atomics;
 } work_request_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
         .available_items = NULL,
         .allocated = 0,
         .available = 0,
-        .executing = 0,
+        .atomics = {
+                .dispatched = 0,
+                .executing = 0,
+        },
 };
 
 static inline bool work_request_full(void) {
-    return __atomic_load_n(&work_request_globals.executing, __ATOMIC_RELAXED) > (size_t)libuv_worker_threads;
+    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) > (size_t)libuv_worker_threads;
 }
 
 static void work_request_cleanup(void) {
@@ -396,12 +402,11 @@ static inline void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.spinlock);
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.available_items, work_request, cache.prev, cache.next);
     work_request_globals.available++;
-    work_request_globals.dispatched--;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 }
 
 void work_standard_worker(uv_work_t *req) {
-    __atomic_add_fetch(&work_request_globals.executing, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
     register_libuv_worker_jobs();
 
     struct rrdeng_work *work_request = req->data;
@@ -409,7 +414,8 @@ void work_standard_worker(uv_work_t *req) {
     work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
 
-    __atomic_sub_fetch(&work_request_globals.executing, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
@@ -443,7 +449,6 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
         work_request_globals.available--;
     }
 
-    work_request_globals.dispatched++;
     netdata_spinlock_unlock(&work_request_globals.spinlock);
 
     memset(work_request, 0, sizeof(struct rrdeng_work));
@@ -460,6 +465,8 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
         work_done(work_request);
         return false;
     }
+
+    __atomic_add_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
 
     return true;
 }
@@ -1783,8 +1790,8 @@ void timer_cb(uv_timer_t* handle) {
     uv_update_time(handle->loop);
 
     worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.waiting);
-    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)work_request_globals.dispatched);
-    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)work_request_globals.executing);
+    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
+    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
 
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
