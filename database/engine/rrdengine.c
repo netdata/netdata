@@ -1768,8 +1768,7 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_NOOP,                                     "noop");
 
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
-    worker_register_job_name(RRD                        fatal("DBENGINE: cannot dispatch work to publish extent pages to open cache");
-ENG_OPCODE_FLUSH_PAGES,                              "flush pages");
+    worker_register_job_name(RRDENG_OPCODE_FLUSH_PAGES,                              "flush pages");
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
