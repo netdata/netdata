@@ -106,18 +106,15 @@ struct journal_v2_header {
 /* only one event loop is supported for now */
 struct transaction_commit_log {
     uint64_t transaction_id;
-
-    /* outstanding transaction buffer */
-    void *buf;
-    unsigned buf_pos;
-    unsigned buf_size;
 };
+
+struct wal;
 
 void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void generate_journalfilepath_v2(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
-void *wal_get_transaction_buffer(struct rrdengine_instance *ctx, unsigned size);
-void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, uv_loop_t *loop);
+struct wal *wal_get_transaction_buffer(struct rrdengine_instance *ctx, unsigned size);
+void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal, uv_loop_t *loop);
 int close_journal_file(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int unlink_journal_file(struct rrdengine_journalfile *journalfile);
 int destroy_journal_file_unsafe(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);

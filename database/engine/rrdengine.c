@@ -1300,12 +1300,13 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
     payload_length = sizeof(*jf_metric_data) + descr_size;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
 
-    buf = wal_get_transaction_buffer(ctx, size_bytes);
+    xt_io_descr->wal = wal_get_transaction_buffer(ctx, size_bytes);
+    buf = xt_io_descr->wal->buf;
 
     jf_header = buf;
     jf_header->type = STORE_DATA;
     jf_header->reserved = 0;
-    jf_header->id = ctx->commit_log.transaction_id++;
+    jf_header->id = xt_io_descr->wal->transaction_id;
     jf_header->payload_length = payload_length;
 
     jf_metric_data = buf + sizeof(*jf_header);
@@ -1318,8 +1319,6 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     crc32set(jf_trailer->checksum, crc);
-
-    wal_flush_transaction_buffer(ctx, xt_io_descr->datafile, &rrdeng_main.loop);
 }
 
 static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1378,6 +1377,9 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
     worker_is_busy(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES);
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
+    struct rrdengine_instance *ctx = datafile->ctx;
+
+    wal_flush_transaction_buffer(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
 
     netdata_spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
@@ -1517,10 +1519,6 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
 
-    ret = uv_fs_write(&rrdeng_main.loop, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov,
-                      1, xt_io_descr->pos, extent_flush_io_callback);
-
-    fatal_assert(-1 != ret);
     ctx->stats.io_write_bytes += real_io_size;
     ++ctx->stats.io_write_requests;
     ctx->stats.io_write_extent_bytes += real_io_size;
@@ -1529,6 +1527,11 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     datafile->pos += real_io_size;
     ctx->disk_space += real_io_size;
     ctx->last_flush_fileno = datafile->fileno;
+
+    ret = uv_fs_write(&rrdeng_main.loop, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov,
+                      1, xt_io_descr->pos, extent_flush_io_callback);
+
+    fatal_assert(-1 != ret);
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 

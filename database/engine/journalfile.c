@@ -56,7 +56,8 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
 {
     worker_is_busy(RRDENG_FLUSH_TRANSACTION_BUFFER_CB);
 
-    struct generic_io_descriptor *io_descr = req->data;
+    WAL *wal = req->data;
+    struct generic_io_descriptor *io_descr = &wal->io_descr;
     struct rrdengine_instance *ctx = io_descr->ctx;
 
     debug(D_RRDENGINE, "%s: Journal block was written to disk.", __func__);
@@ -69,70 +70,61 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     }
 
     uv_fs_req_cleanup(req);
-    posix_memfree(io_descr->buf);
-    freez(io_descr);
+    posix_memfree(wal->buf);
+    freez(wal);
 
     worker_is_idle();
 }
 
 /* Careful to always call this before creating a new journal file */
-void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, uv_loop_t *loop)
+void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, WAL *wal, uv_loop_t *loop)
 {
     int ret;
     struct generic_io_descriptor *io_descr;
-    unsigned pos, size;
-    struct rrdengine_journalfile *journalfile;
+    struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
-    if (unlikely(NULL == ctx->commit_log.buf || 0 == ctx->commit_log.buf_pos)) {
-        return;
-    }
-    /* care with outstanding transactions when switching journal files */
-    journalfile = datafile->journalfile;
-
-    io_descr = mallocz(sizeof(*io_descr));
+    io_descr = &wal->io_descr;
     io_descr->ctx = ctx;
-    pos = ctx->commit_log.buf_pos;
-    size = ctx->commit_log.buf_size;
-    if (pos < size) {
+    if (wal->size < wal->buf_size) {
         /* simulate an empty transaction to skip the rest of the block */
-        *(uint8_t *) (ctx->commit_log.buf + pos) = STORE_PADDING;
+        *(uint8_t *) (wal->buf + wal->size) = STORE_PADDING;
     }
-    io_descr->buf = ctx->commit_log.buf;
-    io_descr->bytes = size;
+    io_descr->buf = wal->buf;
+    io_descr->bytes = wal->buf_size;
     io_descr->pos = journalfile->pos;
-    io_descr->req.data = io_descr;
+    io_descr->req.data = wal;
     io_descr->data = journalfile;
     io_descr->completion = NULL;
 
-    io_descr->iov = uv_buf_init((void *)io_descr->buf, size);
+    io_descr->iov = uv_buf_init((void *)io_descr->buf, wal->buf_size);
     ret = uv_fs_write(loop, &io_descr->req, journalfile->file, &io_descr->iov, 1,
                       journalfile->pos, flush_transaction_buffer_cb);
     fatal_assert(-1 != ret);
     journalfile->pos += RRDENG_BLOCK_SIZE;
     ctx->disk_space += RRDENG_BLOCK_SIZE;
-    ctx->commit_log.buf = NULL;
     ctx->stats.io_write_bytes += RRDENG_BLOCK_SIZE;
     ++ctx->stats.io_write_requests;
 }
 
-void *wal_get_transaction_buffer(struct rrdengine_instance *ctx, unsigned size) {
-    int ret;
-    unsigned buf_pos = 0, buf_size;
+WAL *wal_get_transaction_buffer(struct rrdengine_instance *ctx __maybe_unused, unsigned size) {
+    WAL *wal = callocz(1, sizeof(WAL));
 
-    fatal_assert(size);
-    internal_fatal(ctx->commit_log.buf, "Commit log is already used");
+    if(!size || size > RRDENG_BLOCK_SIZE)
+        fatal("DBENGINE: invalid wal size");
 
-    buf_size = ALIGN_BYTES_CEILING(size);
-    ret = posix_memalign((void *)&ctx->commit_log.buf, RRDFILE_ALIGNMENT, buf_size);
+    size_t buf_size = ALIGN_BYTES_CEILING(size);
+
+    int ret = posix_memalign((void *)&wal->buf, RRDFILE_ALIGNMENT, buf_size);
     if (unlikely(ret)) {
         fatal("DBENGINE: posix_memalign:%s", strerror(ret));
     }
-    memset(ctx->commit_log.buf, 0, buf_size);
-    buf_pos = ctx->commit_log.buf_pos = 0;
-    ctx->commit_log.buf_size =  buf_size;
-    ctx->commit_log.buf_pos += size;
 
-    return ctx->commit_log.buf + buf_pos;
+    wal->transaction_id = ctx->commit_log.transaction_id++;
+    wal->size = size;
+    wal->buf_size = buf_size;
+    memset(wal->buf, 0, buf_size);
+
+    return wal;
 }
 
 void generate_journalfilepath_v2(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
@@ -1238,7 +1230,5 @@ error:
 
 void init_commit_log(struct rrdengine_instance *ctx)
 {
-    ctx->commit_log.buf = NULL;
-    ctx->commit_log.buf_pos = 0;
     ctx->commit_log.transaction_id = 1;
 }

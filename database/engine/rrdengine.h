@@ -242,6 +242,7 @@ struct extent_io_descriptor {
     uv_buf_t iov;
     uv_file file;
     void *buf;
+    struct wal *wal;
     uint64_t pos;
     unsigned bytes;
     struct completion *completion;
@@ -266,6 +267,14 @@ struct generic_io_descriptor {
     unsigned bytes;
     struct completion *completion;
 };
+
+typedef struct wal {
+    uint64_t transaction_id;
+    void *buf;
+    size_t size;
+    size_t buf_size;
+    struct generic_io_descriptor io_descr;
+} WAL;
 
 struct rrdengine_worker_config {
     bool now_deleting_files;
