@@ -16,6 +16,7 @@ struct rrdeng_main {
     uv_loop_t loop;
     uv_async_t async;
     uv_timer_t timer;
+    pid_t tid;
 
     bool flush_running;
     bool evict_running;
@@ -188,14 +189,14 @@ void pdc_destroy(PDC *pdc) {
             // pdc_page_status_set(pd, PDC_PAGE_RELEASED);
         }
 
-        freez(pd);
+        page_details_release(pd);
     }
 
     JudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
     __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
-    freez(pdc);
+    pdc_release(pdc);
 
     if(unroutable)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
@@ -389,7 +390,7 @@ static struct {
 };
 
 static inline bool work_request_full(void) {
-    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) > (size_t)libuv_worker_threads;
+    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)libuv_worker_threads;
 }
 
 static void work_request_cleanup(void) {
@@ -443,6 +444,8 @@ void after_work_standard_callback(uv_work_t* req, int status) {
 static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct completion *completion, enum rrdeng_opcode opcode, work_cb work_cb, after_work_cb after_work_cb) {
     struct rrdeng_work *work_request = NULL;
 
+    internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
+
     netdata_spinlock_lock(&work_request_globals.protected.spinlock);
 
     if(likely(work_request_globals.protected.available_items)) {
@@ -476,6 +479,145 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
     __atomic_add_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
 
     return true;
+}
+
+// ----------------------------------------------------------------------------
+// PDC cache
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        PDC *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} pdc_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void pdc_cleanup(void) {
+    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
+
+    while(pdc_globals.protected.available_items && pdc_globals.protected.available > 10) {
+        PDC *item = pdc_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        pdc_globals.protected.available--;
+        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+}
+
+PDC *pdc_get(void) {
+    PDC *pdc = NULL;
+
+    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
+
+    if(likely(pdc_globals.protected.available_items)) {
+        pdc = pdc_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
+        pdc_globals.protected.available--;
+    }
+
+    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+
+    if(unlikely(!pdc)) {
+        pdc = mallocz(sizeof(PDC));
+        __atomic_add_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    memset(pdc, 0, sizeof(PDC));
+    return pdc;
+}
+
+void pdc_release(PDC *pdc) {
+    if(unlikely(!pdc)) return;
+
+    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
+    pdc_globals.protected.available++;
+    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+}
+
+
+// ----------------------------------------------------------------------------
+// PDC cache
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        struct page_details *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} page_details_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void page_details_cleanup(void) {
+    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
+
+    while(page_details_globals.protected.available_items && page_details_globals.protected.available > 100) {
+        struct page_details *item = page_details_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        page_details_globals.protected.available--;
+        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
+}
+
+struct page_details *page_details_get(void) {
+    struct page_details *pd = NULL;
+
+    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
+
+    if(likely(page_details_globals.protected.available_items)) {
+        pd = page_details_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
+        page_details_globals.protected.available--;
+    }
+
+    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
+
+    if(unlikely(!pd)) {
+        pd = mallocz(sizeof(struct page_details));
+        __atomic_add_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    memset(pd, 0, sizeof(struct page_details));
+    return pd;
+}
+
+void page_details_release(struct page_details *pd) {
+    if(unlikely(!pd)) return;
+
+    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
+    page_details_globals.protected.available++;
+    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -1048,7 +1190,7 @@ static bool extent_uncompress_and_populate_pages(
 
         PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, start_time_s, PGC_SEARCH_EXACT);
         if (!page) {
-            void *page_data = mallocz((size_t) vd.page_length);
+            void *page_data = dbengine_page_alloc(ctx, vd.page_length);
 
             if (unlikely(!vd.data_on_disk_valid)) {
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
@@ -1090,7 +1232,7 @@ static bool extent_uncompress_and_populate_pages(
             bool added = true;
             page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
             if (false == added) {
-                freez(page_data);
+                dbengine_page_free(page_data);
                 stats_cache_hit_while_inserting++;
                 stats_data_from_main_cache++;
             }
@@ -1182,6 +1324,8 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
 
 static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ctx->worker_config.outstanding_flush_requests--;
+
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1223,6 +1367,10 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
     netdata_spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.flushed_to_open_running--;
     netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+    if(datafile->fileno != __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED))
+        // we just finished a flushing on a datafile that is not the active one
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 // Main event loop callback
@@ -1236,9 +1384,6 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
 
     datafile->writers.flushed_to_open_running++;
     rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, NULL, STORAGE_PRIORITY_CRITICAL);
-
-    if(datafile->pos > rrdeng_target_data_file_size(datafile->ctx))
-        rrdeng_enq_cmd(datafile->ctx, RRDENG_OPCODE_DATAFILE_CREATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 
@@ -1345,7 +1490,17 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     }
 
     datafile = ctx->datafiles.first->prev;
+    if(datafile->pos > rrdeng_target_data_file_size(ctx)) {
+        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+        netdata_spinlock_lock(&sp);
+        if(create_new_datafile_pair(ctx) == 0)
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
+        netdata_spinlock_unlock(&sp);
+    }
+
+    datafile = ctx->datafiles.first->prev;
     netdata_spinlock_lock(&datafile->writers.spinlock);
+
     datafile->writers.running++;
 
     xt_io_descr->datafile = datafile;
@@ -1913,6 +2068,8 @@ void timer_cb(uv_timer_t* handle) {
         page_descriptor_cleanup();
         extent_io_descriptor_cleanup();
         rrdeng_cmd_cleanup();
+        pdc_cleanup();
+        page_details_cleanup();
     }
 
     worker_is_idle();
@@ -1973,7 +2130,7 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
-    worker_register_job_name(RRDENG_OPCODE_DATAFILE_CREATE,                          "datafile create");
+    //worker_register_job_name(RRDENG_OPCODE_DATAFILE_CREATE,                          "datafile create");
     worker_register_job_name(RRDENG_OPCODE_JOURNAL_FILE_INDEX,                       "journal file index");
     worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
@@ -1984,7 +2141,7 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_INIT,           "flush init cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EVICT_INIT,           "evict init cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATAFILE_CREATE,      "datafile create cb");
+    //worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATAFILE_CREATE,      "datafile create cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_FILE_INDEX,   "journal file index cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
@@ -2001,6 +2158,7 @@ void rrdeng_worker(void* arg) {
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
     struct rrdeng_cmd cmd;
+    main->tid = gettid();
 
     fatal_assert(0 == uv_timer_start(&main->timer, timer_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
 
@@ -2041,36 +2199,48 @@ void rrdeng_worker(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(!rrdeng_main.flush_running &&
-                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
+                    if(!rrdeng_main.flush_running) {
+
                         rrdeng_main.flush_running = true;
-                    break;
-                }
+                        if(!work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
+                            rrdeng_main.flush_running = false;
 
-                case RRDENG_OPCODE_EVICT_INIT: {
-                    if(!rrdeng_main.evict_running &&
-                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
-                        rrdeng_main.evict_running = true;
-                    break;
-                }
-
-                case RRDENG_OPCODE_DATAFILE_CREATE: {
-                    struct rrdengine_instance *ctx = cmd.ctx;
-                    struct rrdengine_datafile *datafile = ctx->datafiles.first->prev;
-                    if(datafile->pos > rrdeng_target_data_file_size(ctx) &&
-                       create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
-                        ++ctx->last_fileno;
-                        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
                     }
                     break;
                 }
 
+                case RRDENG_OPCODE_EVICT_INIT: {
+                    if(!rrdeng_main.evict_running) {
+
+                        rrdeng_main.evict_running = true;
+                        if (!work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
+                            rrdeng_main.evict_running = false;
+
+                    }
+                    break;
+                }
+
+//                case RRDENG_OPCODE_DATAFILE_CREATE: {
+//                    struct rrdengine_instance *ctx = cmd.ctx;
+//                    struct rrdengine_datafile *datafile = ctx->datafiles.first->prev;
+//                    if(datafile->pos > rrdeng_target_data_file_size(ctx) &&
+//                       create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
+//                        ++ctx->last_fileno;
+//                        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
+//                    }
+//                    break;
+//                }
+
                 case RRDENG_OPCODE_JOURNAL_FILE_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
-                    if(!ctx->worker_config.migration_to_v2_running &&
-                        work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
+                    if(!ctx->worker_config.migration_to_v2_running) {
+
                         ctx->worker_config.migration_to_v2_running = true;
+                        if (!work_dispatch(ctx, datafile, NULL, opcode, journal_v2_indexing_tp_worker, after_journal_v2_indexing))
+                            ctx->worker_config.migration_to_v2_running = false;
+
+                    }
                     break;
                 }
 
@@ -2080,8 +2250,11 @@ void rrdeng_worker(void* arg) {
                          ctx->datafiles.first->next != NULL &&
                          ctx->datafiles.first->next->next != NULL &&
                          ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE)) {
-                        if(work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate))
-                            ctx->worker_config.now_deleting_files = true;
+
+                        ctx->worker_config.now_deleting_files = true;
+                        if(!work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate))
+                            ctx->worker_config.now_deleting_files = false;
+
                     }
                     break;
                 }

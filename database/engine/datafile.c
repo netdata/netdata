@@ -487,15 +487,16 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 }
 
 /* Creates a datafile and a journalfile pair */
-int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
+int create_new_datafile_pair(struct rrdengine_instance *ctx)
 {
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
+    unsigned fileno = __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED) + 1;
     int ret;
     char path[RRDENG_PATH_MAX];
 
     info("DBENGINE: creating new data and journal files in path %s", ctx->dbfiles_path);
-    datafile = datafile_alloc_and_init(ctx, tier, fileno);
+    datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
     if (!ret) {
         generate_datafilepath(datafile, path, sizeof(path));
@@ -517,6 +518,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsi
     datafile_list_insert(ctx, datafile);
     ctx->disk_space += datafile->pos + journalfile->pos;
 
+    __atomic_add_fetch(&ctx->last_fileno, 1, __ATOMIC_RELAXED);
+
     return 0;
 
 error_after_journalfile:
@@ -524,6 +527,8 @@ error_after_journalfile:
     freez(journalfile);
 error_after_datafile:
     freez(datafile);
+
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
     return ret;
 }
 
@@ -542,18 +547,16 @@ int init_data_files(struct rrdengine_instance *ctx)
         return ret;
     } else if (0 == ret) {
         info("DBENGINE: data files not found, creating in path \"%s\".", ctx->dbfiles_path);
-        ret = create_new_datafile_pair(ctx, 1, 1);
+        ctx->last_fileno = 0;
+        ret = create_new_datafile_pair(ctx);
         if (ret) {
             error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->dbfiles_path);
             return ret;
         }
-        ctx->last_fileno = 1;
     }
-    else if(ctx->create_new_datafile_pair) {
-        ret = create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1);
-        if (likely(!ret))
-            ++ctx->last_fileno;
-    }
+    else if(ctx->create_new_datafile_pair)
+        create_new_datafile_pair(ctx);
+
     pgc_reset_hot_max(open_cache);
     ctx->create_new_datafile_pair = false;
     __atomic_store_n(&ctx->journal_initialization, false, __ATOMIC_RELAXED);

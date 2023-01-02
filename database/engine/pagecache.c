@@ -320,7 +320,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             internal_fatal(pgc_page_metric(page) != metric_id, "Wrong metric id in page found in cache");
             internal_fatal(pgc_page_section(page) != (Word_t)ctx, "Wrong section in page found in cache");
 
-            struct page_details *pd = callocz(1, sizeof(*pd));
+            struct page_details *pd = page_details_get();
             pd->metric_id = metric_id;
             pd->first_time_s = page_start_time_s;
             pd->last_time_s = page_end_time_s;
@@ -598,7 +598,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
 
     // let's add it to the judy
     struct extent_io_data *ei = pgc_page_custom_data(open_cache, page);
-    struct page_details *pd = callocz(1, sizeof(*pd));
+    struct page_details *pd = page_details_get();
     *PValue = pd;
 
     pd->datafile.extent.pos = ei->pos;
@@ -755,7 +755,7 @@ void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle
 
     __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
-    handle->pdc = callocz(1, sizeof(struct page_details_control));
+    handle->pdc = pdc_get();
     handle->pdc->priority = priority;
     handle->pdc->ctx = ctx;
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);

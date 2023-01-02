@@ -82,7 +82,7 @@ int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);
 int create_data_file(struct rrdengine_datafile *datafile);
-int create_new_datafile_pair(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno);
+int create_new_datafile_pair(struct rrdengine_instance *ctx);
 int init_data_files(struct rrdengine_instance *ctx);
 void finalize_data_files(struct rrdengine_instance *ctx);
 

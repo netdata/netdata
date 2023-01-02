@@ -52,7 +52,15 @@ typedef struct page_details_control {
     size_t executed_with_gaps;
 
     STORAGE_PRIORITY priority;
+
+    struct {
+        struct page_details_control *prev;
+        struct page_details_control *next;
+    } cache;
 } PDC;
+
+PDC *pdc_get(void);
+void pdc_release(PDC *pdc);
 
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
@@ -111,7 +119,15 @@ struct page_details {
     uint32_t update_every_s;
     uint16_t page_length;
     PDC_PAGE_STATUS status;
+
+    struct {
+        struct page_details *prev;
+        struct page_details *next;
+    } cache;
 };
+
+struct page_details *page_details_get(void);
+void page_details_release(struct page_details *pd);
 
 #define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))
 #define pdc_page_status_set(pd, flag)   __atomic_or_fetch(&((pd)->status), flag, __ATOMIC_RELEASE)
@@ -193,7 +209,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_FLUSHED_TO_OPEN,
     RRDENG_OPCODE_FLUSH_INIT,
     RRDENG_OPCODE_EVICT_INIT,
-    RRDENG_OPCODE_DATAFILE_CREATE,
+    //RRDENG_OPCODE_DATAFILE_CREATE,
     RRDENG_OPCODE_JOURNAL_FILE_INDEX,
     RRDENG_OPCODE_DATABASE_ROTATE,
     RRDENG_OPCODE_CTX_SHUTDOWN,
