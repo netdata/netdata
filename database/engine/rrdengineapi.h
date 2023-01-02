@@ -167,17 +167,20 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_load_fail_uuid_not_found;
     size_t pages_load_fail_invalid_extent;
 
-    // timings
-    size_t time_in_main_cache_lookup;
-    size_t time_in_open_cache_lookup;
-    size_t time_in_journal_v2_lookup;
-    size_t time_in_pass4_lookup;
+    // timings for query preparation
+    size_t prep_time_to_route;
+    size_t prep_time_in_main_cache_lookup;
+    size_t prep_time_in_open_cache_lookup;
+    size_t prep_time_in_journal_v2_lookup;
+    size_t prep_time_in_pass4_lookup;
 
-    size_t time_to_route;
-    size_t time_to_slow_disk_next_page;
-    size_t time_to_fast_disk_next_page;
-    size_t time_to_slow_preload_next_page;
-    size_t time_to_fast_preload_next_page;
+    // timings the query thread experiences
+    size_t query_time_init;
+    size_t query_time_wait_for_prep;
+    size_t query_time_to_slow_disk_next_page;
+    size_t query_time_to_fast_disk_next_page;
+    size_t query_time_to_slow_preload_next_page;
+    size_t query_time_to_fast_preload_next_page;
 
     // query issues
     size_t pages_zero_time_skipped;

@@ -553,6 +553,8 @@ static void unregister_query_handle(struct rrdeng_query_handle *handle __maybe_u
  */
 void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority)
 {
+    usec_t started_ut = now_monotonic_usec();
+
     netdata_thread_disable_cancelability();
 
     METRIC *metric = (METRIC *)db_metric_handle;
@@ -585,6 +587,8 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     rrddim_handle->priority = priority;
 
     pg_cache_preload(handle);
+
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
@@ -729,11 +733,7 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *r
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
 
     if(handle->pdc) {
-        if (!handle->pdc->prep_done) {
-            completion_wait_for(&handle->pdc->prep_completion);
-            handle->pdc->prep_done = true;
-        }
-
+        rrdeng_prep_wait(handle->pdc);
         if (handle->pdc->optimal_end_time_s > rrddim_handle->end_time_s)
             rrddim_handle->end_time_s = handle->pdc->optimal_end_time_s;
     }

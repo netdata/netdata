@@ -286,21 +286,21 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ML_TRAINING
             | SERVICE_HEALTH
             | SERVICE_WEB_SERVER
-            , 5 * USEC_PER_SEC);
+            , 3 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
-            , 10 * USEC_PER_SEC);
+            , 3 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_ML_PREDICTION
             | SERVICE_CONTEXT
-            , 5 * USEC_PER_SEC);
+            , 3 * USEC_PER_SEC);
 
     service_wait_exit(
             SERVICE_MAINTENANCE
-            , 5 * USEC_PER_SEC);
+            , 3 * USEC_PER_SEC);
 
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
