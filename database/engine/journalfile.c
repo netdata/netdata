@@ -70,8 +70,7 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     }
 
     uv_fs_req_cleanup(req);
-    posix_memfree(wal->buf);
-    freez(wal);
+    wal_release(wal);
 
     worker_is_idle();
 }
@@ -100,31 +99,10 @@ void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengi
     ret = uv_fs_write(loop, &io_descr->req, journalfile->file, &io_descr->iov, 1,
                       journalfile->pos, flush_transaction_buffer_cb);
     fatal_assert(-1 != ret);
-    journalfile->pos += RRDENG_BLOCK_SIZE;
-    ctx->disk_space += RRDENG_BLOCK_SIZE;
-    ctx->stats.io_write_bytes += RRDENG_BLOCK_SIZE;
+    journalfile->pos += wal->buf_size;
+    ctx->disk_space += wal->buf_size;
+    ctx->stats.io_write_bytes += wal->buf_size;
     ++ctx->stats.io_write_requests;
-}
-
-WAL *wal_get_transaction_buffer(struct rrdengine_instance *ctx __maybe_unused, unsigned size) {
-    WAL *wal = callocz(1, sizeof(WAL));
-
-    if(!size || size > RRDENG_BLOCK_SIZE)
-        fatal("DBENGINE: invalid wal size");
-
-    size_t buf_size = ALIGN_BYTES_CEILING(size);
-
-    int ret = posix_memalign((void *)&wal->buf, RRDFILE_ALIGNMENT, buf_size);
-    if (unlikely(ret)) {
-        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
-
-    wal->transaction_id = ctx->commit_log.transaction_id++;
-    wal->size = size;
-    wal->buf_size = buf_size;
-    memset(wal->buf, 0, buf_size);
-
-    return wal;
 }
 
 void generate_journalfilepath_v2(struct rrdengine_datafile *datafile, char *str, size_t maxlen)

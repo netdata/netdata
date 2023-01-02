@@ -552,6 +552,97 @@ void pdc_release(PDC *pdc) {
     netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
 }
 
+// ----------------------------------------------------------------------------
+// WAL cache
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        WAL *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} wal_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void wal_cleanup(void) {
+    netdata_spinlock_lock(&wal_globals.protected.spinlock);
+
+    while(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers * 2) {
+        WAL *wal = wal_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        posix_memfree(wal->buf);
+        freez(wal);
+        wal_globals.protected.available--;
+        __atomic_sub_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+}
+
+WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
+    if(!size || size > RRDENG_BLOCK_SIZE)
+        fatal("DBENGINE: invalid WAL size requested");
+
+    WAL *wal = NULL;
+
+    netdata_spinlock_lock(&wal_globals.protected.spinlock);
+
+    if(likely(wal_globals.protected.available_items)) {
+        wal = wal_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        wal_globals.protected.available--;
+    }
+
+    uint64_t transaction_id = ctx->commit_log.transaction_id++;
+    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+
+    if(unlikely(!wal)) {
+        wal = mallocz(sizeof(WAL));
+        wal->buf_size = RRDENG_BLOCK_SIZE;
+        int ret = posix_memalign((void *)&wal->buf, RRDFILE_ALIGNMENT, wal->buf_size);
+        if (unlikely(ret))
+            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
+        __atomic_add_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    // these need to survive
+    unsigned buf_size = wal->buf_size;
+    void *buf = wal->buf;
+
+    memset(wal, 0, sizeof(WAL));
+
+    // put them back
+    wal->buf_size = buf_size;
+    wal->buf = buf;
+
+    memset(wal->buf, 0, wal->buf_size);
+
+    wal->transaction_id = transaction_id;
+    wal->size = size;
+
+    return wal;
+}
+
+void wal_release(WAL *wal) {
+    if(unlikely(!wal)) return;
+
+    netdata_spinlock_lock(&wal_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+    wal_globals.protected.available++;
+    netdata_spinlock_unlock(&wal_globals.protected.spinlock);
+}
 
 // ----------------------------------------------------------------------------
 // PDC cache
@@ -1371,7 +1462,7 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
     payload_length = sizeof(*jf_metric_data) + descr_size;
     size_bytes = sizeof(*jf_header) + payload_length + sizeof(*jf_trailer);
 
-    xt_io_descr->wal = wal_get_transaction_buffer(ctx, size_bytes);
+    xt_io_descr->wal = wal_get(ctx, size_bytes);
     buf = xt_io_descr->wal->buf;
 
     jf_header = buf;
@@ -2155,6 +2246,7 @@ void timer_cb(uv_timer_t* handle) {
         pdc_cleanup();
         page_details_cleanup();
         rrdeng_query_handle_cleanup();
+        wal_cleanup();
     }
 
     worker_is_idle();

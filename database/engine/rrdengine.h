@@ -295,7 +295,15 @@ typedef struct wal {
     size_t size;
     size_t buf_size;
     struct generic_io_descriptor io_descr;
+
+    struct {
+        struct wal *prev;
+        struct wal *next;
+    } cache;
 } WAL;
+
+WAL *wal_get(struct rrdengine_instance *ctx, unsigned size);
+void wal_release(WAL *wal);
 
 struct rrdengine_worker_config {
     bool now_deleting_files;

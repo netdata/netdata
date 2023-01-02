@@ -344,7 +344,7 @@ typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
-static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
+static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
     if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
@@ -353,7 +353,7 @@ static void evict_on_clean_page_added(PGC *cache __maybe_unused) {
     }
 }
 
-static void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
+static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
     if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache))) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
