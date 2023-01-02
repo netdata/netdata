@@ -573,6 +573,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     if(!handle->dt_s)
         handle->dt_s = default_rrd_update_every;
 
+    if(unlikely(priority == STORAGE_PRIORITY_CRITICAL))
+        // critical is reserved for dbengine internal use
+        priority = STORAGE_PRIORITY_HIGH;
+
     rrddim_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
     rrddim_handle->start_time_s = start_time_s;
     rrddim_handle->end_time_s = end_time_s;

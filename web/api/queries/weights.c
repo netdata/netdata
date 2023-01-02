@@ -520,6 +520,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .group_options = group_options,
             .tier = tier,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
+            .priority = STORAGE_PRIORITY_NORMAL,
     };
 
     RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
