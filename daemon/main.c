@@ -150,8 +150,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
-    service_signal_exit(service);
-
     BUFFER *service_list = buffer_create(1024);
     BUFFER *thread_list = buffer_create(1024);
     usec_t started_ut = now_monotonic_usec(), ended_ut;
@@ -198,6 +196,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
         netdata_spinlock_unlock(&service_globals.lock);
     }
+
+    service_signal_exit(service);
 
     // signal them to stop
     size_t last_running = 0;
