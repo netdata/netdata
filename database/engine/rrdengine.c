@@ -1324,6 +1324,9 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
 static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ctx->worker_config.outstanding_flush_requests--;
 
+    if(completion)
+        completion_mark_complete(completion);
+
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
@@ -1385,7 +1388,7 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
     datafile->writers.running--;
 
     datafile->writers.flushed_to_open_running++;
-    rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, NULL, STORAGE_PRIORITY_CRITICAL);
+    rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, xt_io_descr->completion, STORAGE_PRIORITY_CRITICAL);
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 
@@ -1534,9 +1537,6 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     fatal_assert(-1 != ret);
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
-
-    if (completion)
-        completion_mark_complete(completion);
 
     return real_io_size;
 }
@@ -2197,7 +2197,9 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_FLUSHED_TO_OPEN: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     uv_fs_t *uv_fs_request = cmd.data;
-                    work_dispatch(ctx, uv_fs_request, NULL, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open);
+                    struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
+                    struct completion *completion = xt_io_descr->completion;
+                    work_dispatch(ctx, uv_fs_request, completion, opcode, extent_flushed_to_open_tp_worker, after_extent_flushed_to_open);
                     break;
                 }
 

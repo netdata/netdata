@@ -49,7 +49,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct page_descr_with_data *base = NULL;
 
-     for (size_t Index = 0 ; Index < entries; Index++) {
+    for (size_t Index = 0 ; Index < entries; Index++) {
         time_t start_time_t = entries_array[Index].start_time_t;
         time_t end_time_t = entries_array[Index].end_time_t;
         struct page_descr_with_data *descr = page_descriptor_get();
@@ -74,9 +74,13 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
-     }
+    }
 
-     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, NULL, STORAGE_PRIORITY_CRITICAL);
+    struct completion completion;
+    completion_init(&completion);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_CRITICAL);
+    completion_wait_for(&completion);
+    completion_destroy(&completion);
 }
 
 static void open_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
