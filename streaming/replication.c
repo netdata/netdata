@@ -136,8 +136,6 @@ static struct replication_query *replication_query_prepare(
     q->ops = &st->rrdhost->db[0].eng->api.query_ops;
     q->data = callocz(q->dimensions, sizeof(struct replication_dimension));
 
-    time_t expanded_before = 0;
-
     // prepare our array of dimensions
     size_t count = 0;
     RRDDIM *rd;
@@ -161,17 +159,8 @@ static struct replication_query *replication_query_prepare(
         q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before, STORAGE_PRIORITY_LOW);
         d->enabled = true;
         count++;
-
-        if(!q->query.enable_streaming) {
-            time_t new_before = q->ops->align_to_optimal_before(&d->handle);
-            if (!expanded_before || new_before < expanded_before)
-                expanded_before = new_before;
-        }
     }
     rrddim_foreach_done(rd);
-
-    if(!q->query.enable_streaming && expanded_before > q->query.before)
-        q->query.before = expanded_before;
 
     if(!count)
         q->query.execute = false;
@@ -216,16 +205,38 @@ static time_t replication_query_finalize(struct replication_query *q, bool execu
     return query_before;
 }
 
+static void replication_query_align_to_optimal_before(struct replication_query *q) {
+    if(!q->query.execute || q->query.enable_streaming)
+        return;
+
+    size_t dimensions = q->dimensions;
+    time_t expanded_before = 0;
+
+    for (size_t i = 0; i < dimensions; i++) {
+        struct replication_dimension *d = &q->data[i];
+        if(unlikely(!d->enabled)) continue;
+
+        time_t new_before = q->ops->align_to_optimal_before(&d->handle);
+        if (!expanded_before || new_before < expanded_before)
+            expanded_before = new_before;
+    }
+
+    if(expanded_before > q->query.before)
+        q->query.before = expanded_before;
+}
+
 static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q) {
+    if(!q->query.execute)
+        return replication_query_finalize(q, false);
+
+    replication_query_align_to_optimal_before(q);
+
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
     struct storage_engine_query_ops *ops = q->ops;
     time_t wall_clock_time = q->wall_clock_time;
     time_t update_every = q->st->update_every;
-
-    if(!q->query.execute)
-        return replication_query_finalize(q, false);
 
     size_t points_read = q->points_read, points_generated = q->points_generated;
 

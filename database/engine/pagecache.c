@@ -11,31 +11,6 @@ struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
 pthread_key_t query_key;
 
-// To check if threads are terminatiing with pending pdc to clear
-static void query_key_release(void *data)
-{
-    info("Thread %d: Cleaning query data, but it should have been cleared", gettid());
-    struct rrdeng_query_handle *handle = data;
-    struct page_details_control *pdc = handle->pdc;
-
-    // Quick loop to verify that the datafile is still acquired
-    struct page_details *pd;
-    Pvoid_t *PValue;
-    bool first_then_next = true;
-    Word_t time_index = 0;
-    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
-        pd = *PValue;
-        PDC_PAGE_STATUS status = pd->status;
-        if(status & PDC_PAGE_DATAFILE_ACQUIRED) {
-            struct rrdengine_datafile *datafile = pd->datafile.ptr;
-            info("QUERY: Datafile %u is still acquired", datafile->fileno);
-        }
-    }
-
-    pdc_destroy(pdc);
-    pthread_setspecific(query_key, NULL);
-}
-
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
@@ -743,6 +718,32 @@ we_are_done:
     return JudyL_page_array;
 }
 
+void rrdeng_prep_query(PDC *pdc) {
+    size_t pages_to_load = 0;
+    pdc->page_list_JudyL = get_page_list(pdc->ctx, pdc->metric,
+                                                 pdc->start_time_s * USEC_PER_SEC,
+                                                 pdc->end_time_s * USEC_PER_SEC,
+                                                 &pages_to_load,
+                                                 &pdc->optimal_end_time_s);
+
+    if (pages_to_load && pdc->page_list_JudyL) {
+        pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
+        pdc->preload_all_extent_pages = false;
+        usec_t start_ut = now_monotonic_usec();
+//        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
+//            dbengine_load_page_list_directly(ctx, handle->pdc);
+//        else
+        dbengine_load_page_list(pdc->ctx, pdc);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
+    }
+    else
+        completion_mark_complete(&pdc->page_completion);
+
+    completion_mark_complete(&pdc->prep_completion);
+
+    pdc_release_and_destroy_if_unreferenced(pdc, true, true);
+}
+
 /**
  * Searches for pages in a time range and triggers disk I/O if necessary and possible.
  * @param ctx DB context
@@ -751,41 +752,25 @@ we_are_done:
  * @param end_time_ut inclusive ending time in usec
  * @return 1 / 0 (pages found or not found)
  */
-void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, STORAGE_PRIORITY priority) {
+void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 
-    size_t pages_to_load = 0;
-
-    __atomic_add_fetch(&ctx->inflight_queries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&handle->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = pdc_get();
-    handle->pdc->priority = priority;
-    handle->pdc->ctx = ctx;
+    handle->pdc->metric = mrg_metric_dup(main_mrg, handle->metric);
+    handle->pdc->start_time_s = handle->start_time_s;
+    handle->pdc->end_time_s = handle->end_time_s;
+    handle->pdc->priority = handle->priority;
+    handle->pdc->optimal_end_time_s = handle->end_time_s;
+    handle->pdc->ctx = handle->ctx;
+    handle->pdc->refcount = 2; // we get 1 for the query thread and 1 for the prep thread
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);
-    completion_init(&handle->pdc->completion);
+    completion_init(&handle->pdc->prep_completion);
+    completion_init(&handle->pdc->page_completion);
 
-    handle->pdc->page_list_JudyL = get_page_list(ctx, handle->metric,
-                                     start_time_t * USEC_PER_SEC, end_time_t * USEC_PER_SEC,
-                                                 &pages_to_load, &handle->optimal_end_time_s);
-
-    int ret = pthread_setspecific(query_key, handle);
-    fatal_assert(0 == ret);
-
-    if (pages_to_load && handle->pdc->page_list_JudyL) {
-        handle->pdc->refcount = 2; // we get 1 for us and 1 for the 1st worker in the chain: do_read_page_list_work()
-        handle->pdc->preload_all_extent_pages = false;
-        usec_t start_ut = now_monotonic_usec();
-//        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
-//            dbengine_load_page_list_directly(ctx, handle->pdc);
-//        else
-        dbengine_load_page_list(ctx, handle->pdc);
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
-    }
-    else {
-        handle->pdc->refcount = 1; // we are alone in this query - no need for any worker
-        completion_mark_complete(&handle->pdc->completion);
-    }
+    rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority);
 }
 
 /*
@@ -800,7 +785,15 @@ struct pgc_page *pg_cache_lookup_next(
         time_t last_update_every_s,
         size_t *entries
 ) {
-    if (unlikely(!pdc || !pdc->page_list_JudyL))
+    if (unlikely(!pdc))
+        return NULL;
+
+    if (unlikely(!pdc->prep_done)) {
+        completion_wait_for(&pdc->prep_completion);
+        pdc->prep_done = true;
+    }
+
+    if (unlikely(!pdc->page_list_JudyL))
         return NULL;
 
     size_t gaps = 0;
@@ -821,7 +814,7 @@ struct pgc_page *pg_cache_lookup_next(
         page_from_pd = true;
         preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
         if(!page) {
-            if(!completion_is_done(&pdc->completion)) {
+            if(!completion_is_done(&pdc->page_completion)) {
                 page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx,
                                                 pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
                 page_from_pd = false;
@@ -830,7 +823,7 @@ struct pgc_page *pg_cache_lookup_next(
 
             if(!page) {
                 pdc->completed_jobs =
-                        completion_wait_for_a_job(&pdc->completion, pdc->completed_jobs);
+                        completion_wait_for_a_job(&pdc->page_completion, pdc->completed_jobs);
 
                 page = pd->page;
                 page_from_pd = true;
@@ -1008,7 +1001,6 @@ void init_page_cache(void)
     if (!initialized) {
         initialized = true;
 
-        (void)pthread_key_create(&query_key, query_key_release);
         main_mrg = mrg_create();
 
         size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;

@@ -9,7 +9,6 @@ extern struct mrg *main_mrg;
 extern struct pgc *main_cache;
 extern struct pgc *open_cache;
 extern struct pgc *extent_cache;
-extern pthread_key_t query_key;
 
 /* Forward declarations */
 struct rrdengine_instance;
@@ -58,7 +57,8 @@ struct pg_alignment {
 struct rrdeng_query_handle;
 struct page_details_control;
 
-void pg_cache_preload(struct rrdengine_instance *ctx, struct rrdeng_query_handle *handle, time_t start_time_t, time_t end_time_t, STORAGE_PRIORITY priority);
+void rrdeng_prep_query(struct page_details_control *pdc);
+void pg_cache_preload(struct rrdeng_query_handle *handle);
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct page_details_control *pdc, time_t now_s, time_t last_update_every_s, size_t *entries);
 void init_page_cache(void);
 

@@ -39,19 +39,26 @@ struct rrdengine_instance;
 
 typedef struct page_details_control {
     struct rrdengine_instance *ctx;
+    struct metric *metric;
 
-    struct completion completion;   // sync between the query thread and the workers
+    struct completion prep_completion;
+    struct completion page_completion;   // sync between the query thread and the workers
 
     Pvoid_t page_list_JudyL;        // the list of page details
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
     bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
     bool workers_should_stop;       // true when the query thread left and the workers should stop
+    bool prep_done;
 
     SPINLOCK refcount_spinlock;     // spinlock to protect refcount
     int32_t refcount;               // the number of workers currently working on this request + 1 for the query thread
     size_t executed_with_gaps;
 
+    time_t start_time_s;
+    time_t end_time_s;
     STORAGE_PRIORITY priority;
+
+    time_t optimal_end_time_s;
 
     struct {
         struct page_details_control *prev;
@@ -186,9 +193,14 @@ struct rrdeng_query_handle {
     storage_number *metric_data;
     struct page_details_control *pdc;
 
+    // the request
+    time_t start_time_s;
+    time_t end_time_s;
+    STORAGE_PRIORITY priority;
+
+    // internal data
     time_t now_s;
     time_t dt_s;
-    time_t optimal_end_time_s;
 
     unsigned position;
     unsigned entries;
@@ -213,6 +225,7 @@ enum rrdeng_opcode {
     RRDENG_OPCODE_NOOP = 0,
 
     RRDENG_OPCODE_EXTENT_READ,
+    RRDENG_OPCODE_PREP_QUERY,
     RRDENG_OPCODE_FLUSH_PAGES,
     RRDENG_OPCODE_FLUSHED_TO_OPEN,
     RRDENG_OPCODE_FLUSH_INIT,
@@ -378,6 +391,7 @@ void pdc_destroy(PDC *pdc);
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
+void pdc_acquire(PDC *pdc);
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
 
 unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx);

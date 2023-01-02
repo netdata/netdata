@@ -564,25 +564,27 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
+    if(unlikely(priority == STORAGE_PRIORITY_CRITICAL))
+        // critical is reserved for dbengine internal use
+        priority = STORAGE_PRIORITY_HIGH;
+
     handle->ctx = ctx;
     handle->metric = metric;
+    handle->start_time_s = start_time_s;
+    handle->end_time_s = end_time_s;
+    handle->priority = priority;
     handle->now_s = start_time_s;
-    handle->optimal_end_time_s = end_time_s;
 
     handle->dt_s = mrg_metric_get_update_every(main_mrg, metric);
     if(!handle->dt_s)
         handle->dt_s = default_rrd_update_every;
-
-    if(unlikely(priority == STORAGE_PRIORITY_CRITICAL))
-        // critical is reserved for dbengine internal use
-        priority = STORAGE_PRIORITY_HIGH;
 
     rrddim_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
     rrddim_handle->start_time_s = start_time_s;
     rrddim_handle->end_time_s = end_time_s;
     rrddim_handle->priority = priority;
 
-    pg_cache_preload(ctx, handle, start_time_s, end_time_s, priority);
+    pg_cache_preload(handle);
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {
@@ -720,15 +722,21 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_hand
     unregister_query_handle(handle);
     rrdeng_query_handle_release(handle);
     rrddim_handle->handle = NULL;
-    pthread_setspecific(query_key, NULL);
     netdata_thread_enable_cancelability();
 }
 
 time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle) {
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)rrddim_handle->handle;
 
-    if(handle->optimal_end_time_s > rrddim_handle->end_time_s)
-        rrddim_handle->end_time_s = handle->optimal_end_time_s;
+    if(handle->pdc) {
+        if (!handle->pdc->prep_done) {
+            completion_wait_for(&handle->pdc->prep_completion);
+            handle->pdc->prep_done = true;
+        }
+
+        if (handle->pdc->optimal_end_time_s > rrddim_handle->end_time_s)
+            rrddim_handle->end_time_s = handle->pdc->optimal_end_time_s;
+    }
 
     return rrddim_handle->end_time_s;
 }

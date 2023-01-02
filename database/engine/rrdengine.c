@@ -159,7 +159,9 @@ static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_ins
 // page details list
 
 void pdc_destroy(PDC *pdc) {
-    completion_destroy(&pdc->completion);
+    mrg_metric_release(main_mrg, pdc->metric);
+    completion_destroy(&pdc->prep_completion);
+    completion_destroy(&pdc->page_completion);
 
     Pvoid_t *PValue;
     struct page_details *pd;
@@ -202,7 +204,7 @@ void pdc_destroy(PDC *pdc) {
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
 }
 
-static void pdc_acquire(PDC *pdc) {
+void pdc_acquire(PDC *pdc) {
     netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount < 1)
@@ -225,7 +227,7 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
         // we can mark the job completed:
         // - if the remaining refcount is from the query caller, we will wake it up
         // - if the remaining refcount is from another worker, the query thread is already away
-        completion_mark_complete(&pdc->completion);
+        completion_mark_complete(&pdc->page_completion);
     }
 
     if (pdc->refcount == 0) {
@@ -1845,6 +1847,16 @@ static void cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused,
     pgc_evict_pages(main_cache, 0, 0);
 }
 
+static void after_prep_query(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
+}
+
+static void query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+    worker_is_busy(UV_EVENT_PREP_QUERY);
+    PDC *pdc = data;
+    rrdeng_prep_query(pdc);
+}
+
 unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
     unsigned target_size = ctx->max_disk_space / TARGET_DATAFILES;
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
@@ -2033,7 +2045,7 @@ cleanup:
     if(extent_exclusive)
         datafile_release_exclusive_access_to_extent(extent_page_list);
 
-    completion_mark_complete_a_job(&extent_page_list->pdc->completion);
+    completion_mark_complete_a_job(&extent_page_list->pdc->page_completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true, false);
 
     // Free the Judy that holds the requested pagelist and the extents
@@ -2199,6 +2211,7 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_NOOP,                                     "noop");
 
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
+    worker_register_job_name(RRDENG_OPCODE_PREP_QUERY,                               "prep query");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_PAGES,                              "flush pages");
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
@@ -2210,6 +2223,7 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
 
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_READ,          "extent read cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PREP_QUERY,           "prep query cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES,          "flush pages cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_INIT,           "flush init cb");
@@ -2252,6 +2266,13 @@ void rrdeng_worker(void* arg) {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     EXTENT_PD_LIST *extent_page_list = cmd.data;
                     work_dispatch(ctx, extent_page_list, NULL, opcode, extent_read_tp_worker, after_extent_read);
+                    break;
+                }
+
+                case RRDENG_OPCODE_PREP_QUERY: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    PDC *pdc = cmd.data;
+                    work_dispatch(ctx, pdc, NULL, opcode, query_prep_tp_worker, after_prep_query);
                     break;
                 }
 
