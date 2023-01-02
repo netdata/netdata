@@ -106,7 +106,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
                             time_t after, time_t before,
                             RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
-                            size_t tier, time_t timeout, QUERY_SOURCE query_source
+                            size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
             .host = host,
@@ -122,6 +122,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .tier = tier,
             .timeout = timeout,
             .query_source = query_source,
+            .priority = priority,
     };
 
     ONEWAYALLOC *owa = onewayalloc_create(16 * 1024);

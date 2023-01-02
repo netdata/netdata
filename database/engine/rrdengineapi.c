@@ -561,7 +561,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
 
     mrg_metric_set_update_every_if_zero(main_mrg, metric, default_rrd_update_every);
 
-    handle = callocz(1, sizeof(struct rrdeng_query_handle));
+    handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
     handle->ctx = ctx;
@@ -576,6 +576,7 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     rrddim_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
     rrddim_handle->start_time_s = start_time_s;
     rrddim_handle->end_time_s = end_time_s;
+    rrddim_handle->priority = priority;
 
     pg_cache_preload(ctx, handle, start_time_s, end_time_s, priority);
 }
@@ -713,7 +714,7 @@ void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_hand
     }
 
     unregister_query_handle(handle);
-    freez(handle);
+    rrdeng_query_handle_release(handle);
     rrddim_handle->handle = NULL;
     pthread_setspecific(query_key, NULL);
     netdata_thread_enable_cancelability();

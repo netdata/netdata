@@ -193,12 +193,20 @@ struct rrdeng_query_handle {
     unsigned position;
     unsigned entries;
 
+    struct {
+        struct rrdeng_query_handle *prev;
+        struct rrdeng_query_handle *next;
+    } cache;
+
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t started_time_t;
     pid_t query_pid;
     struct rrdeng_query_handle *prev, *next;
 #endif
 };
+
+struct rrdeng_query_handle *rrdeng_query_handle_get(void);
+void rrdeng_query_handle_release(struct rrdeng_query_handle *handle);
 
 enum rrdeng_opcode {
     /* can be used to return empty status or flush the command queue */

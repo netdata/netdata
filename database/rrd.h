@@ -447,6 +447,7 @@ struct storage_engine_query_handle {
     RRDDIM *rd;
     time_t start_time_s;
     time_t end_time_s;
+    STORAGE_PRIORITY priority;
     STORAGE_QUERY_HANDLE* handle;
 };
 

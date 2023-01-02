@@ -951,7 +951,7 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
 
     ops->tier = ops->plan.data[plan_id].tier;
     ops->tier_ptr = &ops->qm->tiers[ops->tier];
-    ops->tier_ptr->eng->api.query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before, STORAGE_PRIORITY_NORMAL);
+    ops->tier_ptr->eng->api.query_ops.init(ops->tier_ptr->db_metric_handle, &ops->handle, after, before, ops->r->internal.qt->request.priority);
     ops->next_metric = ops->tier_ptr->eng->api.query_ops.next_metric;
     ops->is_finished = ops->tier_ptr->eng->api.query_ops.is_finished;
     ops->finalize = ops->tier_ptr->eng->api.query_ops.finalize;
@@ -1974,7 +1974,8 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source) {
+        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
+        STORAGE_PRIORITY priority) {
 
     QUERY_TARGET_REQUEST qtr = {
             .st = st,
@@ -1989,6 +1990,7 @@ RRDR *rrd2rrdr_legacy(
             .timeout = timeout,
             .tier = tier,
             .query_source = query_source,
+            .priority = priority,
     };
 
     return rrd2rrdr(owa, query_target_create(&qtr));

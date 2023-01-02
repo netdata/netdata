@@ -141,7 +141,8 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             NULL /* group options */,
             0, /* timeout */
             0, /* tier */
-            QUERY_SOURCE_ML
+            QUERY_SOURCE_ML,
+            STORAGE_PRIORITY_BEST_EFFORT
     );
     if(R) {
         assert(R->d == 1 && R->n == 1 && R->rows == 1);

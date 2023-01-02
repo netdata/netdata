@@ -831,6 +831,75 @@ static inline void extent_buffer_release(struct extent_buffer *eb) {
 }
 
 // ----------------------------------------------------------------------------
+// query handle cache
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        struct rrdeng_query_handle *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} rrdeng_query_handle_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void rrdeng_query_handle_cleanup(void) {
+    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
+
+    while(rrdeng_query_handle_globals.protected.available_items && rrdeng_query_handle_globals.protected.available > 10) {
+        struct rrdeng_query_handle *item = rrdeng_query_handle_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        rrdeng_query_handle_globals.protected.available--;
+        __atomic_sub_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
+}
+
+struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
+    struct rrdeng_query_handle *handle = NULL;
+
+    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
+
+    if(likely(rrdeng_query_handle_globals.protected.available_items)) {
+        handle = rrdeng_query_handle_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+        rrdeng_query_handle_globals.protected.available--;
+    }
+
+    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
+
+    if(unlikely(!handle)) {
+        handle = mallocz(sizeof(struct rrdeng_query_handle));
+        __atomic_add_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    memset(handle, 0, sizeof(struct rrdeng_query_handle));
+    return handle;
+}
+
+void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
+    if(unlikely(!handle)) return;
+
+    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+    rrdeng_query_handle_globals.protected.available++;
+    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
+}
+
+// ----------------------------------------------------------------------------
 // command queue cache
 
 struct rrdeng_cmd {
@@ -2073,6 +2142,7 @@ void timer_cb(uv_timer_t* handle) {
         rrdeng_cmd_cleanup();
         pdc_cleanup();
         page_details_cleanup();
+        rrdeng_query_handle_cleanup();
     }
 
     worker_is_idle();

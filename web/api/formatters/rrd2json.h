@@ -79,6 +79,7 @@ int rrdset2value_api_v1(
         , time_t timeout
         , size_t tier
         , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
 );
 
 #endif /* NETDATA_RRD2JSON_H */
