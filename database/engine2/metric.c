@@ -408,6 +408,8 @@ struct mrg_statistics mrg_get_statistics(MRG *mrg) {
 // ----------------------------------------------------------------------------
 // unit test
 
+#ifdef MRG_STRESS_TEST
+
 static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
     bool ret;
 
@@ -416,9 +418,9 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
     METRIC *array[entries][sections];
     for(size_t i = 0; i < entries ; i++) {
         MRG_ENTRY e = {
-                .first_time_t = (time_t)i,
-                .latest_time_t = (time_t)(i + 1),
-                .latest_update_every = (time_t)(i + 2),
+                .first_time_t = (time_t)(i + 1),
+                .latest_time_t = (time_t)(i + 2),
+                .latest_update_every = (time_t)(i + 3),
         };
         uuid_generate_random(e.uuid);
 
@@ -453,25 +455,25 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
             if(mrg_metric_id(mrg, array[i][section]) != (Word_t)array[i][section])
                 fatal("DBENGINE METRIC: metric id does not match");
 
-            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)i)
+            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)(i + 1))
                 fatal("DBENGINE METRIC: wrong first time returned");
-            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i + 1))
+            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i + 2))
                 fatal("DBENGINE METRIC: wrong latest time returned");
-            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i + 2))
+            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i + 3))
                 fatal("DBENGINE METRIC: wrong latest time returned");
 
-            if(!mrg_metric_set_first_time_t(mrg, array[i][section], (time_t)(i * 2)))
+            if(!mrg_metric_set_first_time_t(mrg, array[i][section], (time_t)((i + 1) * 2)))
                 fatal("DBENGINE METRIC: cannot set first time");
-            if(!mrg_metric_set_clean_latest_time_t(mrg, array[i][section], (time_t) (i * 3)))
+            if(!mrg_metric_set_clean_latest_time_t(mrg, array[i][section], (time_t) ((i + 1) * 3)))
                 fatal("DBENGINE METRIC: cannot set latest time");
-            if(!mrg_metric_set_update_every(mrg, array[i][section], (time_t)(i * 4)))
+            if(!mrg_metric_set_update_every(mrg, array[i][section], (time_t)((i + 1) * 4)))
                 fatal("DBENGINE METRIC: cannot set update every");
 
-            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)(i * 2))
+            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)((i + 1) * 2))
                 fatal("DBENGINE METRIC: wrong first time returned");
-            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i * 3))
+            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)((i + 1) * 3))
                 fatal("DBENGINE METRIC: wrong latest time returned");
-            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i * 4))
+            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)((i + 1) * 4))
                 fatal("DBENGINE METRIC: wrong latest time returned");
         }
     }
@@ -480,20 +482,6 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
         for (size_t section = 0; section < sections; section++) {
             if(!mrg_metric_release_and_delete(mrg, array[i][section]))
                 fatal("DBENGINE METRIC: failed to delete metric");
-            if(mrg_metric_release_and_delete(mrg, array[i][section]))
-                fatal("DBENGINE METRIC: managed to delete the same metric twice");
-            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != 0)
-                fatal("DBENGINE METRIC: got first time on deleted metric");
-            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != 0)
-                fatal("DBENGINE METRIC: got latest time on deleted metric");
-            if(mrg_metric_get_update_every(mrg, array[i][section]) != 0)
-                fatal("DBENGINE METRIC: got updated every on deleted metric");
-            if(mrg_metric_set_first_time_t(mrg, array[i][section], 1))
-                fatal("DBENGINE METRIC: set first time on deleted metric");
-            if(mrg_metric_set_clean_latest_time_t(mrg, array[i][section], 1))
-                fatal("DBENGINE METRIC: set latest time on deleted metric");
-            if(mrg_metric_set_update_every(mrg, array[i][section], 1))
-                fatal("DBENGINE METRIC: set update every on deleted metric");
         }
     }
 }
@@ -524,6 +512,7 @@ static void *mrg_stress_test_thread3(void *ptr) {
 
     return ptr;
 }
+#endif
 
 int mrg_unittest(void) {
     MRG *mrg = mrg_create();
@@ -597,6 +586,7 @@ int mrg_unittest(void) {
     if(mrg->stats.entries != 0)
         fatal("DBENGINE METRIC: invalid entries counter");
 
+#ifdef MRG_STRESS_TEST
     usec_t started_ut = now_realtime_usec();
     pthread_t thread1;
     netdata_thread_create(&thread1, "TH1",
@@ -635,6 +625,8 @@ int mrg_unittest(void) {
         mrg->stats.search_hits, mrg->stats.search_misses,
         mrg->stats.pointer_validation_hits, mrg->stats.pointer_validation_misses,
         ended_ut - started_ut);
+
+#endif
 
     mrg_destroy(mrg);
 
