@@ -1088,10 +1088,6 @@ void rrdhost_free(RRDHOST *host, bool force) {
 
     rrd_check_wrlock();     // make sure the RRDs are write locked
 
-    rrdhost_wrlock(host);
-    ml_host_delete(host);
-    rrdhost_unlock(host);
-
     // ------------------------------------------------------------------------
     // clean up streaming
 
@@ -1125,6 +1121,8 @@ void rrdhost_free(RRDHOST *host, bool force) {
     rrdset_index_destroy(host);
     rrdcalc_rrdhost_index_destroy(host);
     rrdcalctemplate_index_destroy(host);
+
+    ml_host_delete(host);
 
     freez(host->exporting_flags);
 

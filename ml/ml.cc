@@ -108,6 +108,7 @@ void ml_dimension_delete(RRDDIM *RD) {
     Chart *C = reinterpret_cast<Chart *>(RD->rrdset->ml_chart);
     C->removeDimension(D);
 
+    delete D;
     RD->ml_dimension = nullptr;
 }
 
