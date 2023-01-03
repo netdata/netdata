@@ -243,6 +243,7 @@ ML_FILES += \
     ml/Dimension.h \
     ml/Host.h \
     ml/Host.cc \
+    ml/Mutex.h \
     ml/Queue.h \
     ml/Query.h \
     ml/KMeans.h \
