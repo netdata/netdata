@@ -150,6 +150,20 @@ char *ml_get_host_models(RRDHOST *RH) {
     return nullptr;
 }
 
+void ml_start_anomaly_detection_threads(RRDHOST *RH) {
+    if (RH && RH->ml_host) {
+        Host *H = reinterpret_cast<Host *>(RH->ml_host);
+        H->startAnomalyDetectionThreads();
+    }
+}
+
+void ml_stop_anomaly_detection_threads(RRDHOST *RH) {
+    if (RH && RH->ml_host) {
+        Host *H = reinterpret_cast<Host *>(RH->ml_host);
+        H->stopAnomalyDetectionThreads();
+    }
+}
+
 void ml_chart_update_begin(RRDSET *RS) {
     Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
     if (!C)

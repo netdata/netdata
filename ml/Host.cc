@@ -284,6 +284,13 @@ void *detect_main(void *Arg) {
 }
 
 void Host::startAnomalyDetectionThreads() {
+    if (ThreadsRunning) {
+        error("Anomaly detections threads for host %s are already-up and running.", rrdhost_hostname(RH));
+        return;
+    }
+
+    ThreadsRunning = true;
+
     char Tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%s]", rrdhost_hostname(RH));
@@ -294,6 +301,13 @@ void Host::startAnomalyDetectionThreads() {
 }
 
 void Host::stopAnomalyDetectionThreads() {
+    if (!ThreadsRunning) {
+        error("Anomaly detections threads for host %s have already been stopped.", rrdhost_hostname(RH));
+        return;
+    }
+
+    ThreadsRunning = false;
+
     // Signal the training queue to stop popping-items
     TrainingQueue.signal();
     netdata_thread_cancel(TrainingThread);

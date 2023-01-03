@@ -25,7 +25,8 @@ public:
         RH(RH),
         MLS(),
         TS(),
-        HostAnomalyRate(0.0) {}
+        HostAnomalyRate(0.0),
+        ThreadsRunning(false) {}
 
     void addChart(Chart *C);
     void removeChart(Chart *C);
@@ -48,6 +49,7 @@ private:
     MachineLearningStats MLS;
     TrainingStats TS;
     CalculatedNumber HostAnomalyRate{0.0};
+    std::atomic<bool> ThreadsRunning;
 
     Queue<TrainingRequest> TrainingQueue;
 
