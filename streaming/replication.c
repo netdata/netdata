@@ -221,7 +221,9 @@ static void replication_query_align_to_optimal_before(struct replication_query *
             expanded_before = new_before;
     }
 
-    if(expanded_before > q->query.before && (expanded_before - q->query.before) / q->st->update_every < 1024)
+    if(expanded_before > q->query.before                                 && // it is later than the original
+        (expanded_before - q->query.before) / q->st->update_every < 1024 && // it is reasonable (up to a page)
+        expanded_before < q->st->last_updated.tv_sec)                       // it is not the chart's last updated time
         q->query.before = expanded_before;
 }
 
