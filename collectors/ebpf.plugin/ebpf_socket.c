@@ -62,8 +62,6 @@ ebpf_socket_publish_apps_t **socket_bandwidth_curr = NULL;
 static ebpf_bandwidth_t *bandwidth_vector = NULL;
 
 pthread_mutex_t nv_mutex;
-int wait_to_plot = 0;
-
 netdata_vector_plot_t inbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_vector_plot_t outbound_vectors = { .plot = NULL, .next = 0, .last = 0 };
 netdata_socket_t *socket_values;
@@ -459,6 +457,9 @@ static inline void clean_internal_socket_plot(netdata_socket_plot_t *ptr)
  */
 static void clean_allocated_socket_plot()
 {
+    if (!network_viewer_opt.enabled)
+        return;
+
     uint32_t i;
     uint32_t end = inbound_vectors.last;
     netdata_socket_plot_t *plot = inbound_vectors.plot;
@@ -725,7 +726,7 @@ static void ebpf_update_global_publish(
  */
 static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_socket_t *sock)
 {
-    if (sock->ct > plot->last_time) {
+    if (sock->ct != plot->last_time) {
         plot->last_time         = sock->ct;
         plot->plot_recv_packets = sock->recv_packets;
         plot->plot_sent_packets = sock->sent_packets;
@@ -748,6 +749,7 @@ static inline void update_nv_plot_data(netdata_plot_values_t *plot, netdata_sock
  */
 static inline void calculate_nv_plot()
 {
+    pthread_mutex_lock(&nv_mutex);
     uint32_t i;
     uint32_t end = inbound_vectors.next;
     for (i = 0; i < end; i++) {
@@ -765,9 +767,12 @@ static inline void calculate_nv_plot()
     }
     outbound_vectors.max_plot = end;
 
+    /*
     // The 'Other' dimension is always calculated for the chart to have at least one dimension
     update_nv_plot_data(&outbound_vectors.plot[outbound_vectors.last].plot,
                         &outbound_vectors.plot[outbound_vectors.last].sock);
+                        */
+    pthread_mutex_unlock(&nv_mutex);
 }
 
 /**
@@ -1442,17 +1447,17 @@ static void ebpf_socket_create_nv_charts(netdata_vector_plot_t *ptr, int update_
  *
  * @return It returns 1 if the IP is inside the range and 0 otherwise
  */
-static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
+static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
 {
     if (!network_viewer_opt.excluded_ips && !network_viewer_opt.included_ips)
         return 1;
 
-    uint32_t ipv4_test = ntohl(cmp->addr32[0]);
+    uint32_t ipv4_test = htonl(cmp->addr32[0]);
     ebpf_network_viewer_ip_list_t *move = network_viewer_opt.excluded_ips;
     while (move) {
         if (family == AF_INET) {
-            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
-                ipv4_test <= ntohl(move->last.addr32[0]) )
+            if (move->first.addr32[0] <= ipv4_test &&
+                ipv4_test <= move->last.addr32[0])
                 return 0;
         } else {
             if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
@@ -1465,12 +1470,13 @@ static int is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
 
     move = network_viewer_opt.included_ips;
     while (move) {
-        if (family == AF_INET) {
-            if (ntohl(move->first.addr32[0]) <= ipv4_test &&
-                ntohl(move->last.addr32[0]) >= ipv4_test)
+        if (family == AF_INET && move->ver == AF_INET) {
+            if (move->first.addr32[0] <= ipv4_test &&
+                move->last.addr32[0] >= ipv4_test)
                 return 1;
         } else {
-            if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+            if (move->ver == AF_INET6 &&
+                memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
                 memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
                 return 1;
             }
@@ -1566,7 +1572,7 @@ int is_socket_allowed(netdata_socket_idx_t *key, int family)
     if (!is_port_inside_range(key->dport))
         return 0;
 
-    return is_specific_ip_inside_range(&key->daddr, family);
+    return ebpf_is_specific_ip_inside_range(&key->daddr, family);
 }
 
 /**
@@ -1581,38 +1587,26 @@ int is_socket_allowed(netdata_socket_idx_t *key, int family)
  *
  * @return It returns 0 case the values are equal, 1 case a is bigger than b and -1 case a is smaller than b.
  */
-static int compare_sockets(void *a, void *b)
+static int ebpf_compare_sockets(void *a, void *b)
 {
     struct netdata_socket_plot *val1 = a;
     struct netdata_socket_plot *val2 = b;
-    int cmp;
+    int cmp = 0;
 
     // We do not need to compare val2 family, because data inside hash table is always from the same family
     if (val1->family == AF_INET) { //IPV4
-        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
-            if (val1->index.sport == val2->index.sport)
-                cmp = 0;
-            else {
-                cmp = (val1->index.sport > val2->index.sport)?1:-1;
-            }
-        } else {
+        if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
             cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
-            if (!cmp) {
-                cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
-            }
+
+        if (!cmp) {
+            cmp = memcmp(&val1->index.daddr.addr32[0], &val2->index.daddr.addr32[0], sizeof(uint32_t));
         }
     } else {
-        if (val1->flags & NETDATA_INBOUND_DIRECTION) {
-            if (val1->index.sport == val2->index.sport)
-                cmp = 0;
-            else {
-                cmp = (val1->index.sport > val2->index.sport)?1:-1;
-            }
-        } else {
+        if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
             cmp = memcmp(&val1->index.dport, &val2->index.dport, sizeof(uint16_t));
-            if (!cmp) {
-                cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
-            }
+
+        if (!cmp) {
+            cmp = memcmp(&val1->index.daddr.addr32, &val2->index.daddr.addr32, 4*sizeof(uint32_t));
         }
     }
 
@@ -1632,12 +1626,15 @@ static int compare_sockets(void *a, void *b)
  *
  * @return  it returns the size of the data copied on success and -1 otherwise.
  */
-static inline int build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
-                                               char *proto, int family)
+static inline int ebpf_build_outbound_dimension_name(char *dimname, char *hostname, char *service_name,
+                                                     char *proto, int family)
 {
-    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
-                    service_name, proto,
-                    hostname);
+    if (network_viewer_opt.included_port || network_viewer_opt.excluded_port)
+        return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s:%s_":"%s:%s:[%s]_",
+                        service_name, proto, hostname);
+
+    return snprintf(dimname, CONFIG_MAX_NAME - 7, (family == AF_INET)?"%s:%s_":"%s:[%s]_",
+                    proto, hostname);
 }
 
 /**
@@ -1693,7 +1690,7 @@ static inline void fill_resolved_name(netdata_socket_plot_t *ptr, char *hostname
     }
 
     if (is_outbound)
-        size = build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
+        size = ebpf_build_outbound_dimension_name(dimname, hostname, service_name, protocol, ptr->family);
     else
         size = build_inbound_dimension_name(dimname,service_name, protocol);
 
@@ -1851,14 +1848,12 @@ static void fill_last_nv_dimension(netdata_socket_plot_t *ptr, int is_outbound)
  */
 static inline void update_socket_data(netdata_socket_t *sock, netdata_socket_t *lvalues)
 {
-    sock->recv_packets += lvalues->recv_packets;
-    sock->sent_packets += lvalues->sent_packets;
-    sock->recv_bytes   += lvalues->recv_bytes;
-    sock->sent_bytes   += lvalues->sent_bytes;
-    sock->retransmit   += lvalues->retransmit;
-
-    if (lvalues->ct > sock->ct)
-        sock->ct = lvalues->ct;
+    sock->recv_packets = lvalues->recv_packets;
+    sock->sent_packets = lvalues->sent_packets;
+    sock->recv_bytes   = lvalues->recv_bytes;
+    sock->sent_bytes   = lvalues->sent_bytes;
+    sock->retransmit   = lvalues->retransmit;
+    sock->ct = lvalues->ct;
 }
 
 /**
@@ -1882,7 +1877,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
     ret = (netdata_socket_plot_t *) avl_search_lock(&out->tree, (avl_t *)&test);
     if (ret) {
-        if (lvalues->ct > ret->plot.last_time) {
+        if (lvalues->ct != ret->plot.last_time) {
             update_socket_data(&ret->sock, lvalues);
         }
     } else {
@@ -1893,7 +1888,7 @@ static void store_socket_inside_avl(netdata_vector_plot_t *out, netdata_socket_t
 
         int resolved;
         if (curr == last) {
-            if (lvalues->ct > w->plot.last_time) {
+            if (lvalues->ct != w->plot.last_time) {
                 update_socket_data(&w->sock, lvalues);
             }
             return;
@@ -1978,6 +1973,9 @@ netdata_vector_plot_t * select_vector_to_store(uint32_t *direction, netdata_sock
  */
 static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key, int family, int end)
 {
+    if (!network_viewer_opt.enabled || !is_socket_allowed(key, family))
+        return;
+
     uint64_t bsent = 0, brecv = 0, psent = 0, precv = 0;
     uint16_t retransmit = 0;
     int i;
@@ -1995,7 +1993,7 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
         if (!protocol)
             protocol = w->protocol;
 
-        if (w->ct > ct)
+        if (w->ct != ct)
             ct = w->ct;
     }
 
@@ -2007,11 +2005,9 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
     values[0].protocol     = (!protocol)?IPPROTO_TCP:protocol;
     values[0].ct           = ct;
 
-    if (is_socket_allowed(key, family)) {
-        uint32_t dir;
-        netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
-        store_socket_inside_avl(table, &values[0], key, family, dir);
-    }
+    uint32_t dir;
+    netdata_vector_plot_t *table = select_vector_to_store(&dir, key, protocol);
+    store_socket_inside_avl(table, &values[0], key, family, dir);
 }
 
 /**
@@ -2019,16 +2015,13 @@ static void hash_accumulator(netdata_socket_t *values, netdata_socket_idx_t *key
  *
  * Read data from hash tables created on kernel ring.
  *
- * @param fd  the hash table with data.
- * @param family the family associated to the hash table
+ * @param fd                 the hash table with data.
+ * @param family             the family associated to the hash table
  *
  * @return it returns 0 on success and -1 otherwise.
  */
-static void read_socket_hash_table(int fd, int family, int network_connection)
+static void ebpf_read_socket_hash_table(int fd, int family)
 {
-    if (wait_to_plot)
-        return;
-
     netdata_socket_idx_t key = {};
     netdata_socket_idx_t next_key = {};
 
@@ -2047,9 +2040,7 @@ static void read_socket_hash_table(int fd, int family, int network_connection)
             continue;
         }
 
-        if (network_connection) {
-            hash_accumulator(values, &key, family, end);
-        }
+        hash_accumulator(values, &key, family, end);
 
         key = next_key;
     }
@@ -2167,15 +2158,16 @@ void *ebpf_socket_read_hash(void *ptr)
     usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    int network_connection = em->optional;
+    uint32_t network_connection = network_viewer_opt.enabled;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
 
         pthread_mutex_lock(&nv_mutex);
         read_listen_table();
-        read_socket_hash_table(fd_ipv4, AF_INET, network_connection);
-        read_socket_hash_table(fd_ipv6, AF_INET6, network_connection);
-        wait_to_plot = 1;
+        if (network_connection) {
+            ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
+            ebpf_read_socket_hash_table(fd_ipv6, AF_INET6);
+        }
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -2883,7 +2875,7 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         ebpf_socket_update_cgroup_algorithm();
 
     int socket_global_enabled = em->global_charts;
-    int network_connection = em->optional;
+    uint32_t network_connection = network_viewer_opt.enabled;
     int update_every = em->update_every;
     while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
@@ -2901,7 +2893,8 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
         if (cgroups)
             ebpf_update_socket_cgroup();
 
-        calculate_nv_plot();
+        if (network_connection)
+            calculate_nv_plot();
 
         pthread_mutex_lock(&lock);
         if (socket_global_enabled)
@@ -2926,7 +2919,6 @@ static void socket_collector(usec_t step, ebpf_module_t *em)
             ebpf_socket_create_nv_charts(&outbound_vectors, update_every);
             fflush(stdout);
             ebpf_socket_send_nv_data(&outbound_vectors);
-            wait_to_plot = 0;
             pthread_mutex_unlock(&nv_mutex);
 
         }
@@ -2960,8 +2952,10 @@ static void ebpf_socket_allocate_global_vectors(int apps)
     bandwidth_vector = callocz((size_t)ebpf_nprocs, sizeof(ebpf_bandwidth_t));
 
     socket_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_socket_t));
-    inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
-    outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+    if (network_viewer_opt.enabled) {
+        inbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+        outbound_vectors.plot = callocz(network_viewer_opt.max_dim, sizeof(netdata_socket_plot_t));
+    }
 }
 
 /**
@@ -3220,12 +3214,11 @@ static void get_ipv6_first_addr(union netdata_ip_t *out, union netdata_ip_t *in,
  *
  * @return It returns 1 if the IP is inside the range and 0 otherwise
  */
-static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
-                              union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
+static int ebpf_is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rlast,
+                                   union netdata_ip_t *cmpfirst, union netdata_ip_t *cmplast, int family)
 {
     if (family == AF_INET) {
-        if (ntohl(rfirst->addr32[0]) <= ntohl(cmpfirst->addr32[0]) &&
-            ntohl(rlast->addr32[0]) >= ntohl(cmplast->addr32[0]))
+        if ((rfirst->addr32[0] <= cmpfirst->addr32[0]) && (rlast->addr32[0] >= cmplast->addr32[0]))
             return 1;
     } else {
         if (memcmp(rfirst->addr8, cmpfirst->addr8, sizeof(union netdata_ip_t)) <= 0 &&
@@ -3242,16 +3235,22 @@ static int is_ip_inside_range(union netdata_ip_t *rfirst, union netdata_ip_t *rl
  *
  * @param out a pointer to the link list.
  * @param in the structure that will be linked.
+ * @param table the modified table.
  */
-void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
+void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table)
 {
 #ifndef NETDATA_INTERNAL_CHECKS
     UNUSED(table);
 #endif
+    if (in->ver == AF_INET) { // It is simpler to compare using host order
+        in->first.addr32[0] = ntohl(in->first.addr32[0]);
+        in->last.addr32[0] = ntohl(in->last.addr32[0]);
+    }
     if (likely(*out)) {
         ebpf_network_viewer_ip_list_t *move = *out, *store = *out;
         while (move) {
-            if (in->ver == move->ver && is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
+            if (in->ver == move->ver &&
+                ebpf_is_ip_inside_range(&move->first, &move->last, &in->first, &in->last, in->ver)) {
                 info("The range/value (%s) is inside the range/value (%s) already inserted, it will be ignored.",
                      in->value, move->value);
                 freez(in->value);
@@ -3268,14 +3267,12 @@ void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_li
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    char first[512], last[512];
+    char first[256], last[512];
     if (in->ver == AF_INET) {
-        if (inet_ntop(AF_INET, in->first.addr8, first, INET_ADDRSTRLEN) &&
-            inet_ntop(AF_INET, in->last.addr8, last, INET_ADDRSTRLEN))
-            info("Adding values %s - %s to %s IP list \"%s\" used on network viewer",
-                 first, last,
-                 (*out == network_viewer_opt.included_ips)?"included":"excluded",
-                 table);
+        info("Adding values %s: (%u - %u) to %s IP list \"%s\" used on network viewer",
+             in->value, in->first.addr32[0], in->last.addr32[0],
+             (*out == network_viewer_opt.included_ips)?"included":"excluded",
+             table);
     } else {
         if (inet_ntop(AF_INET6, in->first.addr8, first, INET6_ADDRSTRLEN) &&
             inet_ntop(AF_INET6, in->last.addr8, last, INET6_ADDRSTRLEN))
@@ -3295,7 +3292,7 @@ void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_li
  * @param out a pointer to store the link list
  * @param ip the value given as parameter
  */
-static void parse_ip_list(void **out, char *ip)
+static void ebpf_parse_ip_list(void **out, char *ip)
 {
     ebpf_network_viewer_ip_list_t **list = (ebpf_network_viewer_ip_list_t **)out;
 
@@ -3443,7 +3440,7 @@ static void parse_ip_list(void **out, char *ip)
 
     ebpf_network_viewer_ip_list_t *store;
 
-    storethisip:
+storethisip:
     store = callocz(1, sizeof(ebpf_network_viewer_ip_list_t));
     store->value = ipdup;
     store->hash = simple_hash(ipdup);
@@ -3451,7 +3448,7 @@ static void parse_ip_list(void **out, char *ip)
     memcpy(store->first.addr8, first.addr8, sizeof(first.addr8));
     memcpy(store->last.addr8, last.addr8, sizeof(last.addr8));
 
-    fill_ip_list(list, store, "socket");
+    ebpf_fill_ip_list(list, store, "socket");
     return;
 
 cleanipdup:
@@ -3465,7 +3462,7 @@ cleanipdup:
  *
  * @param ptr  is a pointer with the text to parse.
  */
-static void parse_ips(char *ptr)
+static void ebpf_parse_ips(char *ptr)
 {
     // No value
     if (unlikely(!ptr))
@@ -3492,8 +3489,9 @@ static void parse_ips(char *ptr)
         }
 
         if (isascii(*ptr)) { // Parse port
-            parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:(void **)&network_viewer_opt.excluded_ips,
-                          ptr);
+            ebpf_parse_ip_list((!neg)?(void **)&network_viewer_opt.included_ips:
+                                      (void **)&network_viewer_opt.excluded_ips,
+                                ptr);
         }
 
         ptr = end;
@@ -3763,7 +3761,7 @@ void parse_network_viewer_section(struct config *cfg)
 
     value = appconfig_get(cfg, EBPF_NETWORK_VIEWER_SECTION,
                           "ips", "!127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7 !::1/128");
-    parse_ips(value);
+    ebpf_parse_ips(value);
 }
 
 /**
@@ -3917,16 +3915,9 @@ void *ebpf_socket_thread(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_exit, ptr);
 
-    memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
-    memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
-    avl_init_lock(&inbound_vectors.tree, compare_sockets);
-    avl_init_lock(&outbound_vectors.tree, compare_sockets);
-
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = socket_maps;
 
-    parse_network_viewer_section(&socket_config);
-    parse_service_name_section(&socket_config);
     parse_table_size_options(&socket_config);
 
     if (pthread_mutex_init(&nv_mutex, NULL)) {
@@ -3936,7 +3927,15 @@ void *ebpf_socket_thread(void *ptr)
     }
 
     ebpf_socket_allocate_global_vectors(em->apps_charts);
-    initialize_inbound_outbound();
+
+    if (network_viewer_opt.enabled) {
+        memset(&inbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        memset(&outbound_vectors.tree, 0, sizeof(avl_tree_lock));
+        avl_init_lock(&inbound_vectors.tree, ebpf_compare_sockets);
+        avl_init_lock(&outbound_vectors.tree, ebpf_compare_sockets);
+
+        initialize_inbound_outbound();
+    }
 
     if (running_on_kernel < NETDATA_EBPF_KERNEL_5_0)
         em->mode = MODE_ENTRY;

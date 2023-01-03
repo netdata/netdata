@@ -244,6 +244,7 @@ typedef struct ebpf_network_viewer_hostname_list {
 
 #define NETDATA_NV_CAP_VALUE 50L
 typedef struct ebpf_network_viewer_options {
+    uint32_t enabled;
     uint32_t max_dim;   // Store value read from 'maximum dimensions'
 
     uint32_t hostname_resolution_enabled;
@@ -360,7 +361,7 @@ void clean_port_structure(ebpf_network_viewer_port_list_t **clean);
 extern ebpf_network_viewer_port_list_t *listen_ports;
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *values);
 void parse_network_viewer_section(struct config *cfg);
-void fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
+void ebpf_fill_ip_list(ebpf_network_viewer_ip_list_t **out, ebpf_network_viewer_ip_list_t *in, char *table);
 void parse_service_name_section(struct config *cfg);
 
 extern ebpf_socket_publish_apps_t **socket_bandwidth_curr;
