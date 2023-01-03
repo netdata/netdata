@@ -451,6 +451,7 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 static bool sender_is_still_alive(struct replication_request *rq);
 
 bool replication_response_execute_and_finalize(struct replication_query *q) {
+    struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
     time_t after = q->request.after;
@@ -521,7 +522,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     worker_is_busy(WORKER_JOB_CLEANUP);
 
     if(locked_collection) { // enable_streaming is also true
-        if(sender_is_still_alive(q->rq)) {
+        if(sender_is_still_alive(rq)) {
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 
