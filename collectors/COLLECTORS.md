@@ -126,8 +126,8 @@ configure any of these collectors according to your setup and infrastructure.
 - [CouchDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchdb): Monitor database health and
   performance metrics
   (reads/writes, HTTP traffic, replication status, etc).
-- [MongoDB](/collectors/python.d.plugin/mongodb/README.md): Collect memory-caching system performance metrics and
-  reads the server's response to `stats` command (stats interface).
+- [MongoDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mongodb): Collect server, database,
+  replication and sharding performance and health metrics.
 - [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
   replication and per user statistics.
 - [OracleDB](/collectors/python.d.plugin/oracledb/README.md): Monitor database performance and health metrics.
@@ -135,8 +135,8 @@ configure any of these collectors according to your setup and infrastructure.
   memory usage, queries, and more from the Redis interface-compatible database.
 - [Postgres](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres): Collect database health
   and performance metrics.
-- [ProxySQL](/collectors/python.d.plugin/proxysql/README.md): Monitor database backend and frontend performance
-  metrics.
+- [ProxySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/proxysql): Monitor database backend
+  and frontend performance metrics.
 - [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
   number of database instances by reading the server's response to the `INFO ALL` command.
 - [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): Collect database server and cluster statistics.
@@ -231,8 +231,9 @@ configure any of these collectors according to your setup and infrastructure.
   (`slapd`) server.
 - [NSD](/collectors/python.d.plugin/nsd/README.md): Monitor nameserver performance metrics using the `nsd-control`
   tool.
-- [NTP daemon](/collectors/python.d.plugin/ntpd/README.md): Monitor the system variables of the local `ntpd` daemon
-  (optionally including variables of the polled peers) using the NTP Control Message Protocol via a UDP socket.
+- [NTP daemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ntpd): Monitor the system variables
+  of the local `ntpd` daemon (optionally including variables of the polled peers) using the NTP Control Message Protocol
+  via a UDP socket.
 - [OpenSIPS](/collectors/charts.d.plugin/opensips/README.md): Collect server health and performance metrics using the
   `opensipsctl` tool.
 - [OpenVPN](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn/): Gather server summary
