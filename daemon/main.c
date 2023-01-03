@@ -38,6 +38,7 @@ typedef struct service_thread {
     };
 
     force_quit_t force_quit_callback;
+    request_quit_t request_quit_callback;
     void *data;
 } SERVICE_THREAD;
 
@@ -50,7 +51,7 @@ struct service_globals {
         .pid_judy = NULL,
 };
 
-SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
+SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
     SERVICE_THREAD *sth = NULL;
     pid_t tid = gettid();
 
@@ -60,6 +61,7 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, force_quit_t f
         sth = callocz(1, sizeof(SERVICE_THREAD));
         sth->tid = tid;
         sth->type = thread_type;
+        sth->request_quit_callback = request_quit_callback;
         sth->force_quit_callback = force_quit_callback;
         sth->data = data;
         os_thread_get_current_name_np(sth->name);
@@ -99,7 +101,7 @@ bool service_running(SERVICE_TYPE service) {
     static __thread SERVICE_THREAD *sth = NULL;
 
     if(unlikely(!sth))
-        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, false);
+        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
 
     if(netdata_exit)
         __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
@@ -261,6 +263,22 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     return (running == 0);
 }
 
+static void service_request_exit(void)
+{
+    netdata_spinlock_lock(&service_globals.lock);
+
+    Pvoid_t *PValue;
+    Word_t tid = 0;
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+        SERVICE_THREAD *sth = *PValue;
+        if(sth->request_quit_callback)
+           sth->request_quit_callback(sth->data);
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+
 void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
@@ -279,6 +297,8 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_WEB_REQUESTS
             | SERVICE_STREAMING_CONNECTIONS
             );
+
+    service_request_exit();
 
     service_wait_exit(
             SERVICE_REPLICATION

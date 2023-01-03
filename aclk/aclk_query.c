@@ -327,6 +327,11 @@ static void worker_aclk_register(void) {
     }
 }
 
+static void aclk_query_request_cancel(void *data)
+{
+    pthread_cond_broadcast((pthread_cond_t *) data);
+}
+
 /**
  * Main query processing thread
  */
@@ -335,6 +340,8 @@ void *aclk_query_main_thread(void *ptr)
     worker_aclk_register();
 
     struct aclk_query_thread *query_thr = ptr;
+
+    service_register(SERVICE_THREAD_TYPE_NETDATA, aclk_query_request_cancel, NULL, &query_cond_wait, false);
 
     while (service_running(SERVICE_ACLK | SERVICE_DATA_QUERIES)) {
         aclk_query_process_msgs(query_thr);
