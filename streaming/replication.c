@@ -221,7 +221,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
             expanded_before = new_before;
     }
 
-    if(expanded_before > q->query.before)
+    if(expanded_before > q->query.before && (expanded_before - q->query.before) / q->st->update_every < 1024)
         q->query.before = expanded_before;
 }
 
@@ -297,12 +297,10 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
         if(unlikely(min_end_time <= min_start_time))
             min_start_time = min_end_time - q->st->update_every;
 
-        if(unlikely(!actual_after)) {
+        if(unlikely(!actual_after))
             actual_after = min_end_time;
-            actual_before = min_end_time;
-        }
-        else
-            actual_before = min_end_time;
+
+        actual_before = min_end_time;
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n"
                        , (unsigned long long)min_start_time
@@ -315,15 +313,17 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
             struct replication_dimension *d = &q->data[i];
             if(unlikely(!d->enabled)) continue;
 
-            if(likely(d->sp.start_time <= min_end_time && d->sp.end_time >= min_end_time))
+            if(likely(d->sp.start_time <= min_end_time && d->sp.end_time >= min_end_time)) {
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
 
-            else
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
-                               rrddim_id(d->rd));
+                points_generated++;
+            }
 
-            points_generated++;
+//            else
+//                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
+//                               rrddim_id(d->rd));
+
         }
 
         now = min_end_time + 1;

@@ -36,21 +36,30 @@ extern char *netdata_ssl_ca_file;
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
+static __thread bool sender_thread_buffer_recreate = false;
 
 void sender_thread_buffer_free(void) {
-    if(sender_thread_buffer) {
-        buffer_free(sender_thread_buffer);
-        sender_thread_buffer = NULL;
-    }
+    buffer_free(sender_thread_buffer);
+    sender_thread_buffer = NULL;
 }
 
 // Collector thread starting a transmission
 BUFFER *sender_start(struct sender_state *s __maybe_unused) {
-    if(!sender_thread_buffer)
-        sender_thread_buffer = buffer_create(1024);
-
-    if(sender_thread_buffer_used)
+    if(unlikely(sender_thread_buffer_used))
         fatal("STREAMING: thread buffer is used multiple times concurrently.");
+
+    if(unlikely(sender_thread_buffer_recreate)) {
+        sender_thread_buffer_recreate = false;
+        if(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE) {
+            buffer_free(sender_thread_buffer);
+            sender_thread_buffer = NULL;
+        }
+    }
+
+    if(!sender_thread_buffer) {
+        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE);
+        sender_thread_buffer_recreate = false;
+    }
 
     sender_thread_buffer_used = true;
     buffer_flush(sender_thread_buffer);
@@ -1246,10 +1255,16 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-        if(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
-            size_t max = s->host->sender->buffer->max_size;
-            cbuffer_free(s->host->sender->buffer);
-            s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
+        if(unlikely(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE)) {
+            static __thread time_t last_reset_time_t = 0;
+            time_t now_t = now_monotonic_sec();
+            if(now_t - last_reset_time_t > 600) {
+                last_reset_time_t = now_t;
+                size_t max = s->host->sender->buffer->max_size;
+                cbuffer_free(s->host->sender->buffer);
+                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
+                sender_thread_buffer_recreate = true;
+            }
         }
         netdata_mutex_unlock(&s->mutex);
 
