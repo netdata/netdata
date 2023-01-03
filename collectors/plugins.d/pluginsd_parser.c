@@ -441,19 +441,21 @@ PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
     } else
         rrddim_isnot_obsolete(st, rd);
 
+    bool should_update_dimension = false;
+
     if (likely(unhide_dimension)) {
         rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
-            metaqueue_dimension_update_flags(rd);
-        }
+        should_update_dimension = rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN);
     }
     else {
         rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
-        if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-            metaqueue_dimension_update_flags(rd);
-        }
+        should_update_dimension = !rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN);
+    }
+
+    if (should_update_dimension) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     return PARSER_RC_OK;

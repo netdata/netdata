@@ -969,6 +969,11 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
             if(rrddim_flag_check(rd, RRDDIM_FLAG_METADATA_UPDATE)) {
                 rrddim_flag_clear(rd, RRDDIM_FLAG_METADATA_UPDATE);
 
+                if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
+                    rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
+                else
+                    rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
+
                 rc = sql_store_dimension(
                     &rd->metric_uuid,
                     &rd->rrdset->chart_uuid,
