@@ -191,6 +191,18 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_invalid_entries_fixed;
 };
 
+struct rrdeng_buffer_sizes {
+    size_t workers;
+    size_t pdc;
+    size_t wal;
+    size_t descriptors;
+    size_t xt_io;
+    size_t xt_buf;
+    size_t handles;
+    size_t opcodes;
+};
+
+struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);

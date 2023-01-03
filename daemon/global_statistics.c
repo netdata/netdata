@@ -1485,6 +1485,9 @@ static void dbengine2_statistics_charts(void) {
     mrg_stats_old = mrg_stats;
     mrg_stats = mrg_get_statistics(main_mrg);
 
+    struct rrdeng_buffer_sizes buffers = rrdeng_get_buffer_sizes();
+    size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors + buffers.opcodes + buffers.wal + buffers.workers;
+
     size_t priority = 135000;
 
     {
@@ -1493,6 +1496,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pgc_memory_open = NULL;  // open journal memory
         static RRDDIM *rd_pgc_memory_extent = NULL;  // extent compresses cache memory
         static RRDDIM *rd_pgc_memory_metrics = NULL;  // metric registry memory
+        static RRDDIM *rd_pgc_memory_buffers = NULL;
 
         if (unlikely(!st_pgc_memory)) {
             st_pgc_memory = rrdset_create_localhost(
@@ -1513,6 +1517,7 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_memory_open    = rrddim_add(st_pgc_memory, "open cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
             priority++;
         }
@@ -1521,8 +1526,59 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_extent, (collected_number)pgc_extent_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_metrics, (collected_number)mrg_stats.size);
+        rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_buffers, (collected_number)buffers_total_size);
 
         rrdset_done(st_pgc_memory);
+    }
+
+    {
+        static RRDSET *st_pgc_buffers = NULL;
+        static RRDDIM *rd_pgc_buffers_opcodes = NULL;
+        static RRDDIM *rd_pgc_buffers_handles = NULL;
+        static RRDDIM *rd_pgc_buffers_descriptors = NULL;
+        static RRDDIM *rd_pgc_buffers_wal = NULL;
+        static RRDDIM *rd_pgc_buffers_workers = NULL;
+        static RRDDIM *rd_pgc_buffers_pdc = NULL;
+        static RRDDIM *rd_pgc_buffers_xt_io = NULL;
+        static RRDDIM *rd_pgc_buffers_xt_buf = NULL;
+
+        if (unlikely(!st_pgc_buffers)) {
+            st_pgc_buffers = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_buffers",
+                    NULL,
+                    "dbengine memory",
+                    NULL,
+                    "Netdata DB Buffers",
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_pgc_buffers_opcodes     = rrddim_add(st_pgc_buffers, "opcodes",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_handles     = rrddim_add(st_pgc_buffers, "query handles",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_descriptors = rrddim_add(st_pgc_buffers, "descriptors",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_wal         = rrddim_add(st_pgc_buffers, "wal",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_workers     = rrddim_add(st_pgc_buffers, "workers",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_pdc         = rrddim_add(st_pgc_buffers, "pdc",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_xt_io       = rrddim_add(st_pgc_buffers, "extent io",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_xt_buf      = rrddim_add(st_pgc_buffers, "extent buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            priority++;
+        }
+
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_opcodes, (collected_number)buffers.opcodes);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_handles, (collected_number)buffers.handles);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_descriptors, (collected_number)buffers.descriptors);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_wal, (collected_number)buffers.wal);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_workers, (collected_number)buffers.workers);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pdc, (collected_number)buffers.pdc);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_io, (collected_number)buffers.xt_io);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)buffers.xt_buf);
+
+        rrdset_done(st_pgc_buffers);
     }
 
     {

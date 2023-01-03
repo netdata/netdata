@@ -510,7 +510,7 @@ static struct {
 static void pdc_cleanup(void) {
     netdata_spinlock_lock(&pdc_globals.protected.spinlock);
 
-    while(pdc_globals.protected.available_items && pdc_globals.protected.available > 10) {
+    while(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
         PDC *item = pdc_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
         freez(item);
@@ -579,7 +579,7 @@ static struct {
 static void wal_cleanup(void) {
     netdata_spinlock_lock(&wal_globals.protected.spinlock);
 
-    while(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers * 2) {
+    while(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
         WAL *wal = wal_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         posix_memfree(wal->buf);
@@ -671,7 +671,7 @@ static struct {
 static void page_details_cleanup(void) {
     netdata_spinlock_lock(&page_details_globals.protected.spinlock);
 
-    while(page_details_globals.protected.available_items && page_details_globals.protected.available > 100) {
+    while(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
         struct page_details *item = page_details_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
         freez(item);
@@ -809,7 +809,7 @@ static struct {
 
 static void extent_io_descriptor_cleanup(void) {
     netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-    while(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > 10) {
+    while(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > (size_t)libuv_worker_threads) {
         struct extent_io_descriptor *item = extent_io_descriptor_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
         freez(item);
@@ -873,7 +873,10 @@ static struct {
 
     struct {
         size_t allocated;
+        size_t allocated_bytes;
     } atomics;
+
+    size_t max_size;
 
 } extent_buffer_globals = {
         .protected = {
@@ -883,14 +886,43 @@ static struct {
         },
         .atomics = {
                 .allocated = 0,
+                .allocated_bytes = 0,
         },
+        .max_size = MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE,
 };
 
-struct extent_buffer *extent_buffer_get(size_t size) {
+static void extent_buffer_init(void) {
+    size_t max_extent_uncompressed = MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE;
+    size_t max_size = (size_t)LZ4_compressBound(MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE);
+    if(max_size < max_extent_uncompressed)
+        max_size = max_extent_uncompressed;
+
+    extent_buffer_globals.max_size = max_size;
+}
+
+static void extent_buffer_cleanup(void) {
+    netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
+
+    while(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > (size_t)libuv_worker_threads) {
+        struct extent_buffer *item = extent_buffer_globals.protected.available_items;
+        size_t bytes = sizeof(struct extent_buffer) + item->bytes;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        extent_buffer_globals.protected.available--;
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+}
+
+static struct extent_buffer *extent_buffer_get(size_t size) {
+    internal_fatal(size > extent_buffer_globals.max_size, "DBENGINE: extent size is too big");
+
     struct extent_buffer *eb = NULL;
 
-    if(size < MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE)
-        size = MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE;
+    if(size < extent_buffer_globals.max_size)
+        size = extent_buffer_globals.max_size;
 
     netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
     if(likely(extent_buffer_globals.protected.available_items)) {
@@ -901,14 +933,19 @@ struct extent_buffer *extent_buffer_get(size_t size) {
     netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 
     if(unlikely(eb && eb->bytes < size)) {
+        size_t bytes = sizeof(struct extent_buffer) + eb->bytes;
         freez(eb);
         eb = NULL;
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
     }
 
     if(unlikely(!eb)) {
-        eb = mallocz(sizeof(struct extent_buffer) + size);
+        size_t bytes = sizeof(struct extent_buffer) + size;
+        eb = mallocz(bytes);
         eb->bytes = size;
         __atomic_add_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
     }
 
     return eb;
@@ -1027,7 +1064,7 @@ static struct {
 
 static void rrdeng_cmd_cleanup(void) {
     netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
-    while(rrdeng_cmd_globals.available_items && rrdeng_cmd_globals.available > 10) {
+    while(rrdeng_cmd_globals.available_items && rrdeng_cmd_globals.available > 100) {
         struct rrdeng_cmd *item = rrdeng_cmd_globals.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.available_items, item, cache.prev, cache.next);
         freez(item);
@@ -1222,7 +1259,7 @@ static bool extent_uncompress_and_populate_pages(
     unsigned i, count;
     void *uncompressed_buf = NULL;
     uint32_t payload_length, payload_offset, trailer_offset, uncompressed_payload_length = 0;
-    uint8_t have_read_error = 0;
+    bool have_read_error = false;
     /* persistent structures */
     struct rrdeng_df_extent_header *header;
     struct rrdeng_df_extent_trailer *trailer;
@@ -1263,7 +1300,7 @@ static bool extent_uncompress_and_populate_pages(
     if (unlikely(ret)) {
         ++ctx->stats.io_errors;
         rrd_stat_atomic_add(&global_io_errors, 1);
-        have_read_error = 1;
+        have_read_error = true;
 
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but CRC32 check FAILED", __func__,
@@ -1273,19 +1310,32 @@ static bool extent_uncompress_and_populate_pages(
     if(worker)
         worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
 
-    if (!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm) {
+    if (likely(!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)) {
+        // find the uncompressed extent size
         uncompressed_payload_length = 0;
-        for (i = 0; i < count; ++i)
+        for (i = 0; i < count; ++i) {
+            size_t page_length = header->descr[i].page_length;
+            if(page_length > RRDENG_BLOCK_SIZE) {
+                have_read_error = true;
+                break;
+            }
+
             uncompressed_payload_length += header->descr[i].page_length;
+        }
 
-        eb = extent_buffer_get(uncompressed_payload_length);
-        uncompressed_buf = eb->data;
+        if(unlikely(uncompressed_payload_length > MAX_PAGES_PER_EXTENT * RRDENG_BLOCK_SIZE))
+            have_read_error = true;
 
-        ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
-                                  (int)payload_length, (int)uncompressed_payload_length);
-        ctx->stats.before_decompress_bytes += payload_length;
-        ctx->stats.after_decompress_bytes += ret;
-        debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
+        if(likely(!have_read_error)) {
+            eb = extent_buffer_get(uncompressed_payload_length);
+            uncompressed_buf = eb->data;
+
+            ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
+                                      (int) payload_length, (int) uncompressed_payload_length);
+            ctx->stats.before_decompress_bytes += payload_length;
+            ctx->stats.after_decompress_bytes += ret;
+            debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
+        }
     }
 
     size_t stats_data_from_main_cache = 0;
@@ -2226,6 +2276,19 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
+struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
+    return (struct rrdeng_buffer_sizes) {
+            .opcodes     = rrdeng_cmd_globals.allocated * sizeof(struct rrdeng_cmd),
+            .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
+            .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
+            .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
+            .workers     = __atomic_load_n(&work_request_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
+        .pdc       = __atomic_load_n(&pdc_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(PDC),
+        .xt_io     = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
+        .xt_buf    = __atomic_load_n(&extent_buffer_globals.atomics.allocated_bytes, __ATOMIC_RELAXED),
+    };
+}
+
 void timer_cb(uv_timer_t* handle) {
     worker_is_busy(RRDENG_TIMER_CB);
     uv_stop(handle->loop);
@@ -2247,6 +2310,7 @@ void timer_cb(uv_timer_t* handle) {
         page_details_cleanup();
         rrdeng_query_handle_cleanup();
         wal_cleanup();
+        extent_buffer_cleanup();
     }
 
     worker_is_idle();
@@ -2333,6 +2397,8 @@ void rrdeng_worker(void* arg) {
     worker_register_job_custom_metric(RRDENG_OPCODES_WAITING,  "opcodes waiting",  "opcodes", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
+
+    extent_buffer_init();
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
