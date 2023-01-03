@@ -627,6 +627,8 @@ struct rrdset {
 
     STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
 
+    SPINLOCK data_collection_lock;
+
     // ------------------------------------------------------------------------
     // linking to siblings and parents
 

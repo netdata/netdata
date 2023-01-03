@@ -135,6 +135,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
     st->rrdhost = host;
 
+    netdata_spinlock_init(&st->data_collection_lock);
+
     st->flags =   RRDSET_FLAG_SYNC_CLOCK
                 | RRDSET_FLAG_INDEXED_ID
                 | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
@@ -1423,6 +1425,8 @@ void rrdset_done(RRDSET *st) {
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
+    netdata_spinlock_lock(&st->data_collection_lock);
+
     if (pending_rrdset_next)
         rrdset_timed_next(st, now, 0ULL);
 
@@ -1885,6 +1889,8 @@ after_second_database_work:
                     , rd->calculated_value
         );
     }
+
+    netdata_spinlock_unlock(&st->data_collection_lock);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
