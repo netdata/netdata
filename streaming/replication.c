@@ -1400,7 +1400,7 @@ static int replication_execute_next_pending_request(void) {
     struct replication_request *rq;
 
     if(unlikely(!rqs)) {
-        max_requests_ahead = libuv_worker_threads * 5;
+        max_requests_ahead = libuv_worker_threads * 2;
         if(max_requests_ahead < 2)
             max_requests_ahead = 2;
 

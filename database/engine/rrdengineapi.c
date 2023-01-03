@@ -276,9 +276,6 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         // free data
         dbengine_page_free(page_entry.data);
 
-        if(!pgc_is_page_hot(page))
-            fatal("DBENGINE: hot page already exists in cache, but is not hot");
-
         handle->page_entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
     }
     else

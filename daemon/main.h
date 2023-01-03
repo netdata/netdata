@@ -33,13 +33,13 @@ typedef enum {
     SERVICE_ML_TRAINING           = (1 << 2),
     SERVICE_ML_PREDICTION         = (1 << 3),
     SERVICE_REPLICATION           = (1 << 4),
-    SERVICE_DATA_QUERIES          = (1 << 5),
-    SERVICE_WEB_REQUESTS          = (1 << 6),
+    SERVICE_DATA_QUERIES          = (1 << 5), // ABILITY
+    SERVICE_WEB_REQUESTS          = (1 << 6), // ABILITY
     SERVICE_WEB_SERVER            = (1 << 7),
     SERVICE_ACLK                  = (1 << 8),
     SERVICE_HEALTH                = (1 << 9),
     SERVICE_STREAMING             = (1 << 10),
-    SERVICE_STREAMING_CONNECTIONS = (1 << 11),
+    SERVICE_STREAMING_CONNECTIONS = (1 << 11), // ABILITY
     SERVICE_CONTEXT               = (1 << 12),
     SERVICE_ANALYTICS             = (1 << 13),
     SERVICE_EXPORTERS             = (1 << 14),

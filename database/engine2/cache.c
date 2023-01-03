@@ -1194,6 +1194,9 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
+    internal_fatal(entry->hot && !pgc_is_page_hot(page),
+                   "DBENGINE CACHE: requested to add a hot page, but the page returned is not hot");
+
     if(!entry->hot)
         evict_on_clean_page_added(cache);
 
@@ -1866,13 +1869,14 @@ bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
 }
 
 void pgc_page_hot_set_end_time_t(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_t) {
-    if(!is_page_hot(page))
-        fatal("DBENGINE CACHE: end_time_t update on non-hot page");
+    internal_fatal(!is_page_hot(page),
+                   "DBENGINE CACHE: end_time_t update on non-hot page");
 
-//    if(end_time_t <= __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED))
-//        fatal("DBENGINE CACHE: end_time_t is not bigger than existing");
+    internal_fatal(end_time_t <= __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
+                   "DBENGINE CACHE: end_time_t is not bigger than existing");
 
     __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_RELAXED);
+
 #ifdef PGC_COUNT_POINTS_COLLECTED
     __atomic_add_fetch(&cache->stats.points_collected, 1, __ATOMIC_RELAXED);
 #endif
