@@ -188,6 +188,7 @@ public:
     MachineLearningStatus MLS;
 
     std::vector<CalculatedNumber> CNs;
+    DSample Feature;
     std::vector<KMeans> Models;
     Mutex M;
 };

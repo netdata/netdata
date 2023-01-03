@@ -176,7 +176,8 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN,
                                      SamplingRatio, Cfg.RandomNums);
-    std::vector<DSample> Samples = SB.preprocess();
+    std::vector<DSample> Samples;
+    SB.preprocess(Samples);
 
     KMeans KM;
     KM.train(Samples, Cfg.MaxKMeansIters);
@@ -258,13 +259,13 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
     CNs[N - 1] = Value;
 
     // Create the sample
-    CalculatedNumber *TmpCNs = new CalculatedNumber[N * (Cfg.LagN + 1)]();
+    CalculatedNumber TmpCNs[N * (Cfg.LagN + 1)];
+    memset(TmpCNs, 0, N * (Cfg.LagN + 1) * sizeof(CalculatedNumber));
     std::memcpy(TmpCNs, CNs.data(), N * sizeof(CalculatedNumber));
     SamplesBuffer SB = SamplesBuffer(TmpCNs, N, 1,
                                      Cfg.DiffN, Cfg.SmoothN, Cfg.LagN,
                                      1.0, Cfg.RandomNums);
-    const DSample Sample = SB.preprocess().back();
-    delete[] TmpCNs;
+    SB.preprocess(Feature);
 
     /*
      * Lock to predict and possibly schedule the dimension for training
@@ -301,7 +302,7 @@ bool Dimension::predict(time_t CurrT, CalculatedNumber Value, bool Exists) {
     for (const auto &KM : Models) {
         ModelsConsulted++;
 
-        double AnomalyScore = KM.anomalyScore(Sample);
+        double AnomalyScore = KM.anomalyScore(Feature);
         if (AnomalyScore == std::numeric_limits<CalculatedNumber>::quiet_NaN())
             continue;
 
