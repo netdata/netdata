@@ -524,8 +524,8 @@ int is_legacy = 1;
     );
 
     if(!archived) {
-        metaqueue_host_update_info(host->machine_guid);
-        metaqueue_host_update_system_info(host);
+        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO);
+        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrdhost_load_rrdcontext_data(host);
@@ -572,7 +572,8 @@ static void rrdhost_update(RRDHOST *host
     {
         struct rrdhost_system_info *old = host->system_info;
         host->system_info = system_info;
-        metaqueue_host_update_system_info(host);
+        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO);
+        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
         rrdhost_system_info_free(old);
     }
 
@@ -1368,8 +1369,8 @@ void reload_host_labels(void) {
     rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
-    rrdlabels_remove_all_unmarked(localhost->rrdlabels);
-    metaqueue_store_host_labels(localhost->machine_guid);
+    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS);
+    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_UPDATE);
 
     health_label_log_save(localhost);
 

@@ -285,7 +285,6 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     if(ctr->react_action & (RRDDIM_REACT_UPDATED | RRDDIM_REACT_NEW)) {
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
@@ -499,7 +498,8 @@ int rrddim_hide(RRDSET *st, const char *id) {
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
         rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-        metaqueue_dimension_update_flags(rd);
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
@@ -518,7 +518,8 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
-        metaqueue_dimension_update_flags(rd);
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);

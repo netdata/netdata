@@ -454,7 +454,6 @@ PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
 
     if (should_update_dimension) {
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
@@ -885,7 +884,8 @@ PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __may
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, (DICTIONARY *) (((PARSER_USER_OBJECT *)user)->new_host_labels));
-    metaqueue_store_host_labels(host->machine_guid);
+    rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_LABELS);
+    rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdlabels_destroy(((PARSER_USER_OBJECT *)user)->new_host_labels);
     ((PARSER_USER_OBJECT *)user)->new_host_labels = NULL;

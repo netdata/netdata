@@ -1013,6 +1013,32 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
             continue;
         internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
+
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
+            rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
+            int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
+            if (likely(rc == SQLITE_OK)) {
+                BUFFER *work_buffer = buffer_create(1024);
+                struct query_build tmp = {.sql = work_buffer, .count = 0};
+                uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
+                rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
+                db_execute(buffer_tostring(work_buffer));
+                buffer_free(work_buffer);
+            }
+        }
+
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))) {
+            rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
+
+            BUFFER *work_buffer = sql_store_host_system_info(host);
+            db_execute(buffer_tostring(work_buffer));
+            buffer_free(work_buffer);
+
+            int rc = sql_store_host_info(host);
+            if (unlikely(rc))
+                error_report("Failed to store host info in the database for %s", string2str(host->hostname));
+        }
+
         if (unlikely(metadata_scan_host(host, data->max_count))) {
             run_again = true;
             rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
@@ -1020,6 +1046,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         }
     }
     dfe_done(host);
+
     if (unlikely(run_again))
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
     else
