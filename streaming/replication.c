@@ -76,6 +76,7 @@ struct replication_query {
         time_t after;
         time_t before;
         bool enable_streaming;
+        bool locked_data_collection;
         bool execute;
     } query;
 
@@ -125,13 +126,18 @@ static struct replication_query *replication_query_prepare(
         return q;
     }
 
-    if(q->query.enable_streaming && st->last_updated.tv_sec > q->query.before) {
-        internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long)q->query.before,
-                       (unsigned long long)st->last_updated.tv_sec
-        );
-        q->query.before = st->last_updated.tv_sec;
+    if(q->query.enable_streaming) {
+        netdata_spinlock_lock(&st->data_collection_lock);
+        q->query.locked_data_collection = true;
+
+        if(st->last_updated.tv_sec > q->query.before) {
+            internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           (unsigned long long)q->query.before,
+                           (unsigned long long)st->last_updated.tv_sec
+            );
+            q->query.before = st->last_updated.tv_sec;
+        }
     }
 
     q->ops = &st->rrdhost->db[0].eng->api.query_ops;
@@ -163,10 +169,22 @@ static struct replication_query *replication_query_prepare(
     }
     rrddim_foreach_done(rd);
 
-    if(!count)
+    if(!count) {
+        // no data for this chart
+
         q->query.execute = false;
-    else
+
+        if(q->query.locked_data_collection) {
+            netdata_spinlock_unlock(&st->data_collection_lock);
+            q->query.locked_data_collection = false;
+        }
+
+    }
+    else {
+        // we have data for this chart
+
         q->query.execute = true;
+    }
 
     return q;
 }
@@ -189,6 +207,11 @@ static time_t replication_query_finalize(struct replication_query *q, bool execu
 
         // update global statistics
         queries++;
+    }
+
+    if(q->query.locked_data_collection) {
+        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        q->query.locked_data_collection = false;
     }
 
     if(executed) {
@@ -448,7 +471,7 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
     replication_query_finalize(q, false);
 }
 
-static bool sender_is_still_alive(struct replication_request *rq);
+static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
 bool replication_response_execute_and_finalize(struct replication_query *q) {
     struct replication_request *rq = q->rq;
@@ -456,8 +479,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     RRDHOST *host = st->rrdhost;
     time_t after = q->request.after;
     time_t before = q->request.before;
-    bool enable_streaming = q->request.enable_streaming;
-    time_t query_time = q->wall_clock_time;
+    bool enable_streaming = q->query.enable_streaming;
     time_t first_entry_local = q->db.first_entry_t;
     time_t last_entry_local = q->db.last_entry_t;
 
@@ -468,31 +490,17 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
+    bool locked_data_collection = q->query.locked_data_collection;
+    q->query.locked_data_collection = false;
+
     before = replication_query_execute_and_finalize(wb, q);
 
     // IMPORTANT: q is invalid now
     q = NULL;
 
-    bool locked_collection = false;
-    if(enable_streaming) {
-        netdata_spinlock_lock(&st->data_collection_lock);
-        locked_collection = true;
-    }
-
     // get again the world clock time
-    time_t wall_clock_time = now_realtime_sec();
-    if(enable_streaming) {
-        if(query_time < wall_clock_time ||
-           before < wall_clock_time) {
-            // we needed time to execute this request
-            // so, the parent will need to replicate more data
-            enable_streaming = false;
-            netdata_spinlock_unlock(&st->data_collection_lock);
-            locked_collection = false;
-        }
-        else
-            replication_send_chart_collection_state(wb, st);
-    }
+    if(enable_streaming)
+        replication_send_chart_collection_state(wb, st);
 
     // end with first/last entries we have, and the first start time and
     // last end time of the data we sent
@@ -511,15 +519,15 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
                    , (unsigned long long)after, (unsigned long long)before
 
                    // child world clock time
-                   , (unsigned long long)wall_clock_time
+                   , (unsigned long long)now_realtime_sec()
                    );
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
     worker_is_busy(WORKER_JOB_CLEANUP);
 
-    if(locked_collection) { // enable_streaming is also true
-        if(sender_is_still_alive(rq)) {
+    if(enable_streaming) {
+        if(sender_is_still_connected_for_this_request(rq)) {
             // enable normal streaming if we have to
             // but only if the sender buffer has not been flushed since we started
 
@@ -537,9 +545,10 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
                 internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
                                rrdhost_hostname(st->rrdhost), rrdset_id(st));
         }
-
-        netdata_spinlock_unlock(&st->data_collection_lock);
     }
+
+    if(locked_data_collection)
+        netdata_spinlock_unlock(&st->data_collection_lock);
 
     return enable_streaming;
 }
@@ -1185,7 +1194,7 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     string_freez(rq->chart_id);
 }
 
-static bool sender_is_still_alive(struct replication_request *rq) {
+static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
     return rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender);
 };
 
