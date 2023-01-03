@@ -1110,13 +1110,12 @@ extern DICTIONARY *rrdhost_root_index;
 size_t rrdhost_hosts_available(void);
 
 // ----------------------------------------------------------------------------
-// these loop macros make sure the linked list is accessed with the right lock
 
 #define rrdhost_foreach_read(var) \
-    for((var) = localhost, rrd_check_rdlock(); var ; (var) = (var)->next)
+    for((var) = localhost; var ; (var) = (var)->next)
 
 #define rrdhost_foreach_write(var) \
-    for((var) = localhost, rrd_check_wrlock(); var ; (var) = (var)->next)
+    for((var) = localhost; var ; (var) = (var)->next)
 
 
 // ----------------------------------------------------------------------------
@@ -1173,30 +1172,6 @@ RRDHOST *rrdhost_find_or_create(
 );
 
 int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, char *name, char *value);
-
-#if defined(NETDATA_INTERNAL_CHECKS) && defined(NETDATA_VERIFY_LOCKS)
-void __rrdhost_check_wrlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-void __rrdset_check_wrlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
-void __rrd_check_wrlock(const char *file, const char *function, const unsigned long line);
-
-#define rrdhost_check_rdlock(host) __rrdhost_check_rdlock(host, __FILE__, __FUNCTION__, __LINE__)
-#define rrdhost_check_wrlock(host) __rrdhost_check_wrlock(host, __FILE__, __FUNCTION__, __LINE__)
-#define rrdset_check_rdlock(st) __rrdset_check_rdlock(st, __FILE__, __FUNCTION__, __LINE__)
-#define rrdset_check_wrlock(st) __rrdset_check_wrlock(st, __FILE__, __FUNCTION__, __LINE__)
-#define rrd_check_rdlock() __rrd_check_rdlock(__FILE__, __FUNCTION__, __LINE__)
-#define rrd_check_wrlock() __rrd_check_wrlock(__FILE__, __FUNCTION__, __LINE__)
-
-#else
-#define rrdhost_check_rdlock(host) (void)0
-#define rrdhost_check_wrlock(host) (void)0
-#define rrdset_check_rdlock(st) (void)0
-#define rrdset_check_wrlock(st) (void)0
-#define rrd_check_rdlock() (void)0
-#define rrd_check_wrlock() (void)0
-#endif
 
 // ----------------------------------------------------------------------------
 // RRDSET functions
