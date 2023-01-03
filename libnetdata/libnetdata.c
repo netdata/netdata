@@ -1927,3 +1927,65 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
     netdata_pclose(NULL, fp, pid);
     return true;
 }
+
+void for_each_open_fd(char *action_str) {
+
+    if(unlikely(!action_str || !*action_str)) return;
+
+    int action = -1;
+    if(strcasecmp(action_str, "CLOSE")) action = 1;
+    else if (strcasecmp(action_str, "FD_CLOEXEC")) action = 2;
+    else return;
+
+    const int min_fd = STDERR_FILENO; 
+    int fd;
+
+    DIR *dir = opendir("/proc/self/fd");
+    if (dir == NULL) {
+
+        struct rlimit rl;
+        int open_max = -1;
+
+        if(getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_max != RLIM_INFINITY) open_max = rl.rlim_max;
+#ifdef _SC_OPEN_MAX
+        else open_max = sysconf(_SC_OPEN_MAX);
+#endif
+
+        if (open_max == -1) open_max = 4096; // 4096 arbitrary default
+
+        for (fd = min_fd + 1; fd < open_max; fd++) {
+            if(fd_is_valid(fd)) {
+                switch(action){
+                    case 1:
+                        close(fd);
+                        break;
+                    case 2:
+                        (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
+                        break;
+                    default:
+                        // do nothing
+                }
+            }
+        }
+    } else {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL) {
+            fd = atoi(entry->d_name);
+            if (likely(fd > min_fd && fd_is_valid(fd))){
+                switch(action){
+                    case 1:
+                        error("Closing fd:%d", fd);
+                        close(fd);
+                        break;
+                    case 2:
+                        error("FD_CLOEXEC fd:%d", fd);
+                        (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
+                        break;
+                    default:
+                        // do nothing
+                }
+            }
+        }
+        closedir(dir);
+    }
+}

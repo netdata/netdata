@@ -430,6 +430,8 @@ static inline char *get_word(char **words, size_t num_words, size_t index) {
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 
+void for_each_open_fd(char *action_str);
+
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
