@@ -411,6 +411,14 @@ struct section_pages {
     PGC_PAGE *base;
 };
 
+static ARAL section_pages_aral = {
+        .filename = NULL,
+        .cache_dir = NULL,
+        .use_mmap = false,
+        .initial_elements = 16384 / sizeof(struct section_pages),
+        .requested_element_size = sizeof(struct section_pages),
+};
+
 static void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
     if(mem_after_judyl > mem_before_judyl) {
         __atomic_add_fetch(&ll->stats->size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
@@ -449,7 +457,10 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
         struct section_pages *sp = *section_pages_pptr;
         if(!sp) {
-            sp = callocz(1, sizeof(struct section_pages));
+            // sp = callocz(1, sizeof(struct section_pages));
+            sp = arrayalloc_mallocz(&section_pages_aral);
+            memset(sp, 0, sizeof(struct section_pages));
+
             *section_pages_pptr = sp;
 
             mem_after_judyl += sizeof(struct section_pages);
@@ -527,7 +538,8 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
             if(!rc)
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
-            freez(sp);
+            // freez(sp);
+            arrayalloc_freez(&section_pages_aral, sp);
             mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
         }
