@@ -9,8 +9,6 @@ PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
-pthread_key_t query_key;
-
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
