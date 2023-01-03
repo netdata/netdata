@@ -11,6 +11,10 @@ rrdeng_stats_t global_flushing_pressure_page_deletions = 0;
 
 unsigned rrdeng_pages_per_extent = MAX_PAGES_PER_EXTENT;
 
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2)
+#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
+#endif
+
 struct rrdeng_main {
     uv_thread_t thread;
     uv_loop_t loop;
@@ -55,13 +59,90 @@ static void sanity_check(void)
     BUILD_BUG_ON(sizeof(((struct rrdeng_page_info *)0)->scratch) < 2 * sizeof(uint32_t));
 }
 
-typedef struct datafile_extent_list_s {
+// ----------------------------------------------------------------------------
+// extent page details list cache
+
+typedef struct datafile_extent_offset_list {
     uv_file file;
     unsigned fileno;
     Pvoid_t extent_pd_list_by_extent_offset_JudyL;
-} DATAFILE_EXTENT_PD_LIST;
 
-typedef struct extent_page_list_s {
+    struct {
+        struct datafile_extent_offset_list *prev;
+        struct datafile_extent_offset_list *next;
+    } cache;
+} DEOL;
+
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        DEOL *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} deol_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void deol_cleanup(void) {
+    netdata_spinlock_lock(&deol_globals.protected.spinlock);
+
+    while(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
+        DEOL *item = deol_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        deol_globals.protected.available--;
+        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+}
+
+DEOL *deol_get(void) {
+    DEOL *deol = NULL;
+
+    netdata_spinlock_lock(&deol_globals.protected.spinlock);
+
+    if(likely(deol_globals.protected.available_items)) {
+        deol = deol_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
+        deol_globals.protected.available--;
+    }
+
+    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+
+    if(unlikely(!deol)) {
+        deol = mallocz(sizeof(DEOL));
+        __atomic_add_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    memset(deol, 0, sizeof(DEOL));
+    return deol;
+}
+
+void deol_release(DEOL *deol) {
+    if(unlikely(!deol)) return;
+
+    netdata_spinlock_lock(&deol_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
+    deol_globals.protected.available++;
+    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+}
+
+// ----------------------------------------------------------------------------
+// extent page details list cache
+
+typedef struct extent_page_details_list {
     uv_file file;
     uint64_t extent_offset;
     uint32_t extent_size;
@@ -69,17 +150,83 @@ typedef struct extent_page_list_s {
     Pvoid_t page_details_by_metric_id_JudyL;
     struct page_details_control *pdc;
     struct rrdengine_datafile *datafile;
-} EXTENT_PD_LIST;
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2)
-#error Please increase WORKER_UTILIZATION_MAX_JOB_TYPES to at least (RRDENG_MAX_OPCODE + 2)
-#endif
+    struct {
+        struct extent_page_details_list *prev;
+        struct extent_page_details_list *next;
+    } cache;
+} EPDL;
 
+static struct {
+    struct {
+        SPINLOCK spinlock;
+        EPDL *available_items;
+        size_t available;
+    } protected;
+
+    struct {
+        size_t allocated;
+    } atomics;
+} epdl_globals = {
+        .protected = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+        },
+        .atomics = {
+                .allocated = 0,
+        },
+};
+
+static void epdl_cleanup(void) {
+    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
+
+    while(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
+        EPDL *item = epdl_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
+        freez(item);
+        epdl_globals.protected.available--;
+        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+}
+
+EPDL *epdl_get(void) {
+    EPDL *epdl = NULL;
+
+    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
+
+    if(likely(epdl_globals.protected.available_items)) {
+        epdl = epdl_globals.protected.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
+        epdl_globals.protected.available--;
+    }
+
+    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+
+    if(unlikely(!epdl)) {
+        epdl = mallocz(sizeof(EPDL));
+        __atomic_add_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
+
+    memset(epdl, 0, sizeof(EPDL));
+    return epdl;
+}
+
+void epdl_release(EPDL *epdl) {
+    if(unlikely(!epdl)) return;
+
+    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
+    epdl_globals.protected.available++;
+    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+}
 
 // ----------------------------------------------------------------------------
 // extent page details list
 
-void extent_list_free(EXTENT_PD_LIST *epdl)
+void extent_list_free(EPDL *epdl)
 {
     Pvoid_t *pd_by_start_time_s_JudyL;
     Word_t metric_id_index = 0;
@@ -90,10 +237,10 @@ void extent_list_free(EXTENT_PD_LIST *epdl)
         JudyLFreeArray(pd_by_start_time_s_JudyL, PJE0);
 
     JudyLFreeArray(&epdl->page_details_by_metric_id_JudyL, PJE0);
-    freez(epdl);
+    epdl_release(epdl);
 }
 
-static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS tags, size_t *statistics_counter)
+static void extent_list_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS tags, size_t *statistics_counter)
 {
     size_t pages_matched = 0;
 
@@ -119,7 +266,7 @@ static void extent_list_mark_all_not_loaded_pages_as_failed(EXTENT_PD_LIST *epdl
         __atomic_add_fetch(statistics_counter, pages_matched, __ATOMIC_RELAXED);
 }
 
-static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, EXTENT_PD_LIST *epdl, PDC_PAGE_STATUS tags)
+static bool extent_list_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, EPDL *epdl, PDC_PAGE_STATUS tags)
 {
     size_t count_remaining = 0;
     size_t found = 0;
@@ -241,8 +388,8 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
 }
 
 
-typedef void (*execute_extent_page_details_list_t)(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list, enum storage_priority priority);
-static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, struct page_details_control *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
+typedef void (*execute_extent_page_details_list_t)(struct rrdengine_instance *ctx, EPDL *epdl, enum storage_priority priority);
+static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
 {
     Pvoid_t *PValue;
     Pvoid_t *PValue1;
@@ -258,8 +405,8 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 
     Pvoid_t JudyL_datafile_list = NULL;
 
-    DATAFILE_EXTENT_PD_LIST *datafile_extent_list;
-    EXTENT_PD_LIST *extent_page_list;
+    DEOL *deol;
+    EPDL *epdl;
 
     if (pdc->page_list_JudyL) {
         bool first_then_next = true;
@@ -283,29 +430,29 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
 
             PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
             if (PValue1 && !*PValue1) {
-                *PValue1 = datafile_extent_list = mallocz(sizeof(*datafile_extent_list));
-                datafile_extent_list->extent_pd_list_by_extent_offset_JudyL = NULL;
-                datafile_extent_list->fileno = pd->datafile.fileno;
+                *PValue1 = deol = deol_get();
+                deol->extent_pd_list_by_extent_offset_JudyL = NULL;
+                deol->fileno = pd->datafile.fileno;
             }
             else
-                datafile_extent_list = *PValue1;
+                deol = *PValue1;
 
-            PValue2 = JudyLIns(&datafile_extent_list->extent_pd_list_by_extent_offset_JudyL, pd->datafile.extent.pos, PJE0);
+            PValue2 = JudyLIns(&deol->extent_pd_list_by_extent_offset_JudyL, pd->datafile.extent.pos, PJE0);
             if (PValue2 && !*PValue2) {
-                *PValue2 = extent_page_list = mallocz( sizeof(*extent_page_list));
-                extent_page_list->page_details_by_metric_id_JudyL = NULL;
-                extent_page_list->number_of_pages_in_JudyL = 0;
-                extent_page_list->file = pd->datafile.file;
-                extent_page_list->extent_offset = pd->datafile.extent.pos;
-                extent_page_list->extent_size = pd->datafile.extent.bytes;
-                extent_page_list->datafile = pd->datafile.ptr;
+                *PValue2 = epdl = epdl_get();
+                epdl->page_details_by_metric_id_JudyL = NULL;
+                epdl->number_of_pages_in_JudyL = 0;
+                epdl->file = pd->datafile.file;
+                epdl->extent_offset = pd->datafile.extent.pos;
+                epdl->extent_size = pd->datafile.extent.bytes;
+                epdl->datafile = pd->datafile.ptr;
             }
             else
-                extent_page_list = *PValue2;
+                epdl = *PValue2;
 
-            extent_page_list->number_of_pages_in_JudyL++;
+            epdl->number_of_pages_in_JudyL++;
 
-            Pvoid_t *pd_by_first_time_s_judyL = JudyLIns(&extent_page_list->page_details_by_metric_id_JudyL, pd->metric_id, PJE0);
+            Pvoid_t *pd_by_first_time_s_judyL = JudyLIns(&epdl->page_details_by_metric_id_JudyL, pd->metric_id, PJE0);
             Pvoid_t *pd_pptr = JudyLIns(pd_by_first_time_s_judyL, pd->first_time_s, PJE0);
             *pd_pptr = pd;
         }
@@ -314,28 +461,28 @@ static void pdc_to_extent_page_details_list(struct rrdengine_instance *ctx, stru
         Word_t datafile_no = 0;
         first_then_next = true;
         while((PValue = JudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
-            datafile_extent_list = *PValue;
+            deol = *PValue;
 
             bool first_then_next_extent = true;
             Word_t pos = 0;
-            while ((PValue = JudyLFirstThenNext(datafile_extent_list->extent_pd_list_by_extent_offset_JudyL, &pos, &first_then_next_extent))) {
-                extent_page_list = *PValue;
-                internal_fatal(!extent_page_list, "DBENGINE: extent_list is not populated properly");
+            while ((PValue = JudyLFirstThenNext(deol->extent_pd_list_by_extent_offset_JudyL, &pos, &first_then_next_extent))) {
+                epdl = *PValue;
+                internal_fatal(!epdl, "DBENGINE: extent_list is not populated properly");
 
                 // The extent page list can be dispatched to a worker
                 // It will need to populate the cache with "acquired" pages that are in the list (pd) only
                 // the rest of the extent pages will be added to the cache butnot acquired
 
                 pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
-                extent_page_list->pdc = pdc;
+                epdl->pdc = pdc;
 
                 if(extent_list_no++ == 0)
-                    exec_first_extent_list(ctx, extent_page_list, pdc->priority);
+                    exec_first_extent_list(ctx, epdl, pdc->priority);
                 else
-                    exec_rest_extent_list(ctx, extent_page_list, pdc->priority);
+                    exec_rest_extent_list(ctx, epdl, pdc->priority);
             }
-            JudyLFreeArray(&datafile_extent_list->extent_pd_list_by_extent_offset_JudyL, PJE0);
-            freez(datafile_extent_list);
+            JudyLFreeArray(&deol->extent_pd_list_by_extent_offset_JudyL, PJE0);
+            deol_release(deol);
         }
         JudyLFreeArray(&JudyL_datafile_list, PJE0);
     }
@@ -1246,14 +1393,14 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
 }
 
 static bool extent_uncompress_and_populate_pages(
-                struct rrdengine_instance *ctx,
-                void *data,
-                size_t data_length,
-                EXTENT_PD_LIST *extent_page_list,
-                bool preload_all_pages,
-                bool worker,
-                PDC_PAGE_STATUS tags,
-                bool cached_extent)
+        struct rrdengine_instance *ctx,
+        void *data,
+        size_t data_length,
+        EPDL *epdl,
+        bool preload_all_pages,
+        bool worker,
+        PDC_PAGE_STATUS tags,
+        bool cached_extent)
 {
     int ret;
     unsigned i, count;
@@ -1289,13 +1436,13 @@ static bool extent_uncompress_and_populate_pages(
 
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but header is INVALID", __func__,
-                    extent_page_list->extent_offset, extent_page_list->extent_size, extent_page_list->datafile->fileno);
+                    epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno);
 
         return false;
     }
 
     crc = crc32(0L, Z_NULL, 0);
-    crc = crc32(crc, data, extent_page_list->extent_size - sizeof(*trailer));
+    crc = crc32(crc, data, epdl->extent_size - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
     if (unlikely(ret)) {
         ++ctx->stats.io_errors;
@@ -1304,7 +1451,7 @@ static bool extent_uncompress_and_populate_pages(
 
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but CRC32 check FAILED", __func__,
-                    extent_page_list->extent_offset, extent_page_list->extent_size, extent_page_list->datafile->fileno);
+                    epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno);
     }
 
     if(worker)
@@ -1355,7 +1502,7 @@ static bool extent_uncompress_and_populate_pages(
         if(!page_length || !start_time_s) {
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, having page %u (out of %u) EMPTY",
-                        __func__, extent_page_list->extent_offset, extent_page_list->extent_size, extent_page_list->datafile->fileno, i, count);
+                        __func__, epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno, i, count);
             continue;
         }
 
@@ -1367,7 +1514,7 @@ static bool extent_uncompress_and_populate_pages(
         if(!metric) {
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, having page %u (out of %u) for unknown UUID",
-                        __func__, extent_page_list->extent_offset, extent_page_list->extent_size, extent_page_list->datafile->fileno, i, count);
+                        __func__, epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno, i, count);
             continue;
         }
         mrg_metric_release(main_mrg, metric);
@@ -1376,7 +1523,7 @@ static bool extent_uncompress_and_populate_pages(
             worker_is_busy(UV_EVENT_PAGE_LOOKUP);
 
         struct page_details *pd = NULL;
-        Pvoid_t *pd_by_start_time_s_judyL = JudyLGet(extent_page_list->page_details_by_metric_id_JudyL, metric_id, PJE0);
+        Pvoid_t *pd_by_start_time_s_judyL = JudyLGet(epdl->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
         if(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
@@ -2025,8 +2172,8 @@ void async_cb(uv_async_t *handle)
 
 #define TIMER_PERIOD_MS (1000)
 
-static bool datafile_get_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_list) {
-    struct rrdengine_datafile *df = extent_page_list->datafile;
+static bool datafile_get_exclusive_access_to_extent(EPDL *epdl) {
+    struct rrdengine_datafile *df = epdl->datafile;
     bool is_it_mine = false;
 
     while(!is_it_mine) {
@@ -2035,7 +2182,7 @@ static bool datafile_get_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_
             netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
             return false;
         }
-        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access.extents_JudyL, extent_page_list->extent_offset, PJE0);
+        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
         if (!*PValue) {
             *(Word_t *) PValue = gettid();
             df->extent_exclusive_access.lockers++;
@@ -2051,18 +2198,18 @@ static bool datafile_get_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_
     return true;
 }
 
-static void datafile_release_exclusive_access_to_extent(EXTENT_PD_LIST *extent_page_list) {
-    struct rrdengine_datafile *df = extent_page_list->datafile;
+static void datafile_release_exclusive_access_to_extent(EPDL *epdl) {
+    struct rrdengine_datafile *df = epdl->datafile;
 
     netdata_spinlock_lock(&df->extent_exclusive_access.spinlock);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access.extents_JudyL, extent_page_list->extent_offset, PJE0);
+    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
     if (*(Word_t *) PValue != (Word_t)gettid())
         fatal("DBENGINE: exclusive extent access is not mine");
 #endif
 
-    int rc = JudyLDel(&df->extent_exclusive_access.extents_JudyL, extent_page_list->extent_offset, PJE0);
+    int rc = JudyLDel(&df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
     if (!rc)
         fatal("DBENGINE: cannot find my exclusive access");
 
@@ -2070,20 +2217,20 @@ static void datafile_release_exclusive_access_to_extent(EXTENT_PD_LIST *extent_p
     netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
 }
 
-static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list, bool worker) {
-    struct page_details_control *pdc = extent_page_list->pdc;
+static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
+    struct page_details_control *pdc = epdl->pdc;
 
     bool extent_exclusive = false;
 
     if(pdc->preload_all_extent_pages) {
-        if (!datafile_get_exclusive_access_to_extent(extent_page_list)) {
+        if (!datafile_get_exclusive_access_to_extent(epdl)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
             goto cleanup;
         }
         extent_exclusive = true;
     }
 
-    if (extent_list_check_if_pages_are_already_in_cache(ctx, extent_page_list, PDC_PAGE_PRELOADED_WORKER))
+    if (extent_list_check_if_pages_are_already_in_cache(ctx, epdl, PDC_PAGE_PRELOADED_WORKER))
         goto cleanup;
 
     if(__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED))
@@ -2098,12 +2245,12 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
     void *extent_compressed_data = NULL;
     PGC_PAGE *extent_cache_page = pgc_page_get_and_acquire(
             extent_cache, (Word_t)ctx,
-            (Word_t)extent_page_list->datafile->fileno, (time_t)extent_page_list->extent_offset,
+            (Word_t)epdl->datafile->fileno, (time_t)epdl->extent_offset,
             PGC_SEARCH_EXACT);
 
     if(extent_cache_page) {
         extent_compressed_data = pgc_page_data(extent_cache_page);
-        internal_fatal(extent_page_list->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+        internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                        "DBENGINE: cache size does not match the expected size");
 
         loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
@@ -2114,15 +2261,15 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
         if(worker)
             worker_is_busy(UV_EVENT_EXTENT_MMAP);
 
-        off_t map_start =  ALIGN_BYTES_FLOOR(extent_page_list->extent_offset);
-        size_t length = ALIGN_BYTES_CEILING(extent_page_list->extent_offset + extent_page_list->extent_size) - map_start;
+        off_t map_start =  ALIGN_BYTES_FLOOR(epdl->extent_offset);
+        size_t length = ALIGN_BYTES_CEILING(epdl->extent_offset + epdl->extent_size) - map_start;
 
-        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, extent_page_list->file, map_start);
+        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, epdl->file, map_start);
         if(mmap_data != MAP_FAILED) {
-            extent_compressed_data = mmap_data + (extent_page_list->extent_offset - map_start);
+            extent_compressed_data = mmap_data + (epdl->extent_offset - map_start);
 
-            void *copied_extent_compressed_data = mallocz(extent_page_list->extent_size);
-            memcpy(copied_extent_compressed_data, extent_compressed_data, extent_page_list->extent_size);
+            void *copied_extent_compressed_data = mallocz(epdl->extent_size);
+            memcpy(copied_extent_compressed_data, extent_compressed_data, epdl->extent_size);
 
             int ret = munmap(mmap_data, length);
             fatal_assert(0 == ret);
@@ -2134,9 +2281,9 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
             extent_cache_page = pgc_page_add_and_acquire(extent_cache, (PGC_ENTRY) {
                     .hot = false,
                     .section = (Word_t) ctx,
-                    .metric_id = (Word_t) extent_page_list->datafile->fileno,
-                    .start_time_t = (time_t) extent_page_list->extent_offset,
-                    .size = extent_page_list->extent_size,
+                    .metric_id = (Word_t) epdl->datafile->fileno,
+                    .start_time_t = (time_t) epdl->extent_offset,
+                    .size = epdl->extent_size,
                     .end_time_t = 0,
                     .update_every = 0,
                     .data = copied_extent_compressed_data,
@@ -2144,7 +2291,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
 
             if (!added) {
                 freez(copied_extent_compressed_data);
-                internal_fatal(extent_page_list->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
+                internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                                "DBENGINE: cache size does not match the expected size");
             }
 
@@ -2158,8 +2305,8 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
     if(extent_compressed_data) {
         // Need to decompress and then process the pagelist
         bool extent_used = extent_uncompress_and_populate_pages(
-                ctx, extent_compressed_data, extent_page_list->extent_size,
-                extent_page_list, pdc->preload_all_extent_pages,
+                ctx, extent_compressed_data, epdl->extent_size,
+                epdl, pdc->preload_all_extent_pages,
                 worker, loaded_pages_tag, extent_found_in_cache);
 
         if(extent_used) {
@@ -2176,7 +2323,7 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
 
     // mark all pending pages as failed
     extent_list_mark_all_not_loaded_pages_as_failed(
-            extent_page_list, not_loaded_pages_tag,
+            epdl, not_loaded_pages_tag,
             &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
 
     if(extent_cache_page)
@@ -2184,32 +2331,32 @@ static void load_pages_from_an_extent_list(struct rrdengine_instance *ctx, EXTEN
 
 cleanup:
     if(extent_exclusive)
-        datafile_release_exclusive_access_to_extent(extent_page_list);
+        datafile_release_exclusive_access_to_extent(epdl);
 
-    completion_mark_complete_a_job(&extent_page_list->pdc->page_completion);
+    completion_mark_complete_a_job(&epdl->pdc->page_completion);
     pdc_release_and_destroy_if_unreferenced(pdc, true, false);
 
     // Free the Judy that holds the requested pagelist and the extents
-    extent_list_free(extent_page_list);
+    extent_list_free(epdl);
 
     if(worker)
         worker_is_idle();
 }
 
 static void extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    EXTENT_PD_LIST *extent_page_list = data;
-    load_pages_from_an_extent_list(ctx, extent_page_list, true);
+    EPDL *epdl = data;
+    load_pages_from_an_extent_list(ctx, epdl, true);
 }
 
-static void queue_extent_list(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_page_list, STORAGE_PRIORITY priority) {
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_READ, extent_page_list, NULL, priority);
+static void queue_extent_list(struct rrdengine_instance *ctx, EPDL *epdl, STORAGE_PRIORITY priority) {
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_READ, epdl, NULL, priority);
 }
 
 void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc) {
     pdc_to_extent_page_details_list(ctx, pdc, queue_extent_list, queue_extent_list);
 }
 
-void load_pages_from_an_extent_list_directly(struct rrdengine_instance *ctx, EXTENT_PD_LIST *extent_list, enum storage_priority priority __maybe_unused) {
+void load_pages_from_an_extent_list_directly(struct rrdengine_instance *ctx, EPDL *extent_list, enum storage_priority priority __maybe_unused) {
     load_pages_from_an_extent_list(ctx, extent_list, false);
 }
 
@@ -2283,9 +2430,11 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
             .workers     = __atomic_load_n(&work_request_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
-        .pdc       = __atomic_load_n(&pdc_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(PDC),
-        .xt_io     = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
-        .xt_buf    = __atomic_load_n(&extent_buffer_globals.atomics.allocated_bytes, __ATOMIC_RELAXED),
+            .pdc         = __atomic_load_n(&pdc_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(PDC),
+            .xt_io       = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
+            .xt_buf      = __atomic_load_n(&extent_buffer_globals.atomics.allocated_bytes, __ATOMIC_RELAXED),
+            .epdl        = __atomic_load_n(&epdl_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(EPDL),
+            .deol        = __atomic_load_n(&deol_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(DEOL),
     };
 }
 
@@ -2311,6 +2460,8 @@ void timer_cb(uv_timer_t* handle) {
         rrdeng_query_handle_cleanup();
         wal_cleanup();
         extent_buffer_cleanup();
+        epdl_cleanup();
+        deol_cleanup();
     }
 
     worker_is_idle();
@@ -2422,8 +2573,8 @@ void rrdeng_worker(void* arg) {
             switch (opcode) {
                 case RRDENG_OPCODE_EXTENT_READ: {
                     struct rrdengine_instance *ctx = cmd.ctx;
-                    EXTENT_PD_LIST *extent_page_list = cmd.data;
-                    work_dispatch(ctx, extent_page_list, NULL, opcode, extent_read_tp_worker, after_extent_read);
+                    EPDL *epdl = cmd.data;
+                    work_dispatch(ctx, epdl, NULL, opcode, extent_read_tp_worker, after_extent_read);
                     break;
                 }
 
