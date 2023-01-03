@@ -2101,6 +2101,16 @@ size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr
 // ----------------------------------------------------------------------------
 // unittest
 
+static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) {
+    ;
+}
+
+static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) {
+    ;
+}
+
+#ifdef PGC_STRESS_TEST
+
 struct {
     bool stop;
     PGC *cache;
@@ -2285,12 +2295,7 @@ void *unittest_stress_test_service(void *ptr) {
     return ptr;
 }
 
-static void unittest_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused) {
-    // info("FREE clean page section %lu, metric %lu, start_time %lu, end_time %lu", entry.section, entry.metric_id, entry.start_time_t, entry.end_time_t);
-    ;
-}
-
-static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) {
+static void unittest_stress_test_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused) {
     // info("SAVE %zu pages", entries);
     if(!pgc_uts.stop) {
         usec_t t = pgc_uts.time_per_flush_ut;
@@ -2309,7 +2314,7 @@ static void unittest_save_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENT
 void unittest_stress_test(void) {
     pgc_uts.cache = pgc_create(pgc_uts.cache_size * 1024 * 1024,
                                unittest_free_clean_page_callback,
-                               64, unittest_save_dirty_page_callback,
+                               64, unittest_stress_test_save_dirty_page_callback,
                                1000, 10000, 1,
                                pgc_uts.options, pgc_uts.partitions, 0);
 
@@ -2473,11 +2478,9 @@ void unittest_stress_test(void) {
     freez(pgc_uts.metrics);
     freez(pgc_uts.random_data);
 }
+#endif
 
 int pgc_unittest(void) {
-    mallopt(M_PERTURB, 0x5A);
-    // mallopt(M_MXFAST, 0);
-
     PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, unittest_save_dirty_page_callback,
                             10, 1000, 10,
@@ -2545,6 +2548,9 @@ int pgc_unittest(void) {
 
     pgc_destroy(cache);
 
+#ifdef PGC_STRESS_TEST
     unittest_stress_test();
+#endif
+
     return 0;
 }
