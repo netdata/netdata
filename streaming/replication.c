@@ -483,9 +483,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     time_t wall_clock_time = now_realtime_sec();
     if(enable_streaming) {
         if(query_time < wall_clock_time ||
-           before < wall_clock_time ||
-           query_time < st->last_updated.tv_sec ||
-           before < st->last_updated.tv_sec) {
+           before < wall_clock_time) {
             // we needed time to execute this request
             // so, the parent will need to replicate more data
             enable_streaming = false;
