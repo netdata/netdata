@@ -392,6 +392,8 @@ struct rrdengine_instance {
     struct rrdengine_statistics stats;
 };
 
+#define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce, __ATOMIC_RELAXED) == NO_QUIESCE)
+
 void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t size);
 void dbengine_page_free(void *page);
 

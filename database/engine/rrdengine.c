@@ -1749,7 +1749,7 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
     }
     datafile = xt_io_descr->datafile;
 
-    bool still_running = (NO_QUIESCE == __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED));
+    bool still_running = ctx_is_available_for_queries(ctx);
 
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
@@ -2097,7 +2097,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
-    if (NO_QUIESCE == __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED))
+    if (ctx_is_available_for_queries(ctx))
         update_metrics_first_time_t(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
@@ -2184,7 +2184,8 @@ static void ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     completion_wait_for(&ctx->quiesce_completion);
     completion_destroy(&ctx->quiesce_completion);
 
-    while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED))
+    while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
+            __atomic_load_n(&ctx->inflight_queries, __ATOMIC_RELAXED))
         sleep_usec(1 * USEC_PER_MS);
 
     completion_mark_complete(completion);
@@ -2467,7 +2468,8 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
         }
 
         datafile = datafile->next;
-        if (unlikely(NO_QUIESCE != __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED)))
+
+        if (unlikely(!ctx_is_available_for_queries(ctx)))
             break;
     }
 

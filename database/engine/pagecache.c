@@ -772,12 +772,19 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     handle->pdc->priority = handle->priority;
     handle->pdc->optimal_end_time_s = handle->end_time_s;
     handle->pdc->ctx = handle->ctx;
-    handle->pdc->refcount = 2; // we get 1 for the query thread and 1 for the prep thread
+    handle->pdc->refcount = 1;
     netdata_spinlock_init(&handle->pdc->refcount_spinlock);
     completion_init(&handle->pdc->prep_completion);
     completion_init(&handle->pdc->page_completion);
 
-    rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority);
+    if(ctx_is_available_for_queries(handle->ctx)) {
+        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority);
+        handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
+    }
+    else {
+        completion_mark_complete(&handle->pdc->prep_completion);
+        completion_mark_complete(&handle->pdc->page_completion);
+    }
 }
 
 /*

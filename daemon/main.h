@@ -28,18 +28,18 @@ void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 
 typedef enum {
-    SERVICE_MAINTENANCE           = (1 << 0),
-    SERVICE_COLLECTORS            = (1 << 1),
-    SERVICE_ML_TRAINING           = (1 << 2),
-    SERVICE_ML_PREDICTION         = (1 << 3),
-    SERVICE_REPLICATION           = (1 << 4),
-    SERVICE_DATA_QUERIES          = (1 << 5), // ABILITY
-    SERVICE_WEB_REQUESTS          = (1 << 6), // ABILITY
-    SERVICE_WEB_SERVER            = (1 << 7),
-    SERVICE_ACLK                  = (1 << 8),
-    SERVICE_HEALTH                = (1 << 9),
-    SERVICE_STREAMING             = (1 << 10),
-    SERVICE_STREAMING_CONNECTIONS = (1 << 11), // ABILITY
+    ABILITY_DATA_QUERIES          = (1 << 0),
+    ABILITY_WEB_REQUESTS          = (1 << 1),
+    ABILITY_STREAMING_CONNECTIONS = (1 << 2),
+    SERVICE_MAINTENANCE           = (1 << 3),
+    SERVICE_COLLECTORS            = (1 << 4),
+    SERVICE_ML_TRAINING           = (1 << 5),
+    SERVICE_ML_PREDICTION         = (1 << 6),
+    SERVICE_REPLICATION           = (1 << 7),
+    SERVICE_WEB_SERVER            = (1 << 8),
+    SERVICE_ACLK                  = (1 << 9),
+    SERVICE_HEALTH                = (1 << 10),
+    SERVICE_STREAMING             = (1 << 11),
     SERVICE_CONTEXT               = (1 << 12),
     SERVICE_ANALYTICS             = (1 << 13),
     SERVICE_EXPORTERS             = (1 << 14),

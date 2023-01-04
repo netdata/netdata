@@ -2761,7 +2761,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
 }
 
 QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
-    if(!service_running(SERVICE_DATA_QUERIES))
+    if(!service_running(ABILITY_DATA_QUERIES))
         return NULL;
 
     QUERY_TARGET *qt = &thread_query_target;

@@ -343,7 +343,7 @@ void *aclk_query_main_thread(void *ptr)
 
     service_register(SERVICE_THREAD_TYPE_NETDATA, aclk_query_request_cancel, NULL, &query_cond_wait, false);
 
-    while (service_running(SERVICE_ACLK | SERVICE_DATA_QUERIES)) {
+    while (service_running(SERVICE_ACLK | ABILITY_DATA_QUERIES)) {
         aclk_query_process_msgs(query_thr);
 
         worker_is_idle();

@@ -1059,6 +1059,9 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
         if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
             ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
+
+        if(!query_metric_is_valid_tier(ops->qm, selected_tier))
+            return false;
     }
 
     ops->plan.entries = 1;
@@ -2116,12 +2119,14 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         // set the query target dimension options to rrdr
         r->od[c] = qt->query.array[c].dimension.options;
 
-        r->od[c] |= RRDR_DIMENSION_SELECTED;
-
         // reset the grouping for the new dimension
         r->internal.grouping_reset(r);
 
-        rrd2rrdr_query_execute(r, c, ops[c]);
+        if(ops[c]) {
+            r->od[c] |= RRDR_DIMENSION_SELECTED;
+            rrd2rrdr_query_execute(r, c, ops[c]);
+        }
+
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
 

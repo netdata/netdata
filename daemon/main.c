@@ -116,6 +116,19 @@ bool service_running(SERVICE_TYPE service) {
 
 void service_signal_exit(SERVICE_TYPE service) {
     __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
+
+    netdata_spinlock_lock(&service_globals.lock);
+
+    Pvoid_t *PValue;
+    Word_t tid = 0;
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+        SERVICE_THREAD *sth = *PValue;
+        if((sth->services & service) && sth->request_quit_callback)
+            sth->request_quit_callback(sth->data);
+    }
+
+    netdata_spinlock_unlock(&service_globals.lock);
 }
 
 static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
@@ -129,9 +142,9 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "ML_PREDICTION ");
     if(service & SERVICE_REPLICATION)
         buffer_strcat(wb, "REPLICATION ");
-    if(service & SERVICE_DATA_QUERIES)
+    if(service & ABILITY_DATA_QUERIES)
         buffer_strcat(wb, "DATA_QUERIES ");
-    if(service & SERVICE_WEB_REQUESTS)
+    if(service & ABILITY_WEB_REQUESTS)
         buffer_strcat(wb, "WEB_REQUESTS ");
     if(service & SERVICE_WEB_SERVER)
         buffer_strcat(wb, "WEB_SERVER ");
@@ -141,7 +154,7 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "HEALTH ");
     if(service & SERVICE_STREAMING)
         buffer_strcat(wb, "STREAMING ");
-    if(service & SERVICE_STREAMING_CONNECTIONS)
+    if(service & ABILITY_STREAMING_CONNECTIONS)
         buffer_strcat(wb, "STREAMING_CONNECTIONS ");
     if(service & SERVICE_CONTEXT)
         buffer_strcat(wb, "CONTEXT ");
@@ -263,21 +276,6 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     return (running == 0);
 }
 
-static void service_request_exit(void)
-{
-    netdata_spinlock_lock(&service_globals.lock);
-
-    Pvoid_t *PValue;
-    Word_t tid = 0;
-    bool first = true;
-    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
-        SERVICE_THREAD *sth = *PValue;
-        if(sth->request_quit_callback)
-           sth->request_quit_callback(sth->data);
-    }
-    netdata_spinlock_unlock(&service_globals.lock);
-}
-
 void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
@@ -292,12 +290,11 @@ void netdata_cleanup_and_exit(int ret) {
 
     service_signal_exit(
             SERVICE_MAINTENANCE
-            | SERVICE_DATA_QUERIES
-            | SERVICE_WEB_REQUESTS
-            | SERVICE_STREAMING_CONNECTIONS
+            | ABILITY_DATA_QUERIES
+            | ABILITY_WEB_REQUESTS
+            | ABILITY_STREAMING_CONNECTIONS
+            | SERVICE_ACLK
             );
-
-    service_request_exit();
 
     service_wait_exit(
             SERVICE_REPLICATION
@@ -344,32 +341,23 @@ void netdata_cleanup_and_exit(int ret) {
     if(!ret) {
         // exit cleanly
 
-        info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-
-            size_t in_flight_queries = 1, tries = 100;
-            while (in_flight_queries && --tries > 0) {
-                if (tries < 99)
-                    sleep_usec(10000);
-
-                in_flight_queries = 0;
-                for (size_t tier = 0; tier < storage_tiers; tier++)
-                    in_flight_queries += __atomic_load_n(&multidb_ctx[tier]->inflight_queries, __ATOMIC_RELAXED);
-            }
-
+            info("EXIT: flushing dbengine...");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
 
         // free the database
+        info("EXIT: freeing database memory...");
         rrdhost_free_all();
 
         metadata_sync_shutdown();
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            info("EXIT: stopping dbengine...");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }

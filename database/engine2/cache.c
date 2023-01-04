@@ -602,19 +602,33 @@ static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transi
 }
 
 static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
+    if(!having_hot_lock)
+        // to avoid deadlocks, we have to get the hot lock before the page transition
+        // since this is what all_hot_to_dirty() does
+        pgc_ll_lock(cache, &cache->hot);
+
     page_transition_lock(cache, page);
 
     PGC_PAGE_FLAGS flags = page_get_status_flags(page);
 
     if(flags & PGC_PAGE_DIRTY) {
         page_transition_unlock(cache, page);
+
+        if(!having_hot_lock)
+            // we don't need the hot lock anymore
+            pgc_ll_unlock(cache, &cache->hot);
+
         return;
     }
 
-    if(flags & PGC_PAGE_HOT)
-        pgc_ll_del(cache, &cache->hot, page, having_hot_lock);
+    if(likely(flags & PGC_PAGE_HOT))
+        pgc_ll_del(cache, &cache->hot, page, true);
 
-    if(flags & PGC_PAGE_CLEAN)
+    if(!having_hot_lock)
+        // we don't need the hot lock anymore
+        pgc_ll_unlock(cache, &cache->hot);
+
+    if(unlikely(flags & PGC_PAGE_CLEAN))
         pgc_ll_del(cache, &cache->clean, page, false);
 
     // first add to linked list, the set the flag (required for move_page_last())
@@ -1739,11 +1753,11 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page) {
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
     __atomic_add_fetch(&cache->stats.workers_hot2dirty, 1, __ATOMIC_RELAXED);
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    page_transition_lock(cache, page);
-    internal_fatal(!is_page_hot(page), "DBENGINE CACHE: called %s() but page is not hot", __FUNCTION__ );
-    page_transition_unlock(cache, page);
-#endif
+//#ifdef NETDATA_INTERNAL_CHECKS
+//    page_transition_lock(cache, page);
+//    internal_fatal(!is_page_hot(page), "DBENGINE CACHE: called %s() but page is not hot", __FUNCTION__ );
+//    page_transition_unlock(cache, page);
+//#endif
 
     // make page dirty
     page_set_dirty(cache, page, false);

@@ -1314,7 +1314,7 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 }
 
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
-    if(unlikely(!service_running(SERVICE_WEB_REQUESTS)))
+    if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_permission_denied(w);
 
     static uint32_t
