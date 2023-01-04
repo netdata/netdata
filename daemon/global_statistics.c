@@ -2786,8 +2786,6 @@ static void global_statistics_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    worker_utilization_finish();
-
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
