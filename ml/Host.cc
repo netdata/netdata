@@ -142,19 +142,19 @@ void Host::detectOnce() {
         TSCopy.RemainingUT = 0;
     }
 
-//    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
-//    updateDimensionsChart(RH, MLSCopy);
-//
-//    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
-//    updateHostAndDetectionRateCharts(RH, HostAnomalyRate * 10000.0);
-//
-//    worker_is_busy(WORKER_JOB_DETECTION_RESOURCES);
-//    struct rusage PredictionRU;
-//    getrusage(RUSAGE_THREAD, &PredictionRU);
-//    updateResourceUsageCharts(RH, PredictionRU, TSCopy.TrainingRU);
-//
-//    worker_is_busy(WORKER_JOB_DETECTION_STATS);
-//    updateTrainingStatisticsChart(RH, TSCopy);
+    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+    updateDimensionsChart(RH, MLSCopy);
+
+    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+    updateHostAndDetectionRateCharts(RH, HostAnomalyRate * 10000.0);
+
+    worker_is_busy(WORKER_JOB_DETECTION_RESOURCES);
+    struct rusage PredictionRU;
+    getrusage(RUSAGE_THREAD, &PredictionRU);
+    updateResourceUsageCharts(RH, PredictionRU, TSCopy.TrainingRU);
+
+    worker_is_busy(WORKER_JOB_DETECTION_STATS);
+    updateTrainingStatisticsChart(RH, TSCopy);
 }
 
 class AcquiredDimension {
