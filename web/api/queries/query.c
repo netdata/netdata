@@ -1094,6 +1094,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                         .before = selected_tier_first_time_t};
                     ops->plan.data[ops->plan.entries++] = t;
 
+                    internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
+
                     // prepare for the tier
                     selected_tier_first_time_t = t.after;
 
@@ -1126,6 +1128,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
                     // prepare for the tier
                     selected_tier_last_time_t = t.before;
+
+                    internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
 
                     if (t.before >= before_wanted)
                         break;

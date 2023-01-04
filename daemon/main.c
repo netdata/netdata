@@ -278,7 +278,6 @@ static void service_request_exit(void)
     netdata_spinlock_unlock(&service_globals.lock);
 }
 
-
 void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
@@ -342,22 +341,8 @@ void netdata_cleanup_and_exit(int ret) {
     info("EXIT: stopping static threads...");
     cancel_main_threads();
 
-//    rrdhost_free_all();
-//
-//    service_signal_exit(
-//            SERVICE_METASYNC
-//            | SERVICE_DBENGINE
-//    );
-//
-//    service_wait_exit(~0, 10 * USEC_PER_SEC);
-
     if(!ret) {
         // exit cleanly
-
-        // stop everything
-
-        // free the database
-        rrdhost_free_all();
 
         info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
@@ -367,6 +352,7 @@ void netdata_cleanup_and_exit(int ret) {
             while (in_flight_queries && --tries > 0) {
                 if (tries < 99)
                     sleep_usec(10000);
+
                 in_flight_queries = 0;
                 for (size_t tier = 0; tier < storage_tiers; tier++)
                     in_flight_queries += __atomic_load_n(&multidb_ctx[tier]->inflight_queries, __ATOMIC_RELAXED);
@@ -376,7 +362,12 @@ void netdata_cleanup_and_exit(int ret) {
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
+
+        // free the database
+        rrdhost_free_all();
+
         metadata_sync_shutdown();
+
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             for (size_t tier = 0; tier < storage_tiers; tier++)
