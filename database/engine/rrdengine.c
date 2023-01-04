@@ -1751,18 +1751,19 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
     }
     datafile = xt_io_descr->datafile;
 
-    // Descriptors need to be freed when migration to V2 happens
+    bool still_running = (NO_QUIESCE == __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED));
 
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
 
-        pgc_open_add_hot_page(
-                (Word_t)ctx, descr->metric_id,
-                (time_t) (descr->start_time_ut / USEC_PER_SEC),
-                (time_t) (descr->end_time_ut / USEC_PER_SEC),
-                descr->update_every_s,
-                datafile,
-                xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
+        if (likely(still_running))
+            pgc_open_add_hot_page(
+                    (Word_t)ctx, descr->metric_id,
+                    (time_t) (descr->start_time_ut / USEC_PER_SEC),
+                    (time_t) (descr->end_time_ut / USEC_PER_SEC),
+                    descr->update_every_s,
+                    datafile,
+                    xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
 
         page_descriptor_release(descr);
     }
@@ -1775,7 +1776,7 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
     datafile->writers.flushed_to_open_running--;
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 
-    if(datafile->fileno != __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED))
+    if(datafile->fileno != __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED) && still_running)
         // we just finished a flushing on a datafile that is not the active one
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
 }
@@ -2026,7 +2027,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             open_cache_count++;
         }
     }
-    info("DBENGINE: processed %u journalfiles and matched %u metrics in v2 files and %u in open cache", journalfile_count,
+    info("DBENGINE: processed %u journalfiles and matched %u metric pages in v2 files and %u in open cache", journalfile_count,
         v2_count, open_cache_count);
 }
 
@@ -2718,6 +2719,7 @@ void rrdeng_worker(void* arg) {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx; (void)ctx;
                     // FIXME - ktsaou - flush all pages of this ctx (section)
+                    __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
                     break;
                 }
 
@@ -2731,11 +2733,9 @@ void rrdeng_worker(void* arg) {
                     if(ctx->worker_config.outstanding_flush_requests)
                         // spin
                         rrdeng_enq_cmd(ctx, opcode, NULL, completion, STORAGE_PRIORITY_BEST_EFFORT);
-                    else {
+                    else
                         // done
-                        __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
                         completion_mark_complete(completion);
-                    }
 
                     break;
                 }
