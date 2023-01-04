@@ -34,6 +34,7 @@
 - Remove Fedora 35 from the list of supported platforms. [\#14136](https://github.com/netdata/netdata/pull/14136) ([Ferroin](https://github.com/Ferroin))
 - Fix conditions for uploading repoconfig packages to new infra. [\#14134](https://github.com/netdata/netdata/pull/14134) ([Ferroin](https://github.com/Ferroin))
 - fix httpcheck alarms [\#14133](https://github.com/netdata/netdata/pull/14133) ([ilyam8](https://github.com/ilyam8))
+- eBPF \(memory, NV, basis for functions\) [\#14131](https://github.com/netdata/netdata/pull/14131) ([thiagoftsm](https://github.com/thiagoftsm))
 - bump go.d.plugin to v0.46.0 [\#14124](https://github.com/netdata/netdata/pull/14124) ([ilyam8](https://github.com/ilyam8))
 - heartbeat: don't log every discrepancy [\#14122](https://github.com/netdata/netdata/pull/14122) ([ktsaou](https://github.com/ktsaou))
 - ARAL: add destroy function and optimize ifdefs [\#14121](https://github.com/netdata/netdata/pull/14121) ([ktsaou](https://github.com/ktsaou))
@@ -351,11 +352,6 @@
 - chore\(python.d\): rename dockerd job on lock registration [\#13537](https://github.com/netdata/netdata/pull/13537) ([ilyam8](https://github.com/ilyam8))
 - Update MacOS community support details [\#13536](https://github.com/netdata/netdata/pull/13536) ([DShreve2](https://github.com/DShreve2))
 - Fix a crash when xen libraries are misconfigured [\#13535](https://github.com/netdata/netdata/pull/13535) ([vlvkobal](https://github.com/vlvkobal))
-- Add summary dashboard for PostgreSQL [\#13534](https://github.com/netdata/netdata/pull/13534) ([shyamvalsan](https://github.com/shyamvalsan))
-- add `jupyter` to `apps_groups.conf` [\#13533](https://github.com/netdata/netdata/pull/13533) ([andrewm4894](https://github.com/andrewm4894))
-- Schedule next rotation based on absolute time [\#13531](https://github.com/netdata/netdata/pull/13531) ([MrZammler](https://github.com/MrZammler))
-- Improve PID monitoring \(step 2\) [\#13530](https://github.com/netdata/netdata/pull/13530) ([thiagoftsm](https://github.com/thiagoftsm))
-- fix\(health\): set default curl connection timeout if not set [\#13529](https://github.com/netdata/netdata/pull/13529) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
