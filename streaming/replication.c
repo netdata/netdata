@@ -129,27 +129,19 @@ static struct replication_query *replication_query_prepare(
     }
 
     if(q->query.enable_streaming) {
-        time_t delta = (q->query.before - q->query.after) / q->st->update_every;
-        if(delta > 60) {
-            // disable streaming to have another request
-            // that will enable it with fewer points
-            q->query.enable_streaming = false;
-        }
-        else {
-            netdata_spinlock_lock(&st->data_collection_lock);
-            q->query.locked_data_collection = true;
+        netdata_spinlock_lock(&st->data_collection_lock);
+        q->query.locked_data_collection = true;
 
-            if (st->last_updated.tv_sec > q->query.before) {
-                internal_error(true,
-                               "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
-                               "has start_streaming = true, "
-                               "adjusting replication before timestamp from %llu to %llu",
-                               rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                               (unsigned long long) q->query.before,
-                               (unsigned long long) st->last_updated.tv_sec
-                );
-                q->query.before = st->last_updated.tv_sec;
-            }
+        if (st->last_updated.tv_sec > q->query.before) {
+            internal_error(true,
+                           "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
+                           "has start_streaming = true, "
+                           "adjusting replication before timestamp from %llu to %llu",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           (unsigned long long) q->query.before,
+                           (unsigned long long) st->last_updated.tv_sec
+            );
+            q->query.before = st->last_updated.tv_sec;
         }
     }
 
@@ -175,7 +167,8 @@ static struct replication_query *replication_query_prepare(
         d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
         d->rd = rd;
 
-        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before, STORAGE_PRIORITY_LOW);
+        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before,
+                     q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
         count++;
     }
