@@ -315,7 +315,9 @@ void netdata_spinlock_lock(SPINLOCK *spinlock) {
 }
 
 void netdata_spinlock_unlock(SPINLOCK *spinlock) {
+#ifdef NETDATA_INTERNAL_CHECKS
     spinlock->locker_pid = 0;
+#endif
     __atomic_clear(&spinlock->locked, __ATOMIC_RELEASE);
     netdata_thread_enable_cancelability();
 }
