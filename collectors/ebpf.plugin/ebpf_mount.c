@@ -187,7 +187,7 @@ static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {

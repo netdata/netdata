@@ -246,7 +246,7 @@ static void ebpf_shm_adjust_map_size(struct shm_bpf *obj, ebpf_module_t *em)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *em)
 {

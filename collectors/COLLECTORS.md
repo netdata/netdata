@@ -521,7 +521,7 @@ $ sudo wget https://raw.githubusercontent.com/netdata/community/main/collectors/
 $ sudo wget https://raw.githubusercontent.com/netdata/community/main/collectors/python.d.plugin/clickhouse/clickhouse.conf -O /etc/netdata/python.d/clickhouse.conf
 
 # enable collector by adding line a new line with "clickhouse: yes" to /etc/netdata/python.d.conf file
-# this will apend to the file if it already exists or create it if not
+# this will append to the file if it already exists or create it if not
 $ sudo echo "clickhouse: yes" >> /etc/netdata/python.d.conf
 
 # (optional) edit clickhouse.conf if needed

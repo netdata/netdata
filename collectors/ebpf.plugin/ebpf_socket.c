@@ -387,7 +387,7 @@ static void ebpf_socket_adjust_map_size(struct socket_bpf *obj, ebpf_module_t *e
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_socket_load_and_attach(struct socket_bpf *obj, ebpf_module_t *em)
 {
@@ -2049,12 +2049,12 @@ static void ebpf_read_socket_hash_table(int fd, int family)
 /**
  * Fill Network Viewer Port list
  *
- * Fill the strcture with values read from /proc or hash table.
+ * Fill the structure with values read from /proc or hash table.
  *
  * @param out   the structure where we will store data.
  * @param value the ports we are listen to.
  * @param proto the protocol used for this connection.
- * @param in    the strcuture with values read form different sources.
+ * @param in    the structure with values read form different sources.
  */
 static inline void fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint16_t value, uint16_t proto,
                                      netdata_passive_connection_t *in)
@@ -2073,7 +2073,7 @@ static inline void fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint1
  *
  * @param value the ports we are listen to.
  * @param proto the protocol used with port connection.
- * @param in    the strcuture with values read form different sources.
+ * @param in    the structure with values read form different sources.
  */
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {

@@ -1517,7 +1517,7 @@ try_package_install() {
   fi
 
   if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuraion package."
+    progress "Successfully installed repository configuration package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -1852,7 +1852,7 @@ prepare_offline_install_source() {
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
   fi
 
-  run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+  run cd "${1}" || fatal "Failed to switch to target directory for offline install preparation." F0505
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
     set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"

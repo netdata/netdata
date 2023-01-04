@@ -184,7 +184,7 @@ static void ebpf_swap_disable_release_task(struct swap_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_swap_load_and_attach(struct swap_bpf *obj, ebpf_module_t *em)
 {

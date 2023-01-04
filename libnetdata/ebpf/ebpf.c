@@ -809,7 +809,7 @@ static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t
  *
  * Convert the string given as argument to value present in enum.
  *
- * @param str  value read from configuraion file.
+ * @param str  value read from configuration file.
  *
  * @return It returns the value to be used.
  */
@@ -901,7 +901,7 @@ netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode
 /**
  * Adjust Thread Load
  *
- * Adjust thread configuraton according specified load.
+ * Adjust thread configuration according specified load.
  *
  * @param mod   the main structure that will be adjusted.
  * @param file  the btf file used with thread.
@@ -1060,7 +1060,7 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netd
  * Update configuration for a specific thread.
  *
  * @param modules   structure that will be updated
- * @oaram origin    specify the configuration file loaded
+ * @param origin    specify the configuration file loaded
  * @param btf_file a pointer to the loaded btf file.
  * @param is_rhf is Red Hat family?
  */
@@ -1124,7 +1124,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int i
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
-        // If user defined data globaly, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
+        // If user defined data globally, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
         // forcing users to configure thread by thread.
         origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load & NETDATA_EBPF_LOAD_SOURCE;
     } else
@@ -1139,7 +1139,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int i
  * Apps and cgroup has internal cleanup that needs attaching tracers to release_task, to avoid overload the function
  * we will enable this integration by default, if and only if, we are running with trampolines.
  *
- * @param em   a poiter to the main thread structure.
+ * @param em   a pointer to the main thread structure.
  * @param mode is the mode used with different
  */
 void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode)

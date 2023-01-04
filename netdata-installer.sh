@@ -429,7 +429,7 @@ if [ "$(uname -s)" = "Linux" ] && [ -f /proc/meminfo ]; then
       target_ram="$(echo "${target_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       total_ram="$(echo "${total_ram}" | awk '{$1/=1024*1024*1024;printf "%.2fGiB\n",$1}')"
       run_failed "Netdata needs ${target_ram} of RAM to safely install, but this system only has ${total_ram}. Try reducing the number of processes used for the install using the \$MAKEOPTS variable."
-      exit_reason "Insufficent RAM to safely install." I000F
+      exit_reason "Insufficient RAM to safely install." I000F
       exit 2
     fi
   fi
