@@ -2096,7 +2096,8 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
-    update_metrics_first_time_t(ctx, datafile, datafile->next, worker);
+    if (NO_QUIESCE == __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED))
+        update_metrics_first_time_t(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
         if(worker)
@@ -2442,7 +2443,7 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
         }
 
         datafile = datafile->next;
-        if (unlikely(NO_QUIESCE != ctx->quiesce))
+        if (unlikely(NO_QUIESCE != __atomic_load_n(&ctx->quiesce, __ATOMIC_RELAXED)))
             break;
     }
 
@@ -2730,9 +2731,11 @@ void rrdeng_worker(void* arg) {
                     if(ctx->worker_config.outstanding_flush_requests)
                         // spin
                         rrdeng_enq_cmd(ctx, opcode, NULL, completion, STORAGE_PRIORITY_BEST_EFFORT);
-                    else
+                    else {
                         // done
+                        __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
                         completion_mark_complete(completion);
+                    }
 
                     break;
                 }
