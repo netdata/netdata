@@ -2173,7 +2173,7 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 
 static void flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
-    completion_mark_complete(completion);
+    completion_mark_complete(&ctx->quiesce_completion);
 }
 
 static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -2742,9 +2742,8 @@ void dbengine_event_loop(void* arg) {
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx; (void)ctx;
-                    struct completion *completion = cmd.completion;
                     __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
-                    work_dispatch(ctx, NULL, completion, opcode,
+                    work_dispatch(ctx, NULL, NULL, opcode,
                                       flush_all_hot_and_dirty_pages_of_section_tp_worker,
                                       after_flush_all_hot_and_dirty_pages_of_section);
                     break;
