@@ -38,7 +38,6 @@ void aclk_add_worker_thread(struct aclk_database_worker_config *wc)
         aclk_thread_head = wc;
     }
     uv_mutex_unlock(&aclk_async_lock);
-    return;
 }
 
 void aclk_del_worker_thread(struct aclk_database_worker_config *wc)
@@ -53,7 +52,6 @@ void aclk_del_worker_thread(struct aclk_database_worker_config *wc)
     if (*tmp)
         *tmp = wc->next;
     uv_mutex_unlock(&aclk_async_lock);
-    return;
 }
 
 int aclk_worker_thread_exists(char *guid)
@@ -332,7 +330,6 @@ void sql_aclk_sync_init(void)
         sqlite3_free(err_msg);
     }
 #endif
-    return;
 }
 
 static void async_cb(uv_async_t *handle)
@@ -396,9 +393,6 @@ void aclk_database_worker(void *arg)
     enum aclk_database_opcode opcode;
     uv_timer_t timer_req;
     struct aclk_database_cmd cmd;
-    unsigned cmd_batch_size;
-
-    //aclk_database_init_cmd_queue(wc);
 
     char threadname[NETDATA_THREAD_NAME_MAX+1];
     if (wc->host)
@@ -447,7 +441,6 @@ void aclk_database_worker(void *arg)
         uv_run(loop, UV_RUN_DEFAULT);
 
         /* wait for commands */
-        cmd_batch_size = 0;
         do {
             cmd = aclk_database_deq_cmd(wc);
 
@@ -455,7 +448,6 @@ void aclk_database_worker(void *arg)
                 break;
 
             opcode = cmd.opcode;
-            ++cmd_batch_size;
 
             if(likely(opcode != ACLK_DATABASE_NOOP))
                 worker_is_busy(opcode);
@@ -580,10 +572,8 @@ void aclk_database_worker(void *arg)
     info("Shutting down ACLK sync event loop complete for host %s", wc->host_guid);
     /* TODO: don't let the API block by waiting to enqueue commands */
     uv_cond_destroy(&wc->cmd_cond);
-/*  uv_mutex_destroy(&wc->cmd_mutex); */
-    //fatal_assert(0 == uv_loop_close(loop));
-    int rc;
 
+    int rc;
     do {
         rc = uv_loop_close(loop);
     } while (rc != UV_EBUSY);
@@ -645,7 +635,7 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
         host->dbsync_worker = (void *)wc;
         wc->hostname = strdupz(rrdhost_hostname(host));
         if (node_id && !host->node_id) {
-            host->node_id = mallocz(sizeof(host->node_id));
+            host->node_id = mallocz(sizeof(*host->node_id));
             uuid_copy(*host->node_id, *node_id);
         }
     }
@@ -678,7 +668,6 @@ void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct
     db_execute(buffer_tostring(sql));
 
     buffer_free(sql);
-    return;
 }
 
 #define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
@@ -769,7 +758,6 @@ void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct a
 
 fail:
     buffer_free(sql);
-    return;
 }
 
 static int sql_check_aclk_table(void *data, int argc, char **argv, char **column)
@@ -799,5 +787,4 @@ void sql_check_aclk_table_list(struct aclk_database_worker_config *wc)
         error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
         sqlite3_free(err_msg);
     }
-    return;
 }
