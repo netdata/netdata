@@ -3,55 +3,182 @@
 #include "ADCharts.h"
 #include "Config.h"
 
-void ml::updateDimensionsChart(RRDHOST *RH,
-                               collected_number NumTrainedDimensions,
-                               collected_number NumNormalDimensions,
-                               collected_number NumAnomalousDimensions) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *NumTotalDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumTrainedDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumNormalDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
+void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
+    /*
+     * Machine learning status
+    */
+    {
+        static thread_local RRDSET *MachineLearningStatusRS = nullptr;
 
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
+        static thread_local RRDDIM *Enabled = nullptr;
+        static thread_local RRDDIM *DisabledUE = nullptr;
+        static thread_local RRDDIM *DisabledSP = nullptr;
 
-        IdSS << "dimensions_on_" << localhost->machine_guid;
-        NameSS << "dimensions_on_" << localhost->hostname;
+        if (!MachineLearningStatusRS) {
+            std::stringstream IdSS, NameSS;
 
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "dimensions", // family
-            "anomaly_detection.dimensions", // ctx
-            "Anomaly detection dimensions", // title
-            "dimensions", // units
-            "netdata", // plugin
-            "ml", // module
-            39183, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+            IdSS << "machine_learning_status_for_" << localhost->machine_guid;
+            NameSS << "machine_learning_status_for_" << localhost->hostname;
 
-        NumTotalDimensionsRD = rrddim_add(RS, "total", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumTrainedDimensionsRD = rrddim_add(RS, "trained", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumNormalDimensionsRD = rrddim_add(RS, "normal", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumAnomalousDimensionsRD = rrddim_add(RS, "anomalous", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
+            MachineLearningStatusRS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.machine_learning_status", // ctx
+                "Machine learning status", // title
+                "dimensions", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE // chart_type
+            );
+            rrdset_flag_set(MachineLearningStatusRS , RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Enabled = rrddim_add(MachineLearningStatusRS, "enabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            DisabledUE = rrddim_add(MachineLearningStatusRS, "disabled-ue", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            DisabledSP = rrddim_add(MachineLearningStatusRS, "disabled-sp", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(MachineLearningStatusRS, Enabled, MLS.NumMachineLearningStatusEnabled);
+        rrddim_set_by_pointer(MachineLearningStatusRS, DisabledUE, MLS.NumMachineLearningStatusDisabledUE);
+        rrddim_set_by_pointer(MachineLearningStatusRS, DisabledSP, MLS.NumMachineLearningStatusDisabledSP);
+
+        rrdset_done(MachineLearningStatusRS);
     }
 
-    rrddim_set_by_pointer(RS, NumTotalDimensionsRD, NumNormalDimensions + NumAnomalousDimensions);
-    rrddim_set_by_pointer(RS, NumTrainedDimensionsRD, NumTrainedDimensions);
-    rrddim_set_by_pointer(RS, NumNormalDimensionsRD, NumNormalDimensions);
-    rrddim_set_by_pointer(RS, NumAnomalousDimensionsRD, NumAnomalousDimensions);
+    /*
+     * Metric type
+    */
+    {
+        static thread_local RRDSET *MetricTypesRS = nullptr;
 
-    rrdset_done(RS);
+        static thread_local RRDDIM *Constant = nullptr;
+        static thread_local RRDDIM *Variable = nullptr;
+
+        if (!MetricTypesRS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "metric_types_for_" << localhost->machine_guid;
+            NameSS << "metric_types_for_" << localhost->hostname;
+
+            MetricTypesRS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.metric_types", // ctx
+                "Dimensions by metric type", // title
+                "dimensions", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_METRIC_TYPES, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE // chart_type
+            );
+            rrdset_flag_set(MetricTypesRS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Constant = rrddim_add(MetricTypesRS, "constant", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            Variable = rrddim_add(MetricTypesRS, "variable", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(MetricTypesRS, Constant, MLS.NumMetricTypeConstant);
+        rrddim_set_by_pointer(MetricTypesRS, Variable, MLS.NumMetricTypeVariable);
+
+        rrdset_done(MetricTypesRS);
+    }
+
+    /*
+     * Training status
+    */
+    {
+        static thread_local RRDSET *TrainingStatusRS = nullptr;
+
+        static thread_local RRDDIM *Untrained = nullptr;
+        static thread_local RRDDIM *PendingWithoutModel = nullptr;
+        static thread_local RRDDIM *Trained = nullptr;
+        static thread_local RRDDIM *PendingWithModel = nullptr;
+
+        if (!TrainingStatusRS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "training_status_for_" << localhost->machine_guid;
+            NameSS << "training_status_for_" << localhost->hostname;
+
+            TrainingStatusRS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.training_status", // ctx
+                "Training status of dimensions", // title
+                "dimensions", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_TRAINING_STATUS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE // chart_type
+            );
+
+            rrdset_flag_set(TrainingStatusRS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Untrained = rrddim_add(TrainingStatusRS, "untrained", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            PendingWithoutModel = rrddim_add(TrainingStatusRS, "pending-without-model", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            Trained = rrddim_add(TrainingStatusRS, "trained", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            PendingWithModel = rrddim_add(TrainingStatusRS, "pending-with-model", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(TrainingStatusRS, Untrained, MLS.NumTrainingStatusUntrained);
+        rrddim_set_by_pointer(TrainingStatusRS, PendingWithoutModel, MLS.NumTrainingStatusPendingWithoutModel);
+        rrddim_set_by_pointer(TrainingStatusRS, Trained, MLS.NumTrainingStatusTrained);
+        rrddim_set_by_pointer(TrainingStatusRS, PendingWithModel, MLS.NumTrainingStatusPendingWithModel);
+
+        rrdset_done(TrainingStatusRS);
+    }
+
+    /*
+     * Prediction status
+    */
+    {
+        static thread_local RRDSET *PredictionRS = nullptr;
+
+        static thread_local RRDDIM *Anomalous = nullptr;
+        static thread_local RRDDIM *Normal = nullptr;
+
+        if (!PredictionRS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "dimensions_on_" << localhost->machine_guid;
+            NameSS << "dimensions_on_" << localhost->hostname;
+
+            PredictionRS = rrdset_create(
+                RH,
+                "anomaly_detection", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "dimensions", // family
+                "anomaly_detection.dimensions", // ctx
+                "Anomaly detection dimensions", // title
+                "dimensions", // units
+                "netdata", // plugin
+                "ml", // module
+                ML_CHART_PRIO_DIMENSIONS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE // chart_type
+            );
+            rrdset_flag_set(PredictionRS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Anomalous = rrddim_add(PredictionRS, "anomalous", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            Normal = rrddim_add(PredictionRS, "normal", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(PredictionRS, Anomalous, MLS.NumAnomalousDimensions);
+        rrddim_set_by_pointer(PredictionRS, Normal, MLS.NumNormalDimensions);
+
+        rrdset_done(PredictionRS);
+    }
+
 }
 
 void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyRate) {
@@ -75,7 +202,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             "percentage", // units
             "netdata", // plugin
             "ml", // module
-            39184, // priority
+            ML_CHART_PRIO_ANOMALY_RATE, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
@@ -109,7 +236,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             "percentage", // units
             "netdata", // plugin
             "ml", // module
-            39185, // priority
+            ML_CHART_PRIO_DETECTOR_EVENTS, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
         );
@@ -143,6 +270,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             0, /* tier */
             QUERY_SOURCE_ML
     );
+
     if(R) {
         assert(R->d == 1 && R->n == 1 && R->rows == 1);
 
@@ -157,77 +285,227 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
 
         rrdr_free(OWA, R);
     }
+
     onewayalloc_destroy(OWA);
 }
 
-void ml::updateDetectionChart(RRDHOST *RH) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
+void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionRU, const struct rusage &TrainingRU) {
+    /*
+     * prediction rusage
+    */
+    {
+        static thread_local RRDSET *RS = nullptr;
 
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
+        static thread_local RRDDIM *User = nullptr;
+        static thread_local RRDDIM *System = nullptr;
 
-        IdSS << "prediction_stats_" << RH->machine_guid;
-        NameSS << "prediction_stats_for_" << RH->hostname;
+        if (!RS) {
+            std::stringstream IdSS, NameSS;
 
-        RS = rrdset_create_localhost(
-            "netdata", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "ml", // family
-            "netdata.prediction_stats", // ctx
-            "Prediction thread CPU usage", // title
-            "milliseconds/s", // units
-            "netdata", // plugin
-            "ml", // module
-            136000, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_STACKED // chart_type
-        );
+            IdSS << "prediction_usage_for_" << localhost->machine_guid;
+            NameSS << "prediction_usage_for_" << localhost->hostname;
 
-        UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            RS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.prediction_usage", // ctx
+                "Prediction resource usage", // title
+                "milliseconds/s", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_PREDICTION_USAGE, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_STACKED // chart_type
+            );
+            rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            User = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            System = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(RS, User, PredictionRU.ru_utime.tv_sec * 1000000ULL + PredictionRU.ru_utime.tv_usec);
+        rrddim_set_by_pointer(RS, System, PredictionRU.ru_stime.tv_sec * 1000000ULL + PredictionRU.ru_stime.tv_usec);
+
+        rrdset_done(RS);
     }
 
-    struct rusage TRU;
-    getrusage(RUSAGE_THREAD, &TRU);
+    /*
+     * training rusage
+    */
+    {
+        static thread_local RRDSET *RS = nullptr;
 
-    rrddim_set_by_pointer(RS, UserRD, TRU.ru_utime.tv_sec * 1000000ULL + TRU.ru_utime.tv_usec);
-    rrddim_set_by_pointer(RS, SystemRD, TRU.ru_stime.tv_sec * 1000000ULL + TRU.ru_stime.tv_usec);
-    rrdset_done(RS);
+        static thread_local RRDDIM *User = nullptr;
+        static thread_local RRDDIM *System = nullptr;
+
+        if (!RS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "training_usage_for_" << localhost->machine_guid;
+            NameSS << "training_usage_for_" << localhost->hostname;
+
+            RS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.training_usage", // ctx
+                "Training resource usage", // title
+                "milliseconds/s", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_TRAINING_USAGE, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_STACKED // chart_type
+            );
+            rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            User = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            System = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(RS, User, TrainingRU.ru_utime.tv_sec * 1000000ULL + TrainingRU.ru_utime.tv_usec);
+        rrddim_set_by_pointer(RS, System, TrainingRU.ru_stime.tv_sec * 1000000ULL + TrainingRU.ru_stime.tv_usec);
+
+        rrdset_done(RS);
+    }
 }
 
-void ml::updateTrainingChart(RRDHOST *RH, struct rusage *TRU) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *UserRD = nullptr;
-    static thread_local RRDDIM *SystemRD = nullptr;
+void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
+    /*
+     * queue stats
+    */
+    {
+        static thread_local RRDSET *RS = nullptr;
 
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
+        static thread_local RRDDIM *QueueSize = nullptr;
+        static thread_local RRDDIM *PoppedItems = nullptr;
 
-        IdSS << "training_stats_" << RH->machine_guid;
-        NameSS << "training_stats_for_" << RH->hostname;
+        if (!RS) {
+            std::stringstream IdSS, NameSS;
 
-        RS = rrdset_create_localhost(
-            "netdata", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "ml", // family
-            "netdata.training_stats", // ctx
-            "Training thread CPU usage", // title
-            "milliseconds/s", // units
-            "netdata", // plugin
-            "ml", // module
-            136001, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_STACKED // chart_type
-        );
+            IdSS << "queue_stats_for_" << localhost->machine_guid;
+            NameSS << "queue_stats_for_" << localhost->hostname;
 
-        UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
+            RS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.queue_stats", // ctx
+                "Training queue stats", // title
+                "items", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_QUEUE_STATS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE// chart_type
+            );
+            rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            QueueSize = rrddim_add(RS, "queue_size", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            PoppedItems = rrddim_add(RS, "popped_items", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(RS, QueueSize, TS.QueueSize);
+        rrddim_set_by_pointer(RS, PoppedItems, TS.NumPoppedItems);
+
+        rrdset_done(RS);
     }
 
-    rrddim_set_by_pointer(RS, UserRD, TRU->ru_utime.tv_sec * 1000000ULL + TRU->ru_utime.tv_usec);
-    rrddim_set_by_pointer(RS, SystemRD, TRU->ru_stime.tv_sec * 1000000ULL + TRU->ru_stime.tv_usec);
-    rrdset_done(RS);
+    /*
+     * training stats
+    */
+    {
+        static thread_local RRDSET *RS = nullptr;
+
+        static thread_local RRDDIM *Allotted = nullptr;
+        static thread_local RRDDIM *Consumed = nullptr;
+        static thread_local RRDDIM *Remaining = nullptr;
+
+        if (!RS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "training_time_stats_for_" << localhost->machine_guid;
+            NameSS << "training_time_stats_for_" << localhost->hostname;
+
+            RS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.training_time_stats", // ctx
+                "Training time stats", // title
+                "milliseconds", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_TRAINING_TIME_STATS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE// chart_type
+            );
+            rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Allotted = rrddim_add(RS, "allotted", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            Consumed = rrddim_add(RS, "consumed", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+            Remaining = rrddim_add(RS, "remaining", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(RS, Allotted, TS.AllottedUT);
+        rrddim_set_by_pointer(RS, Consumed, TS.ConsumedUT);
+        rrddim_set_by_pointer(RS, Remaining, TS.RemainingUT);
+
+        rrdset_done(RS);
+    }
+
+    /*
+     * training result stats
+    */
+    {
+        static thread_local RRDSET *RS = nullptr;
+
+        static thread_local RRDDIM *Ok  = nullptr;
+        static thread_local RRDDIM *InvalidQueryTimeRange = nullptr;
+        static thread_local RRDDIM *NotEnoughCollectedValues = nullptr;
+        static thread_local RRDDIM *NullAcquiredDimension = nullptr;
+        static thread_local RRDDIM *ChartUnderReplication = nullptr;
+
+        if (!RS) {
+            std::stringstream IdSS, NameSS;
+
+            IdSS << "training_results_for_" << localhost->machine_guid;
+            NameSS << "training_results_for_" << localhost->hostname;
+
+            RS = rrdset_create_localhost(
+                "netdata", // type
+                IdSS.str().c_str(), // id
+                NameSS.str().c_str(), // name
+                "ml", // family
+                "netdata.training_results", // ctx
+                "Training results", // title
+                "events", // units
+                "netdata", // plugin
+                "ml", // module
+                NETDATA_ML_CHART_PRIO_TRAINING_RESULTS, // priority
+                RH->rrd_update_every, // update_every
+                RRDSET_TYPE_LINE// chart_type
+            );
+            rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+
+            Ok = rrddim_add(RS, "ok", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            InvalidQueryTimeRange = rrddim_add(RS, "invalid-queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            NotEnoughCollectedValues = rrddim_add(RS, "not-enough-values", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            NullAcquiredDimension = rrddim_add(RS, "null-acquired-dimensions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ChartUnderReplication = rrddim_add(RS, "chart-under-replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(RS, Ok, TS.TrainingResultOk);
+        rrddim_set_by_pointer(RS, InvalidQueryTimeRange, TS.TrainingResultInvalidQueryTimeRange);
+        rrddim_set_by_pointer(RS, NotEnoughCollectedValues, TS.TrainingResultNotEnoughCollectedValues);
+        rrddim_set_by_pointer(RS, NullAcquiredDimension, TS.TrainingResultNullAcquiredDimension);
+        rrddim_set_by_pointer(RS, ChartUnderReplication, TS.TrainingResultChartUnderReplication);
+
+        rrdset_done(RS);
+    }
 }
