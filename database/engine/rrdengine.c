@@ -1200,6 +1200,7 @@ static struct {
 
     size_t waiting;
     struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIO_MAX_DONT_USE];
+    size_t executed_by_priority[STORAGE_PRIO_MAX_DONT_USE];
 
 } rrdeng_cmd_globals = {
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,
@@ -1256,6 +1257,14 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
+static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
+    for(; priority <= max_priority ; priority++)
+        if(rrdeng_cmd_globals.waiting_items_by_priority[priority])
+            return true;
+
+    return false;
+}
+
 static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     struct rrdeng_cmd ret = {
             .ctx = NULL,
@@ -1272,6 +1281,13 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_CRITICAL; priority <= max_priority ; priority++) {
         struct rrdeng_cmd *cmd = rrdeng_cmd_globals.waiting_items_by_priority[priority];
         if(cmd) {
+            if(unlikely(priority > STORAGE_PRIORITY_CRITICAL &&
+                        priority < STORAGE_PRIORITY_BEST_EFFORT &&
+                        ++rrdeng_cmd_globals.executed_by_priority[priority] % 50 == 0 &&
+                        rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority)))
+                // let the others run 2% of the requests
+                continue;
+
             DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             ret = *cmd;
             DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.available_items, cmd, cache.prev, cache.next);
