@@ -13,6 +13,7 @@ typedef struct netdata_spinlock {
     bool locked;
 #ifdef NETDATA_INTERNAL_CHECKS
     size_t spins;
+    pid_t locker_pid;
 #endif
 } SPINLOCK;
 #define NETDATA_SPINLOCK_INITIALIZER (SPINLOCK) { .locked = false }
