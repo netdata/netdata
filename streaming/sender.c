@@ -74,7 +74,7 @@ static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
 
 #ifdef ENABLE_COMPRESSION
 /*
-* In case of stream compression buffer oveflow
+* In case of stream compression buffer overflow
 * Inform the user through the error log file and 
 * deactivate compression by downgrading the stream protocol.
 */

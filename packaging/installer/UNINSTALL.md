@@ -51,7 +51,7 @@ A workflow for uninstallation looks like this:
 2.  If you cannot find that file and would like to uninstall Netdata, then create a new file with the following content:
 
 ```sh
-NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
+NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install-prefix` flag. Otherwise it should be empty
 NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running the Netdata process
 ```
 

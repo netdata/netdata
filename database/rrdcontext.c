@@ -750,11 +750,6 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
 }
 
 static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext) {
-    static STRING *ml_anomaly_rates_id = NULL;
-
-    if(unlikely(!ml_anomaly_rates_id))
-        ml_anomaly_rates_id = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
-
     RRDINSTANCE *ri = value;
 
     // link it to its parent
@@ -780,10 +775,6 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
         else
             ri->flags &= ~RRD_FLAG_HIDDEN; // no need of atomics at the constructor
     }
-
-    // we need this when loading from SQL
-    if(unlikely(ri->id == ml_anomaly_rates_id))
-        ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
 
     rrdmetrics_create_in_rrdinstance(ri);
 

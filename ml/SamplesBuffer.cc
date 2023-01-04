@@ -103,31 +103,30 @@ void SamplesBuffer::lagSamples() {
     }
 }
 
-std::vector<DSample> SamplesBuffer::preprocess() {
+void SamplesBuffer::preprocess(std::vector<DSample> &Samples) {
     assert(Preprocessed == false);
 
-    std::vector<DSample> DSamples;
     size_t OutN = NumSamples;
 
     // Diff
     if (DiffN >= OutN)
-        return DSamples;
+        return;
     OutN -= DiffN;
     diffSamples();
 
     // Smooth
     if (SmoothN == 0 || SmoothN > OutN)
-        return DSamples;
+        return;
     OutN -= (SmoothN - 1);
     smoothSamples();
 
     // Lag
     if (LagN >= OutN)
-        return DSamples;
+        return;
     OutN -= LagN;
     lagSamples();
 
-    DSamples.reserve(OutN);
+    Samples.reserve(OutN);
     Preprocessed = true;
 
     uint32_t MaxMT = std::numeric_limits<uint32_t>::max();
@@ -143,8 +142,45 @@ std::vector<DSample> SamplesBuffer::preprocess() {
         const Sample PS = getPreprocessedSample(Idx);
         PS.initDSample(DS);
 
-        DSamples.push_back(DS);
+        Samples.push_back(DS);
     }
+}
 
-    return DSamples;
+void SamplesBuffer::preprocess(DSample &Feature) {
+    assert(Preprocessed == false);
+
+    size_t OutN = NumSamples;
+
+    // Diff
+    if (DiffN >= OutN)
+        return;
+    OutN -= DiffN;
+    diffSamples();
+
+    // Smooth
+    if (SmoothN == 0 || SmoothN > OutN)
+        return;
+    OutN -= (SmoothN - 1);
+    smoothSamples();
+
+    // Lag
+    if (LagN >= OutN)
+        return;
+    OutN -= LagN;
+    lagSamples();
+
+    Preprocessed = true;
+
+    uint32_t MaxMT = std::numeric_limits<uint32_t>::max();
+    uint32_t CutOff = static_cast<double>(MaxMT) * SamplingRatio;
+
+    for (size_t Idx = NumSamples - OutN; Idx != NumSamples; Idx++) {
+        if (RandNums[Idx] > CutOff)
+            continue;
+
+        Feature.set_size(NumDimsPerSample * (LagN + 1));
+
+        const Sample PS = getPreprocessedSample(Idx);
+        PS.initDSample(Feature);
+    }
 }

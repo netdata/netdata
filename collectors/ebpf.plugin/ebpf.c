@@ -1317,7 +1317,7 @@ static void read_local_addresses()
             }
         }
 
-        fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
+        ebpf_fill_ip_list((family == AF_INET)?&network_viewer_opt.ipv4_local_ip:&network_viewer_opt.ipv6_local_ip,
                      w,
                      "selector");
     }
@@ -1520,13 +1520,8 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION,
                                         ebpf_modules[EBPF_MODULE_SOCKET_IDX].config_name,
                                         CONFIG_BOOLEAN_NO);
-
     if (enabled) {
         ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
-        // Read network viewer section if network viewer is enabled
-        // This is kept here to keep backward compatibility
-        parse_network_viewer_section(&collector_config);
-        parse_service_name_section(&collector_config);
         started++;
     }
 
@@ -1536,7 +1531,17 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
     if (!enabled)
         enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "network connections",
                                         CONFIG_BOOLEAN_NO);
-    ebpf_modules[EBPF_MODULE_SOCKET_IDX].optional = (int)enabled;
+    network_viewer_opt.enabled = enabled;
+    if (enabled) {
+        if (!ebpf_modules[EBPF_MODULE_SOCKET_IDX].enabled)
+            ebpf_enable_chart(EBPF_MODULE_SOCKET_IDX, *disable_apps, *disable_cgroups);
+
+        // Read network viewer section if network viewer is enabled
+        // This is kept here to keep backward compatibility
+        parse_network_viewer_section(&collector_config);
+        parse_service_name_section(&collector_config);
+        started++;
+    }
 
     enabled = appconfig_get_boolean(&collector_config, EBPF_PROGRAMS_SECTION, "cachestat",
                                     CONFIG_BOOLEAN_NO);
@@ -1642,8 +1647,10 @@ static void read_collector_values(int *disable_apps, int *disable_cgroups,
         ebpf_enable_all_charts(*disable_apps, *disable_cgroups);
         // Read network viewer section
         // This is kept here to keep backward compatibility
-        parse_network_viewer_section(&collector_config);
-        parse_service_name_section(&collector_config);
+        if (network_viewer_opt.enabled) {
+            parse_network_viewer_section(&collector_config);
+            parse_service_name_section(&collector_config);
+        }
     }
 }
 

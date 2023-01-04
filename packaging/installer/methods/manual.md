@@ -189,7 +189,7 @@ cd netdata
 
 -   You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
--   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
+-   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install-prefix /opt`. This one will install Netdata in `/opt/netdata`.
 
 -   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
 

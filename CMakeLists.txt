@@ -1030,12 +1030,17 @@ set(ML_FILES
 IF(ENABLE_ML)
     message(STATUS "ML: enabled")
     list(APPEND ML_FILES
+            ml/ADCharts.h
+            ml/ADCharts.cc
+            ml/Chart.h
+            ml/Chart.cc
             ml/Config.h
             ml/Config.cc
-            ml/Dimension.cc
             ml/Dimension.h
+            ml/Dimension.cc
             ml/Host.h
             ml/Host.cc
+            ml/Mutex.h
             ml/Query.h
             ml/KMeans.h
             ml/KMeans.cc

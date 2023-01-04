@@ -172,7 +172,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-    ml_new_dimension(rd);
+    ml_dimension_new(rd);
 
     ctr->react_action = RRDDIM_REACT_NEW;
 
@@ -191,7 +191,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdcontext_removed_rrddim(rd);
 
-    ml_delete_dimension(rd);
+    ml_dimension_delete(rd);
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 

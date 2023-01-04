@@ -40,7 +40,7 @@ public:
     std::pair<time_t, CalculatedNumber> nextMetric() {
         points_read++;
         STORAGE_POINT sp = Ops->next_metric(&Handle);
-        return { sp.start_time, sp.sum / sp.count };
+        return { sp.end_time, sp.sum / sp.count };
     }
 
 private:

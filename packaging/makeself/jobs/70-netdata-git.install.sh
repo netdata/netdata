@@ -27,7 +27,7 @@ export PKG_CONFIG_PATH="/openssl-static/lib/pkgconfig"
 export CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=/openssl-static -DOPENSSL_LIBRARIES=/openssl-static/lib -DCMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE=/openssl-static -DLWS_OPENSSL_INCLUDE_DIRS=/openssl-static/include -DLWS_OPENSSL_LIBRARIES=/openssl-static/lib/libssl.a;/openssl-static/lib/libcrypto.a"
 
 run ./netdata-installer.sh \
-  --install "${NETDATA_INSTALL_PARENT}" \
+  --install-prefix "${NETDATA_INSTALL_PARENT}" \
   --dont-wait \
   --dont-start-it \
   --require-cloud \

@@ -45,7 +45,7 @@ gunzip netdata*.tar.gz && tar xf netdata*.tar && rm -rf netdata*.tar
 Install Netdata in `/opt/netdata`. If you want to enable automatic updates, add `--auto-update` or `-u` to install `netdata-updater` in `cron` (**need root permission**):
 
 ```sh
-cd netdata-v* && ./netdata-installer.sh --install /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
+cd netdata-v* && ./netdata-installer.sh --install-prefix /opt && cp /opt/netdata/usr/sbin/netdata-claim.sh /usr/sbin/
 ```
 
 You also need to enable the `netdata` service in `/etc/rc.conf`:
@@ -75,7 +75,7 @@ The `netdata-updater.sh` script will update your Agent.
 ## Optional parameters to alter your installation
 | parameters | Description |
 |:-----:|-----------|
-|`--install <path>`| Install netdata in `<path>.` Ex: `--install /opt` will put netdata in `/opt/netdata`|
+|`--install-prefix <path>`| Install netdata in `<path>.` Ex: `--install-prefix /opt` will put netdata in `/opt/netdata`|
 | `--dont-start-it` | Do not (re)start netdata after installation|
 | `--dont-wait` | Run installation in non-interactive mode|
 | `--auto-update` or `-u` | Install netdata-updater in cron to update netdata automatically once per day|

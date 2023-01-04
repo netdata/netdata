@@ -68,7 +68,6 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--disable-cloud`: For local builds, don’t build any of the cloud code at all. For native packages and static builds,
     use runtime configuration to disable cloud support.
 - `--require-cloud`: Only install if Netdata Cloud can be enabled. Overrides `--disable-cloud`.
-- `--install`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system), this option is deprecated and will be removed in a future version, please use `--install-prefix` instead.
 - `--install-prefix`: Specify an installation prefix for local builds (by default, we use a sane prefix based on the type of system).
 - `--install-version`: Specify the version of Netdata to install.
 - `--old-install-prefix`: Specify the custom local build's installation prefix that should be removed.

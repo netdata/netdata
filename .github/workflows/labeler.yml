@@ -2,17 +2,20 @@
 # Handles labelling of PR's.
 name: Pull Request Labeler
 on:
-  schedule:
-    - cron: '*/10 * * * *'
-env:
-  DISABLE_TELEMETRY: 1
+  pull_request_target: null
+concurrency:
+  group: pr-label-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   labeler:
+    name: Apply PR Labels
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
-      - uses: docker://docker.io/ilyam8/periodic-pr-labeler:v0.1.0
+      - uses: actions/labeler@v4
         if: github.repository == 'netdata/netdata'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          LABEL_MAPPINGS_FILE: .github/labeler.yml
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          sync-labels: true

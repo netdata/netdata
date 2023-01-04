@@ -217,7 +217,7 @@ jobs:
     env:
       RETRY_DELAY: 300
     strategy:
-      # Unlike the actal build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
+      # Unlike the actual build tests, this completes _very_ fast (average of about 3 minutes for each job), so we
       # just run everything in parallel instead lof limiting job concurrency.
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}

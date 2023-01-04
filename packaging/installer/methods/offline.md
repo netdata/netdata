@@ -41,7 +41,7 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 This will create a directory called `netdata-offline` in the current directory and place all the files required for an offline install in it.
 
 If you want to use a specific release channel (nightly or stable), it _must_ be specified on this step using the
-apporpriate option for the kickstart script.
+appropriate option for the kickstart script.
 
 ## Installing on the target system
 
