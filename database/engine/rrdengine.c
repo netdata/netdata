@@ -1727,8 +1727,6 @@ static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_
 }
 
 static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    ctx->worker_config.outstanding_flush_requests--;
-
     if(completion)
         completion_mark_complete(completion);
 
@@ -1833,6 +1831,8 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     if (!count) {
         if (completion)
             completion_mark_complete(completion);
+
+        __atomic_sub_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
         return 0;
     }
 
@@ -2165,6 +2165,29 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
 static void database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     datafile_delete(ctx, ctx->datafiles.first, true);
+}
+
+static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
+}
+
+static void flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
+    completion_mark_complete(completion);
+}
+
+static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
+}
+
+static void ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    completion_wait_for(&ctx->quiesce_completion);
+    completion_destroy(&ctx->quiesce_completion);
+
+    while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED))
+        sleep_usec(1 * USEC_PER_MS);
+
+    completion_mark_complete(completion);
 }
 
 static void cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -2545,18 +2568,18 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx) {
         }
         rrdeng_main.timer.data = &rrdeng_main;
 
-        fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, rrdeng_worker, &rrdeng_main));
+        fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
         spawned = true;
     }
 
     ctx->worker_config.now_deleting_files = false;
     ctx->worker_config.migration_to_v2_running = false;
-    ctx->worker_config.outstanding_flush_requests = 0;
+    ctx->worker_config.atomics.extents_currently_being_flushed = 0;
 
     return true;
 }
 
-void rrdeng_worker(void* arg) {
+void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np(pthread_self(), "DBENGINE");
 
@@ -2640,7 +2663,8 @@ void rrdeng_worker(void* arg) {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct page_descr_with_data *base = cmd.data;
                     struct completion *completion = cmd.completion; // optional
-                    cmd.ctx->worker_config.outstanding_flush_requests++;
+                    // for the datafile and the journalfile
+                    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
                     do_flush_extent(ctx, base, completion);
                     break;
                 }
@@ -2718,8 +2742,11 @@ void rrdeng_worker(void* arg) {
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
                     struct rrdengine_instance *ctx = cmd.ctx; (void)ctx;
-                    // FIXME - ktsaou - flush all pages of this ctx (section)
+                    struct completion *completion = cmd.completion;
                     __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
+                    work_dispatch(ctx, NULL, completion, opcode,
+                                      flush_all_hot_and_dirty_pages_of_section_tp_worker,
+                                      after_flush_all_hot_and_dirty_pages_of_section);
                     break;
                 }
 
@@ -2727,16 +2754,7 @@ void rrdeng_worker(void* arg) {
                     // a ctx is shutting down
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct completion *completion = cmd.completion;
-
-                    // FIXME - ktsaou - make sure we cleanup all requests for this ctx
-
-                    if(ctx->worker_config.outstanding_flush_requests)
-                        // spin
-                        rrdeng_enq_cmd(ctx, opcode, NULL, completion, STORAGE_PRIORITY_BEST_EFFORT);
-                    else
-                        // done
-                        completion_mark_complete(completion);
-
+                    work_dispatch(ctx, NULL, completion, opcode, ctx_shutdown_tp_worker, after_ctx_shutdown);
                     break;
                 }
 

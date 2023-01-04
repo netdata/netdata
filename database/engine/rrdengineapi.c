@@ -939,6 +939,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
+    completion_init(&ctx->quiesce_completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 

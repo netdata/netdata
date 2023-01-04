@@ -72,6 +72,8 @@ static void flush_transaction_buffer_cb(uv_fs_t* req)
     uv_fs_req_cleanup(req);
     wal_release(wal);
 
+    __atomic_sub_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+
     worker_is_idle();
 }
 

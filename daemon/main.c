@@ -374,7 +374,6 @@ void netdata_cleanup_and_exit(int ret) {
 
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
-            pgc_flush_all_hot_and_dirty_pages(main_cache);
         }
 #endif
         metadata_sync_shutdown();

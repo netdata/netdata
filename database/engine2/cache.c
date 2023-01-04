@@ -365,7 +365,7 @@ static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unuse
 // ----------------------------------------------------------------------------
 // flushing control
 
-static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_them);
+static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them);
 
 static inline bool flushing_critical(PGC *cache) {
     if(unlikely(__atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED) > __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED))) {
@@ -1213,7 +1213,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         evict_on_clean_page_added(cache);
 
     if((cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE) || flushing_critical(cache)) {
-        flush_pages(cache, cache->config.max_flushes_inline,
+        flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL,
                     false, false);
     }
 
@@ -1376,13 +1376,16 @@ cleanup:
     return page;
 }
 
-static void all_hot_pages_to_dirty(PGC *cache) {
+static void all_hot_pages_to_dirty(PGC *cache, Word_t section) {
     pgc_ll_lock(cache, &cache->hot);
 
     bool first = true;
-    Word_t last_section = 0;
+    Word_t last_section = (section == PGC_SECTION_ALL) ? 0 : section;
     Pvoid_t *section_pages_pptr;
     while ((section_pages_pptr = JudyLFirstThenNext(cache->hot.sections_judy, &last_section, &first))) {
+        if(section != PGC_SECTION_ALL && last_section != section)
+            break;
+
         struct section_pages *sp = *section_pages_pptr;
 
         PGC_PAGE *page = sp->base;
@@ -1402,7 +1405,7 @@ static void all_hot_pages_to_dirty(PGC *cache) {
 }
 
 // returns true when there is more work to do
-static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_them) {
+static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wait, bool all_of_them) {
     internal_fatal(!cache->dirty.linked_list_in_sections_judy,
                    "wrong dirty pages configuration - dirty pages need to have a judy array, not a linked list");
 
@@ -1434,7 +1437,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
     if(all_of_them || !max_flushes)
         max_flushes = SIZE_MAX;
 
-    Word_t last_section = 0;
+    Word_t last_section = (section == PGC_SECTION_ALL) ? 0 : section;
     size_t flushes_so_far = 0;
     Pvoid_t *section_pages_pptr;
     bool stopped_before_finishing = false;
@@ -1442,6 +1445,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, bool wait, bool all_of_t
     bool first = true;
 
     while (have_dirty_lock && (section_pages_pptr = JudyLFirstThenNext(cache->dirty.sections_judy, &last_section, &first))) {
+        if(section != PGC_SECTION_ALL && last_section != section)
+            break;
+
         struct section_pages *sp = *section_pages_pptr;
         if(!all_of_them && sp->entries < optimal_flush_size)
             continue;
@@ -1687,16 +1693,19 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     return cache;
 }
 
-void pgc_flush_all_hot_and_dirty_pages(PGC *cache) {
-    // convert all hot pages to dirty
-    all_hot_pages_to_dirty(cache);
+void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {
+    all_hot_pages_to_dirty(cache, section);
 
     // save all dirty pages to make them clean
-    flush_pages(cache, 0, true, true);
+    flush_pages(cache, 0, section, true, true);
 }
 
 void pgc_destroy(PGC *cache) {
-    pgc_flush_all_hot_and_dirty_pages(cache);
+    // convert all hot pages to dirty
+    all_hot_pages_to_dirty(cache, PGC_SECTION_ALL);
+
+    // save all dirty pages to make them clean
+    flush_pages(cache, 0, PGC_SECTION_ALL, true, true);
 
     // free all unreferenced clean pages
     free_all_unreferenced_clean_pages(cache);
@@ -1747,7 +1756,7 @@ void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page) {
 
     // flush, if we have to
     if((cache->config.options & PGC_OPTIONS_FLUSH_PAGES_INLINE) || flushing_critical(cache)) {
-        flush_pages(cache, cache->config.max_flushes_inline,
+        flush_pages(cache, cache->config.max_flushes_inline, PGC_SECTION_ALL,
                     false, false);
     }
 }
@@ -1877,7 +1886,7 @@ bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
 
 bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
     bool under_pressure = flushing_critical(cache);
-    return flush_pages(cache, under_pressure ? 0 : max_flushes, true, false);
+    return flush_pages(cache, under_pressure ? 0 : max_flushes, PGC_SECTION_ALL, true, false);
 }
 
 void pgc_page_hot_set_end_time_t(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_t) {

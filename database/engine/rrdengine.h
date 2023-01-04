@@ -308,7 +308,11 @@ void wal_release(WAL *wal);
 struct rrdengine_worker_config {
     bool now_deleting_files;
     bool migration_to_v2_running;
-    unsigned outstanding_flush_requests;
+
+    struct {
+        // non-zero until we commit data to disk (both datafile and journal file)
+        unsigned extents_currently_being_flushed;
+    } atomics;
 };
 
 /*
@@ -382,6 +386,8 @@ struct rrdengine_instance {
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
     uint8_t page_type; /* Default page type for this context */
 
+    struct completion quiesce_completion;
+
     size_t inflight_queries;
     struct rrdengine_statistics stats;
 };
@@ -392,7 +398,7 @@ void dbengine_page_free(void *page);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
-void rrdeng_worker(void *arg);
+void dbengine_event_loop(void *arg);
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, enum storage_priority priority);
 void pdc_destroy(PDC *pdc);
 
