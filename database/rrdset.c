@@ -28,6 +28,8 @@ static inline void rrdset_index_del_name(RRDHOST *host, RRDSET *st) {
 }
 
 static inline RRDSET *rrdset_index_find_name(RRDHOST *host, const char *name) {
+    if (unlikely(!host->rrdset_root_index_name))
+        return NULL;
     return dictionary_get(host->rrdset_root_index_name, name);
 }
 
@@ -433,6 +435,8 @@ static inline void rrdset_index_del(RRDHOST *host, RRDSET *st) {
 
 static RRDSET *rrdset_index_find(RRDHOST *host, const char *id) {
     // TODO - the name index should have an acquired dictionary item, not just a pointer to RRDSET
+    if (unlikely(!host->rrdset_root_index))
+        return NULL;
     return dictionary_get(host->rrdset_root_index, id);
 }
 
