@@ -66,16 +66,17 @@ struct replication_query {
         time_t last_entry_t;
     } db;
 
-    struct {
+    struct {                         // what the parent requested
         time_t after;
         time_t before;
         bool enable_streaming;
     } request;
 
-    struct {
+    struct {                         // what the child will do
         time_t after;
         time_t before;
         bool enable_streaming;
+
         bool locked_data_collection;
         bool execute;
     } query;
@@ -89,7 +90,7 @@ struct replication_query {
     struct replication_request *rq;
 
     size_t dimensions;
-    struct replication_dimension *data; // array of struct replication_dimension
+    struct replication_dimension data[];
 };
 
 static struct replication_query *replication_query_prepare(
@@ -103,8 +104,9 @@ static struct replication_query *replication_query_prepare(
         bool enable_streaming,
         time_t wall_clock_time
 ) {
-    struct replication_query *q = callocz(1, sizeof(struct replication_query));
-    q->dimensions = rrdset_number_of_dimensions(st);
+    size_t dimensions = rrdset_number_of_dimensions(st);
+    struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
+    q->dimensions = dimensions;
     q->st = st;
 
     q->db.first_entry_t = db_first_entry;
@@ -127,21 +129,31 @@ static struct replication_query *replication_query_prepare(
     }
 
     if(q->query.enable_streaming) {
-        netdata_spinlock_lock(&st->data_collection_lock);
-        q->query.locked_data_collection = true;
+        time_t delta = (q->query.before - q->query.after) / q->st->update_every;
+        if(delta > 60) {
+            // disable streaming to have another request
+            // that will enable it with fewer points
+            q->query.enable_streaming = false;
+        }
+        else {
+            netdata_spinlock_lock(&st->data_collection_lock);
+            q->query.locked_data_collection = true;
 
-        if(st->last_updated.tv_sec > q->query.before) {
-            internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                           (unsigned long long)q->query.before,
-                           (unsigned long long)st->last_updated.tv_sec
-            );
-            q->query.before = st->last_updated.tv_sec;
+            if (st->last_updated.tv_sec > q->query.before) {
+                internal_error(true,
+                               "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
+                               "has start_streaming = true, "
+                               "adjusting replication before timestamp from %llu to %llu",
+                               rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                               (unsigned long long) q->query.before,
+                               (unsigned long long) st->last_updated.tv_sec
+                );
+                q->query.before = st->last_updated.tv_sec;
+            }
         }
     }
 
     q->ops = &st->rrdhost->db[0].eng->api.query_ops;
-    q->data = callocz(q->dimensions, sizeof(struct replication_dimension));
 
     // prepare our array of dimensions
     size_t count = 0;
@@ -223,7 +235,6 @@ static time_t replication_query_finalize(struct replication_query *q, bool execu
         netdata_spinlock_unlock(&replication_queries.spinlock);
     }
 
-    freez(q->data);
     freez(q);
 
     return query_before;
@@ -404,45 +415,12 @@ static struct replication_query *replication_response_prepare(RRDSET *st, bool s
     time_t query_after = requested_after;
     time_t query_before = requested_before;
     time_t wall_clock_time = now_realtime_sec();
-    time_t tolerance = 2;   // sometimes from the time we get this value, to the time we check,
-                            // a data collection has been made
-                            // so, we give this tolerance to detect invalid timestamps
 
-    // find the first entry we have
-    time_t db_first_entry = rrdset_first_entry_t(st);
-    if (db_first_entry > wall_clock_time + tolerance) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db first time %llu is in the future (now is %llu)",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long) db_first_entry, (unsigned long long) wall_clock_time);
-        db_first_entry = wall_clock_time;
-    }
+    time_t db_first_entry, db_last_entry;
+    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
     if (query_after < db_first_entry)
         query_after = db_first_entry;
-
-    // find the latest entry we have
-    time_t db_last_entry = st->last_updated.tv_sec;
-    if (!db_last_entry) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' RRDSET reports last updated time zero.",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
-        db_last_entry = rrdset_last_entry_t(st);
-        if (!db_last_entry) {
-            internal_error(true,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db reports last time zero.",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
-            db_last_entry = wall_clock_time;
-        }
-    }
-
-    if (db_last_entry > wall_clock_time + tolerance) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' last updated time %llu is in the future (now is %llu)",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long) db_last_entry, (unsigned long long) wall_clock_time);
-        db_last_entry = wall_clock_time;
-    }
 
     if (query_before > db_last_entry)
         query_before = db_last_entry;
@@ -478,10 +456,8 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
     time_t after = q->request.after;
-    time_t before = q->request.before;
+    time_t before; // the query will report this
     bool enable_streaming = q->query.enable_streaming;
-    time_t first_entry_local = q->db.first_entry_t;
-    time_t last_entry_local = q->db.last_entry_t;
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -502,6 +478,11 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     if(enable_streaming)
         replication_send_chart_collection_state(wb, st);
 
+    // get a fresh retention to send to the parent
+    time_t wall_clock_time = now_realtime_sec();
+    time_t db_first_entry, db_last_entry;
+    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
+
     // end with first/last entries we have, and the first start time and
     // last end time of the data we sent
     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",
@@ -510,7 +491,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
                    (int)st->update_every
 
                    // child first db time, child end db time
-                   , (unsigned long long)first_entry_local, (unsigned long long)last_entry_local
+                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
 
                    // start streaming boolean
                    , enable_streaming ? "true" : "false"
@@ -519,7 +500,7 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
                    , (unsigned long long)after, (unsigned long long)before
 
                    // child world clock time
-                   , (unsigned long long)now_realtime_sec()
+                   , (unsigned long long)wall_clock_time
                    );
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);

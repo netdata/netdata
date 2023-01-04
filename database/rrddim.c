@@ -419,14 +419,21 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 
 // ----------------------------------------------------------------------------
 
+time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+        return 0;
+
+    return rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+}
+
 // get the timestamp of the last entry in the round-robin database
 time_t rrddim_last_entry_t(RRDDIM *rd) {
-    time_t latest = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
+    time_t latest = rrddim_last_entry_t_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
-        time_t t = rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+        time_t t = rrddim_last_entry_t_of_tier(rd, tier);
         if(t > latest)
             latest = t;
     }

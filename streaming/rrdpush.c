@@ -295,40 +295,14 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
-        time_t first_entry_local = rrdset_first_entry_t_of_tier(st, 0);
-        time_t last_entry_local = st->last_updated.tv_sec;
-
-        if(unlikely(!last_entry_local))
-            last_entry_local = rrdset_last_entry_t(st);
+        time_t db_first_time_t, db_last_time_t;
 
         time_t now = now_realtime_sec();
-        if(unlikely(last_entry_local > now)) {
-            internal_error(true,
-                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' last updated time %ld is in the future, adjusting it to now %ld",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                           last_entry_local, now);
-            last_entry_local = now;
-        }
-
-        if(unlikely(first_entry_local && last_entry_local && first_entry_local >= last_entry_local)) {
-            internal_error(true,
-                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first updated time %ld is equal or bigger than last updated time %ld, adjusting it last updated time - update every",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                           first_entry_local, last_entry_local);
-            first_entry_local = last_entry_local - st->update_every;
-        }
-
-        if(unlikely(!first_entry_local && last_entry_local)) {
-            internal_error(true,
-                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first time %ld, last time %ld, setting both to last time",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                           first_entry_local, last_entry_local);
-            first_entry_local = last_entry_local;
-        }
+        rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_time_t, &db_last_time_t, now, 0);
 
         buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu %llu\n",
-                       (unsigned long long)first_entry_local,
-                       (unsigned long long)last_entry_local,
+                       (unsigned long long)db_first_time_t,
+                       (unsigned long long)db_last_time_t,
                        (unsigned long long)now);
 
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);

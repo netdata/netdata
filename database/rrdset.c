@@ -536,6 +536,19 @@ time_t rrdset_last_entry_t(RRDSET *st) {
     return last_entry_t;
 }
 
+time_t rrdset_last_entry_t_of_tier(RRDSET *st, size_t tier) {
+    RRDDIM *rd;
+    time_t last_entry_t  = 0;
+
+    rrddim_foreach_read(rd, st) {
+                time_t t = rrddim_last_entry_t_of_tier(rd, tier);
+                if(t > last_entry_t) last_entry_t = t;
+            }
+    rrddim_foreach_done(rd);
+
+    return last_entry_t;
+}
+
 // get the timestamp of first entry in the round-robin database
 time_t rrdset_first_entry_t(RRDSET *st) {
     RRDDIM *rd;
@@ -568,6 +581,45 @@ time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier) {
 
     if (unlikely(LONG_MAX == first_entry_t)) return 0;
     return first_entry_t;
+}
+
+void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_t, time_t *last_time_t, time_t now, size_t tier) {
+    if(!now)
+        now = now_realtime_sec();
+
+    time_t db_first_entry = rrdset_first_entry_t_of_tier(st, tier);
+    time_t db_last_entry = st->last_updated.tv_sec; // we assume this is a collected RRDSET
+
+    if(unlikely(!db_last_entry)) {
+        db_last_entry = rrdset_last_entry_t_of_tier(st, tier);
+
+        if (unlikely(!db_last_entry))
+            // we assume this is a collected RRDSET
+            db_last_entry = now;
+    }
+
+    if(unlikely(db_last_entry > now)) {
+        internal_error(true,
+                       "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       db_last_entry, now);
+        db_last_entry = now;
+    }
+
+    if(unlikely(db_first_entry && db_last_entry && db_first_entry >= db_last_entry)) {
+        internal_error(true,
+                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is equal or bigger than latest db time %ld, adjusting it last updated time - update every",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       db_first_entry, db_last_entry);
+        db_first_entry = db_last_entry - st->update_every;
+    }
+
+    if(unlikely(!db_first_entry && db_last_entry))
+        // this can be the case on the first data collection of a chart
+        db_first_entry = db_last_entry;
+
+    *first_time_t = db_first_entry;
+    *last_time_t = db_last_entry;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {

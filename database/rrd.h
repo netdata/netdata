@@ -1292,9 +1292,15 @@ void rrdset_isnot_obsolete(RRDSET *st);
 time_t rrddim_first_entry_t(RRDDIM *rd);
 time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier);
 time_t rrddim_last_entry_t(RRDDIM *rd);
-time_t rrdset_last_entry_t(RRDSET *st);
-time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
+time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier);
+
 time_t rrdset_first_entry_t(RRDSET *st);
+time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
+time_t rrdset_last_entry_t(RRDSET *st);
+time_t rrdset_last_entry_t_of_tier(RRDSET *st, size_t tier);
+
+void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_t, time_t *last_time_t, time_t now, size_t tier);
+
 time_t rrdhost_last_entry_t(RRDHOST *h);
 
 // ----------------------------------------------------------------------------
