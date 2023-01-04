@@ -17,10 +17,11 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
         if (!MachineLearningStatusRS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "machine_learning_status_for_" << localhost->machine_guid;
-            NameSS << "machine_learning_status_for_" << localhost->hostname;
+            IdSS << "machine_learning_status_on_" << localhost->machine_guid;
+            NameSS << "machine_learning_status_on_" << rrdhost_hostname(localhost);
 
-            MachineLearningStatusRS = rrdset_create_localhost(
+            MachineLearningStatusRS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
@@ -60,10 +61,11 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
         if (!MetricTypesRS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "metric_types_for_" << localhost->machine_guid;
-            NameSS << "metric_types_for_" << localhost->hostname;
+            IdSS << "metric_types_on_" << localhost->machine_guid;
+            NameSS << "metric_types_on_" << rrdhost_hostname(localhost);
 
-            MetricTypesRS = rrdset_create_localhost(
+            MetricTypesRS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
@@ -103,10 +105,11 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
         if (!TrainingStatusRS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "training_status_for_" << localhost->machine_guid;
-            NameSS << "training_status_for_" << localhost->hostname;
+            IdSS << "training_status_on_" << localhost->machine_guid;
+            NameSS << "training_status_on_" << rrdhost_hostname(localhost);
 
-            TrainingStatusRS = rrdset_create_localhost(
+            TrainingStatusRS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
@@ -150,7 +153,7 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             std::stringstream IdSS, NameSS;
 
             IdSS << "dimensions_on_" << localhost->machine_guid;
-            NameSS << "dimensions_on_" << localhost->hostname;
+            NameSS << "dimensions_on_" << rrdhost_hostname(localhost);
 
             PredictionRS = rrdset_create(
                 RH,
@@ -189,7 +192,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
         std::stringstream IdSS, NameSS;
 
         IdSS << "anomaly_rate_on_" << localhost->machine_guid;
-        NameSS << "anomaly_rate_on_" << localhost->hostname;
+        NameSS << "anomaly_rate_on_" << rrdhost_hostname(localhost);
 
         HostRateRS = rrdset_create(
             RH,
@@ -223,7 +226,7 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
         std::stringstream IdSS, NameSS;
 
         IdSS << "anomaly_detection_on_" << localhost->machine_guid;
-        NameSS << "anomaly_detection_on_" << localhost->hostname;
+        NameSS << "anomaly_detection_on_" << rrdhost_hostname(localhost);
 
         AnomalyDetectionRS = rrdset_create(
             RH,
@@ -302,8 +305,8 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
         if (!RS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "prediction_usage_for_" << localhost->machine_guid;
-            NameSS << "prediction_usage_for_" << localhost->hostname;
+            IdSS << "prediction_usage_for_" << RH->machine_guid;
+            NameSS << "prediction_usage_for_" << rrdhost_hostname(RH);
 
             RS = rrdset_create_localhost(
                 "netdata", // type
@@ -343,8 +346,8 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
         if (!RS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "training_usage_for_" << localhost->machine_guid;
-            NameSS << "training_usage_for_" << localhost->hostname;
+            IdSS << "training_usage_for_" << RH->machine_guid;
+            NameSS << "training_usage_for_" << rrdhost_hostname(RH);
 
             RS = rrdset_create_localhost(
                 "netdata", // type
@@ -386,10 +389,11 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
         if (!RS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "queue_stats_for_" << localhost->machine_guid;
-            NameSS << "queue_stats_for_" << localhost->hostname;
+            IdSS << "queue_stats_on_" << localhost->machine_guid;
+            NameSS << "queue_stats_on_" << rrdhost_hostname(localhost);
 
-            RS = rrdset_create_localhost(
+            RS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
@@ -428,10 +432,11 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
         if (!RS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "training_time_stats_for_" << localhost->machine_guid;
-            NameSS << "training_time_stats_for_" << localhost->hostname;
+            IdSS << "training_time_stats_on_" << localhost->machine_guid;
+            NameSS << "training_time_stats_on_" << rrdhost_hostname(localhost);
 
-            RS = rrdset_create_localhost(
+            RS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
@@ -474,10 +479,11 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
         if (!RS) {
             std::stringstream IdSS, NameSS;
 
-            IdSS << "training_results_for_" << localhost->machine_guid;
-            NameSS << "training_results_for_" << localhost->hostname;
+            IdSS << "training_results_on_" << localhost->machine_guid;
+            NameSS << "training_results_on_" << rrdhost_hostname(localhost);
 
-            RS = rrdset_create_localhost(
+            RS = rrdset_create(
+                RH,
                 "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
