@@ -1193,53 +1193,68 @@ struct rrdeng_cmd {
 };
 
 static struct {
-    SPINLOCK spinlock;
-    struct rrdeng_cmd *available_items;
-    size_t allocated;
-    size_t available;
+    struct {
+        SPINLOCK spinlock;
+        struct rrdeng_cmd *available_items;
+        size_t available;
 
-    size_t waiting;
-    struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIO_MAX_DONT_USE];
-    size_t executed_by_priority[STORAGE_PRIO_MAX_DONT_USE];
+        struct {
+            size_t allocated;
+        } atomics;
+    } cache;
+
+    struct {
+        SPINLOCK spinlock;
+        size_t waiting;
+        struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIO_MAX_DONT_USE];
+        size_t executed_by_priority[STORAGE_PRIO_MAX_DONT_USE];
+    } queue;
+
 
 } rrdeng_cmd_globals = {
-        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-        .available_items = NULL,
-        .allocated = 0,
-        .available = 0,
-        .waiting = 0,
+        .cache = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .available_items = NULL,
+                .available = 0,
+                .atomics = {
+                        .allocated = 0,
+                },
+        },
+        .queue = {
+                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                .waiting = 0,
+        },
 };
 
 static void rrdeng_cmd_cleanup(void) {
-    netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
-    while(rrdeng_cmd_globals.available_items && rrdeng_cmd_globals.available > 100) {
-        struct rrdeng_cmd *item = rrdeng_cmd_globals.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.available_items, item, cache.prev, cache.next);
+    netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
+    while(rrdeng_cmd_globals.cache.available_items && rrdeng_cmd_globals.cache.available > 100) {
+        struct rrdeng_cmd *item = rrdeng_cmd_globals.cache.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
         freez(item);
-        rrdeng_cmd_globals.allocated--;
-        rrdeng_cmd_globals.available--;
+        rrdeng_cmd_globals.cache.available--;
+        __atomic_sub_fetch(&rrdeng_cmd_globals.cache.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
+    netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
 }
 
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, STORAGE_PRIORITY priority) {
-    struct rrdeng_cmd *cmd;
+    struct rrdeng_cmd *cmd = NULL;
 
-    if(priority >= STORAGE_PRIO_MAX_DONT_USE)
+    if(unlikely(priority >= STORAGE_PRIO_MAX_DONT_USE))
         priority = STORAGE_PRIORITY_NORMAL;
 
-    netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
-
-    if(unlikely(!rrdeng_cmd_globals.available_items)) {
-        cmd = mallocz(sizeof(struct rrdeng_cmd));
-        cmd->cache.prev = NULL;
-        cmd->cache.next = NULL;
-        rrdeng_cmd_globals.allocated++;
+    netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
+    if(likely(rrdeng_cmd_globals.cache.available_items)) {
+        cmd = rrdeng_cmd_globals.cache.available_items;
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        rrdeng_cmd_globals.cache.available--;
     }
-    else {
-        cmd = rrdeng_cmd_globals.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.available_items, cmd, cache.prev, cache.next);
-        rrdeng_cmd_globals.available--;
+    netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
+
+    if(unlikely(!cmd)) {
+        cmd = mallocz(sizeof(struct rrdeng_cmd));
+        __atomic_add_fetch(&rrdeng_cmd_globals.cache.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     memset(cmd, 0, sizeof(struct rrdeng_cmd));
@@ -1249,55 +1264,70 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->completion = completion;
     cmd->priority = priority;
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
-    rrdeng_cmd_globals.waiting++;
-
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
+    netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+    rrdeng_cmd_globals.queue.waiting++;
+    netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
 
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
 static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
     for(; priority <= max_priority ; priority++)
-        if(rrdeng_cmd_globals.waiting_items_by_priority[priority])
+        if(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority])
             return true;
 
     return false;
 }
 
 static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
-    struct rrdeng_cmd ret = {
-            .ctx = NULL,
-            .opcode = RRDENG_OPCODE_NOOP,
-            .priority = STORAGE_PRIORITY_BEST_EFFORT,
-            .completion = NULL,
-            .data = NULL,
-    };
+    struct rrdeng_cmd *cmd = NULL;
 
     STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_CRITICAL : STORAGE_PRIORITY_BEST_EFFORT;
 
-    netdata_spinlock_lock(&rrdeng_cmd_globals.spinlock);
-
+    // find an opcode to execute from the queue
+    netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
     for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_CRITICAL; priority <= max_priority ; priority++) {
-        struct rrdeng_cmd *cmd = rrdeng_cmd_globals.waiting_items_by_priority[priority];
+        cmd = rrdeng_cmd_globals.queue.waiting_items_by_priority[priority];
         if(cmd) {
+
+            // avoid starvation of lower priorities
             if(unlikely(priority > STORAGE_PRIORITY_CRITICAL &&
                         priority < STORAGE_PRIORITY_BEST_EFFORT &&
-                        ++rrdeng_cmd_globals.executed_by_priority[priority] % 50 == 0 &&
-                        rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority)))
+                        ++rrdeng_cmd_globals.queue.executed_by_priority[priority] % 50 == 0 &&
+                        rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority))) {
                 // let the others run 2% of the requests
+                cmd = NULL;
                 continue;
+            }
 
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
-            ret = *cmd;
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.available_items, cmd, cache.prev, cache.next);
-            rrdeng_cmd_globals.available++;
-            rrdeng_cmd_globals.waiting--;
+            // remove it from the queue
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            rrdeng_cmd_globals.queue.waiting--;
             break;
         }
     }
+    netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
 
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.spinlock);
+    struct rrdeng_cmd ret;
+    if(cmd) {
+        // copy it, to return it
+        ret = *cmd;
+
+        // put it in the cache
+        netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
+        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        rrdeng_cmd_globals.cache.available++;
+        netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
+    }
+    else
+        ret = (struct rrdeng_cmd) {
+                .ctx = NULL,
+                .opcode = RRDENG_OPCODE_NOOP,
+                .priority = STORAGE_PRIORITY_BEST_EFFORT,
+                .completion = NULL,
+                .data = NULL,
+        };
 
     return ret;
 }
@@ -2441,7 +2471,7 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
-            .opcodes     = rrdeng_cmd_globals.allocated * sizeof(struct rrdeng_cmd),
+            .opcodes     = __atomic_load_n(&rrdeng_cmd_globals.cache.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_cmd),
             .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
@@ -2459,7 +2489,7 @@ void timer_cb(uv_timer_t* handle) {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
 
-    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.waiting);
+    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.queue.waiting);
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
 
@@ -2545,6 +2575,8 @@ void rrdeng_worker(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
 
+    worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
+
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_READ,          "extent read cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PREP_QUERY,           "prep query cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES,          "flush pages cb");
@@ -2581,6 +2613,7 @@ void rrdeng_worker(void* arg) {
 
         /* wait for commands */
         do {
+            worker_is_busy(RRDENG_OPCODE_MAX);
             cmd = rrdeng_deq_cmd();
             opcode = cmd.opcode;
 
