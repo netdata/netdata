@@ -13,7 +13,9 @@
 #include "parser.h"
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
-#define LOG_SRC_TYPES LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC)LST(FLB_WEB_LOG)LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV)LST(FLB_SYSLOG)
+#define LOG_SRC_TYPES   LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC) \
+                        LST(FLB_WEB_LOG)LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV) \
+                        LST(FLB_SYSLOG)LST(FLB_SERIAL)
 #define LST(x) x,
 enum log_source_t {LOG_SRC_TYPES};
 #undef LST
@@ -24,7 +26,17 @@ static const char * const log_source_t_str[] = {LOG_SRC_TYPES};
 struct Circ_buff;
 struct Circ_buff_item_ptrs;
 
+typedef struct flb_serial_config {
+    char *bitrate;
+    char *min_bytes;
+    char *separator;
+    char *format;
+} Flb_serial_config_t;
+
 struct File_info {
+    /* TODO: Struct needs refactoring, as a lot of members take up memory that
+     * is not used, depending on the type of the log source. */
+
     /* Struct members core to any log source type */
     const char *chart_name;                         /**< Top level chart name for this log source on web dashboard **/ 
     char *filename;                                 /**< Full path of log source **/
@@ -68,15 +80,15 @@ struct File_info {
     int log_batches_to_be_parsed;                   /**< Number of pending log batches waiting to be parsed when notify_parser_thread_cond unblocks **/
 
     /* Struct members related to Fluent-Bit inputs, filters, buffers, outputs */
-    int flb_input;                                  /**< Fluent-but input interface property for this log source **/
-    int flb_parser;                                 /**< Fluent-but parser interface property for this log source **/
-    int flb_output;                                 /**< Fluent-but output interface property for this log source **/
+    int flb_input;                                  /**< Fluent-bit input interface property for this log source **/
+    int flb_parser;                                 /**< Fluent-bit parser interface property for this log source **/
+    int flb_output;                                 /**< Fluent-bit output interface property for this log source **/
+    void *flb_config;                               /**< Any other Fluent-Bit configuration specific to this log source only **/
     uv_mutex_t flb_tmp_buff_mut;
     uv_timer_t flb_tmp_buff_cpy_timer;
     // TODO: The following structs need to be converted to pointers, to reduce memory consumption when not used
     Systemd_metrics_t flb_tmp_systemd_metrics;      /**< Temporarily store Systemd metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->systemd **/
     Docker_ev_metrics_t flb_tmp_docker_ev_metrics;  /**< Temporarily store Docker Events metrics after each extraction in flb_write_to_buff_cb(), until they are synced to parser_metrics->docker_ev **/
-
 };
 
 struct File_infos_arr {

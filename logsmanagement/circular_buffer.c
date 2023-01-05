@@ -46,7 +46,8 @@ void generic_parser(void *arg){
                 break;
             }
             case GENERIC:
-            case FLB_GENERIC: {
+            case FLB_GENERIC: 
+            case FLB_SERIAL: {
                 for(int i = 0; item->data[i]; i++){
                     if(unlikely(item->data[i] == '\n')){
                         p_file_info->parser_metrics->num_lines_total++;

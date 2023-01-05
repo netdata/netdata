@@ -14,7 +14,7 @@
 #include "../fluent-bit/include/fluent-bit/flb_macros.h"
 #include <dlfcn.h>
 
-#define LOG_REC_KEY "m" /**< key to represent log message field **/
+#define LOG_REC_KEY "msg" /**< key to represent log message field **/
 #define SYSLOG_TIMESTAMP_SIZE 16
 #define UNKNOWN "unknown"
 
@@ -368,8 +368,10 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                     
                     m_assert(buff->in->timestamp, "buff->in->timestamp is 0");
 
-                    /* FLB_GENERIC and FLB_WEB_LOG case */
-                    if((p_file_info->log_type == FLB_GENERIC || p_file_info->log_type == FLB_WEB_LOG) && 
+                    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case */
+                    if((p_file_info->log_type == FLB_GENERIC || 
+                        p_file_info->log_type == FLB_WEB_LOG || 
+                        p_file_info->log_type == FLB_SERIAL) && 
                        !strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
 
                         char *text = (char *) p->val.via.str.ptr;
@@ -388,7 +390,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         ++p;
                         continue;
                     }
-                    /* FLB_GENERIC and FLB_WEB_LOG case end */
+                    /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
 
                     /* FLB_SYSTEMD or FLB_SYSLOG case */
                     if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
@@ -887,12 +889,13 @@ int flb_add_input(struct File_info *const p_file_info){
     enum return_values {
         SUCCESS = 0,
         INVALID_LOG_TYPE = -1,
-        FLB_PARSER_CREATE_ERROR = -2,
-        FLB_INPUT_ERROR = -3,
-        FLB_INPUT_SET_ERROR = -4,
-        FLB_OUTPUT_ERROR = -5,
-        FLB_OUTPUT_SET_ERROR = -6,
-        DEFAULT_ERROR = -7
+        CONFIG_READ_ERROR = -2,
+        FLB_PARSER_CREATE_ERROR = -3,
+        FLB_INPUT_ERROR = -4,
+        FLB_INPUT_SET_ERROR = -5,
+        FLB_OUTPUT_ERROR = -6,
+        FLB_OUTPUT_SET_ERROR = -7,
+        DEFAULT_ERROR = -8
     };
 
     const int tag_max_size = 5;
@@ -1027,6 +1030,7 @@ int flb_add_input(struct File_info *const p_file_info){
             snprintfz(parser_name, parser_name_size, "%s%u", syslog_parser_prfx, tag);
 
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) p_file_info->parser_config->gen_config;
+            if(unlikely(!syslog_config || !syslog_config->mode || !p_file_info->filename)) return CONFIG_READ_ERROR;
             if(flb_parser_create( parser_name, "regex", syslog_config->log_format,
                 FLB_TRUE, NULL, NULL, NULL, FLB_TRUE, FLB_TRUE, NULL, 0,
                 NULL, ctx->config) == NULL) return FLB_PARSER_CREATE_ERROR;
@@ -1034,7 +1038,6 @@ int flb_add_input(struct File_info *const p_file_info){
             /* Set up syslog input */
             p_file_info->flb_input = flb_input(ctx, "syslog", NULL);
             if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
-            
             if(!strcmp(syslog_config->mode, "unix_udp") || !strcmp(syslog_config->mode, "unix_tcp")){
                 m_assert(syslog_config->unix_perm, "unix_perm is not set");
                 if(flb_input_set(ctx, p_file_info->flb_input, 
@@ -1058,6 +1061,36 @@ int flb_add_input(struct File_info *const p_file_info){
             return FLB_INPUT_SET_ERROR; // should never reach this line
             
             
+            /* Set up output */
+            callback->cb = flb_write_to_buff_cb;
+            callback->data = p_file_info;
+            p_file_info->flb_output = flb_output(ctx, "lib", callback);
+            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
+            if(flb_output_set(ctx, p_file_info->flb_output, 
+                "Match", tag_s,
+                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
+
+            break;
+        }
+        case FLB_SERIAL: {
+            debug(D_LOGS_MANAG, "Setting up FLB_SERIAL collector");
+
+            Flb_serial_config_t *serial_config = (Flb_serial_config_t *) p_file_info->flb_config;
+            if(unlikely(!serial_config || !serial_config->bitrate || !*serial_config->bitrate ||
+                        !serial_config->min_bytes || !p_file_info->filename)) return CONFIG_READ_ERROR;
+        
+            /* Set up serial input */
+            p_file_info->flb_input = flb_input(ctx, "serial", NULL);
+            if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
+            if(flb_input_set(ctx, p_file_info->flb_input, 
+                "Tag", tag_s,
+                "File", p_file_info->filename,
+                "Bitrate", serial_config->bitrate,
+                "Separator", serial_config->separator,
+                "Format", serial_config->format,
+                NULL) != 0) return FLB_INPUT_SET_ERROR;
+
+
             /* Set up output */
             callback->cb = flb_write_to_buff_cb;
             callback->data = p_file_info;

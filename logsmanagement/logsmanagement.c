@@ -191,6 +191,7 @@ static void logs_management_init(struct section *config_section){
         else if (!strcmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
         else if (!strcmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
         else if (!strcmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
+        else if (!strcmp(type, "flb_serial")) p_file_info->log_type = FLB_SERIAL;
         else p_file_info->log_type = FLB_GENERIC;
     }
     freez(type);
@@ -245,7 +246,7 @@ static void logs_management_init(struct section *config_section){
                     const char * const apache_access_path_default[] = {
                         "/var/log/apache/access.log",
                         "/var/log/apache2/access.log", /* Debian, Ubuntu */
-                        "/etc/httpd/logs/access_log",  /* RHEL, Red Hat, CentOS, Fedora */
+                        "/var/log/httpd/access_log",  /* RHEL, Red Hat, CentOS, Fedora */
                         "/var/log/httpd-access.log",   /* FreeBSD */
                         NULL
                     };
@@ -495,6 +496,16 @@ static void logs_management_init(struct section *config_section){
             p_file_info->parser_config->chart_config |= CHART_DOCKER_EV_TYPE;
         }
     }
+    else if(p_file_info->log_type == FLB_SERIAL){
+        Flb_serial_config_t *serial_config = (Flb_serial_config_t *) callocz(1, sizeof(Flb_serial_config_t));
+
+        serial_config->bitrate = appconfig_get(&log_management_config, config_section->name, "bitrate", "115200");
+        serial_config->min_bytes = appconfig_get(&log_management_config, config_section->name, "min bytes", "1");
+        serial_config->separator = appconfig_get(&log_management_config, config_section->name, "separator", "");
+        serial_config->format = appconfig_get(&log_management_config, config_section->name, "format", "");
+
+        p_file_info->flb_config = serial_config;
+    }
 
 
     /* -------------------------------------------------------------------------
@@ -664,7 +675,8 @@ static void logs_management_init(struct section *config_section){
         case FLB_WEB_LOG:
         case FLB_SYSTEMD:
         case FLB_DOCKER_EV: 
-        case FLB_SYSLOG: {
+        case FLB_SYSLOG: 
+        case FLB_SERIAL: {
             rc = flb_add_input(p_file_info);
             if(unlikely(rc)){
                 error("[%s]: flb_add_input() error: %d", p_file_info->chart_name, rc);
