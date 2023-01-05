@@ -334,10 +334,10 @@ void Host::startAnomalyDetectionThreads() {
     char Tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%s]", rrdhost_hostname(RH));
-    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_DEFAULT, train_main, static_cast<void *>(this));
+    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, train_main, static_cast<void *>(this));
 
     snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "DETECT[%s]", rrdhost_hostname(RH));
-    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_DEFAULT, detect_main, static_cast<void *>(this));
+    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, detect_main, static_cast<void *>(this));
 }
 
 void Host::stopAnomalyDetectionThreads() {
@@ -351,8 +351,8 @@ void Host::stopAnomalyDetectionThreads() {
     // Signal the training queue to stop popping-items
     TrainingQueue.signal();
     netdata_thread_cancel(TrainingThread);
-    //netdata_thread_join(TrainingThread, nullptr);
+    netdata_thread_join(TrainingThread, nullptr);
 
     netdata_thread_cancel(DetectionThread);
-    //netdata_thread_join(DetectionThread, nullptr);
+    netdata_thread_join(DetectionThread, nullptr);
 }

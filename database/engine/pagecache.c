@@ -18,7 +18,11 @@ static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_E
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
-     size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
+
+     // mark ctx as having flushing in progress
+    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+
+    size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
 
     struct page_descr_with_data *base = NULL;
 

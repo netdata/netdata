@@ -124,8 +124,13 @@ void service_signal_exit(SERVICE_TYPE service) {
     bool first = true;
     while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
         SERVICE_THREAD *sth = *PValue;
-        if((sth->services & service) && sth->request_quit_callback)
+
+        if((sth->services & service) && sth->request_quit_callback) {
+            netdata_spinlock_unlock(&service_globals.lock);
             sth->request_quit_callback(sth->data);
+            netdata_spinlock_lock(&service_globals.lock);
+            continue;
+        }
     }
 
     netdata_spinlock_unlock(&service_globals.lock);
@@ -196,9 +201,6 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                         break;
                 }
 
-                if(sth->force_quit_callback)
-                    sth->force_quit_callback(sth->data);
-
                 if(running)
                     buffer_strcat(thread_list, ", ");
 
@@ -206,6 +208,13 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
 
                 running++;
                 running_services |= sth->services & service;
+
+                if(sth->force_quit_callback) {
+                    netdata_spinlock_unlock(&service_globals.lock);
+                    sth->force_quit_callback(sth->data);
+                    netdata_spinlock_lock(&service_globals.lock);
+                    continue;
+                }
             }
         }
 

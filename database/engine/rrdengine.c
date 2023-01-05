@@ -1738,7 +1738,8 @@ static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_
     if(completion)
         completion_mark_complete(completion);
 
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+    if(ctx_is_available_for_queries(ctx))
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 }
 
 static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -1909,7 +1910,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     }
 
     datafile = ctx->datafiles.first->prev;
-    if(datafile->pos > rrdeng_target_data_file_size(ctx)) {
+    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
         static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
         netdata_spinlock_lock(&sp);
         if(create_new_datafile_pair(ctx) == 0)
@@ -2677,7 +2678,6 @@ void dbengine_event_loop(void* arg) {
                     struct page_descr_with_data *base = cmd.data;
                     struct completion *completion = cmd.completion; // optional
                     // for the datafile and the journalfile
-                    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
                     do_flush_extent(ctx, base, completion);
                     break;
                 }
@@ -2754,7 +2754,7 @@ void dbengine_event_loop(void* arg) {
 
                 case RRDENG_OPCODE_CTX_QUIESCE: {
                     // a ctx will shutdown shortly
-                    struct rrdengine_instance *ctx = cmd.ctx; (void)ctx;
+                    struct rrdengine_instance *ctx = cmd.ctx;
                     __atomic_store_n(&ctx->quiesce, SET_QUIESCE, __ATOMIC_RELEASE);
                     work_dispatch(ctx, NULL, NULL, opcode,
                                       flush_all_hot_and_dirty_pages_of_section_tp_worker,
