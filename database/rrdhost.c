@@ -533,7 +533,7 @@ int is_legacy = 1;
         ml_host_new(host);
         ml_start_anomaly_detection_threads(host);
     } else
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
 
     return host;
 }
@@ -1137,7 +1137,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 
     if (!netdata_exit && !force) {
         info("Setting archive mode for host '%s'...", rrdhost_hostname(host));
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED);
+        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
         return;
     }
 
