@@ -167,7 +167,7 @@ static bool receiver_read_uncompressed(struct receiver_state *r) {
 #endif
 
     int bytes_read = read_stream(r, r->read_buffer + r->read_len, sizeof(r->read_buffer) - r->read_len - 1);
-    if(unlikely(bytes_read < 0))
+    if(unlikely(bytes_read <= 0))
         return false;
 
     worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes_read);
@@ -219,7 +219,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
     int bytes_read = 0;
     do {
         int ret = read_stream(r, r->read_buffer + r->read_len + bytes_read, r->decompressor->signature_size - bytes_read);
-        if (unlikely(ret < 0))
+        if (unlikely(ret <= 0))
             return false;
 
         bytes_read += ret;
@@ -255,7 +255,7 @@ static bool receiver_read_compressed(struct receiver_state *r) {
         size_t remaining = compressed_message_size - start;
 
         int last_read_bytes = read_stream(r, &compressed[start], remaining);
-        if (unlikely(last_read_bytes < 0)) {
+        if (unlikely(last_read_bytes <= 0)) {
             internal_error(true, "read_stream() failed #2, with code %d", last_read_bytes);
             return false;
         }
