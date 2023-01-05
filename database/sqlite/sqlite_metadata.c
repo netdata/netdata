@@ -953,7 +953,6 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
         internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
-        rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
@@ -1101,6 +1100,9 @@ static void metadata_event_loop(void *arg)
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
+                        break;
+
+                    if (unittest_running)
                         break;
 
                     struct scan_metadata_payload *data = mallocz(sizeof(*data));
