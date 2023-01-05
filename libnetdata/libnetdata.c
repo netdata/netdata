@@ -1957,7 +1957,7 @@ void for_each_open_fd(int action, unsigned int excluded_fds) {
                     (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
                     break;
                 default:
-                    // do nothing
+                    break; // do nothing
             }
         }
     } else {
@@ -1975,7 +1975,7 @@ void for_each_open_fd(int action, unsigned int excluded_fds) {
                     (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
                     break;
                 default:
-                    // do nothing
+                    break; // do nothing
             }
         }
         closedir(dir);
