@@ -1144,7 +1144,7 @@ void rrddim_index_destroy(RRDSET *st);
 
 extern time_t rrdhost_free_orphan_time;
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info);
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest);
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname);
 RRDHOST *rrdhost_find_by_guid(const char *guid);

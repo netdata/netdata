@@ -1307,7 +1307,7 @@ int main(int argc, char **argv) {
                             default_health_enabled = 0;
                             storage_tiers = 1;
                             registry_init();
-                            if(rrd_init("unittest", NULL)) {
+                            if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
                             }
@@ -1835,7 +1835,7 @@ int main(int argc, char **argv) {
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
-    if(rrd_init(netdata_configured_hostname, system_info))
+    if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     char agent_crash_file[FILENAME_MAX + 1];

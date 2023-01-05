@@ -899,7 +899,7 @@ void dbengine_init(char *hostname) {
 #endif
 }
 
-int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
+int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest) {
     rrdhost_init();
 
     if (unlikely(sql_init_database(DB_CHECK_NONE, system_info ? 0 : 1))) {
@@ -912,7 +912,7 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         error_report("Failed to initialize context metadata database");
     }
 
-    if (unlikely(strcmp(hostname, "unittest") == 0)) {
+    if (unlikely(unittest)) {
         dbengine_enabled = true;
     }
     else {
@@ -942,7 +942,9 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info) {
         }
     }
 
-    metadata_sync_init();
+    if(!unittest)
+        metadata_sync_init();
+
     debug(D_RRDHOST, "Initializing localhost with hostname '%s'", hostname);
     localhost = rrdhost_create(
             hostname
