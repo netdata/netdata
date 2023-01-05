@@ -548,13 +548,13 @@ alert information. Current variables supported are:
 
 | variable | description |
 | ---------| ----------- |
-| $family  | Will be replaced by the family instance for the alert (e.g. eth0) |
-| $label:  | Followed by a chart label name, this will replace the variable with the chart label's value |
+| ${family}  | Will be replaced by the family instance for the alert (e.g. eth0) |
+| ${label:LABEL_NAME}  | The variable will be replaced with the value of the label |
 
 For example, an info field like the following:
 
 ```yaml
-info: average inbound utilization for the network interface $family over the last minute
+info: average inbound utilization for the network interface ${family} over the last minute
 ```
 
 Will be rendered on the alert acting on interface `eth0` as:
@@ -567,7 +567,7 @@ An alert acting on a chart that has a chart label named e.g. `target`, with a va
 can be enriched as follows:
 
 ```yaml
-info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site $label:target
+info: average ratio of HTTP responses with unexpected status over the last 5 minutes for the site ${label:target}
 ```
 
 Will become:

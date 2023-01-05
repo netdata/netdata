@@ -74,18 +74,16 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
     char var[RRDCALC_VAR_MAX];
     char *m, *lbl_value = NULL;
 
-    while ((m = strchr(temp + pos, '$'))) {
+    while ((m = strchr(temp + pos, '$')) && *(m+1) == '{') {
         int i = 0;
         char *e = m;
         while (*e) {
+            var[i++] = *e;
 
-            if (*e == ' ' || i == RRDCALC_VAR_MAX - 1)
+            if (*e == '}' || i == RRDCALC_VAR_MAX - 1)
                 break;
-            else
-                var[i] = *e;
 
             e++;
-            i++;
         }
 
         var[i] = '\0';
@@ -97,8 +95,12 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             temp = buf;
         }
         else if (!strncmp(var, RRDCALC_VAR_LABEL, RRDCALC_VAR_LABEL_LEN)) {
+            char label_val[RRDCALC_VAR_MAX + 1] = { 0 };
+            strcpy(label_val, var+RRDCALC_VAR_LABEL_LEN);
+            label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
+
             if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, var+RRDCALC_VAR_LABEL_LEN);
+                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);
