@@ -570,7 +570,7 @@ static void rrdhost_update(RRDHOST *host
     {
         struct rrdhost_system_info *old = host->system_info;
         host->system_info = system_info;
-        rrdhost_flag_set(host,~ | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
         rrdhost_system_info_free(old);
     }
 
