@@ -4,9 +4,9 @@
 
 // SQL statements
 
-#define SQL_STORE_CLAIM_ID  "insert into node_instance " \
-    "(host_id, claim_id, date_created) values (@host_id, @claim_id, unixepoch()) " \
-    "on conflict(host_id) do update set claim_id = excluded.claim_id;"
+#define SQL_STORE_CLAIM_ID  "INSERT INTO node_instance " \
+    "(host_id, claim_id, date_created) VALUES (@host_id, @claim_id, unixepoch()) " \
+    "ON CONFLICT(host_id) DO UPDATE SET claim_id = excluded.claim_id;"
 
 #define SQL_DELETE_HOST_LABELS  "DELETE FROM host_label WHERE host_id = @uuid;"
 
@@ -762,7 +762,7 @@ static void metadata_enq_cmd(struct metadata_wc *wc, struct metadata_cmd *cmd)
     (void) uv_async_send(&wc->async);
 }
 
-static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc, enum metadata_opcode *next_opcode)
+static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc)
 {
     struct metadata_cmd ret;
     unsigned queue_size;
@@ -773,7 +773,6 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc, enum metadat
         memset(&ret, 0, sizeof(ret));
         ret.opcode = METADATA_DATABASE_NOOP;
         ret.completion = NULL;
-        *next_opcode = METADATA_DATABASE_NOOP;
     } else {
         /* dequeue command */
         ret = wc->cmd_queue.cmd_array[wc->cmd_queue.head];
@@ -785,10 +784,6 @@ static struct metadata_cmd metadata_deq_cmd(struct metadata_wc *wc, enum metadat
                                      wc->cmd_queue.head + 1 : 0;
         }
         wc->queue_size = queue_size - 1;
-        if (wc->queue_size > 0)
-            *next_opcode = wc->cmd_queue.cmd_array[wc->cmd_queue.head].opcode;
-        else
-            *next_opcode = METADATA_DATABASE_NOOP;
         /* wake up producers */
         uv_cond_signal(&wc->cmd_cond);
     }
@@ -973,6 +968,15 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
             }
         }
 
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {
+            rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
+            uuid_t uuid;
+            if (likely(host->aclk_state.claimed_id && !uuid_parse(host->aclk_state.claimed_id, uuid)))
+                store_claim_id(&host->host_uuid, &uuid);
+            else
+                store_claim_id(&host->host_uuid, NULL);
+        }
+
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
 
@@ -1013,7 +1017,7 @@ static void metadata_event_loop(void *arg)
     uv_loop_t *loop;
     unsigned cmd_batch_size;
     struct metadata_wc *wc = arg;
-    enum metadata_opcode opcode, next_opcode;
+    enum metadata_opcode opcode;
     uv_work_t metadata_cleanup_worker;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
@@ -1066,7 +1070,7 @@ static void metadata_event_loop(void *arg)
             if (unlikely(cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
                 break;
 
-            cmd = metadata_deq_cmd(wc, &next_opcode);
+            cmd = metadata_deq_cmd(wc);
             opcode = cmd.opcode;
 
             if (unlikely(opcode == METADATA_DATABASE_NOOP && metadata_flag_check(wc, METADATA_FLAG_SHUTDOWN))) {
@@ -1269,22 +1273,6 @@ void metaqueue_delete_dimension_uuid(uuid_t *uuid)
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
-}
-
-void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
-{
-    if (unlikely(!host_uuid))
-        return;
-
-    uuid_t *local_host_uuid = mallocz(sizeof(*host_uuid));
-    uuid_t *local_claim_uuid = NULL;
-
-    uuid_copy(*local_host_uuid, *host_uuid);
-    if (likely(claim_uuid)) {
-        local_claim_uuid = mallocz(sizeof(*claim_uuid));
-        uuid_copy(*local_claim_uuid, *claim_uuid);
-    }
-    queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
 }
 
 //

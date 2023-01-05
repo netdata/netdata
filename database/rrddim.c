@@ -504,8 +504,7 @@ int rrddim_hide(RRDSET *st, const char *id) {
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-        rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN | RRDDIM_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 

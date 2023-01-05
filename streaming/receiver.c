@@ -84,10 +84,9 @@ PARSER_RC streaming_claimed_id(char **words, size_t num_words, void *user)
     if (host->aclk_state.claimed_id)
         freez(host->aclk_state.claimed_id);
     host->aclk_state.claimed_id = strcmp(claim_id_str, "NULL") ? strdupz(claim_id_str) : NULL;
-
-    metaqueue_store_claim_id(&host->host_uuid, host->aclk_state.claimed_id ? &uuid : NULL);
-
     rrdhost_aclk_state_unlock(host);
+
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_CLAIMID |RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdpush_claimed_id(host);
 

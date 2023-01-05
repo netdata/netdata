@@ -523,10 +523,8 @@ int is_legacy = 1;
          , string2str(host->health_default_recipient)
     );
 
-    if(!archived) {
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO);
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
-    }
+    if(!archived)
+        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdhost_load_rrdcontext_data(host);
     if (!archived) {
@@ -572,8 +570,7 @@ static void rrdhost_update(RRDHOST *host
     {
         struct rrdhost_system_info *old = host->system_info;
         host->system_info = system_info;
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_INFO);
-        rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(host,~ | RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
         rrdhost_system_info_free(old);
     }
 
@@ -1371,8 +1368,7 @@ void reload_host_labels(void) {
     rrdhost_load_kubernetes_labels();
     rrdhost_load_auto_labels();
 
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS);
-    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_UPDATE);
+    rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     health_label_log_save(localhost);
 

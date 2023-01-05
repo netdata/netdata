@@ -786,8 +786,9 @@ typedef enum rrdhost_flags {
     RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_LABELS                = (1 << 26), // metadata needs to be stored in the database
     RRDHOST_FLAG_METADATA_INFO                  = (1 << 27), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
 
-    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 28), // set when the receiver part is disconnected
+    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
