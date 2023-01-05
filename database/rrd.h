@@ -140,6 +140,7 @@ extern int gap_when_lost_iterations_above;
 extern time_t rrdset_free_obsolete_time;
 
 #define MIN_LIBUV_WORKER_THREADS 16
+#define MAX_LIBUV_WORKER_THREADS 128
 #define RESERVED_LIBUV_WORKER_THREADS 6
 extern int libuv_worker_threads;
 

@@ -1661,10 +1661,12 @@ int main(int argc, char **argv) {
 
         // set libuv worker threads
         libuv_worker_threads = get_system_cpus() * 2;
+
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
-        if(libuv_worker_threads > 128)
-            libuv_worker_threads = 128;
+
+        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
 
 
         libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);

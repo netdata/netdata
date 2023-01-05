@@ -544,7 +544,7 @@ static struct {
 };
 
 static inline bool work_request_full(void) {
-    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)libuv_worker_threads;
+    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
 }
 
 static void work_request_cleanup(void) {
