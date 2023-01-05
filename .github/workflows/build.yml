@@ -556,6 +556,7 @@ jobs:
           mkdir -p download/test
           mv artifacts/* download/test
           echo 'Redirect 301 "/latest" "/test"' > .htaccess
+          echo 'Redirect 301 "/download/latest" "/download/test"' >> .htaccess
       - name: Verify that artifacts work with installer
         id: verify
         env:
@@ -611,6 +612,7 @@ jobs:
           mkdir -p download/test
           mv artifacts/* download/test
           echo 'Redirect 301 "/latest" "/test"' > .htaccess
+          echo 'Redirect 301 "/download/latest" "/download/test"' >> .htaccess
       - name: Verify that artifacts work with installer
         id: verify
         env:
