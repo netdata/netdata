@@ -530,7 +530,7 @@ install_runit_service() {
     ENABLE="enable"
   fi
 
-  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-runit" "${svc_file}"; then
+  if ! install -D -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-runit" "${svc_file}"; then
     error "Failed to install service file."
     exit 4
   fi
