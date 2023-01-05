@@ -139,7 +139,7 @@ void SamplesBuffer::preprocess(std::vector<DSample> &Samples) {
         const Sample PS = getPreprocessedSample(Idx);
         PS.initDSample(DS);
 
-        Samples.push_back(DS);
+        Samples.push_back(std::move(DS));
     }
 }
 
