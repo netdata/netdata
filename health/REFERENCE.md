@@ -549,7 +549,7 @@ alert information. Current variables supported are:
 | variable | description |
 | ---------| ----------- |
 | ${family}  | Will be replaced by the family instance for the alert (e.g. eth0) |
-| ${label:XXX}  | This will replace the variable with the chart label's XXX value |
+| ${label:LABEL_NAME}  | The variable will be replaced with the value of the label |
 
 For example, an info field like the following:
 
