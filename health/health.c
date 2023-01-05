@@ -1109,7 +1109,7 @@ void *health_main(void *ptr) {
         // the first loop is to lookup values from the db
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
 
-            rrdcalc_update_info_and_title_variables(rc);
+            rrdcalc_update_info_and_title_using_rrdset_labels(rc);
 
             if (update_disabled_silenced(host, rc))
                 continue;

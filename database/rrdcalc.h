@@ -224,7 +224,7 @@ struct alert_config {
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->after)
 
-void rrdcalc_update_info_and_title_variables(RRDCALC *rc);
+void rrdcalc_update_info_and_title_using_rrdset_labels(RRDCALC *rc);
 
 void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 
