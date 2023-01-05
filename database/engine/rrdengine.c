@@ -554,7 +554,7 @@ static void work_request_cleanup(void) {
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
         freez(item);
         work_request_globals.protected.available--;
-        __atomic_add_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
 }
