@@ -163,8 +163,7 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
     posix_spawnattr_t attr;
     posix_spawn_file_actions_t fa;
 
-    int stdin_fd_to_exclude_from_closing = -1;
-    int stdout_fd_to_exclude_from_closing = -1;
+    unsigned int fds_to_exclude_from_closing = OPEN_FD_EXCLUDE_STDERR;
 
     if(posix_spawn_file_actions_init(&fa)) {
         error("POPEN: posix_spawn_file_actions_init() failed.");
@@ -195,7 +194,7 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
         if (posix_spawn_file_actions_addopen(&fa, STDIN_FILENO, "/dev/null", O_RDONLY, 0)) {
             error("POPEN: posix_spawn_file_actions_addopen() on stdin to /dev/null failed.");
             // this is not a fatal error
-            stdin_fd_to_exclude_from_closing = STDIN_FILENO;
+            fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDIN;
         }
     }
 
@@ -222,16 +221,13 @@ static int popene_internal(volatile pid_t *pidptr, char **env, uint8_t flags, FI
         if (posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0)) {
             error("POPEN: posix_spawn_file_actions_addopen() on stdout to /dev/null failed.");
             // this is not a fatal error
-            stdout_fd_to_exclude_from_closing = STDOUT_FILENO;
+            fds_to_exclude_from_closing |= OPEN_FD_EXCLUDE_STDOUT;
         }
     }
 
     if(flags & POPEN_FLAG_CLOSE_FD) {
         // Mark all files to be closed by the exec() stage of posix_spawn()
-        for(int i = (int)(sysconf(_SC_OPEN_MAX) - 1); i >= 0; i--) {
-            if(likely(i != STDERR_FILENO && i != stdin_fd_to_exclude_from_closing && i != stdout_fd_to_exclude_from_closing))
-                (void)fcntl(i, F_SETFD, FD_CLOEXEC);
-        }
+        for_each_open_fd(OPEN_FD_ACTION_FD_CLOEXEC, fds_to_exclude_from_closing);
     }
 
     attr_rc = posix_spawnattr_init(&attr);

@@ -1928,21 +1928,13 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
     return true;
 }
 
-void for_each_open_fd(char *action_str) {
-
-    if(unlikely(!action_str || !*action_str)) return;
-
-    int action = -1;
-    if(strcasecmp(action_str, "CLOSE")) action = 1;
-    else if (strcasecmp(action_str, "FD_CLOEXEC")) action = 2;
-    else return;
-
-    const int min_fd = STDERR_FILENO; 
+void for_each_open_fd(int action, unsigned int excluded_fds) {
     int fd;
 
+    if(unlikely(action < OPEN_FD_ACTION_CLOSE || action > OPEN_FD_ACTION_FD_CLOEXEC)) return;
+    
     DIR *dir = opendir("/proc/self/fd");
     if (dir == NULL) {
-
         struct rlimit rl;
         int open_max = -1;
 
@@ -1951,39 +1943,39 @@ void for_each_open_fd(char *action_str) {
         else open_max = sysconf(_SC_OPEN_MAX);
 #endif
 
-        if (open_max == -1) open_max = 4096; // 4096 arbitrary default
+        if (open_max == -1) open_max = 65535; // 65535 arbitrary default if everything else fails
 
-        for (fd = min_fd + 1; fd < open_max; fd++) {
-            if(fd_is_valid(fd)) {
-                switch(action){
-                    case 1:
-                        close(fd);
-                        break;
-                    case 2:
-                        (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                        break;
-                    default:
-                        // do nothing
-                }
+        for (fd = 0; fd < open_max; fd++) {
+            if(unlikely(((fd == STDIN_FILENO ) && (excluded_fds & OPEN_FD_EXCLUDE_STDIN )) || 
+                        ((fd == STDOUT_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) ||
+                        ((fd == STDERR_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDERR)))) continue;
+            switch(action){
+                case OPEN_FD_ACTION_CLOSE:
+                    if(fd_is_valid(fd)) close(fd);
+                    break;
+                case OPEN_FD_ACTION_FD_CLOEXEC:
+                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
+                    break;
+                default:
+                    // do nothing
             }
         }
     } else {
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
             fd = atoi(entry->d_name);
-            if (likely(fd > min_fd && fd_is_valid(fd))){
-                switch(action){
-                    case 1:
-                        error("Closing fd:%d", fd);
-                        close(fd);
-                        break;
-                    case 2:
-                        error("FD_CLOEXEC fd:%d", fd);
-                        (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
-                        break;
-                    default:
-                        // do nothing
-                }
+            if(unlikely(((fd == STDIN_FILENO ) && (excluded_fds & OPEN_FD_EXCLUDE_STDIN )) || 
+                        ((fd == STDOUT_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) ||
+                        ((fd == STDERR_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDERR)))) continue;
+            switch(action){
+                case OPEN_FD_ACTION_CLOSE:
+                    if(fd_is_valid(fd)) close(fd);
+                    break;
+                case OPEN_FD_ACTION_FD_CLOEXEC:
+                    (void)fcntl(fd, F_SETFD, FD_CLOEXEC);
+                    break;
+                default:
+                    // do nothing
             }
         }
         closedir(dir);
