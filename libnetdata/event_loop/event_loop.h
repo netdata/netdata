@@ -36,6 +36,7 @@ enum event_loop_job {
     UV_EVENT_DATAFILE_DELETE,
     UV_EVENT_FLUSHED_TO_OPEN,
     UV_EVENT_PREP_QUERY,
+    UV_EVENT_WORKER_INIT,
 };
 
 void register_libuv_worker_jobs();

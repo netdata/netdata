@@ -43,6 +43,7 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_DATAFILE_DELETE, "datafile deletion");
     worker_register_job_name(UV_EVENT_FLUSHED_TO_OPEN, "flushed to open");
     worker_register_job_name(UV_EVENT_PREP_QUERY, "prep query");
+    worker_register_job_name(UV_EVENT_WORKER_INIT, "worker init");
 
     uv_thread_set_name_np(pthread_self(), "LIBUV_WORKER");
 }

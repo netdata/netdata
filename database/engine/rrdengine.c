@@ -22,6 +22,8 @@ struct rrdeng_main {
     uv_timer_t timer;
     pid_t tid;
 
+    time_t last_buffers_cleanup;
+
     bool flush_running;
     bool evict_running;
 } rrdeng_main = {
@@ -29,7 +31,9 @@ struct rrdeng_main {
         .loop = {},
         .async = {},
         .timer = {},
+        .last_buffers_cleanup = 0,
         .flush_running = false,
+        .evict_running = false,
 };
 
 static void sanity_check(void)
@@ -524,6 +528,7 @@ static struct {
         size_t allocated;
         size_t dispatched;
         size_t executing;
+        size_t pending_cb;
     } atomics;
 } work_request_globals = {
         .protected = {
@@ -563,15 +568,17 @@ static inline void work_done(struct rrdeng_work *work_request) {
 
 void work_standard_worker(uv_work_t *req) {
     __atomic_add_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
+
     register_libuv_worker_jobs();
+    worker_is_busy(UV_EVENT_WORKER_INIT);
 
     struct rrdeng_work *work_request = req->data;
-    // worker_is_busy(work_request->opcode); // this is the wrong job id to the threadpool
     work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
 
     __atomic_sub_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
@@ -586,6 +593,7 @@ void after_work_standard_callback(uv_work_t* req, int status) {
         work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
 
     work_done(work_request);
+    __atomic_sub_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -2523,7 +2531,10 @@ void timer_cb(uv_timer_t* handle) {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 
-    if(now_monotonic_sec() % 600 == 0) {
+    time_t now = now_monotonic_sec();
+    if(now - rrdeng_main.last_buffers_cleanup > 600) {
+        rrdeng_main.last_buffers_cleanup = now;
+
         work_request_cleanup();
         page_descriptor_cleanup();
         extent_io_descriptor_cleanup();
