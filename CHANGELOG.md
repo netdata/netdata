@@ -6,7 +6,12 @@
 
 **Merged pull requests:**
 
+- Create ML charts on child hosts. [\#14207](https://github.com/netdata/netdata/pull/14207) ([vkalintiris](https://github.com/vkalintiris))
+- Dont call worker\_utilization\_finish\(\) twice [\#14204](https://github.com/netdata/netdata/pull/14204) ([MrZammler](https://github.com/MrZammler))
+- Switch to actions/labeler@v4 for labeling PRs. [\#14203](https://github.com/netdata/netdata/pull/14203) ([Ferroin](https://github.com/Ferroin))
+- Refactor ML code and add support for multiple KMeans models [\#14198](https://github.com/netdata/netdata/pull/14198) ([vkalintiris](https://github.com/vkalintiris))
 - bump go.d.plugin to v0.48.0 [\#14195](https://github.com/netdata/netdata/pull/14195) ([ilyam8](https://github.com/ilyam8))
+- Fix typos [\#14194](https://github.com/netdata/netdata/pull/14194) ([rex4539](https://github.com/rex4539))
 - add `telegraf` to `apps_groups.conf` monitoring section [\#14188](https://github.com/netdata/netdata/pull/14188) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d.plugin to v0.47.0 [\#14182](https://github.com/netdata/netdata/pull/14182) ([ilyam8](https://github.com/ilyam8))
 - fix logrotate postrotate [\#14180](https://github.com/netdata/netdata/pull/14180) ([ilyam8](https://github.com/ilyam8))
@@ -67,6 +72,7 @@
 - Refactor ML code and add support for multiple KMeans models. [\#14065](https://github.com/netdata/netdata/pull/14065) ([vkalintiris](https://github.com/vkalintiris))
 - add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
+- Finish renaming the `--install` option to `--install-prefix`. [\#13881](https://github.com/netdata/netdata/pull/13881) ([Ferroin](https://github.com/Ferroin))
 - Support HTTP proxy Basic auth [\#13762](https://github.com/netdata/netdata/pull/13762) ([underhood](https://github.com/underhood))
 - Cleanly reimplement system/edit-config.in. [\#13702](https://github.com/netdata/netdata/pull/13702) ([Ferroin](https://github.com/Ferroin))
 
@@ -346,12 +352,6 @@
 - add docker dashboard info [\#13547](https://github.com/netdata/netdata/pull/13547) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.37.0 [\#13546](https://github.com/netdata/netdata/pull/13546) ([ilyam8](https://github.com/ilyam8))
 - feat\(python.d/sensors\): discover chips, features at runtime [\#13545](https://github.com/netdata/netdata/pull/13545) ([ilyam8](https://github.com/ilyam8))
-- Remove aclk\_api.\[ch\] [\#13540](https://github.com/netdata/netdata/pull/13540) ([underhood](https://github.com/underhood))
-- Cleanup of APIs [\#13539](https://github.com/netdata/netdata/pull/13539) ([underhood](https://github.com/underhood))
-- bump go.d version to v0.36.0 [\#13538](https://github.com/netdata/netdata/pull/13538) ([ilyam8](https://github.com/ilyam8))
-- chore\(python.d\): rename dockerd job on lock registration [\#13537](https://github.com/netdata/netdata/pull/13537) ([ilyam8](https://github.com/ilyam8))
-- Update MacOS community support details [\#13536](https://github.com/netdata/netdata/pull/13536) ([DShreve2](https://github.com/DShreve2))
-- Fix a crash when xen libraries are misconfigured [\#13535](https://github.com/netdata/netdata/pull/13535) ([vlvkobal](https://github.com/vlvkobal))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
