@@ -296,7 +296,7 @@ void Host::detect() {
     heartbeat_t HB;
     heartbeat_init(&HB);
 
-    while (service_running(SERVICE_ML_PREDICTION)) {
+    while (service_running((SERVICE_TYPE)(SERVICE_ML_PREDICTION | SERVICE_COLLECTORS))) {
         worker_is_idle();
         heartbeat_next(&HB, RH->rrd_update_every * USEC_PER_SEC);
         detectOnce();
