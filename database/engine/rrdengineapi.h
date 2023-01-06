@@ -202,6 +202,7 @@ struct rrdeng_buffer_sizes {
     size_t opcodes;
     size_t epdl;
     size_t deol;
+    size_t pd;
 };
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);

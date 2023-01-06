@@ -744,7 +744,7 @@ void rrdeng_prep_query(PDC *pdc) {
 //        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
 //            dbengine_load_page_list_directly(ctx, handle->pdc);
 //        else
-        dbengine_load_page_list(pdc->ctx, pdc);
+        pdc_route_asynchronously(pdc->ctx, pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else

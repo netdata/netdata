@@ -553,6 +553,8 @@ if ENABLE_DBENGINE
         database/engine2/cache.h \
         database/engine2/metric.c \
         database/engine2/metric.h \
+        database/engine2/pdc.c \
+        database/engine2/pdc.h \
         $(NULL)
 endif
 

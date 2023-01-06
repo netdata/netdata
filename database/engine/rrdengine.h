@@ -21,6 +21,7 @@
 #include "pagecache.h"
 #include "../engine2/metric.h"
 #include "../engine2/cache.h"
+#include "../engine2/pdc.h"
 
 extern unsigned rrdeng_pages_per_extent;
 
@@ -67,7 +68,6 @@ typedef struct page_details_control {
 } PDC;
 
 PDC *pdc_get(void);
-void pdc_release(PDC *pdc);
 
 typedef enum __attribute__ ((__packed__)) {
     // final status for all pages
@@ -134,7 +134,6 @@ struct page_details {
 };
 
 struct page_details *page_details_get(void);
-void page_details_release(struct page_details *pd);
 
 #define pdc_page_status_check(pd, flag) (__atomic_load_n(&((pd)->status), __ATOMIC_ACQUIRE) & (flag))
 #define pdc_page_status_set(pd, flag)   __atomic_or_fetch(&((pd)->status), flag, __ATOMIC_RELEASE)
@@ -402,10 +401,9 @@ void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, enum storage_priority priority);
-void pdc_destroy(PDC *pdc);
 
-void dbengine_load_page_list(struct rrdengine_instance *ctx, struct page_details_control *pdc);
-void dbengine_load_page_list_directly(struct rrdengine_instance *ctx, struct page_details_control *pdc);
+void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
+void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 
 void pdc_acquire(PDC *pdc);
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router);
