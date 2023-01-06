@@ -93,7 +93,6 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 	# enable running new plugins = yes
 	# check for new plugins every = 60
 	# slabinfo = no
-	# fping = yes
 	# ioping = yes
 	# python.d = yes
 	# go.d = yes
@@ -147,11 +146,6 @@ collect_data() {
 
         // attach a metric to it
         rd = rrddim_add(st, "id", "name", multiplier, divider, algorithm);
-    }
-    else {
-        // this chart is already created
-        // let Netdata know we start a new iteration on it
-        rrdset_next(st);
     }
 
     // give the collected value(s) to the chart

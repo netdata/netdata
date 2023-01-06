@@ -21,7 +21,7 @@
 install_netdata() {
   echo "Installing Netdata"
   fakeroot ./netdata-installer.sh \
-    --install "$HOME" \
+    --install-prefix "$HOME" \
     --dont-wait \
     --dont-start-it \
     --enable-plugin-nfacct \

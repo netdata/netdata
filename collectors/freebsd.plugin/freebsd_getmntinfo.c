@@ -212,8 +212,6 @@ int do_getmntinfo(int update_every, usec_t dt) {
                 if (unlikely(mntbuf[i].f_flags & MNT_RDONLY && !m->collected))
                     continue;
 
-                // --------------------------------------------------------------------------
-
                 int rendered = 0;
 
                 if (m->do_space == CONFIG_BOOLEAN_YES || (m->do_space == CONFIG_BOOLEAN_AUTO &&
@@ -242,8 +240,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
                                                           mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         m->rd_space_reserved = rrddim_add(m->st_space, "reserved_for_root", "reserved for root",
                                                           mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(m->st_space);
+                    }
 
                     rrddim_set_by_pointer(m->st_space, m->rd_space_avail,    (collected_number) mntbuf[i].f_bavail);
                     rrddim_set_by_pointer(m->st_space, m->rd_space_used,     (collected_number) (mntbuf[i].f_blocks -
@@ -254,8 +251,6 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                     rendered++;
                 }
-
-                // --------------------------------------------------------------------------
 
                 if (m->do_inodes == CONFIG_BOOLEAN_YES || (m->do_inodes == CONFIG_BOOLEAN_AUTO &&
                                                            (mntbuf[i].f_files > 1 ||
@@ -279,8 +274,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
                         m->rd_inodes_avail = rrddim_add(m->st_inodes, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         m->rd_inodes_used  = rrddim_add(m->st_inodes, "used",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(m->st_inodes);
+                    }
 
                     rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_avail, (collected_number) mntbuf[i].f_ffree);
                     rrddim_set_by_pointer(m->st_inodes, m->rd_inodes_used,  (collected_number) (mntbuf[i].f_files -

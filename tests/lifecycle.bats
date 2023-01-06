@@ -34,7 +34,7 @@ setup() {
 }
 
 @test "install netdata" {
-	./netdata-installer.sh  --dont-wait --dont-start-it --auto-update --install "${INSTALLATION}"
+	./netdata-installer.sh  --dont-wait --dont-start-it --auto-update --install-prefix "${INSTALLATION}"
 
 	# Validate particular files
 	for file in $FILES; do

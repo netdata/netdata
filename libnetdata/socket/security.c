@@ -204,31 +204,43 @@ static SSL_CTX * security_initialize_openssl_server() {
  *      NETDATA_SSL_CONTEXT_EXPORTING - Starts the OpenTSDB context
  */
 void security_start_ssl(int selector) {
+    static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+    netdata_spinlock_lock(&sp);
+
     switch (selector) {
         case NETDATA_SSL_CONTEXT_SERVER: {
-            struct stat statbuf;
-            if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf)) {
-                info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
-                return;
+            if(!netdata_ssl_srv_ctx) {
+                struct stat statbuf;
+                if (stat(netdata_ssl_security_key, &statbuf) || stat(netdata_ssl_security_cert, &statbuf))
+                    info("To use encryption it is necessary to set \"ssl certificate\" and \"ssl key\" in [web] !\n");
+                else {
+                    netdata_ssl_srv_ctx = security_initialize_openssl_server();
+                    SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
+                }
             }
+            break;
+        }
 
-            netdata_ssl_srv_ctx =  security_initialize_openssl_server();
-            SSL_CTX_set_mode(netdata_ssl_srv_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
-            break;
-        }
         case NETDATA_SSL_CONTEXT_STREAMING: {
-            netdata_ssl_client_ctx = security_initialize_openssl_client();
-            //This is necessary for the stream, because it is working sometimes with nonblock socket.
-            //It returns the bitmask after to change, there is not any description of errors in the documentation
-            SSL_CTX_set_mode(
-                netdata_ssl_client_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE |SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |SSL_MODE_AUTO_RETRY);
+            if(!netdata_ssl_client_ctx) {
+                netdata_ssl_client_ctx = security_initialize_openssl_client();
+                //This is necessary for the stream, because it is working sometimes with nonblock socket.
+                //It returns the bitmask after to change, there is not any description of errors in the documentation
+                SSL_CTX_set_mode(netdata_ssl_client_ctx,
+                                 SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+                                 SSL_MODE_AUTO_RETRY);
+            }
             break;
         }
+
         case NETDATA_SSL_CONTEXT_EXPORTING: {
-            netdata_ssl_exporting_ctx = security_initialize_openssl_client();
+            if(!netdata_ssl_exporting_ctx)
+                netdata_ssl_exporting_ctx = security_initialize_openssl_client();
             break;
         }
     }
+
+    netdata_spinlock_unlock(&sp);
 }
 
 /**
@@ -357,31 +369,22 @@ int security_test_certificate(SSL *ssl) {
  * @return It returns 0 on success and -1 otherwise.
  */
 int ssl_security_location_for_context(SSL_CTX *ctx, char *file, char *path) {
-    struct stat statbuf;
-    if (stat(file, &statbuf)) {
-        info("Netdata does not have the parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
-        return 0;
-    }
-
-    ERR_clear_error();
-    u_long err;
-    char buf[256];
-    if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
-        goto slfc;
+    int load_custom = 1, load_default = 1;
+    if (file || path) {
+        if(!SSL_CTX_load_verify_locations(ctx, file, path)) {
+            info("Netdata can not verify custom CAfile or CApath for parent's SSL certificate, so it will use the default OpenSSL configuration to validate certificates!");
+            load_custom = 0;
+        }
     }
 
     if(!SSL_CTX_set_default_verify_paths(ctx)) {
-        goto slfc;
+        info("Can not verify default OpenSSL configuration to validate certificates!");
+        load_default = 0;
     }
+
+    if (load_custom  == 0 && load_default == 0)
+        return -1;
 
     return 0;
-
-slfc:
-    while ((err = ERR_get_error()) != 0) {
-        ERR_error_string_n(err, buf, sizeof(buf));
-        error("Cannot set the directory for the certificates and the parent SSL certificate: %s",buf);
-    }
-    return -1;
 }
-
 #endif

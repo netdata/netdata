@@ -34,7 +34,7 @@ const char *program_version = VERSION;
 #warning NETDATA_TRACE_ALLOCATIONS ENABLED
 #include "Judy.h"
 
-#ifdef HAVE_DLSYM
+#if defined(HAVE_DLSYM) && defined(ENABLE_DLSYM)
 #include <dlfcn.h>
 
 typedef void (*libc_function_t)(void);
@@ -136,7 +136,6 @@ static void *(*libc_malloc)(size_t) = malloc;
 static void *(*libc_calloc)(size_t, size_t) = calloc;
 static void *(*libc_realloc)(void *, size_t) = realloc;
 static void (*libc_free)(void *) = free;
-static char *(*libc_strdup)(const char *) = strdup;
 
 #ifdef HAVE_MALLOC_USABLE_SIZE
 static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size;
@@ -312,7 +311,7 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
         t->padding[i] = 0xFF;
 #endif
 
-    strcpy((char *)&t->data, s);
+    memcpy(&t->data, s, size);
     return (char *)&t->data;
 }
 

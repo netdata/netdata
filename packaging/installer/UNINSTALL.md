@@ -19,7 +19,7 @@ wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/
 Or (if you have curl but not wget):
 
 ```sh
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sha --uninstall
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --uninstall
 ```
 
 This will work in most cases without you needing to do anything more other than accepting removal of configuration
@@ -51,7 +51,7 @@ A workflow for uninstallation looks like this:
 2.  If you cannot find that file and would like to uninstall Netdata, then create a new file with the following content:
 
 ```sh
-NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install` flag. Otherwise it should be empty
+NETDATA_PREFIX="<installation prefix>"   # put what you used as a parameter to shell installed `--install-prefix` flag. Otherwise it should be empty
 NETDATA_ADDED_TO_GROUPS="<additional groups>"  # Additional groups for a user running the Netdata process
 ```
 

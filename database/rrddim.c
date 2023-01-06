@@ -84,6 +84,23 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
         uuid_generate(rd->metric_uuid);
+        bool found_in_sql = false; (void)found_in_sql;
+
+//        bool found_in_sql = true;
+//        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
+//            found_in_sql = false;
+//            uuid_generate(rd->metric_uuid);
+//        }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        char uuid_str[UUID_STR_LEN];
+        uuid_unparse_lower(rd->metric_uuid, uuid_str);
+        error_report("Dimension UUID for host %s chart [%s] dimension [%s] not found in context. It is now set to %s (%s)",
+                     string2str(host->hostname),
+                     string2str(st->name),
+                     string2str(rd->name),
+                     uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
+#endif
     }
 
     // initialize the db tiers
@@ -95,7 +112,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             rd->tiers[tier]->tier_grouping = host->db[tier].tier_grouping;
             rd->tiers[tier]->collect_ops = &eng->api.collect_ops;
             rd->tiers[tier]->query_ops = &eng->api.query_ops;
-            rd->tiers[tier]->db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance, rd->rrdset->storage_metrics_groups[tier]);
+            rd->tiers[tier]->db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
             storage_point_unset(rd->tiers[tier]->virtual_point);
             initialized++;
 
@@ -114,7 +131,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
             if (rd->tiers[tier]) {
-                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every);
+                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
                 initialized++;
             }
         }
@@ -147,17 +164,15 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         }
     }
 
-    if(!rrdset_is_ar_chart(st)) {
-        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-    }
+    rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+    rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     // let the chart resync
     rrdset_flag_set(st, RRDSET_FLAG_SYNC_CLOCK);
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
-    ml_new_dimension(rd);
+    ml_dimension_new(rd);
 
     ctr->react_action = RRDDIM_REACT_NEW;
 
@@ -176,23 +191,23 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdcontext_removed_rrddim(rd);
 
-    ml_delete_dimension(rd);
+    ml_dimension_delete(rd);
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    size_t tiers_available = 0, tiers_said_yes = 0;
+    size_t tiers_available = 0, tiers_said_no_retention = 0;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if(rd->tiers[tier] && rd->tiers[tier]->db_collection_handle) {
             tiers_available++;
 
             if(rd->tiers[tier]->collect_ops->finalize(rd->tiers[tier]->db_collection_handle))
-                tiers_said_yes++;
+                tiers_said_no_retention++;
 
             rd->tiers[tier]->db_collection_handle = NULL;
         }
     }
 
-    if (tiers_available == tiers_said_yes && tiers_said_yes && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (tiers_available == tiers_said_no_retention && tiers_said_no_retention && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* This metric has no data and no references */
         metaqueue_delete_dimension_uuid(&rd->metric_uuid);
     }
@@ -246,16 +261,15 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (rd->tiers[tier] && !rd->tiers[tier]->db_collection_handle)
             rd->tiers[tier]->db_collection_handle =
-                rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every);
+                rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
     }
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_ARCHIVED);
-        if(!rrdset_is_ar_chart(st)) {
-            rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
-            rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
-            rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
-        }
+
+        rrddim_flag_set(rd, RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
 
     if(unlikely(rc))
@@ -357,13 +371,10 @@ inline int rrddim_reset_name(RRDSET *st, RRDDIM *rd, const char *name) {
     rd->name = rrd_string_strdupz(name);
     string_freez(old);
 
-    if (!rrdset_is_ar_chart(st))
-        rrddimvar_rename_all(rd);
+    rrddimvar_rename_all(rd);
 
     rd->exposed = 0;
     rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
-
-    ml_dimension_update_name(st, rd, name);
 
     return 1;
 }
@@ -409,7 +420,13 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 
 // ----------------------------------------------------------------------------
 
-// get the timestamp of the last entry in the round-robin database
+time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+        return 0;
+
+    return rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+}
+
 time_t rrddim_last_entry_t(RRDDIM *rd) {
     time_t latest = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
 
@@ -424,13 +441,18 @@ time_t rrddim_last_entry_t(RRDDIM *rd) {
     return latest;
 }
 
+time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+        return 0;
+
+    return rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+}
+
 time_t rrddim_first_entry_t(RRDDIM *rd) {
     time_t oldest = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
-
-        time_t t = rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
         if(t != 0 && (oldest == 0 || t < oldest))
             oldest = t;
     }
@@ -601,7 +623,7 @@ struct rrddim_map_save_v019 {
     long double last_calculated_value;              // ignored
     long double last_stored_value;                  // ignored
     long long collected_value;                      // ignored
-    long long last_collected_value;                 // ignored
+    long long last_collected_value;                 // load and save
     long double collected_volume;                   // ignored
     long double stored_volume;                      // ignored
     void *next;                                     // ignored
@@ -624,6 +646,7 @@ void rrddim_memory_file_update(RRDDIM *rd) {
 
     rd_on_file->last_collected_time.tv_sec = rd->last_collected_time.tv_sec;
     rd_on_file->last_collected_time.tv_usec = rd->last_collected_time.tv_usec;
+    rd_on_file->last_collected_value = rd->last_collected_value;
 }
 
 void rrddim_memory_file_free(RRDDIM *rd) {
@@ -703,6 +726,8 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     }
 
     if(!reset) {
+        rd->last_collected_value = rd_on_file->last_collected_value;
+
         if(rd_on_file->algorithm != rd->algorithm)
             info("File %s does not have the expected algorithm (expected %u '%s', found %u '%s'). Previous values may be wrong.",
                  fullfilename, rd->algorithm, rrd_algorithm_name(rd->algorithm), rd_on_file->algorithm, rrd_algorithm_name(rd_on_file->algorithm));

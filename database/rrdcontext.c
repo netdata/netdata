@@ -29,7 +29,7 @@
 #define WORKER_JOB_PP_QUEUE_SIZE   13
 
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     RRD_FLAG_NONE           = 0,
     RRD_FLAG_DELETED        = (1 << 0), // this is a deleted object (metrics, instances, contexts)
     RRD_FLAG_COLLECTED      = (1 << 1), // this object is currently being collected
@@ -38,7 +38,7 @@ typedef enum {
     RRD_FLAG_OWN_LABELS     = (1 << 4), // this instance has its own labels - not linked to an RRDSET
     RRD_FLAG_LIVE_RETENTION = (1 << 5), // we have got live retention from the database
     RRD_FLAG_QUEUED_FOR_HUB = (1 << 6), // this context is currently queued to be dispatched to hub
-    RRD_FLAG_QUEUED_FOR_POST_PROCESSING = (1 << 7), // this context is currently queued to be post-processed
+    RRD_FLAG_QUEUED_FOR_PP  = (1 << 7), // this context is currently queued to be post-processed
     RRD_FLAG_HIDDEN         = (1 << 8), // don't expose this to the hub or the API
 
     RRD_FLAG_UPDATE_REASON_TRIGGERED               = (1 << 9),  // the update was triggered by the child object
@@ -46,26 +46,18 @@ typedef enum {
     RRD_FLAG_UPDATE_REASON_NEW_OBJECT              = (1 << 11), // this object has just been created
     RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT          = (1 << 12), // we received an update on this object
     RRD_FLAG_UPDATE_REASON_CHANGED_LINKING         = (1 << 13), // an instance or a metric switched RRDSET or RRDDIM
-    RRD_FLAG_UPDATE_REASON_CHANGED_UUID            = (1 << 14), // an instance or a metric changed UUID
-    RRD_FLAG_UPDATE_REASON_CHANGED_NAME            = (1 << 15), // an instance or a metric changed name
-    RRD_FLAG_UPDATE_REASON_CHANGED_UNITS           = (1 << 16), // this context or instance changed units
-    RRD_FLAG_UPDATE_REASON_CHANGED_TITLE           = (1 << 17), // this context or instance changed title
-    RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY          = (1 << 18), // the context or the instance changed family
-    RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE      = (1 << 19), // this context or instance changed chart type
-    RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY        = (1 << 20), // this context or instance changed its priority
-    RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY    = (1 << 21), // the instance or the metric changed update frequency
-    RRD_FLAG_UPDATE_REASON_ZERO_RETENTION          = (1 << 22), // this object has not retention
-    RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T    = (1 << 23), // this object changed its oldest time in the db
-    RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T     = (1 << 24), // this object change its latest time in the db
-    RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED = (1 << 25), // this object has stopped being collected
-    RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED = (1 << 26), // this object has started being collected
-    RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 27), // this context belongs to a host that just disconnected
-    RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 28), // this context changed because of a db rotation
-    RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 29), // this context is not used anymore
-    RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS           = (1 << 30), // this context is not used anymore
+    RRD_FLAG_UPDATE_REASON_CHANGED_METADATA        = (1 << 14), // this context or instance changed uuid, name, units, title, family, chart type, priority, update every, rrd changed flags
+    RRD_FLAG_UPDATE_REASON_ZERO_RETENTION          = (1 << 15), // this object has no retention
+    RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T    = (1 << 16), // this object changed its oldest time in the db
+    RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T     = (1 << 17), // this object change its latest time in the db
+    RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED = (1 << 18), // this object has stopped being collected
+    RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED = (1 << 19), // this object has started being collected
+    RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD      = (1 << 20), // this context belongs to a host that just disconnected
+    RRD_FLAG_UPDATE_REASON_UNUSED                  = (1 << 21), // this context is not used anymore
+    RRD_FLAG_UPDATE_REASON_DB_ROTATION             = (1 << 22), // this context changed because of a db rotation
 
-    // DO NOT ADD (1 << 31) or bigger!
-    // runtime error: left shift of 1 by 31 places cannot be represented in type 'int'
+    // action to perform on an object
+    RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION        = (1 << 30), // this object has to update its retention from the db
 } RRD_FLAGS;
 
 #define RRD_FLAG_ALL_UPDATE_REASONS                   ( \
@@ -74,14 +66,7 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_NEW_OBJECT                  \
     |RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT              \
     |RRD_FLAG_UPDATE_REASON_CHANGED_LINKING             \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_UUID                \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_NAME                \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_UNITS               \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_TITLE               \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY              \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE          \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY            \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY        \
+    |RRD_FLAG_UPDATE_REASON_CHANGED_METADATA            \
     |RRD_FLAG_UPDATE_REASON_ZERO_RETENTION              \
     |RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T        \
     |RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T         \
@@ -90,7 +75,6 @@ typedef enum {
     |RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD          \
     |RRD_FLAG_UPDATE_REASON_DB_ROTATION                 \
     |RRD_FLAG_UPDATE_REASON_UNUSED                      \
-    |RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS               \
  )
 
 #define RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS   ( \
@@ -107,7 +91,7 @@ typedef enum {
 #define RRD_FLAGS_PREVENTING_DELETIONS                ( \
      RRD_FLAG_QUEUED_FOR_HUB                            \
     |RRD_FLAG_COLLECTED                                 \
-    |RRD_FLAG_QUEUED_FOR_POST_PROCESSING                \
+    |RRD_FLAG_QUEUED_FOR_PP                             \
 )
 
 // get all the flags of an object
@@ -131,6 +115,7 @@ typedef enum {
 static inline void
 rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditionally_add, RRD_FLAGS always_remove) {
     RRD_FLAGS expected, desired;
+
     do {
         expected = *flags;
 
@@ -205,33 +190,26 @@ static struct rrdcontext_reason {
     usec_t delay_ut;
 } rrdcontext_reasons[] = {
     // context related
-    { RRD_FLAG_UPDATE_REASON_TRIGGERED,               "triggered transition", 65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_NEW_OBJECT,              "object created",       65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT,          "object updated",       65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_LOAD_SQL,                "loaded from sql",      65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_TITLE,           "changed title",        65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_UNITS,           "changed units",        65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY,          "changed family",       65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY,        "changed priority",     65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_ZERO_RETENTION,          "has no retention",     65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T,    "updated first_time_t", 65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T,     "updated last_time_t",  65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE,      "changed chart type",   65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED, "stopped collected",    65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED, "started collected",    5 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_UNUSED,                  "unused",               5 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_TRIGGERED,               "triggered transition", 65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_NEW_OBJECT,              "object created",       65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_UPDATED_OBJECT,          "object updated",       65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_LOAD_SQL,                "loaded from sql",      65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_CHANGED_METADATA,        "changed metadata",     65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_ZERO_RETENTION,          "has no retention",     65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_CHANGED_FIRST_TIME_T,    "updated first_time_t", 65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_CHANGED_LAST_TIME_T,     "updated last_time_t",  65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_STOPPED_BEING_COLLECTED, "stopped collected",    65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_STARTED_BEING_COLLECTED, "started collected",    5 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_UNUSED,                  "unused",               5 * USEC_PER_SEC },
 
     // not context related
-    { RRD_FLAG_UPDATE_REASON_CHANGED_UUID,            "changed uuid",         65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY,    "changed updated every",65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_LINKING,         "changed rrd link",     65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_NAME,            "changed name",         65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD,      "child disconnected",   65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_DB_ROTATION,             "db rotation",          65 * USEC_PER_SEC },
-    { RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS,           "changed flags",        65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_CHANGED_LINKING,         "changed rrd link",     65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD,      "child disconnected",   65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_DB_ROTATION,             "db rotation",          65 * USEC_PER_SEC },
+    {RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION,        "updated retention",    65 * USEC_PER_SEC },
 
     // terminator
-    { 0, NULL, 0 },
+    {0, NULL,                                                                0 },
 };
 
 
@@ -321,7 +299,7 @@ typedef struct rrdcontext {
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDMETRIC
 
-static void rrdmetric_update_retention(RRDMETRIC *rm);
+static bool rrdmetric_update_retention(RRDMETRIC *rm);
 
 static inline RRDMETRIC *rrdmetric_acquired_value(RRDMETRIC_ACQUIRED *rma) {
     return dictionary_acquired_item_value((DICTIONARY_ITEM *)rma);
@@ -473,7 +451,7 @@ static void rrd_flags_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
     if(flags & RRD_FLAG_HIDDEN)
         buffer_strcat(wb, "HIDDEN ");
 
-    if(flags & RRD_FLAG_QUEUED_FOR_POST_PROCESSING)
+    if(flags & RRD_FLAG_QUEUED_FOR_PP)
         buffer_strcat(wb, "PENDING_UPDATES ");
 }
 
@@ -539,12 +517,39 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
                    string2str(rm->id), string2str(rm_new->id));
 
     if(uuid_compare(rm->uuid, rm_new->uuid) != 0) {
+#ifdef NETDATA_INTERNAL_CHECKS
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);
-        internal_error(true, "RRDMETRIC: '%s' of instance '%s' changed uuid from '%s' to '%s'", string2str(rm->id), string2str(rm->ri->id), uuid1, uuid2);
+
+        time_t old_first_time_t = 0;
+        time_t old_last_time_t = 0;
+        if(rrdmetric_update_retention(rm)) {
+            old_first_time_t = rm->first_time_t;
+            old_last_time_t = rm->last_time_t;
+        }
+
         uuid_copy(rm->uuid, rm_new->uuid);
-        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_UUID);
+
+        time_t new_first_time_t = 0;
+        time_t new_last_time_t = 0;
+        if(rrdmetric_update_retention(rm)) {
+            new_first_time_t = rm->first_time_t;
+            new_last_time_t = rm->last_time_t;
+        }
+
+        internal_error(true,
+                       "RRDMETRIC: '%s' of instance '%s' of host '%s' changed UUID from '%s' (retention %ld to %ld, %ld secs) to '%s' (retention %ld to %ld, %ld secs)"
+                       , string2str(rm->id)
+                       , string2str(rm->ri->id)
+                       , rrdhost_hostname(rm->ri->rc->rrdhost)
+                       , uuid1, old_first_time_t, old_last_time_t, old_last_time_t - old_first_time_t
+                       , uuid2, new_first_time_t, new_last_time_t, new_last_time_t - new_first_time_t
+                       );
+#else
+        uuid_copy(rm->uuid, rm_new->uuid);
+#endif
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(rm->rrddim && rm_new->rrddim && rm->rrddim != rm_new->rrddim) {
@@ -552,12 +557,14 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if(rm->rrddim && uuid_compare(rm->uuid, rm->rrddim->metric_uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid1);
         uuid_unparse(rm_new->uuid, uuid2);
         internal_error(true, "RRDMETRIC: '%s' is linked to RRDDIM '%s' but they have different UUIDs. RRDMETRIC has '%s', RRDDIM has '%s'", string2str(rm->id), rrddim_id(rm->rrddim), uuid1, uuid2);
     }
+#endif
 
     if(rm->rrddim != rm_new->rrddim)
         rm->rrddim = rm_new->rrddim;
@@ -566,7 +573,7 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
         STRING *old = rm->name;
         rm->name = string_dup(rm_new->name);
         string_freez(old);
-        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);
+        rrd_flag_set_updated(rm, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(!rm->first_time_t || (rm_new->first_time_t && rm_new->first_time_t < rm->first_time_t)) {
@@ -743,11 +750,6 @@ static void rrdinstance_free(RRDINSTANCE *ri) {
 }
 
 static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdcontext) {
-    static STRING *ml_anomaly_rates_id = NULL;
-
-    if(unlikely(!ml_anomaly_rates_id))
-        ml_anomaly_rates_id = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
-
     RRDINSTANCE *ri = value;
 
     // link it to its parent
@@ -768,15 +770,11 @@ static void rrdinstance_insert_callback(const DICTIONARY_ITEM *item __maybe_unus
     }
 
     if(ri->rrdset) {
-        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || rrdset_is_ar_chart(ri->rrdset)))
+        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
             ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
         else
             ri->flags &= ~RRD_FLAG_HIDDEN; // no need of atomics at the constructor
     }
-
-    // we need this when loading from SQL
-    if(unlikely(ri->id == ml_anomaly_rates_id))
-        ri->flags |= RRD_FLAG_HIDDEN; // no need of atomics at the constructor
 
     rrdmetrics_create_in_rrdinstance(ri);
 
@@ -801,8 +799,16 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
                    string2str(ri->id), string2str(ri_new->id));
 
     if(uuid_compare(ri->uuid, ri_new->uuid) != 0) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
+        uuid_unparse(ri->uuid, uuid1);
+        uuid_unparse(ri_new->uuid, uuid2);
+        internal_error(true, "RRDINSTANCE: '%s' of host '%s' changed UUID from '%s' to '%s'",
+                       string2str(ri->id), rrdhost_hostname(ri->rc->rrdhost), uuid1, uuid2);
+#endif
+
         uuid_copy(ri->uuid, ri_new->uuid);
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UUID);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->rrdset && ri_new->rrdset && ri->rrdset != ri_new->rrdset) {
@@ -810,54 +816,56 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
         rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_LINKING);
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if(ri->rrdset && uuid_compare(ri->uuid, ri->rrdset->chart_uuid) != 0) {
         char uuid1[UUID_STR_LEN], uuid2[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid1);
         uuid_unparse(ri->rrdset->chart_uuid, uuid2);
         internal_error(true, "RRDINSTANCE: '%s' is linked to RRDSET '%s' but they have different UUIDs. RRDINSTANCE has '%s', RRDSET has '%s'", string2str(ri->id), rrdset_id(ri->rrdset), uuid1, uuid2);
     }
+#endif
 
     if(ri->name != ri_new->name) {
         STRING *old = ri->name;
         ri->name = string_dup(ri_new->name);
         string_freez(old);
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->title != ri_new->title) {
         STRING *old = ri->title;
         ri->title = string_dup(ri_new->title);
         string_freez(old);
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_TITLE);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->units != ri_new->units) {
         STRING *old = ri->units;
         ri->units = string_dup(ri_new->units);
         string_freez(old);
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UNITS);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->family != ri_new->family) {
         STRING *old = ri->family;
         ri->family = string_dup(ri_new->family);
         string_freez(old);
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->chart_type != ri_new->chart_type) {
         ri->chart_type = ri_new->chart_type;
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->priority != ri_new->priority) {
         ri->priority = ri_new->priority;
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->update_every != ri_new->update_every) {
         ri->update_every = ri_new->update_every;
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(ri->rrdset != ri_new->rrdset) {
@@ -876,7 +884,7 @@ static bool rrdinstance_conflict_callback(const DICTIONARY_ITEM *item __maybe_un
     }
 
     if(ri->rrdset) {
-        if(unlikely((rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)) || rrdset_is_ar_chart(ri->rrdset)))
+        if(unlikely(rrdset_flag_check(ri->rrdset, RRDSET_FLAG_HIDDEN)))
             rrd_flag_set(ri, RRD_FLAG_HIDDEN);
         else
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
@@ -926,11 +934,11 @@ static void rrdinstance_trigger_updates(RRDINSTANCE *ri, const char *function) {
     if(likely(st)) {
         if(unlikely((unsigned int) st->priority != ri->priority)) {
             ri->priority = st->priority;
-            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
         if(unlikely(st->update_every != ri->update_every)) {
             ri->update_every = st->update_every;
-            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_UPDATE_EVERY);
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
     else if(unlikely(rrd_flag_is_collected(ri))) {
@@ -1097,6 +1105,14 @@ static inline void rrdinstance_rrdset_is_freed(RRDSET *st) {
     st->rrdcontext = NULL;
 }
 
+static inline void rrdinstance_rrdset_has_updated_retention(RRDSET *st) {
+    RRDINSTANCE *ri = rrdset_get_rrdinstance(st);
+    if(unlikely(!ri)) return;
+
+    rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION);
+    rrdinstance_trigger_updates(ri, __FUNCTION__ );
+}
+
 static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
     // the chart may not be initialized when this is called
     if(unlikely(!st->rrdinstance)) return;
@@ -1109,7 +1125,7 @@ static inline void rrdinstance_updated_rrdset_name(RRDSET *st) {
         ri->name = string_dup(st->name);
         string_freez(old);
 
-        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_NAME);
+        rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         rrdinstance_trigger_updates(ri, __FUNCTION__ );
     }
 }
@@ -1124,11 +1140,11 @@ static inline void rrdinstance_updated_rrdset_flags_no_action(RRDINSTANCE *ri, R
 
     if(unlikely(st_is_hidden != ri_is_hidden)) {
         if (unlikely(st_is_hidden && !ri_is_hidden))
-            rrd_flag_set_updated(ri, RRD_FLAG_HIDDEN | RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+            rrd_flag_set_updated(ri, RRD_FLAG_HIDDEN | RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
 
         else if (unlikely(!st_is_hidden && ri_is_hidden)) {
             rrd_flag_clear(ri, RRD_FLAG_HIDDEN);
-            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_FLAGS);
+            rrd_flag_set_updated(ri, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
 }
@@ -1262,14 +1278,14 @@ static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unu
         else
             rc->title = string_2way_merge(rc->title, rc_new->title);
         string_freez(old_title);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_TITLE);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(rc->units != rc_new->units) {
         STRING *old_units = rc->units;
         rc->units = string_dup(rc_new->units);
         string_freez(old_units);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_UNITS);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(rc->family != rc_new->family) {
@@ -1279,17 +1295,17 @@ static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unu
         else
             rc->family = string_2way_merge(rc->family, rc_new->family);
         string_freez(old_family);
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_FAMILY);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(rc->chart_type != rc_new->chart_type) {
         rc->chart_type = rc_new->chart_type;
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_CHART_TYPE);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     if(rc->priority != rc_new->priority) {
         rc->priority = rc_new->priority;
-        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
+        rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
     }
 
     rrd_flag_set(rc, rc_new->flags & RRD_FLAGS_ALLOWED_EXTERNALLY_ON_NEW_OBJECTS); // no need for atomics on rc_new
@@ -1344,14 +1360,14 @@ static bool rrdcontext_hub_queue_conflict_callback(const DICTIONARY_ITEM *item _
 
 static void rrdcontext_post_processing_queue_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
-    rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
+    rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
     rc->pp.queued_flags = rc->flags;
     rc->pp.queued_ut = now_realtime_usec();
 }
 
 static void rrdcontext_post_processing_queue_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *context, void *nothing __maybe_unused) {
     RRDCONTEXT *rc = context;
-    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
+    rrd_flag_clear(rc, RRD_FLAG_QUEUED_FOR_PP);
     rc->pp.dequeued_ut = now_realtime_usec();
 }
 
@@ -1359,8 +1375,8 @@ static bool rrdcontext_post_processing_queue_conflict_callback(const DICTIONARY_
     RRDCONTEXT *rc = context;
     bool changed = false;
 
-    if(!(rc->flags & RRD_FLAG_QUEUED_FOR_POST_PROCESSING)) {
-        rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING);
+    if(!(rc->flags & RRD_FLAG_QUEUED_FOR_PP)) {
+        rrd_flag_set(rc, RRD_FLAG_QUEUED_FOR_PP);
         changed = true;
     }
 
@@ -1465,6 +1481,10 @@ void rrdcontext_updated_rrdset(RRDSET *st) {
 
 void rrdcontext_removed_rrdset(RRDSET *st) {
     rrdinstance_rrdset_is_freed(st);
+}
+
+void rrdcontext_updated_retention_rrdset(RRDSET *st) {
+    rrdinstance_rrdset_has_updated_retention(st);
 }
 
 void rrdcontext_updated_rrdset_name(RRDSET *st) {
@@ -2209,9 +2229,6 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
             if(rrd_flag_is_deleted(ri))
                 continue;
 
-            if(ri->rrdset && rrdset_is_ar_chart(ri->rrdset))
-                continue;
-
             RRDMETRIC *rm;
             dfe_start_read(ri->rrdmetrics, rm) {
                 if(rrd_flag_is_deleted(rm))
@@ -2268,6 +2285,7 @@ typedef struct query_target_locals {
 static __thread QUERY_TARGET thread_query_target = {};
 void query_target_release(QUERY_TARGET *qt) {
     if(unlikely(!qt)) return;
+    if(unlikely(!qt->used)) return;
 
     simple_pattern_free(qt->hosts.pattern);
     qt->hosts.pattern = NULL;
@@ -2409,7 +2427,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
         else
-            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid, NULL);
+            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid);
 
         if(tier_retention[tier].db_metric_handle) {
             tier_retention[tier].db_first_time_t = tier_retention[tier].eng->api.query_ops.oldest_time(tier_retention[tier].db_metric_handle);
@@ -2746,9 +2764,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     QUERY_TARGET *qt = &thread_query_target;
 
     if(qt->used)
-        fatal("QUERY TARGET: this query target is already used.");
+        fatal("QUERY TARGET: this query target is already used (%zu queries made with this QUERY_TARGET so far).", qt->queries);
 
     qt->used = true;
+    qt->queries++;
 
     // copy the request into query_thread_target
     qt->request = *qtr;
@@ -3025,7 +3044,7 @@ static void rrdcontext_recalculate_retention_all_hosts(void) {
 // ----------------------------------------------------------------------------
 // garbage collector
 
-static void rrdmetric_update_retention(RRDMETRIC *rm) {
+static bool rrdmetric_update_retention(RRDMETRIC *rm) {
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
 
     if(rm->rrddim) {
@@ -3050,7 +3069,7 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
     }
     else {
         // cannot get retention
-        return;
+        return false;
     }
 #endif
 
@@ -3080,6 +3099,8 @@ static void rrdmetric_update_retention(RRDMETRIC *rm) {
         rrd_flag_set_deleted(rm, RRD_FLAG_UPDATE_REASON_ZERO_RETENTION);
 
     rrd_flag_set(rm, RRD_FLAG_LIVE_RETENTION);
+
+    return true;
 }
 
 static inline bool rrdmetric_should_be_deleted(RRDMETRIC *rm) {
@@ -3224,8 +3245,6 @@ static void rrdcontext_garbage_collect_single_host(RRDHOST *host, bool worker_jo
                     "RRDCONTEXT: context '%s' of host '%s', deleted from rrdmetrics dictionary.",
                     string2str(rc->id),
                     rrdhost_hostname(host));
-
-            fprintf(stderr, "RRDCONTEXT: deleted context '%s'", string2str(rc->id));
         }
 
         // the item is referenced in the dictionary
@@ -3251,16 +3270,18 @@ static void rrdmetric_process_updates(RRDMETRIC *rm, bool force, RRD_FLAGS reaso
     if(reason != RRD_FLAG_NONE)
         rrd_flag_set_updated(rm, reason);
 
-    if(!force && !rrd_flag_is_updated(rm) && rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION))
+    if(!force && !rrd_flag_is_updated(rm) && rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION) && !rrd_flag_check(rm, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
         return;
 
     if(worker_jobs)
         worker_is_busy(WORKER_JOB_PP_METRIC);
 
-    if(reason == RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) {
+    if(reason & RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD) {
         rrd_flag_set_archived(rm);
         rrd_flag_set(rm, RRD_FLAG_UPDATE_REASON_DISCONNECTED_CHILD);
     }
+    if(rrd_flag_is_deleted(rm) && (reason & RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
+        rrd_flag_set_archived(rm);
 
     rrdmetric_update_retention(rm);
 
@@ -3285,7 +3306,11 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         dfe_start_read((DICTIONARY *)ri->rrdmetrics, rm) {
             if(unlikely(netdata_exit)) break;
 
-            rrdmetric_process_updates(rm, force, reason, worker_jobs);
+            RRD_FLAGS reason_to_pass = reason;
+            if(rrd_flag_check(ri, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
+                reason_to_pass |= RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION;
+
+            rrdmetric_process_updates(rm, force, reason_to_pass, worker_jobs);
 
             if(unlikely(!rrd_flag_check(rm, RRD_FLAG_LIVE_RETENTION)))
                 live_retention = false;
@@ -3388,7 +3413,11 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
         dfe_start_reentrant(rc->rrdinstances, ri) {
             if(unlikely(netdata_exit)) break;
 
-            rrdinstance_post_process_updates(ri, force, reason, worker_jobs);
+            RRD_FLAGS reason_to_pass = reason;
+            if(rrd_flag_check(rc, RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION))
+                reason_to_pass |= RRD_FLAG_UPDATE_REASON_UPDATE_RETENTION;
+
+            rrdinstance_post_process_updates(ri, force, reason_to_pass, worker_jobs);
 
             if(unlikely(hidden && !rrd_flag_check(ri, RRD_FLAG_HIDDEN)))
                 hidden = false;
@@ -3499,7 +3528,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
         if (min_priority != LONG_MAX && rc->priority != min_priority) {
             rc->priority = min_priority;
-            rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_PRIORITY);
+            rrd_flag_set_updated(rc, RRD_FLAG_UPDATE_REASON_CHANGED_METADATA);
         }
     }
 
@@ -3518,7 +3547,7 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 static void rrdcontext_queue_for_post_processing(RRDCONTEXT *rc, const char *function __maybe_unused, RRD_FLAGS flags __maybe_unused) {
     if(unlikely(!rc->rrdhost->rrdctx_post_processing_queue)) return;
 
-    if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_POST_PROCESSING)) {
+    if(!rrd_flag_check(rc, RRD_FLAG_QUEUED_FOR_PP)) {
         dictionary_set((DICTIONARY *)rc->rrdhost->rrdctx_post_processing_queue,
                        string2str(rc->id),
                        rc,

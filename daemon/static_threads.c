@@ -2,16 +2,17 @@
 
 #include "common.h"
 
-extern void *aclk_main(void *ptr);
-extern void *analytics_main(void *ptr);
-extern void *checks_main(void *ptr);
-extern void *cpuidlejitter_main(void *ptr);
-extern void *global_statistics_main(void *ptr);
-extern void *health_main(void *ptr);
-extern void *pluginsd_main(void *ptr);
-extern void *service_main(void *ptr);
-extern void *statsd_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *aclk_main(void *ptr);
+void *analytics_main(void *ptr);
+void *cpuidlejitter_main(void *ptr);
+void *global_statistics_main(void *ptr);
+void *global_statistics_workers_main(void *ptr);
+void *health_main(void *ptr);
+void *pluginsd_main(void *ptr);
+void *service_main(void *ptr);
+void *statsd_main(void *ptr);
+void *timex_main(void *ptr);
+void *replication_thread_main(void *ptr __maybe_unused);
 
 extern bool global_statistics_enabled;
 
@@ -24,15 +25,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = timex_main
-    },
-    {
-        .name = "PLUGIN[check]",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "checks",
-        .enabled = 0,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = checks_main
     },
     {
         .name = "PLUGIN[idlejitter]",
@@ -62,6 +54,17 @@ const struct netdata_static_thread static_threads_common[] = {
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
+    },
+    {
+        .name = "WORKERS_STATS",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = global_statistics_workers_main
     },
     {
         .name = "PLUGINSD",
@@ -131,13 +134,23 @@ const struct netdata_static_thread static_threads_common[] = {
 #endif
 
     {
-        .name = "rrdcontext",
+        .name = "RRDCONTEXT",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = rrdcontext_main
+    },
+
+    {
+            .name = "REPLICATION",
+            .config_section = NULL,
+            .config_name = NULL,
+            .enabled = 1,
+            .thread = NULL,
+            .init_routine = NULL,
+            .start_routine = replication_thread_main
     },
 
     // terminator

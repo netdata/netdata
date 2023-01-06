@@ -4,6 +4,7 @@
 #include "buildinfo.h"
 #include "static_threads.h"
 
+bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
@@ -310,7 +311,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -321,7 +322,8 @@ int help(int exitcode) {
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
             " Twitter    : https://twitter.com/linuxnetdata\n"
-            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
+            " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
             "\n"
     );
@@ -677,7 +679,7 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
+    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_YES);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
@@ -749,7 +751,7 @@ static void get_netdata_configured_variables() {
     // get various system parameters
 
     get_system_HZ();
-    get_system_cpus();
+    get_system_cpus_uncached();
     get_system_pid_max();
 
 
@@ -981,6 +983,8 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
+                            unittest_running = true;
+
                             if (unit_test_static_threads())
                                 return 1;
                             if (unit_test_buffer())
@@ -1020,31 +1024,36 @@ int main(int argc, char **argv) {
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
-#ifdef ENABLE_ML_TESTS
-                        else if(strcmp(optarg, "mltest") == 0) {
-                            return test_ml(argc, argv);
+                        else if(strcmp(optarg, "escapetest") == 0) {
+                            return command_argument_sanitization_tests();
                         }
-#endif
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
+                            unittest_running = true;
                             return mc_unittest();
                         }
                         else if(strcmp(optarg, "ctxtest") == 0) {
+                            unittest_running = true;
                             return ctx_unittest();
                         }
                         else if(strcmp(optarg, "dicttest") == 0) {
+                            unittest_running = true;
                             return dictionary_unittest(10000);
                         }
                         else if(strcmp(optarg, "araltest") == 0) {
+                            unittest_running = true;
                             return aral_unittest(10000);
                         }
                         else if(strcmp(optarg, "stringtest") == 0) {
+                            unittest_running = true;
                             return string_unittest(10000);
                         }
                         else if(strcmp(optarg, "rrdlabelstest") == 0) {
+                            unittest_running = true;
                             return rrdlabels_unittest();
                         }
                         else if(strcmp(optarg, "metatest") == 0) {
+                            unittest_running = true;
                             return metadata_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {

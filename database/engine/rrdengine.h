@@ -41,6 +41,7 @@ struct rrdeng_collect_handle {
     unsigned long page_correlation_id;
     // set to 1 when this dimension is not page aligned with the other dimensions in the chart
     uint8_t unaligned_page;
+    struct pg_alignment *alignment;
 };
 
 struct rrdeng_query_handle {
@@ -117,6 +118,7 @@ struct extent_io_descriptor {
     unsigned descr_count;
     int release_descr;
     struct rrdeng_page_descr *descr_array[MAX_PAGES_PER_EXTENT];
+    struct rrdeng_page_descr descr_read_array[MAX_PAGES_PER_EXTENT];
     Word_t descr_commit_idx_array[MAX_PAGES_PER_EXTENT];
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
 };

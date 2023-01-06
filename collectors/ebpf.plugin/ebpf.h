@@ -123,6 +123,9 @@ enum ebpf_threads_status {
 #endif
 #endif
 
+// Messages
+#define NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND "Cannot find the necessary functions to monitor"
+
 // Chart definitions
 #define NETDATA_EBPF_FAMILY "ebpf"
 #define NETDATA_EBPF_IP_FAMILY "ip"
@@ -168,6 +171,7 @@ void *ebpf_socket_thread(void *ptr);
 
 // Common variables
 extern pthread_mutex_t lock;
+extern pthread_mutex_t ebpf_exit_cleanup;
 extern int ebpf_nprocs;
 extern int running_on_kernel;
 extern int isrh;

@@ -347,8 +347,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                         cur_dstat.busy_time_ms = dstat[i].busy_time.sec * 1000 + dstat[i].busy_time.frac * BINTIME_SCALE;
 
-                        // --------------------------------------------------------------------
-
                         if(dm->do_io == CONFIG_BOOLEAN_YES || (dm->do_io == CONFIG_BOOLEAN_AUTO &&
                                                                (dstat[i].bytes[DEVSTAT_READ] ||
                                                                 dstat[i].bytes[DEVSTAT_WRITE] ||
@@ -375,16 +373,13 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                            RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_io_free = rrddim_add(dm->st_io, "frees", NULL, -1, KILO_FACTOR,
                                                            RRD_ALGORITHM_INCREMENTAL);
-                            } else
-                                rrdset_next(dm->st_io);
+                            }
 
                             rrddim_set_by_pointer(dm->st_io, dm->rd_io_in,   dstat[i].bytes[DEVSTAT_READ]);
                             rrddim_set_by_pointer(dm->st_io, dm->rd_io_out,  dstat[i].bytes[DEVSTAT_WRITE]);
                             rrddim_set_by_pointer(dm->st_io, dm->rd_io_free, dstat[i].bytes[DEVSTAT_FREE]);
                             rrdset_done(dm->st_io);
                         }
-
-                        // --------------------------------------------------------------------
 
                         if(dm->do_ops == CONFIG_BOOLEAN_YES || (dm->do_ops == CONFIG_BOOLEAN_AUTO &&
                                                                 (dstat[i].operations[DEVSTAT_READ] ||
@@ -417,8 +412,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                              RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_ops_free = rrddim_add(dm->st_ops, "frees",  NULL, -1, 1,
                                                              RRD_ALGORITHM_INCREMENTAL);
-                            } else
-                                rrdset_next(dm->st_ops);
+                            }
 
                             rrddim_set_by_pointer(dm->st_ops, dm->rd_ops_in,    dstat[i].operations[DEVSTAT_READ]);
                             rrddim_set_by_pointer(dm->st_ops, dm->rd_ops_out,   dstat[i].operations[DEVSTAT_WRITE]);
@@ -426,8 +420,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrddim_set_by_pointer(dm->st_ops, dm->rd_ops_free,  dstat[i].operations[DEVSTAT_FREE]);
                             rrdset_done(dm->st_ops);
                         }
-
-                        // --------------------------------------------------------------------
 
                         if(dm->do_qops == CONFIG_BOOLEAN_YES || (dm->do_qops == CONFIG_BOOLEAN_AUTO &&
                                                                  (dstat[i].start_count ||
@@ -451,14 +443,11 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 rrdset_flag_set(dm->st_qops, RRDSET_FLAG_DETAIL);
 
                                 dm->rd_qops = rrddim_add(dm->st_qops, "operations", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                            } else
-                                rrdset_next(dm->st_qops);
+                            }
 
                             rrddim_set_by_pointer(dm->st_qops, dm->rd_qops, dstat[i].start_count - dstat[i].end_count);
                             rrdset_done(dm->st_qops);
                         }
-
-                        // --------------------------------------------------------------------
 
                         if(dm->do_util == CONFIG_BOOLEAN_YES || (dm->do_util == CONFIG_BOOLEAN_AUTO &&
                                                                  (cur_dstat.busy_time_ms ||
@@ -482,14 +471,11 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                 dm->rd_util = rrddim_add(dm->st_util, "utilization", NULL, 1, 10,
                                                          RRD_ALGORITHM_INCREMENTAL);
-                            } else
-                                rrdset_next(dm->st_util);
+                            }
 
                             rrddim_set_by_pointer(dm->st_util, dm->rd_util, cur_dstat.busy_time_ms);
                             rrdset_done(dm->st_util);
                         }
-
-                        // --------------------------------------------------------------------
 
                         if(dm->do_iotime == CONFIG_BOOLEAN_YES || (dm->do_iotime == CONFIG_BOOLEAN_AUTO &&
                                                                    (cur_dstat.duration_read_ms ||
@@ -522,8 +508,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                 RRD_ALGORITHM_INCREMENTAL);
                                 dm->rd_iotime_free  = rrddim_add(dm->st_iotime, "frees",  NULL, -1, 1,
                                                                 RRD_ALGORITHM_INCREMENTAL);
-                            } else
-                                rrdset_next(dm->st_iotime);
+                            }
 
                             rrddim_set_by_pointer(dm->st_iotime, dm->rd_iotime_in,    cur_dstat.duration_read_ms);
                             rrddim_set_by_pointer(dm->st_iotime, dm->rd_iotime_out,   cur_dstat.duration_write_ms);
@@ -532,14 +517,10 @@ int do_kern_devstat(int update_every, usec_t dt) {
                             rrdset_done(dm->st_iotime);
                         }
 
-                        // --------------------------------------------------------------------
                         // calculate differential charts
                         // only if this is not the first time we run
 
                         if (likely(dt)) {
-
-                            // --------------------------------------------------------------------
-
                             if(dm->do_await == CONFIG_BOOLEAN_YES || (dm->do_await == CONFIG_BOOLEAN_AUTO &&
                                                                       (dstat[i].operations[DEVSTAT_READ] ||
                                                                        dstat[i].operations[DEVSTAT_WRITE] ||
@@ -571,8 +552,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                   RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_await_free  = rrddim_add(dm->st_await, "frees",  NULL, -1, 1,
                                                                   RRD_ALGORITHM_ABSOLUTE);
-                                } else
-                                    rrdset_next(dm->st_await);
+                                }
 
                                 rrddim_set_by_pointer(dm->st_await, dm->rd_await_in,
                                                       (dstat[i].operations[DEVSTAT_READ] -
@@ -605,8 +585,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                 rrdset_done(dm->st_await);
                             }
 
-                            // --------------------------------------------------------------------
-
                             if(dm->do_avagsz == CONFIG_BOOLEAN_YES || (dm->do_avagsz == CONFIG_BOOLEAN_AUTO &&
                                                                        (dstat[i].operations[DEVSTAT_READ] ||
                                                                         dstat[i].operations[DEVSTAT_WRITE] ||
@@ -635,8 +613,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                                      RRD_ALGORITHM_ABSOLUTE);
                                     dm->rd_avagsz_free  = rrddim_add(dm->st_avagsz, "frees",  NULL, -1, KILO_FACTOR,
                                                                      RRD_ALGORITHM_ABSOLUTE);
-                                } else
-                                    rrdset_next(dm->st_avagsz);
+                                }
 
                                 rrddim_set_by_pointer(dm->st_avagsz, dm->rd_avagsz_in,
                                                       (dstat[i].operations[DEVSTAT_READ] -
@@ -661,8 +638,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                       0);
                                 rrdset_done(dm->st_avagsz);
                             }
-
-                            // --------------------------------------------------------------------
 
                             if(dm->do_svctm == CONFIG_BOOLEAN_YES || (dm->do_svctm == CONFIG_BOOLEAN_AUTO &&
                                                                       (dstat[i].operations[DEVSTAT_READ] ||
@@ -689,8 +664,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                                     dm->rd_svctm = rrddim_add(dm->st_svctm, "svctm", NULL, 1, 1,
                                                               RRD_ALGORITHM_ABSOLUTE);
-                                } else
-                                    rrdset_next(dm->st_svctm);
+                                }
 
                                 rrddim_set_by_pointer(dm->st_svctm, dm->rd_svctm,
                                                       ((dstat[i].operations[DEVSTAT_READ] - dm->prev_dstat.operations_read) +
@@ -705,8 +679,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                                                       0);
                                 rrdset_done(dm->st_svctm);
                             }
-
-                            // --------------------------------------------------------------------
 
                             dm->prev_dstat.bytes_read        = dstat[i].bytes[DEVSTAT_READ];
                             dm->prev_dstat.bytes_write       = dstat[i].bytes[DEVSTAT_WRITE];
@@ -723,8 +695,6 @@ int do_kern_devstat(int update_every, usec_t dt) {
                         }
                     }
                 }
-
-                // --------------------------------------------------------------------
 
                 if (likely(do_system_io)) {
                     static RRDSET *st = NULL;
@@ -747,8 +717,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
                         rd_in  = rrddim_add(st, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                         rd_out = rrddim_add(st, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    } else
-                        rrdset_next(st);
+                    }
 
                     rrddim_set_by_pointer(st, rd_in,  total_disk_kbytes_read);
                     rrddim_set_by_pointer(st, rd_out, total_disk_kbytes_write);
@@ -756,6 +725,7 @@ int do_kern_devstat(int update_every, usec_t dt) {
                 }
             }
         }
+
         if (unlikely(common_error)) {
             do_system_io = 0;
             error("DISABLED: system.io chart");

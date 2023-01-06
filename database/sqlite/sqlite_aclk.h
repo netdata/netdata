@@ -67,7 +67,7 @@ static inline void uuid_unparse_lower_fix(uuid_t *uuid, char *out)
 }
 
 #define TABLE_ACLK_ALERT "CREATE TABLE IF NOT EXISTS aclk_alert_%s (sequence_id INTEGER PRIMARY KEY, " \
-        "alert_unique_id, date_created, date_submitted, date_cloud_ack, " \
+        "alert_unique_id, date_created, date_submitted, date_cloud_ack, filtered_alert_unique_id NOT NULL, " \
         "unique(alert_unique_id));"
 
 #define INDEX_ACLK_ALERT "CREATE INDEX IF NOT EXISTS aclk_alert_index_%s ON aclk_alert_%s (alert_unique_id);"

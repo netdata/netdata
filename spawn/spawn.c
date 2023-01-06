@@ -8,7 +8,7 @@ int spawn_thread_shutdown;
 
 struct spawn_queue spawn_cmd_queue;
 
-static struct spawn_cmd_info *create_spawn_cmd(char *command_to_run)
+static struct spawn_cmd_info *create_spawn_cmd(const char *command_to_run)
 {
     struct spawn_cmd_info *cmdinfo;
 
@@ -57,7 +57,7 @@ static void init_spawn_cmd_queue(void)
 /*
  * Returns serial number of the enqueued command
  */
-uint64_t spawn_enq_cmd(char *command_to_run)
+uint64_t spawn_enq_cmd(const char *command_to_run)
 {
     unsigned queue_size;
     uint64_t serial;

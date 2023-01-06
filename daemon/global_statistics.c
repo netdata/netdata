@@ -12,44 +12,55 @@
 #define WORKER_JOB_STRINGS            5
 #define WORKER_JOB_DICTIONARIES       6
 #define WORKER_JOB_MALLOC_TRACE       7
+#define WORKER_JOB_SQLITE3            8
 
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 8
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
+#if WORKER_UTILIZATION_MAX_JOB_TYPES < 9
+#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 9
 #endif
 
 bool global_statistics_enabled = true;
 
 static struct global_statistics {
-    volatile uint16_t connected_clients;
+    uint16_t connected_clients;
 
-    volatile uint64_t web_requests;
-    volatile uint64_t web_usec;
-    volatile uint64_t web_usec_max;
-    volatile uint64_t bytes_received;
-    volatile uint64_t bytes_sent;
-    volatile uint64_t content_size;
-    volatile uint64_t compressed_content_size;
+    uint64_t web_requests;
+    uint64_t web_usec;
+    uint64_t web_usec_max;
+    uint64_t bytes_received;
+    uint64_t bytes_sent;
+    uint64_t content_size;
+    uint64_t compressed_content_size;
 
-    volatile uint64_t web_client_count;
+    uint64_t web_client_count;
 
-    volatile uint64_t rrdr_queries_made;
-    volatile uint64_t rrdr_db_points_read;
-    volatile uint64_t rrdr_result_points_generated;
+    uint64_t api_data_queries_made;
+    uint64_t api_data_db_points_read;
+    uint64_t api_data_result_points_generated;
 
-    volatile uint64_t sqlite3_queries_made;
-    volatile uint64_t sqlite3_queries_ok;
-    volatile uint64_t sqlite3_queries_failed;
-    volatile uint64_t sqlite3_queries_failed_busy;
-    volatile uint64_t sqlite3_queries_failed_locked;
-    volatile uint64_t sqlite3_rows;
-    volatile uint64_t sqlite3_metadata_cache_hit;
-    volatile uint64_t sqlite3_context_cache_hit;
-    volatile uint64_t sqlite3_metadata_cache_miss;
-    volatile uint64_t sqlite3_context_cache_miss;
-    volatile uint64_t sqlite3_metadata_cache_spill;
-    volatile uint64_t sqlite3_context_cache_spill;
-    volatile uint64_t sqlite3_metadata_cache_write;
-    volatile uint64_t sqlite3_context_cache_write;
+    uint64_t api_weights_queries_made;
+    uint64_t api_weights_db_points_read;
+    uint64_t api_weights_result_points_generated;
+
+    uint64_t api_badges_queries_made;
+    uint64_t api_badges_db_points_read;
+    uint64_t api_badges_result_points_generated;
+
+    uint64_t health_queries_made;
+    uint64_t health_db_points_read;
+    uint64_t health_result_points_generated;
+
+    uint64_t ml_queries_made;
+    uint64_t ml_db_points_read;
+    uint64_t ml_result_points_generated;
+    uint64_t ml_models_consulted;
+
+    uint64_t exporters_queries_made;
+    uint64_t exporters_db_points_read;
+
+    uint64_t backfill_queries_made;
+    uint64_t backfill_db_points_read;
+
+    uint64_t db_points_stored_per_tier[RRD_STORAGE_TIERS];
 
 } global_statistics = {
         .connected_clients = 0,
@@ -61,43 +72,81 @@ static struct global_statistics {
         .compressed_content_size = 0,
         .web_client_count = 1,
 
-        .rrdr_queries_made = 0,
-        .rrdr_db_points_read = 0,
-        .rrdr_result_points_generated = 0,
+        .api_data_queries_made = 0,
+        .api_data_db_points_read = 0,
+        .api_data_result_points_generated = 0,
 };
 
-void sqlite3_query_completed(bool success, bool busy, bool locked) {
-    __atomic_fetch_add(&global_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
-
-    if(success) {
-        __atomic_fetch_add(&global_statistics.sqlite3_queries_ok, 1, __ATOMIC_RELAXED);
-    }
-    else {
-        __atomic_fetch_add(&global_statistics.sqlite3_queries_failed, 1, __ATOMIC_RELAXED);
-
-        if(busy)
-            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_busy, 1, __ATOMIC_RELAXED);
-
-        if(locked)
-            __atomic_fetch_add(&global_statistics.sqlite3_queries_failed_locked, 1, __ATOMIC_RELAXED);
+void global_statistics_rrdset_done_chart_collection_completed(size_t *points_read_per_tier_array) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        __atomic_fetch_add(&global_statistics.db_points_stored_per_tier[tier], points_read_per_tier_array[tier], __ATOMIC_RELAXED);
+        points_read_per_tier_array[tier] = 0;
     }
 }
 
-void sqlite3_row_completed(void) {
-    __atomic_fetch_add(&global_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
+void global_statistics_ml_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.ml_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.ml_db_points_read, points_read, __ATOMIC_RELAXED);
 }
 
-void rrdr_query_completed(uint64_t db_points_read, uint64_t result_points_generated) {
-    __atomic_fetch_add(&global_statistics.rrdr_queries_made, 1, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&global_statistics.rrdr_db_points_read, db_points_read, __ATOMIC_RELAXED);
-    __atomic_fetch_add(&global_statistics.rrdr_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+void global_statistics_ml_models_consulted(size_t models_consulted) {
+    __atomic_fetch_add(&global_statistics.ml_models_consulted, models_consulted, __ATOMIC_RELAXED);
 }
 
-void finished_web_request_statistics(uint64_t dt,
-                                     uint64_t bytes_received,
-                                     uint64_t bytes_sent,
-                                     uint64_t content_size,
-                                     uint64_t compressed_content_size) {
+void global_statistics_exporters_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.exporters_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.exporters_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_backfill_query_completed(size_t points_read) {
+    __atomic_fetch_add(&global_statistics.backfill_queries_made, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&global_statistics.backfill_db_points_read, points_read, __ATOMIC_RELAXED);
+}
+
+void global_statistics_rrdr_query_completed(size_t queries, uint64_t db_points_read, uint64_t result_points_generated, QUERY_SOURCE query_source) {
+    switch(query_source) {
+        case QUERY_SOURCE_API_DATA:
+            __atomic_fetch_add(&global_statistics.api_data_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_data_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_data_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_ML:
+            __atomic_fetch_add(&global_statistics.ml_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.ml_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.ml_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_API_WEIGHTS:
+            __atomic_fetch_add(&global_statistics.api_weights_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_weights_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_weights_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_API_BADGE:
+            __atomic_fetch_add(&global_statistics.api_badges_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_badges_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.api_badges_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        case QUERY_SOURCE_HEALTH:
+            __atomic_fetch_add(&global_statistics.health_queries_made, queries, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.health_db_points_read, db_points_read, __ATOMIC_RELAXED);
+            __atomic_fetch_add(&global_statistics.health_result_points_generated, result_points_generated, __ATOMIC_RELAXED);
+            break;
+
+        default:
+        case QUERY_SOURCE_UNITTEST:
+        case QUERY_SOURCE_UNKNOWN:
+            break;
+    }
+}
+
+void global_statistics_web_request_completed(uint64_t dt,
+                                             uint64_t bytes_received,
+                                             uint64_t bytes_sent,
+                                             uint64_t content_size,
+                                             uint64_t compressed_content_size) {
     uint64_t old_web_usec_max = global_statistics.web_usec_max;
     while(dt > old_web_usec_max)
         __atomic_compare_exchange(&global_statistics.web_usec_max, &old_web_usec_max, &dt, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
@@ -110,15 +159,14 @@ void finished_web_request_statistics(uint64_t dt,
     __atomic_fetch_add(&global_statistics.compressed_content_size, compressed_content_size, __ATOMIC_RELAXED);
 }
 
-uint64_t web_client_connected(void) {
+uint64_t global_statistics_web_client_connected(void) {
     __atomic_fetch_add(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
     return __atomic_fetch_add(&global_statistics.web_client_count, 1, __ATOMIC_RELAXED);
 }
 
-void web_client_disconnected(void) {
+void global_statistics_web_client_disconnected(void) {
     __atomic_fetch_sub(&global_statistics.connected_clients, 1, __ATOMIC_RELAXED);
 }
-
 
 static inline void global_statistics_copy(struct global_statistics *gs, uint8_t options) {
     gs->connected_clients            = __atomic_load_n(&global_statistics.connected_clients, __ATOMIC_RELAXED);
@@ -131,33 +179,39 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     gs->compressed_content_size      = __atomic_load_n(&global_statistics.compressed_content_size, __ATOMIC_RELAXED);
     gs->web_client_count             = __atomic_load_n(&global_statistics.web_client_count, __ATOMIC_RELAXED);
 
-    gs->rrdr_queries_made            = __atomic_load_n(&global_statistics.rrdr_queries_made, __ATOMIC_RELAXED);
-    gs->rrdr_db_points_read          = __atomic_load_n(&global_statistics.rrdr_db_points_read, __ATOMIC_RELAXED);
-    gs->rrdr_result_points_generated = __atomic_load_n(&global_statistics.rrdr_result_points_generated, __ATOMIC_RELAXED);
+    gs->api_data_queries_made            = __atomic_load_n(&global_statistics.api_data_queries_made, __ATOMIC_RELAXED);
+    gs->api_data_db_points_read          = __atomic_load_n(&global_statistics.api_data_db_points_read, __ATOMIC_RELAXED);
+    gs->api_data_result_points_generated = __atomic_load_n(&global_statistics.api_data_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->api_weights_queries_made            = __atomic_load_n(&global_statistics.api_weights_queries_made, __ATOMIC_RELAXED);
+    gs->api_weights_db_points_read          = __atomic_load_n(&global_statistics.api_weights_db_points_read, __ATOMIC_RELAXED);
+    gs->api_weights_result_points_generated = __atomic_load_n(&global_statistics.api_weights_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->api_badges_queries_made            = __atomic_load_n(&global_statistics.api_badges_queries_made, __ATOMIC_RELAXED);
+    gs->api_badges_db_points_read          = __atomic_load_n(&global_statistics.api_badges_db_points_read, __ATOMIC_RELAXED);
+    gs->api_badges_result_points_generated = __atomic_load_n(&global_statistics.api_badges_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->health_queries_made            = __atomic_load_n(&global_statistics.health_queries_made, __ATOMIC_RELAXED);
+    gs->health_db_points_read          = __atomic_load_n(&global_statistics.health_db_points_read, __ATOMIC_RELAXED);
+    gs->health_result_points_generated = __atomic_load_n(&global_statistics.health_result_points_generated, __ATOMIC_RELAXED);
+
+    gs->ml_queries_made              = __atomic_load_n(&global_statistics.ml_queries_made, __ATOMIC_RELAXED);
+    gs->ml_db_points_read            = __atomic_load_n(&global_statistics.ml_db_points_read, __ATOMIC_RELAXED);
+    gs->ml_result_points_generated   = __atomic_load_n(&global_statistics.ml_result_points_generated, __ATOMIC_RELAXED);
+    gs->ml_models_consulted          = __atomic_load_n(&global_statistics.ml_models_consulted, __ATOMIC_RELAXED);
+
+    gs->exporters_queries_made       = __atomic_load_n(&global_statistics.exporters_queries_made, __ATOMIC_RELAXED);
+    gs->exporters_db_points_read     = __atomic_load_n(&global_statistics.exporters_db_points_read, __ATOMIC_RELAXED);
+    gs->backfill_queries_made       = __atomic_load_n(&global_statistics.backfill_queries_made, __ATOMIC_RELAXED);
+    gs->backfill_db_points_read     = __atomic_load_n(&global_statistics.backfill_db_points_read, __ATOMIC_RELAXED);
+
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        gs->db_points_stored_per_tier[tier] = __atomic_load_n(&global_statistics.db_points_stored_per_tier[tier], __ATOMIC_RELAXED);
 
     if(options & GLOBAL_STATS_RESET_WEB_USEC_MAX) {
         uint64_t n = 0;
         __atomic_compare_exchange(&global_statistics.web_usec_max, (uint64_t *) &gs->web_usec_max, &n, 1, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
     }
-
-    gs->sqlite3_queries_made          = __atomic_load_n(&global_statistics.sqlite3_queries_made, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_ok            = __atomic_load_n(&global_statistics.sqlite3_queries_ok, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed        = __atomic_load_n(&global_statistics.sqlite3_queries_failed, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed_busy   = __atomic_load_n(&global_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
-    gs->sqlite3_queries_failed_locked = __atomic_load_n(&global_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
-    gs->sqlite3_rows                  = __atomic_load_n(&global_statistics.sqlite3_rows, __ATOMIC_RELAXED);
-
-    gs->sqlite3_metadata_cache_hit  = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-    gs->sqlite3_context_cache_hit   = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
-
-    gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-    gs->sqlite3_context_cache_miss  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
-
-    gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
-    gs->sqlite3_context_cache_spill  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
-
-    gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
-    gs->sqlite3_context_cache_write  = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
 }
 
 static void global_statistics_charts(void) {
@@ -177,6 +231,7 @@ static void global_statistics_charts(void) {
     struct global_statistics gs;
     struct rusage me;
 
+    struct replication_query_statistics replication = replication_get_query_statistics();
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
     getrusage(RUSAGE_SELF, &me);
 
@@ -206,8 +261,6 @@ static void global_statistics_charts(void) {
             rd_cpu_user   = rrddim_add(st_cpu, "user",   NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
             rd_cpu_system = rrddim_add(st_cpu, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_cpu);
 
         rrddim_set_by_pointer(st_cpu, rd_cpu_user,   me.ru_utime.tv_sec * 1000000ULL + me.ru_utime.tv_usec);
         rrddim_set_by_pointer(st_cpu, rd_cpu_system, me.ru_stime.tv_sec * 1000000ULL + me.ru_stime.tv_usec);
@@ -236,8 +289,7 @@ static void global_statistics_charts(void) {
                 RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        } else
-            rrdset_next(st_uptime);
+        }
 
         rrddim_set_by_pointer(st_uptime, rd_uptime, netdata_uptime);
         rrdset_done(st_uptime);
@@ -267,8 +319,6 @@ static void global_statistics_charts(void) {
 
             rd_clients = rrddim_add(st_clients, "clients", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_clients);
 
         rrddim_set_by_pointer(st_clients, rd_clients, gs.connected_clients);
         rrdset_done(st_clients);
@@ -298,8 +348,6 @@ static void global_statistics_charts(void) {
 
             rd_requests = rrddim_add(st_reqs, "requests", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_reqs);
 
         rrddim_set_by_pointer(st_reqs, rd_requests, (collected_number) gs.web_requests);
         rrdset_done(st_reqs);
@@ -331,8 +379,6 @@ static void global_statistics_charts(void) {
             rd_in  = rrddim_add(st_bytes, "in",  NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_bytes, "out", NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_bytes);
 
         rrddim_set_by_pointer(st_bytes, rd_in, (collected_number) gs.bytes_received);
         rrddim_set_by_pointer(st_bytes, rd_out, (collected_number) gs.bytes_sent);
@@ -365,8 +411,6 @@ static void global_statistics_charts(void) {
             rd_average = rrddim_add(st_duration, "average", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
             rd_max = rrddim_add(st_duration, "max", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_duration);
 
         uint64_t gweb_usec = gs.web_usec;
         uint64_t gweb_requests = gs.web_requests;
@@ -413,8 +457,6 @@ static void global_statistics_charts(void) {
 
             rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_compression);
 
         // since we don't lock here to read the global statistics
         // read the smaller value first
@@ -438,72 +480,336 @@ static void global_statistics_charts(void) {
 
     // ----------------------------------------------------------------
 
-    if(gs.rrdr_queries_made) {
-        static RRDSET *st_rrdr_queries = NULL;
-        static RRDDIM *rd_queries = NULL;
+    {
+        static RRDSET *st_queries = NULL;
+        static RRDDIM *rd_api_data_queries = NULL;
+        static RRDDIM *rd_api_weights_queries = NULL;
+        static RRDDIM *rd_api_badges_queries = NULL;
+        static RRDDIM *rd_health_queries = NULL;
+        static RRDDIM *rd_ml_queries = NULL;
+        static RRDDIM *rd_exporters_queries = NULL;
+        static RRDDIM *rd_backfill_queries = NULL;
+        static RRDDIM *rd_replication_queries = NULL;
 
-        if (unlikely(!st_rrdr_queries)) {
-            st_rrdr_queries = rrdset_create_localhost(
+        if (unlikely(!st_queries)) {
+            st_queries = rrdset_create_localhost(
                     "netdata"
                     , "queries"
                     , NULL
                     , "queries"
                     , NULL
-                    , "Netdata API Queries"
+                    , "Netdata DB Queries"
                     , "queries/s"
                     , "netdata"
                     , "stats"
                     , 131000
                     , localhost->rrd_update_every
-                    , RRDSET_TYPE_LINE
+                    , RRDSET_TYPE_STACKED
             );
 
-            rd_queries = rrddim_add(st_rrdr_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_data_queries = rrddim_add(st_queries, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_queries = rrddim_add(st_queries, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_queries = rrddim_add(st_queries, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_queries = rrddim_add(st_queries, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_queries = rrddim_add(st_queries, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_exporters_queries = rrddim_add(st_queries, "exporters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_backfill_queries = rrddim_add(st_queries, "backfill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_queries = rrddim_add(st_queries, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_rrdr_queries);
 
-        rrddim_set_by_pointer(st_rrdr_queries, rd_queries, (collected_number)gs.rrdr_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_data_queries, (collected_number)gs.api_data_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_weights_queries, (collected_number)gs.api_weights_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_api_badges_queries, (collected_number)gs.api_badges_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_health_queries, (collected_number)gs.health_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_ml_queries, (collected_number)gs.ml_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_exporters_queries, (collected_number)gs.exporters_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_backfill_queries, (collected_number)gs.backfill_queries_made);
+        rrddim_set_by_pointer(st_queries, rd_replication_queries, (collected_number)replication.queries_finished);
 
-        rrdset_done(st_rrdr_queries);
+        rrdset_done(st_queries);
     }
 
     // ----------------------------------------------------------------
 
-    if(gs.rrdr_db_points_read || gs.rrdr_result_points_generated) {
-        static RRDSET *st_rrdr_points = NULL;
-        static RRDDIM *rd_points_read = NULL;
-        static RRDDIM *rd_points_generated = NULL;
+    {
+        static RRDSET *st_points_read = NULL;
+        static RRDDIM *rd_api_data_points_read = NULL;
+        static RRDDIM *rd_api_weights_points_read = NULL;
+        static RRDDIM *rd_api_badges_points_read = NULL;
+        static RRDDIM *rd_health_points_read = NULL;
+        static RRDDIM *rd_ml_points_read = NULL;
+        static RRDDIM *rd_exporters_points_read = NULL;
+        static RRDDIM *rd_backfill_points_read = NULL;
+        static RRDDIM *rd_replication_points_read = NULL;
 
-        if (unlikely(!st_rrdr_points)) {
-            st_rrdr_points = rrdset_create_localhost(
+        if (unlikely(!st_points_read)) {
+            st_points_read = rrdset_create_localhost(
                     "netdata"
-                    , "db_points"
+                    , "db_points_read"
                     , NULL
                     , "queries"
                     , NULL
-                    , "Netdata API Points"
+                    , "Netdata DB Points Query Read"
                     , "points/s"
                     , "netdata"
                     , "stats"
                     , 131001
                     , localhost->rrd_update_every
-                    , RRDSET_TYPE_AREA
+                    , RRDSET_TYPE_STACKED
             );
 
-            rd_points_read = rrddim_add(st_rrdr_points, "read", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_points_generated = rrddim_add(st_rrdr_points, "generated", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_data_points_read = rrddim_add(st_points_read, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_points_read = rrddim_add(st_points_read, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_points_read = rrddim_add(st_points_read, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_points_read = rrddim_add(st_points_read, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_points_read = rrddim_add(st_points_read, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_exporters_points_read = rrddim_add(st_points_read, "exporters", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_backfill_points_read = rrddim_add(st_points_read, "backfill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_points_read = rrddim_add(st_points_read, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_rrdr_points);
 
-        rrddim_set_by_pointer(st_rrdr_points, rd_points_read, (collected_number)gs.rrdr_db_points_read);
-        rrddim_set_by_pointer(st_rrdr_points, rd_points_generated, (collected_number)gs.rrdr_result_points_generated);
+        rrddim_set_by_pointer(st_points_read, rd_api_data_points_read, (collected_number)gs.api_data_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_api_weights_points_read, (collected_number)gs.api_weights_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_api_badges_points_read, (collected_number)gs.api_badges_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_health_points_read, (collected_number)gs.health_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_ml_points_read, (collected_number)gs.ml_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_exporters_points_read, (collected_number)gs.exporters_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_backfill_points_read, (collected_number)gs.backfill_db_points_read);
+        rrddim_set_by_pointer(st_points_read, rd_replication_points_read, (collected_number)replication.points_read);
 
-        rrdset_done(st_rrdr_points);
+        rrdset_done(st_points_read);
     }
 
     // ----------------------------------------------------------------
+
+    if(gs.api_data_result_points_generated || replication.points_generated) {
+        static RRDSET *st_points_generated = NULL;
+        static RRDDIM *rd_api_data_points_generated = NULL;
+        static RRDDIM *rd_api_weights_points_generated = NULL;
+        static RRDDIM *rd_api_badges_points_generated = NULL;
+        static RRDDIM *rd_health_points_generated = NULL;
+        static RRDDIM *rd_ml_points_generated = NULL;
+        static RRDDIM *rd_replication_points_generated = NULL;
+
+        if (unlikely(!st_points_generated)) {
+            st_points_generated = rrdset_create_localhost(
+                    "netdata"
+                    , "db_points_results"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "Netdata Points in Query Results"
+                    , "points/s"
+                    , "netdata"
+                    , "stats"
+                    , 131002
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            rd_api_data_points_generated = rrddim_add(st_points_generated, "/api/v1/data", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_weights_points_generated = rrddim_add(st_points_generated, "/api/v1/weights", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_api_badges_points_generated = rrddim_add(st_points_generated, "/api/v1/badge", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_health_points_generated = rrddim_add(st_points_generated, "health", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_ml_points_generated = rrddim_add(st_points_generated, "ml", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_replication_points_generated = rrddim_add(st_points_generated, "replication", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st_points_generated, rd_api_data_points_generated, (collected_number)gs.api_data_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_api_weights_points_generated, (collected_number)gs.api_weights_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_api_badges_points_generated, (collected_number)gs.api_badges_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_health_points_generated, (collected_number)gs.health_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_ml_points_generated, (collected_number)gs.ml_result_points_generated);
+        rrddim_set_by_pointer(st_points_generated, rd_replication_points_generated, (collected_number)replication.points_generated);
+
+        rrdset_done(st_points_generated);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
+        static RRDSET *st_points_stored = NULL;
+        static RRDDIM *rds[RRD_STORAGE_TIERS] = {};
+
+        if (unlikely(!st_points_stored)) {
+            st_points_stored = rrdset_create_localhost(
+                    "netdata"
+                    , "db_points_stored"
+                    , NULL
+                    , "queries"
+                    , NULL
+                    , "Netdata DB Points Stored"
+                    , "points/s"
+                    , "netdata"
+                    , "stats"
+                    , 131003
+                    , localhost->rrd_update_every
+                    , RRDSET_TYPE_STACKED
+            );
+
+            for(size_t tier = 0; tier < storage_tiers ;tier++) {
+                char buf[30 + 1];
+                snprintfz(buf, 30, "tier%zu", tier);
+                rds[tier] = rrddim_add(st_points_stored, buf, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+        }
+
+        for(size_t tier = 0; tier < storage_tiers ;tier++)
+            rrddim_set_by_pointer(st_points_stored, rds[tier], (collected_number)gs.db_points_stored_per_tier[tier]);
+
+        rrdset_done(st_points_stored);
+    }
+
+    {
+        static RRDSET *st = NULL;
+        static RRDDIM *rd = NULL;
+
+        if (unlikely(!st)) {
+            st = rrdset_create_localhost(
+                    "netdata" // type
+                    , "ml_models_consulted" // id
+                    , NULL // name
+                    , "ml" // family
+                    , NULL // context
+                    , "KMeans models used for prediction" // title
+                    , "models" // units
+                    , "netdata" // plugin
+                    , "ml" // module
+                    , 131004 // priority
+                    , localhost->rrd_update_every // update_every
+                    , RRDSET_TYPE_STACKED // chart_type
+            );
+
+            rd = rrddim_add(st, "num_models_consulted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+
+        rrddim_set_by_pointer(st, rd, (collected_number) gs.ml_models_consulted);
+
+        rrdset_done(st);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// sqlite3 statistics
+
+struct sqlite3_statistics {
+    uint64_t sqlite3_queries_made;
+    uint64_t sqlite3_queries_ok;
+    uint64_t sqlite3_queries_failed;
+    uint64_t sqlite3_queries_failed_busy;
+    uint64_t sqlite3_queries_failed_locked;
+    uint64_t sqlite3_rows;
+    uint64_t sqlite3_metadata_cache_hit;
+    uint64_t sqlite3_context_cache_hit;
+    uint64_t sqlite3_metadata_cache_miss;
+    uint64_t sqlite3_context_cache_miss;
+    uint64_t sqlite3_metadata_cache_spill;
+    uint64_t sqlite3_context_cache_spill;
+    uint64_t sqlite3_metadata_cache_write;
+    uint64_t sqlite3_context_cache_write;
+
+} sqlite3_statistics = { };
+
+void global_statistics_sqlite3_query_completed(bool success, bool busy, bool locked) {
+    __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_made, 1, __ATOMIC_RELAXED);
+
+    if(success) {
+        __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_ok, 1, __ATOMIC_RELAXED);
+    }
+    else {
+        __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed, 1, __ATOMIC_RELAXED);
+
+        if(busy)
+            __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed_busy, 1, __ATOMIC_RELAXED);
+
+        if(locked)
+            __atomic_fetch_add(&sqlite3_statistics.sqlite3_queries_failed_locked, 1, __ATOMIC_RELAXED);
+    }
+}
+
+void global_statistics_sqlite3_row_completed(void) {
+    __atomic_fetch_add(&sqlite3_statistics.sqlite3_rows, 1, __ATOMIC_RELAXED);
+}
+
+static inline void sqlite3_statistics_copy(struct sqlite3_statistics *gs) {
+    static usec_t last_run = 0;
+
+    gs->sqlite3_queries_made          = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_made, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_ok            = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_ok, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed        = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_busy   = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_busy, __ATOMIC_RELAXED);
+    gs->sqlite3_queries_failed_locked = __atomic_load_n(&sqlite3_statistics.sqlite3_queries_failed_locked, __ATOMIC_RELAXED);
+    gs->sqlite3_rows                  = __atomic_load_n(&sqlite3_statistics.sqlite3_rows, __ATOMIC_RELAXED);
+
+    usec_t timeout = default_rrd_update_every * USEC_PER_SEC + default_rrd_update_every * USEC_PER_SEC / 3;
+    usec_t now = now_monotonic_usec();
+    if(!last_run)
+        last_run = now;
+    usec_t delta = now - last_run;
+    bool query_sqlite3 = delta < timeout;
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_hit = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    else {
+        gs->sqlite3_metadata_cache_hit = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_hit = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_HIT);
+    else {
+        gs->sqlite3_context_cache_hit = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_miss = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    else {
+        gs->sqlite3_metadata_cache_miss = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_miss = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_MISS);
+    else {
+        gs->sqlite3_context_cache_miss = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_spill = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+    else {
+        gs->sqlite3_metadata_cache_spill = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_spill = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_SPILL);
+    else {
+        gs->sqlite3_context_cache_spill = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_metadata_cache_write = (uint64_t) sql_metadata_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+    else {
+        gs->sqlite3_metadata_cache_write = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    if(query_sqlite3 && now_monotonic_usec() - last_run < timeout)
+        gs->sqlite3_context_cache_write = (uint64_t) sql_context_cache_stats(SQLITE_DBSTATUS_CACHE_WRITE);
+    else {
+        gs->sqlite3_context_cache_write = UINT64_MAX;
+        query_sqlite3 = false;
+    }
+
+    last_run = now_monotonic_usec();
+}
+
+static void sqlite3_statistics_charts(void) {
+    struct sqlite3_statistics gs;
+    sqlite3_statistics_copy(&gs);
 
     if(gs.sqlite3_queries_made) {
         static RRDSET *st_sqlite3_queries = NULL;
@@ -527,8 +833,6 @@ static void global_statistics_charts(void) {
 
             rd_queries = rrddim_add(st_sqlite3_queries, "queries", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_queries);
 
         rrddim_set_by_pointer(st_sqlite3_queries, rd_queries, (collected_number)gs.sqlite3_queries_made);
 
@@ -562,8 +866,6 @@ static void global_statistics_charts(void) {
             rd_busy   = rrddim_add(st_sqlite3_queries_by_status, "busy",   NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_locked = rrddim_add(st_sqlite3_queries_by_status, "locked", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_queries_by_status);
 
         rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_ok,     (collected_number)gs.sqlite3_queries_made);
         rrddim_set_by_pointer(st_sqlite3_queries_by_status, rd_failed, (collected_number)gs.sqlite3_queries_failed);
@@ -597,8 +899,6 @@ static void global_statistics_charts(void) {
 
             rd_rows = rrddim_add(st_sqlite3_rows, "ok", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_rows);
 
         rrddim_set_by_pointer(st_sqlite3_rows, rd_rows, (collected_number)gs.sqlite3_rows);
 
@@ -633,13 +933,18 @@ static void global_statistics_charts(void) {
             rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_cache);
 
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_metadata_cache_spill);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_metadata_cache_write);
+        if(gs.sqlite3_metadata_cache_hit != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_metadata_cache_hit);
+
+        if(gs.sqlite3_metadata_cache_miss != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_metadata_cache_miss);
+
+        if(gs.sqlite3_metadata_cache_spill != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_metadata_cache_spill);
+
+        if(gs.sqlite3_metadata_cache_write != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_metadata_cache_write);
 
         rrdset_done(st_sqlite3_cache);
     }
@@ -672,13 +977,18 @@ static void global_statistics_charts(void) {
             rd_cache_spill = rrddim_add(st_sqlite3_cache, "cache_spill", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_cache_write = rrddim_add(st_sqlite3_cache, "cache_write", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_sqlite3_cache);
 
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_context_cache_spill);
-        rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_context_cache_write);
+        if(gs.sqlite3_context_cache_hit != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_hit, (collected_number)gs.sqlite3_context_cache_hit);
+
+        if(gs.sqlite3_context_cache_miss != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_miss, (collected_number)gs.sqlite3_context_cache_miss);
+
+        if(gs.sqlite3_context_cache_spill != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_spill, (collected_number)gs.sqlite3_context_cache_spill);
+
+        if(gs.sqlite3_context_cache_write != UINT64_MAX)
+            rrddim_set_by_pointer(st_sqlite3_cache, rd_cache_write, (collected_number)gs.sqlite3_context_cache_write);
 
         rrdset_done(st_sqlite3_cache);
     }
@@ -750,8 +1060,7 @@ static void dbengine_statistics_charts(void) {
                         RRDSET_TYPE_LINE);
 
                     rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_compression);
+                }
 
                 unsigned long long ratio;
                 unsigned long long compressed_content_size = stats_array[12];
@@ -790,8 +1099,7 @@ static void dbengine_statistics_charts(void) {
                         RRDSET_TYPE_LINE);
 
                     rd_hit_ratio = rrddim_add(st_pg_cache_hit_ratio, "ratio", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_pg_cache_hit_ratio);
+                }
 
                 static unsigned long long old_hits = 0;
                 static unsigned long long old_misses = 0;
@@ -849,8 +1157,7 @@ static void dbengine_statistics_charts(void) {
                     rd_evictions = rrddim_add(st_pg_cache_pages, "evictions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_used_by_collectors =
                         rrddim_add(st_pg_cache_pages, "used_by_collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_pg_cache_pages);
+                }
 
                 rrddim_set_by_pointer(st_pg_cache_pages, rd_descriptors, (collected_number)stats_array[27]);
                 rrddim_set_by_pointer(st_pg_cache_pages, rd_populated, (collected_number)stats_array[3]);
@@ -890,8 +1197,7 @@ static void dbengine_statistics_charts(void) {
                     rd_deletions = rrddim_add(st_long_term_pages, "deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_flushing_pressure_deletions = rrddim_add(
                         st_long_term_pages, "flushing_pressure_deletions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_long_term_pages);
+                }
 
                 rrddim_set_by_pointer(st_long_term_pages, rd_total, (collected_number)stats_array[2]);
                 rrddim_set_by_pointer(st_long_term_pages, rd_insertions, (collected_number)stats_array[5]);
@@ -925,8 +1231,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_io_stats);
+                }
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[17]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[15]);
@@ -957,8 +1262,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_io_stats);
+                }
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
@@ -992,8 +1296,7 @@ static void dbengine_statistics_charts(void) {
                     rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     pg_cache_over_half_dirty_events =
                         rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st_errors);
+                }
 
                 rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
                 rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
@@ -1025,8 +1328,7 @@ static void dbengine_statistics_charts(void) {
 
                     rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_fd);
+                }
 
                 rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
                 /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
@@ -1067,8 +1369,7 @@ static void dbengine_statistics_charts(void) {
                     rd_cache_metadata = rrddim_add(st_ram_usage, "cache metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                     rd_pages_metadata = rrddim_add(st_ram_usage, "pages metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
                     rd_index_metadata = rrddim_add(st_ram_usage, "index metadata", NULL, 1, 1024*1024, RRD_ALGORITHM_ABSOLUTE);
-                } else
-                    rrdset_next(st_ram_usage);
+                }
 
                 API_producers = (collected_number)stats_array[0];
                 pages_on_disk = (collected_number)stats_array[2];
@@ -1124,8 +1425,7 @@ static void update_strings_charts() {
         rd_ops_searches     = rrddim_add(st_ops, "searches",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_duplications = rrddim_add(st_ops, "duplications", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         rd_ops_releases     = rrddim_add(st_ops, "releases",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(st_ops);
+    }
 
     rrddim_set_by_pointer(st_ops, rd_ops_inserts,      (collected_number)inserts);
     rrddim_set_by_pointer(st_ops, rd_ops_deletes,      (collected_number)deletes);
@@ -1151,8 +1451,7 @@ static void update_strings_charts() {
 
         rd_entries_entries  = rrddim_add(st_entries, "entries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_entries_refs  = rrddim_add(st_entries, "references", NULL, 1, -1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_entries);
+    }
 
     rrddim_set_by_pointer(st_entries, rd_entries_entries, (collected_number)entries);
     rrddim_set_by_pointer(st_entries, rd_entries_refs, (collected_number)references);
@@ -1174,8 +1473,7 @@ static void update_strings_charts() {
             , RRDSET_TYPE_AREA);
 
         rd_mem  = rrddim_add(st_mem, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_mem);
+    }
 
     rrddim_set_by_pointer(st_mem, rd_mem, (collected_number)memory);
     rrdset_done(st_mem);
@@ -1205,8 +1503,7 @@ static void update_heartbeat_charts() {
         rd_heartbeat_min = rrddim_add(st_heartbeat, "min", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_heartbeat_max = rrddim_add(st_heartbeat, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         rd_heartbeat_avg = rrddim_add(st_heartbeat, "average", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(st_heartbeat);
+    }
 
     usec_t min, max, average;
     size_t count;
@@ -1265,6 +1562,7 @@ struct dictionary_categories {
     RRDDIM *rd_spins_use;
     RRDDIM *rd_spins_search;
     RRDDIM *rd_spins_insert;
+    RRDDIM *rd_spins_delete;
 
 } dictionary_categories[] = {
     { .stats = &dictionary_stats_category_other, "dictionaries", "dictionaries", 900000 },
@@ -1313,8 +1611,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_dicts->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_dicts);
 
         rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_active,  (collected_number)stats.dictionaries.active);
         rrddim_set_by_pointer(c->st_dicts, c->rd_dicts_deleted, (collected_number)stats.dictionaries.deleted);
@@ -1357,8 +1653,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_items->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_items);
 
         rrddim_set_by_pointer(c->st_items, c->rd_items_entries,             stats.items.entries);
         rrddim_set_by_pointer(c->st_items, c->rd_items_pending_deletion,    stats.items.pending_deletion);
@@ -1416,8 +1710,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_ops->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_ops);
 
         rrddim_set_by_pointer(c->st_ops, c->rd_ops_creations,           (collected_number)stats.ops.creations);
         rrddim_set_by_pointer(c->st_ops, c->rd_ops_destructions,        (collected_number)stats.ops.destructions);
@@ -1471,8 +1763,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_callbacks->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_callbacks);
 
         rrddim_set_by_pointer(c->st_callbacks, c->rd_callbacks_inserts, (collected_number)stats.callbacks.inserts);
         rrddim_set_by_pointer(c->st_callbacks, c->rd_callbacks_conflicts, (collected_number)stats.callbacks.conflicts);
@@ -1518,8 +1808,6 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
 
             rrdlabels_add(c->st_memory->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_memory);
 
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.indexed);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_values, (collected_number)stats.memory.values);
@@ -1531,9 +1819,10 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     total = 0;
-    load_dictionary_stats_entry(spin_locks.use);
-    load_dictionary_stats_entry(spin_locks.search);
-    load_dictionary_stats_entry(spin_locks.insert);
+    load_dictionary_stats_entry(spin_locks.use_spins);
+    load_dictionary_stats_entry(spin_locks.search_spins);
+    load_dictionary_stats_entry(spin_locks.insert_spins);
+    load_dictionary_stats_entry(spin_locks.delete_spins);
 
     if(c->st_spins || total != 0) {
         if (unlikely(!c->st_spins)) {
@@ -1561,15 +1850,15 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             c->rd_spins_use = rrddim_add(c->st_spins, "use", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             c->rd_spins_search = rrddim_add(c->st_spins, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             c->rd_spins_insert = rrddim_add(c->st_spins, "insert", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            c->rd_spins_delete = rrddim_add(c->st_spins, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
             rrdlabels_add(c->st_spins->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
-        else
-            rrdset_next(c->st_spins);
 
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_use, (collected_number)stats.spin_locks.use);
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_search, (collected_number)stats.spin_locks.search);
-        rrddim_set_by_pointer(c->st_spins, c->rd_spins_insert, (collected_number)stats.spin_locks.insert);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_use, (collected_number)stats.spin_locks.use_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_search, (collected_number)stats.spin_locks.search_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_insert, (collected_number)stats.spin_locks.insert_spins);
+        rrddim_set_by_pointer(c->st_spins, c->rd_spins_delete, (collected_number)stats.spin_locks.delete_spins);
 
         rrdset_done(c->st_spins);
     }
@@ -1653,8 +1942,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_STACKED
         );
     }
-    else
-        rrdset_next(tmp.st_memory);
 
     if(!tmp.st_ops) {
         tmp.st_ops = rrdset_create_localhost(
@@ -1672,8 +1959,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_LINE
         );
     }
-    else
-        rrdset_next(tmp.st_ops);
 
     if(!tmp.st_allocations) {
         tmp.st_allocations = rrdset_create_localhost(
@@ -1691,8 +1976,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_STACKED
         );
     }
-    else
-        rrdset_next(tmp.st_allocations);
 
     if(!tmp.st_avg_alloc) {
         tmp.st_avg_alloc = rrdset_create_localhost(
@@ -1710,8 +1993,6 @@ static void malloc_trace_statistics(void) {
             , RRDSET_TYPE_LINE
         );
     }
-    else
-        rrdset_next(tmp.st_avg_alloc);
 
     malloc_trace_walkthrough(do_memory_trace_item, &tmp);
 
@@ -1757,9 +2038,9 @@ struct worker_job_type_gs {
 
 struct worker_thread {
     pid_t pid;
-    int enabled;
+    bool enabled;
 
-    int cpu_enabled;
+    bool cpu_enabled;
     double cpu;
 
     kernel_uint_t utime;
@@ -1775,6 +2056,7 @@ struct worker_thread {
     usec_t busy_time;
 
     struct worker_thread *next;
+    struct worker_thread *prev;
 };
 
 struct worker_utilization {
@@ -1787,6 +2069,7 @@ struct worker_utilization {
 
     struct worker_job_type_gs per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
+    size_t workers_max_job_id;
     size_t workers_registered;
     size_t workers_busy;
     usec_t workers_total_busy_time;
@@ -1848,6 +2131,7 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "TIMEX",       .family = "workers plugin timex",            .priority = 1000000 },
     { .name = "IDLEJITTER",  .family = "workers plugin idlejitter",       .priority = 1000000 },
     { .name = "RRDCONTEXT",  .family = "workers contexts",                .priority = 1000000 },
+    { .name = "REPLICATION", .family = "workers replication sender",      .priority = 1000000 },
     { .name = "SERVICE",     .family = "workers service",                 .priority = 1000000 },
 
     // has to be terminated with a NULL
@@ -1878,8 +2162,6 @@ static void workers_total_cpu_utilization_chart(void) {
             localhost->rrd_update_every,
             RRDSET_TYPE_STACKED);
     }
-
-    rrdset_next(st);
 
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
@@ -1941,8 +2223,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
     if(unlikely(!wu->rd_workers_time_avg))
         wu->rd_workers_time_avg = rrddim_add(wu->st_workers_time, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-    rrdset_next(wu->st_workers_time);
-
     if(unlikely(wu->workers_min_busy_time == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_min_busy_time = 0.0;
 
     if(wu->rd_workers_time_min)
@@ -1994,8 +2274,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         if(unlikely(!wu->rd_workers_cpu_avg))
             wu->rd_workers_cpu_avg = rrddim_add(wu->st_workers_cpu, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
 
-        rrdset_next(wu->st_workers_cpu);
-
         if(unlikely(wu->workers_cpu_min == WORKERS_MIN_PERCENT_DEFAULT)) wu->workers_cpu_min = 0.0;
 
         if(wu->rd_workers_cpu_min)
@@ -2038,11 +2316,9 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         );
     }
 
-    rrdset_next(wu->st_workers_jobs_per_job_type);
-
     {
         size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        for(i = 0; i <= wu->workers_max_job_id ;i++) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
@@ -2083,11 +2359,9 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
         );
     }
 
-    rrdset_next(wu->st_workers_busy_per_job_type);
-
     {
         size_t i;
-        for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        for(i = 0; i <= wu->workers_max_job_id ;i++) {
             if(unlikely(wu->per_job_type[i].type != WORKER_METRIC_IDLE_BUSY))
                 continue;
 
@@ -2131,8 +2405,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
             wu->rd_workers_threads_free = rrddim_add(wu->st_workers_threads, "free", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             wu->rd_workers_threads_busy = rrddim_add(wu->st_workers_threads, "busy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(wu->st_workers_threads);
 
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, (collected_number)(wu->workers_registered - wu->workers_busy));
         rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, (collected_number)(wu->workers_busy));
@@ -2144,7 +2416,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+        for (i = 0; i <= wu->workers_max_job_id; i++) {
             if(wu->per_job_type[i].type != WORKER_METRIC_ABSOLUTE)
                 continue;
 
@@ -2165,7 +2437,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.value.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+                snprintf(title, 1000, "Netdata Workers %s value of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -2177,7 +2449,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"value"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5
+                    , wu->priority + 5 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                     );
@@ -2186,8 +2458,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
                 wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(wu->per_job_type[i].st);
 
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));
@@ -2202,8 +2472,8 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
 
     {
         size_t i;
-        for (i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
-            if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL)
+        for (i = 0; i <= wu->workers_max_job_id ; i++) {
+            if(wu->per_job_type[i].type != WORKER_METRIC_INCREMENT && wu->per_job_type[i].type != WORKER_METRIC_INCREMENTAL_TOTAL)
                 continue;
 
             if(!wu->per_job_type[i].count_value)
@@ -2223,7 +2493,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 snprintf(context, RRD_ID_LENGTH_MAX, "netdata.workers.%s.rate.%s", wu->name_lowercase, job_name_sanitized);
 
                 char title[1000 + 1];
-                snprintf(title, 1000, "Netdata Workers %s Rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
+                snprintf(title, 1000, "Netdata Workers %s rate of %s", wu->name_lowercase, string2str(wu->per_job_type[i].name));
 
                 wu->per_job_type[i].st = rrdset_create_localhost(
                     "netdata"
@@ -2235,7 +2505,7 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                     , (wu->per_job_type[i].units)?string2str(wu->per_job_type[i].units):"rate"
                     , "netdata"
                     , "stats"
-                    , wu->priority + 5
+                    , wu->priority + 5 + i
                     , localhost->rrd_update_every
                     , RRDSET_TYPE_LINE
                 );
@@ -2244,8 +2514,6 @@ static void workers_utilization_update_chart(struct worker_utilization *wu) {
                 wu->per_job_type[i].rd_max = rrddim_add(wu->per_job_type[i].st, "max", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
                 wu->per_job_type[i].rd_avg = rrddim_add(wu->per_job_type[i].st, "average", NULL, 1, WORKER_CHART_DECIMAL_PRECISION, RRD_ALGORITHM_ABSOLUTE);
             }
-            else
-                rrdset_next(wu->per_job_type[i].st);
 
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_min, (collected_number)(wu->per_job_type[i].min_value * WORKER_CHART_DECIMAL_PRECISION));
             rrddim_set_by_pointer(wu->per_job_type[i].st, wu->per_job_type[i].rd_max, (collected_number)(wu->per_job_type[i].max_value * WORKER_CHART_DECIMAL_PRECISION));
@@ -2289,26 +2557,42 @@ static void workers_utilization_reset_statistics(struct worker_utilization *wu) 
 
     struct worker_thread *wt;
     for(wt = wu->threads; wt ; wt = wt->next) {
-        wt->enabled = 0;
-        wt->cpu_enabled = 0;
+        wt->enabled = false;
+        wt->cpu_enabled = false;
     }
 }
 
+#define TASK_STAT_PREFIX "/proc/self/task/"
+#define TASK_STAT_SUFFIX "/stat"
+
 static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_uint_t *utime __maybe_unused, kernel_uint_t *stime __maybe_unused) {
 #ifdef __linux__
-    char filename[200 + 1];
-    snprintfz(filename, 200, "/proc/self/task/%d/stat", pid);
+    static char filename[sizeof(TASK_STAT_PREFIX) + sizeof(TASK_STAT_SUFFIX) + 20] = TASK_STAT_PREFIX;
+    static size_t start_pos = sizeof(TASK_STAT_PREFIX) - 1;
+    static procfile *ff = NULL;
 
-    procfile *ff = procfile_open(filename, " ", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-    if(!ff) return -1;
+    // construct the filename
+    size_t end_pos = snprintfz(&filename[start_pos], 20, "%d", pid);
+    strcpy(&filename[start_pos + end_pos], TASK_STAT_SUFFIX);
 
+    // (re)open the procfile to the new filename
+    bool set_quotes = (ff == NULL) ? true : false;
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    if(unlikely(!ff)) return -1;
+
+    if(set_quotes)
+        procfile_set_open_close(ff, "(", ")");
+
+    // read the entire file and split it to lines and words
     ff = procfile_readall(ff);
-    if(!ff) return -1;
+    if(unlikely(!ff)) return -1;
 
+    // parse the numbers we are interested
     *utime = str2kernel_uint_t(procfile_lineword(ff, 0, 13));
     *stime = str2kernel_uint_t(procfile_lineword(ff, 0, 14));
 
-    procfile_close(ff);
+    // leave the file open for the next iteration
+
     return 0;
 #else
     // TODO: add here cpu time detection per thread, for FreeBSD and MacOS
@@ -2318,31 +2602,29 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 #endif
 }
 
+static Pvoid_t workers_by_pid_JudyL_array = NULL;
+
 static void workers_threads_cleanup(struct worker_utilization *wu) {
-    struct worker_thread *t;
+    struct worker_thread *t = wu->threads;
+    while(t) {
+        struct worker_thread *next = t->next;
 
-    // free threads at the beginning of the linked list
-    while(wu->threads && !wu->threads->enabled) {
-        t = wu->threads;
-        wu->threads = t->next;
-        t->next = NULL;
-        freez(t);
+        if(!t->enabled) {
+            JudyLDel(&workers_by_pid_JudyL_array, t->pid, PJE0);
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wu->threads, t, prev, next);
+            freez(t);
+        }
+        t = next;
     }
+ }
 
-    // free threads in the middle of the linked list
-    for(t = wu->threads; t && t->next ; t = t->next) {
-        if(t->next->enabled) continue;
+static struct worker_thread *worker_thread_find(struct worker_utilization *wu __maybe_unused, pid_t pid) {
+    struct worker_thread *wt = NULL;
 
-        struct worker_thread *to_remove = t->next;
-        t->next = to_remove->next;
-        to_remove->next = NULL;
-        freez(to_remove);
-    }
-}
+    Pvoid_t *PValue = JudyLGet(workers_by_pid_JudyL_array, pid, PJE0);
+    if(PValue)
+        wt = *PValue;
 
-static struct worker_thread *worker_thread_find(struct worker_utilization *wu, pid_t pid) {
-    struct worker_thread *wt;
-    for(wt = wu->threads; wt && wt->pid != pid ; wt = wt->next) ;
     return wt;
 }
 
@@ -2352,9 +2634,11 @@ static struct worker_thread *worker_thread_create(struct worker_utilization *wu,
     wt = (struct worker_thread *)callocz(1, sizeof(struct worker_thread));
     wt->pid = pid;
 
+    Pvoid_t *PValue = JudyLIns(&workers_by_pid_JudyL_array, pid, PJE0);
+    *PValue = wt;
+
     // link it
-    wt->next = wu->threads;
-    wu->threads = wt;
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wu->threads, wt, prev, next);
 
     return wt;
 }
@@ -2370,6 +2654,7 @@ static struct worker_thread *worker_thread_find_or_create(struct worker_utilizat
 static void worker_utilization_charts_callback(void *ptr
                                                , pid_t pid __maybe_unused
                                                , const char *thread_tag __maybe_unused
+                                               , size_t max_job_id __maybe_unused
                                                , size_t utilization_usec __maybe_unused
                                                , size_t duration_usec __maybe_unused
                                                , size_t jobs_started __maybe_unused
@@ -2386,13 +2671,16 @@ static void worker_utilization_charts_callback(void *ptr
     // find the worker_thread in the list
     struct worker_thread *wt = worker_thread_find_or_create(wu, pid);
 
-    wt->enabled = 1;
+    wt->enabled = true;
     wt->busy_time = utilization_usec;
     wt->jobs_started = jobs_started;
 
     wt->utime_old = wt->utime;
     wt->stime_old = wt->stime;
     wt->collected_time_old = wt->collected_time;
+
+    if(max_job_id > wu->workers_max_job_id)
+        wu->workers_max_job_id = max_job_id;
 
     wu->workers_total_busy_time += utilization_usec;
     wu->workers_total_duration += duration_usec;
@@ -2409,7 +2697,7 @@ static void worker_utilization_charts_callback(void *ptr
 
     // accumulate per job type statistics
     size_t i;
-    for(i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+    for(i = 0; i <= max_job_id ;i++) {
         if(!wu->per_job_type[i].name && job_types_names[i])
             wu->per_job_type[i].name = string_dup(job_types_names[i]);
 
@@ -2447,29 +2735,33 @@ static void worker_utilization_charts_callback(void *ptr
         double stime = (double)(wt->stime - wt->stime_old) / (double)system_hz * 100.0 * (double)USEC_PER_SEC / (double)delta;
         double cpu = utime + stime;
         wt->cpu = cpu;
-        wt->cpu_enabled = 1;
+        wt->cpu_enabled = true;
 
         wu->workers_cpu_total += cpu;
         if(cpu < wu->workers_cpu_min) wu->workers_cpu_min = cpu;
         if(cpu > wu->workers_cpu_max) wu->workers_cpu_max = cpu;
     }
-    wu->workers_cpu_registered += wt->cpu_enabled;
+    wu->workers_cpu_registered += (wt->cpu_enabled) ? 1 : 0;
 }
 
 static void worker_utilization_charts(void) {
     static size_t iterations = 0;
     iterations++;
 
-    int i;
-    for(i = 0; all_workers_utilization[i].name ;i++) {
+    for(int i = 0; all_workers_utilization[i].name ;i++) {
         workers_utilization_reset_statistics(&all_workers_utilization[i]);
+
+        netdata_thread_disable_cancelability();
         workers_foreach(all_workers_utilization[i].name, worker_utilization_charts_callback, &all_workers_utilization[i]);
+        netdata_thread_enable_cancelability();
 
         // skip the first iteration, so that we don't accumulate startup utilization to our charts
         if(likely(iterations > 1))
             workers_utilization_update_chart(&all_workers_utilization[i]);
 
+        netdata_thread_disable_cancelability();
         workers_threads_cleanup(&all_workers_utilization[i]);
+        netdata_thread_enable_cancelability();
     }
 
     workers_total_cpu_utilization_chart();
@@ -2495,7 +2787,8 @@ static void worker_utilization_finish(void) {
 
         // mark all threads as not enabled
         struct worker_thread *t;
-        for(t = wu->threads; t ; t = t->next) t->enabled = 0;
+        for(t = wu->threads; t ; t = t->next)
+            t->enabled = false;
 
         // let the cleanup job free them
         workers_threads_cleanup(wu);
@@ -2503,6 +2796,20 @@ static void worker_utilization_finish(void) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// global statistics thread
+
+
+static void global_statistics_register_workers(void) {
+    worker_register("STATS");
+    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
+    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
+    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
+    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
+    worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
+    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
+    worker_register_job_name(WORKER_JOB_SQLITE3, "sqlite3");
+}
 
 static void global_statistics_cleanup(void *ptr)
 {
@@ -2513,21 +2820,12 @@ static void global_statistics_cleanup(void *ptr)
 
     info("cleaning up...");
 
-    worker_utilization_finish();
-
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
 void *global_statistics_main(void *ptr)
 {
-    worker_register("STATS");
-    worker_register_job_name(WORKER_JOB_GLOBAL, "global");
-    worker_register_job_name(WORKER_JOB_REGISTRY, "registry");
-    worker_register_job_name(WORKER_JOB_WORKERS, "workers");
-    worker_register_job_name(WORKER_JOB_DBENGINE, "dbengine");
-    worker_register_job_name(WORKER_JOB_STRINGS, "strings");
-    worker_register_job_name(WORKER_JOB_DICTIONARIES, "dictionaries");
-    worker_register_job_name(WORKER_JOB_MALLOC_TRACE, "malloc_trace");
+    global_statistics_register_workers();
 
     netdata_thread_cleanup_push(global_statistics_cleanup, ptr);
 
@@ -2548,11 +2846,11 @@ void *global_statistics_main(void *ptr)
         worker_is_idle();
         heartbeat_next(&hb, step);
 
-        worker_is_busy(WORKER_JOB_WORKERS);
-        worker_utilization_charts();
-
         worker_is_busy(WORKER_JOB_GLOBAL);
         global_statistics_charts();
+
+        worker_is_busy(WORKER_JOB_SQLITE3);
+        sqlite3_statistics_charts();
 
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
@@ -2580,3 +2878,49 @@ void *global_statistics_main(void *ptr)
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
+
+
+// ---------------------------------------------------------------------------------------------------------------------
+// workers thread
+
+static void global_statistics_workers_cleanup(void *ptr)
+{
+    worker_unregister();
+
+    struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    info("cleaning up...");
+
+    worker_utilization_finish();
+
+    static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
+}
+
+void *global_statistics_workers_main(void *ptr)
+{
+    global_statistics_register_workers();
+
+    netdata_thread_cleanup_push(global_statistics_workers_cleanup, ptr);
+
+            int update_every =
+                    (int)config_get_number(CONFIG_SECTION_GLOBAL_STATISTICS, "update every", localhost->rrd_update_every);
+            if (update_every < localhost->rrd_update_every)
+                update_every = localhost->rrd_update_every;
+
+            usec_t step = update_every * USEC_PER_SEC;
+            heartbeat_t hb;
+            heartbeat_init(&hb);
+
+            while (!netdata_exit) {
+                worker_is_idle();
+                heartbeat_next(&hb, step);
+
+                worker_is_busy(WORKER_JOB_WORKERS);
+                worker_utilization_charts();
+            }
+
+    netdata_thread_cleanup_pop(1);
+    return NULL;
+}
+

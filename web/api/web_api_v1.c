@@ -610,7 +610,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *group_time_str = NULL;
     char *points_str = NULL;
     char *timeout_str = NULL;
-    char *max_anomaly_rates_str = NULL;
     char *context = NULL;
     char *chart_label_key = NULL;
     char *chart_labels_filter = NULL;
@@ -695,9 +694,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
                     outFileName = tqx_value;
             }
         }
-        else if(!strcmp(name, "max_anomaly_rates")) {
-            max_anomaly_rates_str = value;
-        }
         else if(!strcmp(name, "tier")) {
             tier = str2ul(value);
             if(tier < storage_tiers)
@@ -717,6 +713,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
 
     RRDSET *st = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
+    QUERY_TARGET *qt = NULL;
 
     if(!is_valid_sp(chart) && !is_valid_sp(context)) {
         buffer_sprintf(w->response.data, "No chart or context is given.");
@@ -734,7 +731,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     int       points = (points_str && *points_str)?str2i(points_str):0;
     int       timeout = (timeout_str && *timeout_str)?str2i(timeout_str): 0;
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
-    int       max_anomaly_rates = (max_anomaly_rates_str && *max_anomaly_rates_str) ? str2i(max_anomaly_rates_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
             .after = after,
@@ -746,7 +742,6 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .charts = chart,
             .dimensions = (dimensions)?buffer_tostring(dimensions):NULL,
             .timeout = timeout,
-            .max_anomaly_rates = max_anomaly_rates,
             .points = points,
             .format = format,
             .options = options,
@@ -756,8 +751,9 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .tier = tier,
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
+            .query_source = QUERY_SOURCE_API_DATA,
     };
-    QUERY_TARGET *qt = query_target_create(&qtr);
+    qt = query_target_create(&qtr);
 
     if(!qt || !qt->query.used) {
         buffer_sprintf(w->response.data, "No metrics where matched to query.");
@@ -828,6 +824,10 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         buffer_strcat(w->response.data, ");");
 
 cleanup:
+    if(qt && qt->used) {
+        internal_error(true, "QUERY_TARGET: left non-released on query '%s'", qt->id);
+        query_target_release(qt);
+    }
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;
@@ -1227,7 +1227,7 @@ inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 #ifdef  ENABLE_COMPRESSION
     if(host->sender){
         buffer_strcat(wb, "\t\"stream-compression\": ");
-        buffer_strcat(wb, (host->sender->flags & SENDER_FLAG_COMPRESSION) ? "true" : "false");
+        buffer_strcat(wb, stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) ? "true" : "false");
         buffer_strcat(wb, ",\n");
     }else{
         buffer_strcat(wb, "\t\"stream-compression\": null,\n");

@@ -256,7 +256,7 @@ static int send_bin_msg(struct aclk_query_thread *query_thr, aclk_query_t query)
     return 0;
 }
 
-const char *aclk_query_get_name(aclk_query_type_t qt)
+const char *aclk_query_get_name(aclk_query_type_t qt, int unknown_ok)
 {
     switch (qt) {
         case HTTP_API_V2:          return "http_api_request_v2";
@@ -273,7 +273,8 @@ const char *aclk_query_get_name(aclk_query_type_t qt)
         case UPDATE_NODE_COLLECTORS: return "update_node_collectors";
         case PROTO_BIN_MESSAGE:    return "generic_binary_proto_message";
         default:
-            error_report("Unknown query type used %d", (int) qt);
+            if (!unknown_ok)
+                error_report("Unknown query type used %d", (int) qt);
             return "unknown";
     }
 }
@@ -322,7 +323,7 @@ int aclk_query_process_msgs(struct aclk_query_thread *query_thr)
 static void worker_aclk_register(void) {
     worker_register("ACLKQUERY");
     for (int i = 1; i < ACLK_QUERY_TYPE_COUNT; i++) {
-        worker_register_job_name(i, aclk_query_get_name(i));
+        worker_register_job_name(i, aclk_query_get_name(i, 0));
     }
 }
 
@@ -358,14 +359,13 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
     query_threads->thread_list = callocz(query_threads->count, sizeof(struct aclk_query_thread));
     for (int i = 0; i < query_threads->count; i++) {
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
+        query_threads->thread_list[i].client = client;
 
         if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
             error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,
             &query_threads->thread_list[i]);
-
-        query_threads->thread_list[i].client = client;
     }
 }
 

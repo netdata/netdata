@@ -3,6 +3,8 @@
 #ifndef NETDATA_UNIT_TEST_H
 #define NETDATA_UNIT_TEST_H 1
 
+#include "stdbool.h"
+
 int unit_test_storage(void);
 int unit_test(long delay, long shift);
 int run_all_mockup_tests(void);
@@ -18,5 +20,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
                                  unsigned RAMP_UP_SECONDS, unsigned PAGE_CACHE_MB, unsigned DISK_SPACE_MB);
 
 #endif
+
+bool command_argument_sanitization_tests();
 
 #endif /* NETDATA_UNIT_TEST_H */

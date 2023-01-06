@@ -226,8 +226,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 u_long  ift_omcasts;
             } iftot = {0, 0, 0, 0, 0, 0};
 
-            // --------------------------------------------------------------------
-
             if (likely(do_bandwidth_net)) {
 
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
@@ -260,19 +258,16 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                     rd_in  = rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rd_out = rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
                 rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
                 rrdset_done(st);
             }
 
-            // --------------------------------------------------------------------
-
             if (likely(do_packets_net)) {
-
                 iftot.ift_ipackets = iftot.ift_opackets = iftot.ift_imcasts = iftot.ift_omcasts = 0;
+
                 for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                     if (ifa->ifa_addr->sa_family != AF_LINK)
                         continue;
@@ -308,8 +303,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                     rd_packets_out   = rrddim_add(st, "sent",               NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_packets_m_in  = rrddim_add(st, "multicast_received", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_packets_m_out = rrddim_add(st, "multicast_sent",     NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_packets_in,    iftot.ift_ipackets);
                 rrddim_set_by_pointer(st, rd_packets_out,   iftot.ift_opackets);
@@ -317,8 +311,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 rrddim_set_by_pointer(st, rd_packets_m_out, iftot.ift_omcasts);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_bandwidth_ipv4)) {
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
@@ -349,15 +341,12 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                     rd_in  = rrddim_add(st, "InOctets",  "received", 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rd_out = rrddim_add(st, "OutOctets", "sent",    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
                 rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             if (likely(do_bandwidth_ipv6)) {
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
@@ -388,15 +377,12 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                     rd_in  = rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rd_out = rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                } else
-                    rrdset_next(st);
+                }
 
                 rrddim_set_by_pointer(st, rd_in,  iftot.ift_ibytes);
                 rrddim_set_by_pointer(st, rd_out, iftot.ift_obytes);
                 rrdset_done(st);
             }
-
-            // --------------------------------------------------------------------
 
             network_interfaces_found = 0;
 
@@ -437,8 +423,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                 if (unlikely(!ifm->enabled))
                     continue;
 
-                // --------------------------------------------------------------------
-
                 if (ifm->do_bandwidth == CONFIG_BOOLEAN_YES || (ifm->do_bandwidth == CONFIG_BOOLEAN_AUTO &&
                                                                 (IFA_DATA(ibytes) ||
                                                                  IFA_DATA(obytes) ||
@@ -460,15 +444,12 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_bandwidth_in  = rrddim_add(ifm->st_bandwidth, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_bandwidth_out = rrddim_add(ifm->st_bandwidth, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
-                    } else
-                        rrdset_next(ifm->st_bandwidth);
+                    }
 
                     rrddim_set_by_pointer(ifm->st_bandwidth, ifm->rd_bandwidth_in,  IFA_DATA(ibytes));
                     rrddim_set_by_pointer(ifm->st_bandwidth, ifm->rd_bandwidth_out, IFA_DATA(obytes));
                     rrdset_done(ifm->st_bandwidth);
                 }
-
-                // --------------------------------------------------------------------
 
                 if (ifm->do_packets == CONFIG_BOOLEAN_YES || (ifm->do_packets == CONFIG_BOOLEAN_AUTO &&
                                                               (IFA_DATA(ipackets) ||
@@ -501,8 +482,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
                                                            RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_packets_m_out = rrddim_add(ifm->st_packets, "multicast_sent",     NULL, -1, 1,
                                                            RRD_ALGORITHM_INCREMENTAL);
-                    } else
-                        rrdset_next(ifm->st_packets);
+                    }
 
                     rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_in,    IFA_DATA(ipackets));
                     rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_out,   IFA_DATA(opackets));
@@ -510,8 +490,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
                     rrddim_set_by_pointer(ifm->st_packets, ifm->rd_packets_m_out, IFA_DATA(omcasts));
                     rrdset_done(ifm->st_packets);
                 }
-
-                // --------------------------------------------------------------------
 
                 if (ifm->do_errors == CONFIG_BOOLEAN_YES || (ifm->do_errors == CONFIG_BOOLEAN_AUTO &&
                                                              (IFA_DATA(ierrors) ||
@@ -536,14 +514,12 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_errors_in  = rrddim_add(ifm->st_errors, "inbound",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
                         ifm->rd_errors_out = rrddim_add(ifm->st_errors, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    } else
-                        rrdset_next(ifm->st_errors);
+                    }
 
                     rrddim_set_by_pointer(ifm->st_errors, ifm->rd_errors_in,  IFA_DATA(ierrors));
                     rrddim_set_by_pointer(ifm->st_errors, ifm->rd_errors_out, IFA_DATA(oerrors));
                     rrdset_done(ifm->st_errors);
                 }
-                // --------------------------------------------------------------------
 
                 if (ifm->do_drops == CONFIG_BOOLEAN_YES || (ifm->do_drops == CONFIG_BOOLEAN_AUTO &&
                                                             (IFA_DATA(iqdrops) ||
@@ -572,8 +548,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 #if __FreeBSD__ >= 11
                         ifm->rd_drops_out = rrddim_add(ifm->st_drops, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
-                    } else
-                        rrdset_next(ifm->st_drops);
+                    }
 
                     rrddim_set_by_pointer(ifm->st_drops, ifm->rd_drops_in,  IFA_DATA(iqdrops));
 #if __FreeBSD__ >= 11
@@ -581,8 +556,6 @@ int do_getifaddrs(int update_every, usec_t dt) {
 #endif
                     rrdset_done(ifm->st_drops);
                 }
-
-                // --------------------------------------------------------------------
 
                 if (ifm->do_events == CONFIG_BOOLEAN_YES || (ifm->do_events == CONFIG_BOOLEAN_AUTO &&
                                                              (IFA_DATA(collisions) ||
@@ -606,8 +579,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
 
                         ifm->rd_events_coll = rrddim_add(ifm->st_events, "collisions", NULL, -1, 1,
                                                          RRD_ALGORITHM_INCREMENTAL);
-                    } else
-                        rrdset_next(ifm->st_events);
+                    }
 
                     rrddim_set_by_pointer(ifm->st_events, ifm->rd_events_coll, IFA_DATA(collisions));
                     rrdset_done(ifm->st_events);

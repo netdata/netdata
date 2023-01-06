@@ -140,8 +140,8 @@ int rrdpush_init() {
         }
     }
 
-    netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", "/etc/ssl/certs/");
-    netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", "/etc/ssl/certs/certs.pem");
+    netdata_ssl_ca_path = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CApath", NULL);
+    netdata_ssl_ca_file = appconfig_get(&stream_config, CONFIG_SECTION_STREAM, "CAfile", NULL);
 #endif
 
     return default_rrdpush_enabled;
@@ -161,27 +161,14 @@ int rrdpush_init() {
 // this is for the first iterations of each chart
 unsigned int remote_clock_resync_iterations = 60;
 
-static inline bool should_send_chart_matching(RRDSET *st) {
-    // get all the flags we need to check, with one atomic operation
-    RRDSET_FLAGS flags = rrdset_flag_check(st,
-              RRDSET_FLAG_UPSTREAM_SEND
-            | RRDSET_FLAG_UPSTREAM_IGNORE
-            | RRDSET_FLAG_ANOMALY_RATE_CHART
-            | RRDSET_FLAG_ANOMALY_DETECTION
-            | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
-            );
-
+static inline bool should_send_chart_matching(RRDSET *st, RRDSET_FLAGS flags) {
     if(!(flags & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED))
         return false;
 
     if(unlikely(!(flags & (RRDSET_FLAG_UPSTREAM_SEND | RRDSET_FLAG_UPSTREAM_IGNORE)))) {
         RRDHOST *host = st->rrdhost;
 
-        // Do not stream anomaly rates charts.
-        if (unlikely(flags & RRDSET_FLAG_ANOMALY_RATE_CHART))
-            rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_IGNORE);
-
-        else if (flags & RRDSET_FLAG_ANOMALY_DETECTION) {
+        if (flags & RRDSET_FLAG_ANOMALY_DETECTION) {
             if(ml_streaming_enabled())
                 rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_SEND);
             else
@@ -220,8 +207,6 @@ int configured_as_parent() {
     return is_parent;
 }
 
-#define need_to_send_chart_definition(st) (!rrdset_flag_check(st, RRDSET_FLAG_UPSTREAM_EXPOSED))
-
 // chart labels
 static int send_clabels_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data) {
     BUFFER *wb = (BUFFER *)data;
@@ -238,7 +223,9 @@ static void rrdpush_send_clabels(BUFFER *wb, RRDSET *st) {
 
 // Send the current chart definition.
 // Assumes that collector thread has already called sender_start for mutex / buffer state.
-static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
+    bool replication_progress = false;
+
     RRDHOST *host = st->rrdhost;
 
     rrdset_flag_set(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
@@ -308,16 +295,59 @@ static inline void rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
     rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
 
     if (stream_has_capability(host->sender, STREAM_CAP_REPLICATION)) {
-        time_t first_entry_local = rrdset_first_entry_t(st);
+        time_t first_entry_local = rrdset_first_entry_t_of_tier(st, 0);
         time_t last_entry_local = st->last_updated.tv_sec;
-        buffer_sprintf(wb, "CHART_DEFINITION_END %ld %ld\n", first_entry_local, last_entry_local);
+
+        if(unlikely(!last_entry_local))
+            last_entry_local = rrdset_last_entry_t(st);
+
+        time_t now = now_realtime_sec();
+        if(unlikely(last_entry_local > now)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' last updated time %ld is in the future, adjusting it to now %ld",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           last_entry_local, now);
+            last_entry_local = now;
+        }
+
+        if(unlikely(first_entry_local && last_entry_local && first_entry_local >= last_entry_local)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first updated time %ld is equal or bigger than last updated time %ld, adjusting it last updated time - update every",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           first_entry_local, last_entry_local);
+            first_entry_local = last_entry_local - st->update_every;
+        }
+
+        if(unlikely(!first_entry_local && last_entry_local)) {
+            internal_error(true,
+                           "RRDSET REPLAY ERROR: 'host:%s/chart:%s' first time %ld, last time %ld, setting both to last time",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           first_entry_local, last_entry_local);
+            first_entry_local = last_entry_local;
+        }
+
+        buffer_sprintf(wb, PLUGINSD_KEYWORD_CHART_DEFINITION_END " %llu %llu %llu\n",
+                       (unsigned long long)first_entry_local,
+                       (unsigned long long)last_entry_local,
+                       (unsigned long long)now);
+
+        rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+        rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+        rrdhost_sender_replicating_charts_plus_one(st->rrdhost);
+        replication_progress = true;
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+        internal_error(true, "REPLAY: 'host:%s/chart:%s' replication starts",
+                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
     }
 
     st->upstream_resync_time = st->last_collected_time.tv_sec + (remote_clock_resync_iterations * st->update_every);
+    return replication_progress;
 }
 
 // sends the current chart dimensions
-void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) {
+static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s, RRDSET_FLAGS flags) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
@@ -342,12 +372,17 @@ void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s) 
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
-            internal_error(true, "host '%s', chart '%s', dimension '%s' flag 'exposed' is updated but not exposed", rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
+            internal_error(true, "STREAM: 'host:%s/chart:%s/dim:%s' flag 'exposed' is updated but not exposed",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(rd));
             // we will include it in the next iteration
             rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
         }
     }
     rrddim_foreach_done(rd);
+
+    if(unlikely(flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+        rrdsetvar_print_to_streaming_custom_chart_variables(st, wb);
+
     buffer_fast_strcat(wb, "END\n", 4);
 }
 
@@ -357,7 +392,8 @@ static void rrdpush_sender_thread_spawn(RRDHOST *host);
 bool rrdset_push_chart_definition_now(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
-    if(unlikely(!rrdhost_can_send_definitions_to_parent(host) || !should_send_chart_matching(st)))
+    if(unlikely(!rrdhost_can_send_definitions_to_parent(host)
+        || !should_send_chart_matching(st, __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST))))
         return false;
 
     BUFFER *wb = sender_start(host->sender);
@@ -371,16 +407,12 @@ void rrdset_done_push(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
-    RRDHOST_FLAGS host_flags = rrdhost_flag_check(host,
-              RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS
-            | RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS
-            | RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN
-        );
+    RRDHOST_FLAGS host_flags = __atomic_load_n(&host->flags, __ATOMIC_SEQ_CST);
 
     // check if we are not connected
     if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS))) {
 
-        if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN)))
+        if(unlikely(!(host_flags & (RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED))))
             rrdpush_sender_thread_spawn(host);
 
         if(unlikely(!(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS))) {
@@ -395,16 +427,21 @@ void rrdset_done_push(RRDSET *st) {
         rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS);
     }
 
-    if(unlikely(!should_send_chart_matching(st)))
+    RRDSET_FLAGS rrdset_flags = __atomic_load_n(&st->flags, __ATOMIC_SEQ_CST);
+    bool exposed_upstream = (rrdset_flags & RRDSET_FLAG_UPSTREAM_EXPOSED);
+    bool replication_in_progress = !(rrdset_flags & RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+
+    if(unlikely((exposed_upstream && replication_in_progress) ||
+                !should_send_chart_matching(st, rrdset_flags)))
         return;
 
     BUFFER *wb = sender_start(host->sender);
 
-    if(unlikely(need_to_send_chart_definition(st)))
-        rrdpush_send_chart_definition(wb, st);
+    if(unlikely(!exposed_upstream))
+        replication_in_progress = rrdpush_send_chart_definition(wb, st);
 
-    if (rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED))
-        rrdpush_send_chart_metrics(wb, st, host->sender);
+    if (likely(!replication_in_progress))
+        rrdpush_send_chart_metrics(wb, st, host->sender, rrdset_flags);
 
     sender_commit(host->sender, wb);
 }
@@ -459,20 +496,11 @@ int connect_to_one_of_destinations(
     for (struct rrdpush_destinations *d = host->destinations; d; d = d->next) {
         time_t now = now_realtime_sec();
 
-        if(d->postpone_reconnection_until > now) {
-            info(
-                "STREAM %s: skipping destination '%s' (default port: %d) due to last error (code: %d, %s), will retry it in %d seconds",
-                rrdhost_hostname(host),
-                string2str(d->destination),
-                default_port,
-                d->last_handshake, d->last_error?d->last_error:"unset reason description",
-                (int)(d->postpone_reconnection_until - now));
-
+        if(d->postpone_reconnection_until > now)
             continue;
-        }
 
         info(
-            "STREAM %s: attempting to connect to '%s' (default port: %d)...",
+            "STREAM %s: connecting to '%s' (default port: %d)...",
             rrdhost_hostname(host),
             string2str(d->destination),
             default_port);
@@ -630,7 +658,7 @@ int rrdpush_receiver_too_busy_now(struct web_client *w) {
 
 void *rrdpush_receiver_thread(void *ptr);
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
-    info("clients wants to STREAM metrics.");
+    // info("clients wants to STREAM metrics.");
 
     char *key = NULL, *hostname = NULL, *registry_hostname = NULL, *machine_guid = NULL, *os = "unknown", *timezone = "unknown", *abbrev_timezone = "UTC", *tags = NULL;
     int32_t utc_offset = 0;
@@ -729,21 +757,30 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
 
     if(regenerate_guid(key, buf) == -1) {
         rrdhost_system_info_free(system_info);
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID KEY");
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - INVALID KEY");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not valid GUID (use the command uuidgen to generate one). Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(regenerate_guid(machine_guid, buf) == -1) {
         rrdhost_system_info_free(system_info);
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - INVALID MACHINE GUID");
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - INVALID MACHINE GUID");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
+    const char *api_key_type = appconfig_get(&stream_config, key, "type", "api");
+    if(!api_key_type || !*api_key_type) api_key_type = "unknown";
+    if(strcmp(api_key_type, "api") != 0) {
+        rrdhost_system_info_free(system_info);
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - API KEY GIVEN IS NOT API KEY");
+        error("STREAM [receive from [%s]:%s]: API key '%s' is a %s GUID. Forbidding access.", w->client_ip, w->client_port, key, api_key_type);
         return rrdpush_receiver_permission_denied(w);
     }
 
     if(!appconfig_get_boolean(&stream_config, key, "enabled", 0)) {
         rrdhost_system_info_free(system_info);
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - KEY NOT ENABLED");
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - KEY NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: API key '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, key);
         return rrdpush_receiver_permission_denied(w);
     }
@@ -754,7 +791,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             if(!simple_pattern_matches(key_allow_from, w->client_ip)) {
                 simple_pattern_free(key_allow_from);
                 rrdhost_system_info_free(system_info);
-                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
+                log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - KEY NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: API key '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, key);
                 return rrdpush_receiver_permission_denied(w);
             }
@@ -762,9 +799,18 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
         }
     }
 
+    const char *machine_guid_type = appconfig_get(&stream_config, machine_guid, "type", "machine");
+    if(!machine_guid_type || !*machine_guid_type) machine_guid_type = "unknown";
+    if(strcmp(machine_guid_type, "machine") != 0) {
+        rrdhost_system_info_free(system_info);
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - MACHINE GUID GIVEN IS NOT A MACHINE GUID");
+        error("STREAM [receive from [%s]:%s]: machine GUID '%s' is a %s GUID. Forbidding access.", w->client_ip, w->client_port, machine_guid, machine_guid_type);
+        return rrdpush_receiver_permission_denied(w);
+    }
+
     if(!appconfig_get_boolean(&stream_config, machine_guid, "enabled", 1)) {
         rrdhost_system_info_free(system_info);
-        log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname)?hostname:"-", "ACCESS DENIED - MACHINE GUID NOT ENABLED");
+        log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - MACHINE GUID NOT ENABLED");
         error("STREAM [receive from [%s]:%s]: machine GUID '%s' is not allowed. Forbidding access.", w->client_ip, w->client_port, machine_guid);
         return rrdpush_receiver_permission_denied(w);
     }
@@ -775,7 +821,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             if(!simple_pattern_matches(machine_allow_from, w->client_ip)) {
                 simple_pattern_free(machine_allow_from);
                 rrdhost_system_info_free(system_info);
-                log_stream_connection(w->client_ip, w->client_port, (key && *key)?key:"-", (machine_guid && *machine_guid)?machine_guid:"-", (hostname && *hostname) ? hostname : "-", "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
+                log_stream_connection(w->client_ip, w->client_port, key, machine_guid, hostname, "ACCESS DENIED - MACHINE GUID NOT ALLOWED FROM THIS IP");
                 error("STREAM [receive from [%s]:%s]: Machine GUID '%s' is not permitted from this IP. Forbidding access.", w->client_ip, w->client_port, machine_guid);
                 return rrdpush_receiver_permission_denied(w);
             }
@@ -935,7 +981,8 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_CLABELS) buffer_strcat(wb, "CLABELS ");
     if(caps & STREAM_CAP_COMPRESSION) buffer_strcat(wb, "COMPRESSION ");
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
-    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION");
+    if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
+    if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

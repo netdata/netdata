@@ -36,7 +36,14 @@ time_t removed_when(uint32_t alarm_id, uint32_t before_unique_id, uint32_t after
     return when;
 }
 
-#define MAX_REMOVED_PERIOD 900
+void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, "UPDATE aclk_alert_%s SET filtered_alert_unique_id = %u where filtered_alert_unique_id = %u", uuid_str, ae->unique_id, unique_id);
+    sqlite3_exec_monitored(db_meta, sql, 0, 0, NULL);
+    ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
+}
+
+#define MAX_REMOVED_PERIOD 86400
 //decide if some events should be sent or not
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
 {
@@ -56,12 +63,13 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     uuid_t config_hash_id;
     RRDCALC_STATUS status;
     uint32_t unique_id;
-    
+
     //get the previous sent event of this alarm_id
+    //base the search on the last filtered event
     snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "select hl.new_status, hl.config_hash_id, hl.unique_id from health_log_%s hl, aclk_alert_%s aa \
-                         where hl.unique_id = aa.alert_unique_id        \
-                         and hl.alarm_id = %u and hl.unique_id <> %u \
-                         order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id, ae->unique_id);
+                         where hl.unique_id = aa.filtered_alert_unique_id \
+                         and hl.alarm_id = %u \
+                         order by alarm_event_id desc LIMIT 1;", uuid_str, uuid_str, ae->alarm_id);
 
     rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
@@ -93,8 +101,9 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     //same status, same config
-    if (ae->new_status == RRDCALC_STATUS_CLEAR) {
+    if (ae->new_status == RRDCALC_STATUS_CLEAR || ae->new_status == RRDCALC_STATUS_UNDEFINED) {
         send = 0;
+        update_filtered(ae, unique_id, uuid_str);
         goto done;
     }
 
@@ -107,6 +116,7 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
             goto done;
         } else {
             send = 0;
+            update_filtered(ae, unique_id, uuid_str);
             goto done;
         }
     }
@@ -130,6 +140,8 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
         return 0;
     }
 
+    CHECK_SQLITE_CONNECTION(db_meta);
+
     if (!skip_filter) {
         if (!should_send_to_cloud(host, ae)) {
             return 0;
@@ -137,9 +149,6 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     }
 
     int rc = 0;
-
-    CHECK_SQLITE_CONNECTION(db_meta);
-
     sqlite3_stmt *res_alert = NULL;
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
@@ -148,8 +157,8 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
 
     buffer_sprintf(
         sql,
-        "INSERT INTO aclk_alert_%s (alert_unique_id, date_created) "
-        "VALUES (@alert_unique_id, unixepoch()) on conflict (alert_unique_id) do nothing; ",
+        "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) "
+        "VALUES (@alert_unique_id, unixepoch(), @alert_unique_id) on conflict (alert_unique_id) do nothing; ",
         uuid_str);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_alert, 0);
@@ -401,8 +410,8 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
     BUFFER *sql = buffer_create(1024);
 
     buffer_sprintf(sql,"delete from aclk_alert_%s; " \
-                       "insert into aclk_alert_%s (alert_unique_id, date_created) " \
-                       "select unique_id alert_unique_id, unixepoch() from health_log_%s " \
+                       "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
+                       "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log_%s " \
                        "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
                        "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str, uuid_str);
 
@@ -728,8 +737,8 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created) " \
-        "select unique_id alert_unique_id, unixepoch() from health_log_%s " \
+    buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
+        "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log_%s " \
         "where new_status = -2 and updated_by_id = 0 and unique_id not in " \
         "(select alert_unique_id from aclk_alert_%s) order by unique_id asc " \
         "on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
@@ -1015,7 +1024,7 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
 
     BUFFER *sql = buffer_create(1024);
 
-    buffer_sprintf(sql,"delete from aclk_alert_%s where alert_unique_id not in "
+    buffer_sprintf(sql,"delete from aclk_alert_%s where filtered_alert_unique_id not in "
                    " (select unique_id from health_log_%s); ", uuid_str, uuid_str);
     
     char *err_msg = NULL;

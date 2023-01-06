@@ -138,7 +138,7 @@ RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
         RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
-        const char *group_options, time_t timeout, size_t tier);
+        const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source);
 
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, struct query_target *qt);
 bool query_target_calculate_window(struct query_target *qt);

@@ -148,6 +148,40 @@ static int do_migration_v5_v6(sqlite3 *database, const char *name)
     return init_database_batch(database, DB_CHECK_NONE, 0, &database_migrate_v5_v6[0]);
 }
 
+static int do_migration_v6_v7(sqlite3 *database, const char *name)
+{
+    UNUSED(name);
+    info("Running \"%s\" database migration", name);
+
+    char sql[256];
+
+    int rc;
+    sqlite3_stmt *res = NULL;
+    snprintfz(sql, 255, "SELECT name FROM sqlite_schema WHERE type ='table' AND name LIKE 'aclk_alert_%%';");
+    rc = sqlite3_prepare_v2(database, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement to alter aclk_alert tables");
+        return 1;
+    }
+
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+         char *table = strdupz((char *) sqlite3_column_text(res, 0));
+         if (!column_exists_in_table(table, "filtered_alert_unique_id")) {
+             snprintfz(sql, 255, "ALTER TABLE %s ADD filtered_alert_unique_id", table);
+             sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+             snprintfz(sql, 255, "UPDATE %s SET filtered_alert_unique_id = alert_unique_id", table);
+             sqlite3_exec_monitored(database, sql, 0, 0, NULL);
+         }
+         freez(table);
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when altering aclk_alert tables, rc = %d", rc);
+
+    return 0;
+}
+
 
 static int do_migration_noop(sqlite3 *database, const char *name)
 {
@@ -198,6 +232,7 @@ DATABASE_FUNC_MIGRATION_LIST migration_action[] = {
     {.name = "v3 to v4",  .func = do_migration_v3_v4},
     {.name = "v4 to v5",  .func = do_migration_v4_v5},
     {.name = "v5 to v6",  .func = do_migration_v5_v6},
+    {.name = "v6 to v7",  .func = do_migration_v6_v7},
     // the terminator of this array
     {.name = NULL, .func = NULL}
 };

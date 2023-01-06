@@ -269,8 +269,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_status);
             }
-            else
-                rrdset_next(wireless_dev->st_status);
 
             rrddim_set_by_pointer(wireless_dev->st_status, wireless_dev->rd_status,
                                   (collected_number)wireless_dev->status);
@@ -302,8 +300,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_link);
             }
-            else
-                rrdset_next(wireless_dev->st_link);
 
             if (unlikely(!wireless_dev->st_level)) {
                 wireless_dev->st_level = rrdset_create_localhost(
@@ -325,8 +321,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_level);
             }
-            else
-                rrdset_next(wireless_dev->st_level);
 
             if (unlikely(!wireless_dev->st_noise)) {
                 wireless_dev->st_noise = rrdset_create_localhost(
@@ -348,8 +342,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_noise);
             }
-            else
-                rrdset_next(wireless_dev->st_noise);
 
             rrddim_set_by_pointer(wireless_dev->st_link, wireless_dev->rd_link, (collected_number)wireless_dev->link);
             rrdset_done(wireless_dev->st_link);
@@ -393,8 +385,6 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_discarded_packets);
             }
-            else
-                rrdset_next(wireless_dev->st_discarded_packets);
 
             rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_nwid, (collected_number)wireless_dev->nwid);
             rrddim_set_by_pointer(wireless_dev->st_discarded_packets, wireless_dev->rd_crypt, (collected_number)wireless_dev->crypt);
@@ -429,11 +419,8 @@ int do_proc_net_wireless(int update_every, usec_t dt)
 
                 add_labels_to_wireless(wireless_dev, wireless_dev->st_missed_beacon);
             }
-            else
-                rrdset_next(wireless_dev->st_missed_beacon);
 
             rrddim_set_by_pointer(wireless_dev->st_missed_beacon, wireless_dev->rd_missed_beacon, (collected_number)wireless_dev->missed_beacon);
-
             rrdset_done(wireless_dev->st_missed_beacon);
         }
 

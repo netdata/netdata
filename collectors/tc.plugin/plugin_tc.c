@@ -421,7 +421,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_bytes);
             if(unlikely(d->name_updated))
                 rrdset_reset_name(d->st_bytes, string2str(d->name));
 
@@ -483,8 +482,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_packets);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_packets", string2str(d->name?d->name:d->id));
@@ -549,8 +546,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_dropped);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_dropped", string2str(d->name?d->name:d->id));
@@ -615,8 +610,6 @@ static inline void tc_device_commit(struct tc_device *d) {
             rrdlabels_add(d->st_bytes->rrdlabels, "family", string2str(d->family?d->family:d->id), RRDLABEL_SRC_AUTO);
         }
         else {
-            rrdset_next(d->st_tokens);
-
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];
                 snprintfz(name, RRD_ID_LENGTH_MAX, "%s_tokens", string2str(d->name?d->name:d->id));
@@ -683,7 +676,6 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
         else {
             debug(D_TC_LOOP, "TC: Updating _ctokens chart for device '%s'", string2str(d->name?d->name:d->id));
-            rrdset_next(d->st_ctokens);
 
             if(unlikely(d->name_updated)) {
                 char name[RRD_ID_LENGTH_MAX + 1];

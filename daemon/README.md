@@ -116,7 +116,7 @@ The command line options of the Netdata 1.10.0 version are the following:
  |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   
  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
- Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>
+ Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>
  Released under GNU General Public License v3 or later.
  All rights reserved.
 
@@ -127,7 +127,8 @@ The command line options of the Netdata 1.10.0 version are the following:
  License    : https://github.com/netdata/netdata/blob/master/LICENSE.md
 
  Twitter    : https://twitter.com/linuxnetdata
- Facebook   : https://www.facebook.com/linuxnetdata/
+ LinkedIn   : https://linkedin.com/company/netdata-cloud/
+ Facebook   : https://facebook.com/linuxnetdata/
 
 
  SYNOPSIS: netdata [options]

@@ -7,7 +7,6 @@
 #include "libnetdata/libnetdata.h"
 #include "web/server/web_client.h"
 #include "daemon/common.h"
-#include "replication.h"
 
 #define CONNECTED_TO_SIZE 100
 
@@ -36,6 +35,7 @@ typedef enum {
     STREAM_CAP_COMPRESSION      = (1 << 10), // lz4 compression supported
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
+    STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
 
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
@@ -45,12 +45,12 @@ typedef enum {
 #define STREAM_HAS_COMPRESSION STREAM_CAP_COMPRESSION
 #else
 #define STREAM_HAS_COMPRESSION 0
-#endif  //ENABLE_COMPRESSION
+#endif  // ENABLE_COMPRESSION
 
 #define STREAM_OUR_CAPABILITIES ( \
     STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
     STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
-    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION )
+    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION | STREAM_CAP_BINARY )
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
@@ -107,21 +107,14 @@ struct compressor_state {
 };
 
 struct decompressor_state {
-    char *buffer;
-    size_t buffer_size;
-    size_t buffer_len;
-    size_t buffer_pos;
-    char *out_buffer;
-    size_t out_buffer_len;
-    size_t out_buffer_pos;
+    size_t signature_size;
     size_t total_compressed;
     size_t total_uncompressed;
     size_t packet_count;
-    struct decompressor_data *data; // Decompression API specific data
+    struct decompressor_stream *stream; // Decompression API specific data
     void (*reset)(struct decompressor_state *state);
     size_t (*start)(struct decompressor_state *state, const char *header, size_t header_size);
-    size_t (*put)(struct decompressor_state *state, const char *data, size_t size);
-    size_t (*decompress)(struct decompressor_state *state);
+    size_t (*decompress)(struct decompressor_state *state, const char *compressed_data, size_t compressed_size);
     size_t (*decompressed_bytes_in_buffer)(struct decompressor_state *state);
     size_t (*get)(struct decompressor_state *state, char *data, size_t size);
     void (*destroy)(struct decompressor_state **state);
@@ -149,7 +142,7 @@ struct sender_state {
     size_t sent_bytes;
     size_t sent_bytes_on_this_connection;
     size_t send_attempts;
-    time_t last_sent_t;
+    time_t last_traffic_seen_t;
     size_t not_connected_loops;
     // Metrics are collected asynchronously by collector threads calling rrdset_done_push(). This can also trigger
     // the lazy creation of the sender thread - both cases (buffer access and thread creation) are guarded here.
@@ -166,11 +159,44 @@ struct sender_state {
     struct compressor_state *compressor;
 #endif
 #ifdef ENABLE_HTTPS
-    struct netdata_ssl ssl;                  // Structure used to encrypt the connection
+    struct netdata_ssl ssl;                     // structure used to encrypt the connection
 #endif
 
-    DICTIONARY *replication_requests;
+    struct {
+        DICTIONARY *requests;                   // de-duplication of replication requests, per chart
+
+        struct {
+            size_t pending_requests;            // the currently outstanding replication requests
+            size_t charts_replicating;          // the number of unique charts having pending replication requests (on every request one is added and is removed when we finish it - it does not track completion of the replication for this chart)
+            bool reached_max;                   // true when the sender buffer should not get more replication responses
+        } atomic;
+
+    } replication;
+
+    struct {
+        size_t buffer_used_percentage;          // the current utilization of the sending buffer
+        usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
+    } atomic;
 };
+
+#define rrdpush_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
+#define rrdpush_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)
+
+#define rrdpush_sender_set_buffer_used_percent(sender, value) __atomic_store_n(&((sender)->atomic.buffer_used_percentage), value, __ATOMIC_RELAXED)
+#define rrdpush_sender_get_buffer_used_percent(sender) __atomic_load_n(&((sender)->atomic.buffer_used_percentage), __ATOMIC_RELAXED)
+
+#define rrdpush_sender_set_flush_time(sender) __atomic_store_n(&((sender)->atomic.last_flush_time_ut), now_realtime_usec(), __ATOMIC_RELAXED)
+#define rrdpush_sender_get_flush_time(sender) __atomic_load_n(&((sender)->atomic.last_flush_time_ut), __ATOMIC_RELAXED)
+
+#define rrdpush_sender_replicating_charts(sender) __atomic_load_n(&((sender)->replication.atomic.charts_replicating), __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.charts_replicating), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_replicating_charts_zero(sender) __atomic_store_n(&((sender)->replication.atomic.charts_replicating), 0, __ATOMIC_RELAXED)
+
+#define rrdpush_sender_pending_replication_requests(sender) __atomic_load_n(&((sender)->replication.atomic.pending_requests), __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_plus_one(sender) __atomic_add_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_minus_one(sender) __atomic_sub_fetch(&((sender)->replication.atomic.pending_requests), 1, __ATOMIC_RELAXED)
+#define rrdpush_sender_pending_replication_requests_zero(sender) __atomic_store_n(&((sender)->replication.atomic.pending_requests), 0, __ATOMIC_RELAXED)
 
 struct receiver_state {
     RRDHOST *host;
@@ -204,6 +230,8 @@ struct receiver_state {
     unsigned int rrdpush_compression;
     struct decompressor_state *decompressor;
 #endif
+
+    time_t replication_first_time_t;
 };
 
 struct rrdpush_destinations {
@@ -233,6 +261,7 @@ void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
 void sender_init(RRDHOST *host);
+
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
@@ -264,7 +293,6 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s);
 #ifdef ENABLE_COMPRESSION
 struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
-size_t is_compressed_data(const char *data, size_t data_size);
 #endif
 
 void log_receiver_capabilities(struct receiver_state *rpt);
@@ -272,6 +300,6 @@ void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
 
-void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s);
+#include "replication.h"
 
 #endif //NETDATA_RRDPUSH_H

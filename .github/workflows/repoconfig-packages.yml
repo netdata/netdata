@@ -34,31 +34,10 @@ jobs:
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
-        shell: python3 {0}
         run: |
-          from ruamel.yaml import YAML
-          import json
-          yaml = YAML(typ='safe')
-          entries = list()
-
-          with open('.github/data/distros.yml') as f:
-              data = yaml.load(f)
-
-          for i, v in enumerate(data['include']):
-              if 'packages' in data['include'][i]:
-                  entries.append({
-                      'distro': data['include'][i]['distro'],
-                      'version': data['include'][i]['version'],
-                      'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
-                      'format': data['include'][i]['packages']['type'],
-                      'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
-                      'platform': data['platform_map']['amd64']
-                  })
-
-          entries.sort(key=lambda k: (k['distro'], k['version']))
-          matrix = json.dumps({'include': entries}, sort_keys=True)
-          print('Generated Matrix: ' + matrix)
-          print('::set-output name=matrix::' + matrix)
+          matrix="$(.github/scripts/gen-matrix-repoconfig.py)"
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -117,7 +96,7 @@ jobs:
               /netdata/packaging/repoconfig/build-${{ matrix.format }}.sh
       - name: SSH setup
         id: ssh-setup
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         continue-on-error: true
         uses: shimataro/ssh-key-action@v2
         with:
@@ -127,23 +106,17 @@ jobs:
       - name: Upload to packages.netdata.cloud
         id: package-upload
         continue-on-error: true
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'
         run: |
-          .github/scripts/package-upload.sh \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          netdata/netdata
-          .github/scripts/package-upload.sh \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          netdata/netdata-edge
-          .github/scripts/package-upload.sh \
-          ${{ matrix.repo_distro }} \
-          ${{ matrix.arch }} \
-          ${{ matrix.format }} \
-          netdata/netdata-repoconfig
+          for arch in ${{ matrix.arches }}; do
+            for suffix in '' -edge -repoconfig ; do
+              .github/scripts/package-upload.sh \
+              ${{ matrix.pkgclouddistro }} \
+              ${arch} \
+              ${{ matrix.format }} \
+              netdata/netdata${suffix}
+            done
+          done
       - name: Upload Packages
         id: publish
         if: github.event_name != 'pull_request' && github.repository == 'netdata/netdata'

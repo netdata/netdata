@@ -278,6 +278,37 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
     return ret;
 }
 
+// ----------------------------------------------------------------------------
+// spinlock implementation
+// https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
+
+void netdata_spinlock_init(SPINLOCK *spinlock) {
+    *spinlock = NETDATA_SPINLOCK_INITIALIZER;
+}
+
+void netdata_spinlock_lock(SPINLOCK *spinlock) {
+    static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
+
+    netdata_thread_disable_cancelability();
+
+    for(int i = 1;
+        __atomic_load_n(&spinlock->locked, __ATOMIC_RELAXED) ||
+        __atomic_test_and_set(&spinlock->locked, __ATOMIC_ACQUIRE)
+        ; i++
+        ) {
+        if(unlikely(i == 8)) {
+            i = 0;
+            nanosleep(&ns, NULL);
+        }
+    }
+    // we have the lock
+}
+
+void netdata_spinlock_unlock(SPINLOCK *spinlock) {
+    __atomic_clear(&spinlock->locked, __ATOMIC_RELEASE);
+    netdata_thread_enable_cancelability();
+}
+
 #ifdef NETDATA_TRACE_RWLOCKS
 
 // ----------------------------------------------------------------------------

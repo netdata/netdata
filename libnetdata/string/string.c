@@ -71,10 +71,11 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
 
 static inline bool string_entry_check_and_acquire(STRING *se) {
     REFCOUNT expected, desired, count = 0;
+
+    expected = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
+
     do {
         count++;
-
-        expected = __atomic_load_n(&se->refcount, __ATOMIC_SEQ_CST);
 
         if(expected <= 0) {
             // We cannot use this.
@@ -85,8 +86,8 @@ static inline bool string_entry_check_and_acquire(STRING *se) {
         }
 
         desired = expected + 1;
-    }
-    while(!__atomic_compare_exchange_n(&se->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+
+    } while(!__atomic_compare_exchange_n(&se->refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
     string_internal_stats_add(spins, count - 1);
 

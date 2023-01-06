@@ -3,9 +3,9 @@ title: "Installation guide"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/README.md
 -->
 
-import { Install, InstallBox } from '../../../src/components/Install/'
+import { Install, InstallBox } from '@site/src/components/Install/'
 
-import { OneLineInstallWget, OneLineInstallCurl } from '../../../src/components/OneLineInstall/'
+import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 
 # Installation guide
 
@@ -79,6 +79,10 @@ operating systems.
   <InstallBox
     to="/docs/agent/packaging/installer/methods/kickstart"
     os="General Linux with one-line installer (recommended)"
+    svg="linux" />
+  <InstallBox
+    to="/docs/agent/packaging/installer/methods/packages"
+    os="Native DEB/RPM packages for Linux"
     svg="linux" />
   <InstallBox
     to="/docs/agent/packaging/docker"

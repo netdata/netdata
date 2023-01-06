@@ -29,56 +29,56 @@ jobs:
         id: actionlint
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/actionlint') }}" = "true" ]; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '\.github/workflows/.*' ; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'GitHub Actions workflows have changed, need to run actionlint.'
           else
-            echo '::set-output name=run::false'
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for eslint
         id: eslint
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/eslint') }}" = "true" ]; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -v "web/gui/dashboard" | grep -Eq '.*\.js|node\.d\.plugin\.in' ; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'JS files have changed, need to run ESLint.'
           else
-            echo '::set-output name=run::false'
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for hadolint
         id: hadolint
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/hadolint') }}" = "true" ]; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*Dockerfile.*' ; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'Dockerfiles have changed, need to run Hadolint.'
           else
-            echo '::set-output name=run::false'
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for shellcheck
         id: shellcheck
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/shellcheck') }}" = "true" ]; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.sh.*' ; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'Shell scripts have changed, need to run shellcheck.'
           else
-            echo '::set-output name=run::false'
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Check files for yamllint
         id: yamllint
         run: |
           if [ "${{ contains(github.event.pull_request.labels.*.name, 'run-ci/yamllint') }}" = "true" ]; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
           elif git diff --name-only origin/${{ github.base_ref }} HEAD | grep -Eq '.*\.ya?ml|python\.d/.*\.conf' ; then
-            echo '::set-output name=run::true'
+            echo "run=true" >> "${GITHUB_OUTPUT}"
             echo 'YAML files have changed, need to run yamllint.'
           else
-            echo '::set-output name=run::false'
+            echo "run=false" >> "${GITHUB_OUTPUT}"
           fi
 
   actionlint:

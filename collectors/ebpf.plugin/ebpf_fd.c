@@ -6,6 +6,9 @@
 static char *fd_dimension_names[NETDATA_FD_SYSCALL_END] = { "open", "close" };
 static char *fd_id_names[NETDATA_FD_SYSCALL_END] = { "do_sys_open",  "__close_fd" };
 
+static char *close_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"close_fd", "__close_fd"};
+static char *open_targets[NETDATA_EBPF_MAX_FD_TARGETS] = {"do_sys_openat2", "do_sys_open"};
+
 static netdata_syscall_stat_t fd_aggregated_data[NETDATA_FD_SYSCALL_END];
 static netdata_publish_syscall_t fd_publish_aggregated[NETDATA_FD_SYSCALL_END];
 
@@ -38,7 +41,6 @@ struct netdata_static_thread fd_thread = {"FD KERNEL",
                                           .init_routine = NULL,
                                           .start_routine = NULL};
 
-static enum ebpf_threads_status ebpf_fd_exited = NETDATA_THREAD_EBPF_RUNNING;
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -66,7 +68,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_sys_open_kretprobe, false);
     bpf_program__set_autoload(obj->progs.netdata_release_task_fd_kprobe, false);
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
         bpf_program__set_autoload(obj->progs.netdata_close_fd_kprobe, false);
@@ -86,7 +88,7 @@ static inline void ebpf_fd_disable_probes(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_probes(struct fd_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kretprobe, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_kprobe, false);
     } else {
@@ -122,7 +124,7 @@ static inline void ebpf_disable_trampoline(struct fd_bpf *obj)
  */
 static inline void ebpf_disable_specific_trampoline(struct fd_bpf *obj)
 {
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fentry, false);
         bpf_program__set_autoload(obj->progs.netdata___close_fd_fexit, false);
     } else {
@@ -144,7 +146,7 @@ static void ebpf_set_trampoline_target(struct fd_bpf *obj)
     bpf_program__set_attach_target(obj->progs.netdata_sys_open_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_OPEN].name);
     bpf_program__set_attach_target(obj->progs.netdata_release_task_fd_fentry, 0, EBPF_COMMON_FNCT_CLEAN_UP);
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         bpf_program__set_attach_target(
             obj->progs.netdata_close_fd_fentry, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         bpf_program__set_attach_target(obj->progs.netdata_close_fd_fexit, 0, fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
@@ -186,7 +188,7 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
     if (ret)
         return -1;
 
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
+    if (!strcmp(fd_targets[NETDATA_FD_SYSCALL_CLOSE].name, close_targets[NETDATA_FD_CLOSE_FD])) {
         obj->links.netdata_close_fd_kretprobe = bpf_program__attach_kprobe(obj->progs.netdata_close_fd_kretprobe, true,
                                                                            fd_targets[NETDATA_FD_SYSCALL_CLOSE].name);
         ret = libbpf_get_error(obj->links.netdata_close_fd_kretprobe);
@@ -218,21 +220,47 @@ static int ebpf_fd_attach_probe(struct fd_bpf *obj)
 }
 
 /**
+ * FD Fill Address
+ *
+ * Fill address value used to load probes/trampoline.
+ */
+static inline void ebpf_fd_fill_address(ebpf_addresses_t *address, char **targets)
+{
+    int i;
+    for (i = 0; i < NETDATA_EBPF_MAX_FD_TARGETS; i++) {
+        address->function = targets[i];
+        ebpf_load_addresses(address, -1);
+        if (address->addr)
+            break;
+    }
+}
+
+/**
  * Set target values
  *
- * Set pointers used to laod data.
+ * Set pointers used to load data.
+ *
+ * @return It returns 0 on success and -1 otherwise.
  */
-static void ebpf_fd_set_target_values()
+static int ebpf_fd_set_target_values()
 {
-    static char *close_targets[] = {"close_fd", "__close_fd"};
-    static char *open_targets[] = {"do_sys_openat2", "do_sys_open"};
-    if (running_on_kernel >= NETDATA_EBPF_KERNEL_5_11) {
-        fd_targets[NETDATA_FD_SYSCALL_OPEN].name = open_targets[0];
-        fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = close_targets[0];
-    } else {
-        fd_targets[NETDATA_FD_SYSCALL_OPEN].name = open_targets[1];
-        fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = close_targets[1];
-    }
+    ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0};
+    ebpf_fd_fill_address(&address, close_targets);
+
+    if (!address.addr)
+        return -1;
+
+    fd_targets[NETDATA_FD_SYSCALL_CLOSE].name = address.function;
+
+    address.addr = 0;
+    ebpf_fd_fill_address(&address, open_targets);
+
+    if (!address.addr)
+        return -1;
+
+    fd_targets[NETDATA_FD_SYSCALL_OPEN].name = address.function;
+
+    return 0;
 }
 
 /**
@@ -284,14 +312,18 @@ static void ebpf_fd_disable_release_task(struct fd_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
 {
     netdata_ebpf_targets_t *mt = em->targets;
     netdata_ebpf_program_loaded_t test = mt[NETDATA_FD_SYSCALL_OPEN].mode;
 
-    ebpf_fd_set_target_values();
+    if (ebpf_fd_set_target_values()) {
+        error("%s file descriptor.", NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND);
+        return -1;
+    }
+
     if (test == EBPF_LOAD_TRAMPOLINE) {
         ebpf_fd_disable_probes(obj);
         ebpf_disable_specific_trampoline(obj);
@@ -332,33 +364,21 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
  *****************************************************************/
 
 /**
- * FD Exit
+ * FD Free
  *
- * Cancel child thread and exit.
+ * Cleanup variables after child threads to stop
  *
  * @param ptr thread data.
  */
-static void ebpf_fd_exit(void *ptr)
+static void ebpf_fd_free(ebpf_module_t *em)
 {
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
         return;
     }
-
-    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_fd_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_fd_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
     freez(fd_thread.thread);
@@ -370,8 +390,35 @@ static void ebpf_fd_cleanup(void *ptr)
         fd_bpf__destroy(bpf_obj);
 #endif
 
-    fd_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
+ * FD Exit
+ *
+ * Cancel child thread and exit.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_fd_exit(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    if (fd_thread.thread)
+        netdata_thread_cancel(*fd_thread.thread);
+    ebpf_fd_free(em);
+}
+
+/**
+ * Clean up the main thread.
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_fd_cleanup(void *ptr)
+{
+    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_fd_free(em);
 }
 
 /*****************************************************************
@@ -445,16 +492,11 @@ void *ebpf_fd_read_hash(void *ptr)
 
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
-    while (ebpf_fd_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_fd_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
+    while (!ebpf_exit_plugin) {
+        (void)heartbeat_next(&hb, step);
 
         read_global_table();
     }
-
-    ebpf_fd_exited = NETDATA_THREAD_EBPF_STOPPED;
 
     netdata_thread_cleanup_pop(1);
     return NULL;
@@ -1143,14 +1185,13 @@ void *ebpf_fd_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = fd_maps;
 
-    if (!em->enabled)
-        goto endfd;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
-    if (ebpf_fd_load_bpf(em))
+    if (ebpf_fd_load_bpf(em))  {
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endfd;
+    }
 
     ebpf_fd_allocate_global_vectors(em->apps_charts);
 
@@ -1169,8 +1210,7 @@ void *ebpf_fd_thread(void *ptr)
     fd_collector(em);
 
 endfd:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

@@ -101,7 +101,6 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
             if(unlikely(softnet_column_name(w)))
                 rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(st);
 
     for(w = 0; w < allocated_columns ;w++)
         if(unlikely(softnet_column_name(w)))
@@ -137,7 +136,6 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
                     if(unlikely(softnet_column_name(w)))
                         rrddim_add(st, softnet_column_name(w), NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             }
-            else rrdset_next(st);
 
             for(w = 0; w < allocated_columns ;w++)
                 if(unlikely(softnet_column_name(w)))

@@ -33,12 +33,12 @@ jobs:
             NETDATA_CUSTOM_PR_NUMBER=""
             NETDATA_CUSTOM_COMMIT_HASH="${{ github.sha }}"
           fi
-            echo "::set-output name=netdata_repo::${NETDATA_CUSTOM_REPO}"
-            echo "::set-output name=netdata_branch::${NETDATA_CUSTOM_BRANCH}"
-            echo "::set-output name=netdata_pr_number::${NETDATA_CUSTOM_PR_NUMBER}"
-            echo "::set-output name=netdata_commit_hash::${NETDATA_CUSTOM_COMMIT_HASH}"
+          echo "netdata_repo=${NETDATA_CUSTOM_REPO}" >> $GITHUB_OUTPUT
+          echo "netdata_branch=${NETDATA_CUSTOM_BRANCH}" >> $GITHUB_OUTPUT
+          echo "netdata_pr_number=${NETDATA_CUSTOM_PR_NUMBER}" >> $GITHUB_OUTPUT
+          echo "netdata_commit_hash=${NETDATA_CUSTOM_COMMIT_HASH}" >> $GITHUB_OUTPUT
 
-      - name: Trigger Cloud Regression
+      - name: Trigger Full Cloud Regression
         uses: aurelien-baudet/workflow-dispatch@v2
         with:
           repo: netdata/test-automation
@@ -52,3 +52,18 @@ jobs:
                "custom_netdata_image": "true"
                }'
           wait-for-completion: false
+
+      - name: Trigger Agent Parent/Child with Cloud Integration tests
+        uses: aurelien-baudet/workflow-dispatch@v2
+        with:
+          repo: netdata/test-automation
+          ref: refs/heads/master
+          workflow: agent_smoke_tests.yml
+          token: ${{ secrets.NETDATABOT_GITHUB_TOKEN  }}
+          inputs: '{ "netdata_branch": "${{ steps.output-workflow-dispatch-params.outputs.netdata_branch }}",
+               "netdata_repo": "${{ steps.output-workflow-dispatch-params.outputs.netdata_repo }}",
+               "netdata_pr_number": "${{ steps.output-workflow-dispatch-params.outputs.netdata_pr_number }}",
+               "netdata_branch_commit_hash": "${{ steps.output-workflow-dispatch-params.outputs.netdata_commit_hash }}",
+               "custom_netdata_image": "true"
+               }'
+          wait-for-completion: true

@@ -51,10 +51,8 @@ the accuracy of the values you enter below, changes in the compression ratio, an
 
 :::
 
-Download
-the [calculator](https://docs.google.com/spreadsheets/d/e/2PACX-1vTYMhUU90aOnIQ7qF6iIk6tXps57wmY9lxS6qDXznNJrzCKMDzxU3zkgh8Uv0xj_XqwFl3U6aHDZ6ag/pub?output=xlsx)
-to optimize the data retention to your preferences. Utilize the "Front" spreadsheet. Experiment with the variables which
-are padded with yellow to come up with the best settings for your use case.
+Visit the [Netdata Storage Calculator](https://netdata-storage-calculator.herokuapp.com/) app to customize 
+data retention according to your preferences.
 
 ## Edit `netdata.conf` with recommended database engine settings
 

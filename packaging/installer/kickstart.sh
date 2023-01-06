@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F050D
+# Next unused error code: F050F
 
 # ======================================================================
 # Constants
@@ -27,9 +27,11 @@ KICKSTART_SOURCE="$(
 )"
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
-PUBLIC_CLOUD_URL="https://api.netdata.cloud"
-REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
-REPOCONFIG_VERSION="1-2"
+PUBLIC_CLOUD_URL="https://app.netdata.cloud"
+REPOCONFIG_DEB_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
+REPOCONFIG_DEB_VERSION="1-2"
+REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
 TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
@@ -43,9 +45,10 @@ INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
-NETDATA_CLAIM_URL="${PUBLIC_CLOUD_URL}"
+NETDATA_CLAIM_URL="https://api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
+NETDATA_INSTALLER_OPTIONS=""
 NETDATA_ONLY_BUILD=0
 NETDATA_ONLY_NATIVE=0
 NETDATA_ONLY_STATIC=0
@@ -63,7 +66,6 @@ else
 fi
 
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
-NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS:-""}"
 TELEMETRY_API_KEY="${NETDATA_POSTHOG_API_KEY:-mqkwGT0JNFqO-zX2t0mW6Tec9yooaVu7xCBlXtHnt5Y}"
 
 if echo "${0}" | grep -q 'kickstart-static64'; then
@@ -181,7 +183,6 @@ USAGE: kickstart.sh [options]
   --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud                  Disable support for Netdata Cloud (default: detect)
   --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>                 This option is deprecated and will be removed in a future version, use --install-prefix instead.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --install-version <version>      Specify the version of Netdata to install.
@@ -248,10 +249,16 @@ telemetry_event() {
     TOTAL_RAM="$((TOTAL_RAM * 1024))"
   fi
 
-  if [ -f /etc/machine-id ]; then
-    DISTINCT_ID="$(cat /etc/machine-id)"
+  if [ "${KERNEL_NAME}" = Darwin ] && command -v ioreg >/dev/null 2>&1; then
+    DISTINCT_ID="macos-$(ioreg -rd1 -c IOPlatformExpertDevice | awk '/IOPlatformUUID/ { split($0, line, "\""); printf("%s\n", line[4]); }')"
+  elif [ -f /etc/machine-id ]; then
+    DISTINCT_ID="machine-$(cat /etc/machine-id)"
+  elif [ -f /var/db/dbus/machine-id ]; then
+    DISTINCT_ID="dbus-$(cat /var/db/dbus/machine-id)"
+  elif [ -f /var/lib/dbus/machine-id ]; then
+    DISTINCT_ID="dbus-$(cat /var/lib/dbus/machine-id)"
   elif command -v uuidgen > /dev/null 2>&1; then
-    DISTINCT_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    DISTINCT_ID="uuid-$(uuidgen | tr '[:upper:]' '[:lower:]')"
   else
     DISTINCT_ID="null"
   fi
@@ -626,7 +633,7 @@ get_system_info() {
         SYSCODENAME="${VERSION_CODENAME}"
         SYSARCH="$(uname -m)"
 
-        supported_compat_names="debian ubuntu centos fedora opensuse ol"
+        supported_compat_names="debian ubuntu centos fedora opensuse ol arch"
 
         if str_in_list "${DISTRO}" "${supported_compat_names}"; then
             DISTRO_COMPAT_NAME="${DISTRO}"
@@ -637,6 +644,9 @@ get_system_info() {
                 ;;
             cloudlinux|almalinux|rocky|rhel)
                 DISTRO_COMPAT_NAME="centos"
+                ;;
+            artix|manjaro|obarun)
+                DISTRO_COMPAT_NAME="arch"
                 ;;
             *)
                 DISTRO_COMPAT_NAME="unknown"
@@ -808,7 +818,9 @@ detect_existing_install() {
 
   if pkg_installed netdata; then
     ndprefix="/"
+    EXISTING_INSTALL_IS_NATIVE="1"
   else
+    EXISTING_INSTALL_IS_NATIVE="0"
     if [ -n "${INSTALL_PREFIX}" ]; then
       searchpath="${INSTALL_PREFIX}/bin:${INSTALL_PREFIX}/sbin:${INSTALL_PREFIX}/usr/bin:${INSTALL_PREFIX}/usr/sbin:${PATH}"
       searchpath="${INSTALL_PREFIX}/netdata/bin:${INSTALL_PREFIX}/netdata/sbin:${INSTALL_PREFIX}/netdata/usr/bin:${INSTALL_PREFIX}/netdata/usr/sbin:${searchpath}"
@@ -873,7 +885,11 @@ handle_existing_install() {
   case "${INSTALL_TYPE}" in
     kickstart-*|legacy-*|binpkg-*|manual-static|unknown)
       if [ "${INSTALL_TYPE}" = "unknown" ]; then
-        warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type. Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
+        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+          warning "Found an existing netdata install managed by the system package manager, but could not determine the install type. Usually this means you installed an unsupported third-party netdata package."
+        else
+          warning "Found an existing netdata install at ${ndprefix}, but could not determine the install type. Usually this means you installed Netdata through your distribution’s regular package repositories or some other unsupported method."
+        fi
       else
         progress "Found an existing netdata install at ${ndprefix}, with installation type '${INSTALL_TYPE}'."
       fi
@@ -891,7 +907,13 @@ handle_existing_install() {
             elif [ "${INTERACTIVE}" -eq 0 ]; then
               fatal "User requested reinstall, but we cannot safely reinstall over top of a ${INSTALL_TYPE} installation, exiting." F0104
             else
-              if confirm "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"; then
+              if [ "${EXISTING_INSTALL_IS_NATIVE}" ]; then
+                reinstall_prompt="Reinstalling over top of an existing install managed by the system package manager is known to cause things to break, are you sure you want to continue?"
+              else
+                reinstall_prompt="Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, do you want to continue?"
+              fi
+
+              if confirm "${reinstall_prompt}"; then
                 progress "OK, continuing."
               else
                 fatal "Cancelling reinstallation at user request." F0105
@@ -902,10 +924,18 @@ handle_existing_install() {
 
         return 0
       elif [ "${INSTALL_TYPE}" = "unknown" ]; then
+        claimonly_notice="If you just want to claim this install, you should re-run this command with the --claim-only option instead."
+        if [ "${EXISTING_INSTALL_IS_NATIVE}" -eq 1 ]; then
+          failmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice}"
+          promptmsg="Attempting to update an installation managed by the system package manager is known to not work in most cases. If you are trying to install the latest version of Netdata, you will need to manually uninstall it through your system package manager. ${claimonly_notice} Are you sure you want to continue?"
+        else
+          failmsg="We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. ${claimonly_notice}"
+          promptmsg="Attempting to update an existing install is not officially supported. It may work, but it also might break your system. ${claimonly_notice} Are you sure you want to continue?"
+        fi
         if [ "${INTERACTIVE}" -eq 0 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-          fatal "We do not support trying to update or claim installations when we cannot determine the install type. You will need to uninstall the existing install using the same method you used to install it to proceed. If you just want to claim this install, you can re-run this command with the --claim-only option." F0106
+          fatal "${failmsg}" F0106
         elif [ "${INTERACTIVE}" -eq 1 ] && [ "${NETDATA_CLAIM_ONLY}" -eq 0 ]; then
-          if confirm "Attempting to update an existing install is not officially supported. It may work, but it also might break your system. If you just want to claim this install, you should re-run this command with the --claim-only option instead. Are you sure you want to continue?"; then
+          if confirm "${promptmsg}"; then
             progress "OK, continuing"
           else
             fatal "Cancelling update of unknown installation type at user request." F050C
@@ -1015,7 +1045,7 @@ EOF
 
 confirm_install_prefix() {
   if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    fatal "The --install-prefix and --install options are only supported together with the --build-only option." F0204
+    fatal "The --install-prefix option is only supported together with the --build-only option." F0204
   fi
 
   if [ -n "${INSTALL_PREFIX}" ]; then
@@ -1204,19 +1234,48 @@ set_auto_updates() {
 
 # Check for an already installed package with a given name.
 pkg_installed() {
-  case "${DISTRO_COMPAT_NAME}" in
-    debian|ubuntu)
-      # shellcheck disable=SC2016
-      dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
-      return $?
+  case "${SYSTYPE}" in
+    Linux)
+      case "${DISTRO_COMPAT_NAME}" in
+        debian|ubuntu)
+          # shellcheck disable=SC2016
+          dpkg-query --show --showformat '${Status}' "${1}" 2>&1 | cut -f 1 -d ' ' | grep -q '^install$'
+          return $?
+          ;;
+        centos|fedora|opensuse|ol)
+          rpm -q "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        alpine)
+          apk -e info "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        arch)
+          pacman -Qi "${1}" > /dev/null 2>&1
+          return $?
+          ;;
+        *)
+          return 1
+          ;;
+      esac
       ;;
-    centos|fedora|opensuse|ol)
-      rpm -q "${1}" > /dev/null 2>&1
-      return $?
+    Darwin)
+      if command -v brew > /dev/null 2>&1; then
+        brew list "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
-    *)
-      return 1
+    FreeBSD)
+      if pkg -N > /dev/null 2>&1; then
+        pkg info "${1}" > /dev/null 2>&1
+        return $?
+      else
+        return 1
+      fi
       ;;
+    *) return 1 ;;
   esac
 }
 
@@ -1410,8 +1469,17 @@ try_package_install() {
   fi
 
   repoconfig_name="netdata-repo${release}"
-  repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
-  repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
+
+  case "${pkg_type}" in
+    deb)
+      repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
+      repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
+      ;;
+    rpm)
+      repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
+      repoconfig_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
+      ;;
+  esac
 
   if ! pkg_installed "${repoconfig_name}"; then
     progress "Checking for availability of repository configuration package."
@@ -1449,7 +1517,7 @@ try_package_install() {
   fi
 
   if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuraion package."
+    progress "Successfully installed repository configuration package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -1784,7 +1852,7 @@ prepare_offline_install_source() {
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
   fi
 
-  run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+  run cd "${1}" || fatal "Failed to switch to target directory for offline install preparation." F0505
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
     set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
@@ -2030,10 +2098,6 @@ validate_args() {
 }
 
 parse_args() {
-  if [ -n "${NETDATA_INSTALLER_OPTIONS}" ]; then
-      warning "Explicitly specifying additional installer options with NETDATA_INSTALLER_OPTIONS is deprecated. Please instead pass the options to the script using either --local-build-options or --static-install-options as appropriate."
-  fi
-
   while [ -n "${1}" ]; do
     case "${1}" in
       "--help")
@@ -2088,11 +2152,6 @@ parse_args() {
       "--disable-telemetry")
         NETDATA_DISABLE_TELEMETRY="1"
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
-        ;;
-      "--install")
-        warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
-        INSTALL_PREFIX="${2}"
-        shift 1
         ;;
       "--install-prefix")
         INSTALL_PREFIX="${2}"
@@ -2191,8 +2250,7 @@ parse_args() {
         fi
         ;;
       *)
-        warning "Passing unrecognized option '${1}' to installer script. This behavior is deprecated and will be removed in the near future. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead."
-        NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${1}"
+        fatal "Unrecognized option '${1}'. If you intended to pass this option to the installer code, please use either --local-build-options or --static-install-options to specify it instead." F050E
         ;;
     esac
     shift 1

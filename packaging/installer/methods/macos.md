@@ -48,7 +48,7 @@ area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
 
 For example: 
 ```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
 ```
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
@@ -93,7 +93,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 
    ```bash
    cd netdata/
-   sudo ./netdata-installer.sh --install /usr/local
+   sudo ./netdata-installer.sh --install-prefix /usr/local
    ```
 
 > Your Netdata configuration directory will be at `/usr/local/netdata/`. 

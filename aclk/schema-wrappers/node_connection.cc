@@ -29,7 +29,7 @@ char *generate_node_instance_connection(size_t *len, const node_instance_connect
     timestamp->set_nanos(tv.tv_usec * 1000);
 
     if (data->capabilities) {
-        struct capability *capa = data->capabilities;
+        const struct capability *capa = data->capabilities;
         while (capa->name) {
             aclk_lib::v1::Capability *proto_capa = msg.add_capabilities();
             capability_set(proto_capa, capa);

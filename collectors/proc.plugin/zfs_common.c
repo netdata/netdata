@@ -67,8 +67,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_arc_target_min_size = rrddim_add(st_arc_size, "min",    "min (hard limit)", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_arc_target_max_size = rrddim_add(st_arc_size, "max",    "max (high water)", 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_arc_size);
 
         rrddim_set_by_pointer(st_arc_size, rd_arc_size,            arcstats.size);
         rrddim_set_by_pointer(st_arc_size, rd_arc_target_size,     arcstats.c);
@@ -105,8 +103,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_l2_asize = rrddim_add(st_l2_size, "actual", NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_l2_size  = rrddim_add(st_l2_size, "size",   NULL, 1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_l2_size);
 
         rrddim_set_by_pointer(st_l2_size, rd_l2_size,  arcstats.l2_size);
         rrddim_set_by_pointer(st_l2_size, rd_l2_asize, arcstats.l2_asize);
@@ -149,8 +145,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             if(arcstats.l2exist)
                 rd_l2read = rrddim_add(st_reads, "l2reads", "l2",       1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_reads);
 
         rrddim_set_by_pointer(st_reads, rd_aread,  aread);
         rrddim_set_by_pointer(st_reads, rd_dread,  dread);
@@ -191,8 +185,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_l2_read_bytes  = rrddim_add(st_l2bytes, "read",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
             rd_l2_write_bytes = rrddim_add(st_l2bytes, "write", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_l2bytes);
 
         rrddim_set_by_pointer(st_l2bytes, rd_l2_read_bytes, arcstats.l2_read_bytes);
         rrddim_set_by_pointer(st_l2bytes, rd_l2_write_bytes, arcstats.l2_write_bytes);
@@ -227,8 +219,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_ahits   = rrddim_add(st_ahits, "hits", NULL,   1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_amisses = rrddim_add(st_ahits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_ahits);
 
         rrddim_set_by_pointer(st_ahits, rd_ahits,   arcstats.hits);
         rrddim_set_by_pointer(st_ahits, rd_amisses, arcstats.misses);
@@ -257,8 +247,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_ahits_rate   = rrddim_add(st_ahits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_amisses_rate = rrddim_add(st_ahits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_ahits_rate);
 
         rrddim_set_by_pointer(st_ahits_rate, rd_ahits_rate,   arcstats.hits);
         rrddim_set_by_pointer(st_ahits_rate, rd_amisses_rate, arcstats.misses);
@@ -293,8 +281,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_dhits   = rrddim_add(st_dhits, "hits",   NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_dmisses = rrddim_add(st_dhits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_dhits);
 
         rrddim_set_by_pointer(st_dhits, rd_dhits,   dhit);
         rrddim_set_by_pointer(st_dhits, rd_dmisses, dmiss);
@@ -323,8 +309,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_dhits_rate   = rrddim_add(st_dhits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_dmisses_rate = rrddim_add(st_dhits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_dhits_rate);
 
         rrddim_set_by_pointer(st_dhits_rate, rd_dhits_rate,   dhit);
         rrddim_set_by_pointer(st_dhits_rate, rd_dmisses_rate, dmiss);
@@ -359,8 +343,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_phits   = rrddim_add(st_phits, "hits",   NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_pmisses = rrddim_add(st_phits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_phits);
 
         rrddim_set_by_pointer(st_phits, rd_phits,   phit);
         rrddim_set_by_pointer(st_phits, rd_pmisses, pmiss);
@@ -389,8 +371,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_phits_rate   = rrddim_add(st_phits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pmisses_rate = rrddim_add(st_phits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_phits_rate);
 
         rrddim_set_by_pointer(st_phits_rate, rd_phits_rate,   phit);
         rrddim_set_by_pointer(st_phits_rate, rd_pmisses_rate, pmiss);
@@ -425,8 +405,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_mhits   = rrddim_add(st_mhits, "hits",   NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_mmisses = rrddim_add(st_mhits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_mhits);
 
         rrddim_set_by_pointer(st_mhits, rd_mhits,   mhit);
         rrddim_set_by_pointer(st_mhits, rd_mmisses, mmiss);
@@ -455,8 +433,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_mhits_rate   = rrddim_add(st_mhits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_mmisses_rate = rrddim_add(st_mhits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_mhits_rate);
 
         rrddim_set_by_pointer(st_mhits_rate, rd_mhits_rate,   mhit);
         rrddim_set_by_pointer(st_mhits_rate, rd_mmisses_rate, mmiss);
@@ -491,8 +467,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_l2hits   = rrddim_add(st_l2hits, "hits",   NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_l2misses = rrddim_add(st_l2hits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_l2hits);
 
         rrddim_set_by_pointer(st_l2hits, rd_l2hits,   l2hit);
         rrddim_set_by_pointer(st_l2hits, rd_l2misses, l2miss);
@@ -521,8 +495,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_l2hits_rate   = rrddim_add(st_l2hits_rate, "hits",   NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_l2misses_rate = rrddim_add(st_l2hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_l2hits_rate);
 
         rrddim_set_by_pointer(st_l2hits_rate, rd_l2hits_rate, l2hit);
         rrddim_set_by_pointer(st_l2hits_rate, rd_l2misses_rate, l2miss);
@@ -564,8 +536,6 @@ void generate_charts_arcstats(const char *plugin, const char *module, int show_z
             rd_mru = rrddim_add(st_list_hits,  "mru",  NULL,        1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_mrug = rrddim_add(st_list_hits, "mrug", "mru ghost", 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_list_hits);
 
         rrddim_set_by_pointer(st_list_hits, rd_mfu, arcstats.mfu_hits);
         rrddim_set_by_pointer(st_list_hits, rd_mru, arcstats.mru_hits);
@@ -630,8 +600,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_most_recent   = rrddim_add(st_arc_size_breakdown, "recent", NULL,   1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
             rd_most_frequent = rrddim_add(st_arc_size_breakdown, "frequent", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL);
         }
-        else
-            rrdset_next(st_arc_size_breakdown);
 
         rrddim_set_by_pointer(st_arc_size_breakdown, rd_most_recent,   mru_size);
         rrddim_set_by_pointer(st_arc_size_breakdown, rd_most_frequent, mfu_size);
@@ -678,8 +646,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_indirect  = rrddim_add(st_memory, "indirect",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 #endif
         }
-        else
-            rrdset_next(st_memory);
 
 #ifndef __FreeBSD__
         rrddim_set_by_pointer(st_memory, rd_direct,    arcstats.memory_direct_count);
@@ -726,8 +692,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_mutex_misses    = rrddim_add(st_important_ops, "mtxmis",  "mutex miss", 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_hash_collisions = rrddim_add(st_important_ops, "hash_collisions", "hash collisions", 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_important_ops);
 
         rrddim_set_by_pointer(st_important_ops, rd_deleted,      arcstats.deleted);
         rrddim_set_by_pointer(st_important_ops, rd_evict_skips,  arcstats.evict_skip);
@@ -764,8 +728,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_actual_hits   = rrddim_add(st_actual_hits, "hits", NULL,   1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_actual_misses = rrddim_add(st_actual_hits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_actual_hits);
 
         rrddim_set_by_pointer(st_actual_hits, rd_actual_hits,   real_hits);
         rrddim_set_by_pointer(st_actual_hits, rd_actual_misses, real_misses);
@@ -794,8 +756,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_actual_hits_rate   = rrddim_add(st_actual_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_actual_misses_rate = rrddim_add(st_actual_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_actual_hits_rate);
 
         rrddim_set_by_pointer(st_actual_hits_rate, rd_actual_hits_rate,   real_hits);
         rrddim_set_by_pointer(st_actual_hits_rate, rd_actual_misses_rate, real_misses);
@@ -830,8 +790,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_demand_data_hits   = rrddim_add(st_demand_data_hits, "hits", NULL,   1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_demand_data_misses = rrddim_add(st_demand_data_hits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_demand_data_hits);
 
         rrddim_set_by_pointer(st_demand_data_hits, rd_demand_data_hits,   arcstats.demand_data_hits);
         rrddim_set_by_pointer(st_demand_data_hits, rd_demand_data_misses, arcstats.demand_data_misses);
@@ -860,8 +818,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_demand_data_hits_rate   = rrddim_add(st_demand_data_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_demand_data_misses_rate = rrddim_add(st_demand_data_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_demand_data_hits_rate);
 
         rrddim_set_by_pointer(st_demand_data_hits_rate, rd_demand_data_hits_rate,   arcstats.demand_data_hits);
         rrddim_set_by_pointer(st_demand_data_hits_rate, rd_demand_data_misses_rate, arcstats.demand_data_misses);
@@ -897,8 +853,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_prefetch_data_hits   = rrddim_add(st_prefetch_data_hits, "hits", NULL,   1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
             rd_prefetch_data_misses = rrddim_add(st_prefetch_data_hits, "misses", NULL, 1, 1, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
         }
-        else
-            rrdset_next(st_prefetch_data_hits);
 
         rrddim_set_by_pointer(st_prefetch_data_hits, rd_prefetch_data_hits,   arcstats.prefetch_data_hits);
         rrddim_set_by_pointer(st_prefetch_data_hits, rd_prefetch_data_misses, arcstats.prefetch_data_misses);
@@ -927,8 +881,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_prefetch_data_hits_rate   = rrddim_add(st_prefetch_data_hits_rate, "hits", NULL,   1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_prefetch_data_misses_rate = rrddim_add(st_prefetch_data_hits_rate, "misses", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else
-            rrdset_next(st_prefetch_data_hits_rate);
 
         rrddim_set_by_pointer(st_prefetch_data_hits_rate, rd_prefetch_data_hits_rate,   arcstats.prefetch_data_hits);
         rrddim_set_by_pointer(st_prefetch_data_hits_rate, rd_prefetch_data_misses_rate, arcstats.prefetch_data_misses);
@@ -963,8 +915,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_hash_elements_current = rrddim_add(st_hash_elements, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_hash_elements_max     = rrddim_add(st_hash_elements, "max",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_hash_elements);
 
         rrddim_set_by_pointer(st_hash_elements, rd_hash_elements_current, arcstats.hash_elements);
         rrddim_set_by_pointer(st_hash_elements, rd_hash_elements_max, arcstats.hash_elements_max);
@@ -999,8 +949,6 @@ void generate_charts_arc_summary(const char *plugin, const char *module, int sho
             rd_hash_chains_current = rrddim_add(st_hash_chains, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_hash_chains_max     = rrddim_add(st_hash_chains, "max",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_hash_chains);
 
         rrddim_set_by_pointer(st_hash_chains, rd_hash_chains_current, arcstats.hash_chains);
         rrddim_set_by_pointer(st_hash_chains, rd_hash_chains_max, arcstats.hash_chain_max);

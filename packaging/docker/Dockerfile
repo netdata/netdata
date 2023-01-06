@@ -76,16 +76,12 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
-    # fping from alpine apk is on a different location. Moving it.
-    ln -snf /usr/sbin/fping /usr/local/bin/fping && \
-    chmod 4755 /usr/local/bin/fping && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
     # Fix handling of config directory
 
 # Long-term this should leverage BuildKit’s mount option.
-COPY --from=builder /wheels /wheels
 COPY --from=builder /app /
 
 # Apply the permissions as described in
@@ -112,8 +108,6 @@ RUN chown -R root:root \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
-    pip --no-cache-dir install /wheels/* && \
-    rm -rf /wheels && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENV NETDATA_LISTENER_PORT 19999

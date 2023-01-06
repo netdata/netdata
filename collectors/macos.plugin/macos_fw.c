@@ -168,13 +168,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
                     }
-                    else rrdset_next(st);
 
                     prev_diskstat.bytes_read = rrddim_set(st, "reads", diskstat.bytes_read);
                     prev_diskstat.bytes_write = rrddim_set(st, "writes", diskstat.bytes_write);
                     rrdset_done(st);
-
-                    // --------------------------------------------------------------------
 
                     /* Get number of reads. */
                     if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsReadsKey)))) {
@@ -207,13 +204,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     }
-                    else rrdset_next(st);
 
                     prev_diskstat.operations_read = rrddim_set(st, "reads", diskstat.reads);
                     prev_diskstat.operations_write = rrddim_set(st, "writes", diskstat.writes);
                     rrdset_done(st);
-
-                    // --------------------------------------------------------------------
 
                     /* Get reads time. */
                     if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsTotalReadTimeKey)))) {
@@ -245,13 +239,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                         rrddim_add(st, "utilization", NULL, 1, 10000000, RRD_ALGORITHM_INCREMENTAL);
                     }
-                    else rrdset_next(st);
 
                     cur_diskstat.busy_time_ns = (diskstat.time_read + diskstat.time_write);
                     prev_diskstat.busy_time_ns = rrddim_set(st, "utilization", cur_diskstat.busy_time_ns);
                     rrdset_done(st);
-
-                    // --------------------------------------------------------------------
 
                     /* Get reads latency. */
                     if (likely(number = (CFNumberRef)CFDictionaryGetValue(statistics, CFSTR(kIOBlockStorageDriverStatisticsLatentReadTimeKey)))) {
@@ -284,7 +275,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_INCREMENTAL);
                         rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_INCREMENTAL);
                     }
-                    else rrdset_next(st);
 
                     cur_diskstat.duration_read_ns = diskstat.time_read + diskstat.latency_read;
                     cur_diskstat.duration_write_ns = diskstat.time_write + diskstat.latency_write;
@@ -292,14 +282,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     prev_diskstat.duration_write_ns = rrddim_set(st, "writes", cur_diskstat.duration_write_ns);
                     rrdset_done(st);
 
-                    // --------------------------------------------------------------------
                     // calculate differential charts
                     // only if this is not the first time we run
 
                     if (likely(dt)) {
-
-                        // --------------------------------------------------------------------
-
                         st = rrdset_find_active_bytype_localhost("disk_await", diskstat.name);
                         if (unlikely(!st)) {
                             st = rrdset_create_localhost(
@@ -321,15 +307,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             rrddim_add(st, "reads", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                         }
-                        else rrdset_next(st);
 
                         rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
                             (cur_diskstat.duration_read_ns - prev_diskstat.duration_read_ns) / (diskstat.reads - prev_diskstat.operations_read) : 0);
                         rrddim_set(st, "writes", (diskstat.writes - prev_diskstat.operations_write) ?
                             (cur_diskstat.duration_write_ns - prev_diskstat.duration_write_ns) / (diskstat.writes - prev_diskstat.operations_write) : 0);
                         rrdset_done(st);
-
-                        // --------------------------------------------------------------------
 
                         st = rrdset_find_active_bytype_localhost("disk_avgsz", diskstat.name);
                         if (unlikely(!st)) {
@@ -352,15 +335,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
                             rrddim_add(st, "reads", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
                             rrddim_add(st, "writes", NULL, -1, 1024, RRD_ALGORITHM_ABSOLUTE);
                         }
-                        else rrdset_next(st);
 
                         rrddim_set(st, "reads", (diskstat.reads - prev_diskstat.operations_read) ?
                             (diskstat.bytes_read - prev_diskstat.bytes_read) / (diskstat.reads - prev_diskstat.operations_read) : 0);
                         rrddim_set(st, "writes", (diskstat.writes - prev_diskstat.operations_write) ?
                             (diskstat.bytes_write - prev_diskstat.bytes_write) / (diskstat.writes - prev_diskstat.operations_write) : 0);
                         rrdset_done(st);
-
-                        // --------------------------------------------------------------------
 
                         st = rrdset_find_active_bytype_localhost("disk_svctm", diskstat.name);
                         if (unlikely(!st)) {
@@ -382,7 +362,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                             rrddim_add(st, "svctm", NULL, 1, 1000000, RRD_ALGORITHM_ABSOLUTE);
                         }
-                        else rrdset_next(st);
 
                         rrddim_set(st, "svctm", ((diskstat.reads - prev_diskstat.operations_read) + (diskstat.writes - prev_diskstat.operations_write)) ?
                             (cur_diskstat.busy_time_ns - prev_diskstat.busy_time_ns) / ((diskstat.reads - prev_diskstat.operations_read) + (diskstat.writes - prev_diskstat.operations_write)) : 0);
@@ -423,7 +402,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
             rrddim_add(st, "in",  NULL,  1, 1024, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "out", NULL, -1, 1024, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "in", total_disk_reads);
         rrddim_set(st, "out", total_disk_writes);
@@ -431,7 +409,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
     }
 
     // Can be merged with FreeBSD plugin
-    // --------------------------------------------------------------------------
 
     if (likely(do_space || do_inodes)) {
         // there is no mount info in sysctl MIBs
@@ -477,8 +454,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "avail", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", mntbuf[i].f_bsize, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(st);
+                    }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_bavail);
                     rrddim_set(st, "used", (collected_number) (mntbuf[i].f_blocks - mntbuf[i].f_bfree));
@@ -510,8 +486,7 @@ int do_macos_iokit(int update_every, usec_t dt) {
                         rrddim_add(st, "avail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "used", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                         rrddim_add(st, "reserved_for_root", "reserved for root", 1, 1, RRD_ALGORITHM_ABSOLUTE);
-                    } else
-                        rrdset_next(st);
+                    }
 
                     rrddim_set(st, "avail", (collected_number) mntbuf[i].f_ffree);
                     rrddim_set(st, "used", (collected_number) (mntbuf[i].f_files - mntbuf[i].f_ffree));
@@ -522,7 +497,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
     }
 
     // Can be merged with FreeBSD plugin
-    // --------------------------------------------------------------------
 
     if (likely(do_bandwidth)) {
         if (unlikely(getifaddrs(&ifap))) {
@@ -533,8 +507,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_LINK)
                         continue;
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_bytype_localhost("net", ifa->ifa_name);
                 if (unlikely(!st)) {
@@ -556,13 +528,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "received", NULL,  8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "sent",     NULL, -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "received", IFA_DATA(ibytes));
                 rrddim_set(st, "sent", IFA_DATA(obytes));
                 rrdset_done(st);
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_bytype_localhost("net_packets", ifa->ifa_name);
                 if (unlikely(!st)) {
@@ -587,15 +556,12 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "multicast_received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "multicast_sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "received", IFA_DATA(ipackets));
                 rrddim_set(st, "sent", IFA_DATA(opackets));
                 rrddim_set(st, "multicast_received", IFA_DATA(imcasts));
                 rrddim_set(st, "multicast_sent", IFA_DATA(omcasts));
                 rrdset_done(st);
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_bytype_localhost("net_errors", ifa->ifa_name);
                 if (unlikely(!st)) {
@@ -618,13 +584,10 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "outbound", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "inbound", IFA_DATA(ierrors));
                 rrddim_set(st, "outbound", IFA_DATA(oerrors));
                 rrdset_done(st);
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_bytype_localhost("net_drops", ifa->ifa_name);
                 if (unlikely(!st)) {
@@ -646,12 +609,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
                     rrddim_add(st, "inbound", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "inbound", IFA_DATA(iqdrops));
                 rrdset_done(st);
-
-                // --------------------------------------------------------------------
 
                 st = rrdset_find_active_bytype_localhost("net_events", ifa->ifa_name);
                 if (unlikely(!st)) {
@@ -675,7 +635,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
                     rrddim_add(st, "collisions", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rrddim_add(st, "carrier", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
-                else rrdset_next(st);
 
                 rrddim_set(st, "collisions", IFA_DATA(collisions));
                 rrdset_done(st);
@@ -684,7 +643,6 @@ int do_macos_iokit(int update_every, usec_t dt) {
             freeifaddrs(ifap);
         }
     }
-
 
     return 0;
 }

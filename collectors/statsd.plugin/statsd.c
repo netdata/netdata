@@ -20,15 +20,10 @@
 
 // --------------------------------------------------------------------------------------
 
+// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
 // #define STATSD_MULTITHREADED 1
 
-#ifdef STATSD_MULTITHREADED
-// DO NOT ENABLE MULTITHREADING - IT IS NOT WELL TESTED
 #define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT)
-#else
-#define STATSD_DICTIONARY_OPTIONS (DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_ADD_IN_FRONT | DICT_OPTION_SINGLE_THREADED)
-#endif
-
 #define STATSD_DECIMAL_DETAIL 1000 // floating point values get multiplied by this, with the same divisor
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -101,6 +96,7 @@ typedef enum statsd_metric_options {
     STATSD_METRIC_OPTION_CHECKED                      = 0x00000040, // set when the charting thread checks this metric for use in charts (its usefulness)
     STATSD_METRIC_OPTION_USEFUL                       = 0x00000080, // set when the charting thread finds the metric useful (i.e. used in a chart)
     STATSD_METRIC_OPTION_COLLECTION_FULL_LOGGED       = 0x00000100, // set when the collection is full for this metric
+    STATSD_METRIC_OPTION_UPDATED_CHART_METADATA       = 0x00000200, // set when the private chart metadata have been updated via tags
 } STATS_METRIC_OPTIONS;
 
 typedef enum statsd_metric_type {
@@ -774,14 +770,20 @@ static void statsd_process_metric(const char *name, const char *value, const cha
             statsd_parse_field_trim(tagvalue, tagvalue_end);
 
             if(tagkey && *tagkey && tagvalue && *tagvalue) {
-                if (!m->units && strcmp(tagkey, "units") == 0)
+                if (strcmp(tagkey, "units") == 0 && (!m->units || strcmp(m->units, tagvalue) != 0)) {
                     m->units = strdupz(tagvalue);
+                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+                }
 
-                if (!m->dimname && strcmp(tagkey, "name") == 0)
+                if (strcmp(tagkey, "name") == 0 && (!m->dimname || strcmp(m->dimname, tagvalue) != 0)) {
                     m->dimname = strdupz(tagvalue);
+                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+                }
 
-                if (!m->family && strcmp(tagkey, "family") == 0)
+                if (strcmp(tagkey, "family") == 0 && (!m->family || strcmp(m->family, tagvalue) != 0)) {
                     m->family = strdupz(tagvalue);
+                    m->options |= STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+                }
             }
         }
     }
@@ -1609,7 +1611,9 @@ static inline RRDSET *statsd_private_rrdset_create(
         , int update_every
         , RRDSET_TYPE chart_type
 ) {
-    statsd.private_charts++;
+    if(!m->st)
+        statsd.private_charts++;
+
     RRDSET *st = rrdset_create_custom(
             localhost         // host
             , type            // type
@@ -1639,7 +1643,9 @@ static inline RRDSET *statsd_private_rrdset_create(
 static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for gauge metric '%s'", m->name);
 
-    if(unlikely(!m->st)) {
+    if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
+        m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, context, "gauge", RRD_ID_LENGTH_MAX);
 
@@ -1665,7 +1671,6 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1,    RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1678,7 +1683,9 @@ static inline void statsd_private_chart_gauge(STATSD_METRIC *m) {
 static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const char *dim, const char *family) {
     debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(unlikely(!m->st)) {
+    if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
+        m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
@@ -1704,7 +1711,6 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1717,7 +1723,9 @@ static inline void statsd_private_chart_counter_or_meter(STATSD_METRIC *m, const
 static inline void statsd_private_chart_set(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for set metric '%s'", m->name);
 
-    if(unlikely(!m->st)) {
+    if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
+        m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, context, "set", RRD_ID_LENGTH_MAX);
 
@@ -1743,7 +1751,6 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->rd_value, m->last);
 
@@ -1756,7 +1763,9 @@ static inline void statsd_private_chart_set(STATSD_METRIC *m) {
 static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
     debug(D_STATSD, "updating private chart for dictionary metric '%s'", m->name);
 
-    if(unlikely(!m->st)) {
+    if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
+        m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, context, "dictionary", RRD_ID_LENGTH_MAX);
 
@@ -1780,7 +1789,6 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     STATSD_METRIC_DICTIONARY_ITEM *t;
     dfe_start_read(m->dictionary.dict, t) {
@@ -1798,7 +1806,9 @@ static inline void statsd_private_chart_dictionary(STATSD_METRIC *m) {
 static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, const char *dim, const char *family, const char *units) {
     debug(D_STATSD, "updating private chart for %s metric '%s'", dim, m->name);
 
-    if(unlikely(!m->st)) {
+    if(unlikely(!m->st || m->options & STATSD_METRIC_OPTION_UPDATED_CHART_METADATA)) {
+        m->options &= ~STATSD_METRIC_OPTION_UPDATED_CHART_METADATA;
+
         char type[RRD_ID_LENGTH_MAX + 1], id[RRD_ID_LENGTH_MAX + 1], context[RRD_ID_LENGTH_MAX + 1];
         statsd_get_metric_type_and_id(m, type, id, context, dim, RRD_ID_LENGTH_MAX);
 
@@ -1830,7 +1840,6 @@ static inline void statsd_private_chart_timer_or_histogram(STATSD_METRIC *m, con
         if(m->options & STATSD_METRIC_OPTION_CHART_DIMENSION_COUNT)
             m->rd_count = rrddim_add(m->st, "events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
-    else rrdset_next(m->st);
 
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_min, m->histogram.ext->last_min);
     rrddim_set_by_pointer(m->st, m->histogram.ext->rd_max, m->histogram.ext->last_max);
@@ -2231,7 +2240,6 @@ static inline void statsd_update_app_chart(STATSD_APP *app, STATSD_APP_CHART *ch
         rrdset_flag_set(chart->st, RRDSET_FLAG_STORE_FIRST);
         // rrdset_flag_set(chart->st, RRDSET_FLAG_DEBUG);
     }
-    else rrdset_next(chart->st);
 
     STATSD_APP_CHART_DIM *dim;
     for(dim = chart->dimensions; dim ;dim = dim->next) {
@@ -2747,7 +2755,7 @@ void *statsd_main(void *ptr) {
     heartbeat_init(&hb);
     while(!netdata_exit) {
         worker_is_idle();
-        usec_t hb_dt = heartbeat_next(&hb, step);
+        heartbeat_next(&hb, step);
 
         worker_is_busy(WORKER_STATSD_FLUSH_GAUGES);
         statsd_flush_index_metrics(&statsd.gauges,     statsd_flush_gauge);
@@ -2777,18 +2785,6 @@ void *statsd_main(void *ptr) {
             break;
 
         if(global_statistics_enabled) {
-            if(likely(hb_dt)) {
-                rrdset_next(st_metrics);
-                rrdset_next(st_useful_metrics);
-                rrdset_next(st_events);
-                rrdset_next(st_reads);
-                rrdset_next(st_bytes);
-                rrdset_next(st_packets);
-                rrdset_next(st_tcp_connects);
-                rrdset_next(st_tcp_connected);
-                rrdset_next(st_pcharts);
-            }
-
             rrddim_set_by_pointer(st_metrics, rd_metrics_gauge,        (collected_number)statsd.gauges.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_counter,      (collected_number)statsd.counters.metrics);
             rrddim_set_by_pointer(st_metrics, rd_metrics_timer,        (collected_number)statsd.timers.metrics);

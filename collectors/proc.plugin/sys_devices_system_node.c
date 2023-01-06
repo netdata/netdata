@@ -127,7 +127,6 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
                     rrddim_add(m->numastat_st, "other_node",     "other",      1, 1, RRD_ALGORITHM_INCREMENTAL);
 
                 }
-                else rrdset_next(m->numastat_st);
 
                 size_t lines = procfile_lines(m->numastat_ff), l;
                 for(l = 0; l < lines; l++) {

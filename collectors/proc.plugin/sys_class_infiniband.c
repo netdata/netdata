@@ -544,8 +544,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 4 * 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
 
                 port->stv_speed = rrdsetvar_custom_chart_variable_add_and_acquire(port->st_bytes, "link_speed");
-            } else
-                rrdset_next(port->st_bytes);
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
@@ -578,8 +577,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Create Dimensions
                 rrdset_flag_set(port->st_packets, RRDSET_FLAG_DETAIL);
                 FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_ADD, port)
-            } else
-                rrdset_next(port->st_packets);
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_SETP, port)
@@ -608,8 +606,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Create Dimensions
                 rrdset_flag_set(port->st_errors, RRDSET_FLAG_DETAIL);
                 FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_ADD, port)
-            } else
-                rrdset_next(port->st_errors);
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_SETP, port)
@@ -658,8 +655,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                             port->name);
                         port->do_hwerrors = CONFIG_BOOLEAN_NO;
                     }
-                } else
-                    rrdset_next(port->st_hwerrors);
+                }
             }
 
             if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
@@ -695,8 +691,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                             port->name);
                         port->do_hwpackets = CONFIG_BOOLEAN_NO;
                     }
-                } else
-                    rrdset_next(port->st_hwpackets);
+                }
             }
 
             // Update values to rrd (done by vendor-specific function)

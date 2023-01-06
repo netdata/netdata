@@ -296,7 +296,9 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     if(unlikely(hb->randomness > tick / 2)) {
         // TODO: The heartbeat tick should be specified at the heartbeat_init() function
         usec_t tmp = (now_realtime_usec() * clock_realtime_resolution) % (tick / 2);
-        info("heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, tmp);
+
+        error_limit_static_global_var(erl, 10, 0);
+        error_limit(&erl, "heartbeat randomness of %llu is too big for a tick of %llu - setting it to %llu", hb->randomness, tick, tmp);
         hb->randomness = tmp;
     }
 
@@ -322,11 +324,13 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
 
     if(unlikely(now < next)) {
         errno = 0;
-        error("heartbeat clock: woke up %llu microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
+        error_limit_static_global_var(erl, 10, 0);
+        error_limit(&erl, "heartbeat clock: woke up %llu microseconds earlier than expected (can be due to the CLOCK_REALTIME set to the past).", next - now);
     }
     else if(unlikely(now - next >  tick / 2)) {
         errno = 0;
-        error("heartbeat clock: woke up %llu microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
+        error_limit_static_global_var(erl, 10, 0);
+        error_limit(&erl, "heartbeat clock: woke up %llu microseconds later than expected (can be due to system load or the CLOCK_REALTIME set to the future).", now - next);
     }
 
     if(unlikely(!hb->realtime)) {
@@ -341,20 +345,21 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
 void sleep_usec(usec_t usec) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
-    struct timespec rem, req = {
+    struct timespec rem = { 0, 0 }, req = {
             .tv_sec = (time_t) (usec / USEC_PER_SEC),
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
 #ifdef __linux__
-    while ((errno = clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem)) != 0) {
+    while (clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem) != 0) {
 #else
-    while ((errno = nanosleep(&req, &rem)) != 0) {
+    while (nanosleep(&req, &rem) != 0) {
 #endif
-        if (likely(errno == EINTR)) {
-            req.tv_sec = rem.tv_sec;
-            req.tv_nsec = rem.tv_nsec;
-        } else {
+        if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
+            req = rem;
+            rem = (struct timespec){ 0, 0 };
+        }
+        else {
 #ifdef __linux__
             error("Cannot clock_nanosleep(CLOCK_REALTIME) for %llu microseconds.", usec);
 #else

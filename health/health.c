@@ -17,9 +17,149 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
+static bool prepare_command(BUFFER *wb,
+                            const char *exec,
+                            const char *recipient,
+                            const char *registry_hostname,
+                            uint32_t unique_id,
+                            uint32_t alarm_id,
+                            uint32_t alarm_event_id,
+                            uint32_t when,
+                            const char *alert_name,
+                            const char *alert_chart_name,
+                            const char *alert_family,
+                            const char *new_status,
+                            const char *old_status,
+                            NETDATA_DOUBLE new_value,
+                            NETDATA_DOUBLE old_value,
+                            const char *alert_source,
+                            uint32_t duration,
+                            uint32_t non_clear_duration,
+                            const char *alert_units,
+                            const char *alert_info,
+                            const char *new_value_string,
+                            const char *old_value_string,
+                            const char *source,
+                            const char *error_msg,
+                            int n_warn,
+                            int n_crit,
+                            const char *warn_alarms,
+                            const char *crit_alarms,
+                            const char *classification,
+                            const char *edit_command,
+                            const char *machine_guid)
+{
+    char buf[8192];
+    size_t n = 8192 - 1;
+
+    buffer_strcat(wb, "exec");
+
+    if (!sanitize_command_argument_string(buf, exec, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, recipient, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, registry_hostname, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%u'", unique_id);
+
+    buffer_sprintf(wb, " '%u'", alarm_id);
+
+    buffer_sprintf(wb, " '%u'", alarm_event_id);
+
+    buffer_sprintf(wb, " '%u'", when);
+
+    if (!sanitize_command_argument_string(buf, alert_name, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_chart_name, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_family, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, new_status, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, old_status, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '" NETDATA_DOUBLE_FORMAT_ZERO "'", new_value);
+
+    buffer_sprintf(wb, " '" NETDATA_DOUBLE_FORMAT_ZERO "'", old_value);
+
+    if (!sanitize_command_argument_string(buf, alert_source, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%u'", duration);
+
+    buffer_sprintf(wb, " '%u'", non_clear_duration);
+
+    if (!sanitize_command_argument_string(buf, alert_units, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, alert_info, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, new_value_string, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, old_value_string, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, source, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, error_msg, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    buffer_sprintf(wb, " '%d'", n_warn);
+
+    buffer_sprintf(wb, " '%d'", n_crit);
+
+    if (!sanitize_command_argument_string(buf, warn_alarms, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, crit_alarms, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, classification, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, edit_command, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    if (!sanitize_command_argument_string(buf, machine_guid, n))
+        return false;
+    buffer_sprintf(wb, " '%s'", buf);
+
+    return true;
+}
 
 unsigned int default_health_enabled = 1;
 char *silencers_filename;
+SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 
 // the queue of executed alarm notifications that haven't been waited for yet
 static __thread struct {
@@ -235,7 +375,6 @@ static inline RRDCALC_STATUS rrdcalc_value2status(NETDATA_DOUBLE n) {
     return RRDCALC_STATUS_CLEAR;
 }
 
-#define ALARM_EXEC_COMMAND_LENGTH 8192
 #define ACTIVE_ALARMS_LIST_EXAMINE 500
 #define ACTIVE_ALARMS_LIST 15
 
@@ -306,8 +445,6 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
-    static char command_to_run[ALARM_EXEC_COMMAND_LENGTH + 1];
-
     const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health_default_exec);
     const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health_default_recipient);
 
@@ -375,49 +512,53 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    snprintfz(command_to_run, ALARM_EXEC_COMMAND_LENGTH, "exec %s '%s' '%s' '%u' '%u' '%u' '%lu' '%s' '%s' '%s' '%s' '%s' '" NETDATA_DOUBLE_FORMAT_ZERO
-        "' '" NETDATA_DOUBLE_FORMAT_ZERO
-        "' '%s' '%u' '%u' '%s' '%s' '%s' '%s' '%s' '%s' '%d' '%d' '%s' '%s' '%s' '%s' '%s'",
-              exec,
-              recipient,
-              rrdhost_registry_hostname(host),
-              ae->unique_id,
-              ae->alarm_id,
-              ae->alarm_event_id,
-              (unsigned long)ae->when,
-              ae_name(ae),
-              ae->chart?ae_chart_name(ae):"NOCHART",
-              ae->family?ae_family(ae):"NOFAMILY",
-              rrdcalc_status2string(ae->new_status),
-              rrdcalc_status2string(ae->old_status),
-              ae->new_value,
-              ae->old_value,
-              ae->source?ae_source(ae):"UNKNOWN",
-              (uint32_t)ae->duration,
-              (uint32_t)ae->non_clear_duration,
-              ae_units(ae),
-              ae_info(ae),
-              ae_new_value_string(ae),
-              ae_old_value_string(ae),
-              (expr && expr->source)?expr->source:"NOSOURCE",
-              (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
-              n_warn,
-              n_crit,
-              buffer_tostring(warn_alarms),
-              buffer_tostring(crit_alarms),
-              ae->classification?ae_classification(ae):"Unknown",
-              edit_command,
-              host != localhost ? host->machine_guid:""
-    );
+    BUFFER *wb = buffer_create(8192);
+    bool ok = prepare_command(wb,
+                              exec,
+                              recipient,
+                              rrdhost_registry_hostname(host),
+                              ae->unique_id,
+                              ae->alarm_id,
+                              ae->alarm_event_id,
+                              (unsigned long)ae->when,
+                              ae_name(ae),
+                              ae->chart?ae_chart_name(ae):"NOCHART",
+                              ae->family?ae_family(ae):"NOFAMILY",
+                              rrdcalc_status2string(ae->new_status),
+                              rrdcalc_status2string(ae->old_status),
+                              ae->new_value,
+                              ae->old_value,
+                              ae->source?ae_source(ae):"UNKNOWN",
+                              (uint32_t)ae->duration,
+                              (uint32_t)ae->non_clear_duration,
+                              ae_units(ae),
+                              ae_info(ae),
+                              ae_new_value_string(ae),
+                              ae_old_value_string(ae),
+                              (expr && expr->source)?expr->source:"NOSOURCE",
+                              (expr && expr->error_msg)?buffer_tostring(expr->error_msg):"NOERRMSG",
+                              n_warn,
+                              n_crit,
+                              buffer_tostring(warn_alarms),
+                              buffer_tostring(crit_alarms),
+                              ae->classification?ae_classification(ae):"Unknown",
+                              edit_command,
+                              host != localhost ? host->machine_guid:"");
 
-    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-    ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
+    const char *command_to_run = buffer_tostring(wb);
+    if (ok) {
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
+        ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
 
-    debug(D_HEALTH, "executing command '%s'", command_to_run);
-    ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
-    ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
-    enqueue_alarm_notify_in_progress(ae);
+        debug(D_HEALTH, "executing command '%s'", command_to_run);
+        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+        ae->exec_spawn_serial = spawn_enq_cmd(command_to_run);
+        enqueue_alarm_notify_in_progress(ae);
+    } else {
+        error("Failed to format command arguments");
+    }
 
+    buffer_free(wb);
     freez(edit_command);
     buffer_free(warn_alarms);
     buffer_free(crit_alarms);
@@ -601,18 +742,9 @@ static void health_thread_cleanup(void *ptr) {
     struct health_state *h = ptr;
     h->host->health_spawn = 0;
 
-    netdata_thread_detach(netdata_thread_self());
+    netdata_thread_cancel(netdata_thread_self());
     log_health("[%s]: Health thread ended.", rrdhost_hostname(h->host));
     debug(D_HEALTH, "HEALTH %s: Health thread ended.", rrdhost_hostname(h->host));
-}
-
-void health_thread_stop(RRDHOST *host) {
-    if(host->health_spawn) {
-        log_health("[%s]: Signaling health thread to stop...", rrdhost_hostname(host));
-
-        // signal it to cancel
-        netdata_thread_cancel(host->health_thread);
-    }
 }
 
 static void initialize_health(RRDHOST *host, int is_localhost) {
@@ -637,6 +769,8 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     }
     else
         host->health_log.max = (unsigned int)n;
+
+    conf_enabled_alarms = simple_pattern_create(config_get(CONFIG_SECTION_HEALTH, "enabled alarms", "*"), NULL, SIMPLE_PATTERN_EXACT);
 
     netdata_rwlock_init(&host->health_log.alarm_log_rwlock);
 
@@ -701,13 +835,15 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
     health_silencers_init();
 }
 
-static void health_sleep(time_t next_run, unsigned int loop) {
+static void health_sleep(time_t next_run, unsigned int loop __maybe_unused, RRDHOST *host) {
     time_t now = now_realtime_sec();
     if(now < next_run) {
         worker_is_idle();
         debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration in %d secs", loop, (int) (next_run - now));
-        sleep_usec(USEC_PER_SEC * (usec_t) (next_run - now));
-        now = now_realtime_sec();
+        while (now < next_run && host->health_enabled && !netdata_exit) {
+            sleep_usec(USEC_PER_SEC);
+            now = now_realtime_sec();
+        }
     }
     else {
         debug(D_HEALTH, "Health monitoring iteration no %u done. Next iteration now", loop);
@@ -795,9 +931,6 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
         if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
-        if(unlikely(rrdset_is_ar_chart(st)))
-            continue;
-
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
         if(!st->rrdfamily)
@@ -809,7 +942,6 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
         rrddimvar_index_init(st);
 
         rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "collected_total_raw", RRDVAR_TYPE_TOTAL, &st->last_collected_total, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
         rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
@@ -890,7 +1022,7 @@ void *health_main(void *ptr) {
 #ifdef ENABLE_ACLK
     unsigned int marked_aclk_reload_loop = 0;
 #endif
-    while(!netdata_exit) {
+    while(!netdata_exit && host->health_enabled) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
@@ -932,13 +1064,13 @@ void *health_main(void *ptr) {
 
             host->health_delay_up_to = now + hibernation_delay;
             next_run = now + hibernation_delay;
-            health_sleep(next_run, loop);
+            health_sleep(next_run, loop, host);
         }
 
         if (unlikely(host->health_delay_up_to)) {
             if (unlikely(now < host->health_delay_up_to)) {
                 next_run = host->health_delay_up_to;
-                health_sleep(next_run, loop);
+                health_sleep(next_run, loop, host);
                 continue;
             }
 
@@ -946,15 +1078,11 @@ void *health_main(void *ptr) {
             host->health_delay_up_to = 0;
         }
 
-        if (unlikely(!host->health_enabled)) {
-            health_thread_stop(host);
-        }
-
         // wait until cleanup of obsolete charts on children is complete
         if (host != localhost) {
             if (unlikely(host->trigger_chart_obsoletion_check == 1)) {
                 log_health("[%s]: Waiting for chart obsoletion check.", rrdhost_hostname(host));
-                health_sleep(next_run, loop);
+                health_sleep(next_run, loop, host);
                 continue;
             }
         }
@@ -1054,7 +1182,8 @@ void *health_main(void *ptr) {
                                               0, rc->options,
                                               &rc->db_after,&rc->db_before,
                                               NULL, NULL, NULL,
-                                              &value_is_null, NULL, 0, 0);
+                                              &value_is_null, NULL, 0, 0,
+                                              QUERY_SOURCE_HEALTH);
 
                 if (unlikely(ret != 200)) {
                     // database lookup failed
@@ -1417,7 +1546,7 @@ void *health_main(void *ptr) {
         if(unlikely(netdata_exit))
             break;
 
-        health_sleep(next_run, loop);
+        health_sleep(next_run, loop, host);
 
     } // forever
 
@@ -1428,11 +1557,14 @@ void *health_main(void *ptr) {
 void health_add_host_labels(void) {
     DICTIONARY *labels = localhost->rrdlabels;
 
+    // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).
+    // Their export seems to break exporting to Graphite, see https://github.com/netdata/netdata/issues/14084.
+
     int is_ephemeral = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "is ephemeral", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "_is_ephemeral", is_ephemeral ? "true" : "false", RRDLABEL_SRC_AUTO);
 
     int has_unstable_connection = appconfig_get_boolean(&netdata_config, CONFIG_SECTION_HEALTH, "has unstable connection", CONFIG_BOOLEAN_NO);
-    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_CONFIG);
+    rrdlabels_add(labels, "_has_unstable_connection", has_unstable_connection ? "true" : "false", RRDLABEL_SRC_AUTO);
 }
 
 void health_thread_spawn(RRDHOST * host) {

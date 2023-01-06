@@ -13,6 +13,7 @@
 #include "aclk_rx_msgs.h"
 #include "https_client.h"
 #include "schema-wrappers/schema_wrappers.h"
+#include "aclk_capas.h"
 
 #include "aclk_proxy.h"
 
@@ -59,6 +60,26 @@ struct aclk_shared_state aclk_shared_state = {
     .mqtt_shutdown_msg_id = -1,
     .mqtt_shutdown_msg_rcvd = 0
 };
+
+#ifdef MQTT_WSS_DEBUG
+#include <openssl/ssl.h>
+#define DEFAULT_SSKEYLOGFILE_NAME "SSLKEYLOGFILE"
+const char *ssl_log_filename = NULL;
+FILE *ssl_log_file = NULL;
+static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
+{
+    (void)ssl;
+    if (!ssl_log_file)
+        ssl_log_file = fopen(ssl_log_filename, "a");
+    if (!ssl_log_file) {
+        error("Couldn't open ssl_log file (%s) for append.", ssl_log_filename);
+        return;
+    }
+    fputs(line, ssl_log_file);
+    putc('\n', ssl_log_file);
+    fflush(ssl_log_file);
+}
+#endif
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
 OSSL_DECODER_CTX *aclk_dctx = NULL;
@@ -287,7 +308,7 @@ static void puback_callback(uint16_t packet_id)
 
 static int read_query_thread_count()
 {
-    int threads = MIN(processors/2, 6);
+    int threads = MIN(get_system_cpus()/2, 6);
     threads = MAX(threads, 2);
     threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
     if(threads < 1) {
@@ -511,7 +532,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 
         struct mqtt_wss_proxy proxy_conf = { .host = NULL, .port = 0, .username = NULL, .password = NULL, .type = MQTT_WSS_DIRECT };
-        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, &proxy_conf.type);
+        aclk_set_proxy((char**)&proxy_conf.host, &proxy_conf.port, (char**)&proxy_conf.username, (char**)&proxy_conf.password, &proxy_conf.type);
 
         struct mqtt_connect_params mqtt_conn_params = {
             .clientid   = "anon",
@@ -609,7 +630,10 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         freez((char*)mqtt_conn_params.username);
 #endif
 
-        freez((char *)mqtt_conn_params.will_msg);
+        freez((char*)mqtt_conn_params.will_msg);
+        freez((char*)proxy_conf.host);
+        freez((char*)proxy_conf.username);
+        freez((char*)proxy_conf.password);
 
         if (!ret) {
             last_conn_time_mqtt = now_realtime_sec();
@@ -676,6 +700,18 @@ void *aclk_main(void *ptr)
         goto exit;
     }
 
+#ifdef MQTT_WSS_DEBUG
+    size_t default_ssl_log_filename_size = strlen(netdata_configured_log_dir) + strlen(DEFAULT_SSKEYLOGFILE_NAME) + 2;
+    char *default_ssl_log_filename = mallocz(default_ssl_log_filename_size);
+    snprintfz(default_ssl_log_filename, default_ssl_log_filename_size, "%s/%s", netdata_configured_log_dir, DEFAULT_SSKEYLOGFILE_NAME);
+    ssl_log_filename = config_get(CONFIG_SECTION_CLOUD, "aclk ssl keylog file", default_ssl_log_filename);
+    freez(default_ssl_log_filename);
+    if (ssl_log_filename) {
+        error_report("SSLKEYLOGFILE active (path:\"%s\")!", ssl_log_filename);
+        mqtt_wss_set_SSL_CTX_keylog_cb(mqttwss_client, aclk_ssl_keylog_cb);
+    }
+#endif
+
     // Enable MQTT buffer growth if necessary
     // e.g. old cloud architecture clients with huge nodes
     // that send JSON payloads of 10 MB as single messages
@@ -711,6 +747,11 @@ void *aclk_main(void *ptr)
     } while (!netdata_exit);
 
     aclk_graceful_disconnect(mqttwss_client);
+
+#ifdef MQTT_WSS_DEBUG
+    if (ssl_log_file)
+        fclose(ssl_log_file);
+#endif
 
 exit_full:
 // Tear Down
@@ -779,14 +820,7 @@ void aclk_host_state_update(RRDHOST *host, int cmd)
     node_state_update.node_id = mallocz(UUID_STR_LEN);
     uuid_unparse_lower(node_id, (char*)node_state_update.node_id);
 
-    struct capability caps[] = {
-        { .name = "proto", .version = 1,                     .enabled = 1 },
-        { .name = "ml",    .version = ml_capable(localhost), .enabled = ml_enabled(host) },
-        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1,                     .enabled = 1 },
-        { .name = NULL,    .version = 0,                     .enabled = 0 }
-    };
-    node_state_update.capabilities = caps;
+    node_state_update.capabilities = aclk_get_agent_capas();
 
     rrdhost_aclk_state_lock(localhost);
     node_state_update.claim_id = localhost->aclk_state.claimed_id;
@@ -825,14 +859,7 @@ void aclk_send_node_instances()
             uuid_unparse_lower(list->host_id, host_id);
 
             RRDHOST *host = rrdhost_find_by_guid(host_id);
-            struct capability caps[] = {
-                { .name = "proto", .version = 1,                     .enabled = 1 },
-                { .name = "ml",    .version = ml_capable(localhost), .enabled = host ? ml_enabled(host) : 0 },
-                { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-                { .name = "ctx",   .version = 1,                     .enabled = 1 },
-                { .name = NULL,    .version = 0,                     .enabled = 0 }
-            };
-            node_state_update.capabilities = caps;
+            node_state_update.capabilities = aclk_get_node_instance_capas(host);
 
             rrdhost_aclk_state_lock(localhost);
             node_state_update.claim_id = localhost->aclk_state.claimed_id;
@@ -841,6 +868,8 @@ void aclk_send_node_instances()
             info("Queuing status update for node=%s, live=%d, hops=%d",(char*)node_state_update.node_id,
                  list->live,
                  list->hops);
+
+            freez((void*)node_state_update.capabilities);
             freez((void*)node_state_update.node_id);
             query->data.bin_payload.msg_name = "UpdateNodeInstanceConnection";
             query->data.bin_payload.topic = ACLK_TOPICID_NODE_CONN;

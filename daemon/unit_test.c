@@ -2,6 +2,61 @@
 
 #include "common.h"
 
+static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
+    bool ok = sanitize_command_argument_string(dst, src, dst_size);
+
+    if (!expected)
+        return ok == false;
+
+    return strcmp(expected, dst) == 0;
+}
+
+bool command_argument_sanitization_tests() {
+    char dst[1024];
+
+    for (size_t i = 0; i != 5; i++)  {
+        const char *expected = i == 4 ? "'\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "'", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 9; i++)  {
+        const char *expected = i == 8 ? "'\\'''\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "''", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 7; i++)  {
+        const char *expected = i == 6 ? "'\\''a" : NULL;
+        if (cmd_arg_sanitization_test(expected, "'a", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 7; i++)  {
+        const char *expected = i == 6 ? "a'\\''" : NULL;
+        if (cmd_arg_sanitization_test(expected, "a'", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n", expected, dst);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i != 22; i++)  {
+        const char *expected = i == 21 ? "foo'\\''a'\\'''\\'''\\''b" : NULL;
+        if (cmd_arg_sanitization_test(expected, "--foo'a'''b", dst, i) == false) {
+            fprintf(stderr, "expected: >>>%s<<<, got: >>>%s<<<\n length: %zu\n", expected, dst, strlen(dst));
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int check_number_printing(void) {
     struct {
         NETDATA_DOUBLE n;
@@ -1206,7 +1261,9 @@ int run_test(struct test *test)
             rrddim_set(st, "dim2", test->feed2[c]);
         }
 
-        rrdset_done(st);
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st, now, false);
 
         // align the first entry to second boundary
         if(!c) {
@@ -1797,7 +1854,10 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         for (j = 0; j < DIMS; ++j) {
             rrddim_set_by_pointer_fake_time(rd[i][j], 69, 2 * API_RELATIVE_TIME_MAX); // set first value to 69
         }
-        rrdset_done(st[i]);
+
+        struct timeval now;
+        now_realtime_timeval(&now);
+        rrdset_timed_done(st[i], now, false);
     }
     // Fluh pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
@@ -1831,7 +1891,8 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
     }
     for (c = 0; c < REGION_POINTS[current_region] ; ++c) {
         time_now += update_every; // time_now = start + (c + 1) * update_every
-        for (i = 0 ; i < CHARTS ; ++i) {
+
+         for (i = 0 ; i < CHARTS ; ++i) {
             st[i]->usec_since_last_update = USEC_PER_SEC * update_every;
 
             for (j = 0; j < DIMS; ++j) {
@@ -1839,7 +1900,12 @@ static time_t test_dbengine_create_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS
                        j * REGION_POINTS[current_region] + c;
                 rrddim_set_by_pointer_fake_time(rd[i][j], next, time_now);
             }
-            rrdset_done(st[i]);
+
+            struct timeval now;
+            now.tv_sec = time_now;
+            now.tv_usec = 0;
+
+            rrdset_timed_done(st[i], now, false);
         }
     }
     return time_now; //time_end
@@ -1927,7 +1993,7 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start, time_end,
                                   RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
-                                  NULL, NULL, 0, 0);
+                                  NULL, NULL, 0, 0, QUERY_SOURCE_UNITTEST);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
@@ -2065,7 +2131,7 @@ int test_dbengine(void)
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start[0] + update_every,
                                   time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
-                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0);
+                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0, QUERY_SOURCE_UNITTEST);
 
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));

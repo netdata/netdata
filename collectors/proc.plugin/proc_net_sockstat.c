@@ -244,7 +244,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_used = rrddim_add(st, "used", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_used, (collected_number)sockstat_root.sockets_used);
         rrdset_done(st);
@@ -287,7 +286,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_timewait = rrddim_add(st, "timewait",  NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.tcp_inuse);
         rrddim_set_by_pointer(st, rd_orphan,   (collected_number)sockstat_root.tcp_orphan);
@@ -323,7 +321,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.tcp_mem);
         rrdset_done(st);
@@ -357,7 +354,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.udp_inuse);
         rrdset_done(st);
@@ -391,7 +387,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.udp_mem);
         rrdset_done(st);
@@ -425,7 +420,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.udplite_inuse);
         rrdset_done(st);
@@ -459,7 +453,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.raw_inuse);
         rrdset_done(st);
@@ -493,7 +486,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.frag_inuse);
         rrdset_done(st);
@@ -527,7 +519,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.frag_memory);
         rrdset_done(st);

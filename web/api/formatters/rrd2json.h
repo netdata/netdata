@@ -78,6 +78,7 @@ int rrdset2value_api_v1(
         , NETDATA_DOUBLE *anomaly_rate
         , time_t timeout
         , size_t tier
+        , QUERY_SOURCE query_source
 );
 
 #endif /* NETDATA_RRD2JSON_H */

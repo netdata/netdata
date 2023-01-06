@@ -203,10 +203,6 @@ APPS_PLUGIN_FILES = \
     $(LIBNETDATA_FILES) \
     $(NULL)
 
-CHECKS_PLUGIN_FILES = \
-    collectors/checks.plugin/plugin_checks.c \
-    $(NULL)
-
 FREEBSD_PLUGIN_FILES = \
     collectors/freebsd.plugin/plugin_freebsd.c \
     collectors/freebsd.plugin/plugin_freebsd.h \
@@ -240,10 +236,15 @@ ML_FILES += \
     ml/ADCharts.cc \
     ml/Config.h \
     ml/Config.cc \
+    ml/Chart.cc \
+    ml/Chart.h \
+    ml/Stats.h \
     ml/Dimension.cc \
     ml/Dimension.h \
     ml/Host.h \
     ml/Host.cc \
+    ml/Mutex.h \
+    ml/Queue.h \
     ml/Query.h \
     ml/KMeans.h \
     ml/KMeans.cc \
@@ -264,13 +265,6 @@ ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
-endif
-
-
-if ENABLE_ML_TESTS
-ML_TESTS_FILES = \
-    ml/SamplesBufferTests.cc \
-    $(NULL)
 endif
 
 IDLEJITTER_PLUGIN_FILES = \
@@ -690,6 +684,8 @@ ACLK_FILES = \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
     aclk/aclk_contexts_api.h \
+    aclk/aclk_capas.c \
+    aclk/aclk_capas.h \
     aclk/helpers/mqtt_wss_pal.h \
     aclk/helpers/ringbuffer_pal.h \
     aclk/schema-wrappers/connection.cc \
@@ -738,6 +734,10 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/MQTT-C/include/mqtt.h
 
 libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -I$(srcdir)/aclk/helpers
+
+if MQTT_WSS_DEBUG
+libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG
+endif
 
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
@@ -916,10 +916,8 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
-    $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
-    $(ML_TESTS_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
@@ -1005,11 +1003,6 @@ if ENABLE_ACLK
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(NULL)
-endif
-
-if ENABLE_ML_TESTS
-    netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
-        $(NULL)
 endif
 
 netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@

@@ -98,9 +98,10 @@ struct dictionary_stats {
 
     // spin locks
     struct {
-        size_t use;                 // number of times a reference to item had to spin to acquire it or ignore it
-        size_t search;              // number of times a successful search result had to be thrown away
-        size_t insert;              // number of times an insertion to the hash table had to be repeated
+        size_t use_spins;           // number of times a reference to item had to spin to acquire it or ignore it
+        size_t search_spins;        // number of times a successful search result had to be thrown away
+        size_t insert_spins;        // number of times an insertion to the hash table had to be repeated
+        size_t delete_spins;        // number of times a deletion had to spin to get a decision
     } spin_locks;
 };
 
@@ -230,9 +231,11 @@ size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item
 #define dictionary_walkthrough_write(dict, callback, data) dictionary_walkthrough_rw(dict, 'w', callback, data)
 int dictionary_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *value, void *data), void *data);
 
-#define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data)
-#define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data)
-int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data);
+typedef int (*dictionary_sorted_compar)(const DICTIONARY_ITEM **item1, const DICTIONARY_ITEM **item2);
+
+#define dictionary_sorted_walkthrough_read(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'r', callback, data, NULL)
+#define dictionary_sorted_walkthrough_write(dict, callback, data) dictionary_sorted_walkthrough_rw(dict, 'w', callback, data, NULL)
+int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(const DICTIONARY_ITEM *item, void *entry, void *data), void *data, dictionary_sorted_compar compar);
 
 // ----------------------------------------------------------------------------
 // Traverse with foreach

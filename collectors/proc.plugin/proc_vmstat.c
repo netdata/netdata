@@ -138,7 +138,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             rd_in  = rrddim_add(st_swapio, "in",  NULL,  sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_swapio, "out", NULL, -sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_swapio);
 
         rrddim_set_by_pointer(st_swapio, rd_in, pswpin);
         rrddim_set_by_pointer(st_swapio, rd_out, pswpout);
@@ -170,7 +169,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_io);
 
         rrddim_set_by_pointer(st_io, rd_in, pgpgin);
         rrddim_set_by_pointer(st_io, rd_out, pgpgout);
@@ -204,7 +202,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             rd_minor = rrddim_add(st_pgfaults, "minor", NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_major = rrddim_add(st_pgfaults, "major", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_pgfaults);
 
         rrddim_set_by_pointer(st_pgfaults, rd_minor, pgfault);
         rrddim_set_by_pointer(st_pgfaults, rd_major, pgmajfault);
@@ -240,7 +237,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
 
             rd_oom_kill = rrddim_add(st_oom_kill, "kills", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_oom_kill);
 
         rrddim_set_by_pointer(st_oom_kill, rd_oom_kill, oom_kill);
         rrdset_done(st_oom_kill);
@@ -295,7 +291,6 @@ int do_proc_vmstat(int update_every, usec_t dt) {
             rd_hint_faults_local = rrddim_add(st_numa, "hint_faults_local", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_migrated    = rrddim_add(st_numa, "pages_migrated",    NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_numa);
 
         rrddim_set_by_pointer(st_numa, rd_local,             numa_local);
         rrddim_set_by_pointer(st_numa, rd_foreign,           numa_foreign);

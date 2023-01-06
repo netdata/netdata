@@ -275,8 +275,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         }
     }
 
-    // --------------------------------------------------------------------
-
     if(do_net == 2) {
         static RRDSET *st = NULL;
         static RRDDIM *rd_udp = NULL,
@@ -303,7 +301,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             rd_udp = rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_tcp = rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         // ignore net_count, net_tcp_connections
         (void)net_count;
@@ -313,8 +310,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_tcp, net_tcp_count);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
         static RRDSET *st = NULL;
@@ -343,15 +338,12 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             rd_retransmits  = rrddim_add(st, "retransmits",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_auth_refresh = rrddim_add(st, "auth_refresh", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_calls,        rpc_calls);
         rrddim_set_by_pointer(st, rd_retransmits,  rpc_retransmits);
         rrddim_set_by_pointer(st, rd_auth_refresh, rpc_auth_refresh);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc2 == 2) {
         static RRDSET *st = NULL;
@@ -371,7 +363,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc2_values[i].present ; i++) {
@@ -383,8 +374,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc3 == 2) {
         static RRDSET *st = NULL;
@@ -404,7 +393,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc3_values[i].present ; i++) {
@@ -416,8 +404,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
@@ -437,7 +423,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc4_values[i].present ; i++) {

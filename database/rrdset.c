@@ -100,11 +100,6 @@ struct rrdset_constructor {
 
 // the constructor - the dictionary is write locked while this runs
 static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *constructor_data) {
-    static STRING *anomaly_rates_chart = NULL;
-
-    if(unlikely(!anomaly_rates_chart))
-        anomaly_rates_chart = string_strdupz(ML_ANOMALY_RATES_CHART_ID);
-
     struct rrdset_constructor *ctr = constructor_data;
     RRDHOST *host = ctr->host;
     RRDSET *st = rrdset;
@@ -140,13 +135,11 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
     st->rrdhost = host;
 
-    st->flags = RRDSET_FLAG_SYNC_CLOCK | RRDSET_FLAG_INDEXED_ID;
-
-    if(host == localhost || !host->receiver || !stream_has_capability(host->receiver, STREAM_CAP_REPLICATION))
-        st->flags |= RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED;
-
-    if(unlikely(st->id == anomaly_rates_chart))
-        st->flags |= RRDSET_FLAG_ANOMALY_RATE_CHART;
+    st->flags =   RRDSET_FLAG_SYNC_CLOCK
+                | RRDSET_FLAG_INDEXED_ID
+                | RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED
+                | RRDSET_FLAG_SENDER_REPLICATION_FINISHED
+                ;
 
     netdata_rwlock_init(&st->alerts.rwlock);
 
@@ -185,6 +178,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->red = NAN;
 
     ctr->react_action = RRDSET_REACT_NEW;
+
+    ml_chart_new(st);
 }
 
 // the destructor - the dictionary is write locked while this runs
@@ -238,6 +233,9 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     // 7. destroy the chart labels
     rrdlabels_destroy(st->rrdlabels);  // destroy the labels, after letting the contexts know
+
+    // 8. destroy the ml handle
+    ml_chart_delete(st);
 
     rrdset_memory_file_free(st);                // remove files of db mode save and map
 
@@ -325,6 +323,16 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
         string_freez(old_units);
     }
 
+    if(ctr->family && *ctr->family) {
+        STRING *old_family = st->family;
+        st->family = rrd_string_strdupz(ctr->family);
+        if(old_family != st->family)
+            ctr->react_action |= RRDSET_REACT_UPDATED;
+        string_freez(old_family);
+
+        // TODO - we should rename RRDFAMILY variables
+    }
+
     if(ctr->context && *ctr->context) {
         STRING *old_context = st->context;
         st->context = rrd_string_strdupz(ctr->context);
@@ -355,7 +363,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     st->last_accessed_time = now_realtime_sec();
 
-    if((host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) && !rrdset_is_ar_chart(st)) {
+    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }
@@ -364,6 +372,21 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
         if (ctr->react_action & RRDSET_REACT_NEW) {
             if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid))) {
                 uuid_generate(st->chart_uuid);
+                bool found_in_sql = false; (void)found_in_sql;
+
+//                bool found_in_sql = true;
+//                if(unlikely(sql_find_chart_uuid(host, st, &st->chart_uuid))) {
+//                    uuid_generate(st->chart_uuid);
+//                    found_in_sql = false;
+//                }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+                char uuid_str[UUID_STR_LEN];
+                uuid_unparse_lower(st->chart_uuid, uuid_str);
+                error_report("Chart UUID for host %s chart [%s] not found in context. It is now set to %s (%s)",
+                             string2str(host->hostname),
+                             string2str(st->name), uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
+#endif
             }
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
@@ -524,6 +547,24 @@ time_t rrdset_first_entry_t(RRDSET *st) {
     rrddim_foreach_read(rd, st) {
         time_t t = rrddim_first_entry_t(rd);
         if(t < first_entry_t)
+            first_entry_t = t;
+    }
+    rrddim_foreach_done(rd);
+
+    if (unlikely(LONG_MAX == first_entry_t)) return 0;
+    return first_entry_t;
+}
+
+time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier) {
+    if(unlikely(tier > storage_tiers))
+        return 0;
+
+    RRDDIM *rd;
+    time_t first_entry_t = LONG_MAX;
+
+    rrddim_foreach_read(rd, st) {
+        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
+        if(t && t < first_entry_t)
             first_entry_t = t;
     }
     rrddim_foreach_done(rd);
@@ -1010,12 +1051,14 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
     return last_updated_ut;
 }
 
+static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
+
 static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
     time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
     return now + loop - ((now + loop) % loop);
 }
 
-void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
+void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
     if (unlikely(!t->next_point_time))
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
 
@@ -1043,6 +1086,7 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
                 0, SN_FLAG_NONE);
         }
 
+        rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
         t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
     }
@@ -1073,10 +1117,39 @@ void store_metric_at_tier(RRDDIM *rd, struct rrddim_tier *t, STORAGE_POINT sp, u
         }
     }
 }
-
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+void rrddim_store_metric_with_trace(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags, const char *function) {
+#else // !NETDATA_LOG_COLLECTION_ERRORS
 void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+#endif // !NETDATA_LOG_COLLECTION_ERRORS
+#ifdef NETDATA_LOG_COLLECTION_ERRORS
+    rd->rrddim_store_metric_count++;
+
+    if(likely(rd->rrddim_store_metric_count > 1)) {
+        usec_t expected = rd->rrddim_store_metric_last_ut + rd->update_every * USEC_PER_SEC;
+
+        if(point_end_time_ut != rd->rrddim_store_metric_last_ut) {
+            internal_error(true,
+                           "%s COLLECTION: 'host:%s/chart:%s/dim:%s' granularity %d, collection %zu, expected to store at tier 0 a value at %llu, but it gave %llu [%s%llu usec] (called from %s(), previously by %s())",
+                           (point_end_time_ut < rd->rrddim_store_metric_last_ut) ? "**PAST**" : "GAP",
+                           rrdhost_hostname(rd->rrdset->rrdhost), rrdset_id(rd->rrdset), rrddim_id(rd),
+                           rd->update_every,
+                           rd->rrddim_store_metric_count,
+                           expected, point_end_time_ut,
+                           (point_end_time_ut < rd->rrddim_store_metric_last_ut)?"by -" : "gap ",
+                           expected - point_end_time_ut,
+                           function,
+                           rd->rrddim_store_metric_last_caller?rd->rrddim_store_metric_last_caller:"none");
+        }
+    }
+
+    rd->rrddim_store_metric_last_ut = point_end_time_ut;
+    rd->rrddim_store_metric_last_caller = function;
+#endif // NETDATA_LOG_COLLECTION_ERRORS
+
     // store the metric on tier 0
     rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
@@ -1103,10 +1176,12 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
             rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
         }
 
-        store_metric_at_tier(rd, t, sp, point_end_time_ut);
+        store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
     }
+}
 
-    rrdcontext_collected_rrddim(rd);
+void store_metric_collection_completed() {
+    global_statistics_rrdset_done_chart_collection_completed(rrdset_done_statistics_points_stored_per_tier);
 }
 
 // caching of dimensions rrdset_done() and rrdset_done_interpolate() loop through
@@ -1182,6 +1257,8 @@ static inline size_t rrdset_done_interpolate(
         rrdset_debug(st, "next_store_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
 
         last_ut = next_store_ut;
+
+        ml_chart_update_begin(st);
 
         struct rda_item *rda;
         size_t dim_id;
@@ -1262,34 +1339,42 @@ static inline size_t rrdset_done_interpolate(
                     break;
             }
 
+            time_t current_time = (time_t) (next_store_ut / USEC_PER_SEC);
+
             if(unlikely(!store_this_entry)) {
-                (void) ml_is_anomalous(rd, 0, false);
+                (void) ml_is_anomalous(rd, current_time, 0, false);
+
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrdcontext_collected_rrddim(rd);
                 continue;
             }
 
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, new_value, true)) {
+                if (ml_is_anomalous(rd, current_time, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
 
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
+                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = new_value;
             }
             else {
-                (void) ml_is_anomalous(rd, 0, false);
+                (void) ml_is_anomalous(rd, current_time, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
+                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = NAN;
             }
 
             stored_entries++;
         }
+
+        ml_chart_update_end(st);
 
         // reset the storage flags for the next point, if any;
         storage_flags = SN_DEFAULT_FLAGS;
@@ -1350,11 +1435,14 @@ void rrdset_done(RRDSET *st) {
     struct timeval now;
 
     now_realtime_timeval(&now);
-    rrdset_timed_done(st, now);
+    rrdset_timed_done(st, now, /* pending_rrdset_next = */ st->counter_done != 0);
 }
 
-void rrdset_timed_done(RRDSET *st, struct timeval now) {
+void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(netdata_exit)) return;
+
+    if (pending_rrdset_next)
+        rrdset_next(st);
 
     debug(D_RRD_CALLS, "rrdset_done() for chart '%s'", rrdset_name(st));
 
@@ -1510,13 +1598,16 @@ after_first_database_work:
     if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
         rrdset_done_push(st);
 
+    uint32_t has_reset_value = 0;
+
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
     struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
 
     size_t dim_id;
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
-    st->collected_total = 0;
+    total_number collected_total = 0;
+    total_number last_collected_total = 0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;
@@ -1535,7 +1626,24 @@ after_first_database_work:
 
         // calculate totals
         if(likely(rd->updated)) {
-            st->collected_total += rd->collected_value;
+            // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
+            // to reset the calculation (it will give zero as the calculation for this second)
+            if(unlikely(rd->algorithm == RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL && rd->last_collected_value > rd->collected_value)) {
+                debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
+                , rrdset_id(st)
+                , rrddim_name(rd)
+                , rd->last_collected_value
+                , rd->collected_value
+                );
+
+                if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                    has_reset_value = 1;
+
+                rd->last_collected_value = rd->collected_value;
+            }
+
+            last_collected_total += rd->last_collected_value;
+            collected_total += rd->collected_value;
 
             if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))) {
                 error("Dimension %s in chart '%s' has the OBSOLETE flag set, but it is collected.", rrddim_name(rd), rrdset_id(st));
@@ -1553,8 +1661,6 @@ after_first_database_work:
     rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
     rrdset_debug(st, "last_stored_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (last updated time)", (NETDATA_DOUBLE)last_stored_ut/USEC_PER_SEC);
     rrdset_debug(st, "next_store_ut   = %0.3" NETDATA_DOUBLE_MODIFIER " (next interpolation point)", (NETDATA_DOUBLE)next_store_ut/USEC_PER_SEC);
-
-    uint32_t has_reset_value = 0;
 
     // process all dimensions to calculate their values
     // based on the collected figures only
@@ -1599,7 +1705,7 @@ after_first_database_work:
                 break;
 
             case RRD_ALGORITHM_PCENT_OVER_ROW_TOTAL:
-                if(unlikely(!st->collected_total))
+                if(unlikely(!collected_total))
                     rd->calculated_value = 0;
                 else
                     // the percentage of the current value
@@ -1607,7 +1713,7 @@ after_first_database_work:
                     rd->calculated_value =
                             (NETDATA_DOUBLE)100
                             * (NETDATA_DOUBLE)rd->collected_value
-                            / (NETDATA_DOUBLE)st->collected_total;
+                            / (NETDATA_DOUBLE)collected_total;
 
                 rrdset_debug(st, "%s: CALC PCENT-ROW " NETDATA_DOUBLE_FORMAT " = 100"
                             " * " COLLECTED_NUMBER_FORMAT
@@ -1615,7 +1721,7 @@ after_first_database_work:
                           , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value
-                          , st->collected_total
+                          , collected_total
                 );
                 break;
 
@@ -1694,31 +1800,15 @@ after_first_database_work:
                     continue;
                 }
 
-                // if the new is smaller than the old (an overflow, or reset), set the old equal to the new
-                // to reset the calculation (it will give zero as the calculation for this second)
-                if(unlikely(rd->last_collected_value > rd->collected_value)) {
-                    debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " COLLECTED_NUMBER_FORMAT ", current = " COLLECTED_NUMBER_FORMAT
-                          , rrdset_id(st)
-                          , rrddim_name(rd)
-                          , rd->last_collected_value
-                          , rd->collected_value
-                    );
-
-                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        has_reset_value = 1;
-
-                    rd->last_collected_value = rd->collected_value;
-                }
-
                 // the percentage of the current increment
                 // over the increment of all dimensions together
-                if(unlikely(st->collected_total == st->last_collected_total))
+                if(unlikely(collected_total == last_collected_total))
                     rd->calculated_value = 0;
                 else
                     rd->calculated_value =
                             (NETDATA_DOUBLE)100
                             * (NETDATA_DOUBLE)(rd->collected_value - rd->last_collected_value)
-                            / (NETDATA_DOUBLE)(st->collected_total - st->last_collected_total);
+                            / (NETDATA_DOUBLE)(collected_total - last_collected_total);
 
                 rrdset_debug(st, "%s: CALC PCENT-DIFF " NETDATA_DOUBLE_FORMAT " = 100"
                             " * (" COLLECTED_NUMBER_FORMAT " - " COLLECTED_NUMBER_FORMAT ")"
@@ -1726,7 +1816,7 @@ after_first_database_work:
                           , rrddim_name(rd)
                           , rd->calculated_value
                           , rd->collected_value, rd->last_collected_value
-                          , st->collected_total, st->last_collected_total
+                          , collected_total, last_collected_total
                 );
                 break;
 
@@ -1780,8 +1870,6 @@ after_first_database_work:
     );
 
 after_second_database_work:
-    st->last_collected_total  = st->collected_total;
-
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
         rd = rda->rd;
         if(unlikely(!rd)) continue;
@@ -1866,6 +1954,8 @@ after_second_database_work:
     rrdcontext_collected_rrdset(st);
 
     netdata_thread_enable_cancelability();
+
+    store_metric_collection_completed();
 }
 
 time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
@@ -1953,8 +2043,8 @@ struct rrdset_map_save_v019 {
     usec_t usec_since_last_update;                  // NEEDS TO BE UPDATED - maintained on load
     struct timeval last_updated;                    // NEEDS TO BE UPDATED - check to reset all - fixed on load
     struct timeval last_collected_time;             // ignored
-    long long collected_total;                      // NEEDS TO BE UPDATED - maintained on load
-    long long last_collected_total;                 // NEEDS TO BE UPDATED - maintained on load
+    long long collected_total;                      // ignored
+    long long last_collected_total;                 // ignored
     void *rrdfamily;                                // ignored
     void *rrdhost;                                  // ignored
     void *next;                                     // ignored
@@ -1978,8 +2068,6 @@ void rrdset_memory_file_update(RRDSET *st) {
     st_on_file->usec_since_last_update = st->usec_since_last_update;
     st_on_file->last_updated.tv_sec = st->last_updated.tv_sec;
     st_on_file->last_updated.tv_usec = st->last_updated.tv_usec;
-    st_on_file->collected_total = st->collected_total;
-    st_on_file->last_collected_total = st->last_collected_total;
 }
 
 const char *rrdset_cache_filename(RRDSET *st) {
@@ -2071,8 +2159,6 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     st->usec_since_last_update = st_on_file->usec_since_last_update;
     st->last_updated.tv_sec = st_on_file->last_updated.tv_sec;
     st->last_updated.tv_usec = st_on_file->last_updated.tv_usec;
-    st->collected_total = st_on_file->collected_total;
-    st->last_collected_total = st_on_file->last_collected_total;
 
     // link it to st
     st->st_on_file = st_on_file;

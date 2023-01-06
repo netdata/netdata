@@ -87,6 +87,7 @@ void rrdcontext_updated_rrdset(RRDSET *st);
 void rrdcontext_removed_rrdset(RRDSET *st);
 void rrdcontext_updated_rrdset_name(RRDSET *st);
 void rrdcontext_updated_rrdset_flags(RRDSET *st);
+void rrdcontext_updated_retention_rrdset(RRDSET *st);
 void rrdcontext_collected_rrdset(RRDSET *st);
 int rrdcontext_find_chart_uuid(RRDSET *st, uuid_t *store_uuid);
 
@@ -164,13 +165,13 @@ typedef struct query_target_request {
     time_t before;                      // the requested timeframe
     size_t points;                      // the requested number of points
     time_t timeout;                     // the timeout of the query in seconds
-    int max_anomaly_rates;              // it only applies to anomaly rates chart - TODO - remove it
     uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
     RRDR_GROUPING group_method;
     const char *group_options;
     time_t resampling_time;
     size_t tier;
+    QUERY_SOURCE query_source;
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
@@ -178,6 +179,7 @@ typedef struct query_target {
     QUERY_TARGET_REQUEST request;
 
     bool used;                              // when true, this query is currently being used
+    size_t queries;                         // how many query we have done so far
 
     struct {
         bool relative;                      // true when the request made with relative timestamps, true if it was absolute

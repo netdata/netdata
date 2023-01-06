@@ -6,7 +6,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.
 
 # Demo sites
 
-You can also view live demos of Netdata at **[https://www.netdata.cloud](https://www.netdata.cloud/#live-demo)**.
+You can also view live demos of Netdata at **https://app.netdata.cloud/spaces/netdata-demo**
 
 | Location            | Netdata demo URL                                                                                                                              | 60 mins reqs                                                                                                                                                                                                                                                 | VM donated by                                      |
 | :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| :------------------------------------------------- |
