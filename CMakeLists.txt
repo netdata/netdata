@@ -777,6 +777,12 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
+        database/engine/cache.c
+        database/engine/cache.h
+        database/engine/metric.c
+        database/engine/metric.h
+        database/engine/pdc.c
+        database/engine/pdc.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
