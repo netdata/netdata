@@ -553,10 +553,8 @@ jobs:
       - name: Prepare artifacts directory
         id: prepare
         run: |
-          mkdir -p download/test
-          mv artifacts/* download/test
-          echo 'Redirect 301 "/latest" "/test"' > .htaccess
-          echo 'Redirect 301 "/download/latest" "/download/test"' >> .htaccess
+          mkdir -p download/latest
+          mv artifacts/* download/latest
       - name: Verify that artifacts work with installer
         id: verify
         env:
@@ -609,10 +607,8 @@ jobs:
       - name: Prepare artifacts directory
         id: prepare
         run: |
-          mkdir -p download/test
-          mv artifacts/* download/test
-          echo 'Redirect 301 "/latest" "/test"' > .htaccess
-          echo 'Redirect 301 "/download/latest" "/download/test"' >> .htaccess
+          mkdir -p download/latest
+          mv artifacts/* download/latest
       - name: Verify that artifacts work with installer
         id: verify
         env:
