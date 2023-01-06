@@ -132,11 +132,6 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
-typedef struct query_plan {
-    size_t entries;
-    QUERY_PLAN_ENTRY data[QUERY_PLANS_MAX];
-} QUERY_PLAN;
-
 typedef struct query_metric {
     struct query_metric_tier {
         struct storage_engine *eng;
@@ -147,7 +142,10 @@ typedef struct query_metric {
         long weight;
     } tiers[RRD_STORAGE_TIERS];
 
-    QUERY_PLAN plan;
+    struct {
+        size_t used;
+        QUERY_PLAN_ENTRY array[QUERY_PLANS_MAX];
+    } plan;
 
     struct {
         RRDHOST *host;
