@@ -125,6 +125,7 @@ static void thread_cleanup(void *ptr) {
     query_target_free();
     thread_cache_destroy();
     service_exits();
+    worker_unregister();
 
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;
