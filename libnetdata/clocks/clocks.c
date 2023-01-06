@@ -350,6 +350,9 @@ void sleep_usec(usec_t usec) {
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
+    // make sure errno is not EINTR
+    errno = 0;
+
 #ifdef __linux__
     while (clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem) != 0) {
 #else
@@ -358,6 +361,9 @@ void sleep_usec(usec_t usec) {
         if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
             req = rem;
             rem = (struct timespec){ 0, 0 };
+
+            // break an infinite loop
+            errno = 0;
         }
         else {
 #ifdef __linux__
