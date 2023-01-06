@@ -28,10 +28,10 @@ void Config::readMLConfig(void) {
      * Read values
      */
 
-    unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 4 * 3600);
+    unsigned MaxTrainSamples = config_get_number(ConfigSectionML, "maximum num samples to train", 6 * 3600);
     unsigned MinTrainSamples = config_get_number(ConfigSectionML, "minimum num samples to train", 1 * 900);
-    unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 1 * 3600);
-    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 1);
+    unsigned TrainEvery = config_get_number(ConfigSectionML, "train every", 3 * 3600);
+    unsigned NumModelsToUse = config_get_number(ConfigSectionML, "number of models per dimension", 9);
 
     unsigned DiffN = config_get_number(ConfigSectionML, "num samples to diff", 1);
     unsigned SmoothN = config_get_number(ConfigSectionML, "num samples to smooth", 3);
@@ -75,7 +75,7 @@ void Config::readMLConfig(void) {
         error("invalid min/max train samples found (%u >= %u)", MinTrainSamples, MaxTrainSamples);
 
         MinTrainSamples = 1 * 3600;
-        MaxTrainSamples = 4 * 3600;
+        MaxTrainSamples = 6 * 3600;
     }
 
     /*
