@@ -20,7 +20,7 @@
 
 <img src="https://user-images.githubusercontent.com/1153921/95269366-1b814680-07ee-11eb-8ff4-c1b0b8758499.png" alt="---" style="max-width: 100%;" />
 
-Netdata is distributed, real-time, performance and health monitoring platform for systems, hardware, containers and applications with zero configuration needed. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any preparation.
+Netdata is a distributed, real-time, performance and health monitoring platform for systems, hardware, containers and applications with zero configuration needed. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any preparation.
 
 Netdata [Agent](https://github.com/netdata/netdata) is an enormously powerful, **Open-Sourced**, **Single Node** health monitoring and performance troubleshooting tool.
 It provides you an ability to automatically identify processes, collect and store metrics locally and even more - vizualize all metrics without any chart configuration (of course you can tweak it later on if you need).
