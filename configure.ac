@@ -1711,7 +1711,6 @@ AC_CONFIG_FILES([
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
-    database/engine2/Makefile
     database/ram/Makefile
     database/sqlite/Makefile
     diagrams/Makefile

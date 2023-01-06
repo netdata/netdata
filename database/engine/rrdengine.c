@@ -2,7 +2,7 @@
 #define NETDATA_RRD_INTERNALS
 
 #include "rrdengine.h"
-#include "../engine2/pdc.h"
+#include "pdc.h"
 
 rrdeng_stats_t global_io_errors = 0;
 rrdeng_stats_t global_fs_errors = 0;

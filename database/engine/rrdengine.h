@@ -19,9 +19,9 @@
 #include "journalfile.h"
 #include "rrdengineapi.h"
 #include "pagecache.h"
-#include "../engine2/metric.h"
-#include "../engine2/cache.h"
-#include "../engine2/pdc.h"
+#include "metric.h"
+#include "cache.h"
+#include "pdc.h"
 
 extern unsigned rrdeng_pages_per_extent;
 

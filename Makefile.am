@@ -549,12 +549,12 @@ if ENABLE_DBENGINE
         database/engine/rrdengineapi.h \
         database/engine/pagecache.c \
         database/engine/pagecache.h \
-        database/engine2/cache.c \
-        database/engine2/cache.h \
-        database/engine2/metric.c \
-        database/engine2/metric.h \
-        database/engine2/pdc.c \
-        database/engine2/pdc.h \
+        database/engine/cache.c \
+        database/engine/cache.h \
+        database/engine/metric.c \
+        database/engine/metric.h \
+        database/engine/pdc.c \
+        database/engine/pdc.h \
         $(NULL)
 endif
 
