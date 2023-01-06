@@ -34,6 +34,9 @@ set -e
 
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 
+NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
+NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
+
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ -x "${script_dir}/netdata-updater" ]; then
@@ -369,7 +372,7 @@ download() {
 }
 
 get_netdata_latest_tag() {
-  url="https://github.com/netdata/${1}/releases/latest"
+  url="${1}/latest"
   dest="${2}"
 
   if command -v curl >/dev/null 2>&1; then
@@ -463,9 +466,9 @@ parse_version() {
 
 get_latest_version() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    get_netdata_latest_tag netdata /dev/stdout
+    get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout
   else
-    get_netdata_latest_tag netdata-nightlies /dev/stdout
+    get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout
   fi
 }
 
@@ -529,13 +532,13 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
-    latest="$(get_netdata_latest_tag netdata /dev/stdout)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+    latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout)"
+    export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    tag="$(get_netdata_latest_tag netdata-nightlies /dev/stdout)"
-    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/download/${tag}/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/download/${tag}/sha256sums.txt"
+    tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout)"
+    export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
   fi
 }
 
@@ -907,9 +910,6 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
 # Source the tarball checksum, if not already available from environment (for existing installations with the old logic)
 [ -z "${NETDATA_TARBALL_CHECKSUM}" ] && [ -f "${NETDATA_LIB_DIR}/netdata.tarball.checksum" ] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
-
-# Grab the nightlies baseurl (defaulting to our Google Storage bucket)
-export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://github.com/netdata/netdata-nightlies/releases}"
 
 if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)" U0011
