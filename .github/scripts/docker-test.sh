@@ -26,6 +26,8 @@ wait_for() {
     sleep 1
     if [ "$i" -gt "$timeout" ]; then
       printf "Timed out!\n"
+      docker ps -a
+      docker logs netdata 2>&1
       return 1
     fi
     i="$((i + 1))"
