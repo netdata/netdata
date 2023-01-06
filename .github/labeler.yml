@@ -34,8 +34,6 @@ area/build:
   - "**/Makefile.am"
 
 area/ci:
-  - .travis/*
-  - .travis/**/*
   - .github/*
   - .github/**/*
 

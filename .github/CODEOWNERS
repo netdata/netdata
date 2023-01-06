@@ -5,8 +5,12 @@
 * @Ferroin
 
 # Ownership by directory structure
+<<<<<<< HEAD
 .travis/ @Ferroin @tkatsoulas
 .github/ @Ferroin @tkatsoulas
+=======
+.github/ @Ferroin
+>>>>>>> 0c88f277c (Purge Travis CI config, scripts, and references.)
 aclk/ @stelfrag @underhood
 build/ @Ferroin @tkatsoulas
 contrib/debian @Ferroin @tkatsoulas
@@ -41,7 +45,6 @@ Dockerfile* @Ferroin @tkatsoulas
 
 # Ownership of specific files
 .gitignore @Ferroin @tkatsoulas @vkalintiris
-.travis.yml @Ferroin @tkatsoulas
 .eslintrc @Ferroin @tkatsoulas
 .eslintignore @Ferroin @tkatsoulas
 .csslintrc @Ferroin @tkatsoulas

@@ -27,7 +27,7 @@ fi
 
 STARTIT=1
 REINSTALL_OPTIONS=""
-RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
+RELEASE_CHANNEL="nightly"
 
 while [ "${1}" ]; do
   case "${1}" in
