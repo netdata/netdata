@@ -7,6 +7,7 @@
 **Merged pull requests:**
 
 - Create ML charts on child hosts. [\#14207](https://github.com/netdata/netdata/pull/14207) ([vkalintiris](https://github.com/vkalintiris))
+- Use brackets around info variables [\#14206](https://github.com/netdata/netdata/pull/14206) ([MrZammler](https://github.com/MrZammler))
 - Dont call worker\_utilization\_finish\(\) twice [\#14204](https://github.com/netdata/netdata/pull/14204) ([MrZammler](https://github.com/MrZammler))
 - Switch to actions/labeler@v4 for labeling PRs. [\#14203](https://github.com/netdata/netdata/pull/14203) ([Ferroin](https://github.com/Ferroin))
 - Refactor ML code and add support for multiple KMeans models [\#14198](https://github.com/netdata/netdata/pull/14198) ([vkalintiris](https://github.com/vkalintiris))
@@ -350,8 +351,6 @@
 - bump go.d.plugin to v0.37.1 [\#13555](https://github.com/netdata/netdata/pull/13555) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity 380387 [\#13551](https://github.com/netdata/netdata/pull/13551) ([MrZammler](https://github.com/MrZammler))
 - add docker dashboard info [\#13547](https://github.com/netdata/netdata/pull/13547) ([ilyam8](https://github.com/ilyam8))
-- bump go.d.plugin to v0.37.0 [\#13546](https://github.com/netdata/netdata/pull/13546) ([ilyam8](https://github.com/ilyam8))
-- feat\(python.d/sensors\): discover chips, features at runtime [\#13545](https://github.com/netdata/netdata/pull/13545) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
