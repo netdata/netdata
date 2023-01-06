@@ -100,6 +100,33 @@ RRD_MEMORY_MODE rrd_memory_mode_id(const char *name);
 #include "streaming/rrdpush.h"
 #include "aclk/aclk_rrdhost_state.h"
 #include "sqlite/sqlite_health.h"
+
+typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
+
+// iterator state for RRD dimension data queries
+struct storage_engine_query_handle {
+    RRDDIM *rd;
+    time_t start_time_s;
+    time_t end_time_s;
+    STORAGE_PRIORITY priority;
+    STORAGE_QUERY_HANDLE* handle;
+};
+
+typedef struct storage_point {
+    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
+    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
+    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
+
+    // end_time - start_time = point duration
+    time_t start_time;      // the time the point starts
+    time_t end_time;        // the time the point ends
+
+    unsigned count;         // the number of original points aggregated
+    unsigned anomaly_count; // the number of original points found anomalous
+
+    SN_FLAGS flags;         // flags stored with the point
+} STORAGE_POINT;
+
 #include "rrdcontext.h"
 
 extern bool unittest_running;
@@ -376,21 +403,6 @@ void rrddim_memory_file_save(RRDDIM *rd);
 
 // ----------------------------------------------------------------------------
 
-typedef struct storage_point {
-    NETDATA_DOUBLE min;     // when count > 1, this is the minimum among them
-    NETDATA_DOUBLE max;     // when count > 1, this is the maximum among them
-    NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
-
-    // end_time - start_time = point duration
-    time_t start_time;      // the time the point starts
-    time_t end_time;        // the time the point ends
-
-    unsigned count;         // the number of original points aggregated
-    unsigned anomaly_count; // the number of original points found anomalous
-
-    SN_FLAGS flags;         // flags stored with the point
-} STORAGE_POINT;
-
 #define storage_point_unset(x)                     do { \
     (x).min = (x).max = (x).sum = NAN;                  \
     (x).count = 0;                                      \
@@ -416,10 +428,6 @@ typedef struct storage_point {
 // engine-specific iterator state for dimension data collection
 typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
 
-// ----------------------------------------------------------------------------
-// engine-specific iterator state for dimension data queries
-typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
-
 // ------------------------------------------------------------------------
 // function pointers that handle data collection
 struct storage_engine_collect_ops {
@@ -444,14 +452,6 @@ struct storage_engine_collect_ops {
 };
 
 // ----------------------------------------------------------------------------
-// iterator state for RRD dimension data queries
-struct storage_engine_query_handle {
-    RRDDIM *rd;
-    time_t start_time_s;
-    time_t end_time_s;
-    STORAGE_PRIORITY priority;
-    STORAGE_QUERY_HANDLE* handle;
-};
 
 // function pointers that handle database queries
 struct storage_engine_query_ops {

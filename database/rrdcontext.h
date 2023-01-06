@@ -118,6 +118,25 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // ----------------------------------------------------------------------------
 // public API for queries
 
+typedef struct query_plan_entry {
+    size_t tier;
+    time_t after;
+    time_t before;
+    struct storage_engine_query_handle handle;
+    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
+    int (*is_finished)(struct storage_engine_query_handle *handle);
+    void (*finalize)(struct storage_engine_query_handle *handle);
+    bool initialized;
+    bool finalized;
+} QUERY_PLAN_ENTRY;
+
+#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
+
+typedef struct query_plan {
+    size_t entries;
+    QUERY_PLAN_ENTRY data[QUERY_PLANS_MAX];
+} QUERY_PLAN;
+
 typedef struct query_metric {
     struct query_metric_tier {
         struct storage_engine *eng;
@@ -125,7 +144,10 @@ typedef struct query_metric {
         time_t db_first_time_t;         // the oldest timestamp available for this tier
         time_t db_last_time_t;          // the latest timestamp available for this tier
         time_t db_update_every;         // latest update every for this tier
+        long weight;
     } tiers[RRD_STORAGE_TIERS];
+
+    QUERY_PLAN plan;
 
     struct {
         RRDHOST *host;
