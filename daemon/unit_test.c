@@ -1289,7 +1289,7 @@ int run_test(struct test *test)
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rrddim_name(rd), c+1,
-            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+            (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1301,7 +1301,7 @@ int run_test(struct test *test)
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rrddim_name(rd2), c+1,
-                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+                (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1939,8 +1939,8 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 
                     STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops->next_metric(&handle);
                     value = sp.sum;
-                    time_retrieved = sp.start_time;
-                    end_time = sp.end_time;
+                    time_retrieved = sp.start_time_s;
+                    end_time = sp.end_time_s;
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -2408,8 +2408,8 @@ static void query_dbengine_chart(void *arg)
 
             STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
             value = sp.sum;
-            time_retrieved = sp.start_time;
-            end_time = sp.end_time;
+            time_retrieved = sp.start_time_s;
+            end_time = sp.end_time_s;
 
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */

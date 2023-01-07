@@ -78,7 +78,7 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
             rrdset2json(st, wb, &dimensions, &memory, skip_volatile);
 
             c++;
-            st->last_accessed_time = now;
+            st->last_accessed_time_s = now;
         }
     }
     rrdset_foreach_done(st);
@@ -178,7 +178,7 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
-            st->last_accessed_time = now;
+            st->last_accessed_time_s = now;
         }
     }
     rrdset_foreach_done(st);

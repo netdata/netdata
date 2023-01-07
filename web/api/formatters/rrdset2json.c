@@ -25,8 +25,8 @@ void chart_labels2json(RRDSET *st, BUFFER *wb, size_t indentation)
 // generate JSON for the /api/v1/chart API call
 
 void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memory_used, int skip_volatile) {
-    time_t first_entry_t = rrdset_first_entry_t(st);
-    time_t last_entry_t  = rrdset_last_entry_t(st);
+    time_t first_entry_t = rrdset_first_entry_s(st);
+    time_t last_entry_t  = rrdset_last_entry_s(st);
 
     buffer_sprintf(
         wb,

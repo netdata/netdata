@@ -45,8 +45,8 @@ typedef struct versioned_context_data {
 
     uint64_t priority;      // the chart priority of the context
 
-    uint64_t first_time_t;  // the first entry in the database, in seconds
-    uint64_t last_time_t;   // the last point in the database, in seconds
+    uint64_t first_time_s;  // the first entry in the database, in seconds
+    uint64_t last_time_s;   // the last point in the database, in seconds
 
     bool deleted;           // true when this is deleted
 

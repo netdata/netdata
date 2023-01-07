@@ -69,8 +69,8 @@ struct journal_metric_list {
     uuid_t uuid;
     uint32_t entries;         // Number of entries
     uint32_t page_offset;     // OFFSET that contains entries * struct( journal_page_list )
-    uint32_t delta_start;     // Min time of metric
-    uint32_t delta_end;       // Max time of metric  (to be used to populate page_index)
+    uint32_t delta_start_s;     // Min time of metric
+    uint32_t delta_end_s;       // Max time of metric  (to be used to populate page_index)
 };
 
 // 16 bytes
@@ -122,7 +122,7 @@ int load_journal_file(struct rrdengine_instance *ctx, struct rrdengine_journalfi
                              struct rrdengine_datafile *datafile);
 void init_commit_log(struct rrdengine_instance *ctx);
 
-void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
+void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data);
 

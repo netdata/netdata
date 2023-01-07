@@ -118,8 +118,8 @@ typedef struct storage_point {
     NETDATA_DOUBLE sum;     // the point sum - divided by count gives the average
 
     // end_time - start_time = point duration
-    time_t start_time;      // the time the point starts
-    time_t end_time;        // the time the point ends
+    time_t start_time_s;    // the time the point starts
+    time_t end_time_s;      // the time the point ends
 
     unsigned count;         // the number of original points aggregated
     unsigned anomaly_count; // the number of original points found anomalous
@@ -142,19 +142,6 @@ typedef enum {
 
 extern RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS];
 
-enum {
-    CONTEXT_FLAGS_ARCHIVE = 0x01,
-    CONTEXT_FLAGS_CHART   = 0x02,
-    CONTEXT_FLAGS_CONTEXT = 0x04
-};
-
-struct context_param {
-    RRDDIM *rd;
-    time_t first_entry_t;
-    time_t last_entry_t;
-    uint8_t flags;
-};
-
 #define UPDATE_EVERY 1
 #define UPDATE_EVERY_MAX 3600
 
@@ -164,7 +151,7 @@ struct context_param {
 extern int default_rrd_update_every;
 extern int default_rrd_history_entries;
 extern int gap_when_lost_iterations_above;
-extern time_t rrdset_free_obsolete_time;
+extern time_t rrdset_free_obsolete_time_s;
 
 #define MIN_LIBUV_WORKER_THREADS 16
 #define MAX_LIBUV_WORKER_THREADS 128
@@ -408,17 +395,17 @@ void rrddim_memory_file_save(RRDDIM *rd);
     (x).count = 0;                                      \
     (x).anomaly_count = 0;                              \
     (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time = 0;                                 \
-    (x).end_time = 0;                                   \
+    (x).start_time_s = 0;                               \
+    (x).end_time_s = 0;                                 \
     } while(0)
 
-#define storage_point_empty(x, start_t, end_t)     do { \
+#define storage_point_empty(x, start_s, end_s)     do { \
     (x).min = (x).max = (x).sum = NAN;                  \
     (x).count = 1;                                      \
     (x).anomaly_count = 0;                              \
     (x).flags = SN_FLAG_NONE;                           \
-    (x).start_time = start_t;                           \
-    (x).end_time = end_t;                               \
+    (x).start_time_s = start_s;                         \
+    (x).end_time_s = end_s;                             \
     } while(0)
 
 #define storage_point_is_unset(x) (!(x).count)
@@ -456,7 +443,7 @@ struct storage_engine_collect_ops {
 // function pointers that handle database queries
 struct storage_engine_query_ops {
     // run this before starting a series of next_metric() database queries
-    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, STORAGE_PRIORITY priority);
+    void (*init)(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 
     // run this to load each metric number from the database
     STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
@@ -468,10 +455,10 @@ struct storage_engine_query_ops {
     void (*finalize)(struct storage_engine_query_handle *handle);
 
     // get the timestamp of the last entry of this metric
-    time_t (*latest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
+    time_t (*latest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // get the timestamp of the first entry of this metric
-    time_t (*oldest_time)(STORAGE_METRIC_HANDLE *db_metric_handle);
+    time_t (*oldest_time_s)(STORAGE_METRIC_HANDLE *db_metric_handle);
 
     // adapt 'before' timestamp to the optimal for the query
     // can only move 'before' ahead (to the future)
@@ -488,7 +475,7 @@ typedef struct storage_engine_api {
     STORAGE_METRIC_HANDLE *(*metric_get_or_create)(RRDDIM *rd, STORAGE_INSTANCE *instance);
     void (*metric_release)(STORAGE_METRIC_HANDLE *);
     STORAGE_METRIC_HANDLE *(*metric_dup)(STORAGE_METRIC_HANDLE *);
-    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t);
+    bool (*metric_retention_by_uuid)(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s);
 
     // operations
     struct storage_engine_collect_ops collect_ops;
@@ -512,12 +499,12 @@ struct rrddim_tier {
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     STORAGE_POINT virtual_point;
-    time_t next_point_time;
+    time_t next_point_time_s;
     struct storage_engine_collect_ops *collect_ops;
     struct storage_engine_query_ops *query_ops;
 };
 
-void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now);
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s);
 
 // ----------------------------------------------------------------------------
 // these loop macros make sure the linked list is accessed with the right lock
@@ -648,7 +635,7 @@ struct rrdset {
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    time_t last_accessed_time;                      // the last time this RRDSET has been accessed
+    time_t last_accessed_time_s;                      // the last time this RRDSET has been accessed
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
@@ -662,7 +649,7 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // data collection - streaming to parents, temp variables
 
-    time_t upstream_resync_time;                    // the timestamp up to which we should resync clock upstream
+    time_t upstream_resync_time_s;                    // the timestamp up to which we should resync clock upstream
 
     // ------------------------------------------------------------------------
     // db mode SAVE, MAP specifics
@@ -1144,7 +1131,7 @@ void rrddim_index_destroy(RRDSET *st);
 
 // ----------------------------------------------------------------------------
 
-extern time_t rrdhost_free_orphan_time;
+extern time_t rrdhost_free_orphan_time_s;
 
 int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unittest);
 
@@ -1215,11 +1202,11 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force);
 void rrdhost_save_charts(RRDHOST *host);
 void rrdhost_delete_charts(RRDHOST *host);
 
-int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now);
+int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
 
 void rrdset_update_heterogeneous_flag(RRDSET *st);
 
-time_t rrdset_set_update_every(RRDSET *st, time_t update_every);
+time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s);
 
 RRDSET *rrdset_find(RRDHOST *host, const char *id);
 #define rrdset_find_localhost(id) rrdset_find(localhost, id)
@@ -1270,19 +1257,17 @@ void rrdset_isnot_obsolete(RRDSET *st);
 #define rrdset_is_available_for_exporting_and_alarms(st) (!rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) && !rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
 #define rrdset_is_archived(st) (rrdset_flag_check(st, RRDSET_FLAG_ARCHIVED) && rrdset_number_of_dimensions(st))
 
-time_t rrddim_first_entry_t(RRDDIM *rd);
-time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier);
-time_t rrddim_last_entry_t(RRDDIM *rd);
-time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier);
+time_t rrddim_first_entry_s(RRDDIM *rd);
+time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier);
+time_t rrddim_last_entry_s(RRDDIM *rd);
+time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier);
 
-time_t rrdset_first_entry_t(RRDSET *st);
-time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier);
-time_t rrdset_last_entry_t(RRDSET *st);
-time_t rrdset_last_entry_t_of_tier(RRDSET *st, size_t tier);
+time_t rrdset_first_entry_s(RRDSET *st);
+time_t rrdset_first_entry_s_of_tier(RRDSET *st, size_t tier);
+time_t rrdset_last_entry_s(RRDSET *st);
+time_t rrdset_last_entry_s_of_tier(RRDSET *st, size_t tier);
 
-void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_t, time_t *last_time_t, time_t now, size_t tier);
-
-time_t rrdhost_last_entry_t(RRDHOST *h);
+void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_s, time_t *last_time_s, time_t now_s, size_t tier);
 
 // ----------------------------------------------------------------------------
 // RRD DIMENSION functions
@@ -1320,9 +1305,6 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st, RRDDIM *rd, struct time
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
 
-#ifdef ENABLE_ACLK
-time_t calc_dimension_liveness(RRDDIM *rd, time_t now);
-#endif
 long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 
 #ifdef NETDATA_LOG_COLLECTION_ERRORS

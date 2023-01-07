@@ -28,8 +28,8 @@ size_t get_tier_grouping(size_t tier) {
 RRDHOST *localhost = NULL;
 netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 
-time_t rrdset_free_obsolete_time = 3600;
-time_t rrdhost_free_orphan_time = 3600;
+time_t rrdset_free_obsolete_time_s = 3600;
+time_t rrdhost_free_orphan_time_s = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
 #ifdef ENABLE_DBENGINE
@@ -754,7 +754,7 @@ RRDHOST *rrdhost_find_or_create(
     return host;
 }
 
-inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now) {
+inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, time_t now_s) {
     if(host != protected_host
        && host != localhost
        && rrdhost_receiver_replicating_charts(host) == 0
@@ -763,7 +763,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
        && !rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED)
        && !host->receiver
        && host->child_disconnected_time
-       && host->child_disconnected_time + rrdhost_free_orphan_time < now)
+       && host->child_disconnected_time + rrdhost_free_orphan_time_s < now_s)
         return 1;
 
     return 0;
@@ -1599,20 +1599,4 @@ int rrdhost_set_system_info_variable(struct rrdhost_system_info *system_info, ch
     }
 
     return res;
-}
-
-// Added for gap-filling, if this proves to be a bottleneck in large-scale systems then we will need to cache
-// the last entry times as the metric updates, but let's see if it is a problem first.
-time_t rrdhost_last_entry_t(RRDHOST *h) {
-    RRDSET *st;
-    time_t result = 0;
-
-    rrdset_foreach_read(st, h) {
-        time_t st_last = rrdset_last_entry_t(st);
-
-        if (st_last > result)
-            result = st_last;
-    }
-    rrdset_foreach_done(st);
-    return result;
 }

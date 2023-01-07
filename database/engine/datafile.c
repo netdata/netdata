@@ -111,11 +111,11 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
             else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
                 // no pages in the open cache related to this datafile
 
-                time_t now = now_monotonic_sec();
+                time_t now_s = now_monotonic_sec();
 
                 if(!df->users.time_to_evict) {
                     // first time we did the above
-                    df->users.time_to_evict = now + 120;
+                    df->users.time_to_evict = now_s + 120;
                     internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "
                                          "but it has %u stale lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
@@ -130,7 +130,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                    time_to_scan_ut);
                 }
 
-                else if(now > df->users.time_to_evict) {
+                else if(now_s > df->users.time_to_evict) {
                     // time expired, lets remove it
                     can_be_deleted = true;
                     internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "

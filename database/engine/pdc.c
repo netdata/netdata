@@ -1016,9 +1016,9 @@ static bool epdl_populate_pages_from_extent_data(
                     .hot = false,
                     .section = (Word_t)ctx,
                     .metric_id = metric_id,
-                    .start_time_t = vd.start_time_s,
-                    .end_time_t = vd.end_time_s,
-                    .update_every = vd.update_every_s,
+                    .start_time_s = vd.start_time_s,
+                    .end_time_s = vd.end_time_s,
+                    .update_every_s = vd.update_every_s,
                     .size = (size_t) vd.page_length,
                     .data = page_data
             };
@@ -1143,10 +1143,10 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
                     .hot = false,
                     .section = (Word_t) ctx,
                     .metric_id = (Word_t) epdl->datafile->fileno,
-                    .start_time_t = (time_t) epdl->extent_offset,
+                    .start_time_s = (time_t) epdl->extent_offset,
                     .size = epdl->extent_size,
-                    .end_time_t = 0,
-                    .update_every = 0,
+                    .end_time_s = 0,
+                    .update_every_s = 0,
                     .data = copied_extent_compressed_data,
             }, &added);
 

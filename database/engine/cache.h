@@ -21,11 +21,11 @@ typedef enum __attribute__ ((__packed__)) {
 typedef struct pgc_entry {
     Word_t section;             // the section this belongs to
     Word_t metric_id;           // the metric this belongs to
-    time_t start_time_t;        // the start time of the page
-    time_t end_time_t;          // the end time of the page
+    time_t start_time_s;        // the start time of the page
+    time_t end_time_s;          // the end time of the page
     size_t size;                // the size in bytes of the allocation, outside the cache
     void *data;                 // a pointer to data outside the cache
-    uint32_t update_every;      // the update every of the page
+    uint32_t update_every_s;      // the update every of the page
     bool hot;                   // true if this entry is currently being collected
     uint8_t *custom_data;
 } PGC_ENTRY;
@@ -196,16 +196,16 @@ typedef enum {
     PGC_SEARCH_PREV,
 } PGC_SEARCH;
 
-PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, PGC_SEARCH method);
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method);
 
 // get information from an acquired page
 Word_t pgc_page_section(PGC_PAGE *page);
 Word_t pgc_page_metric(PGC_PAGE *page);
-time_t pgc_page_start_time_t(PGC_PAGE *page);
-time_t pgc_page_end_time_t(PGC_PAGE *page);
-time_t pgc_page_update_every(PGC_PAGE *page);
-time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every);
-time_t pgc_page_fix_end_time_t(PGC_PAGE *page, time_t end_time_t);
+time_t pgc_page_start_time_s(PGC_PAGE *page);
+time_t pgc_page_end_time_s(PGC_PAGE *page);
+time_t pgc_page_update_every_s(PGC_PAGE *page);
+time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every_s);
+time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s);
 void *pgc_page_data(PGC_PAGE *page);
 void *pgc_page_custom_data(PGC *cache, PGC_PAGE *page);
 size_t pgc_page_data_size(PGC *cache, PGC_PAGE *page);
@@ -217,10 +217,10 @@ size_t pgc_get_current_cache_size(PGC *cache);
 size_t pgc_get_wanted_cache_size(PGC *cache);
 
 // resetting the end time of a hot page
-void pgc_page_hot_set_end_time_t(PGC *cache, PGC_PAGE *page, time_t end_time_t);
+void pgc_page_hot_set_end_time_s(PGC *cache, PGC_PAGE *page, time_t end_time_s);
 bool pgc_page_to_clean_evict_or_release(PGC *cache, PGC_PAGE *page);
 
-typedef void (*migrate_to_v2_callback)(Word_t section, int datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
+typedef void (*migrate_to_v2_callback)(Word_t section, unsigned datafile_fileno, uint8_t type, Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos, size_t count_of_unique_extents, size_t count_of_unique_metrics, size_t count_of_unique_pages, void *data);
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data);
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);

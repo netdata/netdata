@@ -70,9 +70,9 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, sq, qt->id, sq
                    , kq, kq, sq, qt->id, sq
                    , kq, kq, (long long)r->update_every
-                   , kq, kq, (long long)qt->db.minimum_latest_update_every
-                   , kq, kq, (long long)qt->db.first_time_t
-                   , kq, kq, (long long)qt->db.last_time_t
+                   , kq, kq, (long long)qt->db.minimum_latest_update_every_s
+                   , kq, kq, (long long)qt->db.first_time_s
+                   , kq, kq, (long long)qt->db.last_time_s
                    , kq, kq, (long long)r->before
                    , kq, kq, (long long)r->after
                    , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq

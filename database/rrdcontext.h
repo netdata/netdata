@@ -136,9 +136,9 @@ typedef struct query_metric {
     struct query_metric_tier {
         struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
-        time_t db_first_time_t;         // the oldest timestamp available for this tier
-        time_t db_last_time_t;          // the latest timestamp available for this tier
-        time_t db_update_every;         // latest update every for this tier
+        time_t db_first_time_s;         // the oldest timestamp available for this tier
+        time_t db_last_time_s;          // the latest timestamp available for this tier
+        time_t db_update_every_s;       // latest update every for this tier
         long weight;
     } tiers[RRD_STORAGE_TIERS];
 
@@ -219,9 +219,9 @@ typedef struct query_target {
     } window;
 
     struct {
-        time_t first_time_t;                // the combined first_time_t of all metrics in the query, across all tiers
-        time_t last_time_t;                 // the combined last_time_T of all metrics in the query, across all tiers
-        time_t minimum_latest_update_every; // the min update every of the metrics in the query
+        time_t first_time_s;                  // the combined first_time_t of all metrics in the query, across all tiers
+        time_t last_time_s;                   // the combined last_time_T of all metrics in the query, across all tiers
+        time_t minimum_latest_update_every_s; // the min update every of the metrics in the query
     } db;
 
     struct {

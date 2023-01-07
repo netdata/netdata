@@ -6,40 +6,40 @@
 
 static void update_metric_retention_and_granularity_by_uuid(
         struct rrdengine_instance *ctx, uuid_t *uuid,
-                time_t first_time, time_t last_time,
-                time_t update_every, time_t now_s)
+        time_t first_time_s, time_t last_time_s,
+        time_t update_every_s, time_t now_s)
 {
-    if(last_time > now_s) {
+    if(last_time_s > now_s) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
                           "fixing last time to now",
-                          first_time, last_time, now_s);
-        last_time = now_s;
+                    first_time_s, last_time_s, now_s);
+        last_time_s = now_s;
     }
 
-    if(first_time > last_time) {
+    if(first_time_s > last_time_s) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
                           "fixing first time to last time",
-                          first_time, last_time, now_s);
+                    first_time_s, last_time_s, now_s);
 
-        first_time = last_time;
+        first_time_s = last_time_s;
     }
 
-    if( first_time == 0 ||
-        last_time == 0
+    if(first_time_s == 0 ||
+            last_time_s == 0
         ) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
                           "using them as-is",
-                          first_time, last_time, now_s);
+                    first_time_s, last_time_s, now_s);
     }
 
     MRG_ENTRY entry = {
             .section = (Word_t)ctx,
-            .first_time_t = first_time,
-            .latest_time_t = last_time,
-            .latest_update_every = update_every
+            .first_time_s = first_time_s,
+            .latest_time_s = last_time_s,
+            .latest_update_every_s = update_every_s
     };
     uuid_copy(entry.uuid, *uuid);
 
@@ -47,7 +47,7 @@ static void update_metric_retention_and_granularity_by_uuid(
     METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
 
     if (likely(!added))
-        mrg_metric_expand_retention(main_mrg, metric, first_time, last_time, update_every);
+        mrg_metric_expand_retention(main_mrg, metric, first_time_s, last_time_s, update_every_s);
 
     mrg_metric_release(main_mrg, metric);
 }
@@ -364,7 +364,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
                 &jf_metric_data->descr[i], now_s,
-                (metric)? mrg_metric_get_update_every(main_mrg, metric) : 0,
+                (metric) ? mrg_metric_get_update_every_s(main_mrg, metric) : 0,
                 false);
 
         if(!vd.data_on_disk_valid) {
@@ -376,9 +376,9 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         if (!metric) {
             MRG_ENTRY entry = {
                     .section = (Word_t)ctx,
-                    .first_time_t = vd.start_time_s,
-                    .latest_time_t = vd.end_time_s,
-                    .latest_update_every = vd.update_every_s,
+                    .first_time_s = vd.start_time_s,
+                    .latest_time_s = vd.end_time_s,
+                    .latest_update_every_s = vd.update_every_s,
             };
             uuid_copy(entry.uuid, *temp_id);
 
@@ -754,12 +754,12 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
     SET_JOURNAL_DATA(journalfile, data_start);
     SET_JOURNAL_DATA_SIZE(journalfile, file_size);
 
-    time_t header_start_time_t  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
 
     time_t now_s = now_realtime_sec();
     for (size_t i=0; i < entries; i++) {
-        time_t start_time_s = header_start_time_t + metric->delta_start;
-        time_t end_time_s = header_start_time_t + metric->delta_end;
+        time_t start_time_s = header_start_time_s + metric->delta_start_s;
+        time_t end_time_s = header_start_time_s + metric->delta_end_s;
         time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
         update_metric_retention_and_granularity_by_uuid(
                 ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
@@ -832,8 +832,8 @@ void *journal_v2_write_metric_page(struct journal_v2_header *j2_header, void *da
     uuid_copy(metric->uuid, *metric_info->uuid);
     metric->entries = metric_info->number_of_pages;
     metric->page_offset = pages_offset;
-    metric->delta_start = (uint32_t)(metric_info->first_time_t - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
-    metric->delta_end = (uint32_t)(metric_info->last_time_t - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
+    metric->delta_start_s = (uint32_t)(metric_info->first_time_s - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
+    metric->delta_end_s = (uint32_t)(metric_info->last_time_s - (time_t)(j2_header->start_time_ut / USEC_PER_SEC));
 
     return ++metric;
 }
@@ -874,11 +874,11 @@ void *journal_v2_write_data_page(struct journal_v2_header *j2_header, void *data
 
     struct extent_io_data *ei = page_info->custom_data;
 
-    data_page->delta_start_s = (uint32_t) (page_info->start_time_t - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
-    data_page->delta_end_s = (uint32_t) (page_info->end_time_t -  (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
+    data_page->delta_start_s = (uint32_t) (page_info->start_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
+    data_page->delta_end_s = (uint32_t) (page_info->end_time_s - (time_t) (j2_header->start_time_ut) / USEC_PER_SEC);
     data_page->extent_index = page_info->extent_index;
 
-    data_page->update_every_s = page_info->update_every;
+    data_page->update_every_s = page_info->update_every_s;
     data_page->page_length = (uint16_t) (ei ? ei->page_length : page_info->page_length);
     data_page->type = 0;
 
@@ -914,7 +914,7 @@ void *journal_v2_write_descriptors(struct journal_v2_header *j2_header, void *da
 // startup  : if the migration is done during agent startup
 //            this will allow us to optimize certain things
 
-void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
+void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                             Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
     size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data)
 {
@@ -923,8 +923,8 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
-    time_t min_time_t = LLONG_MAX;
-    time_t max_time_t = 0;
+    time_t min_time_s = LLONG_MAX;
+    time_t max_time_s = 0;
     struct jv2_metrics_info *metric_info;
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
@@ -1021,13 +1021,13 @@ void do_migrate_to_v2_callback(Word_t section, int datafile_fileno __maybe_unuse
 
         fatal_assert(count < number_of_metrics);
         uuid_list[count++].metric_info = metric_info;
-        min_time_t = MIN(min_time_t, metric_info->first_time_t);
-        max_time_t = MAX(max_time_t, metric_info->last_time_t);
+        min_time_s = MIN(min_time_s, metric_info->first_time_s);
+        max_time_s = MAX(max_time_s, metric_info->last_time_s);
     }
 
     // Store in the header
-    j2_header.start_time_ut = min_time_t * USEC_PER_SEC;
-    j2_header.end_time_ut = max_time_t * USEC_PER_SEC;
+    j2_header.start_time_ut = min_time_s * USEC_PER_SEC;
+    j2_header.end_time_ut = max_time_s * USEC_PER_SEC;
 
     qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journal_metric_compare);
     internal_error(true, "DBENGINE: traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);

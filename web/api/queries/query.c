@@ -694,7 +694,7 @@ static inline void rrdr_done(RRDR *r, long rrdr_line) {
 // tier management
 
 static bool query_metric_is_valid_tier(QUERY_METRIC *qm, size_t tier) {
-    if(!qm->tiers[tier].db_metric_handle || !qm->tiers[tier].db_first_time_t || !qm->tiers[tier].db_last_time_t || !qm->tiers[tier].db_update_every)
+    if(!qm->tiers[tier].db_metric_handle || !qm->tiers[tier].db_first_time_s || !qm->tiers[tier].db_last_time_s || !qm->tiers[tier].db_update_every_s)
         return false;
 
     return true;
@@ -705,9 +705,9 @@ static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
-        time_t first_t = qm->tiers[tier].db_first_time_t;
-        time_t last_t  = qm->tiers[tier].db_last_time_t;
-        time_t update_every = qm->tiers[tier].db_update_every;
+        time_t first_t = qm->tiers[tier].db_first_time_s;
+        time_t last_t  = qm->tiers[tier].db_last_time_s;
+        time_t update_every = qm->tiers[tier].db_update_every_s;
 
         if(!db_metric_handle || !first_t || !last_t || !update_every)
             continue;
@@ -752,9 +752,9 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
-        time_t first_t = qm->tiers[tier].db_first_time_t;
-        time_t last_t  = qm->tiers[tier].db_last_time_t;
-        time_t update_every = qm->tiers[tier].db_update_every;
+        time_t first_t = qm->tiers[tier].db_first_time_s;
+        time_t last_t  = qm->tiers[tier].db_last_time_s;
+        time_t update_every = qm->tiers[tier].db_update_every_s;
 
         if(!db_metric_handle || !first_t || !last_t || !update_every) {
             qm->tiers[tier].weight = -LONG_MAX;
@@ -794,9 +794,9 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
         for(size_t i = 0, used = qt->query.used; i < used ; i++) {
             QUERY_METRIC *qm = &qt->query.array[i];
 
-            time_t first_t = qm->tiers[tier].db_first_time_t;
-            time_t last_t  = qm->tiers[tier].db_last_time_t;
-            time_t update_every = qm->tiers[tier].db_update_every;
+            time_t first_t = qm->tiers[tier].db_first_time_s;
+            time_t last_t  = qm->tiers[tier].db_last_time_s;
+            time_t update_every = qm->tiers[tier].db_update_every_s;
 
             if(!first_t || !last_t || !update_every)
                 continue;
@@ -844,7 +844,7 @@ static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, t
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
         QUERY_METRIC *qm = &qt->query.array[i];
 
-        time_t update_every = qm->tiers[best_tier].db_update_every;
+        time_t update_every = qm->tiers[best_tier].db_update_every_s;
 
         if(!i)
             common_update_every = update_every;
@@ -1053,8 +1053,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
     qm->plan.used = 1;
     qm->plan.array[0].tier = selected_tier;
-    qm->plan.array[0].after = qm->tiers[selected_tier].db_first_time_t;
-    qm->plan.array[0].before = qm->tiers[selected_tier].db_last_time_t;
+    qm->plan.array[0].after = qm->tiers[selected_tier].db_first_time_s;
+    qm->plan.array[0].before = qm->tiers[selected_tier].db_last_time_s;
 
     if(!(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)) {
         // the selected tier
@@ -1069,7 +1069,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     continue;
 
                 // find the first time of this tier
-                time_t first_time_t = qm->tiers[tr].db_first_time_t;
+                time_t first_time_t = qm->tiers[tr].db_first_time_s;
 
                 // can it help?
                 if (first_time_t < selected_tier_first_time_t) {
@@ -1099,7 +1099,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     continue;
 
                 // find the last time of this tier
-                time_t last_time_t = qm->tiers[tr].db_last_time_t;
+                time_t last_time_t = qm->tiers[tr].db_last_time_s;
 
                 //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_t);
 
@@ -1271,8 +1271,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 ops->db_points_read_per_tier[ops->tier]++;
                 ops->db_total_points_read++;
 
-                new_point.start_time = sp.start_time;
-                new_point.end_time   = sp.end_time;
+                new_point.start_time = sp.start_time_s;
+                new_point.end_time   = sp.end_time_s;
                 new_point.anomaly    = sp.count ? (NETDATA_DOUBLE)sp.anomaly_count * 100.0 / (NETDATA_DOUBLE)sp.count : 0.0;
                 query_point_set_id(new_point, ops->db_total_points_read);
 
@@ -1318,7 +1318,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned point %zu start time %ld, end time %ld, that are both equal",
                                qt->id, string2str(qm->dimension.id), new_point.id, new_point.start_time, new_point.end_time);
 
-                new_point.start_time = new_point.end_time - ops->tier_ptr->db_update_every;
+                new_point.start_time = new_point.end_time - ops->tier_ptr->db_update_every_s;
             }
 
             // check if the db is advancing the query
@@ -1505,29 +1505,29 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut);
 
-void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) {
+void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s) {
     if(unlikely(tier >= storage_tiers)) return;
     if(storage_tiers_backfill[tier] == RRD_BACKFILL_NONE) return;
 
     struct rrddim_tier *t = rd->tiers[tier];
     if(unlikely(!t)) return;
 
-    time_t latest_time_t = t->query_ops->latest_time(t->db_metric_handle);
+    time_t latest_time_t = t->query_ops->latest_time_s(t->db_metric_handle);
     time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
-    time_t time_diff   = now - latest_time_t;
+    time_t time_diff   = now_s - latest_time_t;
 
     // if the user wants only NEW backfilling, and we don't have any data
     if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_t <= 0) return;
 
     // there is really nothing we can do
-    if(now <= latest_time_t || time_diff < granularity) return;
+    if(now_s <= latest_time_t || time_diff < granularity) return;
 
     struct storage_engine_query_handle handle;
 
     // for each lower tier
     for(int read_tier = (int)tier - 1; read_tier >= 0 ; read_tier--){
-        time_t smaller_tier_first_time = rd->tiers[read_tier]->query_ops->oldest_time(rd->tiers[read_tier]->db_metric_handle);
-        time_t smaller_tier_last_time = rd->tiers[read_tier]->query_ops->latest_time(rd->tiers[read_tier]->db_metric_handle);
+        time_t smaller_tier_first_time = rd->tiers[read_tier]->query_ops->oldest_time_s(rd->tiers[read_tier]->db_metric_handle);
+        time_t smaller_tier_last_time = rd->tiers[read_tier]->query_ops->latest_time_s(rd->tiers[read_tier]->db_metric_handle);
         if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
 
         long after_wanted = (latest_time_t < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_t;
@@ -1543,9 +1543,9 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now) 
             STORAGE_POINT sp = tmp->query_ops->next_metric(&handle);
             points_read++;
 
-            if(sp.end_time > latest_time_t) {
-                latest_time_t = sp.end_time;
-                store_metric_at_tier(rd, tier, t, sp, sp.end_time * USEC_PER_SEC);
+            if(sp.end_time_s > latest_time_t) {
+                latest_time_t = sp.end_time_s;
+                store_metric_at_tier(rd, tier, t, sp, sp.end_time_s * USEC_PER_SEC);
             }
         }
 
@@ -1580,8 +1580,8 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
         , const char *msg
         ) {
 
-    time_t first_entry_t = r->internal.qt->db.first_time_t;
-    time_t last_entry_t = r->internal.qt->db.last_time_t;
+    time_t first_entry_t = r->internal.qt->db.first_time_s;
+    time_t last_entry_t = r->internal.qt->db.last_time_s;
 
     internal_error(
          true,
@@ -1737,7 +1737,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     time_t resampling_time_requested = qt->request.resampling_time;
     RRDR_OPTIONS options = qt->request.options;
     size_t tier = qt->request.tier;
-    time_t update_every = qt->db.minimum_latest_update_every;
+    time_t update_every = qt->db.minimum_latest_update_every_s;
 
     // RULES
     // points_requested = 0
@@ -1792,8 +1792,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (after_wanted == 0 || before_wanted == 0) {
         relative_period_requested = true;
 
-        time_t first_entry_t = qt->db.first_time_t;
-        time_t last_entry_t = qt->db.last_time_t;
+        time_t first_entry_t = qt->db.first_time_s;
+        time_t last_entry_t = qt->db.last_time_s;
 
         if (first_entry_t == 0 || last_entry_t == 0) {
             internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld", qt->id, first_entry_t, last_entry_t);
@@ -1833,7 +1833,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         update_every = rrdset_find_natural_update_every_for_timeframe(
                 qt, after_wanted, before_wanted, points_wanted, options, tier);
 
-        if (update_every <= 0) update_every = qt->db.minimum_latest_update_every;
+        if (update_every <= 0) update_every = qt->db.minimum_latest_update_every_s;
         query_debug_log(":natural update every %ld", update_every);
     }
 

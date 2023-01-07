@@ -992,7 +992,7 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
 
         if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
             if (unlikely(end_time - start_time != st->update_every))
-                rrdset_set_update_every(st, end_time - start_time);
+                rrdset_set_update_every_s(st, end_time - start_time);
 
             st->last_collected_time.tv_sec = end_time;
             st->last_collected_time.tv_usec = 0;
@@ -1264,7 +1264,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     if (start_streaming) {
         if (st->update_every != update_every_child)
-            rrdset_set_update_every(st, update_every_child);
+            rrdset_set_update_every_s(st, update_every_child);
 
         if(rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
             rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);

@@ -291,7 +291,7 @@ static bool rrdset_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     }
 
     if (unlikely(st->update_every != ctr->update_every)) {
-        rrdset_set_update_every(st, ctr->update_every);
+        rrdset_set_update_every_s(st, ctr->update_every);
         ctr->react_action |= RRDSET_REACT_UPDATED;
     }
 
@@ -365,7 +365,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
     RRDSET *st = rrdset;
     RRDHOST *host = st->rrdhost;
 
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_s = now_realtime_sec();
 
     if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
@@ -453,7 +453,7 @@ inline RRDSET *rrdset_find(RRDHOST *host, const char *id) {
     RRDSET *st = rrdset_index_find(host, id);
 
     if(st)
-        st->last_accessed_time = now_realtime_sec();
+        st->last_accessed_time_s = now_realtime_sec();
 
     return(st);
 }
@@ -532,103 +532,103 @@ int rrdset_reset_name(RRDSET *st, const char *name) {
 }
 
 // get the timestamp of the last entry in the round-robin database
-time_t rrdset_last_entry_t(RRDSET *st) {
+time_t rrdset_last_entry_s(RRDSET *st) {
     RRDDIM *rd;
-    time_t last_entry_t  = 0;
+    time_t last_entry_s  = 0;
 
     rrddim_foreach_read(rd, st) {
-        time_t t = rrddim_last_entry_t(rd);
-        if(t > last_entry_t) last_entry_t = t;
+        time_t t = rrddim_last_entry_s(rd);
+        if(t > last_entry_s) last_entry_s = t;
     }
     rrddim_foreach_done(rd);
 
-    return last_entry_t;
+    return last_entry_s;
 }
 
-time_t rrdset_last_entry_t_of_tier(RRDSET *st, size_t tier) {
+time_t rrdset_last_entry_s_of_tier(RRDSET *st, size_t tier) {
     RRDDIM *rd;
-    time_t last_entry_t  = 0;
+    time_t last_entry_s  = 0;
 
     rrddim_foreach_read(rd, st) {
-                time_t t = rrddim_last_entry_t_of_tier(rd, tier);
-                if(t > last_entry_t) last_entry_t = t;
+                time_t t = rrddim_last_entry_s_of_tier(rd, tier);
+                if(t > last_entry_s) last_entry_s = t;
             }
     rrddim_foreach_done(rd);
 
-    return last_entry_t;
+    return last_entry_s;
 }
 
 // get the timestamp of first entry in the round-robin database
-time_t rrdset_first_entry_t(RRDSET *st) {
+time_t rrdset_first_entry_s(RRDSET *st) {
     RRDDIM *rd;
-    time_t first_entry_t = LONG_MAX;
+    time_t first_entry_s = LONG_MAX;
 
     rrddim_foreach_read(rd, st) {
-        time_t t = rrddim_first_entry_t(rd);
-        if(t < first_entry_t)
-            first_entry_t = t;
+        time_t t = rrddim_first_entry_s(rd);
+        if(t < first_entry_s)
+            first_entry_s = t;
     }
     rrddim_foreach_done(rd);
 
-    if (unlikely(LONG_MAX == first_entry_t)) return 0;
-    return first_entry_t;
+    if (unlikely(LONG_MAX == first_entry_s)) return 0;
+    return first_entry_s;
 }
 
-time_t rrdset_first_entry_t_of_tier(RRDSET *st, size_t tier) {
+time_t rrdset_first_entry_s_of_tier(RRDSET *st, size_t tier) {
     if(unlikely(tier > storage_tiers))
         return 0;
 
     RRDDIM *rd;
-    time_t first_entry_t = LONG_MAX;
+    time_t first_entry_s = LONG_MAX;
 
     rrddim_foreach_read(rd, st) {
-        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
-        if(t && t < first_entry_t)
-            first_entry_t = t;
+        time_t t = rrddim_first_entry_s_of_tier(rd, tier);
+        if(t && t < first_entry_s)
+            first_entry_s = t;
     }
     rrddim_foreach_done(rd);
 
-    if (unlikely(LONG_MAX == first_entry_t)) return 0;
-    return first_entry_t;
+    if (unlikely(LONG_MAX == first_entry_s)) return 0;
+    return first_entry_s;
 }
 
-void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_t, time_t *last_time_t, time_t now, size_t tier) {
-    if(!now)
-        now = now_realtime_sec();
+void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_time_s, time_t *last_time_s, time_t now_s, size_t tier) {
+    if(!now_s)
+        now_s = now_realtime_sec();
 
-    time_t db_first_entry = rrdset_first_entry_t_of_tier(st, tier);
-    time_t db_last_entry = st->last_updated.tv_sec; // we assume this is a collected RRDSET
+    time_t db_first_entry_s = rrdset_first_entry_s_of_tier(st, tier);
+    time_t db_last_entry_s = st->last_updated.tv_sec; // we assume this is a collected RRDSET
 
-    if(unlikely(!db_last_entry)) {
-        db_last_entry = rrdset_last_entry_t_of_tier(st, tier);
+    if(unlikely(!db_last_entry_s)) {
+        db_last_entry_s = rrdset_last_entry_s_of_tier(st, tier);
 
-        if (unlikely(!db_last_entry))
+        if (unlikely(!db_last_entry_s))
             // we assume this is a collected RRDSET
-            db_last_entry = now;
+            db_last_entry_s = now_s;
     }
 
-    if(unlikely(db_last_entry > now)) {
+    if(unlikely(db_last_entry_s > now_s)) {
         internal_error(true,
                        "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_last_entry, now);
-        db_last_entry = now;
+                       db_last_entry_s, now_s);
+        db_last_entry_s = now_s;
     }
 
-    if(unlikely(db_first_entry && db_last_entry && db_first_entry >= db_last_entry)) {
+    if(unlikely(db_first_entry_s && db_last_entry_s && db_first_entry_s >= db_last_entry_s)) {
         internal_error(true,
                        "RRDSET: 'host:%s/chart:%s' oldest db time %ld is equal or bigger than latest db time %ld, adjusting it last updated time - update every",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_first_entry, db_last_entry);
-        db_first_entry = db_last_entry - st->update_every;
+                       db_first_entry_s, db_last_entry_s);
+        db_first_entry_s = db_last_entry_s - st->update_every;
     }
 
-    if(unlikely(!db_first_entry && db_last_entry))
+    if(unlikely(!db_first_entry_s && db_last_entry_s))
         // this can be the case on the first data collection of a chart
-        db_first_entry = db_last_entry;
+        db_first_entry_s = db_last_entry_s;
 
-    *first_time_t = db_first_entry;
-    *last_time_t = db_last_entry;
+    *first_time_s = db_first_entry_s;
+    *last_time_s = db_last_entry_s;
 }
 
 inline void rrdset_is_obsolete(RRDSET *st) {
@@ -641,7 +641,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-        st->last_accessed_time = now_realtime_sec();
+        st->last_accessed_time_s = now_realtime_sec();
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -655,7 +655,7 @@ inline void rrdset_is_obsolete(RRDSET *st) {
 inline void rrdset_isnot_obsolete(RRDSET *st) {
     if(unlikely((rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)))) {
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        st->last_accessed_time = now_realtime_sec();
+        st->last_accessed_time_s = now_realtime_sec();
 
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED);
 
@@ -1006,16 +1006,16 @@ void rrdset_timed_next(RRDSET *st, struct timeval now, usec_t duration_since_las
 #ifdef NETDATA_INTERNAL_CHECKS
         if(since_last_usec > 0 && (susec_t) duration_since_last_update < since_last_usec) {
             static __thread susec_t min_delta = USEC_PER_SEC * 3600, permanent_min_delta = 0;
-            static __thread time_t last_t = 0;
+            static __thread time_t last_time_s = 0;
 
             // the first time initialize it so that it will make the check later
-            if(last_t == 0) last_t = now.tv_sec + 60;
+            if(last_time_s == 0) last_time_s = now.tv_sec + 60;
 
             susec_t delta = since_last_usec - (susec_t) duration_since_last_update;
             if(delta < min_delta) min_delta = delta;
 
-            if(now.tv_sec >= last_t + 60) {
-                last_t = now.tv_sec;
+            if(now.tv_sec >= last_time_s + 60) {
+                last_time_s = now.tv_sec;
 
                 if(min_delta > permanent_min_delta) {
                     info("MINIMUM MICROSECONDS DELTA of thread %d increased from %lld to %lld (+%lld)", gettid(), permanent_min_delta, min_delta, min_delta - permanent_min_delta);
@@ -1105,21 +1105,21 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
 
 static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
 
-static inline time_t tier_next_point_time(RRDDIM *rd, struct rrddim_tier *t, time_t now) {
+static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, time_t now_s) {
     time_t loop = (time_t)rd->update_every * (time_t)t->tier_grouping;
-    return now + loop - ((now + loop) % loop);
+    return now_s + loop - ((now_s + loop) % loop);
 }
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
-    if (unlikely(!t->next_point_time))
-        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+    if (unlikely(!t->next_point_time_s))
+        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
 
-    if(unlikely(sp.start_time > t->next_point_time)) {
+    if(unlikely(sp.start_time_s > t->next_point_time_s)) {
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time * USEC_PER_SEC,
+                t->next_point_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
                 t->virtual_point.min,
                 t->virtual_point.max,
@@ -1130,7 +1130,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         else {
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time * USEC_PER_SEC,
+                t->next_point_time_s * USEC_PER_SEC,
                 NAN,
                 NAN,
                 NAN,
@@ -1140,15 +1140,15 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
-        t->next_point_time = tier_next_point_time(rd, t, sp.end_time);
+        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
     }
 
     // merge the dates into our virtual point
-    if (unlikely(sp.start_time < t->virtual_point.start_time))
-        t->virtual_point.start_time = sp.start_time;
+    if (unlikely(sp.start_time_s < t->virtual_point.start_time_s))
+        t->virtual_point.start_time_s = sp.start_time_s;
 
-    if (likely(sp.end_time > t->virtual_point.end_time))
-        t->virtual_point.end_time = sp.end_time;
+    if (likely(sp.end_time_s > t->virtual_point.end_time_s))
+        t->virtual_point.end_time_s = sp.end_time_s;
 
     // merge the values into our virtual point
     if (likely(!storage_point_is_empty(sp))) {
@@ -1203,11 +1203,11 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
-    time_t now = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
 
     STORAGE_POINT sp = {
-        .start_time = now - rd->update_every,
-        .end_time = now,
+        .start_time_s = now_s - rd->update_every,
+        .end_time_s = now_s,
         .min = n,
         .max = n,
         .sum = n,
@@ -1224,7 +1224,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
         if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
             // we have not collected this tier before
             // let's fill any gap that may exist
-            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now);
+            rrdr_fill_tier_gap_from_smaller_tiers(rd, tier, now_s);
             rrddim_option_set(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS);
         }
 
@@ -1391,10 +1391,10 @@ static inline size_t rrdset_done_interpolate(
                     break;
             }
 
-            time_t current_time = (time_t) (next_store_ut / USEC_PER_SEC);
+            time_t current_time_s = (time_t) (next_store_ut / USEC_PER_SEC);
 
             if(unlikely(!store_this_entry)) {
-                (void) ml_is_anomalous(rd, current_time, 0, false);
+                (void) ml_is_anomalous(rd, current_time_s, 0, false);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rrdcontext_collected_rrddim(rd);
@@ -1404,7 +1404,7 @@ static inline size_t rrdset_done_interpolate(
             if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
-                if (ml_is_anomalous(rd, current_time, new_value, true)) {
+                if (ml_is_anomalous(rd, current_time_s, new_value, true)) {
                     // clear anomaly bit: 0 -> is anomalous, 1 -> not anomalous
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
@@ -1414,7 +1414,7 @@ static inline size_t rrdset_done_interpolate(
                 rd->last_stored_value = new_value;
             }
             else {
-                (void) ml_is_anomalous(rd, current_time, 0, false);
+                (void) ml_is_anomalous(rd, current_time_s, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
@@ -1991,13 +1991,13 @@ after_second_database_work:
     store_metric_collection_completed();
 }
 
-time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
+time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
 
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
-                   rrdset_id(st), (int)st->update_every, (int)update_every);
+                   rrdset_id(st), (int)st->update_every, (int)update_every_s);
 
-    time_t prev_update_every = st->update_every;
-    st->update_every = update_every;
+    time_t prev_update_every_s = st->update_every;
+    st->update_every = update_every_s;
 
     // switch update every to the storage engine
     RRDDIM *rd;
@@ -2007,13 +2007,13 @@ time_t rrdset_set_update_every(RRDSET *st, time_t update_every) {
                 rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
-        assert(rd->update_every == prev_update_every &&
+        assert(rd->update_every == prev_update_every_s &&
                "chart's update every differs from the update every of its dimensions");
         rd->update_every = st->update_every;
     }
     rrddim_foreach_done(rd);
 
-    return prev_update_every;
+    return prev_update_every_s;
 }
 
 // ----------------------------------------------------------------------------
@@ -2061,8 +2061,8 @@ struct rrdset_map_save_v019 {
     size_t counter;                                 // NEEDS TO BE UPDATED - maintained on load
     size_t counter_done;                            // ignored
     union {                                         //
-        time_t last_accessed_time;                  // ignored
-        time_t last_entry_t;                        // ignored
+        time_t last_accessed_time_s;                // ignored
+        time_t last_entry_s;                        // ignored
     };                                              //
     time_t upstream_resync_time;                    // ignored
     void *plugin_name;                              // ignored
@@ -2146,7 +2146,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
 
     if(!st_on_file) return false;
 
-    time_t now = now_realtime_sec();
+    time_t now_s = now_realtime_sec();
 
     st_on_file->magic[sizeof(RRDSET_MAGIC_V019)] = '\0';
     if(strcmp(st_on_file->magic, RRDSET_MAGIC_V019) != 0) {
@@ -2165,13 +2165,13 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         error("File '%s' does not have the desired granularity. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if((now - st_on_file->last_updated.tv_sec) > st->update_every * st->entries) {
+    else if((now_s - st_on_file->last_updated.tv_sec) > st->update_every * st->entries) {
         info("File '%s' is too old. Clearing it.", fullfilename);
         memset(st_on_file, 0, size);
     }
-    else if(st_on_file->last_updated.tv_sec > now + st->update_every) {
-        error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now));
-        st_on_file->last_updated.tv_sec = now;
+    else if(st_on_file->last_updated.tv_sec > now_s + st->update_every) {
+        error("File '%s' refers to the future by %zd secs. Resetting it to now.", fullfilename, (ssize_t)(st_on_file->last_updated.tv_sec - now_s));
+        st_on_file->last_updated.tv_sec = now_s;
     }
 
     if(st_on_file->current_entry >= st_on_file->entries)

@@ -27,18 +27,18 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
     struct page_descr_with_data *base = NULL;
 
     for (size_t Index = 0 ; Index < entries; Index++) {
-        time_t start_time_t = entries_array[Index].start_time_t;
-        time_t end_time_t = entries_array[Index].end_time_t;
+        time_t start_time_s = entries_array[Index].start_time_s;
+        time_t end_time_s = entries_array[Index].end_time_s;
         struct page_descr_with_data *descr = page_descriptor_get();
 
         descr->id = mrg_metric_uuid(main_mrg, (METRIC *) entries_array[Index].metric_id);
         descr->metric_id = entries_array[Index].metric_id;
-        descr->start_time_ut = start_time_t * USEC_PER_SEC;
-        descr->end_time_ut = end_time_t * USEC_PER_SEC;
-        descr->update_every_s = entries_array[Index].update_every;
+        descr->start_time_ut = start_time_s * USEC_PER_SEC;
+        descr->end_time_ut = end_time_s * USEC_PER_SEC;
+        descr->update_every_s = entries_array[Index].update_every_s;
         descr->type = ctx->page_type;
 
-        descr->page_length = (end_time_t - (start_time_t - descr->update_every_s)) / descr->update_every_s * bytes_per_point;
+        descr->page_length = (end_time_s - (start_time_s - descr->update_every_s)) / descr->update_every_s * bytes_per_point;
 
         if(descr->page_length > entries_array[Index].size) {
             descr->page_length = entries_array[Index].size;
@@ -106,11 +106,11 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
 
 static inline struct page_details *pdc_find_page_for_time(
         Pcvoid_t PArray,
-        time_t wanted_time,
+        time_t wanted_time_s,
         size_t *gaps,
         PDC_PAGE_STATUS stop_at
 ) {
-    Word_t PIndexF = wanted_time, PIndexL = wanted_time;
+    Word_t PIndexF = wanted_time_s, PIndexL = wanted_time_s;
     Pvoid_t *PValueF, *PValueL;
     struct page_details *pdF = NULL, *pdL = NULL;
     bool firstF = true, firstL = true;
@@ -141,8 +141,8 @@ static inline struct page_details *pdc_find_page_for_time(
         pdL = NULL;
     }
 
-    TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_FUTURE;
-    TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time, wanted_time) : PAGE_IS_IN_THE_PAST;
+    TIME_RANGE_COMPARE rcF = (pdF) ? is_page_in_time_range(pdF->first_time_s, pdF->last_time_s, wanted_time_s, wanted_time_s) : PAGE_IS_IN_THE_FUTURE;
+    TIME_RANGE_COMPARE rcL = (pdL) ? is_page_in_time_range(pdL->first_time_s, pdL->last_time_s, wanted_time_s, wanted_time_s) : PAGE_IS_IN_THE_PAST;
 
     if (!pdF || pdF == pdL) {
         // F is missing, or they are the same
@@ -230,7 +230,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
     time_t now_s = wanted_start_time_s;
-    time_t dt_s = mrg_metric_get_update_every(main_mrg, metric);
+    time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
 
     if(!dt_s)
         dt_s = default_rrd_update_every;
@@ -252,9 +252,9 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             break;
         }
 
-        time_t page_start_time_s = pgc_page_start_time_t(page);
-        time_t page_end_time_s = pgc_page_end_time_t(page);
-        time_t page_update_every_s = pgc_page_update_every(page);
+        time_t page_start_time_s = pgc_page_start_time_s(page);
+        time_t page_end_time_s = pgc_page_end_time_s(page);
+        time_t page_update_every_s = pgc_page_update_every_s(page);
         size_t page_length = pgc_page_data_size(cache, page);
 
         if(!page_update_every_s)
@@ -386,7 +386,7 @@ static size_t list_has_time_gaps(
     // PASS 2: emulate processing to find the useful pages
 
     time_t now_s = wanted_start_time_s;
-    time_t dt_s = mrg_metric_get_update_every(main_mrg, metric);
+    time_t dt_s = mrg_metric_get_update_every_s(main_mrg, metric);
     if(!dt_s)
         dt_s = default_rrd_update_every;
 
@@ -536,9 +536,9 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                         .hot = false,
                         .section = (Word_t) ctx,
                         .metric_id = metric_id,
-                        .start_time_t = page_first_time_s,
-                        .end_time_t = page_last_time_s,
-                        .update_every = page_update_every_s,
+                        .start_time_s = page_first_time_s,
+                        .end_time_s = page_last_time_s,
+                        .update_every_s = page_update_every_s,
                         .data = datafile,
                         .size = 0,
                         .custom_data = (uint8_t *) &ei,
@@ -566,7 +566,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) // for pd
         return;
 
-    Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_t(page), PJE0);
+    Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_s(page), PJE0);
     if (!PValue || PValue == PJERR)
         fatal("DBENGINE: corrupted judy array");
 
@@ -586,11 +586,11 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->datafile.extent.bytes = ei->bytes;
     pd->datafile.file = ei->file;
     pd->datafile.fileno = ei->fileno;
-    pd->first_time_s = pgc_page_start_time_t(page);
-    pd->last_time_s = pgc_page_end_time_t(page);
+    pd->first_time_s = pgc_page_start_time_s(page);
+    pd->last_time_s = pgc_page_end_time_s(page);
     pd->datafile.ptr = datafile;
     pd->page_length = ei->page_length;
-    pd->update_every_s = pgc_page_update_every(page);
+    pd->update_every_s = pgc_page_update_every_s(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
 }
@@ -855,9 +855,9 @@ struct pgc_page *pg_cache_lookup_next(
 
         // we now have page
 
-        time_t page_start_time_s = pgc_page_start_time_t(page);
-        time_t page_end_time_s = pgc_page_end_time_t(page);
-        time_t page_update_every_s = pgc_page_update_every(page);
+        time_t page_start_time_s = pgc_page_start_time_s(page);
+        time_t page_end_time_s = pgc_page_end_time_s(page);
+        time_t page_update_every_s = pgc_page_update_every_s(page);
         size_t page_length = pgc_page_data_size(main_cache, page);
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
@@ -884,7 +884,7 @@ struct pgc_page *pg_cache_lookup_next(
             size_t entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
             if(unlikely(entries_by_size < entries_by_time)) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
-                pd->last_time_s = page_end_time_s = pgc_page_fix_end_time_t(page, fixed_page_end_time_s);
+                pd->last_time_s = page_end_time_s = pgc_page_fix_end_time_s(page, fixed_page_end_time_s);
                 entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
 
                 internal_fatal(entries_by_size != entries_by_time, "DBENGINE: wrong entries by time again!");
@@ -960,9 +960,9 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
             .hot = true,
             .section = section,
             .metric_id = metric_id,
-            .start_time_t = start_time_s,
-            .end_time_t =  end_time_s,
-            .update_every = update_every_s,
+            .start_time_s = start_time_s,
+            .end_time_s =  end_time_s,
+            .update_every_s = update_every_s,
             .size = 0,
             .data = datafile,
             .custom_data = (uint8_t *) &ext_io_data,
@@ -973,7 +973,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
     int tries = 100;
-    while(!added && page_entry.end_time_t > pgc_page_end_time_t(page) && tries--) {
+    while(!added && page_entry.end_time_s > pgc_page_end_time_s(page) && tries--) {
         pgc_page_to_clean_evict_or_release(open_cache, page);
         page = pgc_page_add_and_acquire(open_cache, page_entry, &added);
     }
@@ -981,7 +981,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
     if(!added) {
         datafile_release(datafile, DATAFILE_ACQUIRE_OPEN_CACHE);
 
-        internal_fatal(page_entry.end_time_t > pgc_page_end_time_t(page),
+        internal_fatal(page_entry.end_time_s > pgc_page_end_time_s(page),
                        "DBENGINE: cannot add longer page to open cache");
     }
 

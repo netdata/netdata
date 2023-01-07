@@ -23,7 +23,7 @@ struct rrdeng_main {
     uv_timer_t timer;
     pid_t tid;
 
-    time_t last_buffers_cleanup;
+    time_t last_buffers_cleanup_s;
 
     bool flush_running;
     bool evict_running;
@@ -32,7 +32,7 @@ struct rrdeng_main {
         .loop = {},
         .async = {},
         .timer = {},
-        .last_buffers_cleanup = 0,
+        .last_buffers_cleanup_s = 0,
         .flush_running = false,
         .evict_running = false,
 };
@@ -939,8 +939,8 @@ static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused,
 
 struct uuid_first_time_s {
     uuid_t *uuid;
-    time_t first_time_t;
-    time_t last_time_t;
+    time_t first_time_s;
+    time_t last_time_s;
     METRIC *metric;
 };
 
@@ -964,7 +964,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             continue;
         }
 
-        time_t journal_start_time_t = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
+        time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
         size_t journal_metric_count = (size_t)journal_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
 
@@ -979,10 +979,10 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             if (unlikely(!uuid_entry))
                 continue;
 
-            time_t first_time_t = uuid_entry->delta_start + journal_start_time_t;
-            time_t last_time_t = uuid_entry->delta_end + journal_start_time_t;
-            uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t , first_time_t);
-            uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t , last_time_t);
+            time_t first_time_s = uuid_entry->delta_start_s + journal_start_time_s;
+            time_t last_time_s = uuid_entry->delta_end_s + journal_start_time_s;
+            uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s , first_time_s);
+            uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s , last_time_s);
             v2_count++;
         }
         journalfile_count++;
@@ -1000,14 +1000,14 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_t,
+                (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_s,
                 PGC_SEARCH_CLOSEST);
 
         if (page) {
-            time_t first_time_t = pgc_page_start_time_t(page);
-            time_t last_time_t = pgc_page_end_time_t(page);
-            uuid_first_t_entry->first_time_t = MIN(uuid_first_t_entry->first_time_t, first_time_t);
-            uuid_first_t_entry->last_time_t = MAX(uuid_first_t_entry->last_time_t, last_time_t);
+            time_t first_time_s = pgc_page_start_time_s(page);
+            time_t last_time_s = pgc_page_end_time_s(page);
+            uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s, first_time_s);
+            uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s, last_time_s);
             pgc_page_release(open_cache, page);
             open_cache_count++;
         }
@@ -1016,7 +1016,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         v2_count, open_cache_count);
 }
 
-static void update_metrics_first_time_t(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_ANALYZE_V2);
 
@@ -1039,8 +1039,8 @@ static void update_metrics_first_time_t(struct rrdengine_instance *ctx, struct r
         if (!*PValue) {
             uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
             uuid_first_t_entry->metric = metric;
-            uuid_first_t_entry->first_time_t = mrg_metric_get_first_time_t(main_mrg, metric);
-            uuid_first_t_entry->last_time_t = mrg_metric_get_latest_time_t(main_mrg, metric);
+            uuid_first_t_entry->first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
+            uuid_first_t_entry->last_time_s = mrg_metric_get_latest_time_s(main_mrg, metric);
             uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
             *PValue = uuid_first_t_entry;
             count++;
@@ -1065,7 +1065,7 @@ static void update_metrics_first_time_t(struct rrdengine_instance *ctx, struct r
     bool first_then_next = true;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
-        mrg_metric_set_first_time_t(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_t);
+        mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
@@ -1083,7 +1083,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
     if (ctx_is_available_for_queries(ctx))
-        update_metrics_first_time_t(ctx, datafile, datafile->next, worker);
+        update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
         if(worker)
@@ -1339,9 +1339,9 @@ void timer_cb(uv_timer_t* handle) {
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
 
-    time_t now = now_monotonic_sec();
-    if(now - rrdeng_main.last_buffers_cleanup > 600) {
-        rrdeng_main.last_buffers_cleanup = now;
+    time_t now_s = now_monotonic_sec();
+    if(now_s - rrdeng_main.last_buffers_cleanup_s > 600) {
+        rrdeng_main.last_buffers_cleanup_s = now_s;
 
         work_request_cleanup();
         page_descriptor_cleanup();

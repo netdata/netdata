@@ -280,7 +280,7 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 
             // fetch the first valid point for the dimension
             int max_skip = 1000;
-            while(d->sp.end_time < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
+            while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
                 d->sp = ops->next_metric(&d->handle);
                 points_read++;
             }
@@ -293,16 +293,16 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
                                (unsigned long long) now);
             }
 
-            if(unlikely(d->sp.end_time < now || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
+            if(unlikely(d->sp.end_time_s < now || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
                 continue;
 
             if(unlikely(!min_start_time)) {
-                min_start_time = d->sp.start_time;
-                min_end_time = d->sp.end_time;
+                min_start_time = d->sp.start_time_s;
+                min_end_time = d->sp.end_time_s;
             }
             else {
-                min_start_time = MIN(min_start_time, d->sp.start_time);
-                min_end_time = MIN(min_end_time, d->sp.end_time);
+                min_start_time = MIN(min_start_time, d->sp.start_time_s);
+                min_end_time = MIN(min_end_time, d->sp.end_time_s);
             }
         }
 
@@ -344,7 +344,7 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
             struct replication_dimension *d = &q->data[i];
             if(unlikely(!d->enabled)) continue;
 
-            if(likely(d->sp.start_time <= min_end_time && d->sp.end_time >= min_end_time)) {
+            if(likely(d->sp.start_time_s <= min_end_time && d->sp.end_time_s >= min_end_time)) {
                 buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
 
@@ -644,8 +644,8 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
             },
 
             .local_db = {
-                    .first_entry_t = rrdset_first_entry_t(st),
-                    .last_entry_t = rrdset_last_entry_t(st),
+                    .first_entry_t = rrdset_first_entry_s(st),
+                    .last_entry_t = rrdset_last_entry_s(st),
                     .last_entry_t_adjusted_to_now = false,
                     .now  = now_realtime_sec(),
             },

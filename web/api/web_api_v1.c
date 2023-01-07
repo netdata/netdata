@@ -388,7 +388,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_s = now_realtime_sec();
     callback(st, w->response.data);
     return HTTP_RESP_OK;
 
@@ -1562,8 +1562,8 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.pages_uncompressed_bytes
                    , (long long)stats.pages_duration_secs
                    , stats.single_point_pages
-                   , stats.first_t
-                   , stats.last_t
+                   , stats.first_time_s
+                   , stats.last_time_s
                    , (long long)stats.database_retention_secs
                    , stats.average_compression_savings
                    , stats.average_point_duration_secs

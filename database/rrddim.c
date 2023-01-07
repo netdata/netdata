@@ -419,45 +419,45 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 
 // ----------------------------------------------------------------------------
 
-time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
         return 0;
 
-    return rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier]->query_ops->latest_time_s(rd->tiers[tier]->db_metric_handle);
 }
 
 // get the timestamp of the last entry in the round-robin database
-time_t rrddim_last_entry_t(RRDDIM *rd) {
-    time_t latest = rrddim_last_entry_t_of_tier(rd, 0);
+time_t rrddim_last_entry_s(RRDDIM *rd) {
+    time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
-        time_t t = rrddim_last_entry_t_of_tier(rd, tier);
-        if(t > latest)
-            latest = t;
+        time_t t = rrddim_last_entry_s_of_tier(rd, tier);
+        if(t > latest_time_s)
+            latest_time_s = t;
     }
 
-    return latest;
+    return latest_time_s;
 }
 
-time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
         return 0;
 
-    return rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier]->query_ops->oldest_time_s(rd->tiers[tier]->db_metric_handle);
 }
 
-time_t rrddim_first_entry_t(RRDDIM *rd) {
-    time_t oldest = 0;
+time_t rrddim_first_entry_s(RRDDIM *rd) {
+    time_t oldest_time_s = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
-        if(t != 0 && (oldest == 0 || t < oldest))
-            oldest = t;
+        time_t t = rrddim_first_entry_s_of_tier(rd, tier);
+        if(t != 0 && (oldest_time_s == 0 || t < oldest_time_s))
+            oldest_time_s = t;
     }
 
-    return oldest;
+    return oldest_time_s;
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st

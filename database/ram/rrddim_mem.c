@@ -63,13 +63,13 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unuse
     netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
 }
 
-bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t) {
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, time_t *first_entry_s, time_t *last_entry_s) {
     STORAGE_METRIC_HANDLE *db_metric_handle = rrddim_metric_get(db_instance, uuid);
     if(!db_metric_handle)
         return false;
 
-    *first_entry_t = rrddim_query_oldest_time(db_metric_handle);
-    *last_entry_t = rrddim_query_latest_time(db_metric_handle);
+    *first_entry_s = rrddim_query_oldest_time_s(db_metric_handle);
+    *last_entry_s = rrddim_query_latest_time_s(db_metric_handle);
 
     return true;
 }
@@ -134,27 +134,27 @@ int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 // only valid when not using dbengine
 static inline size_t rrddim_time2slot(RRDDIM *rd, time_t t) {
     size_t ret = 0;
-    time_t last_entry_t  = rrddim_query_latest_time((STORAGE_METRIC_HANDLE *)rd);
-    time_t first_entry_t = rrddim_query_oldest_time((STORAGE_METRIC_HANDLE *)rd);
+    time_t last_entry_s  = rrddim_query_latest_time_s((STORAGE_METRIC_HANDLE *) rd);
+    time_t first_entry_s = rrddim_query_oldest_time_s((STORAGE_METRIC_HANDLE *) rd);
     size_t entries       = rd->rrdset->entries;
     size_t first_slot    = rrddim_first_slot(rd);
     size_t last_slot     = rrddim_last_slot(rd);
     size_t update_every  = rd->rrdset->update_every;
 
-    if(t >= last_entry_t) {
+    if(t >= last_entry_s) {
         // the requested time is after the last entry we have
         ret = last_slot;
     }
     else {
-        if(t <= first_entry_t) {
+        if(t <= first_entry_s) {
             // the requested time is before the first entry we have
             ret = first_slot;
         }
         else {
-            if(last_slot >= (size_t)((last_entry_t - t) / update_every))
-                ret = last_slot - ((last_entry_t - t) / update_every);
+            if(last_slot >= (size_t)((last_entry_s - t) / update_every))
+                ret = last_slot - ((last_entry_s - t) / update_every);
             else
-                ret = last_slot - ((last_entry_t - t) / update_every) + entries;
+                ret = last_slot - ((last_entry_s - t) / update_every) + entries;
         }
     }
 
@@ -170,8 +170,8 @@ static inline size_t rrddim_time2slot(RRDDIM *rd, time_t t) {
 // only valid when not using dbengine
 static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
     time_t ret;
-    time_t last_entry_t  = rrddim_query_latest_time((STORAGE_METRIC_HANDLE *)rd);
-    time_t first_entry_t = rrddim_query_oldest_time((STORAGE_METRIC_HANDLE *)rd);
+    time_t last_entry_s  = rrddim_query_latest_time_s((STORAGE_METRIC_HANDLE *) rd);
+    time_t first_entry_s = rrddim_query_oldest_time_s((STORAGE_METRIC_HANDLE *) rd);
     size_t entries       = rd->rrdset->entries;
     size_t last_slot     = rrddim_last_slot(rd);
     size_t update_every  = rd->rrdset->update_every;
@@ -182,18 +182,18 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
     }
 
     if(slot > last_slot)
-        ret = last_entry_t - (time_t)(update_every * (last_slot - slot + entries));
+        ret = last_entry_s - (time_t)(update_every * (last_slot - slot + entries));
     else
-        ret = last_entry_t - (time_t)(update_every * (last_slot - slot));
+        ret = last_entry_s - (time_t)(update_every * (last_slot - slot));
 
-    if(unlikely(ret < first_entry_t)) {
+    if(unlikely(ret < first_entry_s)) {
         error("INTERNAL ERROR: rrddim_slot2time() on %s returns time too far in the past", rrddim_name(rd));
-        ret = first_entry_t;
+        ret = first_entry_s;
     }
 
-    if(unlikely(ret > last_entry_t)) {
+    if(unlikely(ret > last_entry_s)) {
         error("INTERNAL ERROR: rrddim_slot2time() on %s returns time into the future", rrddim_name(rd));
-        ret = last_entry_t;
+        ret = last_entry_s;
     }
 
     return ret;
@@ -202,19 +202,19 @@ static inline time_t rrddim_slot2time(RRDDIM *rd, size_t slot) {
 // ----------------------------------------------------------------------------
 // RRDDIM legacy database query functions
 
-void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time, time_t end_time, STORAGE_PRIORITY priority __maybe_unused) {
+void rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *handle, time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority __maybe_unused) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
 
     handle->rd = rd;
-    handle->start_time_s = start_time;
-    handle->end_time_s = end_time;
+    handle->start_time_s = start_time_s;
+    handle->end_time_s = end_time_s;
     handle->priority = priority;
     struct mem_query_handle* h = mallocz(sizeof(struct mem_query_handle));
-    h->slot           = rrddim_time2slot(rd, start_time);
-    h->last_slot      = rrddim_time2slot(rd, end_time);
+    h->slot           = rrddim_time2slot(rd, start_time_s);
+    h->last_slot      = rrddim_time2slot(rd, end_time_s);
     h->dt = rd->rrdset->update_every;
 
-    h->next_timestamp = start_time;
+    h->next_timestamp = start_time_s;
     h->slot_timestamp = rrddim_slot2time(rd, h->slot);
     h->last_timestamp = rrddim_slot2time(rd, h->last_slot);
 
@@ -239,16 +239,16 @@ STORAGE_POINT rrddim_query_next_metric(struct storage_engine_query_handle *handl
     h->next_timestamp += h->dt;
 
     // set this timestamp for our caller
-    sp.start_time = this_timestamp - h->dt;
-    sp.end_time = this_timestamp;
+    sp.start_time_s = this_timestamp - h->dt;
+    sp.end_time_s = this_timestamp;
 
     if(unlikely(this_timestamp < h->slot_timestamp)) {
-        storage_point_empty(sp, sp.start_time, sp.end_time);
+        storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
         return sp;
     }
 
     if(unlikely(this_timestamp > h->last_timestamp)) {
-        storage_point_empty(sp, sp.start_time, sp.end_time);
+        storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
         return sp;
     }
 
@@ -282,12 +282,12 @@ time_t rrddim_query_align_to_optimal_before(struct storage_engine_query_handle *
     return rrddim_handle->end_time_s;
 }
 
-time_t rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
+time_t rrddim_query_latest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     return rd->rrdset->last_updated.tv_sec;
 }
 
-time_t rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
+time_t rrddim_query_oldest_time_s(STORAGE_METRIC_HANDLE *db_metric_handle) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
     return (time_t)(rd->rrdset->last_updated.tv_sec - rrddim_duration(rd));
 }

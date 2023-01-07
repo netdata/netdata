@@ -1,5 +1,4 @@
 #include "cache.h"
-#include "../engine/rrdengine.h"
 
 /* STATES AND TRANSITIONS
  *
@@ -46,9 +45,9 @@ struct pgc_page {
     // indexing data
     Word_t section;
     Word_t metric_id;
-    time_t start_time_t;
-    time_t end_time_t;
-    uint32_t update_every;
+    time_t start_time_s;
+    time_t end_time_s;
+    uint32_t update_every_s;
     uint32_t assumed_size;
 
     REFCOUNT refcount;
@@ -832,9 +831,9 @@ static void free_this_page(PGC *cache, PGC_PAGE *page) {
     cache->config.pgc_free_clean_cb(cache, (PGC_ENTRY){
             .section = page->section,
             .metric_id = page->metric_id,
-            .start_time_t = page->start_time_t,
-            .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
-            .update_every = page->update_every,
+            .start_time_s = page->start_time_s,
+            .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
+            .update_every_s = page->update_every_s,
             .size = page_size_from_assumed_size(cache, page->assumed_size),
             .hot = (is_page_hot(page)) ? true : false,
             .data = page->data,
@@ -879,22 +878,22 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
         fatal("DBENGINE CACHE: metric '%lu' in section '%lu' should exist, but it does not.",
               page->metric_id, page->section);
 
-    Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_t, PJE0);
+    Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, page->start_time_s, PJE0);
     if(unlikely(!page_ptr))
         fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but it does not.",
-              page->start_time_t, page->metric_id, page->section);
+              page->start_time_s, page->metric_id, page->section);
 
     PGC_PAGE *found_page = *page_ptr;
     if(unlikely(found_page != page))
         fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' should exist, but the index returned a different address.",
-              page->start_time_t, page->metric_id, page->section);
+              page->start_time_s, page->metric_id, page->section);
 
     size_t mem_before_judyl = 0, mem_after_judyl = 0;
 
     mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
-    if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_t, PJE0)))
+    if(unlikely(!JudyLDel(pages_judy_pptr, page->start_time_s, PJE0)))
         fatal("DBENGINE CACHE: page with start time '%ld' of metric '%lu' in section '%lu' exists, but cannot be deleted.",
-              page->start_time_t, page->metric_id, page->section);
+              page->start_time_s, page->metric_id, page->section);
     mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
 
     mem_before_judyl += JudyLMemUsed(*metrics_judy_pptr);
@@ -1135,7 +1134,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         mem_after_judyl += JudyLMemUsed(*metrics_judy_pptr);
 
         mem_before_judyl += JudyLMemUsed(*pages_judy_pptr);
-        Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_t, PJE0);
+        Pvoid_t *page_ptr = JudyLIns(pages_judy_pptr, entry->start_time_s, PJE0);
         if(unlikely(!page_ptr || page_ptr == PJERR))
             fatal("DBENGINE CACHE: corrupted page in judy array");
         mem_after_judyl += JudyLMemUsed(*pages_judy_pptr);
@@ -1156,9 +1155,9 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
             page->flags = 0;
             page->section = entry->section;
             page->metric_id = entry->metric_id;
-            page->start_time_t = entry->start_time_t;
-            page->end_time_t = entry->end_time_t,
-            page->update_every = entry->update_every,
+            page->start_time_s = entry->start_time_s;
+            page->end_time_s = entry->end_time_s,
+            page->update_every_s = entry->update_every_s,
             page->data = entry->data;
             page->assumed_size = page_assumed_size(cache, entry->size);
             netdata_spinlock_init(&page->transition_spinlock);
@@ -1234,7 +1233,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     return page;
 }
 
-static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, PGC_SEARCH method) {
+static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
     __atomic_add_fetch(&cache->stats.workers_search, 1, __ATOMIC_RELAXED);
 
     size_t *stats_hit_ptr, *stats_miss_ptr;
@@ -1276,7 +1275,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
     switch(method) {
         default:
         case PGC_SEARCH_CLOSEST: {
-            Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_t, PJE0);
+            Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_s, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
 
@@ -1284,7 +1283,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
                 page = *page_ptr;
 
             else {
-                Word_t time = start_time_t;
+                Word_t time = start_time_s;
 
                 // find the previous page
                 page_ptr = JudyLLast(*pages_judy_pptr, &time, PJE0);
@@ -1295,14 +1294,14 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
                     // found a page starting before our timestamp
                     // check if our timestamp is included
                     page = *page_ptr;
-                    if(start_time_t > page->end_time_t)
+                    if(start_time_s > page->end_time_s)
                         // it is not good for us
                         page = NULL;
                 }
 
                 if(!page) {
                     // find the next page then...
-                    time = start_time_t;
+                    time = start_time_s;
                     page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0);
                     if(page_ptr)
                         page = *page_ptr;
@@ -1312,7 +1311,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         break;
 
         case PGC_SEARCH_EXACT: {
-            Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_t, PJE0);
+            Pvoid_t *page_ptr = JudyLGet(*pages_judy_pptr, start_time_s, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
 
@@ -1322,7 +1321,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         break;
 
         case PGC_SEARCH_FIRST: {
-            Word_t time = start_time_t;
+            Word_t time = start_time_s;
             Pvoid_t *page_ptr = JudyLFirst(*pages_judy_pptr, &time, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
@@ -1333,7 +1332,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         break;
 
         case PGC_SEARCH_NEXT: {
-            Word_t time = start_time_t;
+            Word_t time = start_time_s;
             Pvoid_t *page_ptr = JudyLNext(*pages_judy_pptr, &time, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
@@ -1344,7 +1343,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         break;
 
         case PGC_SEARCH_LAST: {
-            Word_t time = start_time_t;
+            Word_t time = start_time_s;
             Pvoid_t *page_ptr = JudyLLast(*pages_judy_pptr, &time, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
@@ -1355,7 +1354,7 @@ static PGC_PAGE *page_find_and_acquire(PGC *cache, Word_t section, Word_t metric
         break;
 
         case PGC_SEARCH_PREV: {
-            Word_t time = start_time_t;
+            Word_t time = start_time_s;
             Pvoid_t *page_ptr = JudyLPrev(*pages_judy_pptr, &time, PJE0);
             if (unlikely(page_ptr == PJERR))
                 fatal("DBENGINE CACHE: corrupted page in pages judy array");
@@ -1504,9 +1503,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
                     array[pages_added] = (PGC_ENTRY) {
                             .section = page->section,
                             .metric_id = page->metric_id,
-                            .start_time_t = page->start_time_t,
-                            .end_time_t = __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
-                            .update_every = page->update_every,
+                            .start_time_s = page->start_time_s,
+                            .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
+                            .update_every_s = page->update_every_s,
                             .size = page_size_from_assumed_size(cache, page->assumed_size),
                             .data = page->data,
                             .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
@@ -1809,28 +1808,28 @@ Word_t pgc_page_metric(PGC_PAGE *page) {
     return page->metric_id;
 }
 
-time_t pgc_page_start_time_t(PGC_PAGE *page) {
-    return page->start_time_t;
+time_t pgc_page_start_time_s(PGC_PAGE *page) {
+    return page->start_time_s;
 }
 
-time_t pgc_page_end_time_t(PGC_PAGE *page) {
-    return page->end_time_t;
+time_t pgc_page_end_time_s(PGC_PAGE *page) {
+    return page->end_time_s;
 }
 
-time_t pgc_page_update_every(PGC_PAGE *page) {
-    return page->update_every;
+time_t pgc_page_update_every_s(PGC_PAGE *page) {
+    return page->update_every_s;
 }
 
-time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every) {
-    if(page->update_every == 0)
-        page->update_every = update_every;
+time_t pgc_page_fix_update_every(PGC_PAGE *page, time_t update_every_s) {
+    if(page->update_every_s == 0)
+        page->update_every_s = update_every_s;
 
-    return page->update_every;
+    return page->update_every_s;
 }
 
-time_t pgc_page_fix_end_time_t(PGC_PAGE *page, time_t end_time_t) {
-    page->end_time_t = end_time_t;
-    return page->end_time_t;
+time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s) {
+    page->end_time_s = end_time_s;
+    return page->end_time_s;
 }
 
 void *pgc_page_data(PGC_PAGE *page) {
@@ -1903,22 +1902,22 @@ bool pgc_flush_pages(PGC *cache, size_t max_flushes) {
     return flush_pages(cache, under_pressure ? 0 : max_flushes, PGC_SECTION_ALL, true, false);
 }
 
-void pgc_page_hot_set_end_time_t(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_t) {
+void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time_t end_time_s) {
     internal_fatal(!is_page_hot(page),
-                   "DBENGINE CACHE: end_time_t update on non-hot page");
+                   "DBENGINE CACHE: end_time_s update on non-hot page");
 
-    internal_fatal(end_time_t <= __atomic_load_n(&page->end_time_t, __ATOMIC_RELAXED),
-                   "DBENGINE CACHE: end_time_t is not bigger than existing");
+    internal_fatal(end_time_s <= __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
+                   "DBENGINE CACHE: end_time_s is not bigger than existing");
 
-    __atomic_store_n(&page->end_time_t, end_time_t, __ATOMIC_RELAXED);
+    __atomic_store_n(&page->end_time_s, end_time_s, __ATOMIC_RELAXED);
 
 #ifdef PGC_COUNT_POINTS_COLLECTED
     __atomic_add_fetch(&cache->stats.points_collected, 1, __ATOMIC_RELAXED);
 #endif
 }
 
-PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_t, PGC_SEARCH method) {
-    return page_find_and_acquire(cache, section, metric_id, start_time_t, method);
+PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
+    return page_find_and_acquire(cache, section, metric_id, start_time_s, method);
 }
 
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
@@ -2011,8 +2010,8 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         if(!*PValue) {
             mi = callocz(1, sizeof(struct jv2_metrics_info));
             mi->uuid = mrg_metric_uuid(main_mrg, (METRIC *)page->metric_id);
-            mi->first_time_t = page->start_time_t;
-            mi->last_time_t = page->end_time_t;
+            mi->first_time_s = page->start_time_s;
+            mi->last_time_s = page->end_time_s;
             mi->number_of_pages = 1;
             *PValue = mi;
 
@@ -2021,21 +2020,21 @@ void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_
         else {
             mi = *PValue;
             mi->number_of_pages++;
-            if(page->start_time_t < mi->first_time_t)
-                mi->first_time_t = page->start_time_t;
-            if(page->end_time_t > mi->last_time_t)
-                mi->last_time_t = page->end_time_t;
+            if(page->start_time_s < mi->first_time_s)
+                mi->first_time_s = page->start_time_s;
+            if(page->end_time_s > mi->last_time_s)
+                mi->last_time_s = page->end_time_s;
         }
 
-        PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_t, PJE0);
+        PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
         if(!PValue || *PValue == PJERR)
             fatal("Corrupted JudyL metric pages");
 
         if(!*PValue) {
             struct jv2_page_info *pi = callocz(1, (sizeof(struct jv2_page_info)));
-            pi->start_time_t = page->start_time_t;
-            pi->end_time_t = page->end_time_t;
-            pi->update_every = page->update_every;
+            pi->start_time_s = page->start_time_s;
+            pi->end_time_s = page->end_time_s;
+            pi->update_every_s = page->update_every_s;
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;
             pi->extent_index = current_extent_index_id;
@@ -2538,8 +2537,8 @@ int pgc_unittest(void) {
     PGC_PAGE *page1 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
         .section = 1,
         .metric_id = 10,
-        .start_time_t = 100,
-        .end_time_t = 1000,
+        .start_time_s = 100,
+        .end_time_s = 1000,
         .size = 4096,
         .data = NULL,
         .hot = false,
@@ -2558,27 +2557,27 @@ int pgc_unittest(void) {
     PGC_PAGE *page2 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
             .section = 2,
             .metric_id = 10,
-            .start_time_t = 1001,
-            .end_time_t = 2000,
+            .start_time_s = 1001,
+            .end_time_s = 2000,
             .size = 4096,
             .data = NULL,
             .hot = true,
     }, NULL);
 
-    pgc_page_hot_set_end_time_t(cache, page2, 2001);
+    pgc_page_hot_set_end_time_s(cache, page2, 2001);
     pgc_page_hot_to_dirty_and_release(cache, page2);
 
     PGC_PAGE *page3 = pgc_page_add_and_acquire(cache, (PGC_ENTRY){
             .section = 3,
             .metric_id = 10,
-            .start_time_t = 1001,
-            .end_time_t = 2000,
+            .start_time_s = 1001,
+            .end_time_s = 2000,
             .size = 4096,
             .data = NULL,
             .hot = true,
     }, NULL);
 
-    pgc_page_hot_set_end_time_t(cache, page3, 2001);
+    pgc_page_hot_set_end_time_s(cache, page3, 2001);
     pgc_page_hot_to_dirty_and_release(cache, page3);
 
     pgc_destroy(cache);

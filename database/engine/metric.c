@@ -6,13 +6,13 @@ typedef int32_t REFCOUNT;
 struct metric {
     uuid_t uuid;                    // never changes
     Word_t section;                 // never changes
-    time_t first_time_t;            //
-    time_t latest_time_t_clean;     // archived pages latest time
-    time_t latest_time_t_hot;       // currently collected page latest time
-    uint32_t latest_update_every;   //
+    time_t first_time_s;            //
+    time_t latest_time_s_clean;     // archived pages latest time
+    time_t latest_time_s_hot;       // latest time of the currently collected page
+    uint32_t latest_update_every_s; //
     SPINLOCK timestamps_lock;       // protects the 3 timestamps
 
-    // THIS IS MALLOC'd
+    // THIS IS allocated with malloc()
     // YOU HAVE TO INITIALIZE IT YOURSELF !
 };
 
@@ -116,10 +116,10 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     METRIC *metric = arrayalloc_mallocz(mrg->index.aral);
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
-    metric->first_time_t = entry->first_time_t;
-    metric->latest_time_t_clean = entry->latest_time_t;
-    metric->latest_time_t_hot = 0;
-    metric->latest_update_every = entry->latest_update_every;
+    metric->first_time_s = entry->first_time_s;
+    metric->latest_time_s_clean = entry->latest_time_s;
+    metric->latest_time_s_hot = 0;
+    metric->latest_update_every_s = entry->latest_update_every_s;
     metric->timestamps_lock = NETDATA_SPINLOCK_INITIALIZER;
     *PValue = metric;
 
@@ -213,27 +213,28 @@ void mrg_destroy(MRG *mrg __maybe_unused) {
     // no destruction possible
     // we can't traverse the metrics list
 
-    // to delete entries, the caller needs to keep pointers to METRICs
+    // to delete entries, the caller needs to keep pointers to them
+    // and delete them one by one
 
     ;
 }
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
-    // FIXME - support refcounting
+    // FIXME - support refcount
 
-//    internal_fatal(entry.latest_time_t > now_realtime_sec(),
+//    internal_fatal(entry.latest_time_s > now_realtime_sec(),
 //        "DBENGINE METRIC: metric latest time is in the future");
 
     return metric_add(mrg, &entry, ret);
 }
 
 METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
-    // FIXME - support refcounting
+    // FIXME - support refcount
     return metric_get(mrg, uuid, section);
 }
 
 bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
-    // FIXME - support refcounting
+    // FIXME - support refcount
     return metric_del(mrg, metric);
 }
 
@@ -259,44 +260,44 @@ Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
     return metric->section;
 }
 
-bool mrg_metric_set_first_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
+bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     netdata_spinlock_lock(&metric->timestamps_lock);
-    metric->first_time_t = first_time_t;
+    metric->first_time_s = first_time_s;
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
     return true;
 }
 
-void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t, time_t last_time_t, time_t update_every) {
+void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-    if(first_time_t && (!metric->first_time_t || first_time_t < metric->first_time_t))
-        metric->first_time_t = first_time_t;
+    if(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s))
+        metric->first_time_s = first_time_s;
 
-    if(last_time_t && (!metric->latest_time_t_clean || last_time_t > metric->latest_time_t_clean)) {
-        metric->latest_time_t_clean = last_time_t;
+    if(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean)) {
+        metric->latest_time_s_clean = last_time_s;
 
-        if(update_every)
-            metric->latest_update_every = update_every;
+        if(update_every_s)
+            metric->latest_update_every_s = update_every_s;
     }
-    else if(!metric->latest_update_every && update_every)
-        metric->latest_update_every = update_every;
+    else if(!metric->latest_update_every_s && update_every_s)
+        metric->latest_update_every_s = update_every_s;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
 }
 
-bool mrg_metric_set_first_time_t_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_t) {
+bool mrg_metric_set_first_time_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     bool ret = false;
 
     netdata_spinlock_lock(&metric->timestamps_lock);
-    if(!metric->first_time_t) {
-        metric->first_time_t = first_time_t;
+    if(!metric->first_time_s) {
+        metric->first_time_s = first_time_s;
 
-//        if(unlikely(metric->latest_time_t_clean < metric->first_time_t))
-//            metric->latest_time_t_clean = metric->first_time_t;
+//        if(unlikely(metric->latest_time_s_clean < metric->first_time_s))
+//            metric->latest_time_s_clean = metric->first_time_s;
 //
-//        if(unlikely(metric->latest_time_t_hot < metric->first_time_t))
-//            metric->latest_time_t_hot = metric->first_time_t;
+//        if(unlikely(metric->latest_time_s_hot < metric->first_time_s))
+//            metric->latest_time_s_hot = metric->first_time_s;
 
         ret = true;
     }
@@ -305,99 +306,99 @@ bool mrg_metric_set_first_time_t_if_zero(MRG *mrg __maybe_unused, METRIC *metric
     return ret;
 }
 
-time_t mrg_metric_get_first_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
-    time_t first_time_t;
+time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
+    time_t first_time_s;
     netdata_spinlock_lock(&metric->timestamps_lock);
-    first_time_t = metric->first_time_t;
-    if(!first_time_t) {
-        if(metric->latest_time_t_clean)
-            first_time_t = metric->latest_time_t_clean;
+    first_time_s = metric->first_time_s;
+    if(!first_time_s) {
+        if(metric->latest_time_s_clean)
+            first_time_s = metric->latest_time_s_clean;
 
-        if(!first_time_t || metric->latest_time_t_hot < metric->latest_time_t_clean)
-            first_time_t = metric->latest_time_t_hot;
+        if(!first_time_s || metric->latest_time_s_hot < metric->latest_time_s_clean)
+            first_time_s = metric->latest_time_s_hot;
     }
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
-    return first_time_t;
+    return first_time_s;
 }
 
-bool mrg_metric_set_clean_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
+bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-//    internal_fatal(latest_time_t > now_realtime_sec(),
+//    internal_fatal(latest_time_s > now_realtime_sec(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
-    internal_fatal(metric->latest_time_t_clean > latest_time_t,
+    internal_fatal(metric->latest_time_s_clean > latest_time_s,
                    "DBENGINE METRIC: metric new clean latest time is older than the previous one");
 
-    metric->latest_time_t_clean = latest_time_t;
+    metric->latest_time_s_clean = latest_time_s;
 
-    if(unlikely(!metric->first_time_t))
-        metric->first_time_t = latest_time_t;
+    if(unlikely(!metric->first_time_s))
+        metric->first_time_s = latest_time_s;
 
-//    if(unlikely(metric->first_time_t > latest_time_t))
-//        metric->first_time_t = latest_time_t;
+//    if(unlikely(metric->first_time_s > latest_time_s))
+//        metric->first_time_s = latest_time_s;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
 }
 
-bool mrg_metric_set_hot_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_t) {
-//    internal_fatal(latest_time_t > now_realtime_sec(),
+bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+//    internal_fatal(latest_time_s > now_realtime_sec(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
     netdata_spinlock_lock(&metric->timestamps_lock);
-    metric->latest_time_t_hot = latest_time_t;
+    metric->latest_time_s_hot = latest_time_s;
 
-    if(unlikely(!metric->first_time_t))
-        metric->first_time_t = latest_time_t;
+    if(unlikely(!metric->first_time_s))
+        metric->first_time_s = latest_time_s;
 
-//    if(unlikely(metric->first_time_t > latest_time_t))
-//        metric->first_time_t = latest_time_t;
+//    if(unlikely(metric->first_time_s > latest_time_s))
+//        metric->first_time_s = latest_time_s;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
     return true;
 }
 
-time_t mrg_metric_get_latest_time_t(MRG *mrg __maybe_unused, METRIC *metric) {
+time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t max;
     netdata_spinlock_lock(&metric->timestamps_lock);
-    max = MAX(metric->latest_time_t_clean, metric->latest_time_t_hot);
+    max = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
     netdata_spinlock_unlock(&metric->timestamps_lock);
     return max;
 }
 
-bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
-    if(!update_every)
+bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
+    if(!update_every_s)
         return false;
 
     netdata_spinlock_lock(&metric->timestamps_lock);
-    metric->latest_update_every = update_every;
+    metric->latest_update_every_s = update_every_s;
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
     return true;
 }
 
-bool mrg_metric_set_update_every_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every) {
-    if(!update_every)
+bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
+    if(!update_every_s)
         return false;
 
     netdata_spinlock_lock(&metric->timestamps_lock);
-    if(!metric->latest_update_every)
-        metric->latest_update_every = update_every;
+    if(!metric->latest_update_every_s)
+        metric->latest_update_every_s = update_every_s;
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
     return true;
 }
 
-time_t mrg_metric_get_update_every(MRG *mrg __maybe_unused, METRIC *metric) {
-    time_t update_every;
+time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
+    time_t update_every_s;
 
     netdata_spinlock_lock(&metric->timestamps_lock);
-    update_every = metric->latest_update_every;
+    update_every_s = metric->latest_update_every_s;
     netdata_spinlock_unlock(&metric->timestamps_lock);
 
-    return update_every;
+    return update_every_s;
 }
 
 struct mrg_statistics mrg_get_statistics(MRG *mrg) {
@@ -418,9 +419,9 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
     METRIC *array[entries][sections];
     for(size_t i = 0; i < entries ; i++) {
         MRG_ENTRY e = {
-                .first_time_t = (time_t)(i + 1),
-                .latest_time_t = (time_t)(i + 2),
-                .latest_update_every = (time_t)(i + 3),
+                .first_time_s = (time_t)(i + 1),
+                .latest_time_s = (time_t)(i + 2),
+                .latest_update_every_s = (time_t)(i + 3),
         };
         uuid_generate_random(e.uuid);
 
@@ -455,25 +456,25 @@ static void mrg_stress(MRG *mrg, size_t entries, size_t sections) {
             if(mrg_metric_id(mrg, array[i][section]) != (Word_t)array[i][section])
                 fatal("DBENGINE METRIC: metric id does not match");
 
-            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)(i + 1))
+            if(mrg_metric_get_first_time_s(mrg, array[i][section]) != (time_t)(i + 1))
                 fatal("DBENGINE METRIC: wrong first time returned");
-            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)(i + 2))
+            if(mrg_metric_get_latest_time_s(mrg, array[i][section]) != (time_t)(i + 2))
                 fatal("DBENGINE METRIC: wrong latest time returned");
-            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)(i + 3))
+            if(mrg_metric_get_update_every_s(mrg, array[i][section]) != (time_t)(i + 3))
                 fatal("DBENGINE METRIC: wrong latest time returned");
 
-            if(!mrg_metric_set_first_time_t(mrg, array[i][section], (time_t)((i + 1) * 2)))
+            if(!mrg_metric_set_first_time_s(mrg, array[i][section], (time_t)((i + 1) * 2)))
                 fatal("DBENGINE METRIC: cannot set first time");
-            if(!mrg_metric_set_clean_latest_time_t(mrg, array[i][section], (time_t) ((i + 1) * 3)))
+            if(!mrg_metric_set_clean_latest_time_s(mrg, array[i][section], (time_t) ((i + 1) * 3)))
                 fatal("DBENGINE METRIC: cannot set latest time");
             if(!mrg_metric_set_update_every(mrg, array[i][section], (time_t)((i + 1) * 4)))
                 fatal("DBENGINE METRIC: cannot set update every");
 
-            if(mrg_metric_get_first_time_t(mrg, array[i][section]) != (time_t)((i + 1) * 2))
+            if(mrg_metric_get_first_time_s(mrg, array[i][section]) != (time_t)((i + 1) * 2))
                 fatal("DBENGINE METRIC: wrong first time returned");
-            if(mrg_metric_get_latest_time_t(mrg, array[i][section]) != (time_t)((i + 1) * 3))
+            if(mrg_metric_get_latest_time_s(mrg, array[i][section]) != (time_t)((i + 1) * 3))
                 fatal("DBENGINE METRIC: wrong latest time returned");
-            if(mrg_metric_get_update_every(mrg, array[i][section]) != (time_t)((i + 1) * 4))
+            if(mrg_metric_get_update_every_s(mrg, array[i][section]) != (time_t)((i + 1) * 4))
                 fatal("DBENGINE METRIC: wrong latest time returned");
         }
     }
@@ -521,9 +522,9 @@ int mrg_unittest(void) {
 
     MRG_ENTRY entry = {
             .section = 1,
-            .first_time_t = 2,
-            .latest_time_t = 3,
-            .latest_update_every = 4,
+            .first_time_s = 2,
+            .latest_time_s = 3,
+            .latest_update_every_s = 4,
     };
     uuid_generate(entry.uuid);
     metric1 = mrg_metric_add_and_acquire(mrg, entry, &ret);

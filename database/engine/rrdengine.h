@@ -149,16 +149,16 @@ struct jv2_extents_info {
 struct jv2_metrics_info {
     uuid_t *uuid;
     uint32_t page_list_header;
-    time_t first_time_t;
-    time_t last_time_t;
+    time_t first_time_s;
+    time_t last_time_s;
     size_t number_of_pages;
     Pvoid_t JudyL_pages_by_start_time;
 };
 
 struct jv2_page_info {
-    time_t start_time_t;
-    time_t end_time_t;
-    time_t update_every;
+    time_t start_time_s;
+    time_t end_time_s;
+    time_t update_every_s;
     size_t page_length;
     uint32_t extent_index;
     void *custom_data;
@@ -210,7 +210,7 @@ struct rrdeng_query_handle {
     } cache;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    usec_t started_time_t;
+    usec_t started_time_s;
     pid_t query_pid;
     struct rrdeng_query_handle *prev, *next;
 #endif
