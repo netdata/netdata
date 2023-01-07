@@ -189,8 +189,6 @@ LIBNETDATA_FILES = \
     libnetdata/string/utf8.h \
     libnetdata/worker_utilization/worker_utilization.c \
     libnetdata/worker_utilization/worker_utilization.h \
-	libnetdata/event_loop/event_loop.c \
-    libnetdata/event_loop/event_loop.h \
     $(NULL)
 
 if ENABLE_PLUGIN_EBPF
@@ -899,6 +897,8 @@ DAEMON_FILES = \
     daemon/common.h \
     daemon/daemon.c \
     daemon/daemon.h \
+	daemon/event_loop.c \
+    daemon/event_loop.h \
     daemon/global_statistics.c \
     daemon/global_statistics.h \
     daemon/analytics.c \
