@@ -63,6 +63,17 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unuse
     netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
 }
 
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance __maybe_unused, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t) {
+    STORAGE_METRIC_HANDLE *db_metric_handle = rrddim_metric_get(db_instance, uuid);
+    if(!db_metric_handle)
+        return false;
+
+    *first_entry_t = rrddim_query_oldest_time(db_metric_handle);
+    *last_entry_t = rrddim_query_latest_time(db_metric_handle);
+
+    return true;
+}
+
 void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every __maybe_unused) {
     rrddim_store_metric_flush(collection_handle);
 }

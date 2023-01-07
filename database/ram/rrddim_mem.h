@@ -25,6 +25,8 @@ STORAGE_METRIC_HANDLE *rrddim_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *
 STORAGE_METRIC_HANDLE *rrddim_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle);
 void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
 
+bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *uuid, time_t *first_entry_t, time_t *last_entry_t);
+
 STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
 void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
 

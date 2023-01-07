@@ -3054,14 +3054,13 @@ static bool rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = rrddim_first_entry_t(rm->rrddim);
         max_last_time_t = rrddim_last_entry_t(rm->rrddim);
     }
-#ifdef ENABLE_DBENGINE
-    else if (dbengine_enabled) {
+    else {
         RRDHOST *rrdhost = rm->ri->rc->rrdhost;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if(!rrdhost->db[tier].instance) continue;
+            STORAGE_ENGINE *eng = rrdhost->db[tier].eng;
 
             time_t first_time_t, last_time_t;
-            if (rrdeng_metric_retention_by_uuid(rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t) == 0) {
+            if (eng->api.metric_retention_by_uuid(rrdhost->db[tier].instance, &rm->uuid, &first_time_t, &last_time_t)) {
                 if (first_time_t < min_first_time_t)
                     min_first_time_t = first_time_t;
 
@@ -3070,11 +3069,9 @@ static bool rrdmetric_update_retention(RRDMETRIC *rm) {
             }
         }
     }
-    else {
-        // cannot get retention
+
+    if((min_first_time_t == LONG_MAX || min_first_time_t == 0) && max_last_time_t == 0)
         return false;
-    }
-#endif
 
     if(min_first_time_t == LONG_MAX)
         min_first_time_t = 0;

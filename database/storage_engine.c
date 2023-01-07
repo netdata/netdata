@@ -35,6 +35,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops,
         }
@@ -47,6 +48,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops,
         }
@@ -59,6 +61,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops,
         }
@@ -71,6 +74,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops,
         }
@@ -83,6 +87,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrddim_metric_get_or_create,
             .metric_dup = rrddim_metric_dup,
             .metric_release = rrddim_metric_release,
+            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
             .collect_ops = im_collect_ops,
             .query_ops = im_query_ops,
         }
@@ -96,6 +101,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_get_or_create = rrdeng_metric_get_or_create,
             .metric_dup = rrdeng_metric_dup,
             .metric_release = rrdeng_metric_release,
+            .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
             .collect_ops = {
                 .init = rrdeng_store_metric_init,
                 .store_metric = rrdeng_store_metric_next,

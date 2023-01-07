@@ -758,24 +758,24 @@ time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle) {
     return oldest_time_t;
 }
 
-int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t)
 {
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *)si;
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     if (unlikely(!ctx)) {
         error("DBENGINE: invalid STORAGE INSTANCE to %s()", __FUNCTION__);
-        return 1;
+        return false;
     }
 
     METRIC *metric = mrg_metric_get_and_acquire(main_mrg, dim_uuid, (Word_t) ctx);
     if (unlikely(!metric))
-        return 1;
+        return false;
 
     *first_entry_t = mrg_metric_get_first_time_t(main_mrg, metric);
     *last_entry_t = mrg_metric_get_latest_time_t(main_mrg, metric);
 
     mrg_metric_release(main_mrg, metric);
 
-    return 0;
+    return true;
 }
 
 /*
