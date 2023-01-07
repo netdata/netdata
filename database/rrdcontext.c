@@ -2319,11 +2319,25 @@ void query_target_release(QUERY_TARGET *qt) {
         string_freez(qt->query.array[i].chart.name);
         qt->query.array[i].chart.name = NULL;
 
+        // reset the plans
+        for(size_t p = 0; p < qt->query.array[i].plan.used; p++) {
+            internal_fatal(qt->query.array[i].plan.array[p].initialized &&
+                            !qt->query.array[i].plan.array[p].finalized,
+                           "QUERY: left-over initialized plan");
+
+            qt->query.array[i].plan.array[p].initialized = false;
+            qt->query.array[i].plan.array[p].finalized = false;
+        }
+        qt->query.array[i].plan.used = 0;
+
+        // reset the tiers
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
             if(qt->query.array[i].tiers[tier].db_metric_handle) {
                 STORAGE_ENGINE *eng = qt->query.array[i].tiers[tier].eng;
                 eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
                 qt->query.array[i].tiers[tier].db_metric_handle = NULL;
+                qt->query.array[i].tiers[tier].weight = 0;
+                qt->query.array[i].tiers[tier].eng = NULL;
             }
         }
     }
