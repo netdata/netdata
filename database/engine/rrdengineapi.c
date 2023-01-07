@@ -625,8 +625,11 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         handle->now_s = page_start_time_s;
         position = 0;
     }
-    else
+    else {
         internal_fatal(true, "DBENGINE: this page is entirely in our past and should not be accepted for this query in the first place");
+        handle->now_s = page_end_time_s;
+        position = entries - 1;
+    }
 
     handle->entries = entries;
     handle->position = position;
