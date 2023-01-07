@@ -105,7 +105,6 @@ typedef struct storage_query_handle STORAGE_QUERY_HANDLE;
 
 // iterator state for RRD dimension data queries
 struct storage_engine_query_handle {
-    RRDDIM *rd;
     time_t start_time_s;
     time_t end_time_s;
     STORAGE_PRIORITY priority;

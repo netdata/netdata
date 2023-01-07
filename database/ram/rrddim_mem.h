@@ -6,13 +6,12 @@
 #include "database/rrd.h"
 
 struct mem_collect_handle {
+    STORAGE_METRIC_HANDLE *db_metric_handle;
     RRDDIM *rd;
-    time_t update_every_s;
-    time_t last_point_in_time_s;
-    bool flushed;
 };
 
 struct mem_query_handle {
+    STORAGE_METRIC_HANDLE *db_metric_handle;
     time_t dt;
     time_t next_timestamp;
     time_t last_timestamp;
