@@ -45,7 +45,7 @@ struct journal_v2_block_trailer {
 // 28 bytes
 struct journal_page_header {
     union {
-        uint8_t checksum[4];      // CRC check
+        uint8_t checksum[CHECKSUM_SZ];      // CRC check
         uint32_t crc;
     };
     uint32_t uuid_offset;    // Points back to the UUID list which should point here (UUIDs should much)
