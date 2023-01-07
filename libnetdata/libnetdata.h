@@ -536,7 +536,8 @@ static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
     return (total % modulo);
 }
 
-static uint32_t murmur32(uint32_t h) {
+static uint32_t murmur32(uint32_t h) __attribute__((const));
+static inline uint32_t murmur32(uint32_t h) {
     h ^= h >> 16;
     h *= 0x85ebca6b;
     h ^= h >> 13;
@@ -546,7 +547,8 @@ static uint32_t murmur32(uint32_t h) {
     return h;
 }
 
-static uint64_t murmur64(uint64_t k) {
+static uint64_t murmur64(uint64_t h) __attribute__((const));
+static inline uint64_t murmur64(uint64_t k) {
     k ^= k >> 33;
     k *= 0xff51afd7ed558ccdUL;
     k ^= k >> 33;
@@ -556,6 +558,7 @@ static uint64_t murmur64(uint64_t k) {
     return k;
 }
 
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
 static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     if(sizeof(Word_t) == 8) {
         uint64_t hash = murmur64(ptr);

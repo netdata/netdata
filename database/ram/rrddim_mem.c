@@ -74,26 +74,71 @@ bool rrddim_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance __maybe_unuse
     return true;
 }
 
-void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every __maybe_unused) {
+void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
     rrddim_store_metric_flush(collection_handle);
+    ch->update_every_s = update_every;
 }
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every __maybe_unused, STORAGE_METRICS_GROUP *smg __maybe_unused) {
     RRDDIM *rd = (RRDDIM *)db_metric_handle;
+
     rd->db[rd->rrdset->current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;
+    ch->last_point_in_time_s = rd->rrdset->last_updated.tv_sec;
+    ch->update_every_s = rd->rrdset->update_every;
+
     return (STORAGE_COLLECT_HANDLE *)ch;
 }
 
-void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
-        NETDATA_DOUBLE min_value,
-        NETDATA_DOUBLE max_value,
-        uint16_t count,
-        uint16_t anomaly_count,
-        SN_FLAGS flags)
+static inline void rrddim_fill_the_gap(STORAGE_COLLECT_HANDLE *collection_handle, usec_t now_collect_ut) {
+    struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+    RRDSET *st = ch->rd->rrdset;
+
+    usec_t update_every_ut = st->update_every * USEC_PER_SEC;
+    storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
+
+    size_t c = 0, entries = st->entries;
+    usec_t last_stored_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC;
+    if(now_collect_ut - last_stored_ut / update_every_ut >= entries) {
+        rrddim_store_metric_flush(collection_handle);
+    }
+    else {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st) {
+            usec_t next_store_ut = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
+            size_t current_entry = st->current_entry;
+
+            for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
+                rd->db[current_entry] = empty;
+                current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
+            }
+        }
+        rrddim_foreach_done(rd);
+
+        if(c > 0) {
+            c--;
+            st->last_updated.tv_sec += (time_t)(c * st->update_every);
+
+            st->current_entry += (long)c;
+            st->counter += c;
+            if(st->current_entry >= st->entries)
+                st->current_entry -= st->entries;
+        }
+    }
+}
+
+void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle,
+                                 usec_t point_in_time_ut,
+                                 NETDATA_DOUBLE number,
+                                 NETDATA_DOUBLE min_value,
+                                 NETDATA_DOUBLE max_value,
+                                 uint16_t count,
+                                 uint16_t anomaly_count,
+                                 SN_FLAGS flags)
 {
-    UNUSED(point_in_time);
+    UNUSED(point_in_time_ut);
     UNUSED(min_value);
     UNUSED(max_value);
     UNUSED(count);
@@ -101,16 +146,29 @@ void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec
 
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
     RRDDIM *rd = ch->rd;
+
+    time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+    if(unlikely(!ch->flushed && point_in_time_s - ch->update_every_s > ch->last_point_in_time_s))
+        rrddim_fill_the_gap(collection_handle, point_in_time_ut);
+
     rd->db[rd->rrdset->current_entry] = pack_storage_number(number, flags);
+    ch->last_point_in_time_s = point_in_time_s;
+    ch->flushed = false;
 }
 
 void rrddim_store_metric_flush(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct mem_collect_handle *ch = (struct mem_collect_handle *)collection_handle;
+    RRDSET *st = ch->rd->rrdset;
+    storage_number empty = pack_storage_number(NAN, SN_FLAG_NONE);
 
-    RRDDIM *rd = ch->rd;
-    for(int i = 0; i < rd->rrdset->entries ;i++)
-        rd->db[i] = SN_EMPTY_SLOT;
-
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        for(int i = 0; i < rd->rrdset->entries ;i++)
+            rd->db[i] = empty;
+    }
+    rrddim_foreach_done(rd);
+    st->current_entry = 0;
+    ch->flushed = true;
 }
 
 int rrddim_collect_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {

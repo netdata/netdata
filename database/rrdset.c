@@ -1086,7 +1086,7 @@ static inline usec_t rrdset_update_last_collected_time(RRDSET *st) {
     return last_collect_ut;
 }
 
-static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
+static inline void rrdset_init_last_updated_time(RRDSET *st) {
     // copy the last collected time to last updated time
     st->last_updated.tv_sec  = st->last_collected_time.tv_sec;
     st->last_updated.tv_usec = st->last_collected_time.tv_usec;
@@ -1095,12 +1095,6 @@ static inline usec_t rrdset_init_last_updated_time(RRDSET *st) {
         st->last_updated.tv_sec -= st->update_every;
 
     last_updated_time_align(st);
-
-    usec_t last_updated_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
-
-    rrdset_debug(st, "initialized last updated time to %0.3" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)last_updated_ut / USEC_PER_SEC);
-
-    return last_updated_ut;
 }
 
 static __thread size_t rrdset_done_statistics_points_stored_per_tier[RRD_STORAGE_TIERS];
@@ -1453,36 +1447,6 @@ static inline size_t rrdset_done_interpolate(
     return stored_entries;
 }
 
-static inline void rrdset_done_fill_the_gap(RRDSET *st) {
-    usec_t update_every_ut = st->update_every * USEC_PER_SEC;
-    usec_t now_collect_ut  = st->last_collected_time.tv_sec * USEC_PER_SEC + st->last_collected_time.tv_usec;
-
-    long c = 0, entries = st->entries;
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        usec_t next_store_ut = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
-        long current_entry = st->current_entry;
-
-        for(c = 0; c < entries && next_store_ut <= now_collect_ut ; next_store_ut += update_every_ut, c++) {
-            rd->db[current_entry] = pack_storage_number(NAN, SN_FLAG_NONE);
-            current_entry = ((current_entry + 1) >= entries) ? 0 : current_entry + 1;
-
-            rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING (FILLED THE GAP)", rrddim_name(rd), current_entry);
-        }
-    }
-    rrddim_foreach_done(rd);
-
-    if(c > 0) {
-        c--;
-        st->last_updated.tv_sec += c * st->update_every;
-
-        st->current_entry += c;
-        st->counter += c;
-        if(st->current_entry >= st->entries)
-            st->current_entry -= st->entries;
-    }
-}
-
 void rrdset_done(RRDSET *st) {
     struct timeval now;
 
@@ -1594,21 +1558,11 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
     if(unlikely(!st->counter_done)) {
-        // if we have not collected metrics this session (st->counter_done == 0)
-        // and we have collected metrics for this chart in the past (st->counter != 0)
-        // fill the gap (the chart has been just loaded from disk)
-        if(unlikely(st->counter) && st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE) {
-            // TODO this should be inside the storage engine
-            rrdset_done_fill_the_gap(st);
-            last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
-            next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
-        }
-        if (st->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
-            // set a fake last_updated to jump to current time
-            rrdset_init_last_updated_time(st);
-            last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
-            next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
-        }
+        // set a fake last_updated to jump to current time
+        rrdset_init_last_updated_time(st);
+
+        last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
+        next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))) {
             store_this_entry = 1;

@@ -7,8 +7,9 @@
 
 struct mem_collect_handle {
     RRDDIM *rd;
-    long slot;
-    long entries;
+    time_t update_every_s;
+    time_t last_point_in_time_s;
+    bool flushed;
 };
 
 struct mem_query_handle {
@@ -32,7 +33,7 @@ void rrddim_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS
 
 STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg);
 void rrddim_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every);
-void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time, NETDATA_DOUBLE number,
+void rrddim_collect_store_metric(STORAGE_COLLECT_HANDLE *collection_handle, usec_t point_in_time_ut, NETDATA_DOUBLE number,
                                  NETDATA_DOUBLE min_value,
                                  NETDATA_DOUBLE max_value,
                                  uint16_t count,
