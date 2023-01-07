@@ -301,6 +301,12 @@ char *mystrsep(char **ptr, char *s);
 char *trim(char *s); // remove leading and trailing spaces; may return NULL
 char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
 
+int madvise_sequential(void *mem, size_t len);
+int madvise_dontfork(void *mem, size_t len);
+int madvise_willneed(void *mem, size_t len);
+int madvise_dontdump(void *mem, size_t len);
+int madvise_mergeable(void *mem, size_t len);
+
 int  vsnprintfz(char *dst, size_t n, const char *fmt, va_list args);
 int  snprintfz(char *dst, size_t n, const char *fmt, ...) PRINTFLIKE(3, 4);
 

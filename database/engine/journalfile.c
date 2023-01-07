@@ -740,13 +740,8 @@ int load_journal_file_v2(struct rrdengine_instance *ctx, struct rrdengine_journa
         return 1;
     }
 
-    rc = madvise(data_start, file_size, MADV_DONTFORK);
-    if (unlikely(rc))
-        error("DBENGINE: MADV_DONTFORK: setting failed");
-
-    rc = madvise(data_start, file_size, MADV_DONTDUMP);
-    if (unlikely(rc))
-        error("DBENGINE: MADV_DONTDUMP: setting failed");
+    madvise_dontfork(data_start, file_size);
+    madvise_dontdump(data_start, file_size);
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
 
