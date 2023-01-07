@@ -148,10 +148,12 @@ void Host::detectOnce() {
     worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
     updateHostAndDetectionRateCharts(RH, HostAnomalyRate * 10000.0);
 
+#ifdef NETDATA_ML_RESOURCE_CHARTS
     worker_is_busy(WORKER_JOB_DETECTION_RESOURCES);
     struct rusage PredictionRU;
     getrusage(RUSAGE_THREAD, &PredictionRU);
     updateResourceUsageCharts(RH, PredictionRU, TSCopy.TrainingRU);
+#endif
 
     worker_is_busy(WORKER_JOB_DETECTION_STATS);
     updateTrainingStatisticsChart(RH, TSCopy);
