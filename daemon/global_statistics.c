@@ -1553,9 +1553,8 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_memory_extent  = rrddim_add(st_pgc_memory, "extent cache",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_metrics = rrddim_add(st_pgc_memory, "metrics registry", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_main, (collected_number)pgc_main_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
@@ -1606,9 +1605,8 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_buffers_xt_buf      = rrddim_add(st_pgc_buffers, "extent buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_epdl        = rrddim_add(st_pgc_buffers, "epdl",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_deol        = rrddim_add(st_pgc_buffers, "deol",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_opcodes, (collected_number)buffers.opcodes);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_handles, (collected_number)buffers.handles);
@@ -1655,9 +1653,8 @@ static void dbengine2_statistics_charts(void) {
             rd_parallel_load_ratio = rrddim_add(st_cache_hit_ratio, "parallel load", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             rd_before_allocation_ratio = rrddim_add(st_cache_hit_ratio, "before allocation", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
             rd_insert_conflict_ratio = rrddim_add(st_cache_hit_ratio, "insert conflict", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
-
-            priority++;
         }
+        priority++;
 
         size_t pages_to_load = cache_efficiency_stats.pages_to_load_from_disk - cache_efficiency_stats_old.pages_to_load_from_disk;
         size_t pages_hit_parallel_load = cache_efficiency_stats.pages_load_ok_preloaded - cache_efficiency_stats_old.pages_load_ok_preloaded;
@@ -1737,9 +1734,8 @@ static void dbengine2_statistics_charts(void) {
             rd_jv2 = rrddim_add(st_queries, "journal v2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_planned_with_gaps = rrddim_add(st_queries, "planned with gaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_executed_with_gaps = rrddim_add(st_queries, "executed with gaps", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_queries, rd_total, (collected_number)cache_efficiency_stats.queries);
         rrddim_set_by_pointer(st_queries, rd_open, (collected_number)cache_efficiency_stats.queries_open);
@@ -1770,9 +1766,8 @@ static void dbengine2_statistics_charts(void) {
                     RRDSET_TYPE_LINE);
 
             rd_queries = rrddim_add(st_queries_running, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_queries_running, rd_queries, (collected_number)cache_efficiency_stats.currently_running_queries);
 
@@ -1803,9 +1798,8 @@ static void dbengine2_statistics_charts(void) {
             rd_cache = rrddim_add(st_query_pages_metadata_source, "cache hit", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_jv2   = rrddim_add(st_query_pages_metadata_source, "journal v2 scan", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_open  = rrddim_add(st_query_pages_metadata_source, "open journal", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_pages_metadata_source, rd_cache, (collected_number)cache_efficiency_stats.pages_meta_source_main_cache);
         rrddim_set_by_pointer(st_query_pages_metadata_source, rd_jv2, (collected_number)cache_efficiency_stats.pages_meta_source_journal_v2);
@@ -1838,9 +1832,8 @@ static void dbengine2_statistics_charts(void) {
             rd_pages_main_cache = rrddim_add(st_query_pages_data_source, "main cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_disk = rrddim_add(st_query_pages_data_source, "disk", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_extent_cache = rrddim_add(st_query_pages_data_source, "extent cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_main_cache, (collected_number)cache_efficiency_stats.pages_data_source_main_cache);
         rrddim_set_by_pointer(st_query_pages_data_source, rd_pages_disk, (collected_number)cache_efficiency_stats.pages_to_load_from_disk);
@@ -1877,9 +1870,8 @@ static void dbengine2_statistics_charts(void) {
             rd_nowait_failed = rrddim_add(st_query_next_page, "failed fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_wait_loaded = rrddim_add(st_query_next_page, "loaded slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_nowait_loaded = rrddim_add(st_query_next_page, "loaded fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_next_page, rd_pass4, (collected_number)cache_efficiency_stats.pages_pending_found_in_cache_at_pass4);
         rrddim_set_by_pointer(st_query_next_page, rd_wait_failed, (collected_number)cache_efficiency_stats.page_next_wait_failed);
@@ -1920,9 +1912,8 @@ static void dbengine2_statistics_charts(void) {
             rd_pages_overlapping = rrddim_add(st_query_page_issues, "overlapping", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_fixed_update_every = rrddim_add(st_query_page_issues, "update every fixed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pages_fixed_entries = rrddim_add(st_query_page_issues, "entries fixed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_page_issues, rd_pages_zero_time, (collected_number)cache_efficiency_stats.pages_zero_time_skipped);
         rrddim_set_by_pointer(st_query_page_issues, rd_pages_invalid_size, (collected_number)cache_efficiency_stats.pages_invalid_size_skipped);
@@ -1972,9 +1963,8 @@ static void dbengine2_statistics_charts(void) {
             rd_unroutable = rrddim_add(st_query_pages_from_disk, "fail unroutable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_not_found = rrddim_add(st_query_pages_from_disk, "fail uuid not found", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid_extent = rrddim_add(st_query_pages_from_disk, "fail invalid extent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_compressed, (collected_number)cache_efficiency_stats.pages_load_ok_compressed);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid, (collected_number)cache_efficiency_stats.pages_load_fail_invalid_page_in_extent);
@@ -2018,9 +2008,8 @@ static void dbengine2_statistics_charts(void) {
             rd_open_cache = rrddim_add(st_prep_timings, "open cache", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_journal_v2 = rrddim_add(st_prep_timings, "journal v2", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_pass4 = rrddim_add(st_prep_timings, "pass4", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_prep_timings, rd_routing, (collected_number)cache_efficiency_stats.prep_time_to_route);
         rrddim_set_by_pointer(st_prep_timings, rd_main_cache, (collected_number)cache_efficiency_stats.prep_time_in_main_cache_lookup);
@@ -2061,9 +2050,8 @@ static void dbengine2_statistics_charts(void) {
             rd_next_page_disk_slow = rrddim_add(st_query_timings, "next page disk slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_preload_fast = rrddim_add(st_query_timings, "next page preload fast", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_next_page_preload_slow = rrddim_add(st_query_timings, "next page preload slow", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            priority++;
         }
+        priority++;
 
         rrddim_set_by_pointer(st_query_timings, rd_init, (collected_number)cache_efficiency_stats.query_time_init);
         rrddim_set_by_pointer(st_query_timings, rd_prep_wait, (collected_number)cache_efficiency_stats.query_time_wait_for_prep);
@@ -2074,11 +2062,10 @@ static void dbengine2_statistics_charts(void) {
 
         rrdset_done(st_query_timings);
     }
-}
 
-static void dbengine_statistics_charts(void) {
-#ifdef ENABLE_DBENGINE
     if(netdata_rwlock_tryrdlock(&rrd_rwlock) == 0) {
+        priority = 135400;
+
         RRDHOST *host;
         unsigned long long stats_array[RRDENG_NR_STATS] = {0};
         unsigned long long local_stats_array[RRDENG_NR_STATS];
@@ -2126,21 +2113,22 @@ static void dbengine_statistics_charts(void) {
 
                 if (unlikely(!st_compression)) {
                     st_compression = rrdset_create_localhost(
-                        "netdata",
-                        "dbengine_compression_ratio",
-                        NULL,
-                        "dbengine old",
-                        NULL,
-                        "Netdata DB engine data extents' compression savings ratio",
-                        "percentage",
-                        "netdata",
-                        "stats",
-                        132000,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_LINE);
+                            "netdata",
+                            "dbengine_compression_ratio",
+                            NULL,
+                            "dbengine io",
+                            NULL,
+                            "Netdata DB engine data extents' compression savings ratio",
+                            "percentage",
+                            "netdata",
+                            "stats",
+                            priority,
+                            localhost->rrd_update_every,
+                            RRDSET_TYPE_LINE);
 
                     rd_savings = rrddim_add(st_compression, "savings", NULL, 1, 1000, RRD_ALGORITHM_ABSOLUTE);
                 }
+                priority++;
 
                 unsigned long long ratio;
                 unsigned long long compressed_content_size = stats_array[12];
@@ -2166,22 +2154,23 @@ static void dbengine_statistics_charts(void) {
 
                 if (unlikely(!st_io_stats)) {
                     st_io_stats = rrdset_create_localhost(
-                        "netdata",
-                        "dbengine_io_throughput",
-                        NULL,
-                        "dbengine old",
-                        NULL,
-                        "Netdata DB engine I/O throughput",
-                        "MiB/s",
-                        "netdata",
-                        "stats",
-                        132007,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_LINE);
+                            "netdata",
+                            "dbengine_io_throughput",
+                            NULL,
+                            "dbengine io",
+                            NULL,
+                            "Netdata DB engine I/O throughput",
+                            "MiB/s",
+                            "netdata",
+                            "stats",
+                            priority,
+                            localhost->rrd_update_every,
+                            RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1024 * 1024, RRD_ALGORITHM_INCREMENTAL);
                 }
+                priority++;
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[17]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[15]);
@@ -2197,22 +2186,23 @@ static void dbengine_statistics_charts(void) {
 
                 if (unlikely(!st_io_stats)) {
                     st_io_stats = rrdset_create_localhost(
-                        "netdata",
-                        "dbengine_io_operations",
-                        NULL,
-                        "dbengine old",
-                        NULL,
-                        "Netdata DB engine I/O operations",
-                        "operations/s",
-                        "netdata",
-                        "stats",
-                        132008,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_LINE);
+                            "netdata",
+                            "dbengine_io_operations",
+                            NULL,
+                            "dbengine io",
+                            NULL,
+                            "Netdata DB engine I/O operations",
+                            "operations/s",
+                            "netdata",
+                            "stats",
+                            priority,
+                            localhost->rrd_update_every,
+                            RRDSET_TYPE_LINE);
 
                     rd_reads = rrddim_add(st_io_stats, "reads", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_writes = rrddim_add(st_io_stats, "writes", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
+                priority++;
 
                 rrddim_set_by_pointer(st_io_stats, rd_reads, (collected_number)stats_array[18]);
                 rrddim_set_by_pointer(st_io_stats, rd_writes, (collected_number)stats_array[16]);
@@ -2229,24 +2219,25 @@ static void dbengine_statistics_charts(void) {
 
                 if (unlikely(!st_errors)) {
                     st_errors = rrdset_create_localhost(
-                        "netdata",
-                        "dbengine_global_errors",
-                        NULL,
-                        "dbengine old",
-                        NULL,
-                        "Netdata DB engine errors",
-                        "errors/s",
-                        "netdata",
-                        "stats",
-                        132009,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_LINE);
+                            "netdata",
+                            "dbengine_global_errors",
+                            NULL,
+                            "dbengine io",
+                            NULL,
+                            "Netdata DB engine errors",
+                            "errors/s",
+                            "netdata",
+                            "stats",
+                            priority,
+                            localhost->rrd_update_every,
+                            RRDSET_TYPE_LINE);
 
                     rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     pg_cache_over_half_dirty_events =
-                        rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                            rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
+                priority++;
 
                 rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
                 rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
@@ -2263,22 +2254,23 @@ static void dbengine_statistics_charts(void) {
 
                 if (unlikely(!st_fd)) {
                     st_fd = rrdset_create_localhost(
-                        "netdata",
-                        "dbengine_global_file_descriptors",
-                        NULL,
-                        "dbengine old",
-                        NULL,
-                        "Netdata DB engine File Descriptors",
-                        "descriptors",
-                        "netdata",
-                        "stats",
-                        132010,
-                        localhost->rrd_update_every,
-                        RRDSET_TYPE_LINE);
+                            "netdata",
+                            "dbengine_global_file_descriptors",
+                            NULL,
+                            "dbengine io",
+                            NULL,
+                            "Netdata DB engine File Descriptors",
+                            "descriptors",
+                            "netdata",
+                            "stats",
+                            priority,
+                            localhost->rrd_update_every,
+                            RRDSET_TYPE_LINE);
 
                     rd_fd_current = rrddim_add(st_fd, "current", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                     rd_fd_max = rrddim_add(st_fd, "max", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 }
+                priority++;
 
                 rrddim_set_by_pointer(st_fd, rd_fd_current, (collected_number)stats_array[32]);
                 /* Careful here, modify this accordingly if the File-Descriptor budget ever changes */
@@ -2287,7 +2279,6 @@ static void dbengine_statistics_charts(void) {
             }
         }
     }
-#endif
 }
 
 static void update_strings_charts() {
@@ -3753,7 +3744,6 @@ void *global_statistics_main(void *ptr)
 
         if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
-            dbengine_statistics_charts();
             dbengine2_statistics_charts();
         }
 
