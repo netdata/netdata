@@ -362,7 +362,7 @@ void extent_buffer_init(void) {
 void extent_buffer_cleanup(void) {
     netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
 
-    while(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > (size_t)libuv_worker_threads) {
+    while(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
         struct extent_buffer *item = extent_buffer_globals.protected.available_items;
         size_t bytes = sizeof(struct extent_buffer) + item->bytes;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
