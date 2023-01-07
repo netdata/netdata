@@ -382,4 +382,11 @@
 #define NETDATA_ML_CHART_PRIO_TRAINING_TIME_STATS     890007
 #define NETDATA_ML_CHART_PRIO_TRAINING_RESULTS        890008
 
+#define NETDATA_ML_CHART_FAMILY "ml - machine learning"
+#define NETDATA_ML_PLUGIN "ml.plugin"
+#define NETDATA_ML_MODULE_TRAINING "training"
+#define NETDATA_ML_MODULE_DETECTION "detection"
+#define NETDATA_ML_MODULE_PREDICTION "prediction"
+
+
 #endif //NETDATA_ALL_H

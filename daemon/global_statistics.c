@@ -669,15 +669,15 @@ static void global_statistics_charts(void) {
                     "netdata" // type
                     , "ml_models_consulted" // id
                     , NULL // name
-                    , "ml" // family
+                    , NETDATA_ML_CHART_FAMILY // family
                     , NULL // context
                     , "KMeans models used for prediction" // title
                     , "models" // units
-                    , "netdata" // plugin
-                    , "ml" // module
-                    , 131004 // priority
+                    , NETDATA_ML_PLUGIN // plugin
+                    , NETDATA_ML_MODULE_DETECTION // module
+                    , NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS // priority
                     , localhost->rrd_update_every // update_every
-                    , RRDSET_TYPE_STACKED // chart_type
+                    , RRDSET_TYPE_AREA // chart_type
             );
 
             rd = rrddim_add(st, "num_models_consulted", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
