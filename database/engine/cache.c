@@ -1671,9 +1671,9 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
 
     cache->config.max_workers_evict_inline    =   10;
     cache->config.severe_pressure_per1000     = 1000;
-    cache->config.aggressive_evict_per1000    =  995;
-    cache->config.healthy_size_per1000        =  990;
-    cache->config.evict_low_threshold_per1000 =  985;
+    cache->config.aggressive_evict_per1000    =  990;
+    cache->config.healthy_size_per1000        =  980;
+    cache->config.evict_low_threshold_per1000 =  970;
 
     cache->index = callocz(cache->config.partitions, sizeof(struct pgc_index));
 
