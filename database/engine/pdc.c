@@ -431,12 +431,12 @@ static void epdl_destroy(EPDL *epdl)
     Pvoid_t *pd_by_start_time_s_JudyL;
     Word_t metric_id_index = 0;
     bool metric_id_first = true;
-    while ((pd_by_start_time_s_JudyL = JudyLFirstThenNext(
+    while ((pd_by_start_time_s_JudyL = PDCJudyLFirstThenNext(
             epdl->page_details_by_metric_id_JudyL,
             &metric_id_index, &metric_id_first)))
-        JudyLFreeArray(pd_by_start_time_s_JudyL, PJE0);
+        PDCJudyLFreeArray(pd_by_start_time_s_JudyL, PJE0);
 
-    JudyLFreeArray(&epdl->page_details_by_metric_id_JudyL, PJE0);
+    PDCJudyLFreeArray(&epdl->page_details_by_metric_id_JudyL, PJE0);
     epdl_release(epdl);
 }
 
@@ -447,12 +447,12 @@ static void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS
     Word_t metric_id_index = 0;
     bool metric_id_first = true;
     Pvoid_t *pd_by_start_time_s_JudyL;
-    while((pd_by_start_time_s_JudyL = JudyLFirstThenNext(epdl->page_details_by_metric_id_JudyL, &metric_id_index, &metric_id_first))) {
+    while((pd_by_start_time_s_JudyL = PDCJudyLFirstThenNext(epdl->page_details_by_metric_id_JudyL, &metric_id_index, &metric_id_first))) {
 
         Word_t start_time_index = 0;
         bool start_time_first = true;
         Pvoid_t *PValue;
-        while ((PValue = JudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
+        while ((PValue = PDCJudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
             struct page_details *pd = *PValue;
 
             if(!pd->page) {
@@ -474,12 +474,12 @@ static bool epdl_check_if_pages_are_already_in_cache(struct rrdengine_instance *
     Word_t metric_id_index = 0;
     bool metric_id_first = true;
     Pvoid_t *pd_by_start_time_s_JudyL;
-    while((pd_by_start_time_s_JudyL = JudyLFirstThenNext(epdl->page_details_by_metric_id_JudyL, &metric_id_index, &metric_id_first))) {
+    while((pd_by_start_time_s_JudyL = PDCJudyLFirstThenNext(epdl->page_details_by_metric_id_JudyL, &metric_id_index, &metric_id_first))) {
 
         Word_t start_time_index = 0;
         bool start_time_first = true;
         Pvoid_t *PValue;
-        while ((PValue = JudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
+        while ((PValue = PDCJudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
             struct page_details *pd = *PValue;
             if (pd->page)
                 continue;
@@ -515,7 +515,7 @@ static void pdc_destroy(PDC *pdc) {
     Word_t time_index = 0;
     bool first_then_next = true;
     size_t unroutable = 0;
-    while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
+    while((PValue = PDCJudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
         pd = *PValue;
 
         // no need for atomics here - we are done...
@@ -541,7 +541,7 @@ static void pdc_destroy(PDC *pdc) {
         page_details_release(pd);
     }
 
-    JudyLFreeArray(&pdc->page_list_JudyL, PJE0);
+    PDCJudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
     __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
@@ -608,7 +608,7 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
 
     if (pdc->page_list_JudyL) {
         bool first_then_next = true;
-        while((PValue = JudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
+        while((PValue = PDCJudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
             pd = *PValue;
 
             internal_fatal(!pd,
@@ -626,7 +626,7 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
             internal_fatal(pd->page,
                            "DBENGINE: page details has a page linked to it, but it is marked for loading");
 
-            PValue1 = JudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
+            PValue1 = PDCJudyLIns(&JudyL_datafile_list, pd->datafile.fileno, PJE0);
             if (PValue1 && !*PValue1) {
                 *PValue1 = deol = deol_get();
                 deol->extent_pd_list_by_extent_offset_JudyL = NULL;
@@ -635,7 +635,7 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
             else
                 deol = *PValue1;
 
-            PValue2 = JudyLIns(&deol->extent_pd_list_by_extent_offset_JudyL, pd->datafile.extent.pos, PJE0);
+            PValue2 = PDCJudyLIns(&deol->extent_pd_list_by_extent_offset_JudyL, pd->datafile.extent.pos, PJE0);
             if (PValue2 && !*PValue2) {
                 *PValue2 = epdl = epdl_get();
                 epdl->page_details_by_metric_id_JudyL = NULL;
@@ -650,20 +650,20 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
 
             epdl->number_of_pages_in_JudyL++;
 
-            Pvoid_t *pd_by_first_time_s_judyL = JudyLIns(&epdl->page_details_by_metric_id_JudyL, pd->metric_id, PJE0);
-            Pvoid_t *pd_pptr = JudyLIns(pd_by_first_time_s_judyL, pd->first_time_s, PJE0);
+            Pvoid_t *pd_by_first_time_s_judyL = PDCJudyLIns(&epdl->page_details_by_metric_id_JudyL, pd->metric_id, PJE0);
+            Pvoid_t *pd_pptr = PDCJudyLIns(pd_by_first_time_s_judyL, pd->first_time_s, PJE0);
             *pd_pptr = pd;
         }
 
         size_t extent_list_no = 0;
         Word_t datafile_no = 0;
         first_then_next = true;
-        while((PValue = JudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
+        while((PValue = PDCJudyLFirstThenNext(JudyL_datafile_list, &datafile_no, &first_then_next))) {
             deol = *PValue;
 
             bool first_then_next_extent = true;
             Word_t pos = 0;
-            while ((PValue = JudyLFirstThenNext(deol->extent_pd_list_by_extent_offset_JudyL, &pos, &first_then_next_extent))) {
+            while ((PValue = PDCJudyLFirstThenNext(deol->extent_pd_list_by_extent_offset_JudyL, &pos, &first_then_next_extent))) {
                 epdl = *PValue;
                 internal_fatal(!epdl, "DBENGINE: extent_list is not populated properly");
 
@@ -679,10 +679,10 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
                 else
                     exec_rest_extent_list(ctx, epdl, pdc->priority);
             }
-            JudyLFreeArray(&deol->extent_pd_list_by_extent_offset_JudyL, PJE0);
+            PDCJudyLFreeArray(&deol->extent_pd_list_by_extent_offset_JudyL, PJE0);
             deol_release(deol);
         }
-        JudyLFreeArray(&JudyL_datafile_list, PJE0);
+        PDCJudyLFreeArray(&JudyL_datafile_list, PJE0);
     }
 
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
@@ -958,11 +958,11 @@ static bool epdl_populate_pages_from_extent_data(
             worker_is_busy(UV_EVENT_PAGE_LOOKUP);
 
         struct page_details *pd = NULL;
-        Pvoid_t *pd_by_start_time_s_judyL = JudyLGet(epdl->page_details_by_metric_id_JudyL, metric_id, PJE0);
+        Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(epdl->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
         if(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
-            Pvoid_t *pd_pptr = JudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
+            Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
             internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
 
             if(pd_pptr && *pd_pptr) {

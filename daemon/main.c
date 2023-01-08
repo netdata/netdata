@@ -1179,6 +1179,7 @@ void post_conf_load(char **user)
 
 int pgc_unittest(void);
 int mrg_unittest(void);
+int julytest(void);
 
 int main(int argc, char **argv) {
     int i;
@@ -1369,6 +1370,10 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "mrgtest") == 0) {
                             unittest_running = true;
                             return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "julytest") == 0) {
+                            unittest_running = true;
+                            return julytest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

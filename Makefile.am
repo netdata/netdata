@@ -149,6 +149,8 @@ LIBNETDATA_FILES = \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
+    libnetdata/july/july.c \
+    libnetdata/july/july.h \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \

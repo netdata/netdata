@@ -203,6 +203,9 @@ struct rrdeng_buffer_sizes {
     size_t epdl;
     size_t deol;
     size_t pd;
+#ifdef PDC_USE_JULYL
+    size_t julyl;
+#endif
 };
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);

@@ -1335,6 +1335,9 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
+#ifdef PDC_USE_JULYL
+            .julyl       = julyl_cache_size(),
+#endif
     };
 }
 
@@ -1365,6 +1368,9 @@ void timer_cb(uv_timer_t* handle) {
         extent_buffer_cleanup();
         epdl_cleanup();
         deol_cleanup();
+#ifdef PDC_USE_JULYL
+        julyl_cleanup();
+#endif
     }
 
     worker_is_idle();

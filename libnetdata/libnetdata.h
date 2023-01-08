@@ -428,6 +428,7 @@ void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
 #include "libjudy/src/Judy.h"
+#include "july/july.h"
 #include "os.h"
 #include "storage_number/storage_number.h"
 #include "threads/threads.h"

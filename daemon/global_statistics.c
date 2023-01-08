@@ -1523,6 +1523,10 @@ static void dbengine2_statistics_charts(void) {
     size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors +
             buffers.opcodes + buffers.wal + buffers.workers + buffers.epdl + buffers.deol + buffers.pd;
 
+#ifdef PDC_USE_JULYL
+    buffers_total_size += buffers.julyl;
+#endif
+
     size_t priority = 135000;
 
     {
@@ -1578,6 +1582,9 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pgc_buffers_epdl = NULL;
         static RRDDIM *rd_pgc_buffers_deol = NULL;
         static RRDDIM *rd_pgc_buffers_pd = NULL;
+#ifdef PDC_USE_JULYL
+        static RRDDIM *rd_pgc_buffers_julyl = NULL;
+#endif
 
         if (unlikely(!st_pgc_buffers)) {
             st_pgc_buffers = rrdset_create_localhost(
@@ -1605,6 +1612,9 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_buffers_xt_buf      = rrddim_add(st_pgc_buffers, "extent buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_epdl        = rrddim_add(st_pgc_buffers, "epdl",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_deol        = rrddim_add(st_pgc_buffers, "deol",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+#ifdef PDC_USE_JULYL
+            rd_pgc_buffers_julyl       = rrddim_add(st_pgc_buffers, "julyl",          NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+#endif
         }
         priority++;
 
@@ -1619,9 +1629,42 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)buffers.xt_buf);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl, (collected_number)buffers.epdl);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_deol, (collected_number)buffers.deol);
+#ifdef PDC_USE_JULYL
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_julyl, (collected_number)buffers.julyl);
+#endif
 
         rrdset_done(st_pgc_buffers);
     }
+
+#ifdef PDC_USE_JULYL
+    {
+        static RRDSET *st_julyl_moved = NULL;
+        static RRDDIM *rd_julyl_moved = NULL;
+
+        if (unlikely(!st_julyl_moved)) {
+            st_julyl_moved = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_julyl_moved",
+                    NULL,
+                    "dbengine memory",
+                    NULL,
+                    "Netdata JulyL Memory Moved",
+                    "bytes/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_AREA);
+
+            rd_julyl_moved     = rrddim_add(st_julyl_moved, "moved", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_julyl_moved, rd_julyl_moved, (collected_number)julyl_bytes_moved());
+
+        rrdset_done(st_julyl_moved);
+    }
+#endif
 
     {
         static RRDSET *st_cache_hit_ratio = NULL;

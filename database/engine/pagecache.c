@@ -115,7 +115,7 @@ static inline struct page_details *pdc_find_page_for_time(
     struct page_details *pdF = NULL, *pdL = NULL;
     bool firstF = true, firstL = true;
 
-    while ((PValueF = JudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
+    while ((PValueF = PDCJudyLFirstThenNext(PArray, &PIndexF, &firstF))) {
         pdF = *PValueF;
 
         PDC_PAGE_STATUS status = __atomic_load_n(&pdF->status, __ATOMIC_ACQUIRE);
@@ -125,7 +125,7 @@ static inline struct page_details *pdc_find_page_for_time(
         pdF = NULL;
     }
 
-    while ((PValueL = JudyLLastThenPrev(PArray, &PIndexL, &firstL))) {
+    while ((PValueL = PDCJudyLLastThenPrev(PArray, &PIndexL, &firstL))) {
         pdL = *PValueL;
 
         PDC_PAGE_STATUS status = __atomic_load_n(&pdL->status, __ATOMIC_ACQUIRE);
@@ -274,7 +274,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
         if (page_start_time_s - previous_page_end_time_s > dt_s)
             (*cache_gaps)++;
 
-        Pvoid_t *PValue = JudyLIns(JudyL_page_array, (Word_t) page_start_time_s, PJE0);
+        Pvoid_t *PValue = PDCJudyLIns(JudyL_page_array, (Word_t) page_start_time_s, PJE0);
         if (!PValue || PValue == PJERR)
             fatal("DBENGINE: corrupted judy array in %s()", __FUNCTION__ );
 
@@ -377,7 +377,7 @@ static size_t list_has_time_gaps(
 
     first = true;
     this_page_start_time = 0;
-    while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
+    while((PValue = PDCJudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         pd = *PValue;
         pd->status &= ~(PDC_PAGE_SKIP|PDC_PAGE_PREPROCESSED);
     }
@@ -413,7 +413,7 @@ static size_t list_has_time_gaps(
 
     first = true;
     this_page_start_time = 0;
-    while((PValue = JudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
+    while((PValue = PDCJudyLFirstThenNext(JudyL_page_array, &this_page_start_time, &first))) {
         pd = *PValue;
 
         internal_fatal(pd->metric_id != metric_id, "pd has wrong metric_id");
@@ -566,7 +566,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     if(!datafile_acquire(datafile, DATAFILE_ACQUIRE_PAGE_DETAILS)) // for pd
         return;
 
-    Pvoid_t *PValue = JudyLIns(JudyL_pptr, pgc_page_start_time_s(page), PJE0);
+    Pvoid_t *PValue = PDCJudyLIns(JudyL_pptr, pgc_page_start_time_s(page), PJE0);
     if (!PValue || PValue == PJERR)
         fatal("DBENGINE: corrupted judy array");
 
