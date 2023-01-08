@@ -748,7 +748,11 @@ static void health_thread_cleanup(void *ptr) {
 }
 
 static void initialize_health(RRDHOST *host, int is_localhost) {
-    if(!host->health_enabled || rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) return;
+    if(!host->health_enabled ||
+        rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
+        !service_running(SERVICE_HEALTH))
+        return;
+
     rrdhost_flag_set(host, RRDHOST_FLAG_INITIALIZED_HEALTH);
 
     log_health("[%s]: Initializing health.", rrdhost_hostname(host));
