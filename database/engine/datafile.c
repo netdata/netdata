@@ -116,12 +116,12 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 if(!df->users.time_to_evict) {
                     // first time we did the above
                     df->users.time_to_evict = now_s + 120;
-                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "
-                                         "but it has %u stale lockers (oc:%u, pd:%u), "
+                    internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
+                                         "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted shortly "
                                          "(scanned open cache in %llu usecs)",
-                                   df->fileno,
+                                   df->fileno, df->ctx->tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -133,12 +133,12 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 else if(now_s > df->users.time_to_evict) {
                     // time expired, lets remove it
                     can_be_deleted = true;
-                    internal_error(true, "DBENGINE: datafile %u is not used by any open cache pages, "
-                                         "but it has %u stale lockers (oc:%u, pd:%u), "
+                    internal_error(true, "DBENGINE: datafile %u of tier %d is not used by any open cache pages, "
+                                         "but it has %u lockers (oc:%u, pd:%u), "
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted now "
                                          "(scanned open cache in %llu usecs)",
-                                   df->fileno,
+                                   df->fileno, df->ctx->tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -148,11 +148,11 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                 }
             }
             else
-                internal_error(true, "DBENGINE: datafile %u should be deleted, "
-                                     "but it has %u stale lockers (oc:%u, pd:%u), "
+                internal_error(true, "DBENGINE: datafile %u of tier %d "
+                                     "has %u lockers (oc:%u, pd:%u), "
                                      "%zu clean and %zu hot open cache pages "
                                      "(scanned open cache in %llu usecs)",
-                               df->fileno,
+                               df->fileno, df->ctx->tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -565,16 +565,37 @@ int init_data_files(struct rrdengine_instance *ctx)
 
 void finalize_data_files(struct rrdengine_instance *ctx)
 {
-    struct rrdengine_datafile *datafile, *next_datafile;
-    struct rrdengine_journalfile *journalfile;
+    do {
+        struct rrdengine_datafile *datafile = ctx->datafiles.first;
+        struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
-    for (datafile = ctx->datafiles.first ; datafile != NULL ; datafile = next_datafile) {
-        journalfile = datafile->journalfile;
-        next_datafile = datafile->next;
+        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
+            info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->tier);
+            sleep_usec(500 * USEC_PER_MS);
+        }
+
+        bool available = false;
+        do {
+            uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+            netdata_spinlock_lock(&datafile->writers.spinlock);
+            available = (datafile->writers.running || datafile->writers.flushed_to_open_running) ? false : true;
+
+            if(!available) {
+                netdata_spinlock_unlock(&datafile->writers.spinlock);
+                uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+                info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->tier);
+                sleep_usec(500 * USEC_PER_MS);
+            }
+        } while(!available);
 
         close_journal_file(journalfile, datafile);
         close_data_file(datafile);
+        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
+
         freez(journalfile);
         freez(datafile);
-    }
+
+    } while(ctx->datafiles.first);
 }
