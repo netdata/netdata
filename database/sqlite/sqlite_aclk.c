@@ -513,9 +513,9 @@ static void aclk_database_worker(void *arg)
 
     char threadname[NETDATA_THREAD_NAME_MAX+1];
     if (wc->host)
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", rrdhost_hostname(wc->host));
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "ACLK[%s]", rrdhost_hostname(wc->host));
     else {
-        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", wc->uuid_str);
+        snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "ACLK[%s]", wc->uuid_str);
         threadname[11] = '\0';
     }
     uv_thread_set_name_np(wc->thread, threadname);
@@ -640,7 +640,7 @@ static void aclk_database_worker(void *arg)
                             wc->host = rrdhost_find_by_guid(wc->host_guid);
                             if (wc->host) {
                                 info("HOST %s (%s) detected as active", rrdhost_hostname(wc->host), wc->host_guid);
-                                snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "AS_%s", rrdhost_hostname(wc->host));
+                                snprintfz(threadname, NETDATA_THREAD_NAME_MAX, "ACLK[%s]", rrdhost_hostname(wc->host));
                                 uv_thread_set_name_np(wc->thread, threadname);
                                 wc->host->dbsync_worker = wc;
                                 if (unlikely(!wc->hostname))
