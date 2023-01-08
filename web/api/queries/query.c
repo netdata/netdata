@@ -970,7 +970,7 @@ static void query_planer_finalize_plan(QUERY_ENGINE_OPS *ops, size_t plan_id) {
 static void query_planer_finalize_remaining_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
 
-    for(size_t p = ops->current_plan; p < qm->plan.used ; p++)
+    for(size_t p = 0; p < qm->plan.used ; p++)
         query_planer_finalize_plan(ops, p);
 }
 
@@ -1077,7 +1077,10 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
                         .after = (first_time_t < after_wanted) ? after_wanted : first_time_t,
-                        .before = selected_tier_first_time_t};
+                        .before = selected_tier_first_time_t,
+                        .initialized = false,
+                        .finalized = false,
+                    };
                     qm->plan.array[qm->plan.used++] = t;
 
                     internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
@@ -1109,7 +1112,10 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
                         .after = selected_tier_last_time_t,
-                        .before = (last_time_t > before_wanted) ? before_wanted : last_time_t};
+                        .before = (last_time_t > before_wanted) ? before_wanted : last_time_t,
+                        .initialized = false,
+                        .finalized = false,
+                    };
                     qm->plan.array[qm->plan.used++] = t;
 
                     // prepare for the tier

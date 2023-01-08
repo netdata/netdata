@@ -2528,6 +2528,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             }
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
+            qm->plan.used = 0;
             qm->dimension.options = options;
 
             qm->link.host = qtl->host;
