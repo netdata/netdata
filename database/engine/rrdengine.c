@@ -886,20 +886,23 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
         break;
     }
 
+    // get the latest datafile
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     datafile = ctx->datafiles.first->prev;
     netdata_spinlock_lock(&datafile->writers.spinlock);
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
-
         static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
         netdata_spinlock_lock(&sp);
         if(create_new_datafile_pair(ctx) == 0)
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
         netdata_spinlock_unlock(&sp);
 
+        // unlock the old datafile
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+        // get the new datafile
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
         datafile = ctx->datafiles.first->prev;
         netdata_spinlock_lock(&datafile->writers.spinlock);
