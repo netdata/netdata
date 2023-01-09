@@ -293,8 +293,8 @@ static void db_writer(void *arg){
                 if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
                 
                 /* Rotate path of BLOBs */
-                sprintf(old_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i);
-                sprintf(new_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i + 1);
+                snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i);
+                snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, i + 1);
                 rc = uv_fs_rename(writer_loop, &rename_req, old_path, new_path, NULL);
                 if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
                 uv_fs_req_cleanup(&rename_req);
@@ -312,8 +312,8 @@ static void db_writer(void *arg){
             if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_info->chart_name, rc, __LINE__);
             
             /* Replace the maximum number with 0 in BLOB files. */
-            sprintf(old_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, BLOB_MAX_FILES);
-            sprintf(new_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, 0);
+            snprintfz(old_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, BLOB_MAX_FILES);
+            snprintfz(new_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_info->db_dir, 0);
             rc = uv_fs_rename(writer_loop, &rename_req, old_path, new_path, NULL);
             if (unlikely(rc)) fatal_libuv_err(rc, __LINE__);
             uv_fs_req_cleanup(&rename_req);
@@ -383,8 +383,9 @@ int db_init() {
     rc = uv_loop_init(db_loop);
     if (unlikely(rc)) goto return_error;
 
-    main_db_path = mallocz(strlen(main_db_dir) + sizeof(MAIN_DB) + 1);
-    sprintf(main_db_path, "%s/" MAIN_DB, main_db_dir);
+    size_t main_db_path_len = strlen(main_db_dir) + sizeof(MAIN_DB) + 1;
+    main_db_path = mallocz(main_db_path_len);
+    snprintfz(main_db_path, main_db_path_len, "%s/" MAIN_DB, main_db_dir);
 
     /* Create databases directory if it doesn't exist. */
     rc = uv_fs_mkdir(db_loop, &mkdir_req, main_db_dir, 0775, NULL);
@@ -711,7 +712,7 @@ int db_init() {
 
                     // Delete BLOB file from filesystem
                     char blob_delete_path[FILENAME_MAX + 1];
-                    sprintf(blob_delete_path, "%s" BLOB_STORE_FILENAME ".%d", p_file_infos_arr->data[i]->db_dir, last_digits);
+                    snprintfz(blob_delete_path, FILENAME_MAX, "%s" BLOB_STORE_FILENAME ".%d", p_file_infos_arr->data[i]->db_dir, last_digits);
                     uv_fs_t unlink_req;
                     rc = uv_fs_unlink(db_loop, &unlink_req, blob_delete_path, NULL);
                     if (unlikely(rc)) fatal("Delete %s error: %s\n", blob_delete_path, uv_strerror(rc));
@@ -787,9 +788,8 @@ int db_init() {
             if (unlikely(rc != SQLITE_OK)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
             rc = sqlite3_step(stmt_retrieve_metadata_from_id);
             if (unlikely(rc != SQLITE_ROW)) fatal_sqlite3_err(p_file_infos_arr->data[i]->chart_name, rc, __LINE__);
-            char *filename = mallocz(snprintf(NULL, 0, "%s%s", 
-                p_file_infos_arr->data[i]->db_dir, 
-                sqlite3_column_text(stmt_retrieve_metadata_from_id, 0)) + 1);
+            char *filename = mallocz(snprintf(  NULL, 0, "%s%s", p_file_infos_arr->data[i]->db_dir, 
+                                                sqlite3_column_text(stmt_retrieve_metadata_from_id, 0)) + 1);
             sprintf(filename, "%s%s", p_file_infos_arr->data[i]->db_dir, 
                 sqlite3_column_text(stmt_retrieve_metadata_from_id, 0));
             rc = uv_fs_open(db_loop, &open_req, filename, 
