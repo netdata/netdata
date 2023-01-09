@@ -5,7 +5,7 @@
 
 #include "../libnetdata.h"
 
-#define PDC_USE_JULYL 1
+// #define PDC_USE_JULYL 1
 
 PPvoid_t JulyLGet(Pcvoid_t PArray, Word_t Index, PJError_t PJError);
 PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError);
