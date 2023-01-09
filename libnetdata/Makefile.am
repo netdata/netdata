@@ -15,6 +15,7 @@ SUBDIRS = \
     ebpf \
     eval \
     json \
+    july \
     health \
     locks \
     log \
