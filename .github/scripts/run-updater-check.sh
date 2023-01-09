@@ -13,11 +13,11 @@ echo "::endgroup::"
 echo ">>> Updating Netdata..."
 export NETDATA_NIGHTLIES_BASEURL="http://localhost:8080/artifacts/" # Pull the tarball from the local web server.
 /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update || exit 1
-echo ">>> Checking if update was successful..."
-/netdata/.github/scripts/check-updater.sh || exit 1
 echo "::group::>>> Post-Update Environment File Contents"
 cat /etc/netdata/.environment
 echo "::endgroup::"
 echo "::group::>>> Post-Update Netdata Build Info"
 netdata -W buildinfo
 echo "::endgroup::"
+echo ">>> Checking if update was successful..."
+/netdata/.github/scripts/check-updater.sh || exit 1
