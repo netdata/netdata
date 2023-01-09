@@ -590,7 +590,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 
         close_journal_file(journalfile, datafile);
         close_data_file(datafile);
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ctx->datafiles.first, datafile, prev, next);
+        datafile_list_delete_unsafe(ctx, datafile);
         netdata_spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
