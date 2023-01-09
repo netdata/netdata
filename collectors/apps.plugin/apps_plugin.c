@@ -4597,7 +4597,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 #ifdef NETDATA_DEV_MODE
         add_table_field(wb, "CmdLine", "Command Line", false, "detail-string:Cmd", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
 #endif
-        add_table_field(wb, "PPID", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "Pid", "count_unique", false);
+        add_table_field(wb, "PPID", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "PID", "count_unique", false);
         add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
         add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
         add_table_field(wb, "UID", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
