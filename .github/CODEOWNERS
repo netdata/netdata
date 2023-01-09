@@ -42,7 +42,6 @@ Dockerfile* @Ferroin
 # Ownership of specific files
 .gitignore @Ferroin @vkalintiris
 .travis.yml @Ferroin
-.lgtm.yml @Ferroin
 .eslintrc @Ferroin
 .eslintignore @Ferroin
 .csslintrc @Ferroin
