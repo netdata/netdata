@@ -442,7 +442,10 @@ self_update() {
 
 parse_version() {
   r="${1}"
-  if echo "${r}" | grep -q '^v.*'; then
+  if [ "${r}" = "latest" ]; then
+    printf "99999999999999"
+    return 0
+  elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
     # XXX: Need a regex group substitution here.
     r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
