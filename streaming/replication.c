@@ -52,6 +52,7 @@ struct replication_dimension {
     STORAGE_POINT sp;
     struct storage_engine_query_handle handle;
     bool enabled;
+    bool skip;
 
     DICTIONARY *dict;
     const DICTIONARY_ITEM *rda;
@@ -170,6 +171,7 @@ static struct replication_query *replication_query_prepare(
         q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before,
                      q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
         d->enabled = true;
+        d->skip = false;
         count++;
     }
     rrddim_foreach_done(rd);
@@ -279,21 +281,18 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions ;i++) {
             struct replication_dimension *d = &q->data[i];
-            if(unlikely(!d->enabled)) continue;
+            if(unlikely(!d->enabled || d->skip)) continue;
 
             // fetch the first valid point for the dimension
             int max_skip = 1000;
             while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
                 d->sp = ops->next_metric(&d->handle);
                 points_read++;
-
-                if(unlikely(storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp))) {
-                    max_skip = 1000;
-                    continue;
-                }
             }
 
             if(max_skip <= 0) {
+                d->skip = true;
+
                 error_limit_static_global_var(erl, 1, 0);
                 error_limit(&erl,
                                "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
@@ -317,7 +316,10 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
             min_end_time = MIN(min_end_time, d->sp.end_time_s);
         }
 
-        if(likely(min_start_time <= now && min_end_time >= now)) {
+        if(unlikely(min_end_time < now))
+            break;
+
+        if(likely(min_start_time <= now)) {
             // we have a valid point
 
             if (unlikely(min_end_time <= min_start_time))
@@ -331,7 +333,8 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 #endif
 
             buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
-                           (unsigned long long) min_start_time, (unsigned long long) min_end_time,
+                           (unsigned long long) min_start_time,
+                           (unsigned long long) min_end_time,
                            (unsigned long long) wall_clock_time
             );
 
@@ -340,16 +343,22 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
                 struct replication_dimension *d = &q->data[i];
                 if (unlikely(!d->enabled)) continue;
 
-                if (likely(d->sp.start_time_s <= min_end_time && d->sp.end_time_s >= min_end_time)) {
+                if (likely( d->sp.start_time_s <= min_end_time &&
+                            d->sp.end_time_s >= min_end_time &&
+                            !storage_point_is_unset(d->sp) &&
+                            !storage_point_is_empty(d->sp))) {
+
                     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                    rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
 
                     points_generated++;
                 }
             }
-        }
 
-        now = min_end_time + 1;
+            now = min_end_time + 1;
+        }
+        else
+            now = min_start_time;
     }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
