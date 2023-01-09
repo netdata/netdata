@@ -705,11 +705,11 @@ static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
-        time_t first_t = qm->tiers[tier].db_first_time_s;
-        time_t last_t  = qm->tiers[tier].db_last_time_s;
-        time_t update_every = qm->tiers[tier].db_update_every_s;
+        time_t first_time_s = qm->tiers[tier].db_first_time_s;
+        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
+        time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-        if(!db_metric_handle || !first_t || !last_t || !update_every)
+        if(!db_metric_handle || !first_time_s || !last_time_s || !update_every_s)
             continue;
 
         return tier;
@@ -718,17 +718,17 @@ static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
     return 0;
 }
 
-static long query_plan_points_coverage_weight(time_t db_first_t, time_t db_last_t, time_t db_update_every, time_t after_wanted, time_t before_wanted, size_t points_wanted, size_t tier __maybe_unused) {
-    if(db_first_t == 0 || db_last_t == 0 || db_update_every == 0)
+static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_last_time_s, time_t db_update_every_s, time_t after_wanted, time_t before_wanted, size_t points_wanted, size_t tier __maybe_unused) {
+    if(db_first_time_s == 0 || db_last_time_s == 0 || db_update_every_s == 0)
         return -LONG_MAX;
 
-    time_t common_first_t = MAX(db_first_t, after_wanted);
-    time_t common_last_t = MIN(db_last_t, before_wanted);
+    time_t common_first_t = MAX(db_first_time_s, after_wanted);
+    time_t common_last_t = MIN(db_last_time_s, before_wanted);
 
     long time_coverage = (common_last_t - common_first_t) * 1000000 / (before_wanted - after_wanted);
     size_t points_wanted_in_coverage = points_wanted * time_coverage / 1000000;
 
-    long points_available = (common_last_t - common_first_t) / db_update_every;
+    long points_available = (common_last_t - common_first_t) / db_update_every_s;
     long points_delta = (long)(points_available - points_wanted_in_coverage);
     long points_coverage = (points_delta < 0) ? (long)(points_available * time_coverage / points_wanted_in_coverage) : time_coverage;
 
@@ -752,16 +752,16 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
 
         // find the db time-range for this tier for all metrics
         STORAGE_METRIC_HANDLE *db_metric_handle = qm->tiers[tier].db_metric_handle;
-        time_t first_t = qm->tiers[tier].db_first_time_s;
-        time_t last_t  = qm->tiers[tier].db_last_time_s;
-        time_t update_every = qm->tiers[tier].db_update_every_s;
+        time_t first_time_s = qm->tiers[tier].db_first_time_s;
+        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
+        time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-        if(!db_metric_handle || !first_t || !last_t || !update_every) {
+        if(!db_metric_handle || !first_time_s || !last_time_s || !update_every_s) {
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
 
-        qm->tiers[tier].weight = query_plan_points_coverage_weight(first_t, last_t, update_every, after_wanted, before_wanted, points_wanted, tier);
+        qm->tiers[tier].weight = query_plan_points_coverage_weight(first_time_s, last_time_s, update_every_s, after_wanted, before_wanted, points_wanted, tier);
     }
 
     size_t best_tier = 0;
@@ -786,38 +786,38 @@ static size_t rrddim_find_best_tier_for_timeframe(QUERY_TARGET *qt, time_t after
 
     for(size_t tier = 0; tier < storage_tiers ; tier++) {
 
-        time_t common_first_t = 0;
-        time_t common_last_t = 0;
-        time_t common_update_every = 0;
+        time_t common_first_time_s = 0;
+        time_t common_last_time_s = 0;
+        time_t common_update_every_s = 0;
 
         // find the db time-range for this tier for all metrics
         for(size_t i = 0, used = qt->query.used; i < used ; i++) {
             QUERY_METRIC *qm = &qt->query.array[i];
 
-            time_t first_t = qm->tiers[tier].db_first_time_s;
-            time_t last_t  = qm->tiers[tier].db_last_time_s;
-            time_t update_every = qm->tiers[tier].db_update_every_s;
+            time_t first_time_s = qm->tiers[tier].db_first_time_s;
+            time_t last_time_s  = qm->tiers[tier].db_last_time_s;
+            time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-            if(!first_t || !last_t || !update_every)
+            if(!first_time_s || !last_time_s || !update_every_s)
                 continue;
 
-            if(!common_first_t)
-                common_first_t = first_t;
+            if(!common_first_time_s)
+                common_first_time_s = first_time_s;
             else
-                common_first_t = MIN(first_t, common_first_t);
+                common_first_time_s = MIN(first_time_s, common_first_time_s);
 
-            if(!common_last_t)
-                common_last_t = last_t;
+            if(!common_last_time_s)
+                common_last_time_s = last_time_s;
             else
-                common_last_t = MAX(last_t, common_last_t);
+                common_last_time_s = MAX(last_time_s, common_last_time_s);
 
-            if(!common_update_every)
-                common_update_every = update_every;
+            if(!common_update_every_s)
+                common_update_every_s = update_every_s;
             else
-                common_update_every = MIN(update_every, common_update_every);
+                common_update_every_s = MIN(update_every_s, common_update_every_s);
         }
 
-        weight[tier] = query_plan_points_coverage_weight(common_first_t, common_last_t, common_update_every, after_wanted, before_wanted, points_wanted, tier);
+        weight[tier] = query_plan_points_coverage_weight(common_first_time_s, common_last_time_s, common_update_every_s, after_wanted, before_wanted, points_wanted, tier);
     }
 
     size_t best_tier = 0;
@@ -840,19 +840,19 @@ static time_t rrdset_find_natural_update_every_for_timeframe(QUERY_TARGET *qt, t
         best_tier = rrddim_find_best_tier_for_timeframe(qt, after_wanted, before_wanted, points_wanted);
 
     // find the db minimum update every for this tier for all metrics
-    time_t common_update_every = default_rrd_update_every;
+    time_t common_update_every_s = default_rrd_update_every;
     for(size_t i = 0, used = qt->query.used; i < used ; i++) {
         QUERY_METRIC *qm = &qt->query.array[i];
 
-        time_t update_every = qm->tiers[best_tier].db_update_every_s;
+        time_t update_every_s = qm->tiers[best_tier].db_update_every_s;
 
         if(!i)
-            common_update_every = update_every;
+            common_update_every_s = update_every_s;
         else
-            common_update_every = MIN(update_every, common_update_every);
+            common_update_every_s = MIN(update_every_s, common_update_every_s);
     }
 
-    return common_update_every;
+    return common_update_every_s;
 }
 
 // ----------------------------------------------------------------------------
@@ -1058,26 +1058,26 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
     if(!(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)) {
         // the selected tier
-        time_t selected_tier_first_time_t = qm->plan.array[0].after;
-        time_t selected_tier_last_time_t = qm->plan.array[0].before;
+        time_t selected_tier_first_time_s = qm->plan.array[0].after;
+        time_t selected_tier_last_time_s = qm->plan.array[0].before;
 
         // check if our selected tier can start the query
-        if (selected_tier_first_time_t > after_wanted) {
+        if (selected_tier_first_time_s > after_wanted) {
             // we need some help from other tiers
             for (size_t tr = (int)selected_tier + 1; tr < storage_tiers; tr++) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
                 // find the first time of this tier
-                time_t first_time_t = qm->tiers[tr].db_first_time_s;
+                time_t first_time_s = qm->tiers[tr].db_first_time_s;
 
                 // can it help?
-                if (first_time_t < selected_tier_first_time_t) {
+                if (first_time_s < selected_tier_first_time_s) {
                     // it can help us add detail at the beginning of the query
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
-                        .after = (first_time_t < after_wanted) ? after_wanted : first_time_t,
-                        .before = selected_tier_first_time_t,
+                        .after = (first_time_s < after_wanted) ? after_wanted : first_time_s,
+                        .before = selected_tier_first_time_s,
                         .initialized = false,
                         .finalized = false,
                     };
@@ -1086,7 +1086,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
 
                     // prepare for the tier
-                    selected_tier_first_time_t = t.after;
+                    selected_tier_first_time_s = t.after;
 
                     if (t.after <= after_wanted)
                         break;
@@ -1095,31 +1095,31 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         }
 
         // check if our selected tier can finish the query
-        if (selected_tier_last_time_t < before_wanted) {
+        if (selected_tier_last_time_s < before_wanted) {
             // we need some help from other tiers
             for (int tr = (int)selected_tier - 1; tr >= 0; tr--) {
                 if(!query_metric_is_valid_tier(qm, tr))
                     continue;
 
                 // find the last time of this tier
-                time_t last_time_t = qm->tiers[tr].db_last_time_s;
+                time_t last_time_s = qm->tiers[tr].db_last_time_s;
 
-                //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_t);
+                //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_s);
 
                 // can it help?
-                if (last_time_t > selected_tier_last_time_t) {
+                if (last_time_s > selected_tier_last_time_s) {
                     // it can help us add detail at the end of the query
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
-                        .after = selected_tier_last_time_t,
-                        .before = (last_time_t > before_wanted) ? before_wanted : last_time_t,
+                        .after = selected_tier_last_time_s,
+                        .before = (last_time_s > before_wanted) ? before_wanted : last_time_s,
                         .initialized = false,
                         .finalized = false,
                     };
                     qm->plan.array[qm->plan.used++] = t;
 
                     // prepare for the tier
-                    selected_tier_last_time_t = t.before;
+                    selected_tier_last_time_s = t.before;
 
                     internal_fatal(!t.after || !t.before, "QUERY: invalid plan selected");
 
@@ -1518,15 +1518,15 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     struct rrddim_tier *t = rd->tiers[tier];
     if(unlikely(!t)) return;
 
-    time_t latest_time_t = t->query_ops->latest_time_s(t->db_metric_handle);
+    time_t latest_time_s = t->query_ops->latest_time_s(t->db_metric_handle);
     time_t granularity = (time_t)t->tier_grouping * (time_t)rd->update_every;
-    time_t time_diff   = now_s - latest_time_t;
+    time_t time_diff   = now_s - latest_time_s;
 
     // if the user wants only NEW backfilling, and we don't have any data
-    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_t <= 0) return;
+    if(storage_tiers_backfill[tier] == RRD_BACKFILL_NEW && latest_time_s <= 0) return;
 
     // there is really nothing we can do
-    if(now_s <= latest_time_t || time_diff < granularity) return;
+    if(now_s <= latest_time_s || time_diff < granularity) return;
 
     struct storage_engine_query_handle handle;
 
@@ -1534,9 +1534,9 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
     for(int read_tier = (int)tier - 1; read_tier >= 0 ; read_tier--){
         time_t smaller_tier_first_time = rd->tiers[read_tier]->query_ops->oldest_time_s(rd->tiers[read_tier]->db_metric_handle);
         time_t smaller_tier_last_time = rd->tiers[read_tier]->query_ops->latest_time_s(rd->tiers[read_tier]->db_metric_handle);
-        if(smaller_tier_last_time <= latest_time_t) continue;  // it is as bad as we are
+        if(smaller_tier_last_time <= latest_time_s) continue;  // it is as bad as we are
 
-        long after_wanted = (latest_time_t < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_t;
+        long after_wanted = (latest_time_s < smaller_tier_first_time) ? smaller_tier_first_time : latest_time_s;
         long before_wanted = smaller_tier_last_time;
 
         struct rrddim_tier *tmp = rd->tiers[read_tier];
@@ -1549,8 +1549,8 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
             STORAGE_POINT sp = tmp->query_ops->next_metric(&handle);
             points_read++;
 
-            if(sp.end_time_s > latest_time_t) {
-                latest_time_t = sp.end_time_s;
+            if(sp.end_time_s > latest_time_s) {
+                latest_time_s = sp.end_time_s;
                 store_metric_at_tier(rd, tier, t, sp, sp.end_time_s * USEC_PER_SEC);
             }
         }
@@ -1586,12 +1586,12 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
         , const char *msg
         ) {
 
-    time_t first_entry_t = r->internal.qt->db.first_time_s;
-    time_t last_entry_t = r->internal.qt->db.last_time_s;
+    time_t first_entry_s = r->internal.qt->db.first_time_s;
+    time_t last_entry_s = r->internal.qt->db.last_time_s;
 
     internal_error(
-         true,
-         "rrd2rrdr() on %s update every %ld with %s grouping %s (group: %zu, resampling_time: %ld, resampling_group: %zu), "
+    true,
+    "rrd2rrdr() on %s update every %ld with %s grouping %s (group: %zu, resampling_time: %ld, resampling_group: %zu), "
          "after (got: %ld, want: %ld, req: %ld, db: %ld), "
          "before (got: %ld, want: %ld, req: %ld, db: %ld), "
          "duration (got: %ld, want: %ld, req: %ld, db: %ld), "
@@ -1611,19 +1611,19 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , r->after
          , after_wanted
          , after_requested
-         , first_entry_t
+         , first_entry_s
 
          // before
          , r->before
          , before_wanted
          , before_requested
-         , last_entry_t
+         , last_entry_s
 
          // duration
          , (long)(r->before - r->after + r->internal.qt->window.query_granularity)
          , (long)(before_wanted - after_wanted + r->internal.qt->window.query_granularity)
          , (long)before_requested - after_requested
-         , (long)((last_entry_t - first_entry_t) + r->internal.qt->window.query_granularity)
+         , (long)((last_entry_s - first_entry_s) + r->internal.qt->window.query_granularity)
 
          // points
          , r->rows
@@ -1798,30 +1798,30 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
     if (after_wanted == 0 || before_wanted == 0) {
         relative_period_requested = true;
 
-        time_t first_entry_t = qt->db.first_time_s;
-        time_t last_entry_t = qt->db.last_time_s;
+        time_t first_entry_s = qt->db.first_time_s;
+        time_t last_entry_s = qt->db.last_time_s;
 
-        if (first_entry_t == 0 || last_entry_t == 0) {
-            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld", qt->id, first_entry_t, last_entry_t);
+        if (first_entry_s == 0 || last_entry_s == 0) {
+            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld", qt->id, first_entry_s, last_entry_s);
             query_debug_log_free();
             return false;
         }
 
-        query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_t, last_entry_t);
+        query_debug_log(":first_entry_t %ld, last_entry_t %ld", first_entry_s, last_entry_s);
 
         if (after_wanted == 0) {
-            after_wanted = first_entry_t;
+            after_wanted = first_entry_s;
             query_debug_log(":zero after_wanted %ld", after_wanted);
         }
 
         if (before_wanted == 0) {
-            before_wanted = last_entry_t;
+            before_wanted = last_entry_s;
             before_is_aligned_to_db_end = true;
             query_debug_log(":zero before_wanted %ld", before_wanted);
         }
 
         if (points_wanted == 0) {
-            points_wanted = (last_entry_t - first_entry_t) / update_every;
+            points_wanted = (last_entry_s - first_entry_s) / update_every;
             query_debug_log(":zero points_wanted %zu", points_wanted);
         }
     }
