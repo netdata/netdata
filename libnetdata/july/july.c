@@ -2,7 +2,7 @@
 
 #include "july.h"
 
-#define JULYL_MIN_ENTRIES 100
+#define JULYL_MIN_ENTRIES 10
 
 struct JulyL_item {
     Word_t index;
@@ -37,6 +37,7 @@ static struct {
     } protected;
 
     struct {
+        size_t bytes;
         size_t allocated;
         size_t bytes_moved;
         size_t reallocs;
@@ -48,6 +49,7 @@ static struct {
                 .available = 0,
         },
         .atomics = {
+                .bytes = 0,
                 .allocated = 0,
                 .bytes_moved = 0,
                 .reallocs = 0,
@@ -60,8 +62,10 @@ void julyl_cleanup(void) {
     while(julyl_globals.protected.available_items && julyl_globals.protected.available > 10) {
         struct JulyL *item = julyl_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(julyl_globals.protected.available_items, item, cache.prev, cache.next);
+        size_t bytes = item->bytes;
         freez(item);
         julyl_globals.protected.available--;
+        __atomic_sub_fetch(&julyl_globals.atomics.bytes, bytes, __ATOMIC_RELAXED);
         __atomic_sub_fetch(&julyl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
@@ -69,12 +73,12 @@ void julyl_cleanup(void) {
 }
 
 struct JulyL *julyl_get(void) {
-    struct JulyL *j = NULL;
+    struct JulyL *j;
 
     netdata_spinlock_lock(&julyl_globals.protected.spinlock);
 
-    if(likely(julyl_globals.protected.available_items)) {
-        j = julyl_globals.protected.available_items;
+    j = julyl_globals.protected.available_items;
+    if(likely(j)) {
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
         julyl_globals.protected.available--;
     }
@@ -86,6 +90,7 @@ struct JulyL *julyl_get(void) {
         j = mallocz(bytes);
         j->bytes = bytes;
         j->entries = JULYL_MIN_ENTRIES;
+        __atomic_add_fetch(&julyl_globals.atomics.bytes, bytes, __ATOMIC_RELAXED);
         __atomic_add_fetch(&julyl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
@@ -109,7 +114,7 @@ static void julyl_release(struct JulyL *j) {
 }
 
 size_t julyl_cache_size(void) {
-    return __atomic_load_n(&julyl_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct JulyL);
+    return __atomic_load_n(&julyl_globals.atomics.bytes, __ATOMIC_RELAXED);
 }
 
 size_t julyl_bytes_moved(void) {
@@ -175,6 +180,7 @@ PPvoid_t JulyLIns(PPvoid_t PPArray, Word_t Index, PJError_t PJError __maybe_unus
         if (unlikely(July->used == July->entries)) {
             // we have to expand the array
             size_t bytes = sizeof(struct JulyL) + July->entries * 2 * sizeof(struct JulyL_item);
+            __atomic_add_fetch(&julyl_globals.atomics.bytes, bytes - July->bytes, __ATOMIC_RELAXED);
             July = reallocz(July, bytes);
             July->bytes = bytes;
             July->entries *= 2;
