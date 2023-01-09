@@ -1963,7 +1963,7 @@ void for_each_open_fd(int action, unsigned int excluded_fds) {
     } else {
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
-            fd = atoi(entry->d_name);
+            fd = str2i(entry->d_name);
             if(unlikely(((fd == STDIN_FILENO ) && (excluded_fds & OPEN_FD_EXCLUDE_STDIN )) || 
                         ((fd == STDOUT_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDOUT)) ||
                         ((fd == STDERR_FILENO) && (excluded_fds & OPEN_FD_EXCLUDE_STDERR)))) continue;
