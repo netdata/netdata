@@ -34,7 +34,7 @@ setup() {
 }
 
 @test "install stable netdata using kickstart" {
-	./packaging/installer/kickstart.sh --dont-wait --dont-start-it --auto-update --install ${INSTALLATION}
+	./packaging/installer/kickstart.sh --dont-wait --dont-start-it --auto-update --install-prefix ${INSTALLATION}
 
 	# Validate particular files
 	for file in $FILES; do

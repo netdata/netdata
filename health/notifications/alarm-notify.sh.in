@@ -1480,10 +1480,12 @@ send_slack() {
                     "fields": [
                         {
                             "title": "${chart}",
+                            "value": "chart",
                             "short": true
                         },
                         {
                             "title": "${family}",
+                            "value": "family",
                             "short": true
                         }
                     ],

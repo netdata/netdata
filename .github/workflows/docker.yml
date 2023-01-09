@@ -221,7 +221,7 @@ jobs:
 
   docker-dbg-publish:
     if: github.event_name == 'workflow_dispatch'
-    name: Docker Build and Publish (Debuging Image)
+    name: Docker Build and Publish (Debugging Image)
     needs:
       - docker-test
       - normalize-tag

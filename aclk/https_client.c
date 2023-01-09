@@ -6,6 +6,8 @@
 
 #include "mqtt_websockets/c-rbuf/include/ringbuffer.h"
 
+#include "aclk_util.h"
+
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,
     HTTP_PARSE_HEADERS,
@@ -392,6 +394,24 @@ static int handle_http_request(https_req_ctx_t *ctx) {
     if (ctx->request->request_type == HTTP_REQ_POST && ctx->request->payload && ctx->request->payload_size) {
         buffer_sprintf(hdr, "Content-Length: %zu\x0D\x0A", ctx->request->payload_size);
     }
+    if (ctx->request->proxy_username) {
+        size_t creds_plain_len = strlen(ctx->request->proxy_username) + strlen(ctx->request->proxy_password) + 1 /* ':' */;
+        char *creds_plain = callocz(1, creds_plain_len + 1);
+        char *ptr = creds_plain;
+        strcpy(ptr, ctx->request->proxy_username);
+        ptr += strlen(ctx->request->proxy_username);
+        *ptr++ = ':';
+        strcpy(ptr, ctx->request->proxy_password);
+
+        int creds_base64_len = (((4 * creds_plain_len / 3) + 3) & ~3);
+        // OpenSSL encoder puts newline every 64 output bytes
+        // we remove those but during encoding we need that space in the buffer
+        creds_base64_len += (1+(creds_base64_len/64)) * strlen("\n");
+        char *creds_base64 = callocz(1, creds_base64_len + 1);
+        base64_encode_helper((unsigned char*)creds_base64, &creds_base64_len, (unsigned char*)creds_plain, creds_plain_len);
+        buffer_sprintf(hdr, "Proxy-Authorization: Basic %s\x0D\x0A", creds_base64);
+        freez(creds_plain);
+    }
 
     buffer_strcat(hdr, "\x0D\x0A");
 
@@ -491,6 +511,8 @@ int https_request(https_req_t *request, https_req_response_t *response) {
         req.host = request->host;
         req.port = request->port;
         req.url = request->url;
+        req.proxy_username = request->proxy_username;
+        req.proxy_password = request->proxy_password;
         ctx->request = &req;
         if (handle_http_request(ctx)) {
             error("Failed to CONNECT with proxy");

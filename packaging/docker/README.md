@@ -37,31 +37,19 @@ and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
+> **Notice**: all `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit. This is
+> required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved. Failure to do so
+> may cause a task running in a container to hang and consume 100% of the CPU core.
+
 <details>
-<summary>Prerequisite steps for Fedora users</summary>
+<summary>What are these "some distros"?</summary>
 
-There is a known issue with [Docker Engine on Fedora](https://docs.docker.com/engine/install/fedora/) where a task
-running in a container hangs and consumes 100% of the CPU core. The issue is not Netdata specific. When setting
-the `nofile` ulimit, the task performs normally.
+If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
 
-To fix the issue, add the following to the `/etc/docker/daemon.json` file and restart `docker.service`:
-
-```json
-{
-  "default-ulimits": {
-    "nofile": {
-      "Hard": 4096,
-      "Name": "nofile",
-      "Soft": 4096
-    }
-  }
-}
+```bash
+[fedora37 ~]$ docker run --rm busybox grep open /proc/self/limits
+Max open files            1073741816           1073741816           files
 ```
-
-An alternative solution is to set ulimit `nofile` when creating a Netdata container
-with [docker run](https://docs.docker.com/engine/reference/commandline/run/#set-ulimits-in-container---ulimit)
-or [docker-compose](https://docs.docker.com/compose/compose-file/compose-file-v3/#ulimits).
-
 </details>
 
 You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
@@ -88,6 +76,7 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
+  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
@@ -108,6 +97,9 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
+    ulimits:
+      nofile:
+        soft: 4096
     volumes:
       - netdataconfig:/etc/netdata
       - netdatalib:/var/lib/netdata
@@ -212,6 +204,7 @@ docker run -d --name=netdata \
   --restart unless-stopped \
   --cap-add SYS_PTRACE \
   --security-opt apparmor=unconfined \
+  --ulimit nofile=4096 \
   netdata/netdata
 ```
 
@@ -233,6 +226,9 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
+    ulimits:
+      nofile:
+        soft: 4096
     volumes:
       - ./netdataconfig/netdata:/etc/netdata:ro
       - netdatalib:/var/lib/netdata
@@ -495,6 +491,9 @@ services:
       - SYS_PTRACE
     security_opt:
       - apparmor:unconfined
+    ulimits:
+      nofile:
+        soft: 4096
     volumes:
       - netdatalib:/var/lib/netdata
       - netdatacache:/var/cache/netdata

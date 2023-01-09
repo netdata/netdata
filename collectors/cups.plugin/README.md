@@ -11,7 +11,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cups.
 
 This plugin needs a running local CUPS daemon (`cupsd`). This plugin does not need any configuration. Supports cups since version 1.7.
 
-If you installed Netdata using our native packages, you will have to additionaly install `netdata-plugin-cups` to use this plugin for data collection. It is not installed by default due to the large number of dependencies it requires.
+If you installed Netdata using our native packages, you will have to additionally install `netdata-plugin-cups` to use this plugin for data collection. It is not installed by default due to the large number of dependencies it requires.
 
 ## Charts
 

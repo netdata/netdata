@@ -31,6 +31,7 @@ extern unsigned int default_health_enabled;
 #define HEALTH_SILENCERS_MAX_FILE_LEN 10000
 
 extern char *silencers_filename;
+extern SIMPLE_PATTERN *conf_enabled_alarms;
 
 void health_init(void);
 

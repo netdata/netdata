@@ -143,7 +143,9 @@ static char *cloud_req_http_type_names[ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT] = {
     "alarms",
     "alarm_log",
     "chart",
-    "charts"
+    "charts",
+    "function",
+    "functions"
     // if you change then update `ACLK_STATS_CLOUD_HTTP_REQ_TYPE_CNT`.
 };
 

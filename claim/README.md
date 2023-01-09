@@ -288,7 +288,7 @@ you don't see the node in your Space after 60 seconds, see the [troubleshooting 
 To connect a node that is running on a macOS environment the script that will be provided to you by Netdata Cloud is the [kickstart](/packaging/installer/methods/macos.md#install-netdata-with-our-automatic-one-line-installation-script) which will install the Netdata Agent on your node, if it isn't already installed, and connect the node to Netdata Cloud. It should be similar to:
 
 ```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/ --claim-token TOKEN --claim-rooms ROOM1,ROOM2 --claim-url https://api.netdata.cloud
 ```
 The script should return `Agent was successfully claimed.`. If the connecting to Netdata Cloud process returns errors, or if you don't see
 the node in your Space after 60 seconds, see the [troubleshooting information](#troubleshooting).
@@ -382,10 +382,10 @@ For a successful execution you will need to run the script with root privileges 
 
 #### bash: netdata-claim.sh: command not found
 
-If you run the claiming script and see a `command not found` error, you either installed Netdata in a non-standard
-location or are using an unsupported package. If you installed Netdata in a non-standard path using the `--install`
-option, you need to update your `$PATH` or run `netdata-claim.sh` using the full path. For example, if you installed
-Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the claiming script.
+If you run the claiming script and see a `command not found` error, you either installed Netdata in a
+non-standard location or are using an unsupported package. If you installed Netdata in a non-standard path using the
+`--install-prefix` option, you need to update your `$PATH` or run `netdata-claim.sh` using the full path. For example,
+if you installed Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.sh` to run the claiming script.
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
@@ -538,7 +538,7 @@ wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/
 **macOS**
 
 ```bash
-curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install /usr/local/
+curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh --install-prefix /usr/local/
 ```
 ### Claiming script
 

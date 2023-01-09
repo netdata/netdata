@@ -28,8 +28,10 @@ KICKSTART_SOURCE="$(
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
-REPOCONFIG_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
-REPOCONFIG_VERSION="1-2"
+REPOCONFIG_DEB_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
+REPOCONFIG_DEB_VERSION="1-2"
+REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
 STATIC_INSTALL_ARCHES="x86_64 armv7l aarch64 ppc64le"
 TELEMETRY_URL="https://posthog.netdata.cloud/capture/"
@@ -43,7 +45,7 @@ INSTALL_TYPE="unknown"
 INSTALL_PREFIX=""
 NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_ONLY=0
-NETDATA_CLAIM_URL="api.netdata.cloud"
+NETDATA_CLAIM_URL="https://api.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_DISABLE_CLOUD=0
 NETDATA_INSTALLER_OPTIONS=""
@@ -181,7 +183,6 @@ USAGE: kickstart.sh [options]
   --reinstall-even-if-unsafe       Even try to reinstall if we don't think we can do so safely (implies --reinstall).
   --disable-cloud                  Disable support for Netdata Cloud (default: detect)
   --require-cloud                  Only install if Netdata Cloud can be enabled. Overrides --disable-cloud.
-  --install <path>                 This option is deprecated and will be removed in a future version, use --install-prefix instead.
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --install-version <version>      Specify the version of Netdata to install.
@@ -1044,7 +1045,7 @@ EOF
 
 confirm_install_prefix() {
   if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
-    fatal "The --install-prefix and --install options are only supported together with the --build-only option." F0204
+    fatal "The --install-prefix option is only supported together with the --build-only option." F0204
   fi
 
   if [ -n "${INSTALL_PREFIX}" ]; then
@@ -1468,8 +1469,17 @@ try_package_install() {
   fi
 
   repoconfig_name="netdata-repo${release}"
-  repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_VERSION}${pkg_suffix}.${pkg_type}"
-  repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
+
+  case "${pkg_type}" in
+    deb)
+      repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
+      repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
+      ;;
+    rpm)
+      repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
+      repoconfig_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
+      ;;
+  esac
 
   if ! pkg_installed "${repoconfig_name}"; then
     progress "Checking for availability of repository configuration package."
@@ -1507,7 +1517,7 @@ try_package_install() {
   fi
 
   if [ "${REPO_ACTION}" = "repositories-only" ]; then
-    progress "Successfully installed repository configuraion package."
+    progress "Successfully installed repository configuration package."
     deferred_warnings
     cleanup
     trap - EXIT
@@ -1842,7 +1852,7 @@ prepare_offline_install_source() {
     run mkdir -p "${1}" || fatal "Unable to create target directory for offline install preparation." F0504
   fi
 
-  run cd "${1}" || fatal "Failed to swtich to target directory for offline install preparation." F0505
+  run cd "${1}" || fatal "Failed to switch to target directory for offline install preparation." F0505
 
   if [ "${NETDATA_ONLY_NATIVE}" -ne 1 ] && [ "${NETDATA_ONLY_BUILD}" -ne 1 ]; then
     set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
@@ -2142,11 +2152,6 @@ parse_args() {
       "--disable-telemetry")
         NETDATA_DISABLE_TELEMETRY="1"
         NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} --disable-telemetry"
-        ;;
-      "--install")
-        warning "--install flag is deprecated and will be removed in a future version. Please use --install-prefix instead."
-        INSTALL_PREFIX="${2}"
-        shift 1
         ;;
       "--install-prefix")
         INSTALL_PREFIX="${2}"

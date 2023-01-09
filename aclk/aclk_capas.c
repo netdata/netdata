@@ -36,7 +36,7 @@ struct capability *aclk_get_node_instance_capas(RRDHOST *host)
         { .name = "funcs", .version = 0,                     .enabled = 0 },
         { .name = NULL,    .version = 0,                     .enabled = 0 }
     };
-    if (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS)) {
+    if (host == localhost || (host->receiver && stream_has_capability(host->receiver, STREAM_CAP_FUNCTIONS))) {
         ni_caps[4].version = 1;
         ni_caps[4].enabled = 1;
     }

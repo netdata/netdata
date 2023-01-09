@@ -88,7 +88,8 @@ public:
         BytesPerSample(NumDimsPerSample * sizeof(CalculatedNumber)),
         Preprocessed(false) {};
 
-    std::vector<DSample> preprocess();
+    void preprocess(std::vector<DSample> &Samples);
+    void preprocess(DSample &Feature);
     std::vector<Sample> getPreprocessedSamples() const;
 
     size_t capacity() const { return NumSamples; }

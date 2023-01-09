@@ -36,10 +36,12 @@ dist_healthconfig_DATA = \
     health.d/cgroups.conf \
     health.d/cpu.conf \
     health.d/cockroachdb.conf \
+    health.d/consul.conf \
     health.d/disks.conf \
     health.d/dnsmasq_dhcp.conf \
     health.d/dns_query.conf \
     health.d/dockerd.conf \
+    health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
     health.d/geth.conf \

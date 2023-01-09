@@ -82,7 +82,6 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     # Fix handling of config directory
 
 # Long-term this should leverage BuildKit’s mount option.
-COPY --from=builder /wheels /wheels
 COPY --from=builder /app /
 
 # Apply the permissions as described in
@@ -109,8 +108,6 @@ RUN chown -R root:root \
     # Group write permissions due to: https://github.com/netdata/netdata/pull/6543
     find /var/lib/netdata /var/cache/netdata -type d -exec chmod 0770 {} \; && \
     find /var/lib/netdata /var/cache/netdata -type f -exec chmod 0660 {} \; && \
-    pip --no-cache-dir install /wheels/* && \
-    rm -rf /wheels && \
     cp -va /etc/netdata /etc/netdata.stock
 
 ENV NETDATA_LISTENER_PORT 19999

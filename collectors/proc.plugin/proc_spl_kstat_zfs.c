@@ -285,6 +285,8 @@ int update_zfs_pool_state_chart(const DICTIONARY_ITEM *item, void *pool_p, void 
                 pool->rd_offline = rrddim_add(pool->st, "offline", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 pool->rd_removed = rrddim_add(pool->st, "removed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
                 pool->rd_unavail = rrddim_add(pool->st, "unavail", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+                rrdlabels_add(pool->st->rrdlabels, "pool", name, RRDLABEL_SRC_AUTO);
             }
 
             rrddim_set_by_pointer(pool->st, pool->rd_online, pool->online);
