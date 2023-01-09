@@ -58,7 +58,7 @@ to work on these platforms with minimal user effort.
 | Debian | 11.x | x86\_64, i386, ARMv7, AArch64 | |
 | Debian | 10.x | x86\_64, i386, ARMv7, AArch64 | |
 | Fedora | 37 | x86\_64, AArch64 | |
-| Fedora | 36 | x86\_64, ARMv7, AArch64 | |
+| Fedora | 36 | x86\_64, AArch64 | |
 | openSUSE | Leap 15.4 | x86\_64, AArch64 | |
 | Oracle Linux | 9.x | x86\_64, AArch64 | |
 | Oracle Linux | 8.x | x86\_64, AArch64 | |
