@@ -568,6 +568,11 @@ void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, con
 
 }
 
+static void rrdhost_reset_destinations(RRDHOST *host) {
+    for (struct rrdpush_destinations *d = host->destinations; d; d = d->next)
+        d->postpone_reconnection_until = 0;
+}
+
 static int rrdpush_receive(struct receiver_state *rpt)
 {
     rpt->config.mode = default_rrd_memory_mode;
@@ -799,6 +804,9 @@ static int rrdpush_receive(struct receiver_state *rpt)
 #endif
 
     rrdhost_set_is_parent_label(++localhost->connected_children_count);
+
+    // let it reconnect to parent immediately
+    rrdhost_reset_destinations(rpt->host);
 
     size_t count = streaming_parser(rpt, &cd, rpt->fd,
 #ifdef ENABLE_HTTPS
