@@ -97,7 +97,7 @@ void test_execute_query_thread(void *args) {
 
     // Open log source to use for validation
     uv_fs_t open_req;
-    rc = uv_fs_open(&thread_loop, &open_req, query_params.filename, O_RDONLY, 0, NULL);
+    rc = uv_fs_open(&thread_loop, &open_req, query_params.filename[0], O_RDONLY, 0, NULL);
     if (unlikely(rc < 0)) {
         debug(D_LOGS_MANAG, "file_open() error: %s (%d) %s\n", query_params.filename[0], rc, uv_strerror(rc));
         m_assert(rc >= 0, "uv_fs_open() failed");
@@ -137,7 +137,7 @@ void test_execute_query_thread(void *args) {
         m_assert(!rc, "Mismatch between DB and log file data!");
 
         file_offset += query_params.results_buff->len;
-        debug(D_LOGS_MANAG, "Query file offset %" PRId64 " for %s\n", file_offset, query_params.filename);
+        debug(D_LOGS_MANAG, "Query file offset %" PRId64 " for %s\n", file_offset, query_params.filename[0]);
         uv_fs_req_cleanup(&read_req);
 
         // Simulate real query which would do buffer_create() and buffer_free() everytime 

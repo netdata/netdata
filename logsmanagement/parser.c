@@ -1350,8 +1350,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
     }
 
     /* Extract client metrics */
-    if(( parser_config->chart_config & ( CHART_IP_VERSION | CHART_REQ_CLIENT_CURRENT | CHART_REQ_CLIENT_ALL_TIME)) && 
-         line_parsed->req_client && *line_parsed->req_client) {
+    if(( parser_config->chart_config & ( CHART_IP_VERSION | CHART_REQ_CLIENT_CURRENT | CHART_REQ_CLIENT_ALL_TIME)) && *line_parsed->req_client) {
         
         /* Invalid IP version */
         if(unlikely(!strcmp(line_parsed->req_client, WEB_LOG_INVALID_CLIENT_IP_STR))){
@@ -1550,7 +1549,7 @@ static inline void extract_web_log_metrics( Log_parser_config_t *parser_config,
 
     /* Extract SSL cipher suite */
     // TODO: Reduce number of reallocs
-    if((parser_config->chart_config & CHART_SSL_CIPHER) && line_parsed->ssl_cipher && *line_parsed->ssl_cipher){
+    if((parser_config->chart_config & CHART_SSL_CIPHER) && *line_parsed->ssl_cipher){
         int i;
         for(i = 0; i < metrics->web_log->ssl_cipher_arr.size; i++){
             if(!strcmp(metrics->web_log->ssl_cipher_arr.ssl_ciphers[i].string, line_parsed->ssl_cipher)){
