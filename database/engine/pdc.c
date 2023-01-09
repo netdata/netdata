@@ -806,8 +806,11 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
         if (vd.update_every_s) {
             size_t entries_by_time = (vd.start_time_s - (vd.start_time_s - vd.update_every_s)) / vd.update_every_s;
 
-            if (vd.entries != entries_by_time)
-                vd.end_time_s = (time_t) (vd.start_time_s + (vd.entries - 1) * vd.update_every_s);
+            if (vd.entries != entries_by_time) {
+                if (overwrite_zero_update_every_s)
+                    vd.update_every_s = overwrite_zero_update_every_s;
+                vd.end_time_s = (time_t)(vd.start_time_s + (vd.entries - 1) * vd.update_every_s);
+            }
         }
     }
 
