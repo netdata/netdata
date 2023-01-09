@@ -4600,9 +4600,9 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "PPID", "Parent Process ID", false, "integer", NULL, NAN, "ascending", true, false, false, "PID", "count_unique", false);
         add_table_field(wb, "Category", "Category (apps_groups.conf)", true, "string", NULL, NAN, "ascending", true, true, false, NULL, "count_unique", false);
         add_table_field(wb, "User", "User Owner", true, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "UID", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Uid", "User ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
         add_table_field(wb, "Group", "Group Owner", false, "string", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
-        add_table_field(wb, "GID", "Group ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
+        add_table_field(wb, "Gid", "Group ID", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
         add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
