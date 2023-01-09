@@ -284,7 +284,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
         );
         for(int j = 0; j < RESP_CODE_ARR_SIZE - 1; j++){
             char dim_resp_code_name[4];
-            sprintf(dim_resp_code_name, "%d", j + 100);
+            snprintfz(dim_resp_code_name, 4, "%d", j + 100);
             chart_data->dim_resp_code[j] = rrddim_add(chart_data->st_resp_code, dim_resp_code_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         chart_data->dim_resp_code[RESP_CODE_ARR_SIZE - 1] = rrddim_add(chart_data->st_resp_code, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);

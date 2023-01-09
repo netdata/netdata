@@ -44,7 +44,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
         );
         for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
             char dim_prior_name[4];
-            sprintf(dim_prior_name, "%d", j);
+            snprintfz(dim_prior_name, 4, "%d", j);
             chart_data->dim_prior[j] = rrddim_add(chart_data->st_prior, dim_prior_name, 
                                                             NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
