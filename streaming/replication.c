@@ -267,11 +267,14 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
     size_t dimensions = q->dimensions;
     struct storage_engine_query_ops *ops = q->ops;
     time_t wall_clock_time = q->wall_clock_time;
-    time_t update_every = q->st->update_every;
 
     size_t points_read = q->points_read, points_generated = q->points_generated;
 
-    time_t now = after + 1, actual_after = 0, actual_before = 0; (void)actual_before;
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+    time_t actual_after = 0, actual_before = 0;
+#endif
+
+    time_t now = after + 1;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions ;i++) {
@@ -283,6 +286,11 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
             while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
                 d->sp = ops->next_metric(&d->handle);
                 points_read++;
+
+                if(unlikely(storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp))) {
+                    max_skip = 1000;
+                    continue;
+                }
             }
 
             if(max_skip <= 0) {
@@ -291,70 +299,54 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
                                "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
                                rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
                                (unsigned long long) now);
+
+                continue;
             }
 
-            if(unlikely(d->sp.end_time_s < now || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
+            if(d->sp.end_time_s < now)
+                // this dimension does not have any more data
                 continue;
 
-            if(unlikely(!min_start_time)) {
+            if(unlikely(!min_start_time))
                 min_start_time = d->sp.start_time_s;
+
+            if(unlikely(!min_end_time))
                 min_end_time = d->sp.end_time_s;
-            }
-            else {
-                min_start_time = MIN(min_start_time, d->sp.start_time_s);
-                min_end_time = MIN(min_end_time, d->sp.end_time_s);
-            }
+
+            min_start_time = MIN(min_start_time, d->sp.start_time_s);
+            min_end_time = MIN(min_end_time, d->sp.end_time_s);
         }
 
-        if(unlikely(min_start_time > wall_clock_time + 1 || min_end_time > wall_clock_time + update_every + 1)) {
-            internal_error(true,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s': db provided future start time %llu or end time %llu (now is %llu)",
-                            rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
-                           (unsigned long long)min_start_time,
-                           (unsigned long long)min_end_time,
-                           (unsigned long long)wall_clock_time);
-            break;
-        }
+        if(likely(min_start_time <= now && min_end_time >= now)) {
+            // we have a valid point
 
-        if(unlikely(min_end_time < now)) {
+            if (unlikely(min_end_time <= min_start_time))
+                min_start_time = min_end_time - q->st->update_every;
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-            internal_error(true,
-                           "STREAM_SENDER REPLAY: 'host:%s/chart:%s': no data on any dimension beyond time %llu",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st), (unsigned long long)now);
-#endif // NETDATA_LOG_REPLICATION_REQUESTS
-            break;
-        }
+            if (unlikely(!actual_after))
+                actual_after = min_end_time;
 
-        if(unlikely(min_end_time <= min_start_time))
-            min_start_time = min_end_time - q->st->update_every;
+            actual_before = min_end_time;
+#endif
 
-        if(unlikely(!actual_after))
-            actual_after = min_end_time;
+            buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
+                           (unsigned long long) min_start_time, (unsigned long long) min_end_time,
+                           (unsigned long long) wall_clock_time
+            );
 
-        actual_before = min_end_time;
+            // output the replay values for this time
+            for (size_t i = 0; i < dimensions; i++) {
+                struct replication_dimension *d = &q->data[i];
+                if (unlikely(!d->enabled)) continue;
 
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n"
-                       , (unsigned long long)min_start_time
-                       , (unsigned long long)min_end_time
-                       , (unsigned long long)wall_clock_time
-                       );
+                if (likely(d->sp.start_time_s <= min_end_time && d->sp.end_time_s >= min_end_time)) {
+                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
+                                   rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
 
-        // output the replay values for this time
-        for (size_t i = 0; i < dimensions ;i++) {
-            struct replication_dimension *d = &q->data[i];
-            if(unlikely(!d->enabled)) continue;
-
-            if(likely(d->sp.start_time_s <= min_end_time && d->sp.end_time_s >= min_end_time)) {
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
-                               rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
-
-                points_generated++;
+                    points_generated++;
+                }
             }
-
-//            else
-//                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
-//                               rrddim_id(d->rd));
-
         }
 
         now = min_end_time + 1;
