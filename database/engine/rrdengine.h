@@ -423,6 +423,12 @@ typedef struct validated_page_descriptor {
     bool data_on_disk_valid;
 } VALIDATED_PAGE_DESCRIPTOR;
 
+#define page_entries_by_time(start_time_s, end_time_s, update_every_s) \
+        ((update_every_s) ? (((end_time_s) - ((start_time_s) - (update_every_s))) / (update_every_s)) : 1)
+
+#define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
+        ((page_length_in_bytes) / (point_size_in_bytes))
+
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
 
 #endif /* NETDATA_RRDENGINE_H */

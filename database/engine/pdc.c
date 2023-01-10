@@ -778,7 +778,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
             .type = descr->type,
     };
     vd.point_size = page_type_size[vd.type];
-    vd.entries = (size_t) vd.page_length / vd.point_size;
+    vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
     vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
 
     bool is_valid = true;
@@ -804,7 +804,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     }
     else {
         if (vd.update_every_s) {
-            size_t entries_by_time = (vd.end_time_s - (vd.start_time_s - vd.update_every_s)) / vd.update_every_s;
+            size_t entries_by_time = page_entries_by_time(vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
             if (vd.entries != entries_by_time) {
                 if (overwrite_zero_update_every_s < vd.update_every_s)

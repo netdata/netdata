@@ -880,8 +880,8 @@ struct pgc_page *pg_cache_lookup_next(
                 pd->update_every_s = page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
             }
 
-            size_t entries_by_size = page_length / PAGE_POINT_CTX_SIZE_BYTES(ctx);
-            size_t entries_by_time = (page_end_time_s - (page_start_time_s - page_update_every_s)) / page_update_every_s;
+            size_t entries_by_size = page_entries_by_size(page_length, PAGE_POINT_CTX_SIZE_BYTES(ctx));
+            size_t entries_by_time = page_entries_by_time(page_start_time_s, page_end_time_s, page_update_every_s);
             if(unlikely(entries_by_size < entries_by_time)) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
                 pd->last_time_s = page_end_time_s = pgc_page_fix_end_time_s(page, fixed_page_end_time_s);
