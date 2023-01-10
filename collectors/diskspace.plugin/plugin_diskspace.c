@@ -515,7 +515,7 @@ void *diskspace_slow_worker(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, USEC_PER_SEC);
 
@@ -530,7 +530,7 @@ void *diskspace_slow_worker(void *ptr)
         if (!dict_mountpoints)
             continue;
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         // --------------------------------------------------------------------------
         // disk space metrics
@@ -547,10 +547,10 @@ void *diskspace_slow_worker(void *ptr)
         for(bmi = slow_mountinfo_root; bmi; bmi = bmi->next) {
             do_slow_disk_space_stats(bmi, slow_update_every);
             
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
         }
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         worker_is_busy(WORKER_JOB_SLOW_CLEANUP);
 
@@ -640,11 +640,11 @@ void *diskspace_main(void *ptr) {
     usec_t step = update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         /* usec_t hb_dt = */ heartbeat_next(&hb, step);
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         // --------------------------------------------------------------------------
         // this is smart enough not to reload it every time
@@ -671,11 +671,11 @@ void *diskspace_main(void *ptr) {
 
             worker_is_busy(WORKER_JOB_MOUNTPOINT);
             do_disk_space_stats(mi, update_every);
-            if(unlikely(netdata_exit)) break;
+            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
         }
         netdata_mutex_unlock(&slow_mountinfo_mutex);
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         if(dict_mountpoints) {
             worker_is_busy(WORKER_JOB_CLEANUP);

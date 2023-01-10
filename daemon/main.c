@@ -8,6 +8,8 @@ bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
+int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
 struct netdata_static_thread *static_threads;
 
 struct config netdata_config = {
@@ -23,11 +25,267 @@ struct config netdata_config = {
         }
 };
 
-void netdata_cleanup_and_exit(int ret) {
-    // enabling this, is wrong
-    // because the threads will be cancelled while cleaning up
-    // netdata_exit = 1;
+typedef struct service_thread {
+    pid_t tid;
+    SERVICE_THREAD_TYPE type;
+    SERVICE_TYPE services;
+    char name[NETDATA_THREAD_NAME_MAX + 1];
+    bool cancelled;
 
+    union {
+        netdata_thread_t netdata_thread;
+        uv_thread_t uv_thread;
+    };
+
+    force_quit_t force_quit_callback;
+    request_quit_t request_quit_callback;
+    void *data;
+} SERVICE_THREAD;
+
+struct service_globals {
+    SERVICE_TYPE running;
+    SPINLOCK lock;
+    Pvoid_t pid_judy;
+} service_globals = {
+        .running = ~0,
+        .pid_judy = NULL,
+};
+
+SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
+    SERVICE_THREAD *sth = NULL;
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
+    if(!*PValue) {
+        sth = callocz(1, sizeof(SERVICE_THREAD));
+        sth->tid = tid;
+        sth->type = thread_type;
+        sth->request_quit_callback = request_quit_callback;
+        sth->force_quit_callback = force_quit_callback;
+        sth->data = data;
+        os_thread_get_current_name_np(sth->name);
+        *PValue = sth;
+
+        switch(thread_type) {
+            case SERVICE_THREAD_TYPE_NETDATA:
+                sth->netdata_thread = netdata_thread_self();
+                break;
+
+            case SERVICE_THREAD_TYPE_LIBUV:
+                sth->uv_thread = uv_thread_self();
+                break;
+        }
+    }
+    else {
+        sth = *PValue;
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+
+    return sth;
+}
+
+void service_exits(void) {
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
+    if(PValue) {
+        freez(*PValue);
+        JudyLDel(&service_globals.pid_judy, tid, PJE0);
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+bool service_running(SERVICE_TYPE service) {
+    static __thread SERVICE_THREAD *sth = NULL;
+
+    if(unlikely(!sth))
+        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
+
+    if(netdata_exit)
+        __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
+
+    if(service == 0)
+        service = sth->services;
+
+    sth->services |= service;
+
+    return ((__atomic_load_n(&service_globals.running, __ATOMIC_RELAXED) & service) == service);
+}
+
+void service_signal_exit(SERVICE_TYPE service) {
+    __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
+
+    netdata_spinlock_lock(&service_globals.lock);
+
+    Pvoid_t *PValue;
+    Word_t tid = 0;
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+        SERVICE_THREAD *sth = *PValue;
+
+        if((sth->services & service) && sth->request_quit_callback) {
+            netdata_spinlock_unlock(&service_globals.lock);
+            sth->request_quit_callback(sth->data);
+            netdata_spinlock_lock(&service_globals.lock);
+            continue;
+        }
+    }
+
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
+    if(service & SERVICE_MAINTENANCE)
+        buffer_strcat(wb, "MAINTENANCE ");
+    if(service & SERVICE_COLLECTORS)
+        buffer_strcat(wb, "COLLECTORS ");
+    if(service & SERVICE_ML_TRAINING)
+        buffer_strcat(wb, "ML_TRAINING ");
+    if(service & SERVICE_ML_PREDICTION)
+        buffer_strcat(wb, "ML_PREDICTION ");
+    if(service & SERVICE_REPLICATION)
+        buffer_strcat(wb, "REPLICATION ");
+    if(service & ABILITY_DATA_QUERIES)
+        buffer_strcat(wb, "DATA_QUERIES ");
+    if(service & ABILITY_WEB_REQUESTS)
+        buffer_strcat(wb, "WEB_REQUESTS ");
+    if(service & SERVICE_WEB_SERVER)
+        buffer_strcat(wb, "WEB_SERVER ");
+    if(service & SERVICE_ACLK)
+        buffer_strcat(wb, "ACLK ");
+    if(service & SERVICE_HEALTH)
+        buffer_strcat(wb, "HEALTH ");
+    if(service & SERVICE_STREAMING)
+        buffer_strcat(wb, "STREAMING ");
+    if(service & ABILITY_STREAMING_CONNECTIONS)
+        buffer_strcat(wb, "STREAMING_CONNECTIONS ");
+    if(service & SERVICE_CONTEXT)
+        buffer_strcat(wb, "CONTEXT ");
+    if(service & SERVICE_ANALYTICS)
+        buffer_strcat(wb, "ANALYTICS ");
+    if(service & SERVICE_EXPORTERS)
+        buffer_strcat(wb, "EXPORTERS ");
+}
+
+static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
+    BUFFER *service_list = buffer_create(1024);
+    BUFFER *thread_list = buffer_create(1024);
+    usec_t started_ut = now_monotonic_usec(), ended_ut;
+    size_t running;
+    SERVICE_TYPE running_services = 0;
+
+    // cancel the threads
+    running = 0;
+    running_services = 0;
+    {
+        buffer_flush(thread_list);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid() && !sth->cancelled) {
+                sth->cancelled = true;
+
+                switch(sth->type) {
+                    case SERVICE_THREAD_TYPE_NETDATA:
+                        netdata_thread_cancel(sth->netdata_thread);
+                        break;
+
+                    case SERVICE_THREAD_TYPE_LIBUV:
+                        break;
+                }
+
+                if(running)
+                    buffer_strcat(thread_list, ", ");
+
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+
+                running++;
+                running_services |= sth->services & service;
+
+                if(sth->force_quit_callback) {
+                    netdata_spinlock_unlock(&service_globals.lock);
+                    sth->force_quit_callback(sth->data);
+                    netdata_spinlock_lock(&service_globals.lock);
+                    continue;
+                }
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+    }
+
+    service_signal_exit(service);
+
+    // signal them to stop
+    size_t last_running = 0;
+    size_t stale_time_ut = 0;
+    usec_t sleep_ut = 500 * USEC_PER_MS;
+    do {
+        if(running != last_running)
+            stale_time_ut = 0;
+
+        last_running = running;
+        running = 0;
+        running_services = 0;
+        buffer_flush(thread_list);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid()) {
+                if(running)
+                    buffer_strcat(thread_list, ", ");
+
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+
+                running_services |= sth->services & service;
+                running++;
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+
+        if(running) {
+            buffer_flush(service_list);
+            service_to_buffer(service_list, running_services);
+            info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
+                 running, buffer_tostring(service_list),
+                 running <= 10 ? buffer_tostring(thread_list) : "");
+            sleep_usec(sleep_ut);
+            stale_time_ut += sleep_ut;
+        }
+
+        ended_ut = now_monotonic_usec();
+    } while(running && (ended_ut - started_ut < timeout_ut || stale_time_ut < timeout_ut));
+
+    if(running) {
+        buffer_flush(service_list);
+        service_to_buffer(service_list, running_services);
+        info("SERVICE CONTROL: "
+             "the following %zu service(s) [ %s] take too long to exit: %s; "
+             "giving up on them...",
+             running, buffer_tostring(service_list),
+             buffer_tostring(thread_list));
+    }
+
+    buffer_free(thread_list);
+    buffer_free(service_list);
+
+    return (running == 0);
+}
+
+void netdata_cleanup_and_exit(int ret) {
     error_log_limit_unlimited();
     info("EXIT: netdata prepares to exit with code %d...", ret);
 
@@ -39,38 +297,82 @@ void netdata_cleanup_and_exit(int ret) {
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
-    // cleanup/save the database and exit
+    service_signal_exit(
+            SERVICE_MAINTENANCE
+            | ABILITY_DATA_QUERIES
+            | ABILITY_WEB_REQUESTS
+            | ABILITY_STREAMING_CONNECTIONS
+            | SERVICE_ACLK
+            );
+
+    service_wait_exit(
+            SERVICE_REPLICATION
+            | SERVICE_EXPORTERS
+            | SERVICE_ML_TRAINING
+            | SERVICE_HEALTH
+            | SERVICE_WEB_SERVER
+            , 3 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_COLLECTORS
+            | SERVICE_STREAMING
+            , 3 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_ML_PREDICTION
+            | SERVICE_CONTEXT
+            , 3 * USEC_PER_SEC);
+
+    service_wait_exit(
+            SERVICE_MAINTENANCE
+            , 3 * USEC_PER_SEC);
+
     info("EXIT: cleaning up the database...");
     rrdhost_cleanup_all();
+
+    info("EXIT: metasync shutdown prepare...");
+    metadata_sync_shutdown_prepare();
+
+#ifdef ENABLE_ACLK
+    aclk_sync_exit_all();
+#endif
+
+    service_wait_exit(
+            SERVICE_ACLK
+            , 3 * USEC_PER_SEC);
+
+    // stop everything else
+    service_wait_exit(~0, 10 * USEC_PER_SEC);
+
+    info("EXIT: stopping static threads...");
+    cancel_main_threads();
 
     if(!ret) {
         // exit cleanly
 
-        // stop everything
-        info("EXIT: stopping static threads...");
-#ifdef ENABLE_ACLK
-        aclk_sync_exit_all();
-#endif
-        cancel_main_threads();
-
-        // free the database
-        info("EXIT: freeing database memory...");
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            info("EXIT: flushing dbengine...");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
-        metadata_sync_shutdown_prepare();
+
+        // free the database
+        info("EXIT: freeing database memory...");
         rrdhost_free_all();
+
         metadata_sync_shutdown();
+
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            info("EXIT: stopping dbengine...");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
     }
+
     sql_close_context_database();
     sql_close_database();
 
@@ -679,8 +981,9 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_YES);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
@@ -731,14 +1034,14 @@ static void get_netdata_configured_variables() {
 
     // --------------------------------------------------------------------
 
-    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdset_free_obsolete_time < 10) {
-        rrdset_free_obsolete_time = 10;
+    if (rrdset_free_obsolete_time_s < 10) {
+        rrdset_free_obsolete_time_s = 10;
         info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     }
 
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
@@ -746,6 +1049,7 @@ static void get_netdata_configured_variables() {
         gap_when_lost_iterations_above = 1;
         config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
+    gap_when_lost_iterations_above += 2;
 
     // --------------------------------------------------------------------
     // get various system parameters
@@ -874,6 +1178,10 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
+int pgc_unittest(void);
+int mrg_unittest(void);
+int julytest(void);
+
 int main(int argc, char **argv) {
     int i;
     int config_loaded = 0;
@@ -1001,7 +1309,7 @@ int main(int argc, char **argv) {
                             default_health_enabled = 0;
                             storage_tiers = 1;
                             registry_init();
-                            if(rrd_init("unittest", NULL)) {
+                            if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
                             }
@@ -1055,6 +1363,18 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "metatest") == 0) {
                             unittest_running = true;
                             return metadata_unittest();
+                        }
+                        else if(strcmp(optarg, "pgctest") == 0) {
+                            unittest_running = true;
+                            return pgc_unittest();
+                        }
+                        else if(strcmp(optarg, "mrgtest") == 0) {
+                            unittest_running = true;
+                            return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "julytest") == 0) {
+                            unittest_running = true;
+                            return julytest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
@@ -1345,9 +1665,29 @@ int main(int argc, char **argv) {
         // initialize the system clocks
         clocks_init();
 
-        // prepare configuration environment variables for the plugins
+        // set libuv worker threads
+        libuv_worker_threads = get_system_cpus() * 2;
 
-        setenv("UV_THREADPOOL_SIZE", config_get(CONFIG_SECTION_GLOBAL, "libuv worker threads", "16"), 1);
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
+        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+
+
+        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        }
+
+        {
+            char buf[20 + 1];
+            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            setenv("UV_THREADPOOL_SIZE", buf, 1);
+        }
+
+        // prepare configuration environment variables for the plugins
         get_netdata_configured_variables();
         set_global_environment();
 
@@ -1426,7 +1766,6 @@ int main(int argc, char **argv) {
         // setup threads configs
         default_stacksize = netdata_threads_init();
 
-
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
 
@@ -1504,7 +1843,7 @@ int main(int argc, char **argv) {
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
-    if(rrd_init(netdata_configured_hostname, system_info))
+    if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
 
     char agent_crash_file[FILENAME_MAX + 1];

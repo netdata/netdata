@@ -223,9 +223,7 @@ void analytics_mirrored_hosts(void)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        netdata_mutex_lock(&host->receiver_lock);
-        ((host->receiver || host == localhost) ? reachable++ : unreachable++);
-        netdata_mutex_unlock(&host->receiver_lock);
+        ((host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? reachable++ : unreachable++);
 
         count++;
     }
@@ -554,7 +552,7 @@ void analytics_gather_mutable_meta_data(void)
         snprintfz(b, 6, "%d", analytics_data.dashboard_hits);
         analytics_set_data(&analytics_data.netdata_dashboard_used, b);
 
-        snprintfz(b, 6, "%zu", rrd_hosts_available);
+        snprintfz(b, 6, "%zu", rrdhost_hosts_available());
         analytics_set_data(&analytics_data.netdata_config_hosts_available, b);
     }
 }
@@ -587,12 +585,12 @@ void *analytics_main(void *ptr)
     debug(D_ANALYTICS, "Analytics thread starts");
 
     //first delay after agent start
-    while (!netdata_exit && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
+    while (service_running(SERVICE_ANALYTICS) && likely(sec <= ANALYTICS_INIT_SLEEP_SEC)) {
         heartbeat_next(&hb, step_ut);
         sec++;
     }
 
-    if (unlikely(netdata_exit))
+    if (unlikely(!service_running(SERVICE_ANALYTICS)))
         goto cleanup;
 
     analytics_gather_immutable_meta_data();
@@ -605,7 +603,7 @@ void *analytics_main(void *ptr)
         heartbeat_next(&hb, step_ut * 2);
         sec += 2;
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_ANALYTICS)))
             break;
 
         if (likely(sec < ANALYTICS_HEARTBEAT))

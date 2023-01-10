@@ -21,16 +21,16 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             NameSS << "machine_learning_status_on_" << rrdhost_hostname(localhost);
 
             MachineLearningStatusRS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.machine_learning_status", // ctx
                 "Machine learning status", // title
                 "dimensions", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_MACHINE_LEARNING_STATUS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE // chart_type
@@ -65,16 +65,16 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             NameSS << "metric_types_on_" << rrdhost_hostname(localhost);
 
             MetricTypesRS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.metric_types", // ctx
                 "Dimensions by metric type", // title
                 "dimensions", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_METRIC_TYPES, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE // chart_type
@@ -109,16 +109,16 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             NameSS << "training_status_on_" << rrdhost_hostname(localhost);
 
             TrainingStatusRS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.training_status", // ctx
                 "Training status of dimensions", // title
                 "dimensions", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_TRAINING_STATUS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE // chart_type
@@ -156,16 +156,16 @@ void ml::updateDimensionsChart(RRDHOST *RH, const MachineLearningStats &MLS) {
             NameSS << "dimensions_on_" << rrdhost_hostname(localhost);
 
             PredictionRS = rrdset_create(
-                RH,
-                "anomaly_detection", // type
+                    RH,
+                    "anomaly_detection", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
                 "dimensions", // family
                 "anomaly_detection.dimensions", // ctx
                 "Anomaly detection dimensions", // title
                 "dimensions", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 ML_CHART_PRIO_DIMENSIONS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE // chart_type
@@ -195,16 +195,16 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
         NameSS << "anomaly_rate_on_" << rrdhost_hostname(localhost);
 
         HostRateRS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
+                RH,
+                "anomaly_detection", // type
             IdSS.str().c_str(), // id
             NameSS.str().c_str(), // name
             "anomaly_rate", // family
             "anomaly_detection.anomaly_rate", // ctx
             "Percentage of anomalous dimensions", // title
             "percentage", // units
-            "netdata", // plugin
-            "ml", // module
+            NETDATA_ML_PLUGIN, // plugin
+            NETDATA_ML_MODULE_DETECTION, // module
             ML_CHART_PRIO_ANOMALY_RATE, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
@@ -229,16 +229,16 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
         NameSS << "anomaly_detection_on_" << rrdhost_hostname(localhost);
 
         AnomalyDetectionRS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
+                RH,
+                "anomaly_detection", // type
             IdSS.str().c_str(), // id
             NameSS.str().c_str(), // name
             "anomaly_detection", // family
             "anomaly_detection.detector_events", // ctx
             "Anomaly detection events", // title
             "percentage", // units
-            "netdata", // plugin
-            "ml", // module
+            NETDATA_ML_PLUGIN, // plugin
+            NETDATA_ML_MODULE_DETECTION, // module
             ML_CHART_PRIO_DETECTOR_EVENTS, // priority
             RH->rrd_update_every, // update_every
             RRDSET_TYPE_LINE // chart_type
@@ -271,20 +271,21 @@ void ml::updateHostAndDetectionRateCharts(RRDHOST *RH, collected_number AnomalyR
             NULL /* group options */,
             0, /* timeout */
             0, /* tier */
-            QUERY_SOURCE_ML
+            QUERY_SOURCE_ML,
+            STORAGE_PRIORITY_BEST_EFFORT
     );
 
     if(R) {
-        assert(R->d == 1 && R->n == 1 && R->rows == 1);
+        if(R->d == 1 && R->n == 1 && R->rows == 1) {
+            static thread_local bool PrevAboveThreshold = false;
+            bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
+            bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
+            PrevAboveThreshold = AboveThreshold;
 
-        static thread_local bool PrevAboveThreshold = false;
-        bool AboveThreshold = R->v[0] >= Cfg.HostAnomalyRateThreshold;
-        bool NewAnomalyEvent = AboveThreshold && !PrevAboveThreshold;
-        PrevAboveThreshold = AboveThreshold;
-
-        rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
-        rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
-        rrdset_done(AnomalyDetectionRS);
+            rrddim_set_by_pointer(AnomalyDetectionRS, AboveThresholdRD, AboveThreshold);
+            rrddim_set_by_pointer(AnomalyDetectionRS, NewAnomalyEventRD, NewAnomalyEvent);
+            rrdset_done(AnomalyDetectionRS);
+        }
 
         rrdr_free(OWA, R);
     }
@@ -309,15 +310,15 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
             NameSS << "prediction_usage_for_" << rrdhost_hostname(RH);
 
             RS = rrdset_create_localhost(
-                "netdata", // type
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.prediction_usage", // ctx
                 "Prediction resource usage", // title
                 "milliseconds/s", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_PREDICTION, // module
                 NETDATA_ML_CHART_PRIO_PREDICTION_USAGE, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_STACKED // chart_type
@@ -350,15 +351,15 @@ void ml::updateResourceUsageCharts(RRDHOST *RH, const struct rusage &PredictionR
             NameSS << "training_usage_for_" << rrdhost_hostname(RH);
 
             RS = rrdset_create_localhost(
-                "netdata", // type
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.training_usage", // ctx
                 "Training resource usage", // title
                 "milliseconds/s", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_TRAINING_USAGE, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_STACKED // chart_type
@@ -393,16 +394,16 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             NameSS << "queue_stats_on_" << rrdhost_hostname(localhost);
 
             RS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.queue_stats", // ctx
                 "Training queue stats", // title
                 "items", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_QUEUE_STATS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE// chart_type
@@ -436,16 +437,16 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             NameSS << "training_time_stats_on_" << rrdhost_hostname(localhost);
 
             RS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.training_time_stats", // ctx
                 "Training time stats", // title
                 "milliseconds", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_TRAINING_TIME_STATS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE// chart_type
@@ -483,16 +484,16 @@ void ml::updateTrainingStatisticsChart(RRDHOST *RH, const TrainingStats &TS) {
             NameSS << "training_results_on_" << rrdhost_hostname(localhost);
 
             RS = rrdset_create(
-                RH,
-                "netdata", // type
+                    RH,
+                    "netdata", // type
                 IdSS.str().c_str(), // id
                 NameSS.str().c_str(), // name
-                "ml", // family
+                NETDATA_ML_CHART_FAMILY, // family
                 "netdata.training_results", // ctx
                 "Training results", // title
                 "events", // units
-                "netdata", // plugin
-                "ml", // module
+                NETDATA_ML_PLUGIN, // plugin
+                NETDATA_ML_MODULE_TRAINING, // module
                 NETDATA_ML_CHART_PRIO_TRAINING_RESULTS, // priority
                 RH->rrd_update_every, // update_every
                 RRDSET_TYPE_LINE// chart_type

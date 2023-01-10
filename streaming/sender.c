@@ -36,21 +36,30 @@ extern char *netdata_ssl_ca_file;
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
+static __thread bool sender_thread_buffer_recreate = false;
 
 void sender_thread_buffer_free(void) {
-    if(sender_thread_buffer) {
-        buffer_free(sender_thread_buffer);
-        sender_thread_buffer = NULL;
-    }
+    buffer_free(sender_thread_buffer);
+    sender_thread_buffer = NULL;
 }
 
 // Collector thread starting a transmission
 BUFFER *sender_start(struct sender_state *s __maybe_unused) {
-    if(!sender_thread_buffer)
-        sender_thread_buffer = buffer_create(1024);
-
-    if(sender_thread_buffer_used)
+    if(unlikely(sender_thread_buffer_used))
         fatal("STREAMING: thread buffer is used multiple times concurrently.");
+
+    if(unlikely(sender_thread_buffer_recreate)) {
+        sender_thread_buffer_recreate = false;
+        if(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE) {
+            buffer_free(sender_thread_buffer);
+            sender_thread_buffer = NULL;
+        }
+    }
+
+    if(!sender_thread_buffer) {
+        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE);
+        sender_thread_buffer_recreate = false;
+    }
 
     sender_thread_buffer_used = true;
     buffer_flush(sender_thread_buffer);
@@ -227,7 +236,7 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
         rrdset_flag_clear(st, RRDSET_FLAG_UPSTREAM_EXPOSED | RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
         rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
 
-        st->upstream_resync_time = 0;
+        st->upstream_resync_time_s = 0;
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st)
@@ -740,7 +749,13 @@ static bool attempt_to_connect(struct sender_state *state)
     state->sent_bytes_on_this_connection = 0;
 
     // slow re-connection on repeating errors
-    sleep_usec(USEC_PER_SEC * state->reconnect_delay); // seconds
+    usec_t now_ut = now_monotonic_usec();
+    usec_t end_ut = now_ut + USEC_PER_SEC * state->reconnect_delay;
+    while(now_ut < end_ut) {
+        netdata_thread_testcancel();
+        sleep_usec(500 * USEC_PER_MS); // seconds
+        now_ut = now_monotonic_usec();
+    }
 
     return false;
 }
@@ -878,7 +893,7 @@ void execute_commands(struct sender_state *s) {
         log_access("STREAM: %d from '%s' for host '%s': %s",
                    gettid(), s->connected_to, rrdhost_hostname(s->host), start);
 
-        internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
+        // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
         size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
@@ -1021,59 +1036,83 @@ void rrdpush_signal_sender_to_wake_up(struct sender_state *s) {
     }
 }
 
+static bool rrdhost_set_sender(RRDHOST *host) {
+    if(unlikely(!host->sender)) return false;
+
+    bool ret = false;
+    netdata_mutex_lock(&host->sender->mutex);
+    if(!host->sender->tid) {
+        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+        rrdhost_flag_set(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
+        host->sender->tid = gettid();
+        ret = true;
+    }
+    netdata_mutex_unlock(&host->sender->mutex);
+
+    return ret;
+}
+
+static void rrdhost_clear_sender___while_having_sender_mutex(RRDHOST *host) {
+    if(unlikely(!host->sender)) return;
+
+    if(host->sender->tid == gettid()) {
+        host->sender->tid = 0;
+        host->sender->exit.shutdown = false;
+        host->sender->exit.reason = NULL;
+        rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN | RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED | RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
+    }
+}
+
+static bool rrdhost_sender_should_exit(struct sender_state *s) {
+    // check for outstanding cancellation requests
+    netdata_thread_testcancel();
+
+    if(unlikely(!service_running(SERVICE_STREAMING))) {
+        if(!s->exit.reason)
+            s->exit.reason = "NETDATA EXIT";
+        return true;
+    }
+
+    if(unlikely(!rrdhost_has_rrdpush_sender_enabled(s->host))) {
+        if(!s->exit.reason)
+            s->exit.reason = "NON STREAMABLE HOST";
+        return true;
+    }
+
+    if(unlikely(s->exit.shutdown)) {
+        if(!s->exit.reason)
+            s->exit.reason = "SENDER SHUTDOWN REQUESTED";
+        return true;
+    }
+
+    if(unlikely(rrdhost_flag_check(s->host, RRDHOST_FLAG_ORPHAN))) {
+        if(!s->exit.reason)
+            s->exit.reason = "RECEIVER LEFT";
+        return true;
+    }
+
+    return false;
+}
+
 static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
-    struct rrdpush_sender_thread_data *data = ptr;
+    struct rrdpush_sender_thread_data *s = ptr;
     worker_unregister();
 
-    RRDHOST *host = data->host;
+    RRDHOST *host = s->host;
 
     netdata_mutex_lock(&host->sender->mutex);
-
-    info("STREAM %s [send]: sending thread cleans up...", rrdhost_hostname(host));
+    info("STREAM %s [send]: sending thread exits %s",
+         rrdhost_hostname(host),
+         host->sender->exit.reason ? host->sender->exit.reason : "");
 
     rrdpush_sender_thread_close_socket(host);
     rrdpush_sender_pipe_close(host, host->sender->rrdpush_sender_pipe, false);
 
-    if(!rrdhost_flag_check(host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN)) {
-        info("STREAM %s [send]: sending thread detaches itself.", rrdhost_hostname(host));
-        netdata_thread_detach(netdata_thread_self());
-    }
-
-    rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_SPAWN);
-
-    info("STREAM %s [send]: sending thread now exits.", rrdhost_hostname(host));
-
+    rrdhost_clear_sender___while_having_sender_mutex(host);
     netdata_mutex_unlock(&host->sender->mutex);
 
-    freez(data->pipe_buffer);
-    freez(data);
-}
-
-void sender_init(RRDHOST *host)
-{
-    if (host->sender)
-        return;
-
-    host->sender = callocz(1, sizeof(*host->sender));
-    host->sender->host = host;
-    host->sender->buffer = cbuffer_new(1024, 1024 * 1024);
-    host->sender->capabilities = STREAM_OUR_CAPABILITIES;
-
-    host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
-    host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;
-    host->sender->rrdpush_sender_socket  = -1;
-
-#ifdef ENABLE_COMPRESSION
-    if(default_compression_enabled) {
-        host->sender->flags |= SENDER_FLAG_COMPRESSION;
-        host->sender->compressor = create_compressor();
-    }
-    else
-        host->sender->flags &= ~SENDER_FLAG_COMPRESSION;
-#endif
-
-    netdata_mutex_init(&host->sender->mutex);
-    replication_init_sender(host->sender);
+    freez(s->pipe_buffer);
+    freez(s);
 }
 
 void *rrdpush_sender_thread(void *ptr) {
@@ -1105,13 +1144,18 @@ void *rrdpush_sender_thread(void *ptr) {
     worker_register_job_custom_metric(WORKER_SENDER_JOB_REPLAY_DICT_SIZE, "replication dict entries", "entries", WORKER_METRIC_ABSOLUTE);
 
     struct sender_state *s = ptr;
-    s->tid = gettid();
 
     if(!rrdhost_has_rrdpush_sender_enabled(s->host) || !s->host->rrdpush_send_destination ||
        !*s->host->rrdpush_send_destination || !s->host->rrdpush_send_api_key ||
        !*s->host->rrdpush_send_api_key) {
         error("STREAM %s [send]: thread created (task id %d), but host has streaming disabled.",
-              rrdhost_hostname(s->host), s->tid);
+              rrdhost_hostname(s->host), gettid());
+        return NULL;
+    }
+
+    if(!rrdhost_set_sender(s->host)) {
+        error("STREAM %s [send]: thread created (task id %d), but there is another sender running for this host.",
+              rrdhost_hostname(s->host), gettid());
         return NULL;
     }
 
@@ -1127,7 +1171,7 @@ void *rrdpush_sender_thread(void *ptr) {
     }
 #endif
 
-    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), s->tid);
+    info("STREAM %s [send]: thread created (task id %d)", rrdhost_hostname(s->host), gettid());
 
     s->timeout = (int)appconfig_get_number(
         &stream_config, CONFIG_SECTION_STREAM, "timeout seconds", 600);
@@ -1168,14 +1212,9 @@ void *rrdpush_sender_thread(void *ptr) {
     thread_data->sender_state = s;
     thread_data->host = s->host;
 
-    // reset our cleanup flags
-    rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_JOIN);
-
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
-    for(; rrdhost_has_rrdpush_sender_enabled(s->host) && !netdata_exit ;) {
-        // check for outstanding cancellation requests
-        netdata_thread_testcancel();
+    while(!rrdhost_sender_should_exit(s)) {
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
@@ -1186,8 +1225,11 @@ void *rrdpush_sender_thread(void *ptr) {
             s->buffer->read = 0;
             s->buffer->write = 0;
 
-            if(unlikely(!attempt_to_connect(s)))
+            if(!attempt_to_connect(s))
                 continue;
+
+            if(rrdhost_sender_should_exit(s))
+                break;
 
             s->last_traffic_seen_t = now_monotonic_sec();
             rrdpush_claimed_id(s->host);
@@ -1213,6 +1255,17 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
+        if(unlikely(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE)) {
+            static __thread time_t last_reset_time_t = 0;
+            time_t now_t = now_monotonic_sec();
+            if(now_t - last_reset_time_t > 600) {
+                last_reset_time_t = now_t;
+                size_t max = s->host->sender->buffer->max_size;
+                cbuffer_free(s->host->sender->buffer);
+                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
+                sender_thread_buffer_recreate = true;
+            }
+        }
         netdata_mutex_unlock(&s->mutex);
 
         worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);
@@ -1248,12 +1301,14 @@ void *rrdpush_sender_thread(void *ptr) {
                 .revents = 0,
             }
         };
+
         int poll_rc = poll(fds, 2, 1000);
 
         debug(D_STREAM, "STREAM: poll() finished collector=%d socket=%d (current chunk %zu bytes)...",
               fds[Collector].revents, fds[Socket].revents, outstanding);
 
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(rrdhost_sender_should_exit(s)))
+            break;
 
         internal_error(fds[Collector].fd != s->rrdpush_sender_pipe[PIPE_READ],
             "STREAM %s [send to %s]: pipe changed after poll().", rrdhost_hostname(s->host), s->connected_to);
@@ -1263,6 +1318,7 @@ void *rrdpush_sender_thread(void *ptr) {
 
         // Spurious wake-ups without error - loop again
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
+            netdata_thread_testcancel();
             debug(D_STREAM, "Spurious wakeup");
             continue;
         }

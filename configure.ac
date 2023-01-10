@@ -1738,6 +1738,7 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
+    libnetdata/july/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile

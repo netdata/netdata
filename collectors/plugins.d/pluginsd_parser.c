@@ -441,19 +441,20 @@ PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
     } else
         rrddim_isnot_obsolete(st, rd);
 
+    bool should_update_dimension = false;
+
     if (likely(unhide_dimension)) {
         rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
-            metaqueue_dimension_update_flags(rd);
-        }
+        should_update_dimension = rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN);
     }
     else {
         rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
-        if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-            rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-            metaqueue_dimension_update_flags(rd);
-        }
+        should_update_dimension = !rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN);
+    }
+
+    if (should_update_dimension) {
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     return PARSER_RC_OK;
@@ -883,7 +884,7 @@ PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __may
         host->rrdlabels = rrdlabels_create();
 
     rrdlabels_migrate_to_these(host->rrdlabels, (DICTIONARY *) (((PARSER_USER_OBJECT *)user)->new_host_labels));
-    metaqueue_store_host_labels(host->machine_guid);
+    rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
     rrdlabels_destroy(((PARSER_USER_OBJECT *)user)->new_host_labels);
     ((PARSER_USER_OBJECT *)user)->new_host_labels = NULL;
@@ -991,7 +992,7 @@ PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *use
 
         if(start_time && end_time && start_time < wall_clock_time + tolerance && end_time < wall_clock_time + tolerance && start_time < end_time) {
             if (unlikely(end_time - start_time != st->update_every))
-                rrdset_set_update_every(st, end_time - start_time);
+                rrdset_set_update_every_s(st, end_time - start_time);
 
             st->last_collected_time.tv_sec = end_time;
             st->last_collected_time.tv_usec = 0;
@@ -1251,6 +1252,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     st->counter++;
     st->counter_done++;
+    store_metric_collection_completed();
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     st->replay.start_streaming = false;
@@ -1262,7 +1264,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 
     if (start_streaming) {
         if (st->update_every != update_every_child)
-            rrdset_set_update_every(st, update_every_child);
+            rrdset_set_update_every_s(st, update_every_child);
 
         if(rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
             rrdset_flag_set(st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED);
@@ -1339,7 +1341,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     user.parser = parser;
 
     while (likely(!parser_next(parser))) {
-        if (unlikely(netdata_exit || parser_action(parser,  NULL)))
+        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  NULL)))
             break;
     }
 

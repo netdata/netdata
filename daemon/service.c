@@ -22,6 +22,10 @@
 #define WORKER_JOB_SAVE_CHART                       13
 #define WORKER_JOB_DELETE_CHART                     14
 #define WORKER_JOB_FREE_DIMENSION                   15
+#define WORKER_JOB_PGC_MAIN_EVICT                   16
+#define WORKER_JOB_PGC_MAIN_FLUSH                   17
+#define WORKER_JOB_PGC_OPEN_EVICT                   18
+#define WORKER_JOB_PGC_OPEN_FLUSH                   19
 
 static void svc_rrddim_obsolete_to_archive(RRDDIM *rd) {
     RRDSET *st = rd->rrdset;
@@ -83,7 +87,7 @@ static bool svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all_dimensio
     dfe_start_write(st->rrddim_root_index, rd) {
         if(unlikely(
                 all_dimensions ||
-                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time < now))
+                (rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && (rd->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now))
                     )) {
 
             if(dictionary_acquired_item_references(rd_dfe.item) == 1) {
@@ -142,9 +146,9 @@ static void svc_rrdhost_cleanup_obsolete_charts(RRDHOST *host) {
             continue;
 
         if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE)
-                     && st->last_accessed_time + rrdset_free_obsolete_time < now
-                     && st->last_updated.tv_sec + rrdset_free_obsolete_time < now
-                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time < now
+                     && st->last_accessed_time_s + rrdset_free_obsolete_time_s < now
+                     && st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now
+                     && st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now
                      )) {
             svc_rrdset_obsolete_to_archive(st);
         }
@@ -166,10 +170,10 @@ static void svc_rrdset_check_obsoletion(RRDHOST *host) {
         if(rrdset_is_replicating(st))
             continue;
 
-        last_entry_t = rrdset_last_entry_t(st);
+        last_entry_t = rrdset_last_entry_s(st);
 
-        if(last_entry_t && last_entry_t < host->senders_connect_time &&
-             host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
+        if(last_entry_t && last_entry_t < host->child_connect_time &&
+           host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT + ITERATIONS_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT * st->update_every
              < now)
 
             rrdset_is_obsolete(st);
@@ -196,10 +200,10 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             && host->trigger_chart_obsoletion_check
             && (
                    (
-                    host->senders_last_chart_command
-                 && host->senders_last_chart_command + host->health_delay_up_to < now_realtime_sec()
+                    host->child_last_chart_command
+                 && host->child_last_chart_command + host->health_delay_up_to < now_realtime_sec()
                    )
-                || (host->senders_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
+                || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
             ) {
             svc_rrdset_check_obsoletion(host);
@@ -238,7 +242,7 @@ restart_after_removal:
         }
 
         worker_is_busy(WORKER_JOB_FREE_HOST);
-        rrdhost_free(host, 0);
+        rrdhost_free___while_having_rrd_wrlock(host, false);
         goto restart_after_removal;
     }
 
@@ -276,6 +280,10 @@ void *service_main(void *ptr)
     worker_register_job_name(WORKER_JOB_SAVE_CHART, "save chart");
     worker_register_job_name(WORKER_JOB_DELETE_CHART, "delete chart");
     worker_register_job_name(WORKER_JOB_FREE_DIMENSION, "free dimension");
+    worker_register_job_name(WORKER_JOB_PGC_MAIN_EVICT, "main cache evictions");
+    worker_register_job_name(WORKER_JOB_PGC_MAIN_FLUSH, "main cache flushes");
+    worker_register_job_name(WORKER_JOB_PGC_OPEN_EVICT, "open cache evictions");
+    worker_register_job_name(WORKER_JOB_PGC_OPEN_FLUSH, "open cache flushes");
 
     netdata_thread_cleanup_push(service_main_cleanup, ptr);
     heartbeat_t hb;
@@ -284,7 +292,7 @@ void *service_main(void *ptr)
 
     debug(D_SYSTEM, "Service thread starts");
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_MAINTENANCE)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 

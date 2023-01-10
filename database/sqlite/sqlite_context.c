@@ -283,8 +283,8 @@ void ctx_get_context_list(uuid_t *host_uuid, void (*dict_cb)(VERSIONED_CONTEXT_D
         context_data.chart_type = (char *) sqlite3_column_text(res, 3);
         context_data.units = (char *) sqlite3_column_text(res, 4);
         context_data.priority = sqlite3_column_int64(res, 5);
-        context_data.first_time_t = sqlite3_column_int64(res, 6);
-        context_data.last_time_t = sqlite3_column_int64(res, 7);
+        context_data.first_time_s = sqlite3_column_int64(res, 6);
+        context_data.last_time_s = sqlite3_column_int64(res, 7);
         context_data.deleted = sqlite3_column_int(res, 8);
         context_data.family = (char *) sqlite3_column_text(res, 9);
         dict_cb(&context_data, data);
@@ -360,13 +360,13 @@ int ctx_store_context(uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
         goto skip_store;
     }
 
-    rc = sqlite3_bind_int64(res, 8, (time_t) context_data->first_time_t);
+    rc = sqlite3_bind_int64(res, 8, (time_t) context_data->first_time_s);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind first_time_t to store context details");
         goto skip_store;
     }
 
-    rc = sqlite3_bind_int64(res, 9, (time_t) context_data->last_time_t);
+    rc = sqlite3_bind_int64(res, 9, (time_t) context_data->last_time_s);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to bind last_time_t to store context details");
         goto skip_store;
@@ -478,8 +478,8 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          context_data->chart_type,
          context_data->units,
          context_data->priority,
-         context_data->first_time_t,
-         context_data->last_time_t,
+         context_data->first_time_s,
+         context_data->last_time_s,
          context_data->deleted,
          context_data->family);
 }
@@ -504,8 +504,8 @@ int ctx_unittest(void)
     context_data.family = strdupz("TestContextFamily");
     context_data.priority = 50000;
     context_data.deleted = 0;
-    context_data.first_time_t = 1657781000;
-    context_data.last_time_t  = 1657781100;
+    context_data.first_time_s = 1657781000;
+    context_data.last_time_s  = 1657781100;
     context_data.version  = now_realtime_usec();
 
     if (likely(!ctx_store_context(&host_uuid, &context_data)))
@@ -519,8 +519,8 @@ int ctx_unittest(void)
         info("Entry %s not inserted", context_data.id);
 
     // This will change end time
-    context_data.first_time_t = 1657781000;
-    context_data.last_time_t  = 1657782001;
+    context_data.first_time_s = 1657781000;
+    context_data.last_time_s  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else
@@ -530,8 +530,8 @@ int ctx_unittest(void)
     info("List context end after insert");
 
     // This will change start time
-    context_data.first_time_t = 1657782000;
-    context_data.last_time_t  = 1657782001;
+    context_data.first_time_s = 1657782000;
+    context_data.last_time_s  = 1657782001;
     if (likely(!ctx_update_context(&host_uuid, &context_data)))
         info("Entry %s updated", context_data.id);
     else

@@ -4,6 +4,7 @@
 #define NETDATA_COMMON_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "event_loop.h"
 
 // ----------------------------------------------------------------------------
 // shortcuts for the default netdata configuration

@@ -1289,7 +1289,7 @@ int run_test(struct test *test)
         fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
             ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
             test->name, rrddim_name(rd), c+1,
-            (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+            (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
             n, v, (same)?"OK":"### E R R O R ###");
 
         if(!same) errors++;
@@ -1301,7 +1301,7 @@ int run_test(struct test *test)
             fprintf(stderr, "    %s/%s: checking position %lu (at %"PRId64" secs), expecting value " NETDATA_DOUBLE_FORMAT
                 ", found " NETDATA_DOUBLE_FORMAT ", %s\n",
                 test->name, rrddim_name(rd2), c+1,
-                (int64_t)((rrdset_first_entry_t(st) + c * st->update_every) - time_start),
+                (int64_t)((rrdset_first_entry_s(st) + c * st->update_every) - time_start),
                 n, v, (same)?"OK":"### E R R O R ###");
             if(!same) errors++;
         }
@@ -1775,7 +1775,6 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
 static RRDHOST *dbengine_rrdhost_find_or_create(char *name)
 {
     /* We don't want to drop metrics when generating load, we prefer to block data generation itself */
-    rrdeng_drop_metrics_under_page_cache_pressure = 0;
 
     return rrdhost_find_or_create(
             name
@@ -1932,7 +1931,7 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
         time_now = time_start + (c + 1) * update_every;
         for (i = 0 ; i < CHARTS ; ++i) {
             for (j = 0; j < DIMS; ++j) {
-                rd[i][j]->tiers[0]->query_ops->init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every);
+                rd[i][j]->tiers[0]->query_ops->init(rd[i][j]->tiers[0]->db_metric_handle, &handle, time_now, time_now + QUERY_BATCH * update_every, STORAGE_PRIORITY_NORMAL);
                 for (k = 0; k < QUERY_BATCH; ++k) {
                     last = ((collected_number)i * DIMS) * REGION_POINTS[current_region] +
                            j * REGION_POINTS[current_region] + c + k;
@@ -1940,8 +1939,8 @@ static int test_dbengine_check_metrics(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DI
 
                     STORAGE_POINT sp = rd[i][j]->tiers[0]->query_ops->next_metric(&handle);
                     value = sp.sum;
-                    time_retrieved = sp.start_time;
-                    end_time = sp.end_time;
+                    time_retrieved = sp.start_time_s;
+                    end_time = sp.end_time_s;
 
                     same = (roundndd(value) == roundndd(expected)) ? 1 : 0;
                     if(!same) {
@@ -1993,7 +1992,8 @@ static int test_dbengine_check_rrdr(RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS]
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start, time_end,
                                   RRDR_GROUPING_AVERAGE, 0, RRDR_OPTION_NATURAL_POINTS,
-                                  NULL, NULL, 0, 0, QUERY_SOURCE_UNITTEST);
+                                  NULL, NULL, 0, 0,
+                                  QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_NORMAL);
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR on region %d ### E R R O R ###\n", rrdset_name(st[i]), current_region);
             return ++errors;
@@ -2131,7 +2131,8 @@ int test_dbengine(void)
         ONEWAYALLOC *owa = onewayalloc_create(0);
         RRDR *r = rrd2rrdr_legacy(owa, st[i], points, time_start[0] + update_every,
                                   time_end[REGIONS - 1], RRDR_GROUPING_AVERAGE, 0,
-                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0, QUERY_SOURCE_UNITTEST);
+                                  RRDR_OPTION_NATURAL_POINTS, NULL, NULL, 0, 0,
+                                  QUERY_SOURCE_UNITTEST, STORAGE_PRIORITY_NORMAL);
 
         if (!r) {
             fprintf(stderr, "    DB-engine unittest %s: empty RRDR ### E R R O R ###\n", rrdset_name(st[i]));
@@ -2329,7 +2330,7 @@ void generate_dbengine_dataset(unsigned history_seconds)
     }
     freez(thread_info);
     rrd_wrlock();
-    rrdhost_free(host, 1);
+    rrdhost_free___while_having_rrd_wrlock(host, true);
     rrd_unlock();
 }
 
@@ -2389,7 +2390,7 @@ static void query_dbengine_chart(void *arg)
             time_before = MIN(time_after + duration, time_max); /* up to 1 hour queries */
         }
 
-        rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before);
+        rd->tiers[0]->query_ops->init(rd->tiers[0]->db_metric_handle, &handle, time_after, time_before, STORAGE_PRIORITY_NORMAL);
         ++thread_info->queries_nr;
         for (time_now = time_after ; time_now <= time_before ; time_now += update_every) {
             generatedv = generate_dbengine_chart_value(i, j, time_now);
@@ -2407,8 +2408,8 @@ static void query_dbengine_chart(void *arg)
 
             STORAGE_POINT sp = rd->tiers[0]->query_ops->next_metric(&handle);
             value = sp.sum;
-            time_retrieved = sp.start_time;
-            end_time = sp.end_time;
+            time_retrieved = sp.start_time_s;
+            end_time = sp.end_time_s;
 
             if (!netdata_double_isnumber(value)) {
                 if (!thread_info->delete_old_data) { /* data validation only when we don't delete */

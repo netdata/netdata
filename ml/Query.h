@@ -12,15 +12,15 @@ public:
     }
 
     time_t latestTime() {
-        return Ops->latest_time(RD->tiers[0]->db_metric_handle);
+        return Ops->latest_time_s(RD->tiers[0]->db_metric_handle);
     }
 
     time_t oldestTime() {
-        return Ops->oldest_time(RD->tiers[0]->db_metric_handle);
+        return Ops->oldest_time_s(RD->tiers[0]->db_metric_handle);
     }
 
     void init(time_t AfterT, time_t BeforeT) {
-        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT);
+        Ops->init(RD->tiers[0]->db_metric_handle, &Handle, AfterT, BeforeT, STORAGE_PRIORITY_BEST_EFFORT);
         Initialized = true;
         points_read = 0;
     }
@@ -40,7 +40,7 @@ public:
     std::pair<time_t, CalculatedNumber> nextMetric() {
         points_read++;
         STORAGE_POINT sp = Ops->next_metric(&Handle);
-        return { sp.end_time, sp.sum / sp.count };
+        return {sp.end_time_s, sp.sum / sp.count };
     }
 
 private:

@@ -70,8 +70,8 @@ std::pair<CalculatedNumber *, TrainingResponse> Dimension::getCalculatedNumbers(
     TrainingResp.FirstEntryOnRequest = TrainingReq.FirstEntryOnRequest;
     TrainingResp.LastEntryOnRequest = TrainingReq.LastEntryOnRequest;
 
-    TrainingResp.FirstEntryOnResponse = rrddim_first_entry_t_of_tier(RD, 0);
-    TrainingResp.LastEntryOnResponse = rrddim_last_entry_t_of_tier(RD, 0);
+    TrainingResp.FirstEntryOnResponse = rrddim_first_entry_s_of_tier(RD, 0);
+    TrainingResp.LastEntryOnResponse = rrddim_last_entry_s_of_tier(RD, 0);
 
     size_t MinN = Cfg.MinTrainSamples;
     size_t MaxN = Cfg.MaxTrainSamples;
@@ -195,7 +195,7 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
         MT = MetricType::Constant;
         TS = TrainingStatus::Trained;
         TR = TrainingResp;
-        LastTrainingTime = rrddim_last_entry_t(RD);
+        LastTrainingTime = rrddim_last_entry_s(RD);
     }
 
     delete[] CNs;

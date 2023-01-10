@@ -8,7 +8,7 @@
 #define RRDENG_MIN_PAGE_CACHE_SIZE_MB (8)
 #define RRDENG_MIN_DISK_SPACE_MB (64)
 
-#define RRDENG_NR_STATS (37)
+#define RRDENG_NR_STATS (38)
 
 #define RRDENG_FD_BUDGET_PER_INSTANCE (50)
 
@@ -16,26 +16,16 @@ extern int db_engine_use_malloc;
 extern int default_rrdeng_page_fetch_timeout;
 extern int default_rrdeng_page_fetch_retries;
 extern int default_rrdeng_page_cache_mb;
+extern int db_engine_journal_indexing;
+extern int db_engine_journal_check;
 extern int default_rrdeng_disk_quota_mb;
 extern int default_multidb_disk_quota_mb;
-extern uint8_t rrdeng_drop_metrics_under_page_cache_pressure;
 extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
+extern size_t tier_page_size[];
 
 #define PAGE_POINT_SIZE_BYTES(x) page_type_size[(x)->type]
-
-struct rrdeng_region_info {
-    time_t start_time_s;
-    int update_every;
-    unsigned points;
-};
-
-void *rrdeng_create_page(struct rrdengine_instance *ctx, uuid_t *id, struct rrdeng_page_descr **ret_descr);
-void rrdeng_commit_page(struct rrdengine_instance *ctx, struct rrdeng_page_descr *descr,
-                               Word_t page_correlation_id);
-void *rrdeng_get_latest_page(struct rrdengine_instance *ctx, uuid_t *id, void **handle);
-void *rrdeng_get_page(struct rrdengine_instance *ctx, uuid_t *id, usec_t point_in_time_ut, void **handle);
-void rrdeng_put_page(struct rrdengine_instance *ctx, void *handle);
+#define PAGE_POINT_CTX_SIZE_BYTES(x) page_type_size[(x)->page_type]
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,
@@ -44,8 +34,6 @@ void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uu
 
 STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance);
 STORAGE_METRIC_HANDLE *rrdeng_metric_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-STORAGE_METRIC_HANDLE *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
-STORAGE_METRIC_HANDLE *rrdeng_metric_get_legacy(STORAGE_INSTANCE *db_instance, const char *rd_id, const char *st_id);
 void rrdeng_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle);
 STORAGE_METRIC_HANDLE *rrdeng_metric_dup(STORAGE_METRIC_HANDLE *db_metric_handle);
 
@@ -60,15 +48,16 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle, usec_t 
                                      SN_FLAGS flags);
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle);
 
-void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrdimm_handle,
-                                    time_t start_time_s, time_t end_time_s);
+void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct storage_engine_query_handle *rrddim_handle,
+                                    time_t start_time_s, time_t end_time_s, STORAGE_PRIORITY priority);
 STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim_handle);
 
 
-int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrdimm_handle);
-void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrdimm_handle);
+int rrdeng_load_metric_is_finished(struct storage_engine_query_handle *rrddim_handle);
+void rrdeng_load_metric_finalize(struct storage_engine_query_handle *rrddim_handle);
 time_t rrdeng_metric_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t rrdeng_metric_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
+time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *rrddim_handle);
 
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
@@ -78,7 +67,7 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
-int rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *si, uuid_t *dim_uuid, time_t *first_entry_t, time_t *last_entry_t);
+bool rrdeng_metric_retention_by_uuid(STORAGE_INSTANCE *db_instance, uuid_t *dim_uuid, time_t *first_entry_s, time_t *last_entry_s);
 
 extern STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *db_instance, uuid_t *uuid);
 extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_METRICS_GROUP *smg);
@@ -86,12 +75,6 @@ extern void rrdeng_metrics_group_release(STORAGE_INSTANCE *db_instance, STORAGE_
 typedef struct rrdengine_size_statistics {
     size_t default_granularity_secs;
 
-    size_t sizeof_metric;
-    size_t sizeof_metric_in_index;
-    size_t sizeof_page;
-    size_t sizeof_page_in_index;
-    size_t sizeof_extent;
-    size_t sizeof_page_in_extent;
     size_t sizeof_datafile;
     size_t sizeof_page_in_cache;
     size_t sizeof_point_data;
@@ -119,8 +102,8 @@ typedef struct rrdengine_size_statistics {
 
     size_t single_point_pages;
 
-    usec_t first_t;
-    usec_t last_t;
+    time_t first_time_s;
+    time_t last_time_s;
 
     size_t currently_collected_metrics;
     size_t max_concurrently_collected_metrics;
@@ -138,6 +121,95 @@ typedef struct rrdengine_size_statistics {
 
     double average_page_size_bytes;
 } RRDENG_SIZE_STATS;
+
+struct rrdeng_cache_efficiency_stats {
+    size_t queries;
+    size_t queries_planned_with_gaps;
+    size_t queries_executed_with_gaps;
+    size_t queries_open;
+    size_t queries_journal_v2;
+
+    size_t currently_running_queries;
+
+    // query planner output of the queries
+    size_t pages_total;
+    size_t pages_to_load_from_disk;
+
+    // pages metadata sources
+    size_t pages_meta_source_main_cache;
+    size_t pages_meta_source_open_cache;
+    size_t pages_meta_source_journal_v2;
+
+    // preloading
+    size_t pages_pending_found_in_cache_at_pass4;
+    size_t page_next_wait_failed;
+    size_t page_next_wait_loaded;
+    size_t page_next_nowait_failed;
+    size_t page_next_nowait_loaded;
+
+    // pages data sources
+    size_t pages_data_source_main_cache;
+    size_t pages_data_source_disk;
+    size_t pages_data_source_extent_cache;              // loaded by a cached extent
+
+    // cache hits at different points
+    size_t pages_load_ok_loaded_but_cache_hit_before_allocation; // found in cache after loading, before allocating
+    size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
+
+    // loading
+    size_t pages_load_ok_uncompressed;
+    size_t pages_load_ok_compressed;
+    size_t pages_load_ok_preloaded;
+    size_t pages_load_fail_invalid_page_in_extent;
+    size_t pages_load_fail_cant_mmap_extent;
+    size_t pages_load_fail_datafile_not_available;
+    size_t pages_load_fail_unroutable;
+    size_t pages_load_fail_uuid_not_found;
+    size_t pages_load_fail_invalid_extent;
+
+    // timings for query preparation
+    size_t prep_time_to_route;
+    size_t prep_time_in_main_cache_lookup;
+    size_t prep_time_in_open_cache_lookup;
+    size_t prep_time_in_journal_v2_lookup;
+    size_t prep_time_in_pass4_lookup;
+
+    // timings the query thread experiences
+    size_t query_time_init;
+    size_t query_time_wait_for_prep;
+    size_t query_time_to_slow_disk_next_page;
+    size_t query_time_to_fast_disk_next_page;
+    size_t query_time_to_slow_preload_next_page;
+    size_t query_time_to_fast_preload_next_page;
+
+    // query issues
+    size_t pages_zero_time_skipped;
+    size_t pages_past_time_skipped;
+    size_t pages_overlapping_skipped;
+    size_t pages_invalid_size_skipped;
+    size_t pages_invalid_update_every_fixed;
+    size_t pages_invalid_entries_fixed;
+};
+
+struct rrdeng_buffer_sizes {
+    size_t workers;
+    size_t pdc;
+    size_t wal;
+    size_t descriptors;
+    size_t xt_io;
+    size_t xt_buf;
+    size_t handles;
+    size_t opcodes;
+    size_t epdl;
+    size_t deol;
+    size_t pd;
+#ifdef PDC_USE_JULYL
+    size_t julyl;
+#endif
+};
+
+struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
+struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 

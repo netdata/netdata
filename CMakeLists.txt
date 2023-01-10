@@ -471,6 +471,8 @@ set(LIBNETDATA_FILES
         libnetdata/eval/eval.h
         libnetdata/health/health.c
         libnetdata/health/health.h
+        libnetdata/july/july.c
+        libnetdata/july/july.h
         libnetdata/inlined.h
         libnetdata/json/json.c
         libnetdata/json/json.h
@@ -775,8 +777,12 @@ set(RRD_PLUGIN_FILES
         database/engine/rrdengineapi.h
         database/engine/pagecache.c
         database/engine/pagecache.h
-        database/engine/rrdenglocking.c
-        database/engine/rrdenglocking.h
+        database/engine/cache.c
+        database/engine/cache.h
+        database/engine/metric.c
+        database/engine/metric.h
+        database/engine/pdc.c
+        database/engine/pdc.h
         database/KolmogorovSmirnovDist.c
         database/KolmogorovSmirnovDist.h
         )
@@ -1002,6 +1008,8 @@ set(DAEMON_FILES
         daemon/common.h
         daemon/daemon.c
         daemon/daemon.h
+        daemon/event_loop.c
+        daemon/event_loop.h
         daemon/global_statistics.c
         daemon/global_statistics.h
         daemon/analytics.c

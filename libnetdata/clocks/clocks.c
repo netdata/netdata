@@ -189,9 +189,13 @@ void sleep_to_absolute_time(usec_t usec) {
         .tv_nsec = (suseconds_t)((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
+    errno = 0;
     int ret = 0;
     while( (ret = clock_nanosleep(clock, TIMER_ABSTIME, &req, NULL)) != 0 ) {
-        if(ret == EINTR) continue;
+        if(ret == EINTR) {
+            errno = 0;
+            continue;
+        }
         else {
             if (ret == EINVAL) {
                 if (!einval_printed) {
@@ -313,7 +317,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     // sleep_usec() has a loop to guarantee we will sleep for at least the requested time.
     // According the specs, when we sleep for a relative time, clock adjustments should not affect the duration
     // we sleep.
-    sleep_usec(next - now);
+    sleep_usec_with_now(next - now, now);
     now = now_realtime_usec();
     dt = now - hb->realtime;
 
@@ -342,7 +346,7 @@ usec_t heartbeat_next(heartbeat_t *hb, usec_t tick) {
     return dt;
 }
 
-void sleep_usec(usec_t usec) {
+void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
@@ -350,21 +354,37 @@ void sleep_usec(usec_t usec) {
             .tv_nsec = (suseconds_t) ((usec % USEC_PER_SEC) * NSEC_PER_USEC)
     };
 
-#ifdef __linux__
-    while (clock_nanosleep(CLOCK_REALTIME, 0, &req, &rem) != 0) {
-#else
+    // make sure errno is not EINTR
+    errno = 0;
+
+    if(!started_ut)
+        started_ut = now_realtime_usec();
+
+    usec_t end_ut = started_ut + usec;
+
     while (nanosleep(&req, &rem) != 0) {
-#endif
         if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
             req = rem;
             rem = (struct timespec){ 0, 0 };
+
+            // break an infinite loop
+            errno = 0;
+
+            usec_t now_ut = now_realtime_usec();
+            if(now_ut >= end_ut)
+                break;
+
+            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec * NSEC_PER_USEC > usec;
+            usec_t check_ut = now_ut - started_ut;
+            if(remaining_ut > check_ut) {
+                req = (struct timespec){
+                        .tv_sec = (time_t) ( check_ut / USEC_PER_SEC),
+                        .tv_nsec = (suseconds_t) ((check_ut % USEC_PER_SEC) * NSEC_PER_USEC)
+                };
+            }
         }
         else {
-#ifdef __linux__
-            error("Cannot clock_nanosleep(CLOCK_REALTIME) for %llu microseconds.", usec);
-#else
             error("Cannot nanosleep() for %llu microseconds.", usec);
-#endif
             break;
         }
     }

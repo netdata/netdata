@@ -1176,7 +1176,7 @@ static int memory_file_open(const char *filename, size_t size) {
     return fd;
 }
 
-static inline int madvise_sequential(void *mem, size_t len) {
+inline int madvise_sequential(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_SEQUENTIAL);
 
@@ -1184,7 +1184,7 @@ static inline int madvise_sequential(void *mem, size_t len) {
     return ret;
 }
 
-static inline int madvise_dontfork(void *mem, size_t len) {
+inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);
 
@@ -1192,7 +1192,7 @@ static inline int madvise_dontfork(void *mem, size_t len) {
     return ret;
 }
 
-static inline int madvise_willneed(void *mem, size_t len) {
+inline int madvise_willneed(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_WILLNEED);
 
@@ -1200,24 +1200,19 @@ static inline int madvise_willneed(void *mem, size_t len) {
     return ret;
 }
 
+inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused) {
 #if __linux__
-static inline int madvise_dontdump(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTDUMP);
 
     if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTDUMP) failed.");
     return ret;
-}
 #else
-static inline int madvise_dontdump(void *mem, size_t len) {
-    UNUSED(mem);
-    UNUSED(len);
-
     return 0;
-}
 #endif
+}
 
-static inline int madvise_mergeable(void *mem, size_t len) {
+inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused) {
 #ifdef MADV_MERGEABLE
     static int logger = 1;
     int ret = madvise(mem, len, MADV_MERGEABLE);
@@ -1225,14 +1220,12 @@ static inline int madvise_mergeable(void *mem, size_t len) {
     if (ret != 0 && logger-- > 0) error("madvise(MADV_MERGEABLE) failed.");
     return ret;
 #else
-    UNUSED(mem);
-    UNUSED(len);
-    
     return 0;
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only)
+{
     // info("netdata_mmap('%s', %zu", filename, size);
 
     // MAP_SHARED is used in memory mode map
@@ -1271,7 +1264,7 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm) {
         fd_for_mmap = -1;
     }
 
-    mem = mmap(NULL, size, PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
+    mem = mmap(NULL, size, read_only ? PROT_READ : PROT_READ | PROT_WRITE, flags, fd_for_mmap, 0);
     if (mem != MAP_FAILED) {
 
 #ifdef NETDATA_TRACE_ALLOCATIONS

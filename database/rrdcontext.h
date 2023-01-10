@@ -118,14 +118,34 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
 // ----------------------------------------------------------------------------
 // public API for queries
 
+typedef struct query_plan_entry {
+    size_t tier;
+    time_t after;
+    time_t before;
+    struct storage_engine_query_handle handle;
+    STORAGE_POINT (*next_metric)(struct storage_engine_query_handle *handle);
+    int (*is_finished)(struct storage_engine_query_handle *handle);
+    void (*finalize)(struct storage_engine_query_handle *handle);
+    bool initialized;
+    bool finalized;
+} QUERY_PLAN_ENTRY;
+
+#define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
+
 typedef struct query_metric {
     struct query_metric_tier {
         struct storage_engine *eng;
         STORAGE_METRIC_HANDLE *db_metric_handle;
-        time_t db_first_time_t;         // the oldest timestamp available for this tier
-        time_t db_last_time_t;          // the latest timestamp available for this tier
-        time_t db_update_every;         // latest update every for this tier
+        time_t db_first_time_s;         // the oldest timestamp available for this tier
+        time_t db_last_time_s;          // the latest timestamp available for this tier
+        time_t db_update_every_s;       // latest update every for this tier
+        long weight;
     } tiers[RRD_STORAGE_TIERS];
+
+    struct {
+        size_t used;
+        QUERY_PLAN_ENTRY array[QUERY_PLANS_MAX];
+    } plan;
 
     struct {
         RRDHOST *host;
@@ -172,6 +192,7 @@ typedef struct query_target_request {
     time_t resampling_time;
     size_t tier;
     QUERY_SOURCE query_source;
+    STORAGE_PRIORITY priority;
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
@@ -198,9 +219,9 @@ typedef struct query_target {
     } window;
 
     struct {
-        time_t first_time_t;                // the combined first_time_t of all metrics in the query, across all tiers
-        time_t last_time_t;                 // the combined last_time_T of all metrics in the query, across all tiers
-        time_t minimum_latest_update_every; // the min update every of the metrics in the query
+        time_t first_time_s;                  // the combined first_time_t of all metrics in the query, across all tiers
+        time_t last_time_s;                   // the combined last_time_T of all metrics in the query, across all tiers
+        time_t minimum_latest_update_every_s; // the min update every of the metrics in the query
     } db;
 
     struct {

@@ -166,11 +166,11 @@ public:
 private:
     TrainingRequest getTrainingRequest(time_t CurrT) const {
         return TrainingRequest {
-            string_dup(RD->rrdset->id),
-            string_dup(RD->id),
-            CurrT,
-            rrddim_first_entry_t(RD),
-            rrddim_last_entry_t(RD)
+                string_dup(RD->rrdset->id),
+                string_dup(RD->id),
+                CurrT,
+                rrddim_first_entry_s(RD),
+                rrddim_last_entry_s(RD)
         };
     }
 

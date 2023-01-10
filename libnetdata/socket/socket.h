@@ -10,18 +10,18 @@
 #endif
 
 typedef enum web_client_acl {
-    WEB_CLIENT_ACL_NONE         = 0,
-    WEB_CLIENT_ACL_NOCHECK      = 0,
-    WEB_CLIENT_ACL_DASHBOARD    = 1 << 0,
-    WEB_CLIENT_ACL_REGISTRY     = 1 << 1,
-    WEB_CLIENT_ACL_BADGE        = 1 << 2,
-    WEB_CLIENT_ACL_MGMT         = 1 << 3,
-    WEB_CLIENT_ACL_STREAMING    = 1 << 4,
-    WEB_CLIENT_ACL_NETDATACONF  = 1 << 5,
-    WEB_CLIENT_ACL_SSL_OPTIONAL = 1 << 6,
-    WEB_CLIENT_ACL_SSL_FORCE    = 1 << 7,
-    WEB_CLIENT_ACL_SSL_DEFAULT  = 1 << 8,
-    WEB_CLIENT_ACL_ACLK         = 1 << 9,
+    WEB_CLIENT_ACL_NONE         = (0),
+    WEB_CLIENT_ACL_NOCHECK      = (0),
+    WEB_CLIENT_ACL_DASHBOARD    = (1 << 0),
+    WEB_CLIENT_ACL_REGISTRY     = (1 << 1),
+    WEB_CLIENT_ACL_BADGE        = (1 << 2),
+    WEB_CLIENT_ACL_MGMT         = (1 << 3),
+    WEB_CLIENT_ACL_STREAMING    = (1 << 4),
+    WEB_CLIENT_ACL_NETDATACONF  = (1 << 5),
+    WEB_CLIENT_ACL_SSL_OPTIONAL = (1 << 6),
+    WEB_CLIENT_ACL_SSL_FORCE    = (1 << 7),
+    WEB_CLIENT_ACL_SSL_DEFAULT  = (1 << 8),
+    WEB_CLIENT_ACL_ACLK         = (1 << 9),
 } WEB_CLIENT_ACL;
 
 #define WEB_CLIENT_ACL_ALL 0xFFFF
@@ -202,6 +202,7 @@ void poll_events(LISTEN_SOCKETS *sockets
         , int   (*rcv_callback)(POLLINFO *pi, short int *events)
         , int   (*snd_callback)(POLLINFO *pi, short int *events)
         , void  (*tmr_callback)(void *timer_data)
+        , bool  (*check_to_stop_callback)(void)
         , SIMPLE_PATTERN *access_list
         , int allow_dns
         , void *data

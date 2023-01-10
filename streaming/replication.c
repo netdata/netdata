@@ -11,20 +11,21 @@
 #define WORKER_JOB_QUERYING                             2
 #define WORKER_JOB_DELETE_ENTRY                         3
 #define WORKER_JOB_FIND_CHART                           4
-#define WORKER_JOB_CHECK_CONSISTENCY                    5
-#define WORKER_JOB_BUFFER_COMMIT                        6
-#define WORKER_JOB_CLEANUP                              7
-#define WORKER_JOB_WAIT                                 8
+#define WORKER_JOB_PREPARE_QUERY                        5
+#define WORKER_JOB_CHECK_CONSISTENCY                    6
+#define WORKER_JOB_BUFFER_COMMIT                        7
+#define WORKER_JOB_CLEANUP                              8
+#define WORKER_JOB_WAIT                                 9
 
 // master thread worker jobs
-#define WORKER_JOB_STATISTICS                           9
-#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       10
-#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        11
-#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             12
-#define WORKER_JOB_CUSTOM_METRIC_ADDED                  13
-#define WORKER_JOB_CUSTOM_METRIC_DONE                   14
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          15
-#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            16
+#define WORKER_JOB_STATISTICS                           10
+#define WORKER_JOB_CUSTOM_METRIC_PENDING_REQUESTS       11
+#define WORKER_JOB_CUSTOM_METRIC_SKIPPED_NO_ROOM        12
+#define WORKER_JOB_CUSTOM_METRIC_COMPLETION             13
+#define WORKER_JOB_CUSTOM_METRIC_ADDED                  14
+#define WORKER_JOB_CUSTOM_METRIC_DONE                   15
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_RESETS          16
+#define WORKER_JOB_CUSTOM_METRIC_SENDER_FULL            17
 
 #define ITERATIONS_IDLE_WITHOUT_PENDING_TO_RUN_SENDER_VERIFICATION 30
 #define SECONDS_TO_RESET_POINT_IN_TIME 10
@@ -51,137 +52,313 @@ struct replication_dimension {
     STORAGE_POINT sp;
     struct storage_engine_query_handle handle;
     bool enabled;
+    bool skip;
 
     DICTIONARY *dict;
     const DICTIONARY_ITEM *rda;
     RRDDIM *rd;
 };
 
-static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, time_t before, bool enable_streaming, time_t wall_clock_time) {
+struct replication_query {
+    RRDSET *st;
+
+    struct {
+        time_t first_entry_t;
+        time_t last_entry_t;
+    } db;
+
+    struct {                         // what the parent requested
+        time_t after;
+        time_t before;
+        bool enable_streaming;
+    } request;
+
+    struct {                         // what the child will do
+        time_t after;
+        time_t before;
+        bool enable_streaming;
+
+        bool locked_data_collection;
+        bool execute;
+    } query;
+
+    time_t wall_clock_time;
+
+    size_t points_read;
+    size_t points_generated;
+
+    struct storage_engine_query_ops *ops;
+    struct replication_request *rq;
+
+    size_t dimensions;
+    struct replication_dimension data[];
+};
+
+static struct replication_query *replication_query_prepare(
+        RRDSET *st,
+        time_t db_first_entry,
+        time_t db_last_entry,
+        time_t requested_after,
+        time_t requested_before,
+        time_t query_after,
+        time_t query_before,
+        bool enable_streaming,
+        time_t wall_clock_time
+) {
     size_t dimensions = rrdset_number_of_dimensions(st);
-    size_t points_read = 0, points_generated = 0;
+    struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
+    q->dimensions = dimensions;
+    q->st = st;
 
-    struct storage_engine_query_ops *ops = &st->rrdhost->db[0].eng->api.query_ops;
-    struct replication_dimension data[dimensions];
-    memset(data, 0, sizeof(data));
+    q->db.first_entry_t = db_first_entry;
+    q->db.last_entry_t = db_last_entry;
 
-    if(enable_streaming && st->last_updated.tv_sec > before) {
-        internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' has start_streaming = true, adjusting replication before timestamp from %llu to %llu",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long)before,
-                       (unsigned long long)st->last_updated.tv_sec
-        );
-        before = st->last_updated.tv_sec;
+    q->request.after = requested_after,
+    q->request.before = requested_before,
+    q->request.enable_streaming = enable_streaming,
+
+    q->query.after = query_after;
+    q->query.before = query_before;
+    q->query.enable_streaming = enable_streaming;
+
+    q->wall_clock_time = wall_clock_time;
+
+    if (!q->dimensions || !q->query.after || !q->query.before) {
+        q->query.execute = false;
+        q->dimensions = 0;
+        return q;
     }
+
+    if(q->query.enable_streaming) {
+        netdata_spinlock_lock(&st->data_collection_lock);
+        q->query.locked_data_collection = true;
+
+        if (st->last_updated.tv_sec > q->query.before) {
+            internal_error(true,
+                           "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
+                           "has start_streaming = true, "
+                           "adjusting replication before timestamp from %llu to %llu",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                           (unsigned long long) q->query.before,
+                           (unsigned long long) st->last_updated.tv_sec
+            );
+            q->query.before = st->last_updated.tv_sec;
+        }
+    }
+
+    q->ops = &st->rrdhost->db[0].eng->api.query_ops;
 
     // prepare our array of dimensions
-    {
-        RRDDIM *rd;
-        rrddim_foreach_read(rd, st) {
-            if(unlikely(!rd || !rd_dfe.item || !rd->exposed))
-                continue;
+    size_t count = 0;
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        if (unlikely(!rd || !rd_dfe.item || !rd->exposed))
+            continue;
 
-            if (unlikely(rd_dfe.counter >= dimensions)) {
-                internal_error(true, "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
-                               rrdhost_hostname(st->rrdhost), rrdset_id(st));
-                break;
-            }
-
-            struct replication_dimension *d = &data[rd_dfe.counter];
-
-            d->dict = rd_dfe.dict;
-            d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
-            d->rd = rd;
-
-            ops->init(rd->tiers[0]->db_metric_handle, &d->handle, after, before);
-            d->enabled = true;
+        if (unlikely(rd_dfe.counter >= q->dimensions)) {
+            internal_error(true,
+                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' has more dimensions than the replicated ones",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
+            break;
         }
-        rrddim_foreach_done(rd);
+
+        struct replication_dimension *d = &q->data[rd_dfe.counter];
+
+        d->dict = rd_dfe.dict;
+        d->rda = dictionary_acquired_item_dup(rd_dfe.dict, rd_dfe.item);
+        d->rd = rd;
+
+        q->ops->init(rd->tiers[0]->db_metric_handle, &d->handle, q->query.after, q->query.before,
+                     q->query.locked_data_collection ? STORAGE_PRIORITY_HIGH : STORAGE_PRIORITY_LOW);
+        d->enabled = true;
+        d->skip = false;
+        count++;
+    }
+    rrddim_foreach_done(rd);
+
+    if(!count) {
+        // no data for this chart
+
+        q->query.execute = false;
+
+        if(q->query.locked_data_collection) {
+            netdata_spinlock_unlock(&st->data_collection_lock);
+            q->query.locked_data_collection = false;
+        }
+
+    }
+    else {
+        // we have data for this chart
+
+        q->query.execute = true;
     }
 
-    time_t now = after + 1, actual_after = 0, actual_before = 0; (void)actual_before;
+    return q;
+}
+
+static time_t replication_query_finalize(struct replication_query *q, bool executed) {
+    time_t query_before = q->query.before;
+    size_t dimensions = q->dimensions;
+
+    // release all the dictionary items acquired
+    // finalize the queries
+    size_t queries = 0;
+
+    for (size_t i = 0; i < dimensions; i++) {
+        struct replication_dimension *d = &q->data[i];
+        if (unlikely(!d->enabled)) continue;
+
+        q->ops->finalize(&d->handle);
+
+        dictionary_acquired_item_release(d->dict, d->rda);
+
+        // update global statistics
+        queries++;
+    }
+
+    if(q->query.locked_data_collection) {
+        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        q->query.locked_data_collection = false;
+    }
+
+    if(executed) {
+        netdata_spinlock_lock(&replication_queries.spinlock);
+        replication_queries.queries_started += queries;
+        replication_queries.queries_finished += queries;
+        replication_queries.points_read += q->points_read;
+        replication_queries.points_generated += q->points_generated;
+        netdata_spinlock_unlock(&replication_queries.spinlock);
+    }
+
+    freez(q);
+
+    return query_before;
+}
+
+static void replication_query_align_to_optimal_before(struct replication_query *q) {
+    if(!q->query.execute || q->query.enable_streaming)
+        return;
+
+    size_t dimensions = q->dimensions;
+    time_t expanded_before = 0;
+
+    for (size_t i = 0; i < dimensions; i++) {
+        struct replication_dimension *d = &q->data[i];
+        if(unlikely(!d->enabled)) continue;
+
+        time_t new_before = q->ops->align_to_optimal_before(&d->handle);
+        if (!expanded_before || new_before < expanded_before)
+            expanded_before = new_before;
+    }
+
+    if(expanded_before > q->query.before                                 && // it is later than the original
+        (expanded_before - q->query.before) / q->st->update_every < 1024 && // it is reasonable (up to a page)
+        expanded_before < q->st->last_updated.tv_sec                     && // it is not the chart's last updated time
+        expanded_before < q->wall_clock_time)                               // it is not later than the wall clock time
+        q->query.before = expanded_before;
+}
+
+static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q) {
+    if(!q->query.execute)
+        return replication_query_finalize(q, false);
+
+    replication_query_align_to_optimal_before(q);
+
+    time_t after = q->query.after;
+    time_t before = q->query.before;
+    size_t dimensions = q->dimensions;
+    struct storage_engine_query_ops *ops = q->ops;
+    time_t wall_clock_time = q->wall_clock_time;
+
+    size_t points_read = q->points_read, points_generated = q->points_generated;
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+    time_t actual_after = 0, actual_before = 0;
+#endif
+
+    time_t now = after + 1;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions ;i++) {
-            struct replication_dimension *d = &data[i];
-            if(unlikely(!d->enabled)) continue;
+            struct replication_dimension *d = &q->data[i];
+            if(unlikely(!d->enabled || d->skip)) continue;
 
             // fetch the first valid point for the dimension
-            int max_skip = 100;
-            while(d->sp.end_time < now && !ops->is_finished(&d->handle) && max_skip-- > 0) {
+            int max_skip = 1000;
+            while(d->sp.end_time_s < now && !ops->is_finished(&d->handle) && max_skip-- >= 0) {
                 d->sp = ops->next_metric(&d->handle);
                 points_read++;
             }
 
-            internal_error(max_skip <= 0,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu",
-                            rrdhost_hostname(st->rrdhost), rrdset_id(st), rrddim_id(d->rd), (unsigned long long) now);
+            if(max_skip <= 0) {
+                d->skip = true;
 
-            if(unlikely(d->sp.end_time < now || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
+                error_limit_static_global_var(erl, 1, 0);
+                error_limit(&erl,
+                               "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
+                               rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
+                               (unsigned long long) now);
+
+                continue;
+            }
+
+            if(d->sp.end_time_s < now)
+                // this dimension does not have any more data
                 continue;
 
-            if(unlikely(!min_start_time)) {
-                min_start_time = d->sp.start_time;
-                min_end_time = d->sp.end_time;
-            }
-            else {
-                min_start_time = MIN(min_start_time, d->sp.start_time);
-                min_end_time = MIN(min_end_time, d->sp.end_time);
-            }
+            if(unlikely(!min_start_time))
+                min_start_time = d->sp.start_time_s;
+
+            if(unlikely(!min_end_time))
+                min_end_time = d->sp.end_time_s;
+
+            min_start_time = MIN(min_start_time, d->sp.start_time_s);
+            min_end_time = MIN(min_end_time, d->sp.end_time_s);
         }
 
-        if(unlikely(min_start_time > wall_clock_time + 1 || min_end_time > wall_clock_time + st->update_every + 1)) {
-            internal_error(true,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s': db provided future start time %llu or end time %llu (now is %llu)",
-                            rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                           (unsigned long long)min_start_time,
-                           (unsigned long long)min_end_time,
-                           (unsigned long long)wall_clock_time);
+        if(unlikely(min_end_time < now))
             break;
-        }
 
-        if(unlikely(min_end_time < now)) {
+        if(likely(min_start_time <= now)) {
+            // we have a valid point
+
+            if (unlikely(min_end_time <= min_start_time))
+                min_start_time = min_end_time - q->st->update_every;
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
-            internal_error(true,
-                           "STREAM_SENDER REPLAY: 'host:%s/chart:%s': no data on any dimension beyond time %llu",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st), (unsigned long long)now);
-#endif // NETDATA_LOG_REPLICATION_REQUESTS
-            break;
-        }
+            if (unlikely(!actual_after))
+                actual_after = min_end_time;
 
-        if(unlikely(min_end_time <= min_start_time))
-            min_start_time = min_end_time - st->update_every;
-
-        if(unlikely(!actual_after)) {
-            actual_after = min_end_time;
             actual_before = min_end_time;
+#endif
+
+            buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
+                           (unsigned long long) min_start_time,
+                           (unsigned long long) min_end_time,
+                           (unsigned long long) wall_clock_time
+            );
+
+            // output the replay values for this time
+            for (size_t i = 0; i < dimensions; i++) {
+                struct replication_dimension *d = &q->data[i];
+                if (unlikely(!d->enabled)) continue;
+
+                if (likely( d->sp.start_time_s <= min_end_time &&
+                            d->sp.end_time_s >= min_end_time &&
+                            !storage_point_is_unset(d->sp) &&
+                            !storage_point_is_empty(d->sp))) {
+
+                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
+                                   rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
+
+                    points_generated++;
+                }
+            }
+
+            now = min_end_time + 1;
         }
         else
-            actual_before = min_end_time;
-
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n"
-                       , (unsigned long long)min_start_time
-                       , (unsigned long long)min_end_time
-                       , (unsigned long long)wall_clock_time
-                       );
-
-        // output the replay values for this time
-        for (size_t i = 0; i < dimensions ;i++) {
-            struct replication_dimension *d = &data[i];
-            if(unlikely(!d->enabled)) continue;
-
-            if(likely(d->sp.start_time <= min_end_time && d->sp.end_time >= min_end_time))
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
-                               rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
-
-            else
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" NAN \"E\"\n",
-                               rrddim_id(d->rd));
-
-            points_generated++;
-        }
-
-        now = min_end_time + 1;
+            now = min_start_time;
     }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -202,32 +379,12 @@ static time_t replicate_chart_timeframe(BUFFER *wb, RRDSET *st, time_t after, ti
                        (unsigned long long)after, (unsigned long long)before);
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
 
-    // release all the dictionary items acquired
-    // finalize the queries
-    size_t queries = 0;
-    for(size_t i = 0; i < dimensions ;i++) {
-        struct replication_dimension *d = &data[i];
-        if(unlikely(!d->enabled)) continue;
-
-        ops->finalize(&d->handle);
-
-        dictionary_acquired_item_release(d->dict, d->rda);
-
-        // update global statistics
-        queries++;
-    }
-
-    netdata_spinlock_lock(&replication_queries.spinlock);
-    replication_queries.queries_started += queries;
-    replication_queries.queries_finished += queries;
-    replication_queries.points_read += points_read;
-    replication_queries.points_generated += points_generated;
-    netdata_spinlock_unlock(&replication_queries.spinlock);
-
-    return before;
+    q->points_read = points_read;
+    q->points_generated = points_generated;
+    return replication_query_finalize(q, true);
 }
 
-static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
+static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         if(!rd->exposed) continue;
@@ -248,56 +405,23 @@ static void replicate_chart_collection_state(BUFFER *wb, RRDSET *st) {
     );
 }
 
-bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, time_t after, time_t before) {
-    time_t query_after = after;
-    time_t query_before = before;
-    time_t now = now_realtime_sec();
-    time_t tolerance = 2;   // sometimes from the time we get this value, to the time we check,
-                            // a data collection has been made
-                            // so, we give this tolerance to detect invalid timestamps
+static struct replication_query *replication_response_prepare(RRDSET *st, bool start_streaming, time_t requested_after, time_t requested_before) {
+    time_t query_after = requested_after;
+    time_t query_before = requested_before;
+    time_t wall_clock_time = now_realtime_sec();
 
-    // find the first entry we have
-    time_t first_entry_local = rrdset_first_entry_t(st);
-    if(first_entry_local > now + tolerance) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db first time %llu is in the future (now is %llu)",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long)first_entry_local, (unsigned long long)now);
-        first_entry_local = now;
-    }
+    time_t db_first_entry, db_last_entry;
+    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
-    if (query_after < first_entry_local)
-        query_after = first_entry_local;
+    if (query_after < db_first_entry)
+        query_after = db_first_entry;
 
-    // find the latest entry we have
-    time_t last_entry_local = st->last_updated.tv_sec;
-    if(!last_entry_local) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' RRDSET reports last updated time zero.",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st));
-        last_entry_local = rrdset_last_entry_t(st);
-        if(!last_entry_local) {
-            internal_error(true,
-                           "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' db reports last time zero.",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
-            last_entry_local = now;
-        }
-    }
-
-    if(last_entry_local > now + tolerance) {
-        internal_error(true,
-                       "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s' last updated time %llu is in the future (now is %llu)",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       (unsigned long long)last_entry_local, (unsigned long long)now);
-        last_entry_local = now;
-    }
-
-    if (query_before > last_entry_local)
-        query_before = last_entry_local;
+    if (query_before > db_last_entry)
+        query_before = db_last_entry;
 
     // if the parent asked us to start streaming, then fill the rest with the data that we have
     if (start_streaming)
-        query_before = last_entry_local;
+        query_before = db_last_entry;
 
     if (query_after > query_before) {
         time_t tmp = query_before;
@@ -305,7 +429,29 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
         query_after = tmp;
     }
 
-    bool enable_streaming = (start_streaming || query_before == last_entry_local || !after || !before) ? true : false;
+    bool enable_streaming = (start_streaming || query_before == db_last_entry || !requested_after || !requested_before) ? true : false;
+
+    return replication_query_prepare(
+            st,
+            db_first_entry, db_last_entry,
+            requested_after, requested_before,
+            query_after, query_before, enable_streaming,
+            wall_clock_time);
+}
+
+void replication_response_cancel_and_finalize(struct replication_query *q) {
+    replication_query_finalize(q, false);
+}
+
+static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
+
+bool replication_response_execute_and_finalize(struct replication_query *q) {
+    struct replication_request *rq = q->rq;
+    RRDSET *st = q->st;
+    RRDHOST *host = st->rrdhost;
+    time_t after = q->request.after;
+    time_t before; // the query will report this
+    bool enable_streaming = q->query.enable_streaming;
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -314,25 +460,22 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
 
     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
-    if(after != 0 && before != 0)
-        before = replicate_chart_timeframe(wb, st, query_after, query_before, enable_streaming, now);
-    else {
-        after = 0;
-        before = 0;
-        enable_streaming = true;
-    }
+    bool locked_data_collection = q->query.locked_data_collection;
+    q->query.locked_data_collection = false;
+
+    before = replication_query_execute_and_finalize(wb, q);
+
+    // IMPORTANT: q is invalid now
+    q = NULL;
 
     // get again the world clock time
-    time_t world_clock_time = now_realtime_sec();
-    if(enable_streaming) {
-        if(now < world_clock_time) {
-            // we needed time to execute this request
-            // so, the parent will need to replicate more data
-            enable_streaming = false;
-        }
-        else
-            replicate_chart_collection_state(wb, st);
-    }
+    if(enable_streaming)
+        replication_send_chart_collection_state(wb, st);
+
+    // get a fresh retention to send to the parent
+    time_t wall_clock_time = now_realtime_sec();
+    time_t db_first_entry, db_last_entry;
+    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
     // end with first/last entries we have, and the first start time and
     // last end time of the data we sent
@@ -342,7 +485,7 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
                    (int)st->update_every
 
                    // child first db time, child end db time
-                   , (unsigned long long)first_entry_local, (unsigned long long)last_entry_local
+                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
 
                    // start streaming boolean
                    , enable_streaming ? "true" : "false"
@@ -351,12 +494,36 @@ bool replicate_chart_response(RRDHOST *host, RRDSET *st, bool start_streaming, t
                    , (unsigned long long)after, (unsigned long long)before
 
                    // child world clock time
-                   , (unsigned long long)world_clock_time
+                   , (unsigned long long)wall_clock_time
                    );
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
     worker_is_busy(WORKER_JOB_CLEANUP);
+
+    if(enable_streaming) {
+        if(sender_is_still_connected_for_this_request(rq)) {
+            // enable normal streaming if we have to
+            // but only if the sender buffer has not been flushed since we started
+
+            if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
+                rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
+                rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
+                rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
+                internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
+                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
+#endif
+            }
+            else
+                internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
+                               rrdhost_hostname(st->rrdhost), rrdset_id(st));
+        }
+    }
+
+    if(locked_data_collection)
+        netdata_spinlock_unlock(&st->data_collection_lock);
 
     return enable_streaming;
 }
@@ -478,8 +645,8 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
             },
 
             .local_db = {
-                    .first_entry_t = rrdset_first_entry_t(st),
-                    .last_entry_t = rrdset_last_entry_t(st),
+                    .first_entry_t = rrdset_first_entry_s(st),
+                    .last_entry_t = rrdset_last_entry_s(st),
                     .last_entry_t_adjusted_to_now = false,
                     .now  = now_realtime_sec(),
             },
@@ -585,13 +752,20 @@ struct replication_request {
     STRING *chart_id;                   // the chart of the request
     time_t after;                       // the start time of the query (maybe zero) key for sorting (JudyL)
     time_t before;                      // the end time of the query (maybe zero)
-    bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
 
     usec_t sender_last_flush_ut;        // the timestamp of the sender, at the time we indexed this request
     Word_t unique_id;                   // auto-increment, later requests have bigger
-    bool found;                         // used as a result boolean for the find call
+
+    bool start_streaming;               // true, when the parent wants to send the rest of the data (before is overwritten) and enable normal streaming
     bool indexed_in_judy;               // true when the request is indexed in judy
     bool not_indexed_buffer_full;       // true when the request is not indexed because the sender is full
+    bool not_indexed_preprocessing;     // true when the request is not indexed, but it is pending in preprocessing
+
+    // prepare ahead members - preprocessing
+    bool found;                         // used as a result boolean for the find call
+    bool executed;                      // used to detect if we have skipped requests while preprocessing
+    RRDSET *st;                         // caching of the chart during preprocessing
+    struct replication_query *q;        // the preprocessing query initialization
 };
 
 // replication sort entry in JudyL array
@@ -734,6 +908,7 @@ static struct replication_sort_entry *replication_sort_entry_create_unsafe(struc
     rq->unique_id = rse->unique_id;
     rq->indexed_in_judy = false;
     rq->not_indexed_buffer_full = false;
+    rq->not_indexed_preprocessing = false;
     return rse;
 }
 
@@ -747,6 +922,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     if(rrdpush_sender_replication_buffer_full_get(rq->sender)) {
         rq->indexed_in_judy = false;
         rq->not_indexed_buffer_full = true;
+        rq->not_indexed_preprocessing = false;
         replication_globals.unsafe.pending_no_room++;
         replication_recursive_unlock();
         return;
@@ -780,6 +956,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     *item = rse;
     rq->indexed_in_judy = true;
     rq->not_indexed_buffer_full = false;
+    rq->not_indexed_preprocessing = false;
 
     if(!replication_globals.unsafe.first_time_t || rq->after < replication_globals.unsafe.first_time_t)
         replication_globals.unsafe.first_time_t = rq->after;
@@ -787,7 +964,7 @@ static void replication_sort_entry_add(struct replication_request *rq) {
     replication_recursive_unlock();
 }
 
-static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr) {
+static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sort_entry *rse, Pvoid_t **inner_judy_ppptr, bool preprocessing) {
     fatal_when_replication_is_not_locked_for_me();
 
     bool inner_judy_deleted = false;
@@ -798,6 +975,7 @@ static bool replication_sort_entry_unlink_and_free_unsafe(struct replication_sor
     rrdpush_sender_pending_replication_requests_minus_one(rse->rq->sender);
 
     rse->rq->indexed_in_judy = false;
+    rse->rq->not_indexed_preprocessing = preprocessing;
 
     // delete it from the inner judy
     JudyLDel(*inner_judy_ppptr, rse->rq->unique_id, PJE0);
@@ -826,7 +1004,7 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
             Pvoid_t *our_item_pptr = JudyLGet(*inner_judy_pptr, rq->unique_id, PJE0);
             if (our_item_pptr) {
                 rse_to_delete = *our_item_pptr;
-                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr);
+                replication_sort_entry_unlink_and_free_unsafe(rse_to_delete, &inner_judy_pptr, false);
 
                 if(buffer_full) {
                     replication_globals.unsafe.pending_no_room++;
@@ -842,13 +1020,6 @@ static void replication_sort_entry_del(struct replication_request *rq, bool buff
     }
 
     replication_recursive_unlock();
-}
-
-static inline PPvoid_t JudyLFirstOrNext(Pcvoid_t PArray, Word_t * PIndex, bool first) {
-    if(unlikely(first))
-        return JudyLFirst(PArray, PIndex, PJE0);
-
-    return JudyLNext(PArray, PIndex, PJE0);
 }
 
 static struct replication_request replication_request_get_first_available() {
@@ -881,7 +1052,7 @@ static struct replication_request replication_request_get_first_available() {
         }
 
         bool find_same_after = true;
-        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstOrNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, find_same_after))) {
+        while (!rq_to_return.found && (inner_judy_pptr = JudyLFirstThenNext(replication_globals.unsafe.queue.JudyL_array, &replication_globals.unsafe.queue.after, &find_same_after))) {
             Pvoid_t *our_item_pptr;
 
             if(unlikely(round == 2 && replication_globals.unsafe.queue.after > started_after))
@@ -898,13 +1069,10 @@ static struct replication_request replication_request_get_first_available() {
                 // set the return result to found
                 rq_to_return.found = true;
 
-                if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr))
+                if (replication_sort_entry_unlink_and_free_unsafe(rse, &inner_judy_pptr, true))
                     // we removed the item from the outer JudyL
                     break;
             }
-
-            // call JudyLNext from now on
-            find_same_after = false;
 
             // prepare for the next iteration on the outer loop
             replication_globals.unsafe.queue.unique_id = 0;
@@ -945,7 +1113,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
 
     replication_recursive_lock();
 
-    if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+    if(!rq->indexed_in_judy && rq->not_indexed_buffer_full && !rq->not_indexed_preprocessing) {
         // we can replace this command
         internal_error(
                 true,
@@ -958,7 +1126,7 @@ static bool replication_request_conflict_callback(const DICTIONARY_ITEM *item __
         rq->before = rq_new->before;
         rq->start_streaming = rq_new->start_streaming;
     }
-    else if(!rq->indexed_in_judy) {
+    else if(!rq->indexed_in_judy && !rq->not_indexed_preprocessing) {
         replication_sort_entry_add(rq);
         internal_error(
                 true,
@@ -1001,49 +1169,44 @@ static void replication_request_delete_callback(const DICTIONARY_ITEM *item __ma
     string_freez(rq->chart_id);
 }
 
+static bool sender_is_still_connected_for_this_request(struct replication_request *rq) {
+    return rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender);
+};
+
 static bool replication_execute_request(struct replication_request *rq, bool workers) {
     bool ret = false;
 
-    if(likely(workers))
-        worker_is_busy(WORKER_JOB_FIND_CHART);
+    if(!rq->st) {
+        if(likely(workers))
+            worker_is_busy(WORKER_JOB_FIND_CHART);
 
-    RRDSET *st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
-    if(!st) {
+        rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+    }
+
+    if(!rq->st) {
         internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' not found",
                        rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
 
         goto cleanup;
     }
 
+    netdata_thread_disable_cancelability();
+
+    if(!rq->q) {
+        if(likely(workers))
+            worker_is_busy(WORKER_JOB_PREPARE_QUERY);
+
+        rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+    }
+
     if(likely(workers))
         worker_is_busy(WORKER_JOB_QUERYING);
 
-    netdata_thread_disable_cancelability();
-
     // send the replication data
-    bool start_streaming = replicate_chart_response(
-            st->rrdhost, st, rq->start_streaming, rq->after, rq->before);
+    rq->q->rq = rq;
+    replication_response_execute_and_finalize(rq->q);
 
     netdata_thread_enable_cancelability();
-
-    if(start_streaming && rq->sender_last_flush_ut == rrdpush_sender_get_flush_time(rq->sender)) {
-        // enable normal streaming if we have to
-        // but only if the sender buffer has not been flushed since we started
-
-        if(rrdset_flag_check(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS)) {
-            rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
-            rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
-            rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
-
-#ifdef NETDATA_LOG_REPLICATION_REQUESTS
-            internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
-                           rrdhost_hostname(st->rrdhost), rrdset_id(st));
-#endif
-        }
-        else
-            internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' received start streaming command, but the chart is not in progress replicating",
-                           rrdhost_hostname(st->rrdhost), string2str(rq->chart_id));
-    }
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
 
@@ -1068,6 +1231,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
             .sender_last_flush_ut = rrdpush_sender_get_flush_time(sender),
             .indexed_in_judy = false,
             .not_indexed_buffer_full = false,
+            .not_indexed_preprocessing = false,
     };
 
     if(start_streaming && rrdpush_sender_get_buffer_used_percent(sender) <= STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED)
@@ -1079,9 +1243,7 @@ void replication_add_request(struct sender_state *sender, const char *chart_id, 
 
 void replication_sender_delete_pending_requests(struct sender_state *sender) {
     // allow the dictionary destructor to go faster on locks
-    replication_recursive_lock();
     dictionary_flush(sender->replication.requests);
-    replication_recursive_unlock();
 }
 
 void replication_init_sender(struct sender_state *sender) {
@@ -1107,9 +1269,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(rq->indexed_in_judy && !rq->not_indexed_buffer_full) {
+            if(rq->indexed_in_judy)
                 replication_sort_entry_del(rq, true);
-            }
         }
         dfe_done(rq);
 
@@ -1122,9 +1283,8 @@ void replication_recalculate_buffer_used_ratio_unsafe(struct sender_state *s) {
 
         struct replication_request *rq;
         dfe_start_read(s->replication.requests, rq) {
-            if(!rq->indexed_in_judy && rq->not_indexed_buffer_full) {
+            if(!rq->indexed_in_judy && (rq->not_indexed_buffer_full || rq->not_indexed_preprocessing))
                 replication_sort_entry_add(rq);
-            }
         }
         dfe_done(rq);
 
@@ -1214,6 +1374,7 @@ static void replication_initialize_workers(bool master) {
     worker_register_job_name(WORKER_JOB_QUERYING, "querying");
     worker_register_job_name(WORKER_JOB_DELETE_ENTRY, "dict delete");
     worker_register_job_name(WORKER_JOB_FIND_CHART, "find chart");
+    worker_register_job_name(WORKER_JOB_PREPARE_QUERY, "prepare query");
     worker_register_job_name(WORKER_JOB_CHECK_CONSISTENCY, "check consistency");
     worker_register_job_name(WORKER_JOB_BUFFER_COMMIT, "commit");
     worker_register_job_name(WORKER_JOB_CLEANUP, "cleanup");
@@ -1236,23 +1397,89 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_CHART_NOT_FOUND (-2)
 
 static int replication_execute_next_pending_request(void) {
-    worker_is_busy(WORKER_JOB_FIND_NEXT);
-    struct replication_request rq = replication_request_get_first_available();
+    static __thread int max_requests_ahead = 0;
+    static __thread struct replication_request *rqs = NULL;
+    static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
+    static __thread size_t queue_rounds = 0; (void)queue_rounds;
+    struct replication_request *rq;
 
-    if(unlikely(!rq.found)) {
+    if(unlikely(!rqs)) {
+        max_requests_ahead = libuv_worker_threads * 2;
+        if(max_requests_ahead < 2)
+            max_requests_ahead = 2;
+
+        rqs = callocz(max_requests_ahead, sizeof(struct replication_request));
+    }
+
+    // fill the queue
+    do {
+        if(++rqs_last_prepared >= max_requests_ahead) {
+            rqs_last_prepared = 0;
+            queue_rounds++;
+        }
+
+        internal_fatal(queue_rounds > 1 && !rqs[rqs_last_prepared].executed,
+                       "REPLAY FATAL: query has not been executed!");
+
+        worker_is_busy(WORKER_JOB_FIND_NEXT);
+        rqs[rqs_last_prepared] = replication_request_get_first_available();
+        rq = &rqs[rqs_last_prepared];
+
+        if(rq->found) {
+            if (!rq->st) {
+                worker_is_busy(WORKER_JOB_FIND_CHART);
+                rq->st = rrdset_find(rq->sender->host, string2str(rq->chart_id));
+            }
+
+            if (rq->st && !rq->q) {
+                worker_is_busy(WORKER_JOB_PREPARE_QUERY);
+                rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+            }
+        }
+
+    } while(rq->found && rqs_last_prepared != rqs_last_executed);
+
+    // pick the first usable
+    do {
+        if (++rqs_last_executed >= max_requests_ahead)
+            rqs_last_executed = 0;
+
+        rq = &rqs[rqs_last_executed];
+        rq->executed = true;
+
+        if(rq->found) {
+            if (rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
+                // the sender has reconnected since this request was queued,
+                // we can safely throw it away, since the parent will resend it
+                replication_response_cancel_and_finalize(rq->q);
+                rq->found = false;
+            }
+            else if (rrdpush_sender_replication_buffer_full_get(rq->sender)) {
+                // the sender buffer is full, so we can ignore this request,
+                // it has already been marked as 'preprocessed' in the dictionary,
+                // and the sender will put it back in when there is
+                // enough room in the buffer for processing replication requests
+                replication_response_cancel_and_finalize(rq->q);
+                rq->found = false;
+            }
+            else {
+                // we can execute this,
+                // delete it from the dictionary
+                worker_is_busy(WORKER_JOB_DELETE_ENTRY);
+                dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id));
+            }
+        }
+
+    } while(!rq->found && rqs_last_executed != rqs_last_prepared);
+
+    if(unlikely(!rq->found)) {
         worker_is_idle();
         return REQUEST_QUEUE_EMPTY;
     }
 
-    // delete the request from the dictionary
-    worker_is_busy(WORKER_JOB_DELETE_ENTRY);
-    if(!dictionary_del(rq.sender->replication.requests, string2str(rq.chart_id)))
-        error("REPLAY ERROR: 'host:%s/chart:%s' failed to be deleted from sender pending charts index",
-              rrdhost_hostname(rq.sender->host), string2str(rq.chart_id));
+    replication_set_latest_first_time(rq->after);
 
-    replication_set_latest_first_time(rq.after);
-
-    if(unlikely(!replication_execute_request(&rq, true))) {
+    if(unlikely(!replication_execute_request(rq, true))) {
         worker_is_idle();
         return REQUEST_CHART_NOT_FOUND;
     }
@@ -1270,7 +1497,7 @@ static void *replication_worker_thread(void *ptr) {
 
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_REPLICATION)) {
         if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1333,7 +1560,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
     size_t last_executed = 0;
     size_t last_sender_resets = 0;
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_REPLICATION)) {
 
         // statistics
         usec_t now_mono_ut = now_monotonic_usec();

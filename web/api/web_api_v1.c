@@ -388,7 +388,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
     }
 
     w->response.data->contenttype = CT_APPLICATION_JSON;
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_s = now_realtime_sec();
     callback(st, w->response.data);
     return HTTP_RESP_OK;
 
@@ -752,6 +752,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .chart_label_key = chart_label_key,
             .charts_labels_filter = chart_labels_filter,
             .query_source = QUERY_SOURCE_API_DATA,
+            .priority = STORAGE_PRIORITY_NORMAL,
     };
     qt = query_target_create(&qtr);
 
@@ -1068,15 +1069,13 @@ static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
         if (count > 0)
             buffer_strcat(wb, ",\n");
 
-        netdata_mutex_lock(&host->receiver_lock);
         buffer_sprintf(
             wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
             , host->machine_guid
             , rrdhost_hostname(host)
-            , (host->receiver || host == localhost) ? "true" : "false"
+            , (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "true" : "false"
             , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
             );
-        netdata_mutex_unlock(&host->receiver_lock);
 
         rrdhost_aclk_state_lock(host);
         if (host->aclk_state.claimed_id)
@@ -1519,12 +1518,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
 
     buffer_sprintf(wb,
                    "\n\t\t\"default_granularity_secs\":%zu"
-                   ",\n\t\t\"sizeof_metric\":%zu"
-                   ",\n\t\t\"sizeof_metric_in_index\":%zu"
-                   ",\n\t\t\"sizeof_page\":%zu"
-                   ",\n\t\t\"sizeof_page_in_index\":%zu"
-                   ",\n\t\t\"sizeof_extent\":%zu"
-                   ",\n\t\t\"sizeof_page_in_extent\":%zu"
                    ",\n\t\t\"sizeof_datafile\":%zu"
                    ",\n\t\t\"sizeof_page_in_cache\":%zu"
                    ",\n\t\t\"sizeof_point_data\":%zu"
@@ -1540,8 +1533,8 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"pages_uncompressed_bytes\":%zu"
                    ",\n\t\t\"pages_duration_secs\":%lld"
                    ",\n\t\t\"single_point_pages\":%zu"
-                   ",\n\t\t\"first_t\":%llu"
-                   ",\n\t\t\"last_t\":%llu"
+                   ",\n\t\t\"first_t\":%ld"
+                   ",\n\t\t\"last_t\":%ld"
                    ",\n\t\t\"database_retention_secs\":%lld"
                    ",\n\t\t\"average_compression_savings\":%0.2f"
                    ",\n\t\t\"average_point_duration_secs\":%0.2f"
@@ -1554,12 +1547,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"disk_space\":%zu"
                    ",\n\t\t\"max_disk_space\":%zu"
                    , stats.default_granularity_secs
-                   , stats.sizeof_metric
-                   , stats.sizeof_metric_in_index
-                   , stats.sizeof_page
-                   , stats.sizeof_page_in_index
-                   , stats.sizeof_extent
-                   , stats.sizeof_page_in_extent
                    , stats.sizeof_datafile
                    , stats.sizeof_page_in_cache
                    , stats.sizeof_point_data
@@ -1575,8 +1562,8 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.pages_uncompressed_bytes
                    , (long long)stats.pages_duration_secs
                    , stats.single_point_pages
-                   , stats.first_t
-                   , stats.last_t
+                   , stats.first_time_s
+                   , stats.last_time_s
                    , (long long)stats.database_retention_secs
                    , stats.average_compression_savings
                    , stats.average_point_duration_secs

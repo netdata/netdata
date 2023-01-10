@@ -969,7 +969,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = HTTP_RESP_OK;
         goto cleanup;
     }
-    st->last_accessed_time = now_realtime_sec();
+    st->last_accessed_time_s = now_realtime_sec();
 
     if(alarm) {
         rca = rrdcalc_from_rrdset_get(st, alarm);
@@ -1110,14 +1110,14 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
         // if the collected value is too old, don't calculate its value
-        if (rrdset_last_entry_t(st) >= (now_realtime_sec() - (st->update_every * st->gap_when_lost_iterations_above)))
+        if (rrdset_last_entry_s(st) >= (now_realtime_sec() - (st->update_every * gap_when_lost_iterations_above)))
             ret = rrdset2value_api_v1(st, w->response.data, &n,
                                       (dimensions) ? buffer_tostring(dimensions) : NULL,
                                       points, after, before, group, group_options, 0, options,
                                       NULL, &latest_timestamp,
                                       NULL, NULL, NULL,
                                       &value_is_null, NULL, 0, 0,
-                                      QUERY_SOURCE_API_BADGE);
+                                      QUERY_SOURCE_API_BADGE, STORAGE_PRIORITY_NORMAL);
 
         // if the value cannot be calculated, show empty badge
         if (ret != HTTP_RESP_OK) {

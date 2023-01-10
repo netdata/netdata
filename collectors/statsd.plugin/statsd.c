@@ -234,7 +234,8 @@ typedef struct statsd_app {
 // global statsd data
 
 struct collection_thread_status {
-    int status;
+    SPINLOCK spinlock;
+    bool running;
     size_t max_sockets;
 
     netdata_thread_t thread;
@@ -875,7 +876,7 @@ struct statsd_tcp {
 
 #ifdef HAVE_RECVMMSG
 struct statsd_udp {
-    int *running;
+    struct collection_thread_status *status;
     STATSD_SOCKET_DATA_TYPE type;
     size_t size;
     struct iovec *iovecs;
@@ -1097,7 +1098,9 @@ static int statsd_snd_callback(POLLINFO *pi, short int *events) {
 
 void statsd_collector_thread_cleanup(void *data) {
     struct statsd_udp *d = data;
-    *d->running = 0;
+    netdata_spinlock_lock(&d->status->spinlock);
+    d->status->running = false;
+    netdata_spinlock_unlock(&d->status->spinlock);
 
     info("cleaning up...");
 
@@ -1114,9 +1117,15 @@ void statsd_collector_thread_cleanup(void *data) {
     worker_unregister();
 }
 
+static bool statsd_should_stop(void) {
+    return !service_running(SERVICE_COLLECTORS);
+}
+
 void *statsd_collector_thread(void *ptr) {
     struct collection_thread_status *status = ptr;
-    status->status = 1;
+    netdata_spinlock_lock(&status->spinlock);
+    status->running = true;
+    netdata_spinlock_unlock(&status->spinlock);
 
     worker_register("STATSD");
     worker_register_job_name(WORKER_JOB_TYPE_TCP_CONNECTED, "tcp connect");
@@ -1127,7 +1136,7 @@ void *statsd_collector_thread(void *ptr) {
     info("STATSD collector thread started with taskid %d", gettid());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
-    d->running = &status->status;
+    d->status = status;
 
     netdata_thread_cleanup_push(statsd_collector_thread_cleanup, d);
 
@@ -1152,6 +1161,7 @@ void *statsd_collector_thread(void *ptr) {
             , statsd_rcv_callback
             , statsd_snd_callback
             , NULL
+            , statsd_should_stop
             , NULL                     // No access control pattern
             , 0                        // No dns lookups for access control pattern
             , (void *)d
@@ -2358,13 +2368,15 @@ static void statsd_main_cleanup(void *data) {
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
-            if(statsd.collection_threads_status[i].status) {
+            netdata_spinlock_lock(&statsd.collection_threads_status[i].spinlock);
+            if(statsd.collection_threads_status[i].running) {
                 info("STATSD: stopping data collection thread %d...", i + 1);
                 netdata_thread_cancel(statsd.collection_threads_status[i].thread);
             }
             else {
                 info("STATSD: data collection thread %d found stopped.", i + 1);
             }
+            netdata_spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
         }
     }
 
@@ -2537,6 +2549,7 @@ void *statsd_main(void *ptr) {
         statsd.collection_threads_status[i].max_sockets = max_sockets / statsd.threads;
         char tag[NETDATA_THREAD_TAG_MAX + 1];
         snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
+        netdata_spinlock_init(&statsd.collection_threads_status[i].spinlock);
         netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }
 
@@ -2753,7 +2766,7 @@ void *statsd_main(void *ptr) {
     usec_t step = statsd.update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         heartbeat_next(&hb, step);
 
@@ -2781,7 +2794,7 @@ void *statsd_main(void *ptr) {
         worker_is_busy(WORKER_STATSD_FLUSH_STATS);
         statsd_update_all_app_charts();
 
-        if(unlikely(netdata_exit))
+        if(unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         if(global_statistics_enabled) {

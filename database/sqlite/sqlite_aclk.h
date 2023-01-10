@@ -99,7 +99,7 @@ struct aclk_database_cmd {
     struct aclk_completion *completion;
 };
 
-#define ACLK_DATABASE_CMD_Q_MAX_SIZE (16384)
+#define ACLK_DATABASE_CMD_Q_MAX_SIZE (1024)
 
 struct aclk_database_cmdqueue {
     unsigned head, tail;
@@ -166,9 +166,6 @@ int aclk_database_enq_cmd_noblock(struct aclk_database_worker_config *wc, struct
 void aclk_database_enq_cmd(struct aclk_database_worker_config *wc, struct aclk_database_cmd *cmd);
 void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id);
 void sql_aclk_sync_init(void);
-void sql_check_aclk_table_list(struct aclk_database_worker_config *wc);
-void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
-void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc, struct aclk_database_cmd cmd);
 int claimed();
 void aclk_sync_exit_all();
 struct aclk_database_worker_config *find_inactive_wc_by_node_id(char *node_id);

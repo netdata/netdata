@@ -11,24 +11,37 @@ typedef pthread_mutex_t netdata_mutex_t;
 
 typedef struct netdata_spinlock {
     bool locked;
+#ifdef NETDATA_INTERNAL_CHECKS
+    size_t spins;
+    pid_t locker_pid;
+#endif
 } SPINLOCK;
-#define NETDATA_SPINLOCK_INITIALIZER (SPINLOCK){ .locked = false }
+#define NETDATA_SPINLOCK_INITIALIZER (SPINLOCK) { .locked = false }
+
 void netdata_spinlock_init(SPINLOCK *spinlock);
 void netdata_spinlock_lock(SPINLOCK *spinlock);
 void netdata_spinlock_unlock(SPINLOCK *spinlock);
+bool netdata_spinlock_trylock(SPINLOCK *spinlock);
 
 #ifdef NETDATA_TRACE_RWLOCKS
+
+typedef enum {
+    RWLOCK_REQUEST_READ = (1 << 0),
+    RWLOCK_REQUEST_WRITE = (1 << 1),
+    RWLOCK_REQUEST_TRYREAD = (1 << 2),
+    RWLOCK_REQUEST_TRYWRITE = (1 << 3),
+} LOCKER_REQUEST;
+
 typedef struct netdata_rwlock_locker {
+    LOCKER_REQUEST lock;
+    bool got_it;
     pid_t pid;
+    size_t refcount;
     const char *tag;
-    char lock; // 'R', 'W'
     const char *file;
     const char *function;
     unsigned long line;
-    size_t callers;
-    usec_t start_s;
-    struct netdata_rwlock_t **all_caller_locks;
-    struct netdata_rwlock_locker *next;
+    struct netdata_rwlock_locker *next, *prev;
 } netdata_rwlock_locker;
 
 typedef struct netdata_rwlock_t {
@@ -37,6 +50,7 @@ typedef struct netdata_rwlock_t {
     size_t writers;                  // the number of writers on the lock
     netdata_mutex_t lockers_mutex;   // a mutex to protect the linked list of the lock holding threads
     netdata_rwlock_locker *lockers;  // the linked list of the lock holding threads
+    Pvoid_t lockers_pid_JudyL;
 } netdata_rwlock_t;
 
 #define NETDATA_RWLOCK_INITIALIZER {                \
@@ -44,7 +58,8 @@ typedef struct netdata_rwlock_t {
         .readers = 0,                               \
         .writers = 0,                               \
         .lockers_mutex = NETDATA_MUTEX_INITIALIZER, \
-        .lockers = NULL                             \
+        .lockers = NULL,                            \
+        .lockers_pid_JudyL = NULL,                  \
     }
 
 #else // NETDATA_TRACE_RWLOCKS

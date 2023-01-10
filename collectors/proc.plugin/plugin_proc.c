@@ -128,15 +128,15 @@ void *proc_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
         usec_t hb_dt = heartbeat_next(&hb, step);
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         for (i = 0; proc_modules[i].name; i++) {
-            if (unlikely(netdata_exit))
+            if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
             struct proc_module *pm = &proc_modules[i];

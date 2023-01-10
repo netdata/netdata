@@ -3,12 +3,14 @@
 #ifndef NETDATA_RRDPUSH_H
 #define NETDATA_RRDPUSH_H 1
 
-#include "database/rrd.h"
 #include "libnetdata/libnetdata.h"
-#include "web/server/web_client.h"
 #include "daemon/common.h"
+#include "web/server/web_client.h"
+#include "database/rrd.h"
 
 #define CONNECTED_TO_SIZE 100
+#define CBUFFER_INITIAL_SIZE (16 * 1024)
+#define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE * 4)
 
 // ----------------------------------------------------------------------------
 // obsolete versions - do not use anymore
@@ -22,6 +24,9 @@
 
 typedef enum {
     // do not use the first 3 bits
+    // they used to be versions 1, 2 and 3
+    // before we introduce capabilities
+
     STREAM_CAP_V1               = (1 << 3), // v1 = the oldest protocol
     STREAM_CAP_V2               = (1 << 4), // v2 = the second version of the protocol (with host labels)
     STREAM_CAP_VN               = (1 << 5), // version negotiation supported (for versions 3, 4, 5 of the protocol)
@@ -37,6 +42,7 @@ typedef enum {
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
 
+    STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
     // needed for negotiating errors between parent and child
 } STREAM_CAPABILITIES;
@@ -163,6 +169,11 @@ struct sender_state {
 #endif
 
     struct {
+        bool shutdown;
+        const char *reason;
+    } exit;
+
+    struct {
         DICTIONARY *requests;                   // de-duplication of replication requests, per chart
 
         struct {
@@ -216,13 +227,32 @@ struct receiver_state {
     char *program_name;        // Duplicated in pluginsd
     char *program_version;
     struct rrdhost_system_info *system_info;
-    int update_every;
     STREAM_CAPABILITIES capabilities;
     time_t last_msg_t;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
-    unsigned int shutdown:1;    // Tell the thread to exit
-    unsigned int exited;      // Indicates that the thread has exited  (NOT A BITFIELD!)
+
+    struct {
+        bool shutdown;      // signal the streaming parser to exit
+        const char *reason; // the reason of disconnection to log
+    } exit;
+
+    struct {
+        RRD_MEMORY_MODE mode;
+        int history;
+        int update_every;
+        int health_enabled; // CONFIG_BOOLEAN_YES, CONFIG_BOOLEAN_NO, CONFIG_BOOLEAN_AUTO
+        time_t alarms_delay;
+        int rrdpush_enabled;
+        char *rrdpush_api_key; // DONT FREE - it is allocated in appconfig
+        char *rrdpush_send_charts_matching; // DONT FREE - it is allocated in appconfig
+        bool rrdpush_enable_replication;
+        time_t rrdpush_seconds_to_replicate;
+        time_t rrdpush_replication_step;
+        char *rrdpush_destination;  // DONT FREE - it is allocated in appconfig
+        unsigned int rrdpush_compression;
+    } config;
+
 #ifdef ENABLE_HTTPS
     struct netdata_ssl ssl;
 #endif
@@ -260,8 +290,6 @@ extern unsigned int remote_clock_resync_iterations;
 void rrdpush_destinations_init(RRDHOST *host);
 void rrdpush_destinations_free(RRDHOST *host);
 
-void sender_init(RRDHOST *host);
-
 BUFFER *sender_start(struct sender_state *s);
 void sender_commit(struct sender_state *s, BUFFER *wb);
 void sender_cancel(struct sender_state *s);
@@ -275,7 +303,7 @@ void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
 
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
-void rrdpush_sender_thread_stop(RRDHOST *host);
+void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait);
 
 void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQUIRED *rva);
 void log_stream_connection(const char *client_ip, const char *client_port, const char *api_key, const char *machine_guid, const char *host, const char *msg);
@@ -295,10 +323,14 @@ struct compressor_state *create_compressor();
 struct decompressor_state *create_decompressor();
 #endif
 
+void rrdpush_receive_log_status(struct receiver_state *rpt, const char *msg, const char *status);
 void log_receiver_capabilities(struct receiver_state *rpt);
 void log_sender_capabilities(struct sender_state *s);
 STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version);
 int32_t stream_capabilities_to_vn(uint32_t caps);
+
+void receiver_state_free(struct receiver_state *rpt);
+bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
 #include "replication.h"
 

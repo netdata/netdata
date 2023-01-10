@@ -4,68 +4,68 @@
 #define BUFSIZE (512)
 
 /* Caller must hold descriptor lock */
-void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug)
-{
-    if(log_debug && !(debug_flags & D_RRDENGINE))
-        return;
-
-    BUFFER *wb = buffer_create(512);
-
-    if(!descr) {
-        buffer_sprintf(wb, "DBENGINE: %s : descr is NULL", msg);
-    }
-    else {
-        struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
-        char uuid_str[UUID_STR_LEN];
-
-        uuid_unparse_lower(*descr->id, uuid_str);
-        buffer_sprintf(wb, "DBENGINE: %s : page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
-                       msg,
-                       pg_cache_descr->page, uuid_str,
-                       descr->page_length,
-                       (uint64_t)descr->start_time_ut,
-                       (uint64_t)descr->end_time_ut,
-                       (uint32_t)descr->update_every_s,
-                       (uint32_t)descr->type
-                       );
-        if (!descr->extent) {
-            buffer_strcat(wb, "N/A");
-        } else {
-            buffer_sprintf(wb, "%"PRIu64, descr->extent->offset);
-        }
-
-        buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
-    }
-
-    if(log_debug)
-        debug(D_RRDENGINE, "%s", buffer_tostring(wb));
-    else
-        internal_error(true, "%s", buffer_tostring(wb));
-
-    buffer_free(wb);
-}
-
-void print_page_descr(struct rrdeng_page_descr *descr)
-{
-    char uuid_str[UUID_STR_LEN];
-    char str[BUFSIZE + 1];
-    int pos = 0;
-
-    uuid_unparse_lower(*descr->id, uuid_str);
-    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
-                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
-                     uuid_str,
-                     descr->page_length,
-                     (uint64_t)descr->start_time_ut,
-                     (uint64_t)descr->end_time_ut);
-    if (!descr->extent) {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
-    } else {
-        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
-    }
-    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
-    fputs(str, stderr);
-}
+//void print_page_cache_descr(struct rrdeng_page_descr *descr, const char *msg, bool log_debug)
+//{
+//    if(log_debug && !(debug_flags & D_RRDENGINE))
+//        return;
+//
+//    BUFFER *wb = buffer_create(512);
+//
+//    if(!descr) {
+//        buffer_sprintf(wb, "DBENGINE: %s : descr is NULL", msg);
+//    }
+//    else {
+//        struct page_cache_descr *pg_cache_descr = descr->pg_cache_descr;
+//        char uuid_str[UUID_STR_LEN];
+//
+//        uuid_unparse_lower(*descr->id, uuid_str);
+//        buffer_sprintf(wb, "DBENGINE: %s : page(%p) metric:%s, len:%"PRIu32", time:%"PRIu64"->%"PRIu64", update_every:%u, type:%u, xt_offset:",
+//                       msg,
+//                       pg_cache_descr->page, uuid_str,
+//                       descr->page_length,
+//                       (uint64_t)descr->start_time_ut,
+//                       (uint64_t)descr->end_time_ut,
+//                       (uint32_t)descr->update_every_s,
+//                       (uint32_t)descr->type
+//                       );
+//        if (!descr->extent) {
+//            buffer_strcat(wb, "N/A");
+//        } else {
+//            buffer_sprintf(wb, "%"PRIu64, descr->extent->offset);
+//        }
+//
+//        buffer_sprintf(wb, ", flags:0x%2.2lX refcnt:%u", pg_cache_descr->flags, pg_cache_descr->refcnt);
+//    }
+//
+//    if(log_debug)
+//        debug(D_RRDENGINE, "%s", buffer_tostring(wb));
+//    else
+//        internal_error(true, "%s", buffer_tostring(wb));
+//
+//    buffer_free(wb);
+//}
+//
+//void print_page_descr(struct rrdeng_page_descr *descr)
+//{
+//    char uuid_str[UUID_STR_LEN];
+//    char str[BUFSIZE + 1];
+//    int pos = 0;
+//
+//    uuid_unparse_lower(*descr->id, uuid_str);
+//    pos += snprintfz(str, BUFSIZE - pos, "id=%s\n"
+//                                     "--->len:%"PRIu32" time:%"PRIu64"->%"PRIu64" xt_offset:",
+//                     uuid_str,
+//                     descr->page_length,
+//                     (uint64_t)descr->start_time_ut,
+//                     (uint64_t)descr->end_time_ut);
+//    if (!descr->extent) {
+//        pos += snprintfz(str + pos, BUFSIZE - pos, "N/A");
+//    } else {
+//        pos += snprintfz(str + pos, BUFSIZE - pos, "%"PRIu64, descr->extent->offset);
+//    }
+//    snprintfz(str + pos, BUFSIZE - pos, "\n\n");
+//    fputs(str, stderr);
+//}
 
 int check_file_properties(uv_file file, uint64_t *file_size, size_t min_size)
 {
@@ -144,9 +144,6 @@ int open_file_for_io(char *path, int flags, uv_file *file, int direct)
 
 char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size)
 {
-    struct page_cache *pg_cache;
-
-    pg_cache = &ctx->pg_cache;
     snprintfz(str, size,
               "metric_API_producers: %ld\n"
               "metric_API_consumers: %ld\n"
@@ -187,10 +184,10 @@ char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t si
               "global_flushing_pressure_page_deletions: %ld\n",
               (long)ctx->stats.metric_API_producers,
               (long)ctx->stats.metric_API_consumers,
-              (long)pg_cache->page_descriptors,
+              0L,
               (long)ctx->stats.page_cache_descriptors,
-              (long)pg_cache->populated_pages,
-              (long)pg_cache->committed_page_index.nr_committed_pages,
+              0L,
+              0L,
               (long)ctx->stats.pg_cache_insertions,
               (long)ctx->stats.pg_cache_deletions,
               (long)ctx->stats.pg_cache_hits,

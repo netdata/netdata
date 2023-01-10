@@ -54,12 +54,12 @@ void SamplesBuffer::diffSamples() {
 
 void SamplesBuffer::smoothSamples() {
     // Holds the mean value of each window
-    CalculatedNumber *AccCNs = new CalculatedNumber[NumDimsPerSample]();
-    Sample Acc(AccCNs, NumDimsPerSample);
+    CalculatedNumber AccCNs[1] = { 0 };
+    Sample Acc(AccCNs, 1);
 
     // Used to avoid clobbering the accumulator when moving the window
-    CalculatedNumber *TmpCNs = new CalculatedNumber[NumDimsPerSample]();
-    Sample Tmp(TmpCNs, NumDimsPerSample);
+    CalculatedNumber TmpCNs[1] = { 0 };
+    Sample Tmp(TmpCNs, 1);
 
     CalculatedNumber Factor = (CalculatedNumber) 1 / SmoothN;
 
@@ -88,9 +88,6 @@ void SamplesBuffer::smoothSamples() {
         Acc.copy(Tmp);
         Acc.scale(Factor);
     }
-
-    delete[] AccCNs;
-    delete[] TmpCNs;
 }
 
 void SamplesBuffer::lagSamples() {

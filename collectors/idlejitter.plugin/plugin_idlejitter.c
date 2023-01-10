@@ -48,7 +48,7 @@ void *cpuidlejitter_main(void *ptr) {
     usec_t update_every_ut = localhost->rrd_update_every * USEC_PER_SEC;
     struct timeval before, after;
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         int iterations = 0;
         usec_t error_total = 0,
                 error_min = 0,

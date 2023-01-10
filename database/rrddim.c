@@ -64,7 +64,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t entries = st->entries;
         if(!entries) entries = 5;
 
-        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1);
+        rd->db = netdata_mmap(NULL, entries * sizeof(storage_number), MAP_PRIVATE, 1, false);
         if(!rd->db) {
             info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
@@ -285,7 +285,6 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     if(ctr->react_action & (RRDDIM_REACT_UPDATED | RRDDIM_REACT_NEW)) {
         rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
-        rrdset_flag_set(rd->rrdset, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
@@ -420,44 +419,45 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 
 // ----------------------------------------------------------------------------
 
-time_t rrddim_last_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
         return 0;
 
-    return rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier]->query_ops->latest_time_s(rd->tiers[tier]->db_metric_handle);
 }
 
-time_t rrddim_last_entry_t(RRDDIM *rd) {
-    time_t latest = rd->tiers[0]->query_ops->latest_time(rd->tiers[0]->db_metric_handle);
+// get the timestamp of the last entry in the round-robin database
+time_t rrddim_last_entry_s(RRDDIM *rd) {
+    time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
         if(unlikely(!rd->tiers[tier])) continue;
 
-        time_t t = rd->tiers[tier]->query_ops->latest_time(rd->tiers[tier]->db_metric_handle);
-        if(t > latest)
-            latest = t;
+        time_t t = rrddim_last_entry_s_of_tier(rd, tier);
+        if(t > latest_time_s)
+            latest_time_s = t;
     }
 
-    return latest;
+    return latest_time_s;
 }
 
-time_t rrddim_first_entry_t_of_tier(RRDDIM *rd, size_t tier) {
+time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
         return 0;
 
-    return rd->tiers[tier]->query_ops->oldest_time(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier]->query_ops->oldest_time_s(rd->tiers[tier]->db_metric_handle);
 }
 
-time_t rrddim_first_entry_t(RRDDIM *rd) {
-    time_t oldest = 0;
+time_t rrddim_first_entry_s(RRDDIM *rd) {
+    time_t oldest_time_s = 0;
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        time_t t = rrddim_first_entry_t_of_tier(rd, tier);
-        if(t != 0 && (oldest == 0 || t < oldest))
-            oldest = t;
+        time_t t = rrddim_first_entry_s_of_tier(rd, tier);
+        if(t != 0 && (oldest_time_s == 0 || t < oldest_time_s))
+            oldest_time_s = t;
     }
 
-    return oldest;
+    return oldest_time_s;
 }
 
 RRDDIM *rrddim_add_custom(RRDSET *st
@@ -504,8 +504,8 @@ int rrddim_hide(RRDSET *st, const char *id) {
         return 1;
     }
     if (!rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
-        rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN);
-        metaqueue_dimension_update_flags(rd);
+        rrddim_flag_set(rd, RRDDIM_FLAG_META_HIDDEN | RRDDIM_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrddim_option_set(rd, RRDDIM_OPTION_HIDDEN);
@@ -524,7 +524,8 @@ int rrddim_unhide(RRDSET *st, const char *id) {
     }
     if (rrddim_flag_check(rd, RRDDIM_FLAG_META_HIDDEN)) {
         rrddim_flag_clear(rd, RRDDIM_FLAG_META_HIDDEN);
-        metaqueue_dimension_update_flags(rd);
+        rrddim_flag_set(rd, RRDDIM_FLAG_METADATA_UPDATE);
+        rrdhost_flag_set(rd->rrdset->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
     }
 
     rrddim_option_clear(rd, RRDDIM_OPTION_HIDDEN);
@@ -694,8 +695,8 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     rrdset_strncpyz_name(filename, rrddim_id(rd), FILENAME_MAX);
     snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
 
-    rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(fullfilename, size,
-        ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1);
+    rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(
+        fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1, false);
 
     if(unlikely(!rd_on_file)) return false;
 

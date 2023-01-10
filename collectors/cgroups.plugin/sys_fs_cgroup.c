@@ -2754,9 +2754,19 @@ static inline void discovery_find_all_cgroups() {
     debug(D_CGROUP, "done searching for cgroups");
 }
 
+static void cgroup_discovery_cleanup(void *ptr) {
+    UNUSED(ptr);
+
+    discovery_thread.exited = 1;
+    worker_unregister();
+    service_exits();
+}
+
 void cgroup_discovery_worker(void *ptr)
 {
     UNUSED(ptr);
+
+    netdata_thread_cleanup_push(cgroup_discovery_cleanup, ptr);
 
     worker_register("CGROUPSDISC");
     worker_register_job_name(WORKER_DISCOVERY_INIT,               "init");
@@ -2777,24 +2787,23 @@ void cgroup_discovery_worker(void *ptr)
         NULL,
         SIMPLE_PATTERN_EXACT);
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         uv_mutex_lock(&discovery_thread.mutex);
-        while (!discovery_thread.start_discovery)
+        while (!discovery_thread.start_discovery && service_running(SERVICE_COLLECTORS))
             uv_cond_wait(&discovery_thread.cond_var, &discovery_thread.mutex);
         discovery_thread.start_discovery = 0;
         uv_mutex_unlock(&discovery_thread.mutex);
 
-        if (unlikely(netdata_exit))
+        if (unlikely(!service_running(SERVICE_COLLECTORS)))
             break;
 
         discovery_find_all_cgroups();
     }
 
-    discovery_thread.exited = 1;
-    worker_unregister();
-} 
+    netdata_thread_cleanup_pop(1);
+}
 
 // ----------------------------------------------------------------------------
 // generate charts
@@ -4853,11 +4862,11 @@ void *cgroups_main(void *ptr) {
     usec_t step = cgroup_update_every * USEC_PER_SEC;
     usec_t find_every = cgroup_check_for_new_every * USEC_PER_SEC, find_dt = 0;
 
-    while(!netdata_exit) {
+    while(service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
 
         usec_t hb_dt = heartbeat_next(&hb, step);
-        if(unlikely(netdata_exit)) break;
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         find_dt += hb_dt;
         if (unlikely(find_dt >= find_every || (!is_inside_k8s && cgroups_check))) {
@@ -4872,9 +4881,11 @@ void *cgroups_main(void *ptr) {
 
         worker_is_busy(WORKER_CGROUPS_READ);
         read_all_discovered_cgroups(cgroup_root);
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         worker_is_busy(WORKER_CGROUPS_CHART);
         update_cgroup_charts(cgroup_update_every);
+        if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
 
         worker_is_idle();
         uv_mutex_unlock(&cgroup_root_mutex);

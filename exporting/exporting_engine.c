@@ -197,7 +197,7 @@ void *exporting_main(void *ptr)
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_EXPORTERS)) {
         heartbeat_next(&hb, step_ut);
         engine->now = now_realtime_sec();
 

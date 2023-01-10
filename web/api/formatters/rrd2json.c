@@ -77,6 +77,7 @@ int rrdset2value_api_v1(
         , time_t timeout
         , size_t tier
         , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
 ) {
     int ret = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
@@ -94,7 +95,8 @@ int rrdset2value_api_v1(
             group_options,
             timeout,
             tier,
-            query_source);
+            query_source,
+            priority);
 
     if(!r) {
         if(value_is_null) *value_is_null = 1;

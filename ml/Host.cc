@@ -54,7 +54,15 @@ void Host::getModelsAsJson(nlohmann::json &Json) {
     }
 }
 
+#define WORKER_JOB_DETECTION_PREP 0
+#define WORKER_JOB_DETECTION_DIM_CHART 1
+#define WORKER_JOB_DETECTION_HOST_CHART 2
+#define WORKER_JOB_DETECTION_STATS 3
+#define WORKER_JOB_DETECTION_RESOURCES 4
+
 void Host::detectOnce() {
+    worker_is_busy(WORKER_JOB_DETECTION_PREP);
+
     MLS = {};
     MachineLearningStats MLSCopy = {};
     TrainingStats TSCopy = {};
@@ -134,13 +142,20 @@ void Host::detectOnce() {
         TSCopy.RemainingUT = 0;
     }
 
+    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
     updateDimensionsChart(RH, MLSCopy);
+
+    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
     updateHostAndDetectionRateCharts(RH, HostAnomalyRate * 10000.0);
 
+#ifdef NETDATA_ML_RESOURCE_CHARTS
+    worker_is_busy(WORKER_JOB_DETECTION_RESOURCES);
     struct rusage PredictionRU;
     getrusage(RUSAGE_THREAD, &PredictionRU);
     updateResourceUsageCharts(RH, PredictionRU, TSCopy.TrainingRU);
+#endif
 
+    worker_is_busy(WORKER_JOB_DETECTION_STATS);
     updateTrainingStatisticsChart(RH, TSCopy);
 }
 
@@ -150,7 +165,6 @@ public:
         RRDDIM_ACQUIRED *AcqRD = nullptr;
         Dimension *D = nullptr;
 
-        rrdhost_rdlock(RH);
         RRDSET *RS = rrdset_find(RH, string2str(ChartId));
         if (RS) {
             AcqRD = rrddim_find_and_acquire(RS, string2str(DimensionId));
@@ -160,7 +174,6 @@ public:
                     D = reinterpret_cast<Dimension *>(RD->ml_dimension);
             }
         }
-        rrdhost_unlock(RH);
 
         return AcquiredDimension(AcqRD, D);
     }
@@ -190,8 +203,19 @@ void Host::scheduleForTraining(TrainingRequest TR) {
     TrainingQueue.push(TR);
 }
 
+#define WORKER_JOB_TRAINING_FIND 0
+#define WORKER_JOB_TRAINING_TRAIN 1
+#define WORKER_JOB_TRAINING_STATS 2
+
 void Host::train() {
-    while (!netdata_exit) {
+    worker_register("MLTRAIN");
+    worker_register_job_name(WORKER_JOB_TRAINING_FIND, "find");
+    worker_register_job_name(WORKER_JOB_TRAINING_TRAIN, "train");
+    worker_register_job_name(WORKER_JOB_TRAINING_STATS, "stats");
+
+    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, (force_quit_t )ml_stop_anomaly_detection_threads, RH, true);
+
+    while (service_running(SERVICE_ML_TRAINING)) {
         auto P = TrainingQueue.pop();
         TrainingRequest TrainingReq = P.first;
         size_t Size = P.second;
@@ -200,15 +224,21 @@ void Host::train() {
         if (AllottedUT > USEC_PER_SEC)
             AllottedUT = USEC_PER_SEC;
 
-        usec_t StartUT = now_realtime_usec();
+        usec_t StartUT = now_monotonic_usec();
         TrainingResult TrainingRes;
         {
+            worker_is_busy(WORKER_JOB_TRAINING_FIND);
             AcquiredDimension AcqDim = AcquiredDimension::find(RH, TrainingReq.ChartId, TrainingReq.DimensionId);
+
+            worker_is_busy(WORKER_JOB_TRAINING_TRAIN);
             TrainingRes = AcqDim.train(TrainingReq);
+
             string_freez(TrainingReq.ChartId);
             string_freez(TrainingReq.DimensionId);
         }
-        usec_t ConsumedUT = now_realtime_usec() - StartUT;
+        usec_t ConsumedUT = now_monotonic_usec() - StartUT;
+
+        worker_is_busy(WORKER_JOB_TRAINING_STATS);
 
         usec_t RemainingUT = 0;
         if (ConsumedUT < AllottedUT)
@@ -249,15 +279,27 @@ void Host::train() {
             }
         }
 
+        worker_is_idle();
         std::this_thread::sleep_for(std::chrono::microseconds{RemainingUT});
+        worker_is_busy(0);
     }
 }
 
 void Host::detect() {
+    worker_register("MLDETECT");
+    worker_register_job_name(WORKER_JOB_DETECTION_PREP, "prep");
+    worker_register_job_name(WORKER_JOB_DETECTION_DIM_CHART, "dim chart");
+    worker_register_job_name(WORKER_JOB_DETECTION_HOST_CHART, "host chart");
+    worker_register_job_name(WORKER_JOB_DETECTION_STATS, "stats");
+    worker_register_job_name(WORKER_JOB_DETECTION_RESOURCES, "resources");
+
+    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, (force_quit_t )ml_stop_anomaly_detection_threads, RH, true);
+
     heartbeat_t HB;
     heartbeat_init(&HB);
 
-    while (!netdata_exit) {
+    while (service_running((SERVICE_TYPE)(SERVICE_ML_PREDICTION | SERVICE_COLLECTORS))) {
+        worker_is_idle();
         heartbeat_next(&HB, RH->rrd_update_every * USEC_PER_SEC);
         detectOnce();
     }
@@ -294,10 +336,10 @@ void Host::startAnomalyDetectionThreads() {
     char Tag[NETDATA_THREAD_TAG_MAX + 1];
 
     snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "TRAIN[%s]", rrdhost_hostname(RH));
-    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, train_main, static_cast<void *>(this));
+    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_DEFAULT, train_main, static_cast<void *>(this));
 
     snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "DETECT[%s]", rrdhost_hostname(RH));
-    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, detect_main, static_cast<void *>(this));
+    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_DEFAULT, detect_main, static_cast<void *>(this));
 }
 
 void Host::stopAnomalyDetectionThreads() {
@@ -311,8 +353,8 @@ void Host::stopAnomalyDetectionThreads() {
     // Signal the training queue to stop popping-items
     TrainingQueue.signal();
     netdata_thread_cancel(TrainingThread);
-    netdata_thread_join(TrainingThread, nullptr);
+    // netdata_thread_join(TrainingThread, nullptr);
 
     netdata_thread_cancel(DetectionThread);
-    netdata_thread_join(DetectionThread, nullptr);
+    // netdata_thread_join(DetectionThread, nullptr);
 }

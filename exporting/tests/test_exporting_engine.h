@@ -55,9 +55,6 @@ int __wrap_connect_to_one_of(
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size);
-void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
 time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);

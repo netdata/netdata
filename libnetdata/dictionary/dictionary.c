@@ -1234,11 +1234,29 @@ static inline size_t item_get_name_len(const DICTIONARY_ITEM *item) {
         return strlen(item->caller_name);
 }
 
+static ARAL dict_items_aral = {
+        .filename = NULL,
+        .cache_dir = NULL,
+        .use_mmap = false,
+        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM),
+        .requested_element_size = sizeof(DICTIONARY_ITEM),
+};
+
+static ARAL dict_shared_items_aral = {
+        .filename = NULL,
+        .cache_dir = NULL,
+        .use_mmap = false,
+        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM_SHARED),
+        .requested_element_size = sizeof(DICTIONARY_ITEM_SHARED),
+};
+
 static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item;
 
     size_t size = sizeof(DICTIONARY_ITEM);
-    item = callocz(1, size);
+//    item = callocz(1, size);
+    item = arrayalloc_mallocz(&dict_items_aral);
+    memset(item, 0, sizeof(DICTIONARY_ITEM));
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->creator_pid = gettid();
@@ -1257,7 +1275,10 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     }
     else {
         size = sizeof(DICTIONARY_ITEM_SHARED);
-        item->shared = callocz(1, size);
+        // item->shared = callocz(1, size);
+        item->shared = arrayalloc_mallocz(&dict_shared_items_aral);
+        memset(item->shared, 0, sizeof(DICTIONARY_ITEM_SHARED));
+
         item->shared->links = 1;
         *allocated_bytes += size;
     }
@@ -1396,12 +1417,15 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
         }
         value_size += item->shared->value_len;
 
-        freez(item->shared);
+        // freez(item->shared);
+        arrayalloc_freez(&dict_shared_items_aral, item->shared);
         item->shared = NULL;
         item_size += sizeof(DICTIONARY_ITEM_SHARED);
     }
 
-    freez(item);
+    // freez(item);
+    arrayalloc_freez(&dict_items_aral, item);
+
     item_size += sizeof(DICTIONARY_ITEM);
 
     DICTIONARY_STATS_MINUS_MEMORY(dict, key_size, item_size, value_size);

@@ -1314,6 +1314,9 @@ static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, ch
 }
 
 static inline int web_client_process_url(RRDHOST *host, struct web_client *w, char *url) {
+    if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
+        return web_client_permission_denied(w);
+
     static uint32_t
             hash_api = 0,
             hash_netdata_conf = 0,
@@ -1934,4 +1937,25 @@ ssize_t web_client_receive(struct web_client *w)
     }
 
     return(bytes);
+}
+
+
+int web_client_socket_is_now_used_for_streaming(struct web_client *w) {
+    // prevent the web_client from closing the streaming socket
+
+    WEB_CLIENT_IS_DEAD(w);
+
+    if(web_server_mode == WEB_SERVER_MODE_STATIC_THREADED) {
+        web_client_flag_set(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET);
+    }
+    else {
+        if(w->ifd == w->ofd)
+            w->ifd = w->ofd = -1;
+        else
+            w->ifd = -1;
+    }
+
+    buffer_flush(w->response.data);
+
+    return HTTP_RESP_OK;
 }
