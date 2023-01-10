@@ -10,7 +10,7 @@ typedef struct mrg_entry {
     uuid_t uuid;
     Word_t section;
     time_t first_time_s;
-    time_t latest_time_s;
+    time_t last_time_s;
     uint32_t latest_update_every_s;
 } MRG_ENTRY;
 

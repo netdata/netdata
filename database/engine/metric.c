@@ -117,7 +117,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
     metric->first_time_s = entry->first_time_s;
-    metric->latest_time_s_clean = entry->latest_time_s;
+    metric->latest_time_s_clean = entry->last_time_s;
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
     metric->timestamps_lock = NETDATA_SPINLOCK_INITIALIZER;
@@ -269,6 +269,12 @@ bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t
 }
 
 void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
+
+    internal_fatal(first_time_s > now_realtime_sec() + 1,
+                   "DBENGINE METRIC: metric first time is in the future");
+    internal_fatal(last_time_s > now_realtime_sec() + 1,
+                   "DBENGINE METRIC: metric last time is in the future");
+
     netdata_spinlock_lock(&metric->timestamps_lock);
 
     if(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s))
@@ -325,8 +331,8 @@ time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-//    internal_fatal(latest_time_s > now_realtime_sec(),
-//                   "DBENGINE METRIC: metric latest time is in the future");
+    internal_fatal(latest_time_s > now_realtime_sec() + 1,
+                   "DBENGINE METRIC: metric latest time is in the future");
 
     internal_fatal(metric->latest_time_s_clean > latest_time_s,
                    "DBENGINE METRIC: metric new clean latest time is older than the previous one");
@@ -523,7 +529,7 @@ int mrg_unittest(void) {
     MRG_ENTRY entry = {
             .section = 1,
             .first_time_s = 2,
-            .latest_time_s = 3,
+            .last_time_s = 3,
             .latest_update_every_s = 4,
     };
     uuid_generate(entry.uuid);

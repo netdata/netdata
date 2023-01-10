@@ -38,7 +38,7 @@ static void update_metric_retention_and_granularity_by_uuid(
     MRG_ENTRY entry = {
             .section = (Word_t)ctx,
             .first_time_s = first_time_s,
-            .latest_time_s = last_time_s,
+            .last_time_s = last_time_s,
             .latest_update_every_s = update_every_s
     };
     uuid_copy(entry.uuid, *uuid);
@@ -362,8 +362,9 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
         temp_id = (uuid_t *)jf_metric_data->descr[i].uuid;
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, temp_id, (Word_t) ctx);
 
+        struct rrdeng_extent_page_descr *descr = &jf_metric_data->descr[i];
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
-                &jf_metric_data->descr[i], now_s,
+                descr, now_s,
                 (metric) ? mrg_metric_get_update_every_s(main_mrg, metric) : 0,
                 false);
 
@@ -377,7 +378,7 @@ static void restore_extent_metadata(struct rrdengine_instance *ctx, struct rrden
             MRG_ENTRY entry = {
                     .section = (Word_t)ctx,
                     .first_time_s = vd.start_time_s,
-                    .latest_time_s = vd.end_time_s,
+                    .last_time_s = vd.end_time_s,
                     .latest_update_every_s = vd.update_every_s,
             };
             uuid_copy(entry.uuid, *temp_id);

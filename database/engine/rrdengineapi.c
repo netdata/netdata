@@ -124,7 +124,7 @@ static METRIC *rrdeng_metric_create(STORAGE_INSTANCE *db_instance, uuid_t *uuid)
     MRG_ENTRY entry = {
             .section = (Word_t)ctx,
             .first_time_s = 0,
-            .latest_time_s = 0,
+            .last_time_s = 0,
             .latest_update_every_s = 0,
     };
     uuid_copy(entry.uuid, *uuid);
@@ -269,7 +269,14 @@ time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
 
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
-    if (false == added) {
+    if (unlikely(!added)) {
+        internal_fatal(!pgc_is_page_hot(page),
+                       "DBENGINE CACHE: requested to add a hot page to the main cache, "
+                       "but the page returned is not hot");
+
+        if(unlikely(pgc_page_data_size(main_cache, page) < PAGE_POINT_CTX_SIZE_BYTES(ctx)))
+            fatal("DBENGINE: hot page returned from main cache does not have the size for storing 1 point");
+
         // copy the point in data
         memcpy(pgc_page_data(page), data, PAGE_POINT_CTX_SIZE_BYTES(ctx));
 

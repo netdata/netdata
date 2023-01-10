@@ -1219,9 +1219,6 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
-    internal_fatal(entry->hot && !pgc_is_page_hot(page),
-                   "DBENGINE CACHE: requested to add a hot page, but the page returned is not hot");
-
     if(!entry->hot)
         evict_on_clean_page_added(cache);
 
