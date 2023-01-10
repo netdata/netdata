@@ -1175,16 +1175,16 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 #define query_add_point_to_group(r, point, ops)                   do {  \
     if(likely(netdata_double_isnumber((point).value))) {                \
         if(likely(fpclassify((point).value) != FP_ZERO))                \
-            (ops)->group_points_non_zero++;                              \
+            (ops)->group_points_non_zero++;                             \
                                                                         \
         if(unlikely((point).flags & SN_FLAG_RESET))                     \
-            (ops)->group_value_flags |= RRDR_VALUE_RESET;                \
+            (ops)->group_value_flags |= RRDR_VALUE_RESET;               \
                                                                         \
-        (ops)->grouping_add(r, (point).value);                           \
+        (ops)->grouping_add(r, (point).value);                          \
     }                                                                   \
                                                                         \
-    (ops)->group_points_added++;                                         \
-    (ops)->group_anomaly_rate += (point).anomaly;                        \
+    (ops)->group_points_added++;                                        \
+    (ops)->group_anomaly_rate += (point).anomaly;                       \
 } while(0)
 
 static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
