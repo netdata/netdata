@@ -42,7 +42,7 @@ static void update_metric_handle_from_rrddim(struct mem_metric_handle *mh, RRDDI
 }
 
 static void check_metric_handle_from_rrddim(struct mem_metric_handle *mh) {
-    RRDDIM *rd = mh->rd;
+    RRDDIM *rd = mh->rd; (void)rd;
     internal_fatal(mh->entries != (size_t)rd->rrdset->entries, "RRDDIM: entries do not match");
     internal_fatal(mh->update_every_s != rd->rrdset->update_every, "RRDDIM: update every does not match");
 }
