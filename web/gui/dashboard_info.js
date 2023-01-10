@@ -768,6 +768,25 @@ netdataDashboard.menu = {
         title: 'Consul',
         icon: '<i class="fas fa-circle-notch"></i>',
         info: 'Consul performance and health metrics. For details, see <a href="https://developer.hashicorp.com/consul/docs/agent/telemetry#key-metrics" target="_blank">Key Metrics</a>.'
+    },
+
+    'Systemd Logs': {
+        title: 'Systemd Logs',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Metrics extracted from log messages collected from the Journald daemon. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/systemd" target="_blank">the Fluent-Bit Systemd plugin</a>.'
+    },
+
+    'Docker Events Logs': {
+        title: 'Docker Events Logs',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Docker server events metrics. For details, see <a href="https://docs.fluentbit.io/manual/pipeline/inputs/docker-events" target="_blank">the Fluent-Bit Docker Events plugin</a> ' +
+        'and <a href="https://docs.docker.com/engine/reference/commandline/events/" target="_blank">the official Docker Events documentation</a>.'
+    },
+
+    'Apache access.log': {
+        title: 'Apache access.log',
+        icon: '<i class="fas fa-book"></i>',
+        info: 'Performance metrics exctracted from the Apache server <b>access.log</b>. If Go plugins are enabled, see also <a href="#menu_web_log_apache" target="_blank">the web log apache collector</a>.'
     }
 };
 
