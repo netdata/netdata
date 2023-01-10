@@ -996,6 +996,8 @@ static void sqlite3_statistics_charts(void) {
     // ----------------------------------------------------------------
 }
 
+#ifdef ENABLE_DBENGINE
+
 struct dbengine2_cache_pointers {
     RRDSET *st_cache_hit_ratio;
     RRDDIM *rd_hit_ratio_closest;
@@ -2323,6 +2325,7 @@ static void dbengine2_statistics_charts(void) {
         }
     }
 }
+#endif // ENABLE_DBENGINE
 
 static void update_strings_charts() {
     static RRDSET *st_ops = NULL, *st_entries = NULL, *st_mem = NULL;

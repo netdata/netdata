@@ -279,7 +279,7 @@ int __netdata_rwlock_trywrlock(netdata_rwlock_t *rwlock) {
 // https://www.youtube.com/watch?v=rmGJc9PXpuE&t=41s
 
 void netdata_spinlock_init(SPINLOCK *spinlock) {
-    *spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    memset(spinlock, 0, sizeof(SPINLOCK));
 }
 
 void netdata_spinlock_lock(SPINLOCK *spinlock) {

@@ -83,7 +83,7 @@ void worker_register(const char *name) {
     struct workers_workname *workname = *PValue;
     if(!workname) {
         workname = mallocz(sizeof(struct workers_workname));
-        workname->spinlock = NETDATA_SPINLOCK_INITIALIZER;
+        netdata_spinlock_init(&workname->spinlock);
         workname->base = NULL;
         *PValue = workname;
     }
