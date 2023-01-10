@@ -1007,7 +1007,6 @@ struct rrdhost {
 
     unsigned int health_enabled;                   // 1 when this host has health enabled
     bool health_spawn;                             // true when health thread is running
-    netdata_thread_t health_thread;                // the health thread
     unsigned int aclk_alert_reloaded;              // 1 on thread start and health reload, 0 after removed are sent
     time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
     STRING *health_default_exec;                   // the full path of the alarms notifications program

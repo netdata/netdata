@@ -82,7 +82,6 @@ void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 struct health_state {
     RRDHOST *host;
-    netdata_thread_t thread;
 };
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);

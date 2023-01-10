@@ -742,7 +742,6 @@ static void health_thread_cleanup(void *ptr) {
     struct health_state *h = ptr;
     h->host->health_spawn = 0;
 
-    netdata_thread_cancel(netdata_thread_self());
     log_health("[%s]: Health thread ended.", rrdhost_hostname(h->host));
     debug(D_HEALTH, "HEALTH %s: Health thread ended.", rrdhost_hostname(h->host));
 }
@@ -1576,7 +1575,8 @@ void health_thread_spawn(RRDHOST * host) {
         struct health_state *health = callocz(1, sizeof(*health));
         health->host = host;
 
-        if(netdata_thread_create(&host->health_thread, tag, NETDATA_THREAD_OPTION_JOINABLE, health_main, (void *) health)) {
+        netdata_thread_t health_thread;
+        if(netdata_thread_create(&health_thread, tag, NETDATA_THREAD_OPTION_DEFAULT, health_main, (void *) health)) {
             log_health("[%s]: Failed to create new thread for client.", rrdhost_hostname(host));
             error("HEALTH [%s]: Failed to create new thread for client.", rrdhost_hostname(host));
         }
