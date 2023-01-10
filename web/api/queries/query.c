@@ -1210,10 +1210,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
 
 static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_OPS *ops) {
     QUERY_TARGET *qt = r->internal.qt;
-    QUERY_METRIC *qm = &qt->query.array[dim_id_in_rrdr];
+    QUERY_METRIC *qm = &qt->query.array[dim_id_in_rrdr]; (void)qm;
     size_t points_wanted = qt->window.points;
     time_t after_wanted = qt->window.after;
-    time_t before_wanted = qt->window.before;
+    time_t before_wanted = qt->window.before; (void)before_wanted;
 
 //    bool debug_this = false;
 //    if(strcmp("user", string2str(rd->id)) == 0 && strcmp("system.cpu", string2str(rd->rrdset->id)) == 0)
