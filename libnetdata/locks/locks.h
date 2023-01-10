@@ -16,7 +16,9 @@ typedef struct netdata_spinlock {
     pid_t locker_pid;
 #endif
 } SPINLOCK;
-#define NETDATA_SPINLOCK_INITIALIZER (SPINLOCK) { .locked = false }
+
+#define NETDATA_SPINLOCK_INITIALIZER \
+    { .locked = false }
 
 void netdata_spinlock_init(SPINLOCK *spinlock);
 void netdata_spinlock_lock(SPINLOCK *spinlock);

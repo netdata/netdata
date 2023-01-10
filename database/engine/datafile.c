@@ -25,12 +25,11 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     fatal_assert(0 == uv_rwlock_init(&datafile->extent_rwlock));
     datafile->ctx = ctx;
 
-    datafile->users.spinlock = NETDATA_SPINLOCK_INITIALIZER;
     datafile->users.available = true;
 
-    datafile->extent_exclusive_access.spinlock = NETDATA_SPINLOCK_INITIALIZER;
-
-    datafile->writers.spinlock = NETDATA_SPINLOCK_INITIALIZER;
+    netdata_spinlock_init(&datafile->users.spinlock);
+    netdata_spinlock_init(&datafile->extent_exclusive_access.spinlock);
+    netdata_spinlock_init(&datafile->writers.spinlock);
 
     return datafile;
 }

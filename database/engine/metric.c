@@ -120,7 +120,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->latest_time_s_clean = entry->last_time_s;
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
-    metric->timestamps_lock = NETDATA_SPINLOCK_INITIALIZER;
+    netdata_spinlock_init(&metric->timestamps_lock);
     *PValue = metric;
 
     mrg_index_write_unlock(mrg);
