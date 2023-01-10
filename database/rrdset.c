@@ -134,7 +134,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->rrd_memory_mode = ctr->memory_mode;
 
     st->chart_type = ctr->chart_type;
-    st->gap_when_lost_iterations_above = (int) (gap_when_lost_iterations_above + 2);
     st->rrdhost = host;
 
     netdata_spinlock_init(&st->data_collection_lock);
@@ -1395,7 +1394,7 @@ static inline size_t rrdset_done_interpolate(
                 continue;
             }
 
-            if(likely(rd->updated && rd->collections_counter > 1 && iterations < st->gap_when_lost_iterations_above)) {
+            if(likely(rd->updated && rd->collections_counter > 1 && iterations < gap_when_lost_iterations_above)) {
                 uint32_t dim_storage_flags = storage_flags;
 
                 if (ml_is_anomalous(rd, current_time_s, new_value, true)) {

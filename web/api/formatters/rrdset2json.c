@@ -83,7 +83,7 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         "\t\t\t\"dimensions\": {\n",
         st->update_every);
 
-    unsigned long memory = sizeof(RRDSET) + st->memsize;
+    unsigned long memory = sizeof(RRDSET);
 
     size_t dimensions = 0;
     RRDDIM *rd;

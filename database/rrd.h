@@ -34,8 +34,8 @@ typedef struct ml_host ml_host_t;
 typedef struct ml_chart ml_chart_t;
 typedef struct ml_dimension ml_dimension_t;
 
-typedef enum {
-    QUERY_SOURCE_UNKNOWN,
+typedef enum __attribute__ ((__packed__)) {
+    QUERY_SOURCE_UNKNOWN = 0,
     QUERY_SOURCE_API_DATA,
     QUERY_SOURCE_API_BADGE,
     QUERY_SOURCE_API_WEIGHTS,
@@ -44,7 +44,7 @@ typedef enum {
     QUERY_SOURCE_UNITTEST,
 } QUERY_SOURCE;
 
-typedef enum storage_priority {
+typedef enum __attribute__ ((__packed__)) storage_priority {
     STORAGE_PRIORITY_CRITICAL = 0,
     STORAGE_PRIORITY_HIGH,
     STORAGE_PRIORITY_NORMAL,
@@ -66,12 +66,12 @@ struct pg_cache_page_index;
 // ----------------------------------------------------------------------------
 // memory mode
 
-typedef enum rrd_memory_mode {
-    RRD_MEMORY_MODE_NONE = 0,
-    RRD_MEMORY_MODE_RAM  = 1,
-    RRD_MEMORY_MODE_MAP  = 2,
-    RRD_MEMORY_MODE_SAVE = 3,
-    RRD_MEMORY_MODE_ALLOC = 4,
+typedef enum __attribute__ ((__packed__)) rrd_memory_mode {
+    RRD_MEMORY_MODE_NONE     = 0,
+    RRD_MEMORY_MODE_RAM      = 1,
+    RRD_MEMORY_MODE_MAP      = 2,
+    RRD_MEMORY_MODE_SAVE     = 3,
+    RRD_MEMORY_MODE_ALLOC    = 4,
     RRD_MEMORY_MODE_DBENGINE = 5,
 
     // this is 8-bit
@@ -133,8 +133,8 @@ extern bool dbengine_enabled;
 extern size_t storage_tiers;
 extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
-typedef enum {
-    RRD_BACKFILL_NONE,
+typedef enum __attribute__ ((__packed__)) {
+    RRD_BACKFILL_NONE = 0,
     RRD_BACKFILL_FULL,
     RRD_BACKFILL_NEW
 } RRD_BACKFILL;
@@ -165,10 +165,10 @@ typedef long long total_number;
 // ----------------------------------------------------------------------------
 // chart types
 
-typedef enum rrdset_type {
+typedef enum __attribute__ ((__packed__)) rrdset_type {
     RRDSET_TYPE_LINE    = 0,
     RRDSET_TYPE_AREA    = 1,
-    RRDSET_TYPE_STACKED = 2
+    RRDSET_TYPE_STACKED = 2,
 } RRDSET_TYPE;
 
 #define RRDSET_TYPE_LINE_NAME "line"
@@ -182,7 +182,7 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type);
 // ----------------------------------------------------------------------------
 // algorithms types
 
-typedef enum rrd_algorithm {
+typedef enum __attribute__ ((__packed__)) rrd_algorithm {
     RRD_ALGORITHM_ABSOLUTE              = 0,
     RRD_ALGORITHM_INCREMENTAL           = 1,
     RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL = 2,
@@ -213,7 +213,7 @@ DICTIONARY *rrdfamily_rrdvars_dict(const RRDFAMILY_ACQUIRED *rf);
 // flags & options
 
 // options are permanent configuration options (no atomics to alter/access them)
-typedef enum rrddim_options {
+typedef enum __attribute__ ((__packed__)) rrddim_options {
     RRDDIM_OPTION_NONE                              = 0,
     RRDDIM_OPTION_HIDDEN                            = (1 << 0), // this dimension will not be offered to callers
     RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS   = (1 << 1), // do not offer RESET or OVERFLOW info to callers
@@ -227,7 +227,7 @@ typedef enum rrddim_options {
 #define rrddim_option_clear(rd, option) (rd)->options &= ~(option)
 
 // flags are runtime changing status flags (atomics are required to alter/access them)
-typedef enum rrddim_flags {
+typedef enum __attribute__ ((__packed__)) rrddim_flags {
     RRDDIM_FLAG_NONE                            = 0,
     RRDDIM_FLAG_PENDING_HEALTH_INITIALIZATION   = (1 << 0),
 
@@ -246,7 +246,7 @@ typedef enum rrddim_flags {
 #define rrddim_flag_set(rd, flag)   __atomic_or_fetch(&((rd)->flags), (flag), __ATOMIC_SEQ_CST)
 #define rrddim_flag_clear(rd, flag) __atomic_and_fetch(&((rd)->flags), ~(flag), __ATOMIC_SEQ_CST)
 
-typedef enum rrdlabel_source {
+typedef enum __attribute__ ((__packed__)) rrdlabel_source {
     RRDLABEL_SRC_AUTO       = (1 << 0), // set when Netdata found the label by some automation
     RRDLABEL_SRC_CONFIG     = (1 << 1), // set when the user configured the label
     RRDLABEL_SRC_K8S        = (1 << 2), // set when this label is found from k8s (RRDLABEL_SRC_AUTO should also be set)
@@ -306,10 +306,10 @@ struct rrddim {
     STRING *id;                                     // the id of this dimension (for internal identification)
     STRING *name;                                   // the name of this dimension (as presented to user)
 
-    RRD_ALGORITHM algorithm:8;                      // the algorithm that is applied to add new collected values
-    RRDDIM_OPTIONS options:8;                       // permanent configuration options
-    RRD_MEMORY_MODE rrd_memory_mode:8;              // the memory mode for this dimension
-    /*RRDDIM_FLAGS*/ uint8_t flags;                 // run time changing status flags
+    RRD_ALGORITHM algorithm;                        // the algorithm that is applied to add new collected values
+    RRDDIM_OPTIONS options;                         // permanent configuration options
+    RRD_MEMORY_MODE rrd_memory_mode;                // the memory mode for this dimension
+    RRDDIM_FLAGS flags;                             // run time changing status flags
 
     bool updated;                                   // 1 when the dimension has been updated since the last processing
     bool exposed;                                   // 1 when set what have sent this dimension to the central netdata
@@ -527,7 +527,7 @@ void rrdr_fill_tier_gap_from_smaller_tiers(RRDDIM *rd, size_t tier, time_t now_s
 // flags are set/unset in a manner that is not thread safe
 // and may lead to missing information.
 
-typedef enum rrdset_flags {
+typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_DETAIL                           = (1 << 1),  // if set, the data set should be considered as a detail of another
                                                               // (the master data set should be the one that has the same family and is not detail)
     RRDSET_FLAG_DEBUG                            = (1 << 2),  // enables or disables debugging for a chart
@@ -612,13 +612,7 @@ struct rrdset {
 
     DICTIONARY *rrddim_root_index;                  // dimensions index
 
-    int gap_when_lost_iterations_above;             // after how many lost iterations a gap should be stored
-                                                    // netdata will interpolate values for gaps lower than this
-                                                    // TODO - use the global - all charts have the same value
-
     STORAGE_METRICS_GROUP *storage_metrics_groups[RRD_STORAGE_TIERS];
-
-    SPINLOCK data_collection_lock;
 
     // ------------------------------------------------------------------------
     // linking to siblings and parents
@@ -631,10 +625,12 @@ struct rrdset {
     // ------------------------------------------------------------------------
     // data collection members
 
+    SPINLOCK data_collection_lock;
+
     size_t counter;                                 // the number of times we added values to this database
     size_t counter_done;                            // the number of times rrdset_done() has been called
 
-    time_t last_accessed_time_s;                      // the last time this RRDSET has been accessed
+    time_t last_accessed_time_s;                    // the last time this RRDSET has been accessed
 
     usec_t usec_since_last_update;                  // the time in microseconds since the last collection of data
 
@@ -656,7 +652,6 @@ struct rrdset {
     //        (RRDSET_DB_STATE ptr to an undefined structure, and a call to clean this up during destruction)
 
     char *cache_dir;                                // the directory to store dimensions
-    unsigned long memsize;                          // how much mem we have allocated for this (without dimensions)
     void *st_on_file;                               // compatibility with V019 RRDSET files
 
     // ------------------------------------------------------------------------
@@ -746,7 +741,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st_on_file, RRD_MEMORY_MODE m
 // flags are set/unset in a manner that is not thread safe
 // and may lead to missing information.
 
-typedef enum rrdhost_flags {
+typedef enum __attribute__ ((__packed__)) rrdhost_flags {
     // Orphan, Archived and Obsolete flags
     RRDHOST_FLAG_ORPHAN                         = (1 << 10), // this host is orphan (not receiving data)
     RRDHOST_FLAG_ARCHIVED                       = (1 << 11), // The host is archived, no collected charts yet
@@ -790,7 +785,7 @@ typedef enum rrdhost_flags {
 #define rrdset_debug(st, fmt, args...) debug_dummy()
 #endif
 
-typedef enum {
+typedef enum __attribute__ ((__packed__)) {
     // Indexing
     RRDHOST_OPTION_INDEXED_MACHINE_GUID     = (1 << 0), // when set, we have indexed its machine guid
     RRDHOST_OPTION_INDEXED_HOSTNAME         = (1 << 1), // when set, we have indexed its hostname

@@ -1049,6 +1049,7 @@ static void get_netdata_configured_variables() {
         gap_when_lost_iterations_above = 1;
         config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
+    gap_when_lost_iterations_above += 2;
 
     // --------------------------------------------------------------------
     // get various system parameters
