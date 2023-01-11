@@ -31,6 +31,7 @@ void ml_dimension_delete(RRDDIM *RD);
 
 void ml_start_anomaly_detection_threads(RRDHOST *RH);
 void ml_stop_anomaly_detection_threads(RRDHOST *RH);
+void ml_cancel_anomaly_detection_threads(RRDHOST *RH);
 
 char *ml_get_host_info(RRDHOST *RH);
 char *ml_get_host_runtime_info(RRDHOST *RH);
