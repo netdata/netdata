@@ -1,1 +1,1024 @@
-<mxfile modified="2019-07-10T07:30:20.643Z" host="www.draw.io" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36" version="10.9.2" etag="JRR-u-yNVbUJwUu5Enbm" type="device"><diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">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</diagram></mxfile>
+<mxfile modified="2023-01-11T16:28:22.275Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="iPFcqWrhDfQf7XqxsKfV" version="20.8.4" type="github">
+  <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
+    <mxGraphModel dx="1354" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin/nut" id="129">
+          <mxCell style="group" parent="1" vertex="1" connectable="0">
+            <mxGeometry x="348" y="1688" width="112" height="52" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/firehol/netdata/blob/master/conf.d/charts.d/nut.conf" id="130">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528949/3bf2bc06-43bf-11e7-9e5a-7e04a9138c37.png;" parent="129" vertex="1">
+            <mxGeometry width="52" height="52" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Network&lt;div&gt;UPS&lt;/div&gt;&lt;div&gt;Tools&lt;/div&gt;" link="https://github.com/firehol/netdata/blob/master/conf.d/charts.d/nut.conf" id="131">
+          <mxCell style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontStyle=1" parent="129" vertex="1">
+            <mxGeometry x="52" y="1" width="60" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin/opensips" id="2">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528626/8172be36-43b8-11e7-8bc5-ab72292f713c.png;" parent="1" vertex="1">
+            <mxGeometry x="980" y="1706" width="157" height="37" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/couchdb" id="3">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/31036171-c62e6012-a573-11e7-92b1-d385911756fb.png;imageBackground=none;" parent="1" vertex="1">
+            <mxGeometry x="810" y="1515" width="156" height="44" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/retroshare" id="4">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528653/838a9446-43b8-11e7-95eb-22c83b65876c.png;" parent="1" vertex="1">
+            <mxGeometry x="400" y="1638" width="198" height="43" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/firehol/netdata/wiki/netdata-for-IoT" id="5">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528606/807278dc-43b8-11e7-9a0f-3122d40a297b.png;" parent="1" vertex="1">
+            <mxGeometry x="1154" y="2050" width="82" height="86" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/messagebird" id="6">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528607/80773520-43b8-11e7-8010-5219c75fbe9b.png;" parent="1" vertex="1">
+            <mxGeometry x="576" y="410" width="195" height="38" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="7" value="" style="whiteSpace=wrap;html=1;strokeColor=#C7D1E0;fillColor=none;gradientColor=#CCFFFF;fontSize=13;align=center;dashed=1;perimeterSpacing=0;opacity=30;rounded=0;shadow=0;glass=0;comic=0;strokeWidth=3;dashPattern=1 1;" parent="1" vertex="1">
+          <mxGeometry x="70" y="552" width="1171" height="471" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/phpfpm" id="8">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528604/806dd3ae-43b8-11e7-90cd-ec59e7e93db8.png;" parent="1" vertex="1">
+            <mxGeometry x="82" y="1530" width="124" height="42" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;font&gt;&lt;b&gt;APM&lt;br&gt;Application Metrics&lt;/b&gt;&lt;/font&gt;&lt;div&gt;statsd protocol&lt;/div&gt;&lt;div&gt;(TCP or UDP)&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/statsd.plugin" id="9">
+          <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=14;align=center;gradientColor=#CCFFFF;" parent="1" vertex="1">
+            <mxGeometry x="1022" y="1032" width="208" height="158" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Streaming&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Database Replication&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming" id="10">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="1034" y="690" width="202" height="97" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/firehol/netdata/tree/master/python.d#varnish-cache" id="11">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528611/80c7208a-43b8-11e7-9374-14f21e84f31c.png;" parent="1" vertex="1">
+            <mxGeometry x="1050" y="1556" width="93" height="93" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/fail2ban" id="12">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528612/80cb72d4-43b8-11e7-92c2-b61bc6187be6.png;" parent="1" vertex="1">
+            <mxGeometry x="1151" y="1312" width="95" height="78" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;fping.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;network latency&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/fping.plugin" id="13">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="484.33349609375" y="1031" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;freeipmi.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;enterprise h/w&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin" id="14">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="163" y="1031" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span&gt;To another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming#options-for-the-sending-node" id="15">
+          <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#9673a6;fillColor=#e1d5e7;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="1090" y="557" width="150" height="120" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/exim" id="17">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528609/809837e8-43b8-11e7-9bcf-474b6d87fbc5.png;" parent="1" vertex="1">
+            <mxGeometry x="605.5" y="1643" width="61" height="46" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/dovecot" id="18">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528610/80b618bc-43b8-11e7-873f-b32a36890b3f.png;" parent="1" vertex="1">
+            <mxGeometry x="690" y="1627" width="96" height="39" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/named" id="19">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528618/8113194a-43b8-11e7-9cb2-fe4cdd112fec.png;" parent="1" vertex="1">
+            <mxGeometry x="1067.5" y="1310" width="74" height="74" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/apache" id="20">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528622/8135d458-43b8-11e7-8419-a23f1dc5a2d0.png;" parent="1" vertex="1">
+            <mxGeometry x="86" y="1440" width="136" height="71" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="21" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="113" y="1147" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="22" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="103" y="1137" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="23" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="264" y="1137" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="24" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="444" y="1159" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="25" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="434" y="1149" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="26" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="424" y="1139" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="27" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="414" y="1129" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="28" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="95" y="1125" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="29" value="" style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="254" y="1126" width="110" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="30" value="" style="whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="674" y="887" width="557" height="130" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;metrics database&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal&quot;&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;(organized in hosts, charts and dimensions)&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/database#netdata-database" id="31">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+            <mxGeometry x="254" y="690" width="770" height="93" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;plugins.d&lt;/b&gt;&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;external plugins API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;text format, over pipes&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/plugins.d" id="32">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=16;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+            <mxGeometry x="74" y="887" width="580" height="130" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;font style=&quot;font-size: 18px&quot;&gt;&lt;b&gt;internal&amp;nbsp;&lt;/b&gt;&lt;b&gt;data collection API&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;(with add-only access to the database)&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors#internal-plugins-api" id="33">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+            <mxGeometry x="74" y="796" width="1160" height="77" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;font style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;Linux&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly /proc and /sys)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/proc.plugin#procplugin" id="34">
+          <mxCell style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+            <mxGeometry x="684" y="897" width="177" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;FreeBSD&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/freebsd.plugin" id="35">
+          <mxCell style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+            <mxGeometry x="871" y="897" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;MacOS&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;data collection&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(mainly sysctl)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/macos.plugin" id="36">
+          <mxCell style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+            <mxGeometry x="991" y="897" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="37" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
+          <mxGeometry x="369" y="863" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="38" value="&lt;div style=&quot;text-align: center&quot;&gt;&lt;span&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;netdata internal plugins&lt;/font&gt;&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left&quot;&gt;(running as threads inside netdata)&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="883" y="967" width="230" height="40" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;statsd&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(udp/tcp)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/statsd.plugin" id="39">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+            <mxGeometry x="1111" y="897" width="110" height="110" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;charts.d&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(bash plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin" id="40">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="85" y="1115" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;node.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(node.js plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin" id="41">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="244" y="1116" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;python.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(python plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin" id="42">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="404" y="1119" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;remote netdata servers&lt;/b&gt;&lt;div&gt;database replication, streaming metrics in realtime&lt;br&gt;over TCP&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming" id="43">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=16;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+            <mxGeometry x="706" y="1200" width="420" height="90" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="44" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15.79;dx=26.57;arrowHead=55;fontSize=16;direction=north;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="600" y="1007" width="130" height="223" as="geometry" />
+        </mxCell>
+        <mxCell id="45" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15.21;dx=32.57;arrowHead=55;fontSize=16;direction=north;flipH=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="1150" y="997" width="75" height="93" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;cgroups&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#cgroupsplugin" id="46">
+          <mxCell style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+            <mxGeometry x="774" y="957" width="87" height="53" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="47" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
+          <mxGeometry x="739" y="863" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="48" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
+          <mxGeometry x="891" y="863" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="49" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
+          <mxGeometry x="1011" y="863" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="50" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
+          <mxGeometry x="1131" y="863" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="51" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.43;fillColor=#ffcd28;strokeColor=#d79b00;gradientColor=#ffa500;gradientDirection=east;" parent="1" vertex="1">
+          <mxGeometry x="369" y="773" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="52" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.43;fillColor=#ffcd28;strokeColor=#d79b00;gradientColor=#ffa500;gradientDirection=east;" parent="1" vertex="1">
+          <mxGeometry x="649" y="773" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="53" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=10.43;fillColor=#ffcd28;strokeColor=#d79b00;gradientColor=#ffa500;gradientDirection=east;" parent="1" vertex="1">
+          <mxGeometry x="1106" y="774" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="54" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="504" y="1007" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="55" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="264" y="1007" width="70" height="120" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;apps.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;process tree&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/apps.plugin" id="56">
+          <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="324" y="1031" width="110" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="57" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="344" y="1007" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="58" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="424" y="1007" width="70" height="120" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;QoS&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(tc classes)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/tc.plugin#tcplugin" id="59">
+          <mxCell style="whiteSpace=wrap;html=1;" parent="1" vertex="1">
+            <mxGeometry x="684" y="957" width="80" height="53" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="60" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="183" y="1007" width="70" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mysql" id="61">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528613/80d9b420-43b8-11e7-8f7f-8e4ccc9ad41f.png;" parent="1" vertex="1">
+            <mxGeometry x="825" y="1410" width="127" height="86" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/squid" id="62">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528614/80e5538e-43b8-11e7-8640-f43ac3d70f5f.png;" parent="1" vertex="1">
+            <mxGeometry x="1144" y="1668" width="101" height="75" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/redis" id="63">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528616/80f902f8-43b8-11e7-82c2-6d34f4dfcae6.png;" parent="1" vertex="1">
+            <mxGeometry x="685" y="1318" width="145" height="46" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/postgres" id="64">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528615/80f6b638-43b8-11e7-86a6-d8f0cb560fc0.png;" parent="1" vertex="1">
+            <mxGeometry x="449" y="1318" width="184" height="62" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/freeradius" id="66">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528617/8109f568-43b8-11e7-9f48-14e3f39dc35f.png;" parent="1" vertex="1">
+            <mxGeometry x="812.5" y="1640" width="141" height="36" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/haproxy" id="67">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528620/81254a98-43b8-11e7-8464-1474aa385f6d.png;" parent="1" vertex="1">
+            <mxGeometry x="1062.5" y="1510" width="173" height="42" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/ipfs" id="68">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528621/81281520-43b8-11e7-8c7b-91fccb8c6916.png;" parent="1" vertex="1">
+            <mxGeometry x="227" y="1653.5" width="92" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/ovpn_status_log" id="69">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528619/81251f1e-43b8-11e7-8f9c-958219e14be9.png;" parent="1" vertex="1">
+            <mxGeometry x="980" y="1667.5" width="161" height="29" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/postfix" id="70">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529111/d26ce2f8-43c2-11e7-9bda-0d659de92f41.png;" parent="1" vertex="1">
+            <mxGeometry x="657" y="1691" width="70" height="49" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/nginx" id="72">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528623/813c32b2-43b8-11e7-95c4-153aa5efdd5e.png;" parent="1" vertex="1">
+            <mxGeometry x="238" y="1500" width="112" height="24" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Backends&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Metrics Archiving&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/backends" id="73">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="786" y="607" width="237" height="70" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;Alarms&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;Health Monitoring" link="https://github.com/netdata/netdata/tree/master/health#health-monitoring" id="74">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="539" y="607" width="237" height="70" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;Query Engine&lt;/font&gt;&lt;/b&gt;&lt;br&gt;Data reduction &amp;amp; re-sampling&lt;br&gt;" link="https://github.com/netdata/netdata/tree/master/web/api/queries" id="75">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="254" y="607" width="275" height="70" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;HTTP API&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/web/api" id="76">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="74" y="557" width="800" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; Notifications&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/health/notifications" id="77">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="675" y="470" width="163" height="77" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="78" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;flipH=1;direction=north;" parent="1" vertex="1">
+          <mxGeometry x="684" y="527" width="100" height="120" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends/graphite" id="79">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529200/52a30280-43c4-11e7-85c6-b88321a49d61.png;" parent="1" vertex="1">
+            <mxGeometry x="900" y="307" width="179" height="47" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends/opentsdb" id="80">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528624/814fd1aa-43b8-11e7-9125-5e5c3c677aef.png;" parent="1" vertex="1">
+            <mxGeometry x="1000" y="423" width="198" height="41" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="81">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528632/81c29fdc-43b8-11e7-8bfe-fc832d11b72d.png;" parent="1" vertex="1">
+            <mxGeometry x="1126" y="360" width="109" height="50" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="83" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="844" y="407" width="110" height="235" as="geometry" />
+        </mxCell>
+        <mxCell id="84" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="1054" y="597" width="83" height="115" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="85">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528636/81e18712-43b8-11e7-94b9-37ea1cf6c3a6.png;" parent="1" vertex="1">
+            <mxGeometry x="1106" y="300" width="114" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="86" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="626" y="667" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="87" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0.1;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="870" y="667" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="88" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=east;notch=0;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="1014" y="703" width="35" height="70" as="geometry" />
+        </mxCell>
+        <UserObject label="netdata&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;registry&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;my-netdata menu&lt;/font&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/registry#netdata-registry" id="89">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="74" y="607" width="170" height="176" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="90" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.twoWayArrow;dy=0.52;dx=21.1;strokeColor=#82b366;fillColor=#d5e8d4;fontSize=14;direction=south;" parent="1" vertex="1">
+          <mxGeometry x="133" y="577" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="91" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="357" y="584" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="92" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="619" y="584" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="93" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="103" y="1006" width="70" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="94" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;strokeColor=#6A9153;fillColor=#ffffff;gradientColor=#FFF2F9;fontSize=14;align=center;direction=south;" parent="1" vertex="1">
+          <mxGeometry x="85" y="1293" width="1159" height="20" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;b&gt;SNMP&lt;/b&gt;&lt;div&gt;enterprise&lt;/div&gt;&lt;div&gt;network&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/snmp" id="95">
+          <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;fontSize=14;align=center;gradientColor=#F0F9FF;" parent="1" vertex="1">
+            <mxGeometry x="70" y="1230" width="210" height="199" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="96" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15.21;dx=32.57;arrowHead=55;fontSize=16;direction=north;flipH=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="210" y="1167" width="94" height="163" as="geometry" />
+        </mxCell>
+        <mxCell id="97" value="headless" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="1106" y="798" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="98" value="store &amp;amp;&lt;div&gt;forward&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="953" y="721" width="60" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;span&gt;from another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming#options-for-the-receiving-node" id="99">
+          <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#9673a6;fillColor=#e1d5e7;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="1083" y="1184" width="150" height="120" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="100" value="" style="curved=1;endArrow=block;html=1;fontSize=14;entryX=0.847;entryY=0.256;entryPerimeter=0;startArrow=oval;startFill=1;endFill=1;dashed=1;strokeWidth=3;fillColor=#f5f5f5;strokeColor=#C7D1E0;dashPattern=1 1;endSize=8;exitX=0.8;exitY=0.8;exitPerimeter=0;" parent="1" source="15" target="99" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1239" y="641" as="sourcePoint" />
+            <mxPoint x="1364" y="727" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="1264" y="660" />
+              <mxPoint x="1254" y="900" />
+              <mxPoint x="1254" y="1110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/slack" id="101">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529341/ebcbc5d0-43c6-11e7-9056-df89e0c10e6a.png;" parent="1" vertex="1">
+            <mxGeometry x="530" y="302" width="162" height="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pushbullet" id="102">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528627/81813ef2-43b8-11e7-9371-9dfcfb1f27f8.png;" parent="1" vertex="1">
+            <mxGeometry x="553" y="363" width="188" height="32" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/discord" id="103">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528628/8195a284-43b8-11e7-8582-e94e53feb1c7.png;" parent="1" vertex="1">
+            <mxGeometry x="440" y="227" width="146" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pagerduty" id="104">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528630/81a3e33a-43b8-11e7-89a0-53c9d89ef2d6.png;" parent="1" vertex="1">
+            <mxGeometry x="500" y="188" width="140" height="26" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/telegram" id="105">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529349/256417f2-43c7-11e7-8036-9aa59efe0605.png;" parent="1" vertex="1">
+            <mxGeometry x="452" y="363" width="77" height="83" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/twilio" id="106">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528631/81c0f9b6-43b8-11e7-9088-77d895f50346.png;" parent="1" vertex="1">
+            <mxGeometry x="600" y="250" width="134" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="107" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;flipH=1;direction=east;" parent="1" vertex="1">
+          <mxGeometry x="710" y="300" width="100" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="109" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528634/81caae16-43b8-11e7-9c68-45b69b1e92ab.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="285" y="709" width="48" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="110" value="" style="shadow=0;dashed=0;html=1;strokeColor=none;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.mscae.cloud.api_management;fillColor=#0079D6;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="91" y="562" width="35" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;div style=&quot;text-align: right&quot;&gt;&lt;b&gt;&lt;font style=&quot;font-size: 24px&quot;&gt;netdata&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;text-align: right&quot;&gt;simple. effective. awesome!&lt;/div&gt;&lt;div style=&quot;text-align: right&quot;&gt;&lt;b&gt;https://netdata.cloud&lt;/b&gt;&lt;/div&gt;&lt;div style=&quot;text-align: right&quot;&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;br&gt;(C) Copyright 2018&lt;br&gt;&lt;/span&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;Netdata, Inc.&lt;/span&gt;&lt;/div&gt;" link="https://netdata.cloud" id="111">
+          <mxCell style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=20;" parent="1" vertex="1">
+            <mxGeometry x="994" y="1763.666748046875" width="270" height="160" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="112" value="&lt;font style=&quot;font-size: 26px&quot;&gt;high level feature set and architecture of &lt;b&gt;netdata&lt;/b&gt;&lt;/font&gt;&lt;div&gt;&lt;span&gt;the open-source, real-time, performance and health monitoring&lt;/span&gt;&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=20;" parent="1" vertex="1">
+          <mxGeometry x="424" y="40" width="580" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="113" value="" style="endArrow=none;html=1;dashed=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=20;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="73" y="1754" as="sourcePoint" />
+            <mxPoint x="1254" y="1754" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="114" value="" style="shadow=0;dashed=0;html=1;strokeColor=none;fillColor=#0079D6;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.azure.health_monitoring;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="549" y="624" width="45" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="115" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528633/81c95b24-43b8-11e7-808d-651a09e9ecca.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="685" y="490" width="31" height="29" as="geometry" />
+        </mxCell>
+        <mxCell id="116" value="" style="shadow=0;dashed=0;html=1;strokeColor=none;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.office.users.users;fillColor=#2072B8;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="85" y="735" width="46" height="41" as="geometry" />
+        </mxCell>
+        <mxCell id="117" value="" style="shadow=0;dashed=0;html=1;strokeColor=none;fillColor=#505050;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;shape=mxgraph.office.servers.server_farm;fillColor=#DA4026;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="194" y="737" width="39" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="118" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528635/81d4c720-43b8-11e7-8578-00c9ed60c219.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="1054" y="704" width="35" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="119" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528645/8275abfe-43b8-11e7-9d21-306ab844f7bb.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="127" y="933" width="61" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="120" value="" style="endArrow=none;html=1;dashed=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=20;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="106" as="sourcePoint" />
+            <mxPoint x="1285" y="105.5714111328125" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="121" value="&lt;div&gt;netdata is a &lt;b&gt;monitoring agent&lt;/b&gt;: you install it on all your systems:&lt;/div&gt;&lt;div&gt;&amp;nbsp;- supports &lt;b&gt;auto-detection&lt;/b&gt;&amp;nbsp;and &lt;b&gt;zero configuration&lt;/b&gt;&amp;nbsp;for most applications and systems&lt;/div&gt;&amp;nbsp;- is &lt;b&gt;real-time&lt;/b&gt;: every metric is on your dashboard in less than 1-second (collection to visualization)&lt;div&gt;&amp;nbsp;- is &lt;b&gt;fast&lt;/b&gt;: for a few thousand metrics per second, it needs &amp;lt; 1% CPU of a single core&lt;/div&gt;&lt;div&gt;&amp;nbsp;- and&amp;nbsp;&lt;b&gt;efficient&lt;/b&gt;: it needs a few MB of RAM and no disk I/O at all while it runs&lt;/div&gt;&lt;div&gt;&amp;nbsp;- also, it is&amp;nbsp;&lt;b&gt;embeddable&lt;/b&gt;, &lt;b&gt;extensible&lt;/b&gt;, and&amp;nbsp;&lt;b&gt;open-source&lt;/b&gt;&amp;nbsp;(GPL v3+)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;...and netdata runs everywhere:&lt;/div&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=18;" parent="1" vertex="1">
+          <mxGeometry x="73" y="1774" width="800" height="170" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mongodb" id="123">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528638/8218d8de-43b8-11e7-9720-3b6a5eed1146.png;" parent="1" vertex="1">
+            <mxGeometry x="556" y="1515" width="182" height="51" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/nsd" id="124">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529281/e5054aba-43c5-11e7-8c58-7d61ae6cacc7.png;" parent="1" vertex="1">
+            <mxGeometry x="1144" y="1413" width="97" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/isc_dhcpd" id="125">
+          <mxCell style="group" parent="1" vertex="1" connectable="0">
+            <mxGeometry x="977.5" y="1440" width="147.5" height="44" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/firehol/netdata/tree/master/python.d#isc_dhcpd" id="126">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528644/82759286-43b8-11e7-913b-4e6e0b4d5e5b.png;" parent="125" vertex="1">
+            <mxGeometry y="13.600000000000001" width="123.2" height="30.400000000000002" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="127" value="&lt;font style=&quot;font-size: 14px&quot;&gt;DHCP&lt;/font&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=26;fontStyle=1" parent="125" vertex="1">
+          <mxGeometry x="67.01298701298701" y="-5" width="60" height="40" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/sensors" id="128">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528639/822c2c40-43b8-11e7-9755-278480ba7fe7.png;" parent="1" vertex="1">
+            <mxGeometry x="200" y="1700" width="134" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin/apcupsd" id="132">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528640/823c442c-43b8-11e7-8081-57b558e9a2b0.png;" parent="1" vertex="1">
+            <mxGeometry x="466.5" y="1698.5" width="179" height="43" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="133" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528641/82468914-43b8-11e7-8018-af01bd67cba2.png;" parent="1" vertex="1">
+          <mxGeometry x="357" y="1960" width="92" height="73" as="geometry" />
+        </mxCell>
+        <mxCell id="134" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528642/82562b62-43b8-11e7-85f5-31c7f70e057b.png;" parent="1" vertex="1">
+          <mxGeometry x="464" y="1965" width="76" height="69" as="geometry" />
+        </mxCell>
+        <mxCell id="135" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528647/82db5e7c-43b8-11e7-837e-b2de7adbb878.png;" parent="1" vertex="1">
+          <mxGeometry x="556" y="1959" width="89" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="137" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529330/b4c0293c-43c6-11e7-9751-b66fad47604a.png;" parent="1" vertex="1">
+          <mxGeometry x="188" y="2052" width="93" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="138" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528649/82f60f6a-43b8-11e7-8d7e-aab838249843.png;" parent="1" vertex="1">
+          <mxGeometry x="871" y="1973" width="95" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="139" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528650/8311b94a-43b8-11e7-8475-6096e0ab7025.png;" parent="1" vertex="1">
+          <mxGeometry x="994" y="1973" width="119" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="140" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528651/832e5f1e-43b8-11e7-8ba2-19ce72f932ba.png;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1963" width="94" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="141" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528648/82de5cbc-43b8-11e7-841f-a226ba8e5c59.png;" parent="1" vertex="1">
+          <mxGeometry x="195" y="1958.5" width="60" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="142" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528654/8395aee4-43b8-11e7-9b0b-87fe2ac5811c.png;" parent="1" vertex="1">
+          <mxGeometry x="659" y="1958" width="93" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="143" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528655/83a954d0-43b8-11e7-8551-fbce651f9d4f.png;" parent="1" vertex="1">
+          <mxGeometry x="761.5" y="1955" width="87" height="79" as="geometry" />
+        </mxCell>
+        <mxCell id="144" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528656/83aef5a2-43b8-11e7-8cbc-543e0b739f1e.png;" parent="1" vertex="1">
+          <mxGeometry x="1010" y="2100" width="136" height="34" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/firehol/netdata/wiki/netdata-for-IoT" id="145">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528652/835acc70-43b8-11e7-9b04-0e355fe46b45.png;" parent="1" vertex="1">
+            <mxGeometry x="1003.5" y="2053" width="135" height="31" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mysql" id="146">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528659/83cfad88-43b8-11e7-8a33-03d4f0b31cac.png;" parent="1" vertex="1">
+            <mxGeometry x="726" y="1415" width="79" height="73" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="147" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528658/83cc4c60-43b8-11e7-9260-ed6d5f03b1f4.png;" parent="1" vertex="1">
+          <mxGeometry x="602.5" y="2054" width="63" height="83" as="geometry" />
+        </mxCell>
+        <mxCell id="148" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528657/83b9bece-43b8-11e7-95cd-17fa93d37a46.png;" parent="1" vertex="1">
+          <mxGeometry x="952.5" y="1053.5" width="72" height="66" as="geometry" />
+        </mxCell>
+        <mxCell id="149" value="" style="endArrow=block;dashed=1;html=1;dashPattern=1 1;fontFamily=Helvetica;fontSize=13;fontColor=#000000;align=center;strokeColor=#C7D1E0;strokeWidth=3;startArrow=none;startFill=0;endFill=1;exitX=0.5;exitY=0;" parent="1" source="148" target="35" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="884" y="1057" as="sourcePoint" />
+            <mxPoint x="934" y="1007" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="884" y="1000" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="150" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.5;entryY=0;exitX=1;exitY=0.75;startArrow=block;startFill=1;" parent="1" source="34" target="148" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="794" y="1147" as="sourcePoint" />
+            <mxPoint x="844" y="1097" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="874" y="1000" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="151" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
+          <mxGeometry x="357" y="667" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="152" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528664/84510b62-43b8-11e7-990b-6bc09e5ea649.png;" parent="1" vertex="1">
+          <mxGeometry x="394.5" y="2061" width="99" height="71" as="geometry" />
+        </mxCell>
+        <mxCell id="153" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529313/70be8382-43c6-11e7-943b-2c0ec46cc782.png;" parent="1" vertex="1">
+          <mxGeometry x="81" y="2080" width="95" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="154" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528662/84277932-43b8-11e7-9322-db0e415d9d04.png;" parent="1" vertex="1">
+          <mxGeometry x="684.5" y="2053" width="63" height="83" as="geometry" />
+        </mxCell>
+        <mxCell id="155" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528667/848aff48-43b8-11e7-85ec-1b904e34246e.png;" parent="1" vertex="1">
+          <mxGeometry x="499.5" y="2050" width="89" height="91" as="geometry" />
+        </mxCell>
+        <mxCell id="156" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528660/83f71b8e-43b8-11e7-9240-f443470a9aa9.png;" parent="1" vertex="1">
+          <mxGeometry x="299" y="2055" width="86" height="77" as="geometry" />
+        </mxCell>
+        <mxCell id="157" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528661/840ec356-43b8-11e7-8011-f8260539cf2d.png;" parent="1" vertex="1">
+          <mxGeometry x="786" y="1896" width="160" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="158" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528663/842f7c18-43b8-11e7-9ff1-a76f1cefd321.png;" parent="1" vertex="1">
+          <mxGeometry x="970" y="1896" width="132" height="37" as="geometry" />
+        </mxCell>
+        <mxCell id="159" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528666/845b707a-43b8-11e7-9260-6594db9f8b12.png;" parent="1" vertex="1">
+          <mxGeometry x="673.5" y="1871" width="101" height="76" as="geometry" />
+        </mxCell>
+        <mxCell id="160" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528665/845b0fcc-43b8-11e7-8955-89043524e863.png;" parent="1" vertex="1">
+          <mxGeometry x="759" y="2075" width="88" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="161" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529042/23528fa8-43c1-11e7-94bd-d01e7ded928d.png;" parent="1" vertex="1">
+          <mxGeometry x="1134" y="1991" width="116" height="40" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;font style=&quot;font-size: 20px&quot;&gt;system&lt;u&gt;d&lt;/u&gt;&lt;/font&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/cgroups.plugin#monitoring-systemd-services" id="162">
+          <mxCell style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontStyle=1" parent="1" vertex="1">
+            <mxGeometry x="797" y="1145" width="90" height="20" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="163" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.421;entryY=0.191;startArrow=block;startFill=1;entryPerimeter=0;" parent="1" source="46" target="162" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="871" y="952" as="sourcePoint" />
+            <mxPoint x="909" y="1059" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="164" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529330/b4c0293c-43c6-11e7-9751-b66fad47604a.png;" parent="1" vertex="1">
+          <mxGeometry x="688" y="1083.5" width="55" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="165" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528664/84510b62-43b8-11e7-990b-6bc09e5ea649.png;" parent="1" vertex="1">
+          <mxGeometry x="776" y="1089.5" width="47" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="166" value="" style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26529313/70be8382-43c6-11e7-943b-2c0ec46cc782.png;" parent="1" vertex="1">
+          <mxGeometry x="662.5" y="1039.5" width="72" height="39" as="geometry" />
+        </mxCell>
+        <mxCell id="167" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.5;entryY=0;startArrow=block;startFill=1;" parent="1" source="46" target="165" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="849" y="1020" as="sourcePoint" />
+            <mxPoint x="850" y="1112" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="168" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.75;entryY=0;startArrow=block;startFill=1;" parent="1" source="46" target="164" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="828" y="1020" as="sourcePoint" />
+            <mxPoint x="818" y="1076" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="169" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.75;entryY=0;startArrow=block;startFill=1;" parent="1" source="46" target="166" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="764" y="1037" as="sourcePoint" />
+            <mxPoint x="777" y="1087" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="170" value="&lt;font color=&quot;#e6d0de&quot;&gt;netdata daemon&lt;/font&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontColor=#E6E6E6;rotation=90;" parent="1" vertex="1">
+          <mxGeometry x="1195" y="593" width="110" height="20" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;web_log&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;real-time web performance&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/web_log" id="171">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="429" y="1230" width="120" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="174" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;strokeColor=#6A9153;fillColor=#ffffff;gradientColor=#FFF2F9;fontSize=14;align=center;direction=south;" parent="1" vertex="1">
+          <mxGeometry x="877" y="265" width="377" height="20" as="geometry" />
+        </mxCell>
+        <UserObject label="standard dashboard" link="https://registry.my-netdata.io/" id="176">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528929/cbe844ee-43be-11e7-8e1b-7899d142c1a5.png;fontSize=14;" parent="1" vertex="1">
+            <mxGeometry x="75" y="315" width="121" height="107" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;font-size: 16px&quot;&gt;&lt;b&gt;dashboard.js&lt;/b&gt;&lt;/span&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;real-time netdata charts&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;on any web page&lt;/font&gt;&lt;/div&gt;" id="177">
+          <mxCell style="whiteSpace=wrap;html=1;strokeColor=#666666;fillColor=#f5f5f5;fontSize=14;align=center;" parent="1" vertex="1">
+            <mxGeometry x="75" y="470" width="249" height="74" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="178" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="159" y="534" width="70" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="custom dashboards" link="https://github.com/firehol/netdata/wiki/Custom-Dashboards" id="179">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528933/e9bd18b4-43be-11e7-9e3c-725342bbcdca.png;fontSize=14;" parent="1" vertex="1">
+            <mxGeometry x="204" y="315" width="121" height="108" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="180" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="100" y="446" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="181" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="229" y="446" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="182" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="357" y="533" width="70" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="SVG badges from metrics" link="https://github.com/netdata/netdata/tree/master/web/api/badges" id="183">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528965/8993b082-43bf-11e7-8d5b-3eea117bbd55.png;fontSize=14;spacingTop=-3;" parent="1" vertex="1">
+            <mxGeometry x="469" y="485" width="161" height="25" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="184" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="512" y="534" width="70" height="30" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin/ap" id="185">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528669/84b0fd1a-43b8-11e7-9e11-64ebc53766cb.png;" parent="1" vertex="1">
+            <mxGeometry x="623" y="1584.5" width="57" height="36" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/memcached" id="186">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528670/84b1a6f2-43b8-11e7-9b30-391149075235.png;" parent="1" vertex="1">
+            <mxGeometry x="744" y="1503" width="55" height="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="use metrics&#xa;in your scripts" link="https://github.com/netdata/netdata/tree/master/web/api/exporters/shell" id="187">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528672/84d2eda8-43b8-11e7-8385-6ad78be4d7cc.png;fontSize=14;spacing=2;spacingTop=-14;" parent="1" vertex="1">
+            <mxGeometry x="352" y="438" width="77" height="66" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="188" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528673/84d4fc60-43b8-11e7-9512-5db073e72e9f.png;" parent="1" vertex="1">
+          <mxGeometry x="283" y="1956" width="58" height="77" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/email" id="189">
+          <mxCell style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528675/84f226d2-43b8-11e7-9de6-6d7c391aaa8d.png;rounded=0;shadow=0;glass=0;dashed=1;dashPattern=1 1;comic=0;strokeColor=#C7D1E0;strokeWidth=3;fillColor=none;gradientColor=#CCFFFF;fontSize=14;fontColor=#E6E6E6;align=center;" parent="1" vertex="1">
+            <mxGeometry x="766" y="250" width="56" height="56" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/rabbitmq" id="190">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528674/84f187cc-43b8-11e7-9239-43a0825aa92a.png;" parent="1" vertex="1">
+            <mxGeometry x="280" y="1390" width="189" height="50" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/pushover" id="191">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528605/80703edc-43b8-11e7-839d-267f613e15b0.png;" parent="1" vertex="1">
+            <mxGeometry x="654" y="205" width="134" height="28" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="192" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528645/8275abfe-43b8-11e7-9d21-306ab844f7bb.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
+          <mxGeometry x="127" y="815" width="61" height="39" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/fronius" id="194">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://user-images.githubusercontent.com/12159026/28160720-5c8e2718-67c1-11e7-8018-759767e9c766.png;" parent="1" vertex="1">
+            <mxGeometry x="731.5" y="1674" width="82" height="32" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/stiebeleltron" id="195">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://user-images.githubusercontent.com/12159026/28159553-9b155924-67bd-11e7-9bdc-b8675f60c77b.png;" parent="1" vertex="1">
+            <mxGeometry x="740" y="1711.5" width="119" height="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/powerdns" id="196">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/30879830-48619148-a309-11e7-96fc-81497a348341.png;" parent="1" vertex="1">
+            <mxGeometry x="859.5" y="1321.5" width="190" height="32" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/chrony" id="197">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/30880129-3f00fd86-a30a-11e7-8487-30fe4137ec3b.png;" parent="1" vertex="1">
+            <mxGeometry x="1118" y="1465" width="123" height="36" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/flock" id="198">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/32355748-512dda64-c039-11e7-8117-bc31a0cf50eb.png;" parent="1" vertex="1">
+            <mxGeometry x="370" y="311" width="142" height="50" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/beanstalk" id="199">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/32415654-a8f9ad3c-c245-11e7-902f-e04bdf0661e6.png;" parent="1" vertex="1">
+            <mxGeometry x="287" y="1321.5" width="140" height="49" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/alerta" id="200">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/34533144-9ecf2918-f0c1-11e7-928e-c2654b092303.png;" parent="1" vertex="1">
+            <mxGeometry x="420" y="275" width="106" height="27" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="201" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/34533412-c59e2c28-f0c2-11e7-9ae3-8eb392608029.png;" parent="1" vertex="1">
+          <mxGeometry x="845" y="1086.5" width="79" height="51" as="geometry" />
+        </mxCell>
+        <mxCell id="202" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;exitX=1;exitY=0.75;startArrow=block;startFill=1;entryX=0.662;entryY=0.006;entryPerimeter=0;" parent="1" source="34" target="201" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="871.2857142857142" y="952.1428571428571" as="sourcePoint" />
+            <mxPoint x="935.8571428571429" y="1069.2857142857142" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="870" y="1020" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/charts.d.plugin/libreswan" id="203">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/34575234-a3d94b0c-f182-11e7-8002-dad5c88b4da8.png;" parent="1" vertex="1">
+            <mxGeometry x="868.5" y="1685" width="104" height="57" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/irc" id="204">
+          <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://user-images.githubusercontent.com/31221999/36795772-8b096efe-1cac-11e8-8d6d-791ee5c88179.png;" parent="1" vertex="1">
+            <mxGeometry x="680" y="153" width="69" height="35" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/ceph" id="205">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37906004-70962334-3109-11e8-9d55-02d2bd06dafc.png;" parent="1" vertex="1">
+            <mxGeometry x="270.5" y="1563" width="77" height="96" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;font size=&quot;1&quot;&gt;&lt;b style=&quot;font-size: 25px&quot;&gt;ntpd&lt;/b&gt;&lt;/font&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/ntpd" id="206">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="985.5" y="1367" width="63" height="34" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/nginx_plus" id="209">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37907025-95e2e5c0-310c-11e8-997f-4d7ec9a79f76.png;" parent="1" vertex="1">
+            <mxGeometry x="238" y="1450" width="132" height="45" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;httpcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote web port&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/httpcheck" id="210">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="297" y="1230" width="120" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;portcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote TCP port&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/portcheck" id="211">
+          <mxCell style="whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+            <mxGeometry x="560" y="1230" width="120" height="60" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="215" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37907799-cf84a726-310e-11e8-9964-057e0297752d.png;" parent="1" vertex="1">
+          <mxGeometry x="707" y="1133" width="83" height="43" as="geometry" />
+        </mxCell>
+        <mxCell id="216" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;entryX=0.5;entryY=0;startArrow=block;startFill=1;exitX=0.291;exitY=1.021;exitPerimeter=0;" parent="1" source="46" target="215" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="819.4939412610393" y="1020" as="sourcePoint" />
+            <mxPoint x="784.2352941176473" y="1136.7058823529414" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="217" value="&lt;font style=&quot;font-size: 20px&quot;&gt;&lt;b&gt;bcache&lt;/b&gt;&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="953" y="1150.5" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="220" value="" style="endArrow=none;dashed=1;html=1;dashPattern=1 1;strokeColor=#C7D1E0;strokeWidth=3;fontSize=13;exitX=1;exitY=0.75;startArrow=block;startFill=1;entryX=0.25;entryY=0;" parent="1" source="34" target="217" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="871" y="952" as="sourcePoint" />
+            <mxPoint x="907" y="1130" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="880" y="1030" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/traefik" id="221">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37908248-4f38d018-3110-11e8-8ef6-53aab84c26ca.png;" parent="1" vertex="1">
+            <mxGeometry x="1160" y="1560" width="74" height="100" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/icecast" id="223">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37908744-b9166bde-3111-11e8-9706-da2c7c1c55bb.png;" parent="1" vertex="1">
+            <mxGeometry x="358.5" y="1540" width="53" height="53" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/springboot" id="224">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37909449-9ccaba6e-3113-11e8-98b7-7ad8204bbcf5.png;" parent="1" vertex="1">
+            <mxGeometry x="460" y="1581" width="151" height="49" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="226" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609442-6a8da100-da47-11e8-9918-468e59e8e70f.png;" parent="1" vertex="1">
+          <mxGeometry x="858" y="2072" width="142" height="63" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/elasticsearch" id="227">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609507-8d6c8500-da48-11e8-9556-0cebef6862f2.png;" parent="1" vertex="1">
+            <mxGeometry x="694" y="1571" width="226" height="55" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="228" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609535-4206a680-da49-11e8-80bb-793dc9a783dd.png;" parent="1" vertex="1">
+          <mxGeometry x="1013.5" y="184" width="98" height="89" as="geometry" />
+        </mxCell>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="230">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609564-f7d1f500-da49-11e8-936a-6d0ff9329ded.png;" parent="1" vertex="1">
+            <mxGeometry x="940" y="361" width="162" height="40" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends/prometheus" id="231">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609572-2354df80-da4a-11e8-9121-49d3f1a74fce.png;" parent="1" vertex="1">
+            <mxGeometry x="959" y="476" width="274" height="52" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/awssns" id="232">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609620-26040480-da4b-11e8-8ac3-c1b6a209619f.png;" parent="1" vertex="1">
+            <mxGeometry x="510" y="120" width="140" height="56" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/health/notifications/rocketchat" id="233">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609674-ec7fc900-da4b-11e8-84cd-ff47fe586f84.png;" parent="1" vertex="1">
+            <mxGeometry x="422" y="143" width="77" height="77" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/adaptec_raid" id="234">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609913-17b8e700-da51-11e8-8828-dadf97b32a99.png;" parent="1" vertex="1">
+            <mxGeometry x="84" y="1585.5" width="124" height="39" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/boinc" id="235">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609954-c0674680-da51-11e8-9e7f-d2f0425c0c94.png;" parent="1" vertex="1">
+            <mxGeometry x="78.5" y="1691" width="109" height="56" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/dockerd" id="236">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529330/b4c0293c-43c6-11e7-9751-b66fad47604a.png;" parent="1" vertex="1">
+            <mxGeometry x="980" y="1564" width="60" height="51" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/hddtemp" id="237">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610043-2228b000-da54-11e8-9ce3-ca7e11207cf3.png;" parent="1" vertex="1">
+            <mxGeometry x="222" y="1585" width="49" height="46" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/litespeed" id="239">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610070-df1b0c80-da54-11e8-823f-d50b3ec97d42.png;" parent="1" vertex="1">
+            <mxGeometry x="424" y="1510" width="126" height="62" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/web_log" id="122">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528643/826ac662-43b8-11e7-9e85-1c2fb9bda363.png;" parent="1" vertex="1">
+            <mxGeometry x="484.5" y="1419.5" width="80" height="78" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;dnsdist&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/dnsdist" id="240">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="1071" y="1382.5" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;linux power supply&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/linux_power_supply" id="242">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="972.5" y="1491" width="72" height="69" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;mdstat&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mdstat" id="244">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="326" y="1644" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;megacli&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/megacli" id="245">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="245" y="1535.5" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/monit" id="246">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610128-25bd3680-da56-11e8-9776-8b463033141e.png;" parent="1" vertex="1">
+            <mxGeometry x="920.5" y="1578" width="46" height="49" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/proxysql" id="247">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610153-b3008b00-da56-11e8-8eec-73cfdbf2dc54.png;" parent="1" vertex="1">
+            <mxGeometry x="552" y="1371" width="168" height="42" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/puppet" id="249">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610182-9022a680-da57-11e8-9905-5a7d1ec1f2ff.png;" parent="1" vertex="1">
+            <mxGeometry x="585.5" y="1464" width="119" height="47" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/rethinkdbs" id="250">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610207-41c1d780-da58-11e8-9f4d-11533e728dd7.png;" parent="1" vertex="1">
+            <mxGeometry x="766" y="1360" width="195" height="41" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/tomcat" id="71">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528629/819c42b0-43b8-11e7-8cdf-c9921ed712b7.png;" parent="1" vertex="1">
+            <mxGeometry x="376" y="1495" width="93" height="36" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/samba" id="251">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610269-c3663500-da59-11e8-825d-28a63ba34c9d.png;" parent="1" vertex="1">
+            <mxGeometry x="86" y="1637" width="120" height="21" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;smartd&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/smartd_log" id="252">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="366.5" y="1597" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/spigotmc" id="253">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610289-2788f900-da5a-11e8-89d0-0406cee9defa.png;" parent="1" vertex="1">
+            <mxGeometry x="986" y="1616.5" width="50" height="50" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;unbound&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/unbound" id="254">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="1051" y="1412.5" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;logind&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/logind" id="243">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="961.5" y="1408" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/uwsgi" id="257">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47610328-3b812a80-da5b-11e8-9488-2277ce3bca10.png;" parent="1" vertex="1">
+            <mxGeometry x="385" y="1451.5" width="76" height="27" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;w1sensor&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/w1sensor" id="258">
+          <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+            <mxGeometry x="91" y="1661.5" width="84" height="33" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/go_expvar" id="261">
+          <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47671918-5a95ce80-dbb9-11e8-809f-758427c68caa.png;" parent="1" vertex="1">
+            <mxGeometry x="595" y="1415.5" width="113" height="47" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="EO4iENxAbkBTY7UVkQMS-262" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=data:image/png,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;" parent="1" vertex="1">
+          <mxGeometry x="80" y="34" width="241" height="241" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
