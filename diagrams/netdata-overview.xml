@@ -24,7 +24,7 @@
             <mxGeometry x="980" y="1706" width="157" height="37" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/couchdb" id="3">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchdb" linkTarget="_blank" id="3">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/31036171-c62e6012-a573-11e7-92b1-d385911756fb.png;imageBackground=none;" parent="1" vertex="1">
             <mxGeometry x="810" y="1515" width="156" height="44" as="geometry" />
           </mxCell>
@@ -47,7 +47,7 @@
         <mxCell id="7" value="" style="whiteSpace=wrap;html=1;strokeColor=#C7D1E0;fillColor=none;gradientColor=#CCFFFF;fontSize=13;align=center;dashed=1;perimeterSpacing=0;opacity=30;rounded=0;shadow=0;glass=0;comic=0;strokeWidth=3;dashPattern=1 1;" parent="1" vertex="1">
           <mxGeometry x="70" y="552" width="1171" height="471" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/phpfpm" id="8">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm" linkTarget="_blank" id="8">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528604/806dd3ae-43b8-11e7-90cd-ec59e7e93db8.png;" parent="1" vertex="1">
             <mxGeometry x="82" y="1530" width="124" height="42" as="geometry" />
           </mxCell>
@@ -72,7 +72,7 @@
             <mxGeometry x="1151" y="1312" width="95" height="78" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;fping.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;network latency&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/fping.plugin" id="13">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;fping.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;network latency&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/fping.plugin" linkTarget="_blank" id="13">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="484.33349609375" y="1031" width="110" height="60" as="geometry" />
           </mxCell>
@@ -259,7 +259,7 @@
             <mxGeometry x="1144" y="1668" width="101" height="75" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/redis" id="63">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis" linkTarget="_blank" id="63">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528616/80f902f8-43b8-11e7-82c2-6d34f4dfcae6.png;" parent="1" vertex="1">
             <mxGeometry x="685" y="1318" width="145" height="46" as="geometry" />
           </mxCell>
@@ -269,7 +269,7 @@
             <mxGeometry x="449" y="1318" width="184" height="62" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/freeradius" id="66">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/freeradius" linkTarget="_blank" id="66">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528617/8109f568-43b8-11e7-9f48-14e3f39dc35f.png;" parent="1" vertex="1">
             <mxGeometry x="812.5" y="1640" width="141" height="36" as="geometry" />
           </mxCell>
@@ -284,7 +284,7 @@
             <mxGeometry x="227" y="1653.5" width="92" height="40" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/ovpn_status_log" id="69">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn" linkTarget="_blank" id="69">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528619/81251f1e-43b8-11e7-8f9c-958219e14be9.png;" parent="1" vertex="1">
             <mxGeometry x="980" y="1667.5" width="161" height="29" as="geometry" />
           </mxCell>
@@ -379,7 +379,7 @@
         <mxCell id="94" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;strokeColor=#59DE9C;fillColor=#ffffff;gradientColor=#FFF2F9;fontSize=14;align=center;direction=south;" parent="1" vertex="1">
           <mxGeometry x="85" y="1293" width="1159" height="20" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;b&gt;SNMP&lt;/b&gt;&lt;div&gt;enterprise&lt;/div&gt;&lt;div&gt;network&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/snmp" id="95">
+        <UserObject label="&lt;b&gt;SNMP&lt;/b&gt;&lt;div&gt;enterprise&lt;/div&gt;&lt;div&gt;network&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/snmp" linkTarget="_blank" id="95">
           <mxCell style="ellipse;shape=cloud;whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="70" y="1230" width="210" height="199" as="geometry" />
           </mxCell>
@@ -657,7 +657,7 @@
         <mxCell id="170" value="&lt;font color=&quot;#e6d0de&quot;&gt;netdata daemon&lt;/font&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontColor=#E6E6E6;rotation=90;" parent="1" vertex="1">
           <mxGeometry x="1195" y="593" width="110" height="20" as="geometry" />
         </mxCell>
-        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;web_log&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;real-time web performance&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/web_log" id="171">
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;web_log&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;real-time web performance&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog" linkTarget="_blank" id="171">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="429" y="1230" width="120" height="60" as="geometry" />
           </mxCell>
@@ -733,7 +733,7 @@
         <mxCell id="192" value="" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://cloud.githubusercontent.com/assets/2662304/26528645/8275abfe-43b8-11e7-9d21-306ab844f7bb.png;strokeColor=#6A9153;fillColor=#CCFFFF;gradientColor=#CCFFFF;fontSize=20;align=center;" parent="1" vertex="1">
           <mxGeometry x="127" y="815" width="61" height="39" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin/fronius" id="194">
+        <UserObject label="" link="https://github.com/netdata/netdata/issues/11268" linkTarget="_blank" id="194">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://user-images.githubusercontent.com/12159026/28160720-5c8e2718-67c1-11e7-8018-759767e9c766.png;" parent="1" vertex="1">
             <mxGeometry x="731.5" y="1674" width="82" height="32" as="geometry" />
           </mxCell>
@@ -743,7 +743,7 @@
             <mxGeometry x="740" y="1711.5" width="119" height="30" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/powerdns" id="196">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns" linkTarget="_blank" id="196">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/30879830-48619148-a309-11e7-96fc-81497a348341.png;" parent="1" vertex="1">
             <mxGeometry x="859.5" y="1321.5" width="190" height="32" as="geometry" />
           </mxCell>
@@ -805,12 +805,12 @@
             <mxGeometry x="238" y="1450" width="132" height="45" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;httpcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote web port&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/httpcheck" id="210">
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;httpcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote web port&lt;/span&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck" linkTarget="_blank" id="210">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="297" y="1230" width="120" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;portcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote TCP port&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/portcheck" id="211">
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;portcheck&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitor any remote TCP port&lt;/span&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/portcheck" linkTarget="_blank" id="211">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="560" y="1230" width="120" height="60" as="geometry" />
           </mxCell>
@@ -846,7 +846,7 @@
             <mxGeometry x="358.5" y="1540" width="53" height="53" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/springboot" id="224">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2" linkTarget="_blank" id="224">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/37909449-9ccaba6e-3113-11e8-98b7-7ad8204bbcf5.png;" parent="1" vertex="1">
             <mxGeometry x="460" y="1581" width="151" height="49" as="geometry" />
           </mxCell>
@@ -854,7 +854,7 @@
         <mxCell id="226" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609442-6a8da100-da47-11e8-9918-468e59e8e70f.png;" parent="1" vertex="1">
           <mxGeometry x="858" y="2072" width="142" height="63" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/elasticsearch" id="227">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch" linkTarget="_blank" id="227">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609507-8d6c8500-da48-11e8-9556-0cebef6862f2.png;" parent="1" vertex="1">
             <mxGeometry x="694" y="1571" width="226" height="55" as="geometry" />
           </mxCell>
@@ -892,7 +892,7 @@
             <mxGeometry x="78.5" y="1691" width="109" height="56" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/dockerd" id="236">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine" linkTarget="_blank" id="236">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529330/b4c0293c-43c6-11e7-9751-b66fad47604a.png;" parent="1" vertex="1">
             <mxGeometry x="980" y="1564" width="60" height="51" as="geometry" />
           </mxCell>
@@ -907,7 +907,7 @@
             <mxGeometry x="424" y="1510" width="126" height="62" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/web_log" id="122">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog" linkTarget="_blank" id="122">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528643/826ac662-43b8-11e7-9e85-1c2fb9bda363.png;" parent="1" vertex="1">
             <mxGeometry x="484.5" y="1419.5" width="80" height="78" as="geometry" />
           </mxCell>
@@ -922,7 +922,7 @@
             <mxGeometry x="972.5" y="1491" width="72" height="69" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;mdstat&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mdstat" id="244">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;mdstat&lt;/font&gt;&lt;/b&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/proc.plugin" linkTarget="_blank" id="244">
           <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
             <mxGeometry x="326" y="1644" width="84" height="33" as="geometry" />
           </mxCell>
