@@ -102,7 +102,7 @@
             <mxGeometry x="1067.5" y="1310" width="74" height="74" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/apache" id="20">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache" linkTarget="_blank" id="20">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528622/8135d458-43b8-11e7-8419-a23f1dc5a2d0.png;" parent="1" vertex="1">
             <mxGeometry x="86" y="1440" width="136" height="71" as="geometry" />
           </mxCell>
@@ -249,7 +249,7 @@
         <mxCell id="60" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
           <mxGeometry x="183" y="1007" width="70" height="30" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mysql" id="61">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql" linkTarget="_blank" id="61">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528613/80d9b420-43b8-11e7-8f7f-8e4ccc9ad41f.png;" parent="1" vertex="1">
             <mxGeometry x="825" y="1410" width="127" height="86" as="geometry" />
           </mxCell>
@@ -294,12 +294,12 @@
             <mxGeometry x="657" y="1691" width="70" height="49" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/nginx" id="72">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx" linkTarget="_blank" id="72">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528623/813c32b2-43b8-11e7-95c4-153aa5efdd5e.png;" parent="1" vertex="1">
             <mxGeometry x="238" y="1500" width="112" height="24" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Backends&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Metrics Archiving&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/backends" id="73">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Backends&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Metrics Archiving&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="73">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
             <mxGeometry x="786" y="607" width="237" height="70" as="geometry" />
           </mxCell>
@@ -327,17 +327,17 @@
         <mxCell id="78" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=none;fillColor=#59DE9C;fontSize=14;flipH=1;direction=north;" parent="1" vertex="1">
           <mxGeometry x="684" y="527" width="100" height="120" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends/graphite" id="79">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting/graphite" linkTarget="_blank" id="79">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26529200/52a30280-43c4-11e7-85c6-b88321a49d61.png;" parent="1" vertex="1">
             <mxGeometry x="900" y="307" width="179" height="47" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends/opentsdb" id="80">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting/opentsdb" linkTarget="_blank" id="80">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528624/814fd1aa-43b8-11e7-9125-5e5c3c677aef.png;" parent="1" vertex="1">
             <mxGeometry x="1000" y="423" width="198" height="41" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="81">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="81">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528632/81c29fdc-43b8-11e7-8bfe-fc832d11b72d.png;" parent="1" vertex="1">
             <mxGeometry x="1126" y="360" width="109" height="50" as="geometry" />
           </mxCell>
@@ -348,7 +348,7 @@
         <mxCell id="84" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;" parent="1" vertex="1">
           <mxGeometry x="1054" y="597" width="83" height="115" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="85">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="85">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528636/81e18712-43b8-11e7-94b9-37ea1cf6c3a6.png;" parent="1" vertex="1">
             <mxGeometry x="1106" y="300" width="114" height="40" as="geometry" />
           </mxCell>
@@ -554,7 +554,7 @@
             <mxGeometry x="1003.5" y="2053" width="135" height="31" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/mysql" id="146">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql" linkTarget="_blank" id="146">
           <mxCell style="shape=image;imageAspect=0;aspect=fixed;verticalLabelPosition=bottom;verticalAlign=top;image=https://cloud.githubusercontent.com/assets/2662304/26528659/83cfad88-43b8-11e7-8a33-03d4f0b31cac.png;" parent="1" vertex="1">
             <mxGeometry x="726" y="1415" width="79" height="73" as="geometry" />
           </mxCell>
@@ -748,7 +748,7 @@
             <mxGeometry x="859.5" y="1321.5" width="190" height="32" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/chrony" id="197">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/chrony" linkTarget="_blank" id="197">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/30880129-3f00fd86-a30a-11e7-8487-30fe4137ec3b.png;" parent="1" vertex="1">
             <mxGeometry x="1118" y="1465" width="123" height="36" as="geometry" />
           </mxCell>
@@ -862,7 +862,7 @@
         <mxCell id="228" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609535-4206a680-da49-11e8-80bb-793dc9a783dd.png;" parent="1" vertex="1">
           <mxGeometry x="1013.5" y="184" width="98" height="89" as="geometry" />
         </mxCell>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/backends" id="230">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="230">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://user-images.githubusercontent.com/2662304/47609564-f7d1f500-da49-11e8-936a-6d0ff9329ded.png;" parent="1" vertex="1">
             <mxGeometry x="940" y="361" width="162" height="40" as="geometry" />
           </mxCell>
@@ -912,12 +912,12 @@
             <mxGeometry x="484.5" y="1419.5" width="80" height="78" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;dnsdist&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/dnsdist" id="240">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;dnsdist&lt;/font&gt;&lt;/b&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsdist" linkTarget="_blank" id="240">
           <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
             <mxGeometry x="1071" y="1382.5" width="84" height="33" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;linux power supply&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/linux_power_supply" id="242">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 15px&quot;&gt;linux power supply&lt;/font&gt;&lt;/b&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/proc.plugin" linkTarget="_blank" id="242">
           <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
             <mxGeometry x="972.5" y="1491" width="72" height="69" as="geometry" />
           </mxCell>
@@ -972,7 +972,7 @@
             <mxGeometry x="986" y="1616.5" width="50" height="50" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;unbound&lt;/font&gt;&lt;/b&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/unbound" id="254">
+        <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 18px&quot;&gt;unbound&lt;/font&gt;&lt;/b&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/unbound" linkTarget="_blank" id="254">
           <mxCell style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
             <mxGeometry x="1051" y="1412.5" width="84" height="33" as="geometry" />
           </mxCell>
