@@ -365,9 +365,6 @@ int is_legacy = 1;
     rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
 
-    if (health_enabled)
-        health_thread_spawn(host);
-
     if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
 #ifdef ENABLE_DBENGINE
         char dbenginepath[FILENAME_MAX + 1];
@@ -649,9 +646,6 @@ static void rrdhost_update(RRDHOST *host
         rrdhost_load_rrdcontext_data(host);
         info("Host %s is not in archived mode anymore", rrdhost_hostname(host));
     }
-
-    if (health_enabled)
-        health_thread_spawn(host);
 
     netdata_spinlock_unlock(&host->rrdhost_update_lock);
 }
@@ -1375,7 +1369,6 @@ void reload_host_labels(void) {
     health_label_log_save(localhost);
 
     rrdpush_send_host_labels(localhost);
-    health_reload();
 }
 
 // ----------------------------------------------------------------------------
