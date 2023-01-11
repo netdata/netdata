@@ -361,8 +361,8 @@ void Host::stopAnomalyDetectionThreads(bool join) {
 
     if(join && !ThreadsJoined) {
         ThreadsJoined = true;
+        ThreadsRunning = false;
         netdata_thread_join(TrainingThread, nullptr);
         netdata_thread_join(DetectionThread, nullptr);
-        ThreadsRunning = false;
     }
 }
