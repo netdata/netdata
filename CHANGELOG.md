@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
+- Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
 - bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
 - remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
@@ -46,6 +48,7 @@
 - Fix conditions for uploading repoconfig packages to new infra. [\#14134](https://github.com/netdata/netdata/pull/14134) ([Ferroin](https://github.com/Ferroin))
 - fix httpcheck alarms [\#14133](https://github.com/netdata/netdata/pull/14133) ([ilyam8](https://github.com/ilyam8))
 - eBPF \(memory, NV, basis for functions\) [\#14131](https://github.com/netdata/netdata/pull/14131) ([thiagoftsm](https://github.com/thiagoftsm))
+- DBENGINE v2 [\#14125](https://github.com/netdata/netdata/pull/14125) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin to v0.46.0 [\#14124](https://github.com/netdata/netdata/pull/14124) ([ilyam8](https://github.com/ilyam8))
 - heartbeat: don't log every discrepancy [\#14122](https://github.com/netdata/netdata/pull/14122) ([ktsaou](https://github.com/ktsaou))
 - ARAL: add destroy function and optimize ifdefs [\#14121](https://github.com/netdata/netdata/pull/14121) ([ktsaou](https://github.com/ktsaou))
@@ -345,11 +348,6 @@
 - CMake improvements part 1 [\#13575](https://github.com/netdata/netdata/pull/13575) ([underhood](https://github.com/underhood))
 - bump go.d.plugin to v0.37.2 [\#13574](https://github.com/netdata/netdata/pull/13574) ([ilyam8](https://github.com/ilyam8))
 - Updating info for postgreqsql metrics [\#13573](https://github.com/netdata/netdata/pull/13573) ([shyamvalsan](https://github.com/shyamvalsan))
-- add `apt` to `apps_groups.conf` [\#13571](https://github.com/netdata/netdata/pull/13571) ([andrewm4894](https://github.com/andrewm4894))
-- Deduplicate all netdata strings [\#13570](https://github.com/netdata/netdata/pull/13570) ([ktsaou](https://github.com/ktsaou))
-- eBPF cmake missing include dir [\#13568](https://github.com/netdata/netdata/pull/13568) ([underhood](https://github.com/underhood))
-- chore: removing logging that a chart collection in the same interpolation point [\#13567](https://github.com/netdata/netdata/pull/13567) ([ilyam8](https://github.com/ilyam8))
-- add more monitoring tools to `apps_groups.conf` [\#13566](https://github.com/netdata/netdata/pull/13566) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
