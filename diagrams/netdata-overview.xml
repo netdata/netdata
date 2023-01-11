@@ -1,4 +1,4 @@
-<mxfile modified="2023-01-11T17:09:46.805Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="epSVvfsG8GOzfU1FqnpF" version="20.8.4" type="github">
+<mxfile modified="2023-01-11T17:12:35.284Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="4nW3KVzMPxz8MziA57o0" version="20.8.4" type="github">
   <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
     <mxGraphModel dx="1354" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
       <root>
@@ -264,7 +264,7 @@
             <mxGeometry x="685" y="1318" width="145" height="46" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="" link="https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/postgres" id="64">
+        <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres" linkTarget="_blank" id="64">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528615/80f6b638-43b8-11e7-86a6-d8f0cb560fc0.png;" parent="1" vertex="1">
             <mxGeometry x="449" y="1318" width="184" height="62" as="geometry" />
           </mxCell>
