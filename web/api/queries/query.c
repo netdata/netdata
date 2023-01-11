@@ -2093,11 +2093,22 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if (qt->request.timeout)
         now_realtime_timeval(&query_start_time);
 
+    size_t capacity = libuv_worker_threads * 2;
+    size_t max_queries_to_prepare = (qt->query.used > (capacity - 1)) ? (capacity - 1) : qt->query.used;
+    size_t queries_prepared;
+
     QUERY_ENGINE_OPS **ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
-    for(size_t c = 0, max = qt->query.used; c < max ; c++)
-        ops[c] = rrd2rrdr_query_prep(r, c);
+    for(queries_prepared = 0; queries_prepared < max_queries_to_prepare ; queries_prepared++)
+        ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
 
     for(size_t c = 0, max = qt->query.used; c < max ; c++) {
+
+        if(queries_prepared < qt->query.used) {
+            // preload another query
+            ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+            queries_prepared++;
+        }
+
         // set the query target dimension options to rrdr
         r->od[c] = qt->query.array[c].dimension.options;
 
