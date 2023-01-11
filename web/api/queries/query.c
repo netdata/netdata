@@ -2094,10 +2094,24 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         now_realtime_timeval(&query_start_time);
 
     QUERY_ENGINE_OPS **ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
-    for(size_t c = 0, max = qt->query.used; c < max ; c++)
-        ops[c] = rrd2rrdr_query_prep(r, c);
+
+    size_t capacity = libuv_worker_threads * 2;
+    size_t max_queries_to_prepare = (qt->query.used > (capacity - 1)) ? (capacity - 1) : qt->query.used;
+    size_t queries_prepared = 0;
+    while(queries_prepared < max_queries_to_prepare) {
+        // preload another query
+        ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+        queries_prepared++;
+    }
 
     for(size_t c = 0, max = qt->query.used; c < max ; c++) {
+
+        if(queries_prepared < max) {
+            // preload another query
+            ops[queries_prepared] = rrd2rrdr_query_prep(r, queries_prepared);
+            queries_prepared++;
+        }
+
         // set the query target dimension options to rrdr
         r->od[c] = qt->query.array[c].dimension.options;
 
@@ -2149,6 +2163,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
             r->result_options |= RRDR_RESULT_OPTION_CANCEL;
+
+            for(size_t i = c + 1; i < queries_prepared ; i++) {
+                if(ops[i])
+                    query_planer_finalize_remaining_plans(ops[i]);
+            }
+
             break;
         }
     }
