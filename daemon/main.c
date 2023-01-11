@@ -226,7 +226,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     // signal them to stop
     size_t last_running = 0;
     size_t stale_time_ut = 0;
-    usec_t sleep_ut = 500 * USEC_PER_MS;
+    usec_t sleep_ut = 50 * USEC_PER_MS;
+    size_t log_countdown_ut = sleep_ut;
     do {
         if(running != last_running)
             stale_time_ut = 0;
@@ -257,11 +258,17 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         netdata_spinlock_unlock(&service_globals.lock);
 
         if(running) {
-            buffer_flush(service_list);
-            service_to_buffer(service_list, running_services);
-            info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
-                 running, buffer_tostring(service_list),
-                 running <= 10 ? buffer_tostring(thread_list) : "");
+            log_countdown_ut -= (log_countdown_ut >= sleep_ut) ? sleep_ut : log_countdown_ut;
+            if(log_countdown_ut == 0 || running != last_running) {
+                log_countdown_ut = 20 * sleep_ut;
+
+                buffer_flush(service_list);
+                service_to_buffer(service_list, running_services);
+                info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
+                     running, buffer_tostring(service_list),
+                     running <= 10 ? buffer_tostring(thread_list) : "");
+            }
+
             sleep_usec(sleep_ut);
             stale_time_ut += sleep_ut;
         }
@@ -285,17 +292,38 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     return (running == 0);
 }
 
+#define delta_shutdown_time(msg)                        \
+    {                                                   \
+        usec_t now_ut = now_monotonic_usec();           \
+        if(prev_msg)                                    \
+            info("NETDATA SHUTDOWN: in %7llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
+        else                                            \
+            info("NETDATA SHUTDOWN: next: %s", msg);    \
+        last_ut = now_ut;                               \
+        prev_msg = msg;                                 \
+        timeout = false;                                \
+    }
+
 void netdata_cleanup_and_exit(int ret) {
+    usec_t started_ut = now_monotonic_usec();
+    usec_t last_ut = started_ut;
+    const char *prev_msg = NULL;
+    bool timeout = false;
+
     error_log_limit_unlimited();
-    info("EXIT: netdata prepares to exit with code %d...", ret);
+    info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
+
+    delta_shutdown_time("create shutdown file");
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
     snprintfz(agent_crash_file, FILENAME_MAX, "%s/.agent_crash", netdata_configured_varlib_dir);
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
+
+    delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(
             SERVICE_MAINTENANCE
@@ -305,7 +333,9 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_ACLK
             );
 
-    service_wait_exit(
+    delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
+
+    timeout = !service_wait_exit(
             SERVICE_REPLICATION
             | SERVICE_EXPORTERS
             | SERVICE_ML_TRAINING
@@ -313,38 +343,51 @@ void netdata_cleanup_and_exit(int ret) {
             | SERVICE_WEB_SERVER
             , 3 * USEC_PER_SEC);
 
-    service_wait_exit(
+    delta_shutdown_time("stop collectors and streaming threads");
+
+    timeout = !service_wait_exit(
             SERVICE_COLLECTORS
             | SERVICE_STREAMING
             , 3 * USEC_PER_SEC);
 
-    service_wait_exit(
+    delta_shutdown_time("stop ML prediction and context threads");
+
+    timeout = !service_wait_exit(
             SERVICE_ML_PREDICTION
             | SERVICE_CONTEXT
             , 3 * USEC_PER_SEC);
 
-    service_wait_exit(
+    delta_shutdown_time("stop maintenance thread");
+
+    timeout = !service_wait_exit(
             SERVICE_MAINTENANCE
             , 3 * USEC_PER_SEC);
 
-    info("EXIT: cleaning up the database...");
+    delta_shutdown_time("clean rrdhost database");
+
     rrdhost_cleanup_all();
 
-    info("EXIT: metasync shutdown prepare...");
+    delta_shutdown_time("prepare metasync shutdown");
+
     metadata_sync_shutdown_prepare();
 
 #ifdef ENABLE_ACLK
+    delta_shutdown_time("signal aclk sync to stop");
     aclk_sync_exit_all();
 #endif
 
-    service_wait_exit(
+    delta_shutdown_time("stop aclk threads");
+
+    timeout = !service_wait_exit(
             SERVICE_ACLK
             , 3 * USEC_PER_SEC);
 
-    // stop everything else
-    service_wait_exit(~0, 10 * USEC_PER_SEC);
+    delta_shutdown_time("stop all remaining worker threads");
 
-    info("EXIT: stopping static threads...");
+    timeout = !service_wait_exit(~0, 10 * USEC_PER_SEC);
+
+    delta_shutdown_time("cancel main threads");
+
     cancel_main_threads();
 
     if(!ret) {
@@ -352,42 +395,59 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            info("EXIT: flushing dbengine...");
+            delta_shutdown_time("flush dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_prepare_exit(multidb_ctx[tier]);
         }
 #endif
 
         // free the database
-        info("EXIT: freeing database memory...");
+        delta_shutdown_time("free rrdhost structures");
+
         rrdhost_free_all();
+
+        delta_shutdown_time("stop metasync threads");
 
         metadata_sync_shutdown();
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
-            info("EXIT: stopping dbengine...");
+            delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
         }
 #endif
     }
 
+    delta_shutdown_time("close SQL context db");
+
     sql_close_context_database();
+
+    delta_shutdown_time("closed SQL main db");
+
     sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
-        info("EXIT: removing netdata PID file '%s'...", pidfile);
+        delta_shutdown_time("remove pid file");
+
         if(unlink(pidfile) != 0)
             error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
 #ifdef ENABLE_HTTPS
+    delta_shutdown_time("free openssl structures");
     security_clean_openssl();
 #endif
-    info("EXIT: all done - netdata is now exiting - bye bye...");
+
+    delta_shutdown_time("remove incomplete shutdown file");
+
     (void) unlink(agent_incomplete_shutdown_file);
+
+    delta_shutdown_time("exit");
+
+    usec_t ended_ut = now_monotonic_usec();
+    info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
     exit(ret);
 }
 
@@ -1178,11 +1238,28 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
+#define delta_startup_time(msg)                         \
+    {                                                   \
+        usec_t now_ut = now_monotonic_usec();           \
+        if(prev_msg)                                    \
+            info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
+        else                                            \
+            info("NETDATA STARTUP: next: %s", msg);    \
+        last_ut = now_ut;                               \
+        prev_msg = msg;                                 \
+    }
+
 int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
 
 int main(int argc, char **argv) {
+    // initialize the system clocks
+    clocks_init();
+    usec_t started_ut = now_monotonic_usec();
+    usec_t last_ut = started_ut;
+    const char *prev_msg = NULL;
+
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
@@ -1629,9 +1706,7 @@ int main(int argc, char **argv) {
     }
 #endif
 
-
-    if(!config_loaded)
-    {
+    if(!config_loaded) {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
         load_cloud_conf(0);
@@ -1641,7 +1716,6 @@ int main(int argc, char **argv) {
     if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
         appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
     }
-
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -1661,9 +1735,6 @@ int main(int argc, char **argv) {
         // mallopt(M_MXFAST, 0);
 #endif
 #endif
-
-        // initialize the system clocks
-        clocks_init();
 
         // set libuv worker threads
         libuv_worker_threads = get_system_cpus() * 2;
@@ -1749,6 +1820,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // Initialize ML configuration
 
+        delta_startup_time("initialize ML");
         ml_init();
 
         // --------------------------------------------------------------------
@@ -1757,17 +1829,17 @@ int main(int argc, char **argv) {
         // block signals while initializing threads.
         // this causes the threads to block signals.
 
+        delta_startup_time("initialize signals");
         signals_block();
-
-        // setup the signals we want to use
-
-        signals_init();
-
-        // setup threads configs
-        default_stacksize = netdata_threads_init();
+        signals_init(); // setup the signals we want to use
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
+
+        delta_startup_time("initialize static threads");
+
+        // setup threads configs
+        default_stacksize = netdata_threads_init();
 
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
@@ -1788,13 +1860,16 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // create the listening sockets
 
+        delta_startup_time("initialize web server");
+
         web_client_api_v1_init();
         web_server_threading_selection();
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
-
     }
+
+    delta_startup_time("set resource limits");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1813,18 +1888,27 @@ int main(int argc, char **argv) {
     else
         info("resources control: allowed file descriptors: soft = %zu, max = %zu", (size_t)rlimit_nofile.rlim_cur, (size_t)rlimit_nofile.rlim_max);
 
+
+    delta_startup_time("become daemon");
+
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
         fatal("Cannot daemonize myself.");
 
     info("netdata started on pid %d.", getpid());
 
+    delta_startup_time("initialize threads after fork");
+
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // initialize internal registry
+    delta_startup_time("initialize registry");
     registry_init();
+
     // fork the spawn server
+    delta_startup_time("fork the spawn server");
     spawn_init();
+
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
      * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
@@ -1837,14 +1921,20 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
+    delta_startup_time("collecting system info");
+
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
     get_system_info(system_info);
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
+    delta_startup_time("initialize RRD structures");
+
     if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    delta_startup_time("check for incomplete shutdown");
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
@@ -1860,6 +1950,8 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
 
+    delta_startup_time("collect claiming info");
+
     if (claiming_pending_arguments)
          claim_agent(claiming_pending_arguments);
     load_claiming_state();
@@ -1870,10 +1962,13 @@ int main(int argc, char **argv) {
     error_log_limit_reset();
 
     // Load host labels
+    delta_startup_time("collect host labels");
     reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads
+
+    delta_startup_time("start the static threads");
 
     web_server_config_options();
 
@@ -1895,9 +1990,14 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
 
+    delta_startup_time("initialize commands API");
+
     commands_init();
 
-    info("netdata initialization completed. Enjoy real-time performance monitoring!");
+    delta_startup_time("ready");
+
+    usec_t ready_ut = now_monotonic_usec();
+    info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");
