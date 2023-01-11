@@ -443,6 +443,8 @@ self_update() {
 parse_version() {
   r="${1}"
   if [ "${r}" = "latest" ]; then
+    # If we get ‘latest’ as a version, return the largest possible
+    # version value.
     printf "99999999999999"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
