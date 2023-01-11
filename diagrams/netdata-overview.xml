@@ -1,4 +1,4 @@
-<mxfile modified="2023-01-11T17:06:50.269Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="mobxyiV94Uef8dLQDGhA" version="20.8.4" type="github">
+<mxfile modified="2023-01-11T17:09:46.805Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="epSVvfsG8GOzfU1FqnpF" version="20.8.4" type="github">
   <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
     <mxGraphModel dx="1354" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
       <root>
@@ -665,7 +665,7 @@
         <mxCell id="174" value="" style="shape=curlyBracket;whiteSpace=wrap;html=1;rounded=1;strokeColor=#6A9153;fillColor=#ffffff;gradientColor=#FFF2F9;fontSize=14;align=center;direction=south;" parent="1" vertex="1">
           <mxGeometry x="877" y="265" width="377" height="20" as="geometry" />
         </mxCell>
-        <UserObject label="standard dashboard" link="https://registry.my-netdata.io/" id="176">
+        <UserObject label="standard dashboard" link="http://london.my-netdata.io/" linkTarget="_blank" id="176">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528929/cbe844ee-43be-11e7-8e1b-7899d142c1a5.png;fontSize=14;" parent="1" vertex="1">
             <mxGeometry x="75" y="315" width="121" height="107" as="geometry" />
           </mxCell>
@@ -675,7 +675,7 @@
             <mxGeometry x="75" y="470" width="249" height="74" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="custom dashboards" link="https://github.com/firehol/netdata/wiki/Custom-Dashboards" id="179">
+        <UserObject label="custom dashboards" link="https://learn.netdata.cloud/docs/agent/web/gui/custom" linkTarget="_blank" id="179">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528933/e9bd18b4-43be-11e7-9e3c-725342bbcdca.png;fontSize=14;" parent="1" vertex="1">
             <mxGeometry x="204" y="315" width="121" height="108" as="geometry" />
           </mxCell>
