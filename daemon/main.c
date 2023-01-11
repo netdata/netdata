@@ -226,7 +226,8 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
     // signal them to stop
     size_t last_running = 0;
     size_t stale_time_ut = 0;
-    usec_t sleep_ut = 500 * USEC_PER_MS;
+    usec_t sleep_ut = 50 * USEC_PER_MS;
+    size_t log_countdown_ut = sleep_ut;
     do {
         if(running != last_running)
             stale_time_ut = 0;
@@ -257,11 +258,17 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
         netdata_spinlock_unlock(&service_globals.lock);
 
         if(running) {
-            buffer_flush(service_list);
-            service_to_buffer(service_list, running_services);
-            info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
-                 running, buffer_tostring(service_list),
-                 running <= 10 ? buffer_tostring(thread_list) : "");
+            log_countdown_ut -= (log_countdown_ut >= sleep_ut) ? sleep_ut : log_countdown_ut;
+            if(log_countdown_ut == 0 || running != last_running) {
+                log_countdown_ut = 20 * sleep_ut;
+
+                buffer_flush(service_list);
+                service_to_buffer(service_list, running_services);
+                info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
+                     running, buffer_tostring(service_list),
+                     running <= 10 ? buffer_tostring(thread_list) : "");
+            }
+
             sleep_usec(sleep_ut);
             stale_time_ut += sleep_ut;
         }
