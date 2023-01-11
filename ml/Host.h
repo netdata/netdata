@@ -26,7 +26,10 @@ public:
         MLS(),
         TS(),
         HostAnomalyRate(0.0),
-        ThreadsRunning(false) {}
+        ThreadsRunning(false),
+        ThreadsCancelled(false),
+        ThreadsJoined(false)
+        {}
 
     void addChart(Chart *C);
     void removeChart(Chart *C);
@@ -36,7 +39,7 @@ public:
     void getDetectionInfoAsJson(nlohmann::json &Json) const;
 
     void startAnomalyDetectionThreads();
-    void stopAnomalyDetectionThreads();
+    void stopAnomalyDetectionThreads(bool join);
 
     void scheduleForTraining(TrainingRequest TR);
     void train();
@@ -50,6 +53,8 @@ private:
     TrainingStats TS;
     CalculatedNumber HostAnomalyRate{0.0};
     std::atomic<bool> ThreadsRunning;
+    std::atomic<bool> ThreadsCancelled;
+    std::atomic<bool> ThreadsJoined;
 
     Queue<TrainingRequest> TrainingQueue;
 
