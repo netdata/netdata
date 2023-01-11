@@ -273,14 +273,20 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     size_t wanted_cache_size;
     size_t per1000;
 
+    size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
+    size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
+
     if(cache->config.options & PGC_OPTIONS_AUTOSCALE) {
         size_t dirty_max = __atomic_load_n(&cache->dirty.stats->max_size, __ATOMIC_RELAXED);
         size_t hot_max = __atomic_load_n(&cache->hot.stats->max_size, __ATOMIC_RELAXED);
-        size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
-        size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
 
+        // our promise to users
         size_t max_size1 = MAX(hot_max, hot) * 2;
+
+        // protection against slow flushing
         size_t max_size2 = hot_max + ((dirty_max < hot_max / 2) ? hot_max / 2 : dirty_max * 2);
+
+        // the final wanted cache size
         wanted_cache_size = MIN(max_size1, max_size2);
 
         if(cache->config.dynamic_target_size_cb) {
@@ -292,12 +298,15 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
         if (wanted_cache_size < hot + dirty + cache->config.clean_size)
             wanted_cache_size = hot + dirty + cache->config.clean_size;
     }
-    else {
-        size_t dirty = __atomic_load_n(&cache->dirty.stats->size, __ATOMIC_RELAXED);
-        size_t hot = __atomic_load_n(&cache->hot.stats->size, __ATOMIC_RELAXED);
-
+    else
         wanted_cache_size = hot + dirty + cache->config.clean_size;
-    }
+
+    // protection again huge queries
+    // if huge queries are running, or huge amounts need to be saved
+    // allow the cache to grow more (hot pages in main cache are also referenced)
+    size_t referenced_size = __atomic_load_n(&cache->stats.referenced_size, __ATOMIC_RELAXED);
+    if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
+        wanted_cache_size = referenced_size * 2 / 3;
 
     current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
 
