@@ -153,14 +153,12 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_data_source_extent_cache;              // loaded by a cached extent
 
     // cache hits at different points
-    size_t pages_load_ok_loaded_but_cache_hit_before_allocation; // found in cache after loading, before allocating
     size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
 
     // loading
     size_t pages_load_extent_merged;
     size_t pages_load_ok_uncompressed;
     size_t pages_load_ok_compressed;
-    size_t pages_load_ok_preloaded;
     size_t pages_load_fail_invalid_page_in_extent;
     size_t pages_load_fail_cant_mmap_extent;
     size_t pages_load_fail_datafile_not_available;
