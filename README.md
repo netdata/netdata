@@ -27,7 +27,9 @@ It gives you the ability to automatically identify processes, collect and store 
 
 [Netdata.cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant Netdata Agents to get the metric data, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric). 
 
-It gives you some extra features, like [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), [Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor) and much more. 
+It gives you some extra features, like [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), [Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
+
+Try it for yourself right now by checking out the Netdata Cloud [demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (No sign up or login needed).
 
 Netdata's mission is to help more people troubleshoot ever more complex IT infrastructures, this is why our **free** [community plan](https://www.netdata.cloud/pricing) gives you ability to monitor unlimited number of Nodes, Containers and Metrics (custom or built-in).
 
