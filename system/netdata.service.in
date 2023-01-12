@@ -71,6 +71,10 @@ ProtectControlGroups=on
 ReadWriteDirectories=/run/netdata
 # This is needed to make email-based alert deliver work if Postfix is the email provider on the system.
 ReadWriteDirectories=-/var/spool/postfix/maildrop
+# LXCFS directories (https://github.com/lxc/lxcfs#lxcfs)
+# If we don't set them explicitly, systemd mounts procfs from the host. See https://github.com/netdata/netdata/issues/14238. 
+BindReadOnlyPaths=-/proc/cpuinfo -/proc/diskstats -/proc/loadavg -/proc/meminfo
+BindReadOnlyPaths=-/proc/stat -/proc/swaps -/proc/uptime -/proc/slabinfo
 
 [Install]
 WantedBy=multi-user.target
