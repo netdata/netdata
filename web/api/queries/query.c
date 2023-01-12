@@ -2106,6 +2106,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if (qt->request.timeout)
         now_realtime_timeval(&query_start_time);
 
+    size_t last_db_points_read = 0;
+    size_t last_result_points_generated = 0;
+
     QUERY_ENGINE_OPS **ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
 
     size_t capacity = libuv_worker_threads * 2;
@@ -2135,6 +2138,15 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
+
+        global_statistics_rrdr_query_completed(
+                1,
+                r->internal.db_points_read - last_db_points_read,
+                r->internal.result_points_generated - last_result_points_generated,
+                qt->request.query_source);
+
+        last_db_points_read = r->internal.db_points_read;
+        last_result_points_generated = r->internal.result_points_generated;
 
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
@@ -2245,7 +2257,5 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-    global_statistics_rrdr_query_completed(dimensions_used, r->internal.db_points_read,
-                                           r->internal.result_points_generated, qt->request.query_source);
     return r;
 }
