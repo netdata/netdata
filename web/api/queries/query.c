@@ -936,9 +936,6 @@ typedef struct query_engine_ops {
     NETDATA_DOUBLE group_anomaly_rate;
     RRDR_VALUE_FLAGS group_value_flags;
 
-    time_t query_start_time_s;
-    time_t query_end_time_s;
-
     // statistics
     size_t db_total_points_read;
     size_t db_points_read_per_tier[RRD_STORAGE_TIERS];
@@ -1226,10 +1223,8 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
             .query_granularity = (time_t)(r->update_every / r->group),
             .group_value_flags = RRDR_VALUE_NOTHING,
     };
-    ops->query_start_time_s = (time_t)(qt->window.after - ops->query_granularity);
-    ops->query_end_time_s = (time_t)(ops->query_start_time_s + (qt->window.points * ops->view_update_every));
 
-    if(!query_plan(ops, ops->query_start_time_s, ops->query_end_time_s, qt->window.points))
+    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points))
         return NULL;
 
     return ops;
