@@ -1,4 +1,4 @@
-<mxfile modified="2023-01-12T11:34:49.716Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="vvft_89BTJZYmtelFEKt" version="20.8.4" type="github">
+<mxfile modified="2023-01-12T11:37:55.832Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="YHS6oGXqs_uoUgLub2kx" version="20.8.4" type="github">
   <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
     <mxGraphModel dx="1354" dy="644" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
       <root>
@@ -44,7 +44,7 @@
             <mxGeometry x="576" y="410" width="195" height="38" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="7" value="" style="whiteSpace=wrap;html=1;strokeColor=#C7D1E0;fillColor=none;gradientColor=#CCFFFF;fontSize=13;align=center;dashed=1;perimeterSpacing=0;opacity=30;rounded=0;shadow=0;glass=0;comic=0;strokeWidth=3;dashPattern=1 1;" parent="1" vertex="1">
+        <mxCell id="7" value="" style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=none;gradientColor=#CCFFFF;fontSize=13;align=center;dashed=1;perimeterSpacing=0;opacity=30;rounded=0;shadow=0;glass=0;comic=0;strokeWidth=3;dashPattern=1 1;" parent="1" vertex="1">
           <mxGeometry x="70" y="552" width="1171" height="471" as="geometry" />
         </mxCell>
         <UserObject label="" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm" linkTarget="_blank" id="8">
@@ -366,7 +366,7 @@
             <mxGeometry x="1083" y="1184" width="150" height="120" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="100" value="" style="curved=1;endArrow=block;html=1;fontSize=14;entryX=0.847;entryY=0.256;entryPerimeter=0;startArrow=oval;startFill=1;endFill=1;dashed=1;strokeWidth=3;fillColor=#f5f5f5;strokeColor=#C7D1E0;dashPattern=1 1;endSize=8;exitX=0.8;exitY=0.8;exitPerimeter=0;" parent="1" source="15" target="99" edge="1">
+        <mxCell id="100" value="" style="curved=1;endArrow=block;html=1;fontSize=14;entryX=0.847;entryY=0.256;entryPerimeter=0;startArrow=oval;startFill=1;endFill=1;dashed=1;strokeWidth=3;fillColor=#f5f5f5;strokeColor=#59DE9C;dashPattern=1 1;endSize=8;exitX=0.8;exitY=0.8;exitPerimeter=0;" parent="1" source="15" target="99" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="1239" y="641" as="sourcePoint" />
             <mxPoint x="1364" y="727" as="targetPoint" />
@@ -619,8 +619,8 @@
             <mxPoint x="777" y="1087" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="170" value="&lt;font color=&quot;#e6d0de&quot;&gt;netdata daemon&lt;/font&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontColor=#E6E6E6;rotation=90;" parent="1" vertex="1">
-          <mxGeometry x="1195" y="593" width="110" height="20" as="geometry" />
+        <mxCell id="170" value="&lt;font color=&quot;#e6d0de&quot;&gt;netdata daemon&lt;/font&gt;" style="text;html=1;resizable=0;points=[];autosize=1;align=left;verticalAlign=top;spacingTop=-4;fontSize=13;fontColor=#59DE9C;rotation=90;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="1195" y="593" width="118" height="22" as="geometry" />
         </mxCell>
         <UserObject label="&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&lt;b&gt;web_log&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;real-time web performance&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog" linkTarget="_blank" id="171">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
