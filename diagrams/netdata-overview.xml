@@ -1,4 +1,4 @@
-<mxfile modified="2023-01-12T11:26:08.672Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="rsnsexdA8CFAQPNhlviU" version="20.8.4" type="github">
+<mxfile modified="2023-01-12T11:27:07.712Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="AxN57UwkDIRi-3GPG6tO" version="20.8.4" type="github">
   <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
     <mxGraphModel dx="1354" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
       <root>
@@ -1078,14 +1078,11 @@
         </mxCell>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;&amp;nbsp; ML Engine&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&amp;nbsp; &amp;nbsp;Anomaly Detection" link="https://learn.netdata.cloud/docs/agent/ml" linkTarget="_blank" id="6RedLYv8twKyCitmQhae-261">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" vertex="1" parent="1">
-            <mxGeometry x="460" y="607" width="180" height="70" as="geometry" />
+            <mxGeometry x="457" y="607" width="183" height="70" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="6RedLYv8twKyCitmQhae-262" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="525" y="583" width="70" height="30" as="geometry" />
-        </mxCell>
         <mxCell id="6RedLYv8twKyCitmQhae-263" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" vertex="1" parent="1">
-          <mxGeometry x="524" y="666" width="70" height="30" as="geometry" />
+          <mxGeometry x="512" y="666" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="6RedLYv8twKyCitmQhae-265" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.52;dx=24;notch=0;fillColor=#59DE9C;strokeColor=none;" vertex="1" parent="1">
           <mxGeometry x="618" y="629" width="40" height="30" as="geometry" />
@@ -1098,6 +1095,9 @@
         </mxCell>
         <mxCell id="6RedLYv8twKyCitmQhae-270" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://raw.githubusercontent.com/netdata/netdata-ui/a17e8628d120ab739d1c98bf21ed6a240d12ba6d/src/components/icon/assets/anomalies_lens.svg;" vertex="1" parent="1">
           <mxGeometry x="466.5" y="626" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="6RedLYv8twKyCitmQhae-272" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="512" y="583" width="70" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
