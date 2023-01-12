@@ -42,12 +42,6 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
-        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
-            char dim_prior_name[4];
-            snprintfz(dim_prior_name, 4, "%d", j);
-            chart_data->dim_prior[j] = rrddim_add(chart_data->st_prior, dim_prior_name, 
-                                                            NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
         chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1] = rrddim_add(chart_data->st_prior, "Unknown", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
@@ -171,11 +165,19 @@ void systemd_chart_update(struct File_info *p_file_info, struct Chart_meta *char
 
     /* Syslog priority value - update chart */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
-        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE; j++){
-            rrddim_set_by_pointer(  chart_data->st_prior, 
-                                    chart_data->dim_prior[j], 
-                                    chart_data->num_prior[j]);
+        for(int j = 0; j < SYSLOG_PRIOR_ARR_SIZE - 1; j++){
+            if(unlikely(!chart_data->dim_prior[j] && chart_data->num_prior[j])){
+                char dim_prior_name[4];
+                snprintfz(dim_prior_name, 4, "%d", j);
+                chart_data->dim_prior[j] = rrddim_add(chart_data->st_prior, dim_prior_name, NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            }
+            if(chart_data->dim_prior[j]) rrddim_set_by_pointer( chart_data->st_prior, 
+                                                                chart_data->dim_prior[j], 
+                                                                chart_data->num_prior[j]);
         }
+        rrddim_set_by_pointer(  chart_data->st_prior, 
+                                chart_data->dim_prior[SYSLOG_PRIOR_ARR_SIZE - 1], // "Unknown"
+                                chart_data->num_prior[SYSLOG_PRIOR_ARR_SIZE - 1]);
         rrdset_done(chart_data->st_prior);
     }
 

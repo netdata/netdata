@@ -139,6 +139,8 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
+        // Too many method dimensions, create only "GET" so that the chart is visible
+        // and the remaining ones as they become non-zero.
         chart_data->dim_req_method_get = rrddim_add(chart_data->st_req_methods, "GET", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 
@@ -245,6 +247,8 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , p_file_info->update_every
                 , RRDSET_TYPE_AREA
         );
+        // Too many response code dimensions, create only "other" so that the 
+        // chart is visible and the remaining ones as they become non-zero.
         chart_data->dim_resp_code[RESP_CODE_ARR_SIZE - 1] = rrddim_add(chart_data->st_resp_code, "other", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
     }
 

@@ -86,7 +86,7 @@ then
 					--use-system-protobuf \
 					--enable-logsmanagement \
 					--enable-logsmanagement-tests \
-					--install $INSTALL_PATH
+					--install-prefix $INSTALL_PATH
 	else
 		c_flags="-DLOGS_MANAGEMENT_STRESS_TEST=$enable_stress_tests "
 		# c_flags+="-Wl,--no-as-needed -ldl "
@@ -95,7 +95,7 @@ then
 					--dont-wait \
 					--disable-telemetry \
 					--enable-logsmanagement \
-					--install $INSTALL_PATH
+					--install-prefix $INSTALL_PATH
 	fi
 
 else
