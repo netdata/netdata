@@ -353,7 +353,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
-    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
+    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache)) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -362,7 +362,7 @@ static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
 }
 
 static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
-    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache))) {
+    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache))) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -1676,7 +1676,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->config.max_workers_evict_inline    =   10;
-    cache->config.severe_pressure_per1000     = 1000;
+    cache->config.severe_pressure_per1000     = 1010;
     cache->config.aggressive_evict_per1000    =  990;
     cache->config.healthy_size_per1000        =  980;
     cache->config.evict_low_threshold_per1000 =  970;
@@ -1896,7 +1896,7 @@ size_t pgc_get_wanted_cache_size(PGC *cache) {
 }
 
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
-    bool under_pressure = cache_under_severe_pressure(cache);
+    bool under_pressure = cache_needs_space_aggressively(cache);
     return evict_pages(cache,
                        under_pressure ? 0 : max_skip,
                        under_pressure ? 0 : max_evict,
