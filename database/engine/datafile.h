@@ -44,13 +44,6 @@ struct rrdengine_datafile {
         size_t flushed_to_open_running;
     } writers;
 
-    // exclusive access to extents
-    struct {
-        SPINLOCK spinlock;
-        unsigned lockers;
-        Pvoid_t extents_JudyL;
-    } extent_exclusive_access;
-
     struct {
         SPINLOCK spinlock;
         unsigned lockers;
@@ -58,6 +51,11 @@ struct rrdengine_datafile {
         bool available;
         time_t time_to_evict;
     } users;
+
+    struct {
+        SPINLOCK spinlock;
+        Pvoid_t pending_epdl_by_extent_offset_judyL;
+    } extent_queries;
 };
 
 typedef enum __attribute__ ((__packed__)) {

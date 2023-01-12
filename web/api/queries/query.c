@@ -738,7 +738,7 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
     if(points_available <= 0)
         return -LONG_MAX;
 
-    return points_coverage;
+    return points_coverage + (long)(25000 * tier); // 2.5% benefit for each higher tier
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
@@ -748,6 +748,20 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
 
+    time_t min_first_time_s = 0;
+    time_t max_last_time_s = 0;
+
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        time_t first_time_s = qm->tiers[tier].db_first_time_s;
+        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
+
+        if(!min_first_time_s || (first_time_s && first_time_s < min_first_time_s))
+            min_first_time_s = first_time_s;
+
+        if(!max_last_time_s || (last_time_s && last_time_s > max_last_time_s))
+            max_last_time_s = last_time_s;
+    }
+
     for(size_t tier = 0; tier < storage_tiers ; tier++) {
 
         // find the db time-range for this tier for all metrics
@@ -756,12 +770,20 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
         time_t last_time_s  = qm->tiers[tier].db_last_time_s;
         time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-        if(!db_metric_handle || !first_time_s || !last_time_s || !update_every_s) {
+        if( !db_metric_handle ||
+            !first_time_s ||
+            !last_time_s ||
+            !update_every_s ||
+            first_time_s > max_last_time_s ||
+            last_time_s < min_first_time_s
+            ) {
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
 
-        qm->tiers[tier].weight = query_plan_points_coverage_weight(first_time_s, last_time_s, update_every_s, after_wanted, before_wanted, points_wanted, tier);
+        qm->tiers[tier].weight = query_plan_points_coverage_weight(
+                min_first_time_s, max_last_time_s, update_every_s,
+                after_wanted, before_wanted, points_wanted, tier);
     }
 
     size_t best_tier = 0;
@@ -2093,6 +2115,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if (qt->request.timeout)
         now_realtime_timeval(&query_start_time);
 
+    size_t last_db_points_read = 0;
+    size_t last_result_points_generated = 0;
+
     QUERY_ENGINE_OPS **ops = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(QUERY_ENGINE_OPS *));
 
     size_t capacity = libuv_worker_threads * 2;
@@ -2122,6 +2147,15 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
+
+        global_statistics_rrdr_query_completed(
+                1,
+                r->internal.db_points_read - last_db_points_read,
+                r->internal.result_points_generated - last_result_points_generated,
+                qt->request.query_source);
+
+        last_db_points_read = r->internal.db_points_read;
+        last_result_points_generated = r->internal.result_points_generated;
 
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
@@ -2232,7 +2266,5 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
-    global_statistics_rrdr_query_completed(dimensions_used, r->internal.db_points_read,
-                                           r->internal.result_points_generated, qt->request.query_source);
     return r;
 }

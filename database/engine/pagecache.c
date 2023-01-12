@@ -55,7 +55,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_CRITICAL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }
@@ -713,7 +713,7 @@ we_are_done:
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_open_cache, pages_found_in_open_cache, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_meta_source_journal_v2, pages_found_in_journals_v2, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache, pages_found_in_main_cache, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_pending_found_in_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_main_cache_at_pass4, pages_found_pass4, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_to_load_from_disk, pages_pending, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_overlapping_skipped, pages_overlapping, __ATOMIC_RELAXED);
 
@@ -739,7 +739,6 @@ void rrdeng_prep_query(PDC *pdc) {
 
     if (pages_to_load && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
-        pdc->preload_all_extent_pages = false;
         usec_t start_ut = now_monotonic_usec();
 //        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
 //            dbengine_load_page_list_directly(ctx, handle->pdc);
@@ -783,7 +782,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
 
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
-        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority);
+        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);

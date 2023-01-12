@@ -18,7 +18,6 @@ void register_libuv_worker_jobs() {
     worker_register_job_name(UV_EVENT_COMMIT_PAGE_CB, "commit cb");
     worker_register_job_name(UV_EVENT_FLUSH_PAGES_CB, "flush cb");
     worker_register_job_name(UV_EVENT_PAGE_LOOKUP, "page lookup");
-    worker_register_job_name(UV_EVENT_METRIC_LOOKUP, "metric lookup");
     worker_register_job_name(UV_EVENT_PAGE_POPULATION, "populate page");
     worker_register_job_name(UV_EVENT_EXT_DECOMPRESSION, "extent decompression");
     worker_register_job_name(UV_EVENT_READ_MMAP_EXTENT, "read extent (mmap)");

@@ -41,6 +41,7 @@ static struct {
         , {"natural-points"    , 0    , RRDR_OPTION_NATURAL_POINTS}
         , {"virtual-points"    , 0    , RRDR_OPTION_VIRTUAL_POINTS}
         , {"all-dimensions"    , 0    , RRDR_OPTION_ALL_DIMENSIONS}
+        , {"plan"              , 0    , RRDR_OPTION_SHOW_PLAN}
         , {NULL                , 0    , 0}
 };
 

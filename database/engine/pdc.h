@@ -5,6 +5,8 @@
 
 #include "../engine/rrdengine.h"
 
+struct rrdeng_cmd;
+
 #ifdef PDC_USE_JULYL
 #define PDCJudyLIns             JulyLIns
 #define PDCJudyLGet             JulyLGet
@@ -43,6 +45,9 @@ void page_details_cleanup(void);
 void epdl_cleanup(void);
 void deol_cleanup(void);
 void extent_buffer_cleanup(void);
+
+void epdl_cmd_dequeued(void *epdl_ptr);
+void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd);
 
 struct extent_buffer {
     size_t bytes;

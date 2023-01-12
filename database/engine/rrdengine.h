@@ -27,6 +27,7 @@ extern unsigned rrdeng_pages_per_extent;
 
 /* Forward declarations */
 struct rrdengine_instance;
+struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
@@ -47,7 +48,6 @@ typedef struct page_details_control {
 
     Pvoid_t page_list_JudyL;        // the list of page details
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
-    bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
     bool workers_should_stop;       // true when the query thread left and the workers should stop
     bool prep_done;
 
@@ -126,6 +126,11 @@ struct page_details {
     uint32_t update_every_s;
     uint16_t page_length;
     PDC_PAGE_STATUS status;
+
+    struct {
+        struct page_details *prev;
+        struct page_details *next;
+    } load;
 
     struct {
         struct page_details *prev;
@@ -400,7 +405,18 @@ int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
-void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, enum storage_priority priority);
+typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
+typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);
+
+void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd);
+void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd);
+
+typedef struct rrdeng_cmd *(*requeue_callback_t)(void *data);
+void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
+
+void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data,
+                struct completion *completion, enum storage_priority priority,
+                enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb);
 
 void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);

@@ -11,6 +11,13 @@ struct extent_page_details_list {
     struct page_details_control *pdc;
     struct rrdengine_datafile *datafile;
 
+    struct rrdeng_cmd *cmd;
+
+    struct {
+        struct extent_page_details_list *prev;
+        struct extent_page_details_list *next;
+    } query;
+
     struct {
         struct extent_page_details_list *prev;
         struct extent_page_details_list *next;
@@ -465,7 +472,7 @@ static void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS
     if(pages_matched && statistics_counter)
         __atomic_add_fetch(statistics_counter, pages_matched, __ATOMIC_RELAXED);
 }
-
+/*
 static bool epdl_check_if_pages_are_already_in_cache(struct rrdengine_instance *ctx, EPDL *epdl, PDC_PAGE_STATUS tags)
 {
     size_t count_remaining = 0;
@@ -501,6 +508,7 @@ static bool epdl_check_if_pages_are_already_in_cache(struct rrdengine_instance *
 
     return count_remaining == 0;
 }
+*/
 
 // ----------------------------------------------------------------------------
 // PDC logic
@@ -585,6 +593,56 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
 
     netdata_spinlock_unlock(&pdc->refcount_spinlock);
     return false;
+}
+
+void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd) {
+    EPDL *epdl = epdl_ptr;
+    epdl->cmd = cmd;
+}
+
+void epdl_cmd_dequeued(void *epdl_ptr) {
+    EPDL *epdl = epdl_ptr;
+    epdl->cmd = NULL;
+}
+
+static struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
+    EPDL *epdl = epdl_ptr;
+    return epdl->cmd;
+}
+
+static bool epdl_pending_add(EPDL *epdl) {
+    bool added_new;
+
+    netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
+    Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
+    internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
+
+    EPDL *base = *PValue;
+
+    if(!base)
+        added_new = true;
+    else {
+        added_new = false;
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
+
+        if(base->pdc->priority > epdl->pdc->priority)
+            rrdeng_req_cmd(epdl_get_cmd, base, epdl->pdc->priority);
+    }
+
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
+    *PValue = base;
+
+    netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
+
+    return added_new;
+}
+
+static void epdl_pending_del(EPDL *epdl) {
+    netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
+    int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
+    (void)rc;
+    internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
+    netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 }
 
 void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent_page_details_list_t exec_first_extent_list, execute_extent_page_details_list_t exec_rest_extent_list)
@@ -674,10 +732,12 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
                 pdc_acquire(pdc); // we do this for the next worker: do_read_extent_work()
                 epdl->pdc = pdc;
 
-                if(extent_list_no++ == 0)
-                    exec_first_extent_list(ctx, epdl, pdc->priority);
-                else
-                    exec_rest_extent_list(ctx, epdl, pdc->priority);
+                if(epdl_pending_add(epdl)) {
+                    if (extent_list_no++ == 0)
+                        exec_first_extent_list(ctx, epdl, pdc->priority);
+                    else
+                        exec_rest_extent_list(ctx, epdl, pdc->priority);
+                }
             }
             PDCJudyLFreeArray(&deol->extent_pd_list_by_extent_offset_JudyL, PJE0);
             deol_release(deol);
@@ -686,51 +746,6 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
     }
 
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
-}
-
-static bool datafile_get_exclusive_access_to_extent(EPDL *epdl) {
-    struct rrdengine_datafile *df = epdl->datafile;
-    bool is_it_mine = false;
-
-    while(!is_it_mine) {
-        netdata_spinlock_lock(&df->extent_exclusive_access.spinlock);
-        if(!df->users.available) {
-            netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
-            return false;
-        }
-        Pvoid_t *PValue = JudyLIns(&df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
-        if (!*PValue) {
-            *(Word_t *) PValue = gettid();
-            df->extent_exclusive_access.lockers++;
-            is_it_mine = true;
-        }
-        netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
-
-        if(!is_it_mine) {
-            static const struct timespec ns = { .tv_sec = 0, .tv_nsec = 1 };
-            nanosleep(&ns, NULL);
-        }
-    }
-    return true;
-}
-
-static void datafile_release_exclusive_access_to_extent(EPDL *epdl) {
-    struct rrdengine_datafile *df = epdl->datafile;
-
-    netdata_spinlock_lock(&df->extent_exclusive_access.spinlock);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    Pvoid_t *PValue = JudyLGet(df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
-    if (*(Word_t *) PValue != (Word_t)gettid())
-        fatal("DBENGINE: exclusive extent access is not mine");
-#endif
-
-    int rc = JudyLDel(&df->extent_exclusive_access.extents_JudyL, epdl->extent_offset, PJE0);
-    if (!rc)
-        fatal("DBENGINE: cannot find my exclusive access");
-
-    df->extent_exclusive_access.lockers--;
-    netdata_spinlock_unlock(&df->extent_exclusive_access.spinlock);
 }
 
 static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
@@ -843,12 +858,34 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     return vd;
 }
 
+static struct page_details *epdl_to_pd_load_list(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+    struct page_details *pd_list = NULL;
+
+    for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
+        Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
+        internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
+
+        if (pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
+            Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
+            internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
+
+            if (pd_pptr && *pd_pptr) {
+                struct page_details *pd = *pd_pptr;
+                internal_fatal(metric_id != pd->metric_id, "DBENGINE: metric ids do not match");
+
+                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+            }
+        }
+    }
+
+    return pd_list;
+}
+
 static bool epdl_populate_pages_from_extent_data(
         struct rrdengine_instance *ctx,
         void *data,
         size_t data_length,
         EPDL *epdl,
-        bool preload_all_pages,
         bool worker,
         PDC_PAGE_STATUS tags,
         bool cached_extent)
@@ -936,13 +973,15 @@ static bool epdl_populate_pages_from_extent_data(
         }
     }
 
+    if(worker)
+        worker_is_busy(UV_EVENT_PAGE_LOOKUP);
+
     size_t stats_data_from_main_cache = 0;
     size_t stats_data_from_extent = 0;
     size_t stats_load_compressed = 0;
     size_t stats_load_uncompressed = 0;
     size_t stats_load_invalid_page = 0;
     size_t stats_cache_hit_while_inserting = 0;
-    size_t stats_cache_hit_before_allocation = 0;
 
     uint32_t page_offset = 0, page_length;
     time_t now_s = now_realtime_sec();
@@ -957,9 +996,6 @@ static bool epdl_populate_pages_from_extent_data(
             continue;
         }
 
-        if(worker)
-            worker_is_busy(UV_EVENT_METRIC_LOOKUP);
-
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
         Word_t metric_id = (Word_t)metric;
         if(!metric) {
@@ -970,97 +1006,81 @@ static bool epdl_populate_pages_from_extent_data(
         }
         mrg_metric_release(main_mrg, metric);
 
-        if(worker)
-            worker_is_busy(UV_EVENT_PAGE_LOOKUP);
-
-        struct page_details *pd = NULL;
-        Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(epdl->page_details_by_metric_id_JudyL, metric_id, PJE0);
-        internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
-
-        if(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
-            Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
-            internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
-
-            if(pd_pptr && *pd_pptr) {
-                pd = *pd_pptr;
-                internal_fatal(metric_id != pd->metric_id, "DBENGINE: metric ids do not match");
-            }
-        }
-
-        if(!pd && !preload_all_pages)
+        struct page_details *pd_list = epdl_to_pd_load_list(epdl, metric_id, start_time_s);
+        if(likely(!pd_list))
             continue;
 
         VALIDATED_PAGE_DESCRIPTOR vd = validate_extent_page_descr(
                 &header->descr[i], now_s,
-                (pd) ? pd->update_every_s : 0,
+                (pd_list) ? pd_list->update_every_s : 0,
                 have_read_error);
 
         if(worker)
             worker_is_busy(UV_EVENT_PAGE_POPULATION);
 
-        PGC_PAGE *page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx, metric_id, start_time_s, PGC_SEARCH_EXACT);
-        if (!page) {
-            void *page_data = dbengine_page_alloc(ctx, vd.page_length);
+        void *page_data = dbengine_page_alloc(ctx, vd.page_length);
 
-            if (unlikely(!vd.data_on_disk_valid)) {
+        if (unlikely(!vd.data_on_disk_valid)) {
+            fill_page_with_nulls(page_data, vd.page_length, vd.type);
+            stats_load_invalid_page++;
+        }
+
+        else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+            memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
+            stats_load_uncompressed++;
+        }
+
+        else {
+            if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
+                error_limit_static_global_var(erl, 10, 0);
+                error_limit(&erl,
+                            "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
+                            i, page_offset, vd.page_length, uncompressed_payload_length);
+
                 fill_page_with_nulls(page_data, vd.page_length, vd.type);
                 stats_load_invalid_page++;
             }
-
-            else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-                memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
-                stats_load_uncompressed++;
-            }
-
             else {
-                if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
-                    error_limit_static_global_var(erl, 10, 0);
-                    error_limit(&erl,
-                                "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
-                                i, page_offset, vd.page_length, uncompressed_payload_length);
-
-                    fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                    stats_load_invalid_page++;
-                }
-                else {
-                    memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
-                    stats_load_compressed++;
-                }
+                memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
+                stats_load_compressed++;
             }
-
-            PGC_ENTRY page_entry = {
-                    .hot = false,
-                    .section = (Word_t)ctx,
-                    .metric_id = metric_id,
-                    .start_time_s = vd.start_time_s,
-                    .end_time_s = vd.end_time_s,
-                    .update_every_s = vd.update_every_s,
-                    .size = (size_t) vd.page_length,
-                    .data = page_data
-            };
-
-            bool added = true;
-            page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
-            if (false == added) {
-                dbengine_page_free(page_data);
-                stats_cache_hit_while_inserting++;
-                stats_data_from_main_cache++;
-            }
-            else
-                stats_data_from_extent++;
         }
-        else {
-            stats_cache_hit_before_allocation++;
+
+        PGC_ENTRY page_entry = {
+                .hot = false,
+                .section = (Word_t)ctx,
+                .metric_id = metric_id,
+                .start_time_s = vd.start_time_s,
+                .end_time_s = vd.end_time_s,
+                .update_every_s = vd.update_every_s,
+                .size = (size_t) vd.page_length,
+                .data = page_data
+        };
+
+        bool added = true;
+        PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+        if (false == added) {
+            dbengine_page_free(page_data);
+            stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
         }
+        else
+            stats_data_from_extent++;
 
-        if (pd) {
+        struct page_details *pd = pd_list;
+        do {
+            if(pd != pd_list)
+                pgc_page_dup(main_cache, page);
+
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
             pdc_page_status_set(pd, PDC_PAGE_READY | tags);
-        }
-        else
-            pgc_page_release(main_cache, page);
+
+            pd = pd->load.next;
+        } while(pd);
+
+        if(worker)
+            worker_is_busy(UV_EVENT_PAGE_LOOKUP);
     }
 
     if(stats_data_from_main_cache)
@@ -1068,11 +1088,10 @@ static bool epdl_populate_pages_from_extent_data(
 
     if(cached_extent)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_extent_cache, stats_data_from_extent, __ATOMIC_RELAXED);
-    else
+    else {
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_data_source_disk, stats_data_from_extent, __ATOMIC_RELAXED);
-
-    if(stats_cache_hit_before_allocation)
-        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_before_allocation, stats_cache_hit_before_allocation, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.extents_loaded_from_disk, 1, __ATOMIC_RELAXED);
+    }
 
     if(stats_cache_hit_while_inserting)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_ok_loaded_but_cache_hit_while_inserting, stats_cache_hit_while_inserting, __ATOMIC_RELAXED);
@@ -1095,22 +1114,23 @@ static bool epdl_populate_pages_from_extent_data(
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
-    struct page_details_control *pdc = epdl->pdc;
+    epdl_pending_del(epdl);
 
-    bool extent_exclusive = false;
+    bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
+    for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
+        internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
+        internal_fatal(ep->extent_offset != epdl->extent_offset, "DBENGINE: extent offsets do not match");
+        internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
+        internal_fatal(ep->file != epdl->file, "DBENGINE: files do not match");
 
-    if(pdc->preload_all_extent_pages) {
-        if (!datafile_get_exclusive_access_to_extent(epdl)) {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_datafile_not_available, 1, __ATOMIC_RELAXED);
-            goto cleanup;
+        PDC *pdc = ep->pdc;
+        if(!__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED)) {
+            should_stop = false;
+            break;
         }
-        extent_exclusive = true;
     }
 
-    if (epdl_check_if_pages_are_already_in_cache(ctx, epdl, PDC_PAGE_PRELOADED_WORKER))
-        goto cleanup;
-
-    if(__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED))
+    if(should_stop)
         goto cleanup;
 
     if(worker)
@@ -1183,8 +1203,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         // Need to decompress and then process the pagelist
         bool extent_used = epdl_populate_pages_from_extent_data(
                 ctx, extent_compressed_data, epdl->extent_size,
-                epdl, pdc->preload_all_extent_pages,
-                worker, loaded_pages_tag, extent_found_in_cache);
+                epdl, worker, loaded_pages_tag, extent_found_in_cache);
 
         if(extent_used) {
             // since the extent was used, all the pages that are not
@@ -1198,23 +1217,26 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         not_loaded_pages_tag |= PDC_PAGE_FAILED_TO_MAP_EXTENT;
 
 
-    // mark all pending pages as failed
-    epdl_mark_all_not_loaded_pages_as_failed(
-            epdl, not_loaded_pages_tag,
-            &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
-
     if(extent_cache_page)
         pgc_page_release(extent_cache, extent_cache_page);
 
-    cleanup:
-    if(extent_exclusive)
-        datafile_release_exclusive_access_to_extent(epdl);
+    // mark all pending pages as failed
+    for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
+        epdl_mark_all_not_loaded_pages_as_failed(
+                ep, not_loaded_pages_tag,
+                &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+    }
 
-    completion_mark_complete_a_job(&epdl->pdc->page_completion);
-    pdc_release_and_destroy_if_unreferenced(pdc, true, false);
+cleanup:
+    for(EPDL *ep = epdl, *next = NULL; ep ; ep = next) {
+        next = ep->query.next;
 
-    // Free the Judy that holds the requested pagelist and the extents
-    epdl_destroy(epdl);
+        completion_mark_complete_a_job(&ep->pdc->page_completion);
+        pdc_release_and_destroy_if_unreferenced(ep->pdc, true, false);
+
+        // Free the Judy that holds the requested pagelist and the extents
+        epdl_destroy(ep);
+    }
 
     if(worker)
         worker_is_idle();

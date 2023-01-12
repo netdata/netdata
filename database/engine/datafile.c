@@ -28,8 +28,8 @@ static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_insta
     datafile->users.available = true;
 
     netdata_spinlock_init(&datafile->users.spinlock);
-    netdata_spinlock_init(&datafile->extent_exclusive_access.spinlock);
     netdata_spinlock_init(&datafile->writers.spinlock);
+    netdata_spinlock_init(&datafile->extent_queries.spinlock);
 
     return datafile;
 }

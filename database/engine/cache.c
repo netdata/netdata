@@ -353,7 +353,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
-    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
+    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache)) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -362,7 +362,7 @@ static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
 }
 
 static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
-    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache))) {
+    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache))) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -1046,8 +1046,11 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
-                if(!all_of_them)
-                    // we do it one-by-one to avoid locking clean queue for way too long
+                if(unlikely(all_of_them))
+                    // get more pages
+                    ;
+                else
+                    // one page at a time
                     break;
             }
             else {
@@ -1071,8 +1074,53 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(likely(pages_to_evict)) {
             // remove them from the index
 
-            for(PGC_PAGE *page = pages_to_evict, *next = NULL; page ; page = next) {
-                next = page->link.next;
+            if(unlikely(pages_to_evict->link.next)) {
+                // we have many pages, let's minimize the index locks we are going to get
+
+                PGC_PAGE *pages_per_partition[cache->config.partitions];
+                memset(pages_per_partition, 0, sizeof(PGC_PAGE *) * cache->config.partitions);
+
+                // sort them by partition
+                for (PGC_PAGE *page = pages_to_evict, *next = NULL; page; page = next) {
+                    next = page->link.next;
+
+                    size_t partition = pgc_indexing_partition(cache, page->metric_id);
+                    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
+                }
+
+                // remove them from the index
+                for (size_t partition = 0; partition < cache->config.partitions; partition++) {
+                    if (!pages_per_partition[partition]) continue;
+
+                    pgc_index_write_lock(cache, partition);
+
+                    for (PGC_PAGE *page = pages_per_partition[partition]; page; page = page->link.next)
+                        remove_this_page_from_index_unsafe(cache, page, partition);
+
+                    pgc_index_write_unlock(cache, partition);
+                }
+
+                // free them
+                for (size_t partition = 0; partition < cache->config.partitions; partition++) {
+                    if (!pages_per_partition[partition]) continue;
+
+                    for (PGC_PAGE *page = pages_per_partition[partition], *next = NULL; page; page = next) {
+                        next = page->link.next;
+
+                        size_t page_size = page->assumed_size;
+                        free_this_page(cache, page);
+
+                        __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                        __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
+
+                        total_pages_evicted++;
+                    }
+                }
+            }
+            else {
+                // just one page to be evicted
+                PGC_PAGE *page = pages_to_evict;
 
                 size_t page_size = page->assumed_size;
 
@@ -1676,7 +1724,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
     cache->config.max_workers_evict_inline    =   10;
-    cache->config.severe_pressure_per1000     = 1000;
+    cache->config.severe_pressure_per1000     = 1010;
     cache->config.aggressive_evict_per1000    =  990;
     cache->config.healthy_size_per1000        =  980;
     cache->config.evict_low_threshold_per1000 =  970;
@@ -1896,7 +1944,7 @@ size_t pgc_get_wanted_cache_size(PGC *cache) {
 }
 
 bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict) {
-    bool under_pressure = cache_under_severe_pressure(cache);
+    bool under_pressure = cache_needs_space_aggressively(cache);
     return evict_pages(cache,
                        under_pressure ? 0 : max_skip,
                        under_pressure ? 0 : max_evict,
