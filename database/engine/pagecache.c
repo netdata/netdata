@@ -739,7 +739,6 @@ void rrdeng_prep_query(PDC *pdc) {
 
     if (pages_to_load && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
-        pdc->preload_all_extent_pages = false;
         usec_t start_ut = now_monotonic_usec();
 //        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
 //            dbengine_load_page_list_directly(ctx, handle->pdc);

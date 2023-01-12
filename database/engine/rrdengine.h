@@ -47,7 +47,6 @@ typedef struct page_details_control {
 
     Pvoid_t page_list_JudyL;        // the list of page details
     unsigned completed_jobs;        // the number of jobs completed last time the query thread checked
-    bool preload_all_extent_pages;  // true to preload all the pages on each extent involved in the query
     bool workers_should_stop;       // true when the query thread left and the workers should stop
     bool prep_done;
 
@@ -126,6 +125,11 @@ struct page_details {
     uint32_t update_every_s;
     uint16_t page_length;
     PDC_PAGE_STATUS status;
+
+    struct {
+        struct page_details *prev;
+        struct page_details *next;
+    } load;
 
     struct {
         struct page_details *prev;
