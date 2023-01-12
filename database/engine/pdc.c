@@ -600,17 +600,18 @@ bool epdl_pending_add(EPDL *epdl) {
     Pvoid_t *PValue = JudyLIns(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
     internal_fatal(!PValue || PValue == PJERR, "DBENGINE: corrupted pending extent judy");
 
-    if(!*PValue) {
-        *PValue = epdl;
+    EPDL *base = *PValue;
+
+    if(!base)
         added_new = true;
-    }
     else {
-        EPDL *base = *PValue;
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
-        *PValue = base;
         added_new = false;
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
     }
+
+    DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
+    *PValue = base;
+
     netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 
     return added_new;
