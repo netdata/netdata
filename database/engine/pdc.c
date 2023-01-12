@@ -11,6 +11,8 @@ struct extent_page_details_list {
     struct page_details_control *pdc;
     struct rrdengine_datafile *datafile;
 
+    struct rrdeng_cmd *cmd;
+
     struct {
         struct extent_page_details_list *prev;
         struct extent_page_details_list *next;
@@ -593,7 +595,22 @@ bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router 
     return false;
 }
 
-bool epdl_pending_add(EPDL *epdl) {
+void epdl_cmd_queued(void *epdl_ptr, struct rrdeng_cmd *cmd) {
+    EPDL *epdl = epdl_ptr;
+    epdl->cmd = cmd;
+}
+
+void epdl_cmd_dequeued(void *epdl_ptr) {
+    EPDL *epdl = epdl_ptr;
+    epdl->cmd = NULL;
+}
+
+struct rrdeng_cmd *epdl_cmd_requeue(void *epdl_ptr) {
+    EPDL *epdl = epdl_ptr;
+    return epdl->cmd;
+}
+
+static bool epdl_pending_add(EPDL *epdl) {
     bool added_new;
 
     netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
@@ -607,6 +624,9 @@ bool epdl_pending_add(EPDL *epdl) {
     else {
         added_new = false;
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
+
+        if(base->pdc->priority > epdl->pdc->priority)
+            rrdeng_req_cmd(epdl_cmd_requeue, base, epdl->pdc->priority);
     }
 
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
@@ -617,7 +637,7 @@ bool epdl_pending_add(EPDL *epdl) {
     return added_new;
 }
 
-void epdl_pending_del(EPDL *epdl) {
+static void epdl_pending_del(EPDL *epdl) {
     netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
     int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
     (void)rc;

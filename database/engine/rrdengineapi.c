@@ -930,7 +930,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     struct completion completion = {};
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 
@@ -951,7 +951,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
     // 1. make sure all collectors are stopped
 
     completion_init(&ctx->quiesce_completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)

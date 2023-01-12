@@ -27,6 +27,7 @@ extern unsigned rrdeng_pages_per_extent;
 
 /* Forward declarations */
 struct rrdengine_instance;
+struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
@@ -404,7 +405,18 @@ int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
-void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion, enum storage_priority priority);
+typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
+typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);
+
+void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd);
+void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd);
+
+typedef struct rrdeng_cmd *(*requeue_callback_t)(void *data);
+void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority);
+
+void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data,
+                struct completion *completion, enum storage_priority priority,
+                enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb);
 
 void pdc_route_asynchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
 void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details_control *pdc);
