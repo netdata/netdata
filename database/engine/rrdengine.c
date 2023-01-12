@@ -25,16 +25,16 @@ struct rrdeng_main {
 
     time_t last_buffers_cleanup_s;
 
-    bool flush_running;
-    bool evict_running;
+    size_t flushes_running;
+    size_t evictions_running;
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
         .async = {},
         .timer = {},
         .last_buffers_cleanup_s = 0,
-        .flush_running = false,
-        .evict_running = false,
+        .flushes_running = 0,
+        .evictions_running = 0,
 };
 
 static void sanity_check(void)
@@ -1306,11 +1306,11 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
 }
 
 static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    rrdeng_main.flush_running = false;
+    rrdeng_main.flushes_running--;
 }
 
 static void after_do_cache_evict(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
-    rrdeng_main.evict_running = false;
+    rrdeng_main.evictions_running--;
 }
 
 static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1516,23 +1516,17 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_FLUSH_INIT: {
-                    if(!rrdeng_main.flush_running) {
-
-                        rrdeng_main.flush_running = true;
-                        if(!work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush))
-                            rrdeng_main.flush_running = false;
-
+                    if(rrdeng_main.flushes_running < (size_t)(libuv_worker_threads / 4)) {
+                        rrdeng_main.flushes_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_flush_tp_worker, after_do_cache_flush);
                     }
                     break;
                 }
 
                 case RRDENG_OPCODE_EVICT_INIT: {
-                    if(!rrdeng_main.evict_running) {
-
-                        rrdeng_main.evict_running = true;
-                        if (!work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict))
-                            rrdeng_main.evict_running = false;
-
+                    if(rrdeng_main.evictions_running < (size_t)libuv_worker_threads / 4) {
+                        rrdeng_main.evictions_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict);
                     }
                     break;
                 }
