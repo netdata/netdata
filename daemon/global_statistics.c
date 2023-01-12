@@ -1705,7 +1705,7 @@ static void dbengine2_statistics_charts(void) {
         size_t pages_hit_merged_extent = cache_efficiency_stats.pages_load_extent_merged - cache_efficiency_stats_old.pages_load_extent_merged;
         size_t pages_hit_at_query_plan = cache_efficiency_stats.pages_meta_source_main_cache - cache_efficiency_stats_old.pages_meta_source_main_cache;
 
-        size_t pages_total_hit = pages_hit_at_query_plan + pages_hit_insert_conflict + pages_hit_cached_extent;
+        size_t pages_total_hit = pages_hit_at_query_plan + pages_hit_insert_conflict + pages_hit_cached_extent + pages_hit_merged_extent;
         size_t pages_total = cache_efficiency_stats.pages_total - cache_efficiency_stats_old.pages_total;
 
         static size_t overall_hit_ratio = 100;
