@@ -23,7 +23,7 @@
 Netdata is a distributed, real-time, performance and health monitoring platform for systems, hardware, containers and applications with zero configuration needed. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any preparation.
 
 Netdata [Agent](https://github.com/netdata/netdata) is an enormously powerful, **Open-Sourced**, **Single Node** health monitoring and performance troubleshooting tool.
-It provides you an ability to automatically identify processes, collect and store metrics locally and even more - vizualize all metrics without any chart configuration (of course you can tweak it later on if you need).
+It gives you the ability to automatically identify processes, collect and store metrics locally and even more - visualize all metrics without any configuration (of course you can tweak it later on if you need).
 
 [Netdata.cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant Netdata Agents to get the metric data, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric). 
 
