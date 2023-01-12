@@ -19,7 +19,7 @@ mkdir -p "${staging}"
 
 case "${format}" in
     deb)
-        src="${staging}/$(echo "${distro}" | cut -f 1 -d '/')/pool/"
+        src="${staging}/${distro}"
         mkdir -p "${src}"
 
         for pkg in ${packages}; do
