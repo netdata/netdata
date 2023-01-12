@@ -738,7 +738,7 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
     if(points_available <= 0)
         return -LONG_MAX;
 
-    return points_coverage;
+    return points_coverage + (long)(25000 * tier); // 2.5% benefit for each higher tier
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
