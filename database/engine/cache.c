@@ -989,16 +989,12 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
-        bool evictions_critical = false;
         size_t max_size_to_evict = 0;
         if (all_of_them)
             max_size_to_evict = SIZE_MAX;
 
-        else {
-            size_t per1000 = cache_usage_per1000(cache, &max_size_to_evict);
-            if(per1000 >= cache->config.severe_pressure_per1000 && wait)
-                evictions_critical = true;
-        }
+        else
+            cache_usage_per1000(cache, &max_size_to_evict);
 
         if (!max_size_to_evict)
             break;
@@ -1022,7 +1018,6 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
         // find a page to evict
         pages_to_evict = NULL;
-        size_t size_to_evict = 0;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
 
@@ -1051,9 +1046,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
-                size_to_evict += page->assumed_size;
-
-                if(unlikely(all_of_them || (evictions_critical && size_to_evict < max_size_to_evict)))
+                if(unlikely(all_of_them))
                     // get more pages
                     ;
                 else
