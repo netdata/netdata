@@ -32,6 +32,53 @@ static int fill_formatted_callback(const char *name, const char *value, RRDLABEL
     return 1;
 }
 
+void rrdr_show_plan(RRDR *r, BUFFER *wb, const char *kq, const char *sq __maybe_unused) {
+    QUERY_TARGET *qt = r->internal.qt;
+
+    buffer_sprintf(wb, "\n\t%squery_plan%s: {", kq, kq);
+
+    for(size_t m = 0; m < qt->query.used; m++) {
+        QUERY_METRIC *qm = &qt->query.array[m];
+
+        if(m)
+            buffer_strcat(wb, ",");
+
+        buffer_sprintf(wb, "\n\t\t%s%s%s: {", kq, string2str(qm->dimension.id), kq);
+
+        buffer_sprintf(wb, "\n\t\t\t%splans%s: [", kq, kq);
+        for(size_t p = 0; p < qm->plan.used ;p++) {
+            QUERY_PLAN_ENTRY *qp = &qm->plan.array[p];
+            if(p)
+                buffer_strcat(wb, ",");
+
+            buffer_strcat(wb, "\n\t\t\t\t{");
+            buffer_sprintf(wb, "\n\t\t\t\t\t%stier%s: %zu,", kq, kq, qp->tier);
+            buffer_sprintf(wb, "\n\t\t\t\t\t%safter%s: %ld,", kq, kq, qp->after);
+            buffer_sprintf(wb, "\n\t\t\t\t\t%sbefore%s: %ld", kq, kq, qp->before);
+            buffer_strcat(wb, "\n\t\t\t\t}");
+        }
+        buffer_strcat(wb, "\n\t\t\t],");
+
+        buffer_sprintf(wb, "\n\t\t\t%stiers%s: [", kq, kq);
+        for(size_t tier = 0; tier < storage_tiers ;tier++) {
+            if(tier)
+                buffer_strcat(wb, ",");
+
+            buffer_strcat(wb, "\n\t\t\t\t{");
+            buffer_sprintf(wb, "\n\t\t\t\t\t%stier%s: %zu,", kq, kq, tier);
+            buffer_sprintf(wb, "\n\t\t\t\t\t%sdb_first_time%s: %ld,", kq, kq, qm->tiers[tier].db_first_time_s);
+            buffer_sprintf(wb, "\n\t\t\t\t\t%sdb_last_time%s: %ld,", kq, kq, qm->tiers[tier].db_last_time_s);
+            buffer_sprintf(wb, "\n\t\t\t\t\t%sweight%s: %ld", kq, kq, qm->tiers[tier].weight);
+            buffer_strcat(wb, "\n\t\t\t\t}");
+        }
+        buffer_strcat(wb, "\n\t\t\t]");
+
+        buffer_strcat(wb, "\n\t\t}");
+    }
+
+    buffer_strcat(wb, "\n\t},");
+}
+
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
     RRDR_GROUPING group_method)
 {
@@ -369,9 +416,12 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
     for(size_t tier = 0; tier < storage_tiers ; tier++)
         buffer_sprintf(wb, "%s%zu", tier>0?", ":"", r->internal.tier_points_read[tier]);
 
-    buffer_strcat(wb, " ]");
+    buffer_strcat(wb, " ],");
 
-    buffer_sprintf(wb, ",\n   %sresult%s: ", kq, kq);
+    if(options & RRDR_OPTION_SHOW_PLAN)
+        rrdr_show_plan(r, wb, kq, sq);
+
+    buffer_sprintf(wb, "\n   %sresult%s: ", kq, kq);
 
     if(string_value) buffer_strcat(wb, sq);
     //info("JSONWRAPPER(): %s: END", r->st->id);

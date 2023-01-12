@@ -40,7 +40,8 @@ typedef enum rrdr_options {
     RRDR_OPTION_RETURN_RAW      = 0x00100000, // Return raw data for aggregating across multiple nodes
     RRDR_OPTION_RETURN_JWAR     = 0x00200000, // Return anomaly rates in jsonwrap
     RRDR_OPTION_SELECTED_TIER   = 0x00400000, // Use the selected tier for the query
-    RRDR_OPTION_ALL_DIMENSIONS = 0x00800000, // Return the full dimensions list
+    RRDR_OPTION_ALL_DIMENSIONS  = 0x00800000, // Return the full dimensions list
+    RRDR_OPTION_SHOW_PLAN       = 0x01000000, // Return the query plan in jsonwrap
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate

@@ -748,6 +748,8 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
 
+    time_t lowest_tier_last_time_s = 0;
+
     for(size_t tier = 0; tier < storage_tiers ; tier++) {
 
         // find the db time-range for this tier for all metrics
@@ -760,6 +762,12 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
+
+        if(!lowest_tier_last_time_s)
+            lowest_tier_last_time_s = last_time_s;
+
+        if(last_time_s < lowest_tier_last_time_s)
+            last_time_s = lowest_tier_last_time_s;
 
         qm->tiers[tier].weight = query_plan_points_coverage_weight(first_time_s, last_time_s, update_every_s, after_wanted, before_wanted, points_wanted, tier);
     }
@@ -913,6 +921,9 @@ typedef struct query_engine_ops {
     size_t group_points_added;
     NETDATA_DOUBLE group_anomaly_rate;
     RRDR_VALUE_FLAGS group_value_flags;
+
+    time_t query_start_time_s;
+    time_t query_end_time_s;
 
     // statistics
     size_t db_total_points_read;
@@ -1201,8 +1212,10 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
             .query_granularity = (time_t)(r->update_every / r->group),
             .group_value_flags = RRDR_VALUE_NOTHING,
     };
+    ops->query_start_time_s = (time_t)(qt->window.after - ops->query_granularity);
+    ops->query_end_time_s = (time_t)(ops->query_start_time_s + (qt->window.points * ops->view_update_every));
 
-    if(!query_plan(ops, qt->window.after, qt->window.before, qt->window.points))
+    if(!query_plan(ops, ops->query_start_time_s, ops->query_end_time_s, qt->window.points))
         return NULL;
 
     return ops;
