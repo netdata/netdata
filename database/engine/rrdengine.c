@@ -584,6 +584,7 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
     if(cmd && cmd->priority > priority) {
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+        cmd->priority = priority;
     }
 
     netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
