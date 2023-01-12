@@ -157,6 +157,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_load_ok_loaded_but_cache_hit_while_inserting; // found in cache while inserting it (conflict)
 
     // loading
+    size_t pages_load_extent_merged;
     size_t pages_load_ok_uncompressed;
     size_t pages_load_ok_compressed;
     size_t pages_load_ok_preloaded;

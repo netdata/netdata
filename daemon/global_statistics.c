@@ -1982,6 +1982,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_unroutable = NULL;
         static RRDDIM *rd_not_found = NULL;
         static RRDDIM *rd_invalid_extent = NULL;
+        static RRDDIM *rd_extent_merged = NULL;
 
         if (unlikely(!st_query_pages_from_disk)) {
             st_query_pages_from_disk = rrdset_create_localhost(
@@ -2008,6 +2009,7 @@ static void dbengine2_statistics_charts(void) {
             rd_unroutable = rrddim_add(st_query_pages_from_disk, "fail unroutable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_not_found = rrddim_add(st_query_pages_from_disk, "fail uuid not found", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid_extent = rrddim_add(st_query_pages_from_disk, "fail invalid extent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_extent_merged = rrddim_add(st_query_pages_from_disk, "extent merged", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         priority++;
 
@@ -2021,6 +2023,7 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_unroutable, (collected_number)cache_efficiency_stats.pages_load_fail_unroutable);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_not_found, (collected_number)cache_efficiency_stats.pages_load_fail_uuid_not_found);
         rrddim_set_by_pointer(st_query_pages_from_disk, rd_invalid_extent, (collected_number)cache_efficiency_stats.pages_load_fail_invalid_extent);
+        rrddim_set_by_pointer(st_query_pages_from_disk, rd_extent_merged, (collected_number)cache_efficiency_stats.pages_load_extent_merged);
 
         rrdset_done(st_query_pages_from_disk);
     }

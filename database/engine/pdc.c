@@ -609,6 +609,7 @@ bool epdl_pending_add(EPDL *epdl) {
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
         *PValue = base;
         added_new = false;
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
     }
     netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 
