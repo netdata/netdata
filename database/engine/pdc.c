@@ -605,7 +605,7 @@ void epdl_cmd_dequeued(void *epdl_ptr) {
     epdl->cmd = NULL;
 }
 
-struct rrdeng_cmd *epdl_cmd_requeue(void *epdl_ptr) {
+static struct rrdeng_cmd *epdl_get_cmd(void *epdl_ptr) {
     EPDL *epdl = epdl_ptr;
     return epdl->cmd;
 }
@@ -626,7 +626,7 @@ static bool epdl_pending_add(EPDL *epdl) {
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
         if(base->pdc->priority > epdl->pdc->priority)
-            rrdeng_req_cmd(epdl_cmd_requeue, base, epdl->pdc->priority);
+            rrdeng_req_cmd(epdl_get_cmd, base, epdl->pdc->priority);
     }
 
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
