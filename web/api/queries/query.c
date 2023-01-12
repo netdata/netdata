@@ -748,7 +748,19 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
     if(unlikely(after_wanted == before_wanted || points_wanted <= 0))
         return query_metric_first_working_tier(qm);
 
-    time_t lowest_tier_last_time_s = 0;
+    time_t min_first_time_s = 0;
+    time_t max_last_time_s = 0;
+
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        time_t first_time_s = qm->tiers[tier].db_first_time_s;
+        time_t last_time_s  = qm->tiers[tier].db_last_time_s;
+
+        if(!min_first_time_s || (first_time_s && first_time_s < min_first_time_s))
+            min_first_time_s = first_time_s;
+
+        if(!max_last_time_s || (last_time_s && last_time_s > max_last_time_s))
+            max_last_time_s = last_time_s;
+    }
 
     for(size_t tier = 0; tier < storage_tiers ; tier++) {
 
@@ -758,18 +770,20 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
         time_t last_time_s  = qm->tiers[tier].db_last_time_s;
         time_t update_every_s = qm->tiers[tier].db_update_every_s;
 
-        if(!db_metric_handle || !first_time_s || !last_time_s || !update_every_s) {
+        if( !db_metric_handle ||
+            !first_time_s ||
+            !last_time_s ||
+            !update_every_s ||
+            first_time_s > max_last_time_s ||
+            last_time_s < min_first_time_s
+            ) {
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
 
-        if(!lowest_tier_last_time_s)
-            lowest_tier_last_time_s = last_time_s;
-
-        if(last_time_s < lowest_tier_last_time_s)
-            last_time_s = lowest_tier_last_time_s;
-
-        qm->tiers[tier].weight = query_plan_points_coverage_weight(first_time_s, last_time_s, update_every_s, after_wanted, before_wanted, points_wanted, tier);
+        qm->tiers[tier].weight = query_plan_points_coverage_weight(
+                min_first_time_s, max_last_time_s, update_every_s,
+                after_wanted, before_wanted, points_wanted, tier);
     }
 
     size_t best_tier = 0;
