@@ -251,6 +251,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([sched_setscheduler sched_getscheduler sched_getparam sched_get_priority_min sched_get_priority_max getpriority setpriority nice])
 AC_CHECK_FUNCS([recvmmsg])
+AC_CHECK_FUNCS([close_range])
 
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T
