@@ -1,4 +1,4 @@
-<mxfile modified="2023-01-12T11:27:07.712Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="AxN57UwkDIRi-3GPG6tO" version="20.8.4" type="github">
+<mxfile modified="2023-01-12T11:30:27.168Z" host="app.diagrams.net" agent="5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36" etag="SEzqd2_cAA-pf72bjX4s" version="20.8.4" type="github">
   <diagram id="319b92f5-ce0c-3638-1d72-e7e1d323a6f9" name="Page-1">
     <mxGraphModel dx="1354" dy="608" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" background="#ffffff" math="0" shadow="0">
       <root>
@@ -74,12 +74,12 @@
         </UserObject>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;fping.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;network latency&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/fping.plugin" linkTarget="_blank" id="13">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
-            <mxGeometry x="484.33349609375" y="1031" width="110" height="60" as="geometry" />
+            <mxGeometry x="484.33349609375" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;freeipmi.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;enterprise h/w&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/freeipmi.plugin" id="14">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
-            <mxGeometry x="163" y="1031" width="110" height="60" as="geometry" />
+            <mxGeometry x="163" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
         <UserObject label="&lt;span&gt;To another&lt;/span&gt;&lt;div&gt;netdata&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/streaming#options-for-the-sending-node" id="15">
@@ -183,7 +183,7 @@
             <mxGeometry x="85" y="1115" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;node.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(node.js plugins)&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/node.d.plugin" id="41">
+        <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;go.d&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;(go plugins)&lt;/span&gt;&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin" linkTarget="_blank" id="41">
           <mxCell style="whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
             <mxGeometry x="244" y="1116" width="110" height="60" as="geometry" />
           </mxCell>
@@ -218,7 +218,7 @@
         <mxCell id="49" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#fff2cc;strokeColor=#d6b656;gradientColor=#ffd966;" parent="1" vertex="1">
           <mxGeometry x="1011" y="863" width="70" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="54" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
+        <mxCell id="54" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="504" y="1007" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="55" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#d5e8d4;strokeColor=#82b366;gradientColor=#97d077;" parent="1" vertex="1">
@@ -226,10 +226,10 @@
         </mxCell>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px&quot;&gt;apps.plugin&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;process tree&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;monitoring&lt;/span&gt;&lt;/div&gt;" link="https://github.com/netdata/netdata/tree/master/collectors/apps.plugin" id="56">
           <mxCell style="whiteSpace=wrap;html=1;fontSize=12;fillColor=#FFFFFF;strokeColor=#59DE9C;" parent="1" vertex="1">
-            <mxGeometry x="324" y="1031" width="110" height="60" as="geometry" />
+            <mxGeometry x="324" y="1034" width="110" height="60" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="57" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
+        <mxCell id="57" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="344" y="1007" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="58" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
@@ -295,7 +295,7 @@
         </UserObject>
         <UserObject label="&lt;b&gt;&lt;font style=&quot;font-size: 16px&quot;&gt;Exporting&lt;/font&gt;&lt;/b&gt;&lt;div&gt;Metrics Archiving&lt;/div&gt;" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="73">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" parent="1" vertex="1">
-            <mxGeometry x="870" y="607" width="153.5" height="70" as="geometry" />
+            <mxGeometry x="870" y="607" width="149.75" height="70" as="geometry" />
           </mxCell>
         </UserObject>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;Alarms&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;Health Monitoring" link="https://learn.netdata.cloud/docs/agent/health" linkTarget="_blank" id="74">
@@ -328,9 +328,6 @@
             <mxGeometry x="1126" y="360" width="109" height="50" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="84" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=#d6b656;fillColor=#fff2cc;fontSize=14;" parent="1" vertex="1">
-          <mxGeometry x="1054" y="597" width="83" height="115" as="geometry" />
-        </mxCell>
         <UserObject label="" link="https://learn.netdata.cloud/docs/agent/exporting" linkTarget="_blank" id="85">
           <mxCell style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://cloud.githubusercontent.com/assets/2662304/26528636/81e18712-43b8-11e7-94b9-37ea1cf6c3a6.png;" parent="1" vertex="1">
             <mxGeometry x="1106" y="300" width="114" height="40" as="geometry" />
@@ -358,7 +355,7 @@
             <mxGeometry x="70" y="1230" width="210" height="199" as="geometry" />
           </mxCell>
         </UserObject>
-        <mxCell id="96" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15.21;dx=32.57;arrowHead=55;fontSize=16;direction=north;flipH=1;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
+        <mxCell id="96" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=9.5;dx=29;arrowHead=57;fontSize=16;direction=north;flipH=1;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="210" y="1167" width="94" height="163" as="geometry" />
         </mxCell>
         <mxCell id="97" value="headless" style="text;html=1;resizable=0;points=[];autosize=1;align=center;verticalAlign=top;spacingTop=-4;fontSize=14;" parent="1" vertex="1">
@@ -1007,8 +1004,8 @@
         <mxCell id="50" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none" parent="1" vertex="1">
           <mxGeometry x="1131" y="863" width="70" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="6wNVMjbWM3VSl3cxvCD3-276" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=15;dx=38;arrowHead=55;strokeColor=none;fillColor=#59DE9C;fontSize=14;" parent="1" vertex="1">
-          <mxGeometry x="1054" y="597" width="83" height="115" as="geometry" />
+        <mxCell id="6wNVMjbWM3VSl3cxvCD3-276" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.jumpInArrow;dy=13;dx=33;arrowHead=58;strokeColor=none;fillColor=#59DE9C;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="1054" y="597" width="66" height="115" as="geometry" />
         </mxCell>
         <mxCell id="6wNVMjbWM3VSl3cxvCD3-277" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=east;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="1014" y="703" width="35" height="70" as="geometry" />
@@ -1062,7 +1059,7 @@
           <mxGeometry x="100" y="445" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="6wNVMjbWM3VSl3cxvCD3-307" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0.1;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
-          <mxGeometry x="897" y="666" width="70" height="30" as="geometry" />
+          <mxGeometry x="910" y="666" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="6wNVMjbWM3VSl3cxvCD3-308" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="716" y="666" width="70" height="30" as="geometry" />
@@ -1070,7 +1067,7 @@
         <mxCell id="6wNVMjbWM3VSl3cxvCD3-313" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="103" y="1006" width="70" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="6wNVMjbWM3VSl3cxvCD3-314" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=5.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
+        <mxCell id="6wNVMjbWM3VSl3cxvCD3-314" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
           <mxGeometry x="183" y="1007" width="70" height="30" as="geometry" />
         </mxCell>
         <mxCell id="6wNVMjbWM3VSl3cxvCD3-315" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=8.29;fillColor=#59DE9C;strokeColor=none;" parent="1" vertex="1">
@@ -1078,7 +1075,7 @@
         </mxCell>
         <UserObject label="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 20px&quot;&gt;&amp;nbsp; ML Engine&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&amp;nbsp; &amp;nbsp;Anomaly Detection" link="https://learn.netdata.cloud/docs/agent/ml" linkTarget="_blank" id="6RedLYv8twKyCitmQhae-261">
           <mxCell style="whiteSpace=wrap;html=1;strokeColor=#59DE9C;fillColor=#FFFFFF;fontSize=14;align=center;" vertex="1" parent="1">
-            <mxGeometry x="457" y="607" width="183" height="70" as="geometry" />
+            <mxGeometry x="460" y="607" width="180" height="70" as="geometry" />
           </mxCell>
         </UserObject>
         <mxCell id="6RedLYv8twKyCitmQhae-263" value="" style="html=1;shadow=0;dashed=0;align=center;verticalAlign=middle;shape=mxgraph.arrows2.arrow;dy=0.51;dx=19.57;direction=north;notch=0;fillColor=#59DE9C;strokeColor=none;" vertex="1" parent="1">
