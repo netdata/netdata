@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- allow the cache to grow when huge queries are running that exceed the cache size [\#14247](https://github.com/netdata/netdata/pull/14247) ([ktsaou](https://github.com/ktsaou))
+- profile startup and shutdown timings [\#14243](https://github.com/netdata/netdata/pull/14243) ([ktsaou](https://github.com/ktsaou))
+- `ml - machine learning` to just `machine learning` [\#14242](https://github.com/netdata/netdata/pull/14242) ([andrewm4894](https://github.com/andrewm4894))
+- cancel ml threads on shutdown and join them on host free [\#14240](https://github.com/netdata/netdata/pull/14240) ([ktsaou](https://github.com/ktsaou))
 - pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
 - Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
@@ -41,6 +45,7 @@
 - MQTT5 Topic Alias [\#14148](https://github.com/netdata/netdata/pull/14148) ([underhood](https://github.com/underhood))
 - Disable integration by default \(eBPF \<-\> APPS\) [\#14147](https://github.com/netdata/netdata/pull/14147) ([thiagoftsm](https://github.com/thiagoftsm))
 - Revert "MQTT 5 publish topic alias support" [\#14145](https://github.com/netdata/netdata/pull/14145) ([MrZammler](https://github.com/MrZammler))
+- rename "Pid" to "PID" in functions [\#14144](https://github.com/netdata/netdata/pull/14144) ([andrewm4894](https://github.com/andrewm4894))
 - Document memory mode alloc [\#14142](https://github.com/netdata/netdata/pull/14142) ([cakrit](https://github.com/cakrit))
 - fix\(packaging\): add setuid for cgroup-network and ebpf.plugin in RPM [\#14140](https://github.com/netdata/netdata/pull/14140) ([ilyam8](https://github.com/ilyam8))
 - use chart labels in portcheck alarms [\#14137](https://github.com/netdata/netdata/pull/14137) ([ilyam8](https://github.com/ilyam8))
@@ -345,9 +350,6 @@
 - feat\(python.d/nvidia\_smi\): collect power state [\#13580](https://github.com/netdata/netdata/pull/13580) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d/nvidia\_smi\): repsect update\_every for polling [\#13579](https://github.com/netdata/netdata/pull/13579) ([ilyam8](https://github.com/ilyam8))
 - prevent crash on rrdcontext apis when rrdcontexts is not initialized [\#13578](https://github.com/netdata/netdata/pull/13578) ([ktsaou](https://github.com/ktsaou))
-- CMake improvements part 1 [\#13575](https://github.com/netdata/netdata/pull/13575) ([underhood](https://github.com/underhood))
-- bump go.d.plugin to v0.37.2 [\#13574](https://github.com/netdata/netdata/pull/13574) ([ilyam8](https://github.com/ilyam8))
-- Updating info for postgreqsql metrics [\#13573](https://github.com/netdata/netdata/pull/13573) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
