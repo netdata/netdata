@@ -989,12 +989,16 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
+        bool evictions_critical = false;
         size_t max_size_to_evict = 0;
         if (all_of_them)
             max_size_to_evict = SIZE_MAX;
 
-        else
-            cache_usage_per1000(cache, &max_size_to_evict);
+        else {
+            size_t per1000 = cache_usage_per1000(cache, &max_size_to_evict);
+            if(per1000 >= cache->config.severe_pressure_per1000 && wait)
+                evictions_critical = true;
+        }
 
         if (!max_size_to_evict)
             break;
@@ -1018,6 +1022,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
         // find a page to evict
         pages_to_evict = NULL;
+        size_t size_to_evict = 0;
         for(PGC_PAGE *page = cache->clean.base, *next = NULL, *first_page_we_relocated = NULL; page ; page = next) {
             next = page->link.next;
 
@@ -1046,8 +1051,13 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
-                if(!all_of_them)
-                    // we do it one-by-one to avoid locking clean queue for way too long
+                size_to_evict += page->assumed_size;
+
+                if(unlikely(all_of_them || (evictions_critical && size_to_evict < max_size_to_evict)))
+                    // get more pages
+                    ;
+                else
+                    // one page at a time
                     break;
             }
             else {
@@ -1071,8 +1081,53 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(likely(pages_to_evict)) {
             // remove them from the index
 
-            for(PGC_PAGE *page = pages_to_evict, *next = NULL; page ; page = next) {
-                next = page->link.next;
+            if(unlikely(pages_to_evict->link.next)) {
+                // we have many pages, let's minimize the index locks we are going to get
+
+                PGC_PAGE *pages_per_partition[cache->config.partitions];
+                memset(pages_per_partition, 0, sizeof(PGC_PAGE *) * cache->config.partitions);
+
+                // sort them by partition
+                for (PGC_PAGE *page = pages_to_evict, *next = NULL; page; page = next) {
+                    next = page->link.next;
+
+                    size_t partition = pgc_indexing_partition(cache, page->metric_id);
+                    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
+                }
+
+                // remove them from the index
+                for (size_t partition = 0; partition < cache->config.partitions; partition++) {
+                    if (!pages_per_partition[partition]) continue;
+
+                    pgc_index_write_lock(cache, partition);
+
+                    for (PGC_PAGE *page = pages_per_partition[partition]; page; page = page->link.next)
+                        remove_this_page_from_index_unsafe(cache, page, partition);
+
+                    pgc_index_write_unlock(cache, partition);
+                }
+
+                // free them
+                for (size_t partition = 0; partition < cache->config.partitions; partition++) {
+                    if (!pages_per_partition[partition]) continue;
+
+                    for (PGC_PAGE *page = pages_per_partition[partition], *next = NULL; page; page = next) {
+                        next = page->link.next;
+
+                        size_t page_size = page->assumed_size;
+                        free_this_page(cache, page);
+
+                        __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
+                        __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
+
+                        total_pages_evicted++;
+                    }
+                }
+            }
+            else {
+                // just one page to be evicted
+                PGC_PAGE *page = pages_to_evict;
 
                 size_t page_size = page->assumed_size;
 
