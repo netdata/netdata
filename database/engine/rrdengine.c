@@ -1524,7 +1524,7 @@ void dbengine_event_loop(void* arg) {
                 }
 
                 case RRDENG_OPCODE_EVICT_INIT: {
-                    if(rrdeng_main.evictions_running < (size_t)libuv_worker_threads / 4) {
+                    if(!rrdeng_main.evictions_running) {
                         rrdeng_main.evictions_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict);
                     }
