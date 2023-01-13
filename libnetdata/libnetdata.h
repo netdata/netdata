@@ -15,7 +15,7 @@ extern "C" {
 #define NETDATA_INTERNAL_CHECKS 1
 #endif
 
-#if INTPTR_MAX == INT32_MAX
+#if SIZEOF_VOID_P == 4
 #define ENV32BIT 1
 #else
 #define ENV64BIT 1
