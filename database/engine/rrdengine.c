@@ -476,8 +476,8 @@ static void wal_cleanup1(void) {
     netdata_spinlock_unlock(&wal_globals.protected.spinlock);
 
     if(wal) {
-        freez(wal);
         posix_memfree(wal->buf);
+        freez(wal);
         __atomic_sub_fetch(&wal_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 }
