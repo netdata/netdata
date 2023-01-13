@@ -1998,9 +1998,9 @@ static void dbengine2_statistics_charts(void) {
             rd_unavailable = rrddim_add(st_query_pages_from_disk, "fail unavailable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_unroutable = rrddim_add(st_query_pages_from_disk, "fail unroutable", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_not_found = rrddim_add(st_query_pages_from_disk, "fail not found", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_cancelled = rrddim_add(st_query_pages_from_disk, "fail cancelled", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid_extent = rrddim_add(st_query_pages_from_disk, "fail invalid extent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_extent_merged = rrddim_add(st_query_pages_from_disk, "extent merged", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_cancelled = rrddim_add(st_query_pages_from_disk, "cancelled", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
         priority++;
 
