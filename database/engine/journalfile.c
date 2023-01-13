@@ -652,7 +652,7 @@ static int check_journal_v2_file(void *data_start, size_t file_size, uint32_t or
         }
 
         metric++;
-        if (((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) file_size) {
+        if ((uint32_t)((uint8_t *) metric - (uint8_t *) data_start) > (uint32_t) file_size) {
             info("DBENGINE: verification failed EOF reached -- total entries %u, verified %u", entries, verified);
             return 1;
         }
@@ -925,7 +925,7 @@ void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_
 
     generate_journalfilepath_v2(datafile, path, sizeof(path));
 
-    info("DBENGINE: indexing file '%s': extents %lu, metrics %lu, pages %lu",
+    info("DBENGINE: indexing file '%s': extents %zu, metrics %zu, pages %zu",
         path,
         number_of_extents,
         number_of_metrics,
@@ -1092,7 +1092,7 @@ void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_
 
         internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
 
-        info("DBENGINE: migrated journal file '%s', file size %lu", path, total_file_size);
+        info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
 
         SET_JOURNAL_DATA(journalfile, data_start);
         SET_JOURNAL_DATA_SIZE(journalfile, total_file_size);

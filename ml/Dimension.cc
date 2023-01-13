@@ -221,7 +221,7 @@ void Dimension::scheduleForTraining(time_t CurrT) {
             break;
         }
         case TrainingStatus::Trained: {
-            bool NeedsTraining = LastTrainingTime + (Cfg.TrainEvery * updateEvery()) < CurrT;
+            bool NeedsTraining = (time_t)(LastTrainingTime + (Cfg.TrainEvery * updateEvery())) < CurrT;
 
             if (NeedsTraining) {
                 Host *H = reinterpret_cast<Host *>(RD->rrdset->rrdhost->ml_host);
