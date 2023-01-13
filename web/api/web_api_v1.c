@@ -1510,7 +1510,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 }
 
 #ifndef ENABLE_DBENGINE
-int web_client_api_request_v1_dbengine_stats(RRDHOST *host, struct web_client *w, char *url) {
+int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struct web_client *w __maybe_unused, char *url __maybe_unused) {
     return HTTP_RESP_NOT_FOUND;
 }
 #else

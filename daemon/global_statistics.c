@@ -3781,10 +3781,12 @@ void *global_statistics_main(void *ptr)
         worker_is_busy(WORKER_JOB_REGISTRY);
         registry_statistics();
 
+#ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
             worker_is_busy(WORKER_JOB_DBENGINE);
             dbengine2_statistics_charts();
         }
+#endif
 
         worker_is_busy(WORKER_JOB_HEARTBEAT);
         update_heartbeat_charts();

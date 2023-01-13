@@ -31,7 +31,7 @@ netdata_rwlock_t rrd_rwlock = NETDATA_RWLOCK_INITIALIZER;
 time_t rrdset_free_obsolete_time_s = 3600;
 time_t rrdhost_free_orphan_time_s = 3600;
 
-bool is_storage_engine_shared(STORAGE_INSTANCE *engine) {
+bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
