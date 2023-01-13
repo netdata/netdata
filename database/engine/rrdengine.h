@@ -88,7 +88,7 @@ typedef enum __attribute__ ((__packed__)) {
 
     // worker related statuses
     PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 9),
-    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 10),
+    PDC_PAGE_FAILED_NOT_IN_EXTENT      = (1 << 10),
     PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 11),
     PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 12),
 

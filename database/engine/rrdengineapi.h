@@ -164,7 +164,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_load_fail_cant_mmap_extent;
     size_t pages_load_fail_datafile_not_available;
     size_t pages_load_fail_unroutable;
-    size_t pages_load_fail_uuid_not_found;
+    size_t pages_load_fail_not_found;
     size_t pages_load_fail_invalid_extent;
 
     // timings for query preparation

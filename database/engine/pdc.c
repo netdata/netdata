@@ -12,6 +12,7 @@ struct extent_page_details_list {
     struct rrdengine_datafile *datafile;
 
     struct rrdeng_cmd *cmd;
+    bool head_to_datafile_extent_queries_pending_for_extent;
 
     struct {
         struct extent_page_details_list *prev;
@@ -619,10 +620,13 @@ static bool epdl_pending_add(EPDL *epdl) {
 
     EPDL *base = *PValue;
 
-    if(!base)
+    if(!base) {
         added_new = true;
+        epdl->head_to_datafile_extent_queries_pending_for_extent = true;
+    }
     else {
         added_new = false;
+        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
         if(base->pdc->priority > epdl->pdc->priority)
@@ -639,9 +643,12 @@ static bool epdl_pending_add(EPDL *epdl) {
 
 static void epdl_pending_del(EPDL *epdl) {
     netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
-    int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
-    (void)rc;
-    internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
+    if(epdl->head_to_datafile_extent_queries_pending_for_extent) {
+        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
+        int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
+        (void) rc;
+        internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
+    }
     netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 }
 
@@ -858,10 +865,19 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     return vd;
 }
 
-static struct page_details *epdl_to_pd_load_list(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+
+    if(unlikely(epdl->head_to_datafile_extent_queries_pending_for_extent))
+        // stop appending more pages to this epdl
+        epdl_pending_del(epdl);
+
     struct page_details *pd_list = NULL;
 
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
+        if(unlikely(ep->pdc->workers_should_stop))
+            // do not load pages - the query thread for this PDC is not there anymore
+            continue;
+
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
@@ -1006,7 +1022,7 @@ static bool epdl_populate_pages_from_extent_data(
         }
         mrg_metric_release(main_mrg, metric);
 
-        struct page_details *pd_list = epdl_to_pd_load_list(epdl, metric_id, start_time_s);
+        struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);
         if(likely(!pd_list))
             continue;
 
@@ -1114,8 +1130,6 @@ static bool epdl_populate_pages_from_extent_data(
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
-    epdl_pending_del(epdl);
-
     bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
     for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
         internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
@@ -1123,8 +1137,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
         internal_fatal(ep->file != epdl->file, "DBENGINE: files do not match");
 
-        PDC *pdc = ep->pdc;
-        if(!__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED)) {
+        if(!__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)) {
             should_stop = false;
             break;
         }
@@ -1199,6 +1212,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         }
     }
 
+    size_t *statistics_counter;
     if(extent_compressed_data) {
         // Need to decompress and then process the pagelist
         bool extent_used = epdl_populate_pages_from_extent_data(
@@ -1208,14 +1222,18 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(extent_used) {
             // since the extent was used, all the pages that are not
             // loaded from this extent, were not found in the extent
-            not_loaded_pages_tag |= PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT;
+            not_loaded_pages_tag |= PDC_PAGE_FAILED_NOT_IN_EXTENT;
+            statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_not_found;
         }
-        else
+        else {
             not_loaded_pages_tag |= PDC_PAGE_FAILED_INVALID_EXTENT;
+            statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_invalid_extent;
+        }
     }
-    else
+    else {
         not_loaded_pages_tag |= PDC_PAGE_FAILED_TO_MAP_EXTENT;
-
+        statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent;
+    }
 
     if(extent_cache_page)
         pgc_page_release(extent_cache, extent_cache_page);
@@ -1223,11 +1241,14 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
     // mark all pending pages as failed
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         epdl_mark_all_not_loaded_pages_as_failed(
-                ep, not_loaded_pages_tag,
-                &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+                ep, not_loaded_pages_tag, statistics_counter);
     }
 
 cleanup:
+    // remove it from the datafile extent_queries
+    // this can be called multiple times safely
+    epdl_pending_del(epdl);
+
     for(EPDL *ep = epdl, *next = NULL; ep ; ep = next) {
         next = ep->query.next;
 
