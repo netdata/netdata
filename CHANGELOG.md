@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
+- DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
+- fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
+- Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
 - allow the cache to grow when huge queries are running that exceed the cache size [\#14247](https://github.com/netdata/netdata/pull/14247) ([ktsaou](https://github.com/ktsaou))
 - Update netdata-overview.xml [\#14245](https://github.com/netdata/netdata/pull/14245) ([andrewm4894](https://github.com/andrewm4894))
 - profile startup and shutdown timings [\#14243](https://github.com/netdata/netdata/pull/14243) ([ktsaou](https://github.com/ktsaou))
@@ -24,6 +28,7 @@
 - Switch to actions/labeler@v4 for labeling PRs. [\#14203](https://github.com/netdata/netdata/pull/14203) ([Ferroin](https://github.com/Ferroin))
 - Refactor ML code and add support for multiple KMeans models [\#14198](https://github.com/netdata/netdata/pull/14198) ([vkalintiris](https://github.com/vkalintiris))
 - Add few alarms for elasticsearch [\#14197](https://github.com/netdata/netdata/pull/14197) ([ilyam8](https://github.com/ilyam8))
+- chore\(packaging\): remove python-pymongo [\#14196](https://github.com/netdata/netdata/pull/14196) ([ilyam8](https://github.com/ilyam8))
 - bump go.d.plugin to v0.48.0 [\#14195](https://github.com/netdata/netdata/pull/14195) ([ilyam8](https://github.com/ilyam8))
 - Fix typos [\#14194](https://github.com/netdata/netdata/pull/14194) ([rex4539](https://github.com/rex4539))
 - add `telegraf` to `apps_groups.conf` monitoring section [\#14188](https://github.com/netdata/netdata/pull/14188) ([andrewm4894](https://github.com/andrewm4894))
@@ -60,6 +65,7 @@
 - bump go.d.plugin to v0.46.0 [\#14124](https://github.com/netdata/netdata/pull/14124) ([ilyam8](https://github.com/ilyam8))
 - heartbeat: don't log every discrepancy [\#14122](https://github.com/netdata/netdata/pull/14122) ([ktsaou](https://github.com/ktsaou))
 - ARAL: add destroy function and optimize ifdefs [\#14121](https://github.com/netdata/netdata/pull/14121) ([ktsaou](https://github.com/ktsaou))
+- Enable retries for SSL\_ERROR\_WANT\_READ [\#14120](https://github.com/netdata/netdata/pull/14120) ([MrZammler](https://github.com/MrZammler))
 - ci: fix cgroup-parent name in packaging [\#14118](https://github.com/netdata/netdata/pull/14118) ([ilyam8](https://github.com/ilyam8))
 - don't log too much about streaming connections [\#14117](https://github.com/netdata/netdata/pull/14117) ([ktsaou](https://github.com/ktsaou))
 - fix get\_system\_cpus\(\) [\#14116](https://github.com/netdata/netdata/pull/14116) ([ktsaou](https://github.com/ktsaou))
@@ -343,13 +349,6 @@
 - Update dashboard to version v2.28.8. [\#13609](https://github.com/netdata/netdata/pull/13609) ([netdatabot](https://github.com/netdatabot))
 - Don't try to load db rows when chart\_id or dim\_id is null [\#13608](https://github.com/netdata/netdata/pull/13608) ([MrZammler](https://github.com/MrZammler))
 - Add info text for wal and update for checkpoints [\#13607](https://github.com/netdata/netdata/pull/13607) ([shyamvalsan](https://github.com/shyamvalsan))
-- bump go.d.plugin to v0.38.0 [\#13603](https://github.com/netdata/netdata/pull/13603) ([ilyam8](https://github.com/ilyam8))
-- Use prepared statements for context related queries [\#13602](https://github.com/netdata/netdata/pull/13602) ([stelfrag](https://github.com/stelfrag))
-- fix\(cgroups.plugin\): fix chart id length check [\#13601](https://github.com/netdata/netdata/pull/13601) ([ilyam8](https://github.com/ilyam8))
-- Temporary fix for command injection vulnerability in GHA workflow. [\#13600](https://github.com/netdata/netdata/pull/13600) ([Ferroin](https://github.com/Ferroin))
-- update logind dashboard info [\#13597](https://github.com/netdata/netdata/pull/13597) ([ilyam8](https://github.com/ilyam8))
-- Add link to the performance optimization guide [\#13595](https://github.com/netdata/netdata/pull/13595) ([cakrit](https://github.com/cakrit))
-- sqlite3 global statistics [\#13594](https://github.com/netdata/netdata/pull/13594) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
