@@ -726,6 +726,7 @@ jobs:
           repo: netdata-nightlies
           body: Netdata nightly build for ${{ steps.version.outputs.date }}.
           commit: ${{ steps.version.outputs.commit }}
+          makeLatest: true
           tag: ${{ steps.version.outputs.version }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Failure Notification
