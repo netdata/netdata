@@ -1023,6 +1023,15 @@ struct dbengine2_cache_pointers {
     RRDDIM *rd_pgc_memory_evicting;
     RRDDIM *rd_pgc_memory_flushing;
 
+    RRDSET *st_pgc_tm;
+    RRDDIM *rd_pgc_tm_current;
+    RRDDIM *rd_pgc_tm_wanted;
+    RRDDIM *rd_pgc_tm_hot_max;
+    RRDDIM *rd_pgc_tm_dirty_max;
+    RRDDIM *rd_pgc_tm_hot;
+    RRDDIM *rd_pgc_tm_dirty;
+    RRDDIM *rd_pgc_tm_referenced;
+
     RRDSET *st_pgc_pages;
     RRDDIM *rd_pgc_pages_clean;
     RRDDIM *rd_pgc_pages_hot;
@@ -1168,7 +1177,6 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
     }
 
     {
-
         if (unlikely(!ptrs->st_pgc_memory)) {
             BUFFER *id = buffer_create(100);
             buffer_sprintf(id, "dbengine_%s_cache_memory", name);
@@ -1220,6 +1228,56 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
                               (collected_number)(pgc_stats->size - pgc_stats->queues.clean.size - pgc_stats->queues.hot.size - pgc_stats->queues.dirty.size - pgc_stats->evicting_size - pgc_stats->flushing_size));
 
         rrdset_done(ptrs->st_pgc_memory);
+    }
+
+    {
+        if (unlikely(!ptrs->st_pgc_tm)) {
+            BUFFER *id = buffer_create(100);
+            buffer_sprintf(id, "dbengine_%s_target_memory", name);
+
+            BUFFER *family = buffer_create(100);
+            buffer_sprintf(family, "dbengine %s cache", name);
+
+            BUFFER *title = buffer_create(100);
+            buffer_sprintf(title, "Netdata %s Target Cache Memory", name);
+
+            ptrs->st_pgc_tm = rrdset_create_localhost(
+                    "netdata",
+                    buffer_tostring(id),
+                    NULL,
+                    buffer_tostring(family),
+                    NULL,
+                    buffer_tostring(title),
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            ptrs->rd_pgc_tm_current    = rrddim_add(ptrs->st_pgc_tm, "current",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_wanted     = rrddim_add(ptrs->st_pgc_tm, "wanted",     NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_referenced = rrddim_add(ptrs->st_pgc_tm, "referenced", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_hot_max    = rrddim_add(ptrs->st_pgc_tm, "hot max",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_dirty_max  = rrddim_add(ptrs->st_pgc_tm, "dirty max",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_hot        = rrddim_add(ptrs->st_pgc_tm, "hot",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            ptrs->rd_pgc_tm_dirty      = rrddim_add(ptrs->st_pgc_tm, "dirty",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+            buffer_free(id);
+            buffer_free(family);
+            buffer_free(title);
+            priority++;
+        }
+
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_current, (collected_number)pgc_stats->current_cache_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_wanted, (collected_number)pgc_stats->wanted_cache_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_referenced, (collected_number)pgc_stats->referenced_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot_max, (collected_number)pgc_stats->queues.hot.max_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty_max, (collected_number)pgc_stats->queues.dirty.max_size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_hot, (collected_number)pgc_stats->queues.hot.size);
+        rrddim_set_by_pointer(ptrs->st_pgc_tm, ptrs->rd_pgc_tm_dirty, (collected_number)pgc_stats->queues.dirty.size);
+
+        rrdset_done(ptrs->st_pgc_tm);
     }
 
     {
