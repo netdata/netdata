@@ -96,10 +96,7 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 | `python`|for most of the external plugins|
 | `python-yaml`|used for monitoring **beanstalkd**|
 | `python-beanstalkc`|used for monitoring **beanstalkd**|
-| `python-dnspython`|used for monitoring DNS query time|
-| `python-ipaddress`|used for monitoring **DHCPd**<br/>this package is required only if the system has python v2. python v3 has this functionality embedded|
 | `python-mysqldb`<br/>or<br/>`python-pymysql`|used for monitoring **mysql** or **mariadb** databases<br/>`python-mysqldb` is a lot faster and thus preferred|
-| `python-pymongo`|used for monitoring **mongodb** databases|
 | `nodejs`|used for `node.js` plugins for monitoring **named** and **SNMP** devices|
 | `lm-sensors`|for monitoring **hardware sensors**|
 | `libelf`|for monitoring kernel-level metrics using eBPF|
@@ -123,7 +120,7 @@ Netdata Cloud support may require the following packages to be installed:
 |:---------:|--------------------------------------------------------------------------------------------------------------------------------------|
 |  `cmake`  | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux |
 | `openssl` | Needed to secure communications with the Netdata Cloud                                                                               |
-| `protobuf`| Used for the new Cloud<->Agent binary protocol
+| `protobuf`| Used for the new Cloud<->Agent binary protocol |
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
