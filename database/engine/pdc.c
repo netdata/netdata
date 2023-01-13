@@ -1166,6 +1166,9 @@ static bool epdl_populate_pages_from_extent_data(
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
+    size_t *statistics_counter = NULL;
+    PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
+
     bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
     for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
         internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
@@ -1179,13 +1182,15 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         }
     }
 
-    if(should_stop)
+    if(unlikely(should_stop)) {
+        statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cancelled;
+        not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;
+    }
 
     if(worker)
         worker_is_busy(UV_EVENT_EXTENT_CACHE);
 
-    PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
     bool extent_found_in_cache = false;
 
     void *extent_compressed_data = NULL;
@@ -1199,8 +1204,8 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                        "DBENGINE: cache size does not match the expected size");
 
-        loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
-        not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
+        loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_CACHE;
+        not_loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_CACHE;
         extent_found_in_cache = true;
     }
     else {
@@ -1243,12 +1248,11 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
 
             extent_compressed_data = pgc_page_data(extent_cache_page);
 
-            loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
-            not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
+            loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_DISK;
+            not_loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_DISK;
         }
     }
 
-    size_t *statistics_counter;
     if(extent_compressed_data) {
         // Need to decompress and then process the pagelist
         bool extent_used = epdl_populate_pages_from_extent_data(
@@ -1275,15 +1279,16 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         pgc_page_release(extent_cache, extent_cache_page);
 
     // mark all pending pages as failed
-    for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
-        epdl_mark_all_not_loaded_pages_as_failed(
-                ep, not_loaded_pages_tag, statistics_counter);
-    }
 
 cleanup:
     // remove it from the datafile extent_queries
     // this can be called multiple times safely
     epdl_pending_del(epdl);
+
+    for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
+        epdl_mark_all_not_loaded_pages_as_failed(
+                ep, not_loaded_pages_tag, statistics_counter);
+    }
 
     for(EPDL *ep = epdl, *next = NULL; ep ; ep = next) {
         next = ep->query.next;
