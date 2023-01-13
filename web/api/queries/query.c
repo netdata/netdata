@@ -726,15 +726,15 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
         db_last_time_s < after_wanted)
         return -LONG_MAX;
 
-    time_t common_first_t = MAX(db_first_time_s, after_wanted);
-    time_t common_last_t = MIN(db_last_time_s, before_wanted);
+    long long common_first_t = MAX(db_first_time_s, after_wanted);
+    long long common_last_t = MIN(db_last_time_s, before_wanted);
 
-    long time_coverage = (common_last_t - common_first_t) * 1000000 / (before_wanted - after_wanted);
-    size_t points_wanted_in_coverage = points_wanted * time_coverage / 1000000;
+    long long time_coverage = (common_last_t - common_first_t) * 1000000LL / (before_wanted - after_wanted);
+    long long points_wanted_in_coverage = (long long)points_wanted * time_coverage / 1000000LL;
 
-    long points_available = (common_last_t - common_first_t) / db_update_every_s;
-    long points_delta = (long)(points_available - points_wanted_in_coverage);
-    long points_coverage = (points_delta < 0) ? (long)(points_available * time_coverage / points_wanted_in_coverage) : time_coverage;
+    long long points_available = (common_last_t - common_first_t) / db_update_every_s;
+    long long points_delta = (long)(points_available - points_wanted_in_coverage);
+    long long points_coverage = (points_delta < 0) ? (long)(points_available * time_coverage / points_wanted_in_coverage) : time_coverage;
 
     // a way to benefit higher tiers
     // points_coverage += (long)tier * 10000;
@@ -742,7 +742,7 @@ static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_
     if(points_available <= 0)
         return -LONG_MAX;
 
-    return points_coverage + (long)(25000 * tier); // 2.5% benefit for each higher tier
+    return (long)(points_coverage + (25000LL * tier)); // 2.5% benefit for each higher tier
 }
 
 static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t after_wanted, time_t before_wanted, size_t points_wanted) {
