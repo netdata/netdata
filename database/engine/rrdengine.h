@@ -97,7 +97,7 @@ typedef enum __attribute__ ((__packed__)) {
 
     PDC_PAGE_PRELOADED_PASS1           = (1 << 15),
     PDC_PAGE_PRELOADED_PASS4           = (1 << 16),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 17),
+    PDC_PAGE_CANCELLED                 = (1 << 17), // the query thread had left when we try to load the page
 
     PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 19),
     PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 19),

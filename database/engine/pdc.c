@@ -553,7 +553,7 @@ static void pdc_destroy(PDC *pdc) {
     struct page_details *pd;
     Word_t time_index = 0;
     bool first_then_next = true;
-    size_t unroutable = 0;
+    size_t unroutable = 0, cancelled = 0;
     while((PValue = PDCJudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
         pd = *PValue;
 
@@ -567,10 +567,12 @@ static void pdc_destroy(PDC *pdc) {
 
         internal_fatal(pd->datafile.ptr, "DBENGINE: page details has a datafile.ptr that is not released.");
 
-        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP | PDC_PAGE_INVALID))) {
+        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_CANCELLED))) {
             // pdc_page_status_set(pd, PDC_PAGE_FAILED);
             unroutable++;
         }
+        else if(!pd->page && (status & PDC_PAGE_CANCELLED))
+            cancelled++;
 
         if(pd->page && !(status & PDC_PAGE_RELEASED)) {
             pgc_page_release(main_cache, pd->page);
@@ -588,6 +590,9 @@ static void pdc_destroy(PDC *pdc) {
 
     if(unroutable)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
+
+    if(cancelled)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_cancelled, cancelled, __ATOMIC_RELAXED);
 }
 
 void pdc_acquire(PDC *pdc) {
@@ -904,22 +909,23 @@ static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_
     struct page_details *pd_list = NULL;
 
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
-        if(unlikely(ep->pdc->workers_should_stop))
-            // do not load pages - the query thread for this PDC is not there anymore
-            continue;
-
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
-        if (pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
+        if (unlikely(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL)) {
             Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
             internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
 
-            if (pd_pptr && *pd_pptr) {
+            if(likely(pd_pptr && *pd_pptr)) {
                 struct page_details *pd = *pd_pptr;
                 internal_fatal(metric_id != pd->metric_id, "DBENGINE: metric ids do not match");
 
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+                if(likely(!pd->page)) {
+                    if (unlikely(__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)))
+                        pdc_page_status_set(pd, PDC_PAGE_FAILED | PDC_PAGE_CANCELLED);
+                    else
+                        DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+                }
             }
         }
     }

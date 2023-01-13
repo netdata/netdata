@@ -166,6 +166,7 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_load_fail_unroutable;
     size_t pages_load_fail_not_found;
     size_t pages_load_fail_invalid_extent;
+    size_t pages_load_fail_cancelled;
 
     // timings for query preparation
     size_t prep_time_to_route;
