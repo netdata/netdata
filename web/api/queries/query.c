@@ -719,7 +719,11 @@ static size_t query_metric_first_working_tier(QUERY_METRIC *qm) {
 }
 
 static long query_plan_points_coverage_weight(time_t db_first_time_s, time_t db_last_time_s, time_t db_update_every_s, time_t after_wanted, time_t before_wanted, size_t points_wanted, size_t tier __maybe_unused) {
-    if(db_first_time_s == 0 || db_last_time_s == 0 || db_update_every_s == 0)
+    if(db_first_time_s == 0 ||
+        db_last_time_s == 0 ||
+        db_update_every_s == 0 ||
+        db_first_time_s > before_wanted ||
+        db_last_time_s < after_wanted)
         return -LONG_MAX;
 
     time_t common_first_t = MAX(db_first_time_s, after_wanted);
@@ -774,12 +778,14 @@ static size_t query_metric_best_tier_for_timeframe(QUERY_METRIC *qm, time_t afte
             !first_time_s ||
             !last_time_s ||
             !update_every_s ||
-            first_time_s > max_last_time_s ||
-            last_time_s < min_first_time_s
+            first_time_s > before_wanted ||
+            last_time_s < after_wanted
             ) {
             qm->tiers[tier].weight = -LONG_MAX;
             continue;
         }
+
+        internal_fatal(first_time_s > before_wanted || last_time_s < after_wanted, "QUERY: invalid db durations");
 
         qm->tiers[tier].weight = query_plan_points_coverage_weight(
                 min_first_time_s, max_last_time_s, update_every_s,
@@ -1003,6 +1009,8 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     internal_fatal(!qm->plan.array[plan_id].initialized, "QUERY: plan has not been initialized");
     internal_fatal(qm->plan.array[plan_id].finalized, "QUERY: plan has been finalized");
 
+    internal_fatal(qm->plan.array[plan_id].after > qm->plan.array[plan_id].before, "QUERY: flipped after/before");
+
     ops->tier = qm->plan.array[plan_id].tier;
     ops->tier_ptr = &qm->tiers[ops->tier];
     ops->handle = &qm->plan.array[plan_id].handle;
@@ -1071,12 +1079,16 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
 
         if(!query_metric_is_valid_tier(qm, selected_tier))
             return false;
+
+        if(qm->tiers[selected_tier].db_first_time_s > before_wanted ||
+           qm->tiers[selected_tier].db_last_time_s < after_wanted)
+            return false;
     }
 
     qm->plan.used = 1;
     qm->plan.array[0].tier = selected_tier;
-    qm->plan.array[0].after = qm->tiers[selected_tier].db_first_time_s;
-    qm->plan.array[0].before = qm->tiers[selected_tier].db_last_time_s;
+    qm->plan.array[0].after = (qm->tiers[selected_tier].db_first_time_s < after_wanted) ? after_wanted : qm->tiers[selected_tier].db_first_time_s;
+    qm->plan.array[0].before = (qm->tiers[selected_tier].db_last_time_s > before_wanted) ? before_wanted : qm->tiers[selected_tier].db_last_time_s;
 
     if(!(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)) {
         // the selected tier
@@ -1091,14 +1103,14 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     continue;
 
                 // find the first time of this tier
-                time_t first_time_s = qm->tiers[tr].db_first_time_s;
+                time_t tier_first_time_s = qm->tiers[tr].db_first_time_s;
 
                 // can it help?
-                if (first_time_s < selected_tier_first_time_s) {
+                if (tier_first_time_s < selected_tier_first_time_s) {
                     // it can help us add detail at the beginning of the query
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
-                        .after = (first_time_s < after_wanted) ? after_wanted : first_time_s,
+                        .after = (tier_first_time_s < after_wanted) ? after_wanted : tier_first_time_s,
                         .before = selected_tier_first_time_s,
                         .initialized = false,
                         .finalized = false,
@@ -1124,17 +1136,17 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
                     continue;
 
                 // find the last time of this tier
-                time_t last_time_s = qm->tiers[tr].db_last_time_s;
+                time_t tier_last_time_s = qm->tiers[tr].db_last_time_s;
 
                 //buffer_sprintf(wb, ": EVAL BEFORE tier %d, %ld", tier, last_time_s);
 
                 // can it help?
-                if (last_time_s > selected_tier_last_time_s) {
+                if (tier_last_time_s > selected_tier_last_time_s) {
                     // it can help us add detail at the end of the query
                     QUERY_PLAN_ENTRY t = {
                         .tier = tr,
                         .after = selected_tier_last_time_s,
-                        .before = (last_time_s > before_wanted) ? before_wanted : last_time_s,
+                        .before = (tier_last_time_s > before_wanted) ? before_wanted : tier_last_time_s,
                         .initialized = false,
                         .finalized = false,
                     };
@@ -1156,15 +1168,16 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     if(qm->plan.used > 1)
         qsort(&qm->plan.array, qm->plan.used, sizeof(QUERY_PLAN_ENTRY), compare_query_plan_entries_on_start_time);
 
-    // make sure it has the whole timeframe we need
-    if(qm->plan.array[0].after < after_wanted)
-        qm->plan.array[0].after = after_wanted;
-
-    if(qm->plan.array[qm->plan.used - 1].before > before_wanted)
-        qm->plan.array[qm->plan.used - 1].before = before_wanted;
-
     if(!query_metric_is_valid_tier(qm, qm->plan.array[0].tier))
         return false;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    for(size_t p = 0; p < qm->plan.used ;p++) {
+        internal_fatal(qm->plan.array[p].after > qm->plan.array[p].before, "QUERY: flipped after/before");
+        internal_fatal(qm->plan.array[p].after < after_wanted, "QUERY: too small plan first time");
+        internal_fatal(qm->plan.array[p].before > before_wanted, "QUERY: too big plan last time");
+    }
+#endif
 
     query_planer_initialize_plans(ops);
     query_planer_activate_plan(ops, 0, 0);

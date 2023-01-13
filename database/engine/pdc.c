@@ -1278,13 +1278,12 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
     if(extent_cache_page)
         pgc_page_release(extent_cache, extent_cache_page);
 
-    // mark all pending pages as failed
-
 cleanup:
     // remove it from the datafile extent_queries
     // this can be called multiple times safely
     epdl_pending_del(epdl);
 
+    // mark all pending pages as failed
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         epdl_mark_all_not_loaded_pages_as_failed(
                 ep, not_loaded_pages_tag, statistics_counter);
