@@ -960,6 +960,7 @@ static bool epdl_populate_pages_from_extent_data(
         // added to satisfy the requirements of older compilers (prevent warnings)
         payload_length = 0;
         payload_offset = 0;
+        trailer_offset = 0;
         count = 0;
         header = NULL;
         trailer = NULL;
