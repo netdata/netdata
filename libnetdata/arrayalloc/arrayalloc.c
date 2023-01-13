@@ -1,6 +1,5 @@
 #include "../libnetdata.h"
 #include "arrayalloc.h"
-#include "daemon/common.h"
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 #define TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS , const char *file, const char *function, size_t line
