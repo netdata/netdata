@@ -60,18 +60,24 @@ static struct {
         },
 };
 
-void pdc_cleanup(void) {
-    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
+void pdc_cleanup1(void) {
+    PDC *item = NULL;
 
-    while(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
-        PDC *item = pdc_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&pdc_globals.protected.spinlock))
+        return;
+
+    if(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
+        item = pdc_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         pdc_globals.protected.available--;
-        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 PDC *pdc_get(void) {
@@ -133,18 +139,24 @@ static struct {
         },
 };
 
-void page_details_cleanup(void) {
-    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
+void page_details_cleanup1(void) {
+    struct page_details *item = NULL;
 
-    while(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
-        struct page_details *item = page_details_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&page_details_globals.protected.spinlock))
+        return;
+
+    if(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
+        item = page_details_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         page_details_globals.protected.available--;
-        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 struct page_details *page_details_get(void) {
@@ -206,18 +218,24 @@ static struct {
         },
 };
 
-void epdl_cleanup(void) {
-    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
+void epdl_cleanup1(void) {
+    EPDL *item = NULL;
 
-    while(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
-        EPDL *item = epdl_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&epdl_globals.protected.spinlock))
+        return;
+
+    if(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
+        item = epdl_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         epdl_globals.protected.available--;
-        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 static EPDL *epdl_get(void) {
@@ -279,18 +297,24 @@ static struct {
         },
 };
 
-void deol_cleanup(void) {
-    netdata_spinlock_lock(&deol_globals.protected.spinlock);
+void deol_cleanup1(void) {
+    DEOL *item = NULL;
 
-    while(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
-        DEOL *item = deol_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&deol_globals.protected.spinlock))
+        return;
+
+    if(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
+        item = deol_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         deol_globals.protected.available--;
-        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 static DEOL *deol_get(void) {
@@ -367,20 +391,26 @@ void extent_buffer_init(void) {
     extent_buffer_globals.max_size = max_size;
 }
 
-void extent_buffer_cleanup(void) {
-    netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
+void extent_buffer_cleanup1(void) {
+    struct extent_buffer *item = NULL;
 
-    while(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
-        struct extent_buffer *item = extent_buffer_globals.protected.available_items;
-        size_t bytes = sizeof(struct extent_buffer) + item->bytes;
+    if(!netdata_spinlock_trylock(&extent_buffer_globals.protected.spinlock))
+        return;
+
+    if(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
+        item = extent_buffer_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         extent_buffer_globals.protected.available--;
-        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+
+    if(item) {
+        size_t bytes = sizeof(struct extent_buffer) + item->bytes;
+        freez(item);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
+    }
 }
 
 struct extent_buffer *extent_buffer_get(size_t size) {

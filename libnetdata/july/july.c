@@ -56,20 +56,26 @@ static struct {
         },
 };
 
-void julyl_cleanup(void) {
-    netdata_spinlock_lock(&julyl_globals.protected.spinlock);
+void julyl_cleanup1(void) {
+    struct JulyL *item = NULL;
 
-    while(julyl_globals.protected.available_items && julyl_globals.protected.available > 10) {
-        struct JulyL *item = julyl_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&julyl_globals.protected.spinlock))
+        return;
+
+    if(julyl_globals.protected.available_items && julyl_globals.protected.available > 10) {
+        item = julyl_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(julyl_globals.protected.available_items, item, cache.prev, cache.next);
-        size_t bytes = item->bytes;
-        freez(item);
         julyl_globals.protected.available--;
-        __atomic_sub_fetch(&julyl_globals.atomics.bytes, bytes, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&julyl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&julyl_globals.protected.spinlock);
+
+    if(item) {
+        size_t bytes = item->bytes;
+        freez(item);
+        __atomic_sub_fetch(&julyl_globals.atomics.bytes, bytes, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&julyl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 struct JulyL *julyl_get(void) {
