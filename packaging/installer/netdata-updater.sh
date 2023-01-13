@@ -769,8 +769,8 @@ update_binpkg() {
     opensuse)
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
-      upgrade_cmd="upgrade"
-      pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
+      upgrade_cmd="update"
+      pkg_install_opts="${interactive_opts}"
       repo_update_opts=""
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
