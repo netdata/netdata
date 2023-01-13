@@ -440,6 +440,7 @@ static size_t list_has_time_gaps(
                 (*pages_pending)++;
 
                 if (pd->status & PDC_PAGE_DISK_PENDING) {
+                    internal_fatal(pd->status & PDC_PAGE_SKIP, "page is disk pending and skipped");
                     internal_fatal(!pd->datafile.ptr, "datafile is NULL");
                     internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
                     internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");

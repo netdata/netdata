@@ -493,7 +493,7 @@ static void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS
         while ((PValue = PDCJudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
             struct page_details *pd = *PValue;
 
-            if(!pd->page && !pdc_page_status_check(pd, PDC_PAGE_FAILED)) {
+            if(!pd->page && !pdc_page_status_check(pd, PDC_PAGE_FAILED|PDC_PAGE_READY)) {
                 pdc_page_status_set(pd, PDC_PAGE_FAILED | tags);
                 pages_matched++;
             }
