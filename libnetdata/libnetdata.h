@@ -15,6 +15,12 @@ extern "C" {
 #define NETDATA_INTERNAL_CHECKS 1
 #endif
 
+#if SIZEOF_VOID_P == 4
+#define ENV32BIT 1
+#else
+#define ENV64BIT 1
+#endif
+
 // NETDATA_TRACE_ALLOCATIONS does not work under musl libc, so don't enable it
 //#if defined(NETDATA_INTERNAL_CHECKS) && !defined(NETDATA_TRACE_ALLOCATIONS)
 //#define NETDATA_TRACE_ALLOCATIONS 1

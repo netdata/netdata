@@ -161,6 +161,8 @@ struct sender_state {
     int rrdpush_sender_pipe[2];                     // collector to sender thread signaling
     int rrdpush_sender_socket;
 
+    uint16_t hops;
+
 #ifdef ENABLE_COMPRESSION
     struct compressor_state *compressor;
 #endif
@@ -231,6 +233,8 @@ struct receiver_state {
     time_t last_msg_t;
     char read_buffer[PLUGINSD_LINE_MAX + 1];
     int read_len;
+
+    uint16_t hops;
 
     struct {
         bool shutdown;      // signal the streaming parser to exit

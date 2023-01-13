@@ -633,9 +633,10 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     struct receiver_state *rpt = callocz(1, sizeof(*rpt));
     rpt->last_msg_t = now_realtime_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
+    rpt->hops = 1;
 
     rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
-    rpt->system_info->hops = 1;
+    rpt->system_info->hops = rpt->hops;
 
     rpt->fd                = w->ifd;
     rpt->client_ip         = strdupz(w->client_ip);
@@ -689,7 +690,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
 
         else if(!strcmp(name, "hops"))
-            rpt->system_info->hops = (uint16_t) strtoul(value, NULL, 0);
+            rpt->hops = rpt->system_info->hops = (uint16_t) strtoul(value, NULL, 0);
 
         else if(!strcmp(name, "ml_capable"))
             rpt->system_info->ml_capable = strtoul(value, NULL, 0);

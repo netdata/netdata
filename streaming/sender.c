@@ -510,6 +510,8 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
     stream_encoded_t se;
     rrdpush_encode_variable(&se, host);
 
+    host->sender->hops = host->system_info->hops + 1;
+
     char http[HTTP_HEADER_SIZE + 1];
     int eol = snprintfz(http, HTTP_HEADER_SIZE,
             "STREAM "
@@ -568,7 +570,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
                  , rrdhost_timezone(host)
                  , rrdhost_abbrev_timezone(host)
                  , host->utc_offset
-                 , host->system_info->hops + 1
+                 , host->sender->hops
                  , host->system_info->ml_capable
                  , host->system_info->ml_enabled
                  , host->system_info->mc_version

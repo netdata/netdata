@@ -457,6 +457,10 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
             }
         }
 
+//         this is a test
+//        if(rpt->hops <= host->sender->hops)
+//            rrdpush_sender_thread_stop(host, "HOPS MISMATCH", false);
+
         signal_rrdcontext = true;
         rrdpush_receiver_replication_reset(host);
 

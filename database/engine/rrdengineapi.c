@@ -10,13 +10,17 @@ struct rrdengine_instance multidb_ctx_storage_tier4;
 
 #define mrg_metric_ctx(metric) (struct rrdengine_instance *)mrg_metric_section(main_mrg, metric)
 
-
 #if RRD_STORAGE_TIERS != 5
 #error RRD_STORAGE_TIERS is not 5 - you need to add allocations here
 #endif
 struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 uint8_t tier_page_type[RRD_STORAGE_TIERS] = {PAGE_METRICS, PAGE_TIER, PAGE_TIER, PAGE_TIER, PAGE_TIER};
+
+#if defined(ENV32BIT)
+size_t tier_page_size[RRD_STORAGE_TIERS] = {2048, 1024, 192, 192, 192};
+#else
 size_t tier_page_size[RRD_STORAGE_TIERS] = {4096, 2048, 384, 384, 384};
+#endif
 
 #if PAGE_TYPE_MAX != 1
 #error PAGE_TYPE_MAX is not 1 - you need to add allocations here
@@ -33,10 +37,15 @@ __attribute__((constructor)) void initialize_multidb_ctx(void) {
 
 int default_rrdeng_page_fetch_timeout = 3;
 int default_rrdeng_page_fetch_retries = 3;
-int default_rrdeng_page_cache_mb = 32;
 int db_engine_journal_check = 0;
 int default_rrdeng_disk_quota_mb = 256;
 int default_multidb_disk_quota_mb = 256;
+
+#if defined(ENV32BIT)
+int default_rrdeng_page_cache_mb = 16;
+#else
+int default_rrdeng_page_cache_mb = 32;
+#endif
 
 // ----------------------------------------------------------------------------
 // metrics groups

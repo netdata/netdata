@@ -4,6 +4,10 @@
 #include "buildinfo.h"
 #include "static_threads.h"
 
+#if defined(ENV32BIT)
+#warning COMPILING 32BIT NETDATA
+#endif
+
 bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
