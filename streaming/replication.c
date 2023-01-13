@@ -4,6 +4,7 @@
 #include "Judy.h"
 
 #define STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
+#define MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER 25ULL
 #define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
 #define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10ULL
 
@@ -1215,7 +1216,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     // send the replication data
     rq->q->rq = rq;
     replication_response_execute_and_finalize(
-            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED / 100ULL));
+            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL));
 
     netdata_thread_enable_cancelability();
 
