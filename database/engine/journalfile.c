@@ -1062,7 +1062,7 @@ void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_
         // Calculate start of the pages start for next descriptor
         pages_offset += (metric_info->number_of_pages * (sizeof(struct journal_page_list)) + sizeof(struct journal_page_header) + sizeof(struct journal_v2_block_trailer));
         // Verify we are at the right location
-        if (pages_offset != (next_page_address - data_start)) {
+        if (pages_offset != (uint32_t)(next_page_address - data_start)) {
             // make sure checks fail so that we abort
             data = data_start;
             break;
