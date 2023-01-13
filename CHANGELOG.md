@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
 - allow the cache to grow when huge queries are running that exceed the cache size [\#14247](https://github.com/netdata/netdata/pull/14247) ([ktsaou](https://github.com/ktsaou))
+- Update netdata-overview.xml [\#14245](https://github.com/netdata/netdata/pull/14245) ([andrewm4894](https://github.com/andrewm4894))
 - profile startup and shutdown timings [\#14243](https://github.com/netdata/netdata/pull/14243) ([ktsaou](https://github.com/ktsaou))
 - `ml - machine learning` to just `machine learning` [\#14242](https://github.com/netdata/netdata/pull/14242) ([andrewm4894](https://github.com/andrewm4894))
 - cancel ml threads on shutdown and join them on host free [\#14240](https://github.com/netdata/netdata/pull/14240) ([ktsaou](https://github.com/ktsaou))
@@ -15,6 +17,7 @@
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
 - bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
 - remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
+- Remove temporary allocations when preprocessing a samples buffer [\#14208](https://github.com/netdata/netdata/pull/14208) ([vkalintiris](https://github.com/vkalintiris))
 - Create ML charts on child hosts. [\#14207](https://github.com/netdata/netdata/pull/14207) ([vkalintiris](https://github.com/vkalintiris))
 - Use brackets around info variables [\#14206](https://github.com/netdata/netdata/pull/14206) ([MrZammler](https://github.com/MrZammler))
 - Dont call worker\_utilization\_finish\(\) twice [\#14204](https://github.com/netdata/netdata/pull/14204) ([MrZammler](https://github.com/MrZammler))
@@ -347,9 +350,6 @@
 - update logind dashboard info [\#13597](https://github.com/netdata/netdata/pull/13597) ([ilyam8](https://github.com/ilyam8))
 - Add link to the performance optimization guide [\#13595](https://github.com/netdata/netdata/pull/13595) ([cakrit](https://github.com/cakrit))
 - sqlite3 global statistics [\#13594](https://github.com/netdata/netdata/pull/13594) ([ktsaou](https://github.com/ktsaou))
-- feat\(python.d/nvidia\_smi\): collect power state [\#13580](https://github.com/netdata/netdata/pull/13580) ([ilyam8](https://github.com/ilyam8))
-- fix\(python.d/nvidia\_smi\): repsect update\_every for polling [\#13579](https://github.com/netdata/netdata/pull/13579) ([ilyam8](https://github.com/ilyam8))
-- prevent crash on rrdcontext apis when rrdcontexts is not initialized [\#13578](https://github.com/netdata/netdata/pull/13578) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
