@@ -919,7 +919,7 @@ void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     struct rrdengine_journalfile *journalfile = (struct rrdengine_journalfile *) user_data;
     struct rrdengine_datafile *datafile = journalfile->datafile;
-    time_t min_time_s = LLONG_MAX;
+    time_t min_time_s = LONG_MAX;
     time_t max_time_s = 0;
     struct jv2_metrics_info *metric_info;
 
