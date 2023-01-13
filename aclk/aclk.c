@@ -459,7 +459,7 @@ static int aclk_block_till_recon_allowed() {
     next_connection_attempt = now_realtime_sec() + (recon_delay / MSEC_PER_SEC);
     last_backoff_value = (float)recon_delay / MSEC_PER_SEC;
 
-    info("Wait before attempting to reconnect in %.3f seconds\n", recon_delay / (float)MSEC_PER_SEC);
+    info("Wait before attempting to reconnect in %.3f seconds", recon_delay / (float)MSEC_PER_SEC);
     // we want to wake up from time to time to check netdata_exit
     while (recon_delay)
     {
