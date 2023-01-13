@@ -994,18 +994,38 @@ static int journal_metric_uuid_compare(const void *key, const void *metric)
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
 
-void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t metric_first_time_JudyL)
-{
+struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
+
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+
+    struct rrdengine_datafile *next_datafile = datafile->next;
+
+    while(next_datafile && !datafile_acquire(next_datafile, DATAFILE_ACQUIRE_RETENTION))
+        next_datafile = next_datafile->next;
+
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    datafile_release(datafile, DATAFILE_ACQUIRE_RETENTION);
+
+    return next_datafile;
+}
+
+void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t metric_first_time_JudyL) {
+    // acquire the datafile to work with it
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    while(datafile && !datafile_acquire(datafile, DATAFILE_ACQUIRE_RETENTION))
+        datafile = datafile->next;
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
     if (unlikely(!datafile))
         return;
 
     unsigned v2_count = 0;
     unsigned journalfile_count = 0;
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     while (datafile) {
         struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
         if (!journal_header || !datafile->users.available) {
-            datafile = datafile->next;
+            datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
             continue;
         }
 
@@ -1031,9 +1051,8 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             v2_count++;
         }
         journalfile_count++;
-        datafile = datafile->next;
+        datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
     }
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     // Let's scan the open cache for almost exact match
     bool first_then_next = true;

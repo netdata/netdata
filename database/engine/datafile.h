@@ -24,7 +24,14 @@ struct rrdengine_instance;
 #define MAX_DATAFILES (65536) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (50)
 
-#define DATAFILE_IDEAL_IO_SIZE (1048576U)
+typedef enum __attribute__ ((__packed__)) {
+    DATAFILE_ACQUIRE_OPEN_CACHE = 0,
+    DATAFILE_ACQUIRE_PAGE_DETAILS,
+    DATAFILE_ACQUIRE_RETENTION,
+
+    // terminator
+    DATAFILE_ACQUIRE_MAX,
+} DATAFILE_ACQUIRE_REASONS;
 
 /* only one event loop is supported for now */
 struct rrdengine_datafile {
@@ -47,7 +54,7 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         unsigned lockers;
-        unsigned lockers_by_reason[2];
+        unsigned lockers_by_reason[DATAFILE_ACQUIRE_MAX];
         bool available;
         time_t time_to_evict;
     } users;
@@ -57,11 +64,6 @@ struct rrdengine_datafile {
         Pvoid_t pending_epdl_by_extent_offset_judyL;
     } extent_queries;
 };
-
-typedef enum __attribute__ ((__packed__)) {
-    DATAFILE_ACQUIRE_OPEN_CACHE = 0,
-    DATAFILE_ACQUIRE_PAGE_DETAILS = 1,
-} DATAFILE_ACQUIRE_REASONS;
 
 void datafile_acquire_dup(struct rrdengine_datafile *df);
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
