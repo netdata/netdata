@@ -956,6 +956,13 @@ static bool epdl_populate_pages_from_extent_data(
     bool can_use_data = true;
     if(data_length < sizeof(*header) + sizeof(header->descr[0]) + sizeof(*trailer)) {
         can_use_data = false;
+
+        // added to satisfy the requirements of older compilers (prevent warnings)
+        payload_length = 0;
+        payload_offset = 0;
+        count = 0;
+        header = NULL;
+        trailer = NULL;
     }
     else {
         header = data;
