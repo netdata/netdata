@@ -926,13 +926,17 @@ ssize_t netdata_ssl_read(SSL *ssl, void *buf, size_t num) {
     int bytes, err, retries = 0;
 
     //do {
-        bytes = SSL_read(ssl, buf, (int)num);
-        err = SSL_get_error(ssl, bytes);
-        retries++;
-    //} while (bytes <= 0 && (err == SSL_ERROR_WANT_READ));
+    bytes = SSL_read(ssl, buf, (int)num);
+    err = SSL_get_error(ssl, bytes);
+    retries++;
+        //} while (bytes <= 0 && err == SSL_ERROR_WANT_READ);
 
-    if(unlikely(bytes <= 0))
-        error("SSL_read() returned %d bytes, SSL error %d", bytes, err);
+    if(unlikely(bytes <= 0)) {
+        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+            bytes = 0;
+        } else
+            error("SSL_write() returned %d bytes, SSL error %d", bytes, err);
+    }
 
     if(retries > 1)
         error_limit(&erl, "SSL_read() retried %d times", retries);
@@ -947,17 +951,21 @@ ssize_t netdata_ssl_write(SSL *ssl, const void *buf, size_t num) {
     size_t total = 0;
 
     //do {
-        bytes = SSL_write(ssl, (uint8_t *)buf + total, (int)(num - total));
-        err = SSL_get_error(ssl, bytes);
-        retries++;
+    bytes = SSL_write(ssl, (uint8_t *)buf + total, (int)(num - total));
+    err = SSL_get_error(ssl, bytes);
+    retries++;
 
-        if(bytes > 0)
-            total += bytes;
+    if(bytes > 0)
+        total += bytes;
 
     //} while ((bytes <= 0 && (err == SSL_ERROR_WANT_WRITE)) || (bytes > 0 && total < num));
 
-    if(unlikely(bytes <= 0))
-        error("SSL_write() returned %d bytes, SSL error %d", bytes, err);
+    if(unlikely(bytes <= 0)) {
+        if (err == SSL_ERROR_WANT_WRITE || err == SSL_ERROR_WANT_READ) {
+            bytes = 0;
+        } else
+            error("SSL_write() returned %d bytes, SSL error %d", bytes, err);
+    }
 
     if(retries > 1)
         error_limit(&erl, "SSL_write() retried %d times", retries);

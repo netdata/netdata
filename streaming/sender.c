@@ -818,8 +818,10 @@ static ssize_t attempt_read(struct sender_state *s) {
             return ret;
         }
 
-        worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
-        rrdpush_sender_thread_close_socket(s->host);
+        if (ret == -1) {
+            worker_is_busy(WORKER_SENDER_JOB_DISCONNECT_SSL_ERROR);
+            rrdpush_sender_thread_close_socket(s->host);
+        }
         return ret;
     }
 #endif
