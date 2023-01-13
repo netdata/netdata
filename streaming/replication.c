@@ -3,9 +3,9 @@
 #include "replication.h"
 #include "Judy.h"
 
-#define STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50
-#define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50
-#define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10
+#define STREAMING_START_MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
+#define MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED 50ULL
+#define MIN_SENDER_BUFFER_PERCENTAGE_ALLOWED 10ULL
 
 #define WORKER_JOB_FIND_NEXT                            1
 #define WORKER_JOB_QUERYING                             2
@@ -258,7 +258,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         q->query.before = expanded_before;
 }
 
-static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q) {
+static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     if(!q->query.execute)
         return replication_query_finalize(q, false);
 
@@ -277,6 +277,7 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 #endif
 
     time_t now = after + 1;
+    time_t last_end_time_in_buffer = 0;
     while(now <= before) {
         time_t min_start_time = 0, min_end_time = 0;
         for (size_t i = 0; i < dimensions ;i++) {
@@ -331,6 +332,13 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 
             actual_before = min_end_time;
 #endif
+
+            if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
+                q->query.before = last_end_time_in_buffer;
+                q->query.enable_streaming = false;
+                break;
+            }
+            last_end_time_in_buffer = min_end_time;
 
             buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
                            (unsigned long long) min_start_time,
@@ -445,13 +453,12 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
-bool replication_response_execute_and_finalize(struct replication_query *q) {
+bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size) {
     struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
     time_t after = q->request.after;
     time_t before; // the query will report this
-    bool enable_streaming = q->query.enable_streaming;
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -463,7 +470,8 @@ bool replication_response_execute_and_finalize(struct replication_query *q) {
     bool locked_data_collection = q->query.locked_data_collection;
     q->query.locked_data_collection = false;
 
-    before = replication_query_execute_and_finalize(wb, q);
+    before = replication_query_execute_and_finalize(wb, q, max_msg_size);
+    bool enable_streaming = q->query.enable_streaming;
 
     // IMPORTANT: q is invalid now
     q = NULL;
@@ -1204,7 +1212,8 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
 
     // send the replication data
     rq->q->rq = rq;
-    replication_response_execute_and_finalize(rq->q);
+    replication_response_execute_and_finalize(
+            rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_SENDER_BUFFER_PERCENTAGE_ALLOWED / 100ULL));
 
     netdata_thread_enable_cancelability();
 
