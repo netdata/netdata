@@ -440,6 +440,7 @@ static size_t list_has_time_gaps(
                 (*pages_pending)++;
 
                 if (pd->status & PDC_PAGE_DISK_PENDING) {
+                    internal_fatal(pd->status & PDC_PAGE_SKIP, "page is disk pending and skipped");
                     internal_fatal(!pd->datafile.ptr, "datafile is NULL");
                     internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
                     internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
@@ -633,7 +634,7 @@ static Pvoid_t get_page_list(
     pass1_ut = now_monotonic_usec();
     size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
-                                                false, PDC_PAGE_PRELOADED_PASS1 | PDC_PAGE_SOURCE_MAIN_CACHE);
+                                                false, PDC_PAGE_SOURCE_MAIN_CACHE);
     query_gaps += cache_gaps;
     pages_found_in_main_cache += pages_pass1;
     pages_total += pages_pass1;

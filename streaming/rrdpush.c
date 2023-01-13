@@ -974,7 +974,7 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
      */
 
     {
-        time_t age;
+        time_t age = 0;
         bool receiver_stale = false;
         bool receiver_working = false;
 

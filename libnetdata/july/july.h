@@ -33,7 +33,7 @@ static inline PPvoid_t JulyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool 
     return JulyLPrev(PArray, PIndex, PJE0);
 }
 
-void julyl_cleanup(void);
+void julyl_cleanup1(void);
 size_t julyl_cache_size(void);
 size_t julyl_bytes_moved(void);
 

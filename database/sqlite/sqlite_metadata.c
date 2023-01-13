@@ -610,7 +610,7 @@ bind_fail:
     return 1;
 }
 
-static bool dimension_can_be_deleted(uuid_t *dim_uuid)
+static bool dimension_can_be_deleted(uuid_t *dim_uuid __maybe_unused)
 {
 #ifdef ENABLE_DBENGINE
     if(dbengine_enabled) {

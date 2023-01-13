@@ -310,7 +310,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
 
     current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
 
-    per1000 = current_cache_size * 1000 / wanted_cache_size;
+    per1000 = (size_t)((unsigned long long)current_cache_size * 1000UL / (unsigned long long)wanted_cache_size);
 
     __atomic_store_n(&cache->usage.per1000, per1000, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);

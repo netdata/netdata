@@ -12,6 +12,7 @@ struct extent_page_details_list {
     struct rrdengine_datafile *datafile;
 
     struct rrdeng_cmd *cmd;
+    bool head_to_datafile_extent_queries_pending_for_extent;
 
     struct {
         struct extent_page_details_list *prev;
@@ -59,18 +60,24 @@ static struct {
         },
 };
 
-void pdc_cleanup(void) {
-    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
+void pdc_cleanup1(void) {
+    PDC *item = NULL;
 
-    while(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
-        PDC *item = pdc_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&pdc_globals.protected.spinlock))
+        return;
+
+    if(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
+        item = pdc_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         pdc_globals.protected.available--;
-        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 PDC *pdc_get(void) {
@@ -132,18 +139,24 @@ static struct {
         },
 };
 
-void page_details_cleanup(void) {
-    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
+void page_details_cleanup1(void) {
+    struct page_details *item = NULL;
 
-    while(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
-        struct page_details *item = page_details_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&page_details_globals.protected.spinlock))
+        return;
+
+    if(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
+        item = page_details_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         page_details_globals.protected.available--;
-        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 struct page_details *page_details_get(void) {
@@ -205,18 +218,24 @@ static struct {
         },
 };
 
-void epdl_cleanup(void) {
-    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
+void epdl_cleanup1(void) {
+    EPDL *item = NULL;
 
-    while(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
-        EPDL *item = epdl_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&epdl_globals.protected.spinlock))
+        return;
+
+    if(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
+        item = epdl_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         epdl_globals.protected.available--;
-        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 static EPDL *epdl_get(void) {
@@ -278,18 +297,24 @@ static struct {
         },
 };
 
-void deol_cleanup(void) {
-    netdata_spinlock_lock(&deol_globals.protected.spinlock);
+void deol_cleanup1(void) {
+    DEOL *item = NULL;
 
-    while(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
-        DEOL *item = deol_globals.protected.available_items;
+    if(!netdata_spinlock_trylock(&deol_globals.protected.spinlock))
+        return;
+
+    if(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
+        item = deol_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         deol_globals.protected.available--;
-        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+
+    if(item) {
+        freez(item);
+        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+    }
 }
 
 static DEOL *deol_get(void) {
@@ -366,20 +391,26 @@ void extent_buffer_init(void) {
     extent_buffer_globals.max_size = max_size;
 }
 
-void extent_buffer_cleanup(void) {
-    netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
+void extent_buffer_cleanup1(void) {
+    struct extent_buffer *item = NULL;
 
-    while(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
-        struct extent_buffer *item = extent_buffer_globals.protected.available_items;
-        size_t bytes = sizeof(struct extent_buffer) + item->bytes;
+    if(!netdata_spinlock_trylock(&extent_buffer_globals.protected.spinlock))
+        return;
+
+    if(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
+        item = extent_buffer_globals.protected.available_items;
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
-        freez(item);
         extent_buffer_globals.protected.available--;
-        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
     }
 
     netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
+
+    if(item) {
+        size_t bytes = sizeof(struct extent_buffer) + item->bytes;
+        freez(item);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&extent_buffer_globals.atomics.allocated_bytes, bytes, __ATOMIC_RELAXED);
+    }
 }
 
 struct extent_buffer *extent_buffer_get(size_t size) {
@@ -462,7 +493,7 @@ static void epdl_mark_all_not_loaded_pages_as_failed(EPDL *epdl, PDC_PAGE_STATUS
         while ((PValue = PDCJudyLFirstThenNext(*pd_by_start_time_s_JudyL, &start_time_index, &start_time_first))) {
             struct page_details *pd = *PValue;
 
-            if(!pd->page) {
+            if(!pd->page && !pdc_page_status_check(pd, PDC_PAGE_FAILED|PDC_PAGE_READY)) {
                 pdc_page_status_set(pd, PDC_PAGE_FAILED | tags);
                 pages_matched++;
             }
@@ -522,7 +553,7 @@ static void pdc_destroy(PDC *pdc) {
     struct page_details *pd;
     Word_t time_index = 0;
     bool first_then_next = true;
-    size_t unroutable = 0;
+    size_t unroutable = 0, cancelled = 0;
     while((PValue = PDCJudyLFirstThenNext(pdc->page_list_JudyL, &time_index, &first_then_next))) {
         pd = *PValue;
 
@@ -536,10 +567,12 @@ static void pdc_destroy(PDC *pdc) {
 
         internal_fatal(pd->datafile.ptr, "DBENGINE: page details has a datafile.ptr that is not released.");
 
-        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP | PDC_PAGE_INVALID))) {
+        if(!pd->page && !(status & (PDC_PAGE_READY | PDC_PAGE_FAILED | PDC_PAGE_RELEASED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_CANCELLED))) {
             // pdc_page_status_set(pd, PDC_PAGE_FAILED);
             unroutable++;
         }
+        else if(!pd->page && (status & PDC_PAGE_CANCELLED))
+            cancelled++;
 
         if(pd->page && !(status & PDC_PAGE_RELEASED)) {
             pgc_page_release(main_cache, pd->page);
@@ -557,6 +590,9 @@ static void pdc_destroy(PDC *pdc) {
 
     if(unroutable)
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_unroutable, unroutable, __ATOMIC_RELAXED);
+
+    if(cancelled)
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_fail_cancelled, cancelled, __ATOMIC_RELAXED);
 }
 
 void pdc_acquire(PDC *pdc) {
@@ -619,10 +655,13 @@ static bool epdl_pending_add(EPDL *epdl) {
 
     EPDL *base = *PValue;
 
-    if(!base)
+    if(!base) {
         added_new = true;
+        epdl->head_to_datafile_extent_queries_pending_for_extent = true;
+    }
     else {
         added_new = false;
+        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_load_extent_merged, 1, __ATOMIC_RELAXED);
 
         if(base->pdc->priority > epdl->pdc->priority)
@@ -639,9 +678,12 @@ static bool epdl_pending_add(EPDL *epdl) {
 
 static void epdl_pending_del(EPDL *epdl) {
     netdata_spinlock_lock(&epdl->datafile->extent_queries.spinlock);
-    int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
-    (void)rc;
-    internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
+    if(epdl->head_to_datafile_extent_queries_pending_for_extent) {
+        epdl->head_to_datafile_extent_queries_pending_for_extent = false;
+        int rc = JudyLDel(&epdl->datafile->extent_queries.pending_epdl_by_extent_offset_judyL, epdl->extent_offset, PJE0);
+        (void) rc;
+        internal_fatal(!rc, "DBENGINE: epdl not found in pending list");
+    }
     netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
 }
 
@@ -858,22 +900,32 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
     return vd;
 }
 
-static struct page_details *epdl_to_pd_load_list(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_time(EPDL *epdl, Word_t metric_id, time_t start_time_s) {
+
+    if(unlikely(epdl->head_to_datafile_extent_queries_pending_for_extent))
+        // stop appending more pages to this epdl
+        epdl_pending_del(epdl);
+
     struct page_details *pd_list = NULL;
 
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLGet(ep->page_details_by_metric_id_JudyL, metric_id, PJE0);
         internal_fatal(pd_by_start_time_s_judyL == PJERR, "DBENGINE: corrupted extent metrics JudyL");
 
-        if (pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL) {
+        if (unlikely(pd_by_start_time_s_judyL && *pd_by_start_time_s_judyL)) {
             Pvoid_t *pd_pptr = PDCJudyLGet(*pd_by_start_time_s_judyL, start_time_s, PJE0);
             internal_fatal(pd_pptr == PJERR, "DBENGINE: corrupted metric page details JudyHS");
 
-            if (pd_pptr && *pd_pptr) {
+            if(likely(pd_pptr && *pd_pptr)) {
                 struct page_details *pd = *pd_pptr;
                 internal_fatal(metric_id != pd->metric_id, "DBENGINE: metric ids do not match");
 
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+                if(likely(!pd->page)) {
+                    if (unlikely(__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)))
+                        pdc_page_status_set(pd, PDC_PAGE_FAILED | PDC_PAGE_CANCELLED);
+                    else
+                        DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+                }
             }
         }
     }
@@ -904,6 +956,14 @@ static bool epdl_populate_pages_from_extent_data(
     bool can_use_data = true;
     if(data_length < sizeof(*header) + sizeof(header->descr[0]) + sizeof(*trailer)) {
         can_use_data = false;
+
+        // added to satisfy the requirements of older compilers (prevent warnings)
+        payload_length = 0;
+        payload_offset = 0;
+        trailer_offset = 0;
+        count = 0;
+        header = NULL;
+        trailer = NULL;
     }
     else {
         header = data;
@@ -1006,7 +1066,7 @@ static bool epdl_populate_pages_from_extent_data(
         }
         mrg_metric_release(main_mrg, metric);
 
-        struct page_details *pd_list = epdl_to_pd_load_list(epdl, metric_id, start_time_s);
+        struct page_details *pd_list = epdl_get_pd_load_link_list_from_metric_start_time(epdl, metric_id, start_time_s);
         if(likely(!pd_list))
             continue;
 
@@ -1114,7 +1174,8 @@ static bool epdl_populate_pages_from_extent_data(
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
-    epdl_pending_del(epdl);
+    size_t *statistics_counter = NULL;
+    PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
 
     bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
     for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
@@ -1123,20 +1184,21 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
         internal_fatal(ep->file != epdl->file, "DBENGINE: files do not match");
 
-        PDC *pdc = ep->pdc;
-        if(!__atomic_load_n(&pdc->workers_should_stop, __ATOMIC_RELAXED)) {
+        if(!__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)) {
             should_stop = false;
             break;
         }
     }
 
-    if(should_stop)
+    if(unlikely(should_stop)) {
+        statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cancelled;
+        not_loaded_pages_tag = PDC_PAGE_CANCELLED;
         goto cleanup;
+    }
 
     if(worker)
         worker_is_busy(UV_EVENT_EXTENT_CACHE);
 
-    PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
     bool extent_found_in_cache = false;
 
     void *extent_compressed_data = NULL;
@@ -1150,8 +1212,8 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                        "DBENGINE: cache size does not match the expected size");
 
-        loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
-        not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_EXTENT_CACHE;
+        loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_CACHE;
+        not_loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_CACHE;
         extent_found_in_cache = true;
     }
     else {
@@ -1194,8 +1256,8 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
 
             extent_compressed_data = pgc_page_data(extent_cache_page);
 
-            loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
-            not_loaded_pages_tag |= PDC_PAGE_LOADED_FROM_DISK;
+            loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_DISK;
+            not_loaded_pages_tag |= PDC_PAGE_EXTENT_FROM_DISK;
         }
     }
 
@@ -1208,26 +1270,33 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(extent_used) {
             // since the extent was used, all the pages that are not
             // loaded from this extent, were not found in the extent
-            not_loaded_pages_tag |= PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT;
+            not_loaded_pages_tag |= PDC_PAGE_FAILED_NOT_IN_EXTENT;
+            statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_not_found;
         }
-        else
+        else {
             not_loaded_pages_tag |= PDC_PAGE_FAILED_INVALID_EXTENT;
+            statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_invalid_extent;
+        }
     }
-    else
+    else {
         not_loaded_pages_tag |= PDC_PAGE_FAILED_TO_MAP_EXTENT;
-
+        statistics_counter = &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent;
+    }
 
     if(extent_cache_page)
         pgc_page_release(extent_cache, extent_cache_page);
 
+cleanup:
+    // remove it from the datafile extent_queries
+    // this can be called multiple times safely
+    epdl_pending_del(epdl);
+
     // mark all pending pages as failed
     for(EPDL *ep = epdl; ep ;ep = ep->query.next) {
         epdl_mark_all_not_loaded_pages_as_failed(
-                ep, not_loaded_pages_tag,
-                &rrdeng_cache_efficiency_stats.pages_load_fail_cant_mmap_extent);
+                ep, not_loaded_pages_tag, statistics_counter);
     }
 
-cleanup:
     for(EPDL *ep = epdl, *next = NULL; ep ; ep = next) {
         next = ep->query.next;
 

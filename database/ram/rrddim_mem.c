@@ -136,7 +136,7 @@ STORAGE_COLLECT_HANDLE *rrddim_collect_init(STORAGE_METRIC_HANDLE *db_metric_han
     RRDDIM *rd = mh->rd;
 
     update_metric_handle_from_rrddim(mh, rd);
-    internal_fatal(mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
+    internal_fatal((uint32_t)mh->update_every_s != update_every, "RRDDIM: update requested does not match the dimension");
 
     struct mem_collect_handle *ch = callocz(1, sizeof(struct mem_collect_handle));
     ch->rd = rd;

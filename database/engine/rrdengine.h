@@ -88,20 +88,19 @@ typedef enum __attribute__ ((__packed__)) {
 
     // worker related statuses
     PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 9),
-    PDC_PAGE_FAILED_UUID_NOT_IN_EXTENT = (1 << 10),
+    PDC_PAGE_FAILED_NOT_IN_EXTENT      = (1 << 10),
     PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 11),
     PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 12),
 
-    PDC_PAGE_LOADED_FROM_EXTENT_CACHE  = (1 << 13),
-    PDC_PAGE_LOADED_FROM_DISK          = (1 << 14),
+    PDC_PAGE_EXTENT_FROM_CACHE         = (1 << 13),
+    PDC_PAGE_EXTENT_FROM_DISK          = (1 << 14),
 
-    PDC_PAGE_PRELOADED_PASS1           = (1 << 15),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 16),
-    PDC_PAGE_PRELOADED_WORKER          = (1 << 17),
+    PDC_PAGE_CANCELLED                 = (1 << 15), // the query thread had left when we try to load the page
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 19),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 19),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 20),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 16),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 17),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 18),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 19),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),

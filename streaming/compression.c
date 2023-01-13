@@ -244,7 +244,7 @@ static size_t lz4_decompressor_decompress(struct decompressor_state *state, cons
               , state->stream->size
               , state->stream->write_at
               , decompressed_size
-              , state->stream->write_at + decompressed_size - state->stream->size
+              , (size_t)(state->stream->write_at + decompressed_size - state->stream->size)
               );
 
     state->stream->write_at += decompressed_size;

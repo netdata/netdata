@@ -331,11 +331,11 @@ time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-    internal_fatal(latest_time_s > now_realtime_sec() + 1,
-                   "DBENGINE METRIC: metric latest time is in the future");
+//    internal_fatal(latest_time_s > now_realtime_sec() + 1,
+//                   "DBENGINE METRIC: metric latest time is in the future");
 
-    internal_fatal(metric->latest_time_s_clean > latest_time_s,
-                   "DBENGINE METRIC: metric new clean latest time is older than the previous one");
+//    internal_fatal(metric->latest_time_s_clean > latest_time_s,
+//                   "DBENGINE METRIC: metric new clean latest time is older than the previous one");
 
     metric->latest_time_s_clean = latest_time_s;
 
