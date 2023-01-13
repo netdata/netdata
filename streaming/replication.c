@@ -336,8 +336,8 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
-                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu, interrupting replication query.",
-                               buffer_strlen(wb), max_msg_size);
+                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s', interrupting replication query.",
+                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost));
                 break;
             }
             last_end_time_in_buffer = min_end_time;
