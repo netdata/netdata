@@ -81,6 +81,7 @@ struct replication_query {
 
         bool locked_data_collection;
         bool execute;
+        bool interrupted;
     } query;
 
     time_t wall_clock_time;
@@ -197,8 +198,7 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-static time_t replication_query_finalize(struct replication_query *q, bool executed) {
-    time_t query_before = q->query.before;
+static void replication_query_finalize(struct replication_query *q, bool executed) {
     size_t dimensions = q->dimensions;
 
     // release all the dictionary items acquired
@@ -232,8 +232,6 @@ static time_t replication_query_finalize(struct replication_query *q, bool execu
     }
 
     freez(q);
-
-    return query_before;
 }
 
 static void replication_query_align_to_optimal_before(struct replication_query *q) {
@@ -259,10 +257,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         q->query.before = expanded_before;
 }
 
-static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
-    if(!q->query.execute)
-        return replication_query_finalize(q, false);
-
+static void replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     replication_query_align_to_optimal_before(q);
 
     time_t after = q->query.after;
@@ -335,10 +330,15 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 #endif
 
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
+                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'."
+                                     "Interrupting replication query at %ld, before the expected %ld.",
+                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
+                               last_end_time_in_buffer, q->query.before);
+
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
-                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s', interrupting replication query.",
-                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost));
+                q->query.interrupted = true;
+
                 break;
             }
             last_end_time_in_buffer = min_end_time;
@@ -392,7 +392,6 @@ static time_t replication_query_execute_and_finalize(BUFFER *wb, struct replicat
 
     q->points_read = points_read;
     q->points_generated = points_generated;
-    return replication_query_finalize(q, true);
 }
 
 static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
@@ -460,8 +459,6 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
-    time_t after = q->request.after;
-    time_t before; // the query will report this
 
     // we might want to optimize this by filling a temporary buffer
     // and copying the result to the host's buffer in order to avoid
@@ -473,11 +470,15 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     bool locked_data_collection = q->query.locked_data_collection;
     q->query.locked_data_collection = false;
 
-    before = replication_query_execute_and_finalize(wb, q, max_msg_size);
+    if(q->query.execute)
+        replication_query_execute(wb, q, max_msg_size);
+
+    time_t after = q->request.after;
+    time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
 
-    // IMPORTANT: q is invalid now
-    q = NULL;
+    replication_query_finalize(q, q->query.execute);
+    q = NULL; // IMPORTANT: q is invalid now
 
     // get again the world clock time
     if(enable_streaming)

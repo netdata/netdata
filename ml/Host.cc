@@ -142,6 +142,9 @@ void Host::detectOnce() {
         TSCopy.RemainingUT = 0;
     }
 
+    if(!RH)
+        return;
+
     worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
     updateDimensionsChart(RH, MLSCopy);
 
