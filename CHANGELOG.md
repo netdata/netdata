@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- fix\(health\): don't assume 2 cores if the number is unknown [\#14265](https://github.com/netdata/netdata/pull/14265) ([ilyam8](https://github.com/ilyam8))
+- More 32bit fixes [\#14264](https://github.com/netdata/netdata/pull/14264) ([ktsaou](https://github.com/ktsaou))
 - Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
 - DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
 - fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
@@ -345,10 +347,6 @@
 - Assorted updates for apps\_groups.conf. [\#13618](https://github.com/netdata/netdata/pull/13618) ([Ferroin](https://github.com/Ferroin))
 - add spiceproxy to proxmox group [\#13615](https://github.com/netdata/netdata/pull/13615) ([ilyam8](https://github.com/ilyam8))
 - Improve coverage of Linux kernel threads in apps\_groups.conf [\#13612](https://github.com/netdata/netdata/pull/13612) ([Ferroin](https://github.com/Ferroin))
-- Clean chart hash map  [\#13611](https://github.com/netdata/netdata/pull/13611) ([stelfrag](https://github.com/stelfrag))
-- Update dashboard to version v2.28.8. [\#13609](https://github.com/netdata/netdata/pull/13609) ([netdatabot](https://github.com/netdatabot))
-- Don't try to load db rows when chart\_id or dim\_id is null [\#13608](https://github.com/netdata/netdata/pull/13608) ([MrZammler](https://github.com/MrZammler))
-- Add info text for wal and update for checkpoints [\#13607](https://github.com/netdata/netdata/pull/13607) ([shyamvalsan](https://github.com/shyamvalsan))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
