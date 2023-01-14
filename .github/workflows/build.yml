@@ -171,6 +171,7 @@ jobs:
   matrix: # Generate the shared build matrix for our build tests.
     name: Prepare Build Matrix
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -212,6 +213,7 @@ jobs:
   prepare-test-images: # Prepare the test environments for our build checks. This also checks dependency handling code for each tested environment.
     name: Prepare Test Environments
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
     needs:
       - matrix
     env:
@@ -312,6 +314,7 @@ jobs:
   source-build: # Test various source build arrangements.
     name: Test Source Build
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
     needs:
       - matrix
       - prepare-test-images
@@ -385,6 +388,7 @@ jobs:
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch'
     needs:
       - build-dist
       - matrix
@@ -630,8 +634,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
-      - updater-check
-      - source-build
       - artifact-verification-dist
       - artifact-verification-static
     steps:
@@ -685,8 +687,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
     needs:
-      - updater-check
-      - source-build
       - artifact-verification-dist
       - artifact-verification-static
     steps:
@@ -772,8 +772,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
     needs:
-      - updater-check
-      - source-build
       - artifact-verification-dist
       - artifact-verification-static
       - normalize-tag
