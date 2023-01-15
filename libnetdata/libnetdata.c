@@ -1184,6 +1184,14 @@ inline int madvise_sequential(void *mem, size_t len) {
     return ret;
 }
 
+inline int madvise_random(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_RANDOM);
+
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_RANDOM) failed.");
+    return ret;
+}
+
 inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);

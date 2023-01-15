@@ -213,6 +213,7 @@ void journalfile_set_data(struct rrdengine_journalfile *journalfile, void *journ
         journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MAPPED_READ_WRITE;
     }
 
+    madvise_random(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
     madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
     journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
     journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
