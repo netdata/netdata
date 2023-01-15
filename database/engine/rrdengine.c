@@ -1059,15 +1059,15 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     unsigned v2_count = 0;
     unsigned journalfile_count = 0;
     while (datafile) {
-        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
-        if (!journal_header || !datafile->users.available) {
+        struct journal_v2_header *j2_header = journalfile_acquire_data(datafile->journalfile, NULL, 0, 0);
+        if (!j2_header) {
             datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
             continue;
         }
 
-        time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
-        size_t journal_metric_count = (size_t)journal_header->metric_count;
-        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+        size_t journal_metric_count = (size_t)j2_header->metric_count;
+        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
         Word_t index = 0;
         bool first_then_next = true;
@@ -1087,6 +1087,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             v2_count++;
         }
         journalfile_count++;
+        journalfile_release_data(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
     }
 
@@ -1120,16 +1121,16 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     if(worker)
         worker_is_busy(UV_EVENT_ANALYZE_V2);
 
-    struct rrdengine_journalfile *journal_file = datafile_to_delete->journalfile;
-    struct journal_v2_header *journal_header = (struct journal_v2_header *)GET_JOURNAL_DATA(journal_file);
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+    struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
+    struct journal_v2_header *j2_header = journalfile_acquire_data(journalfile, NULL, 0, 0);
+    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
     Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
     Pvoid_t *PValue;
 
     unsigned count = 0;
     struct uuid_first_time_s *uuid_first_t_entry;
-    for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
+    for (uint32_t index = 0; index < j2_header->metric_count; ++index) {
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
         if (!metric)
             continue;
@@ -1146,6 +1147,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             count++;
         }
     }
+    journalfile_release_data(journalfile);
 
     info("DBENGINE: recalculating retention for %u metrics", count);
 
@@ -1220,7 +1222,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journal_file_bytes = journal_file->pos;
-    deleted_bytes = GET_JOURNAL_DATA_SIZE(journal_file);
+    deleted_bytes = journalfile_get_data_size(journal_file);
 
     info("DBENGINE: deleting data and journal files to maintain disk quota");
     datafile_list_delete_unsafe(ctx, datafile);
@@ -1377,7 +1379,7 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
         if(!available)
             continue;
 
-        if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
+        if (unlikely(!journalfile_has_data(datafile->journalfile))) {
             info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
             pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
             count++;

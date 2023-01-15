@@ -964,11 +964,11 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
-    void *data_start = GET_JOURNAL_DATA(datafile->journalfile);
-    if (unlikely(!data_start))
-        return;
+    struct journal_v2_header *j2_header = journalfile_acquire_data(datafile->journalfile, NULL, 0, 0);
+    void *data_start = (void *)j2_header;
 
-    struct journal_v2_header *j2_header = (void *) data_start;
+    if(unlikely(!j2_header))
+        return;
 
     stats->extents += j2_header->extent_count;
 
@@ -1026,6 +1026,8 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
         }
         metric++;
     }
+
+    journalfile_release_data(datafile->journalfile);
 }
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
@@ -1034,11 +1036,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
-
-        if (GET_JOURNAL_DATA(df->journalfile)) {
-            // FIXME: Rework statistics based only on V2
-            populate_v2_statistics(df, &stats);
-        }
+        populate_v2_statistics(df, &stats);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 

@@ -17,20 +17,29 @@ struct rrdengine_journalfile;
 
 #define is_descr_journal_v2(descr) ((descr)->extent_entry != NULL)
 
+typedef enum __attribute__ ((__packed__)) {
+    JOURNALFILE_FLAG_MAPPED_READ_WRITE = (1 << 0),
+    JOURNALFILE_FLAG_MAPPED_READ_ONLY  = (1 << 1),
+    JOURNALFILE_FLAG_MADV_WILLNEED     = (1 << 2),
+    JOURNALFILE_FLAG_MADV_DONTNEED     = (1 << 3),
+} JOURNALFILE_FLAGS;
+
 /* only one event loop is supported for now */
 struct rrdengine_journalfile {
     struct {
         SPINLOCK spinlock;
         int32_t refcount;
         time_t last_access_s;
-        bool mmap_read_write;
+        JOURNALFILE_FLAGS flags;
+        void *journal_data;                         // MMAPed file of journal v2
+        uint32_t journal_data_size;                 // Total file size mapped
+        time_t first_time_s;
+        time_t last_time_s;
     } unsafe;
 
     uv_file file;
     uint64_t pos;
     void *data;
-    void *journal_data;                         // MMAPed file of journal v2
-    uint32_t journal_data_size;                 // Total file size mapped
     struct rrdengine_datafile *datafile;
 };
 
@@ -132,5 +141,13 @@ void init_commit_log(struct rrdengine_instance *ctx);
 void do_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data);
+
+
+bool journalfile_has_data(struct rrdengine_journalfile *journalfile);
+size_t journalfile_get_data_size(struct rrdengine_journalfile *journalfile);
+void journalfile_set_data(struct rrdengine_journalfile *journalfile, void *journal_data, uint32_t journal_data_size, bool mmapped_read_write);
+struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
+void journalfile_release_data(struct rrdengine_journalfile *journalfile);
+void journalfile_unmap_data(struct rrdengine_journalfile *journalfile);
 
 #endif /* NETDATA_JOURNALFILE_H */

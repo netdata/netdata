@@ -81,13 +81,7 @@ static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PG
     ;
 }
 
-typedef enum {
-    PAGE_IS_IN_THE_PAST   = -1,
-    PAGE_IS_IN_RANGE      =  0,
-    PAGE_IS_IN_THE_FUTURE =  1,
-} TIME_RANGE_COMPARE;
-
-static inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
+inline TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s) {
     // page_first_time_s <= wanted_end_time_s && page_last_time_s >= wanted_start_time_s
 
     if(page_last_time_s < wanted_start_time_s)
@@ -465,8 +459,8 @@ static size_t list_has_time_gaps(
     return gaps;
 }
 
-typedef void (*page_found_callback)(PGC_PAGE *page, void *data);
-size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback callback, void *callback_data) {
+typedef void (*page_found_callback_t)(PGC_PAGE *page, void *data);
+static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *metric, usec_t start_time_ut, usec_t end_time_ut, page_found_callback_t callback, void *callback_data) {
     uuid_t *uuid = mrg_metric_uuid(main_mrg, metric);
     Word_t metric_id = mrg_metric_id(main_mrg, metric);
 
@@ -478,32 +472,27 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile;
     for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
-        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
-
-        if (!journal_header)
+        struct journal_v2_header *j2_header = journalfile_acquire_data(datafile->journalfile, NULL, wanted_start_time_s, wanted_end_time_s);
+        if (unlikely(!j2_header))
             continue;
 
-        time_t journal_start_time_s = (time_t)(journal_header->start_time_ut / USEC_PER_SEC);
-        time_t journal_end_time_s = (time_t)(journal_header->end_time_ut / USEC_PER_SEC);
-
-        // is the datafile within our time-range?
-        TIME_RANGE_COMPARE jrc = is_page_in_time_range(journal_start_time_s, journal_end_time_s, wanted_start_time_s, wanted_end_time_s);
-        if(jrc != PAGE_IS_IN_RANGE)
-            continue;
+        time_t journal_start_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
 
         // the datafile possibly contains useful data for this query
 
-        size_t journal_metric_count = (size_t)journal_header->metric_count;
-        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+        size_t journal_metric_count = (size_t)j2_header->metric_count;
+        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
         struct journal_metric_list *uuid_entry = bsearch(uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
 
-        if (unlikely(!uuid_entry))
+        if (unlikely(!uuid_entry)) {
             // our UUID is not in this datafile
+            journalfile_release_data(datafile->journalfile);
             continue;
+        }
 
-        struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) journal_header + uuid_entry->page_offset);
+        struct journal_page_header *page_list_header = (struct journal_page_header *) ((uint8_t *) j2_header + uuid_entry->page_offset);
         struct journal_page_list *page_list = (struct journal_page_list *)((uint8_t *) page_list_header + sizeof(*page_list_header));
-        struct journal_extent_list *extent_list = (void *)((uint8_t *)journal_header + journal_header->extent_offset);
+        struct journal_extent_list *extent_list = (void *)((uint8_t *)j2_header + j2_header->extent_offset);
         uint32_t uuid_page_entries = page_list_header->entries;
 
         for (uint32_t index = 0; index < uuid_page_entries; index++) {
@@ -555,6 +544,8 @@ size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METRIC *met
                 pages_found++;
             }
         }
+
+        journalfile_release_data(datafile->journalfile);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 

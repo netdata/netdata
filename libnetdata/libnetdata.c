@@ -1289,10 +1289,10 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
             else info("Cannot seek to beginning of file '%s'.", filename);
         }
 
-        madvise_sequential(mem, size);
+        // madvise_sequential(mem, size);
         madvise_dontfork(mem, size);
         madvise_dontdump(mem, size);
-        if(flags & MAP_SHARED) madvise_willneed(mem, size);
+        // if(flags & MAP_SHARED) madvise_willneed(mem, size);
         if(ksm) madvise_mergeable(mem, size);
     }
 
