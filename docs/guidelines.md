@@ -14,7 +14,7 @@ import Tabs from '@theme/Tabs'; import TabItem from '@theme/TabItem';
 Welcome to our docs developer guidelines!
 
 This document will guide you to the process of contributing to our
-docs [learn.netdata.cloud/docs](https://learn.netdata.cloud/doc)
+docs (**learn.netdata.cloud**)
 
 ## Documentation architecture
 
@@ -265,10 +265,12 @@ So let's go through the different necessary metadata tags to get a document prop
 1. In case any mandatory tags are missing or falsely inputted the file will remain unpublished. This is by design to
    prevent non-properly tagged files from getting published.
 2. All metadata values must be included in `" "`. From `string` noted text inside the fields use `' ''`
-   :::
+
 
 While Docusaurus can make use of more metadata tags than the above, these are the minimum we require to publish the file
 on Learn.
+
+:::
 
 ### Placing a document in learn
 
