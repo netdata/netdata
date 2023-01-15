@@ -15,15 +15,6 @@ netdata_cachestat_pid_t *cachestat_vector = NULL;
 static netdata_idx_t cachestat_hash_values[NETDATA_CACHESTAT_END];
 static netdata_idx_t *cachestat_values = NULL;
 
-struct netdata_static_thread cachestat_threads = {.name = "CACHESTAT KERNEL",
-                                                  .config_section = NULL,
-                                                  .config_name = NULL,
-                                                  .env_name = NULL,
-                                                  .enabled = 1,
-                                                  .thread = NULL,
-                                                  .init_routine = NULL,
-                                                  .start_routine = NULL};
-
 ebpf_local_maps_t cachestat_maps[] = {{.name = "cstat_global", .internal_input = NETDATA_CACHESTAT_END,
                                               .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                               .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
@@ -353,7 +344,6 @@ static void ebpf_cachestat_free(ebpf_module_t *em)
 
     freez(cachestat_vector);
     freez(cachestat_values);
-    freez(cachestat_threads.thread);
 
 #ifdef LIBBPF_MAJOR_VERSION
     if (bpf_obj)
@@ -374,21 +364,7 @@ static void ebpf_cachestat_free(ebpf_module_t *em)
 static void ebpf_cachestat_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (cachestat_threads.thread)
-        netdata_thread_cancel(*cachestat_threads.thread);
-    ebpf_cachestat_free(em);
-}
 
-/**
- * Cachestat cleanup
- *
- * Clean up allocated addresses.
- *
- * @param ptr thread data.
- */
-static void ebpf_cachestat_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_cachestat_free(em);
 }
 
@@ -668,7 +644,7 @@ void ebpf_cachestat_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_cachestat_read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = cachestat_hash_values;
@@ -686,35 +662,6 @@ static void read_global_table()
             val[idx] = total;
         }
     }
-}
-
-/**
- * Socket read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_cachestat_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_cachestat_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_CACHESTAT_SLEEP_MS * em->update_every;
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_global_table();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -1118,12 +1065,6 @@ void ebpf_cachestat_send_cgroup_data(int update_every)
 */
 static void cachestat_collector(ebpf_module_t *em)
 {
-    cachestat_threads.thread = callocz(1, sizeof(netdata_thread_t));
-    cachestat_threads.start_routine = ebpf_cachestat_read_hash;
-
-    netdata_thread_create(cachestat_threads.thread, cachestat_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_cachestat_read_hash, em);
-
     netdata_publish_cachestat_t publish;
     memset(&publish, 0, sizeof(publish));
     int cgroups = em->cgroup_charts;
@@ -1138,6 +1079,7 @@ static void cachestat_collector(ebpf_module_t *em)
             break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
+        ebpf_cachestat_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();
