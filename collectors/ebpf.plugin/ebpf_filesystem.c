@@ -30,17 +30,6 @@ static ebpf_local_maps_t fs_maps[] = {{.name = "tbl_ext4", .internal_input = NET
                                        .type = NETDATA_EBPF_MAP_CONTROLLER,
                                        .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED}};
 
-struct netdata_static_thread filesystem_threads = {
-                                 .name = "EBPF FS READ",
-                                 .config_section = NULL,
-                                 .config_name = NULL,
-                                 .env_name = NULL,
-                                 .enabled = 1,
-                                 .thread = NULL,
-                                 .init_routine = NULL,
-                                 .start_routine = NULL
-};
-
 static netdata_syscall_stat_t filesystem_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t filesystem_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
@@ -337,14 +326,9 @@ void ebpf_filesystem_cleanup_ebpf_data()
 static void ebpf_filesystem_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    freez(filesystem_threads.thread);
     ebpf_cleanup_publish_syscall(filesystem_publish_aggregated);
 
     ebpf_filesystem_cleanup_ebpf_data();
@@ -365,21 +349,6 @@ static void ebpf_filesystem_free(ebpf_module_t *em)
  * @param ptr thread data.
  */
 static void ebpf_filesystem_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (filesystem_threads.thread)
-        netdata_thread_cancel(*filesystem_threads.thread);
-    ebpf_filesystem_free(em);
-}
-
-/**
- * File system cleanup
- *
- * Clean up allocated thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_filesystem_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_filesystem_free(em);
@@ -484,30 +453,16 @@ static void read_filesystem_tables()
  *
  * @return It always returns NULL.
  */
-void *ebpf_filesystem_read_hash(void *ptr)
+void ebpf_filesystem_read_hash(ebpf_module_t *em)
 {
-    netdata_thread_cleanup_push(ebpf_filesystem_cleanup, ptr);
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
+    ebpf_obsolete_fs_charts(em->update_every);
 
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    usec_t step = NETDATA_FILESYSTEM_READ_SLEEP_MS * em->update_every;
-    int update_every = em->update_every;
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
+    (void) ebpf_update_partitions(em);
 
-        (void) ebpf_update_partitions(em);
-        ebpf_obsolete_fs_charts(update_every);
+    if (em->optional)
+        return;
 
-        // No more partitions, it is not necessary to read tables
-        if (em->optional)
-            continue;
-
-        read_filesystem_tables();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
+    read_filesystem_tables();
 }
 
 /**
@@ -544,12 +499,6 @@ static void ebpf_histogram_send_data()
  */
 static void filesystem_collector(ebpf_module_t *em)
 {
-    filesystem_threads.thread = mallocz(sizeof(netdata_thread_t));
-    filesystem_threads.start_routine = ebpf_filesystem_read_hash;
-
-    netdata_thread_create(filesystem_threads.thread, filesystem_threads.name,
-                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_filesystem_read_hash, em);
-
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -559,6 +508,7 @@ static void filesystem_collector(ebpf_module_t *em)
         if (ebpf_exit_plugin)
             break;
 
+        ebpf_filesystem_read_hash(em);
         pthread_mutex_lock(&lock);
 
         ebpf_create_fs_charts(update_every);
