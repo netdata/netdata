@@ -140,12 +140,16 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
         j2_header = NULL;
 
         if(!journalfile->unsafe.refcount) {
-            // repeating this call seems to have an effect
-            // if the mapped section is dirty, the first madvise_dontneed() seems to be ignored
-            // so, repeating this call allows the kernel to reprocess this request
-            madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-            journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
-            journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+            journalfile->unsafe.refcount_zero_counter++;
+
+            if(journalfile->unsafe.refcount_zero_counter % 1000 == 0) {
+                // repeating this call seems to have an effect
+                // if the mapped section is dirty, the first madvise_dontneed() seems to be ignored
+                // so, repeating this call allows the kernel to reprocess this request
+                madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+                journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
+                journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+            }
         }
     }
 
@@ -157,16 +161,16 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
 void journalfile_release_data(struct rrdengine_journalfile *journalfile) {
     netdata_spinlock_lock(&journalfile->unsafe.spinlock);
 
+    internal_fatal(!journalfile->unsafe.journal_data, "trying to release a journalfile without data");
     internal_fatal(journalfile->unsafe.refcount < 1, "trying to release a non-acquired journalfile");
 
     journalfile->unsafe.refcount--;
     if(!journalfile->unsafe.refcount) {
+        journalfile->unsafe.refcount_zero_counter = 0;
 
-        if(journalfile->unsafe.journal_data && !(journalfile->unsafe.flags & JOURNALFILE_FLAG_MADV_DONTNEED)) {
-            madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-            journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
-            journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
-        }
+        madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+        journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
+        journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
 
         journalfile->unsafe.last_access_s = now_monotonic_sec();
     }

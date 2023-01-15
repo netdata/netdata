@@ -35,6 +35,7 @@ struct rrdengine_journalfile {
         uint32_t journal_data_size;                 // Total file size mapped
         time_t first_time_s;
         time_t last_time_s;
+        size_t refcount_zero_counter;
     } unsafe;
 
     uv_file file;
