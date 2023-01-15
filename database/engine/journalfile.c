@@ -125,16 +125,20 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
     struct journal_v2_header *j2_header = journalfile->unsafe.journal_data;
 
     if(j2_header && (!wanted_first_time_s || !wanted_last_time_s || is_page_in_time_range(journalfile->unsafe.first_time_s, journalfile->unsafe.last_time_s, wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE)) {
+        journalfile->unsafe.refcount++;
+
 //        if(!(journalfile->unsafe.flags & JOURNALFILE_FLAG_MADV_WILLNEED)) {
-//            madvise_willneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
 //            journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_WILLNEED;
 //            journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_DONTNEED;
+//
+//            netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+//            madvise_willneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+//            netdata_spinlock_lock(&journalfile->unsafe.spinlock);
 //        }
 
         if(data_size)
             *data_size = journalfile->unsafe.journal_data_size;
 
-        journalfile->unsafe.refcount++;
     }
     else if(j2_header) {
         j2_header = NULL;
@@ -143,12 +147,18 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
             journalfile->unsafe.refcount_zero_counter++;
 
             if(journalfile->unsafe.refcount_zero_counter % 1000 == 0) {
+                journalfile->unsafe.refcount++;
+                journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
+                journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+
                 // repeating this call seems to have an effect
                 // if the mapped section is dirty, the first madvise_dontneed() seems to be ignored
                 // so, repeating this call allows the kernel to reprocess this request
+                netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
                 madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-                journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
-                journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+                netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+                journalfile->unsafe.refcount--;
             }
         }
     }
@@ -164,16 +174,20 @@ void journalfile_release_data(struct rrdengine_journalfile *journalfile) {
     internal_fatal(!journalfile->unsafe.journal_data, "trying to release a journalfile without data");
     internal_fatal(journalfile->unsafe.refcount < 1, "trying to release a non-acquired journalfile");
 
-    journalfile->unsafe.refcount--;
-    if(!journalfile->unsafe.refcount) {
+    if(journalfile->unsafe.refcount == 1) {
+        // we are the last one
+        // while having the refcount, unlock the journal to call madvise()
         journalfile->unsafe.refcount_zero_counter = 0;
-
-        madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+        journalfile->unsafe.last_access_s = now_monotonic_sec();
         journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
         journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
 
-        journalfile->unsafe.last_access_s = now_monotonic_sec();
+        netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+        madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+        netdata_spinlock_lock(&journalfile->unsafe.spinlock);
     }
+
+    journalfile->unsafe.refcount--;
     netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
 }
 
