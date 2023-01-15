@@ -151,7 +151,7 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
             journalfile->unsafe.journalfile_not_needed_counter++;
 
             if(journalfile->unsafe.journalfile_not_needed_counter % 1000 == 0) {
-                // at least 1000 times it has been evaluated since last release
+                // at least 1000 times it has been evaluated since last release or madvise_dontneed()
 
                 time_t now_s = now_monotonic_sec();
                 if(now_s - journalfile->unsafe.last_madvise_dontneed_time_s >= 120) {
@@ -167,6 +167,7 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
                     // so, repeating this call allows the kernel to reprocess this request
                     netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
                     madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+                    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.madvise_dontneed_called, 1, __ATOMIC_RELAXED);
                     netdata_spinlock_lock(&journalfile->unsafe.spinlock);
 
                     journalfile->unsafe.refcount--;

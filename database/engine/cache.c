@@ -1980,6 +1980,7 @@ struct pgc_statistics pgc_get_statistics(PGC *cache) {
 }
 
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_indexing_started, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&cache->stats.workers_jv2_flush, 1, __ATOMIC_RELAXED);
 
     pgc_ll_lock(cache, &cache->hot);

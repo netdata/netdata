@@ -1118,6 +1118,8 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
+
     if(worker)
         worker_is_busy(UV_EVENT_ANALYZE_V2);
 
@@ -1200,10 +1202,12 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
                          "it is in use currently by %u users.",
                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno, datafile->users.lockers);
 
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_spin, 1, __ATOMIC_RELAXED);
             sleep_usec(1 * USEC_PER_SEC);
         }
     }
 
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     info("DBENGINE: deleting data file '%s/"
          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
          "'.",
