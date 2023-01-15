@@ -141,24 +141,36 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
 
     }
     else if(j2_header) {
+        // this journal has data, but it does not match our query
+
         j2_header = NULL;
 
         if(!journalfile->unsafe.refcount) {
-            journalfile->unsafe.refcount_zero_counter++;
+            // this journal has no references
 
-            if(journalfile->unsafe.refcount_zero_counter % 1000 == 0) {
-                journalfile->unsafe.refcount++;
-                journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
-                journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+            journalfile->unsafe.journalfile_not_needed_counter++;
 
-                // repeating this call seems to have an effect
-                // if the mapped section is dirty, the first madvise_dontneed() seems to be ignored
-                // so, repeating this call allows the kernel to reprocess this request
-                netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
-                madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-                netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+            if(journalfile->unsafe.journalfile_not_needed_counter % 1000 == 0) {
+                // at least 1000 times it has been evaluated since last release
 
-                journalfile->unsafe.refcount--;
+                time_t now_s = now_monotonic_sec();
+                if(now_s - journalfile->unsafe.last_madvise_dontneed_time_s >= 120) {
+                    // 2 minutes have passes since last dontneed call
+
+                    journalfile->unsafe.refcount++;
+                    journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
+                    journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
+                    journalfile->unsafe.last_madvise_dontneed_time_s = now_s;
+
+                    // repeating this call seems to have an effect
+                    // if the mapped section is dirty, the first madvise_dontneed() seems to be ignored
+                    // so, repeating this call allows the kernel to reprocess this request
+                    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+                    madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+                    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+                    journalfile->unsafe.refcount--;
+                }
             }
         }
     }
@@ -174,18 +186,8 @@ void journalfile_release_data(struct rrdengine_journalfile *journalfile) {
     internal_fatal(!journalfile->unsafe.journal_data, "trying to release a journalfile without data");
     internal_fatal(journalfile->unsafe.refcount < 1, "trying to release a non-acquired journalfile");
 
-    if(journalfile->unsafe.refcount == 1) {
-        // we are the last one
-        // while having the refcount, unlock the journal to call madvise()
-        journalfile->unsafe.refcount_zero_counter = 0;
-        journalfile->unsafe.last_access_s = now_monotonic_sec();
-        journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_DONTNEED;
-        journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_WILLNEED;
-
-        netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
-        madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-        netdata_spinlock_lock(&journalfile->unsafe.spinlock);
-    }
+    if(journalfile->unsafe.refcount == 1)
+        journalfile->unsafe.journalfile_not_needed_counter = 0;
 
     journalfile->unsafe.refcount--;
     netdata_spinlock_unlock(&journalfile->unsafe.spinlock);

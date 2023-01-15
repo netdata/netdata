@@ -29,13 +29,13 @@ struct rrdengine_journalfile {
     struct {
         SPINLOCK spinlock;
         int32_t refcount;
-        time_t last_access_s;
+        time_t last_madvise_dontneed_time_s;
         JOURNALFILE_FLAGS flags;
         void *journal_data;                         // MMAPed file of journal v2
         uint32_t journal_data_size;                 // Total file size mapped
         time_t first_time_s;
         time_t last_time_s;
-        size_t refcount_zero_counter;
+        size_t journalfile_not_needed_counter;
     } unsafe;
 
     uv_file file;
