@@ -1200,6 +1200,14 @@ inline int madvise_willneed(void *mem, size_t len) {
     return ret;
 }
 
+inline int madvise_dontneed(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTNEED);
+
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTNEED) failed.");
+    return ret;
+}
+
 inline int madvise_dontdump(void *mem __maybe_unused, size_t len __maybe_unused) {
 #if __linux__
     static int logger = 1;

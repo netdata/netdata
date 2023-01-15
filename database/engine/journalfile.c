@@ -119,14 +119,94 @@ void generate_journalfilepath(struct rrdengine_datafile *datafile, char *str, si
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
-void journalfile_init(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
+void journalfile_set_data(struct rrdengine_journalfile *journalfile, void *journal_data, uint32_t journal_data_size, bool mmap_read_write) {
+    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+    internal_fatal(journalfile->journal_data, "DBENGINE JOURNALFILE: trying to re-set journal_data");
+
+    journalfile->journal_data = journal_data;
+    journalfile->journal_data_size = journal_data_size;
+    journalfile->unsafe.mmap_read_write = mmap_read_write;
+
+    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+}
+
+void *journalfile_acquire_data(struct rrdengine_journalfile *journalfile, size_t *data_size) {
+    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+    if(data_size)
+        *data_size = journalfile->journal_data_size;
+
+    void *journal_data = journalfile->journal_data;
+
+    if(journal_data) {
+        if(!journalfile->unsafe.refcount)
+            madvise_willneed(journalfile->journal_data, journalfile->journal_data_size);
+
+        journalfile->unsafe.refcount++;
+    }
+
+    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+
+    return journal_data;
+}
+
+void journalfile_release_data(struct rrdengine_journalfile *journalfile) {
+    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+    internal_fatal(journalfile->unsafe.refcount < 1, "trying to release a non-acquired journalfile");
+
+    journalfile->unsafe.refcount--;
+    if(!journalfile->unsafe.refcount) {
+
+        if(journalfile->journal_data)
+            madvise_dontneed(journalfile->journal_data, journalfile->journal_data_size);
+
+        journalfile->unsafe.last_access_s = now_monotonic_sec();
+    }
+    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+}
+
+void journalfile_acquired_unmap_and_release_data(struct rrdengine_journalfile *journalfile) {
+    bool only_me = true;
+
+    do {
+        if(!only_me)
+            sleep_usec(10 * USEC_PER_MS);
+
+        netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+
+        internal_fatal(journalfile->unsafe.refcount < 1, "trying to unmap and release a non-acquired journalfile");
+
+        only_me = (journalfile->unsafe.refcount == 1);
+        if (only_me) {
+            if(munmap(journalfile->journal_data, journalfile->journal_data_size)) {
+                error("DBENGINE: failed to unmap index file");
+                ++journalfile->datafile->ctx->stats.fs_errors;
+                rrd_stat_atomic_add(&global_fs_errors, 1);
+            }
+            else {
+                journalfile->journal_data = NULL;
+                journalfile->journal_data_size = 0;
+            }
+        }
+        else {
+            internal_error(true, "DBENGINE JOURNALFILE: waiting for journalfile to be available to unmap...");
+        }
+
+        journalfile->unsafe.refcount--;
+
+        netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    } while(!only_me);
+}
+
+struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile)
 {
-    journalfile->file = (uv_file)0;
-    journalfile->pos = 0;
+    struct rrdengine_journalfile *journalfile = callocz(1, sizeof(struct rrdengine_journalfile));
     journalfile->datafile = datafile;
-    SET_JOURNAL_DATA(journalfile, 0);
-    SET_JOURNAL_DATA_SIZE(journalfile, 0);
-    journalfile->data = NULL;
+    netdata_spinlock_init(&journalfile->unsafe.spinlock);
+    datafile->journalfile = journalfile;
+    return journalfile;
 }
 
 static int close_uv_file(struct rrdengine_datafile *datafile, uv_file file)

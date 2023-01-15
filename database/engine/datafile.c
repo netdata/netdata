@@ -447,9 +447,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (0 != ret) {
             must_delete_pair = 1;
         }
-        journalfile = mallocz(sizeof(*journalfile));
-        datafile->journalfile = journalfile;
-        journalfile_init(journalfile, datafile);
+        journalfile = journalfile_alloc_and_init(datafile);
         ret = load_journal_file(ctx, journalfile, datafile);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
@@ -504,9 +502,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
         goto error_after_datafile;
     }
 
-    journalfile = mallocz(sizeof(*journalfile));
-    datafile->journalfile = journalfile;
-    journalfile_init(journalfile, datafile);
+    journalfile = journalfile_alloc_and_init(datafile);
     ret = create_journal_file(journalfile, datafile);
     if (!ret) {
         generate_journalfilepath(datafile, path, sizeof(path));

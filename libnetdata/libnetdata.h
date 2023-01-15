@@ -310,6 +310,7 @@ char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces i
 int madvise_sequential(void *mem, size_t len);
 int madvise_dontfork(void *mem, size_t len);
 int madvise_willneed(void *mem, size_t len);
+int madvise_dontneed(void *mem, size_t len);
 int madvise_dontdump(void *mem, size_t len);
 int madvise_mergeable(void *mem, size_t len);
 
