@@ -125,11 +125,11 @@ struct journal_v2_header *journalfile_acquire_data(struct rrdengine_journalfile 
     struct journal_v2_header *j2_header = journalfile->unsafe.journal_data;
 
     if(j2_header && (!wanted_first_time_s || !wanted_last_time_s || is_page_in_time_range(journalfile->unsafe.first_time_s, journalfile->unsafe.last_time_s, wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE)) {
-        if(!(journalfile->unsafe.flags & JOURNALFILE_FLAG_MADV_WILLNEED)) {
-            madvise_willneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-            journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_WILLNEED;
-            journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_DONTNEED;
-        }
+//        if(!(journalfile->unsafe.flags & JOURNALFILE_FLAG_MADV_WILLNEED)) {
+//            madvise_willneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+//            journalfile->unsafe.flags |= JOURNALFILE_FLAG_MADV_WILLNEED;
+//            journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MADV_DONTNEED;
+//        }
 
         if(data_size)
             *data_size = journalfile->unsafe.journal_data_size;
