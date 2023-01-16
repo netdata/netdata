@@ -1012,7 +1012,6 @@ void *health_main(void *ptr) {
 
     int cleanup_sql_every_loop = 7200 / min_run_every;
 
-    time_t now                = now_realtime_sec();
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     bool health_running_logged = false;
@@ -1027,7 +1026,7 @@ void *health_main(void *ptr) {
         loop++;
         debug(D_HEALTH, "Health monitoring iteration no %u started", loop);
 
-        now = now_realtime_sec();
+        time_t now = now_realtime_sec();
         int runnable = 0, apply_hibernation_delay = 0;
         time_t next_run = now + min_run_every;
         RRDCALC *rc;
