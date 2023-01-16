@@ -1055,7 +1055,7 @@ void init_page_cache(void)
                 1,
                 extent_cache_flush_dirty_page_callback,
                 5,
-                5,                                          // it will lose up to that extents at once!
+                10,                                         // it will lose up to that extents at once!
                 100,                            //
                 2,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
