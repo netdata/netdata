@@ -951,7 +951,7 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
 
 // returns true, when there is more work to do
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data) {
-    size_t per1000 = __atomic_load_n(&cache->usage.per1000, __ATOMIC_RELAXED);
+    size_t per1000 = cache_usage_per1000(cache, NULL);
 
     if(!all_of_them && per1000 < cache->config.healthy_size_per1000)
         // don't bother - not enough to do anything
