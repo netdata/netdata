@@ -122,8 +122,10 @@ static bool is_lxcfs_proc_mounted() {
         if (words < 2) {
             continue;
         }
-        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5))
-            return true;
+        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5)) {
+            procfile_close(ff);
+            return true;   
+        }            
     }
 
     procfile_close(ff);
