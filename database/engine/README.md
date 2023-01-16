@@ -52,11 +52,19 @@ A **page** is a simple array of values. Each slot in the array has a **timestamp
 
 This simple fixed step page design allows Netdata to collect several millions of points per second and pack all the values in a compact form with minimal metadata overhead.
 
+#### Hot Pages
+
 While a metric is collected, there is one **hot page** in memory for each of the configured tiers. Values collected for a metric are appended to its **hot page** until that page becomes full.
+
+#### Dirty Pages
 
 Once a **hot page** is full, it becomes a **dirty page**, and it is scheduled for immediate **flushing** (saving) to disk.
 
+#### Clean Pages
+
 Flushed (saved) pages are **clean pages**, i.e. read-only pages that reside primarily on disk, and are loaded on demand to satisfy data queries.
+
+#### Pages Configuration
 
 Pages are configured like this:
 
@@ -72,9 +80,15 @@ Pages are configured like this:
 
 To minimize the amount of data written to disk and the amount of storage required for storing metrics, Netdata aggregates up to 64 **dirty pages** of independent metrics, packs them all together into one bigger buffer, compresses this buffer with LZ4 (about 75% savings on the average) and commits a transaction to the disk files.
 
+#### Extents
+
 This collection of 64 pages that is packed and compressed together is called an **extent**. Netdata tries to store together, in the same **extent**, metrics that are meant to be "close". Dimensions of the same chart are such. They are usually queried together, so it is beneficial to have them in the same **extent** to read all of them at once at query time.
 
+#### Datafiles
+
 Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`), until these **datafiles** become full. The size of each **datafile** is determined automatically by Netdata. The minimum for each **datafile** is 4MB and the maximum 512MB. Depending on the amount of disk space configured for each tier, Netdata will decide a **datafile** size trying to maintain about 50 datafiles for the whole database, within the limits mentioned (4MB min, 512MB max per file). The maximum number of datafiles supported is 65536, and therefore the maximum database size (per tier) that Netdata can support is 32TB.
+
+#### Journal Files
 
 Each **datafile** has two **journal files** with metadata related to the stored data in the **datafile**.
 
@@ -82,15 +96,17 @@ Each **datafile** has two **journal files** with metadata related to the stored 
 
 - **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. This journal file is automatically re-created from **journal file v1** if it is missing. It is safe to delete these files (when Netdata does not run). Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
 
+#### Database Rotation
+
 Database rotation is achieved by deleting the oldest **datafile** (and its journals) and creating a new one (with its journals).
 
 Data on disk are append-only. There is no way to delete, add, or update data in the middle of the database. If data are not useful for whatever reason, Netdata can be instructed to ignore these data. They will eventually be deleted from disk when the database is rotated. New data are always appended.
 
-### Tiers
+#### Tiers
 
 Tiers are supported in Netdata Agents with version `netdata-1.35.0.138.nightly` and greater.
 
-**datafiles** are organized in **tiers**. All tiers share the same metrics and same collected values.
+**datafiles** and **journal files** are organized in **tiers**. All tiers share the same metrics and same collected values.
 
 - **tier 0** is the high resolution tier that stores the collected data at the frequency they are collected.
 - **tier 1** by default aggregates 60 values of **tier 0**.
@@ -191,19 +207,19 @@ Netdata has several protection mechanisms to prevent the use of more memory (tha
 
 2. The disks that host Netdata files are extremely slow for the workload required by the database so that data cannot be flushed to disk quickly to free memory. Netdata will automatically spawn more flushing workers in an attempt to parallelize and speed up flushing, but still if the disks cannot write the data quickly enough, they will remain in memory until they are written to disk.
 
-#### Operational Caches
+### Caches
 
+#### Main Cache
 
-#### How to find the number of concurrently collected metrics
+#### Open Cache
 
-In the dashboard of the agent, at the `Netdata Monitoring` section, the `dbengine main cache` subsection, the chart `netdata.dbengine_main_cache_pages` shows the number of currently `hot` pages used. The `hot` pages is also the number of metrics `x` storage tiers. So, if you use 3 storage tiers (the default), divide the number of hot pages by 3 to find the number of concurrently collected metrics.
+#### Extent Cache
 
-## Memory for archived metrics
+### Shared Memory
+
+## Metrics Registry
 
 DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
-
-### How to find the number of archived metrics
-
 
 ## Legacy configuration
 
