@@ -316,6 +316,8 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     __atomic_store_n(&cache->stats.wanted_cache_size, wanted_cache_size, __ATOMIC_RELAXED);
     __atomic_store_n(&cache->stats.current_cache_size, current_cache_size, __ATOMIC_RELAXED);
 
+    netdata_spinlock_unlock(&cache->usage.spinlock);
+
     if(size_to_evict) {
         size_t target = (size_t)((unsigned long long)wanted_cache_size * (unsigned long long)cache->config.evict_low_threshold_per1000 / 1000ULL);
         if(current_cache_size > target)
@@ -324,28 +326,22 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
             *size_to_evict = 0;
     }
 
-    netdata_spinlock_unlock(&cache->usage.spinlock);
-    return per1000;
-}
-
-static inline bool cache_under_pressure(PGC *cache, size_t limit) {
-    size_t per1000 = cache_usage_per1000(cache, NULL);
-
     if(per1000 >= cache->config.severe_pressure_per1000)
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
 
     else if(per1000 >= cache->config.aggressive_evict_per1000)
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
 
-    if(per1000 >= limit)
-        return true;
-
-    return false;
+    return per1000;
 }
 
-#define cache_under_severe_pressure(cache) cache_under_pressure(cache, (cache)->config.severe_pressure_per1000)
-#define cache_needs_space_aggressively(cache) cache_under_pressure(cache, (cache)->config.aggressive_evict_per1000)
-#define cache_above_healthy_limit(cache) cache_under_pressure(cache, (cache)->config.healthy_size_per1000)
+static inline bool cache_pressure(PGC *cache, size_t limit) {
+    return (cache_usage_per1000(cache, NULL) >= limit);
+}
+
+#define cache_under_severe_pressure(cache) cache_pressure(cache, (cache)->config.severe_pressure_per1000)
+#define cache_needs_space_aggressively(cache) cache_pressure(cache, (cache)->config.aggressive_evict_per1000)
+#define cache_above_healthy_limit(cache) cache_pressure(cache, (cache)->config.healthy_size_per1000)
 
 typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
@@ -955,12 +951,14 @@ static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_P
 
 // returns true, when there is more work to do
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data) {
-    if(!all_of_them && !cache_above_healthy_limit(cache))
+    size_t per1000 = __atomic_load_n(&cache->usage.per1000, __ATOMIC_RELAXED);
+
+    if(!all_of_them && per1000 < cache->config.healthy_size_per1000)
         // don't bother - not enough to do anything
         return false;
 
     size_t workers_running = __atomic_add_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
-    if(!wait && !all_of_them && workers_running > cache->config.max_workers_evict_inline) {
+    if(!wait && !all_of_them && workers_running > cache->config.max_workers_evict_inline && per1000 < cache->config.severe_pressure_per1000) {
         __atomic_sub_fetch(&cache->stats.workers_evict, 1, __ATOMIC_RELAXED);
         return false;
     }
@@ -994,7 +992,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             batch = true;
         }
         else if(unlikely(wait)) {
-            size_t per1000 = cache_usage_per1000(cache, &max_size_to_evict);
+            per1000 = cache_usage_per1000(cache, &max_size_to_evict);
             batch = (wait && per1000 > cache->config.severe_pressure_per1000) ? true : false;
         }
         else {
