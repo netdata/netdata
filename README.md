@@ -185,7 +185,7 @@ This is a high-level overview of Netdata features and architecture. Click on it 
 has links to our documentation.
 
 [![An infographic of how Netdata
-works](https://user-images.githubusercontent.com/43294513/60951037-8ba5d180-a2f8-11e9-906e-e27356f168bc.png)](https://my-netdata.io/infographic.html)
+works](https://user-images.githubusercontent.com/43294513/212722097-fdd85dee-2fc8-47f5-90dc-d3149428cdfa.png)](https://my-netdata.io/infographic.html)
 
 ## Documentation
 
