@@ -1240,7 +1240,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only)
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd)
 {
     // info("netdata_mmap('%s', %zu", filename, size);
 
@@ -1305,7 +1305,12 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
     }
 
 cleanup:
-    if(fd != -1) close(fd);
+    if(fd != -1) {
+        if (open_fd)
+            *open_fd = fd;
+        else
+            close(fd);
+    }
     if(mem == MAP_FAILED) return NULL;
     errno = 0;
     return mem;
