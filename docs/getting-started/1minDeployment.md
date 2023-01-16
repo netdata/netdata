@@ -21,12 +21,12 @@ For production ready Netdata deployments, we advise you to visit the *Installati
 
 :::
 
-1. Visit the [Netdata Cloud app](https://app.netdata.cloud/). Sign up with your prefer method and create a free account.
+1. Visit the [Netdata Cloud app](https://app.netdata.cloud/). Sign up with your preferred method and create a free account.
 
 2. Run the **Quick tour** of the Netdata on-boarding process to familiarize yourself with the Netdata Cloud.
     ![](https://user-images.githubusercontent.com/12612986/212523017-bbee4593-5e1a-48c5-b24a-234e0cd12ed7.png)
 
-3. Deploy Netdata on the platform you want. Follow the instructions for your preffered platform to install the Netdata
+3. Deploy Netdata on the platform you want. Follow the instructions for your preferred platform to install the Netdata
    solution and start monitoring it from your Netdata Cloud space. 
    ![](https://user-images.githubusercontent.com/12612986/212523020-749bdf88-2ffd-4429-aa9f-a634791c8746.png)
 
