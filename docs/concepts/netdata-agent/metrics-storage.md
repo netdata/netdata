@@ -12,7 +12,7 @@ learn_docs_purpose: "Explain how the Agent can manage/retain the metrics it coll
 Upon collection, collected metrics need to be either forwarded, exported, or just stored for further treatment. The
 Agent is capable of storing metrics both short and long-term, with or without the usage of non-volatile storage.
 
-## Agent database modes and their cases
+### Agent's database, modes and their cases
 
 The Agent support different modes of managing metrics to cover any deployment case.
 
@@ -50,14 +50,33 @@ In a nutshell you can use:
 
 6. `[db].mode = none`, without a database (collected metrics can only be streamed to another Netdata).
 
-## Netdata's dbengine
+### Netdata's dbengine
 
 In the `dbengine`'s implementation, the amount of historical metrics stored is based on the amount of disk space you
 allocate and the effective compression ratio, not just on the fixed number of metrics collected. It allocates a certain
 amount of ram ( subject to `[db].dbengine page cache size MB`) and stores them into the allocated space for each tier of
 data collected.
 
-### Tiering
+With the DB engine mode the metric data are stored in database files. These files are organized in pairs, the datafiles
+and their corresponding journalfiles, e.g.:
+
+```sh
+datafile-1-0000000001.ndf
+journalfile-1-0000000001.njf
+datafile-1-0000000002.ndf
+journalfile-1-0000000002.njf
+datafile-1-0000000003.ndf
+journalfile-1-0000000003.njf
+...
+```
+
+They are located under their host's cache directory in the directory `./dbengine` (e.g. for localhost the default
+location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
+can safely delete some pairs of files when Netdata is stopped to manually free up some space.
+
+_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
+
+#### Tiering
 
 Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are
 collected and stored, i.e. their resolution), significantly affecting retention. Every Tier down samples the exact
@@ -140,27 +159,6 @@ representation:
 Among `min`, `max` and `sum`, the correct value is chosen based on the user query. `average` is calculated on the fly at
 query time.
 
-
-### Storage files
-
-With the DB engine mode the metric data are stored in database files. These files are organized in pairs, the datafiles
-and their corresponding journalfiles, e.g.:
-
-```sh
-datafile-1-0000000001.ndf
-journalfile-1-0000000001.njf
-datafile-1-0000000002.ndf
-journalfile-1-0000000002.njf
-datafile-1-0000000003.ndf
-journalfile-1-0000000003.njf
-...
-```
-
-They are located under their host's cache directory in the directory `./dbengine` (e.g. for localhost the default
-location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames contain more recent metric data. The user
-can safely delete some pairs of files when Netdata is stopped to manually free up some space.
-
-_Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._
 
 ### Related Concepts
 

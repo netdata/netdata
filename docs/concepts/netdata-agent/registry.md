@@ -42,6 +42,12 @@ Netdata to provide unified cross-server dashboards. For example, when you jump f
 menu, several session settings (like the currently viewed charts, the current zoom and pan operations on the charts,
 etc.) are propagated to the new server, so that the new dashboard will come with exactly the same view.
 
+#### Registry default
+
+`https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to
+both HTTP and HTTPS requests but the default is HTTPS.
+
+
 ### Netdata Registry Storage
 
 The registry keeps track of 4 entities:
@@ -77,10 +83,6 @@ Your Netdata servers do not talk to the registry. This is a UML diagram of its o
 
 ![registry](https://cloud.githubusercontent.com/assets/2662304/19448565/11a70632-94ab-11e6-9d80-f410b4acb797.png)
 
-### Registry default
-
-`https://registry.my-netdata.io`, which is currently served by `https://london.my-netdata.io`. This registry listens to
-both HTTP and HTTPS requests but the default is HTTPS.
 
 ### Can this registry handle the global load of Netdata installations?
 
