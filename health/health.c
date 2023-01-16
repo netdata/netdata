@@ -1206,21 +1206,6 @@ void *health_main(void *ptr) {
                     } else
                         rc->run_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
-                    /* - RRDCALC_FLAG_DB_STALE not currently used
-                       if (unlikely(old_db_timestamp == rc->db_before)) {
-                       // database is stale
-
-                       debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database is stale", host->hostname, rc->chart?rc->chart:"NOCHART", rc->name);
-
-                       if (unlikely(!(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))) {
-                       rc->rrdcalc_flags |= RRDCALC_FLAG_DB_STALE;
-                       error("Health on host '%s', alarm '%s.%s': database is stale", host->hostname, rc->chart?rc->chart:"NOCHART", rc->name);
-                       }
-                       }
-                       else if (unlikely(rc->rrdcalc_flags & RRDCALC_FLAG_DB_STALE))
-                       rc->rrdcalc_flags &= ~RRDCALC_FLAG_DB_STALE;
-                    */
-
                     if (unlikely(value_is_null)) {
                         // collected value is null
                         rc->value = NAN;
