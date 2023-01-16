@@ -742,7 +742,7 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/c_rhash/include/c_rhash.h \
     mqtt_websockets/c_rhash/src/c_rhash_internal.h
 
-libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
+libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
 
 if MQTT_WSS_DEBUG
 libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG

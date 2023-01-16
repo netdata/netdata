@@ -1282,7 +1282,8 @@ ADD_LIBRARY(mqttwebsockets STATIC
 
 target_compile_options(mqttwebsockets PUBLIC
                         -DMQTT_WSS_CUSTOM_ALLOC
-                        -DRBUF_CUSTOM_MALLOC)
+                        -DRBUF_CUSTOM_MALLOC
+                        -DMQTT_WSS_CPUSTATS)
 
 target_include_directories(mqttwebsockets PUBLIC
              ${CMAKE_SOURCE_DIR}/aclk/helpers)

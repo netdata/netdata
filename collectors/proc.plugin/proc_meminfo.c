@@ -158,9 +158,11 @@ int do_proc_meminfo(int update_every, usec_t dt) {
     unsigned long long MemCached = Cached + SReclaimable - Shmem;
     unsigned long long MemUsed = MemTotal - MemFree - MemCached - Buffers;
     // The Linux kernel doesn't report ZFS ARC usage as cache memory (the ARC is included in the total used system memory)
-    MemCached += (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
-    MemUsed -= (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
-    MemAvailable += (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
+    if (!inside_lxc_container) {
+        MemCached += (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
+        MemUsed -= (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
+        MemAvailable += (zfs_arcstats_shrinkable_cache_size_bytes / 1024);
+    }
 
     if(do_ram) {
         {

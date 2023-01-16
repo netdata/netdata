@@ -14,7 +14,7 @@ run_limited = False
 with open('.github/data/distros.yml') as f:
     data = yaml.load(f)
 
-if "${{ github.event_name }}" == "pull_request" and bool(int(SHORT_RUN)):
+if bool(int(SHORT_RUN)):
     run_limited = True
 
 for i, v in enumerate(data['include']):

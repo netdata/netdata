@@ -98,6 +98,41 @@ static void proc_main_cleanup(void *ptr)
     worker_unregister();
 }
 
+bool inside_lxc_container = false;
+
+static bool is_lxcfs_proc_mounted() {
+    procfile *ff = NULL;
+
+    if (unlikely(!ff)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "/proc/self/mounts");
+        ff = procfile_open(filename, " \t", PROCFILE_FLAG_DEFAULT);
+        if (unlikely(!ff))
+            return false;
+    }
+
+    ff = procfile_readall(ff);
+    if (unlikely(!ff))
+        return false;
+
+    unsigned long l, lines = procfile_lines(ff);
+
+    for (l = 0; l < lines; l++) {
+        size_t words = procfile_linewords(ff, l);
+        if (words < 2) {
+            continue;
+        }
+        if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5)) {
+            procfile_close(ff);
+            return true;   
+        }            
+    }
+
+    procfile_close(ff);
+
+    return false;
+}
+
 void *proc_main(void *ptr)
 {
     worker_register("PROC");
@@ -127,6 +162,8 @@ void *proc_main(void *ptr)
     usec_t step = localhost->rrd_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+
+    inside_lxc_container = is_lxcfs_proc_mounted();
 
     while (service_running(SERVICE_COLLECTORS)) {
         worker_is_idle();
