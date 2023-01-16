@@ -10,17 +10,6 @@ static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_ID
 
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
 
-struct netdata_static_thread sync_threads = {
-    .name = "SYNC KERNEL",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-
 static ebpf_local_maps_t sync_maps[] = {{.name = "tbl_sync", .internal_input = NETDATA_SYNC_END,
                                          .user_input = 0, .type = NETDATA_EBPF_MAP_STATIC,
                                          .map_fd = ND_EBPF_MAP_FD_NOT_INITIALIZED},
@@ -216,17 +205,12 @@ void ebpf_sync_cleanup_objects()
 static void ebpf_sync_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_sync_cleanup_objects();
 #endif
-    freez(sync_threads.thread);
 
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
@@ -241,19 +225,6 @@ static void ebpf_sync_free(ebpf_module_t *em)
  * @param ptr thread data.
  */
 static void ebpf_sync_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (sync_threads.thread)
-        netdata_thread_cancel(*sync_threads.thread);
-    ebpf_sync_free(em);
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_sync_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_sync_free(em);
@@ -351,7 +322,7 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_sync_read_global_table()
 {
     netdata_idx_t stored;
     uint32_t idx = NETDATA_SYNC_CALL;
@@ -364,34 +335,6 @@ static void read_global_table()
             }
         }
     }
-}
-
-/**
- * Sync read hash
- *
- * This is the thread callback.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_sync_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_sync_cleanup, ptr);
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-    usec_t step = NETDATA_EBPF_SYNC_SLEEP_MS * em->update_every;
-
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_global_table();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -453,12 +396,6 @@ static void sync_send_data()
 */
 static void sync_collector(ebpf_module_t *em)
 {
-    sync_threads.thread = mallocz(sizeof(netdata_thread_t));
-    sync_threads.start_routine = ebpf_sync_read_hash;
-
-    netdata_thread_create(sync_threads.thread, sync_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_sync_read_hash, em);
-
     heartbeat_t hb;
     heartbeat_init(&hb);
     usec_t step = em->update_every * USEC_PER_SEC;
@@ -467,6 +404,7 @@ static void sync_collector(ebpf_module_t *em)
         if (ebpf_exit_plugin)
             break;
 
+        ebpf_sync_read_global_table();
         pthread_mutex_lock(&lock);
 
         sync_send_data();
