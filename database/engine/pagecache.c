@@ -12,7 +12,7 @@ struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
     // Release storage associated with the page
-    freez(entry.data);
+    dbengine_page_free(entry.data, entry.size);
 }
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
@@ -73,7 +73,7 @@ static void open_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
 static void extent_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
 {
-    freez(entry.data);
+    dbengine_extent_free(entry.data, entry.size);
 }
 
 static void extent_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)

@@ -733,13 +733,22 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_page_alloc(struct rrdengine_instance *ctx __maybe_unused, size_t size) {
+void *dbengine_page_alloc(size_t size) {
     void *page = mallocz(size);
     return page;
 }
 
-void dbengine_page_free(void *page) {
+void dbengine_page_free(void *page, size_t size __maybe_unused) {
     freez(page);
+}
+
+void *dbengine_extent_alloc(size_t size) {
+    void *extent = mallocz(size);
+    return extent;
+}
+
+void dbengine_extent_free(void *extent, size_t size __maybe_unused) {
+    freez(extent);
 }
 
 static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
