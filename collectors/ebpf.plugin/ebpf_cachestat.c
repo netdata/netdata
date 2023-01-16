@@ -333,11 +333,7 @@ static inline int ebpf_cachestat_load_and_attach(struct cachestat_bpf *obj, ebpf
 static void ebpf_cachestat_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_cleanup_publish_syscall(cachestat_counter_publish_aggregated);
