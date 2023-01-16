@@ -36,8 +36,8 @@ struct rrdengine_journalfile {
         time_t last_time_s;
         size_t journalfile_not_needed_counter;
         time_t last_madvise_dontneed_time_s;
+        int fd;
     } unsafe;
-
     uv_file file;
     uint64_t pos;
     void *data;
