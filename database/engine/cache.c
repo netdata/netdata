@@ -996,8 +996,10 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
             batch = true;
         }
         else {
-            if(cache_usage_per1000(cache, &max_size_to_evict) > cache->config.severe_pressure_per1000 && wait)
+            if(cache_usage_per1000(cache, &max_size_to_evict) > cache->config.severe_pressure_per1000 && wait) {
+                max_size_to_evict = max_size_to_evict / 4;
                 batch = true;
+            }
         }
 
         if (!max_size_to_evict)
