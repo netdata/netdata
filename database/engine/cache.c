@@ -989,12 +989,16 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.evict_spins, 1, __ATOMIC_RELAXED);
 
+        bool batch = false;
         size_t max_size_to_evict = 0;
-        if (all_of_them)
+        if (all_of_them) {
             max_size_to_evict = SIZE_MAX;
-
-        else
-            cache_usage_per1000(cache, &max_size_to_evict);
+            batch = true;
+        }
+        else {
+            if(cache_usage_per1000(cache, &max_size_to_evict) > cache->config.severe_pressure_per1000 && wait)
+                batch = true;
+        }
 
         if (!max_size_to_evict)
             break;
@@ -1046,7 +1050,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
 
                 DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
-                if(unlikely(all_of_them))
+                if(unlikely(all_of_them || batch))
                     // get more pages
                     ;
                 else
