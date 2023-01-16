@@ -1222,7 +1222,7 @@ void add_aclk_host_labels(void) {
 }
 
 void aclk_queue_node_info(RRDHOST *host) {
-    struct aclk_database_worker_config *wc = (struct aclk_database_worker_config *) host->dbsync_worker;
+    struct aclk_sync_host_config *wc = (struct aclk_sync_host_config *) host->aclk_sync_host_config;
     if (likely(wc)) {
         wc->node_info_send = 1;
     }

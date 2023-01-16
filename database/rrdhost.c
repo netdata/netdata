@@ -1167,21 +1167,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         return;
     }
 
-#ifdef ENABLE_ACLK
-    struct aclk_database_worker_config *wc =  host->dbsync_worker;
-    if (wc && !netdata_exit) {
-        struct aclk_database_cmd cmd;
-        memset(&cmd, 0, sizeof(cmd));
-        cmd.opcode = ACLK_DATABASE_ORPHAN_HOST;
-        struct aclk_completion compl ;
-        init_aclk_completion(&compl );
-        cmd.completion = &compl ;
-        aclk_database_enq_cmd(wc, &cmd);
-        wait_for_aclk_completion(&compl );
-        destroy_aclk_completion(&compl );
-    }
-#endif
-
     // ------------------------------------------------------------------------
     // free it
 
@@ -1218,10 +1203,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     string_freez(host->hostname);
     __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
     freez(host);
-#ifdef ENABLE_ACLK
-    if (wc)
-        wc->is_orphan = 0;
-#endif
 }
 
 void rrdhost_free_all(void) {

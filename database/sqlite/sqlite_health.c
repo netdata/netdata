@@ -345,7 +345,7 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
     host->health.health_log_entries_written++;
 
-    failed:
+failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
 }
@@ -452,7 +452,7 @@ void sql_health_alarm_log_count(RRDHOST *host) {
 #define SQL_INJECT_REMOVED_UPDATE(guid) "update health_log_%s set flags = flags | ?1, updated_by_id = ?2 where unique_id = ?3; ", guid
 void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm_event_id, uint32_t unique_id, uint32_t max_unique_id)
 {
-    int rc = 0;
+    int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
 
     if (!alarm_id || !alarm_event_id || !unique_id || !max_unique_id)
@@ -546,7 +546,7 @@ failed:
 #define SQL_SELECT_MAX_UNIQUE_ID(guid) "SELECT MAX(unique_id) from health_log_%s", guid
 uint32_t sql_get_max_unique_id (char *uuid_str)
 {
-    int rc = 0;
+    int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
     uint32_t max_unique_id = 0;
 
@@ -573,10 +573,10 @@ uint32_t sql_get_max_unique_id (char *uuid_str)
 #define SQL_SELECT_LAST_STATUSES(guid) "SELECT new_status, unique_id, alarm_id, alarm_event_id from health_log_%s group by alarm_id having max(alarm_event_id)", guid
 void sql_check_removed_alerts_state(char *uuid_str)
 {
-    int rc = 0;
+    int rc;
     char command[MAX_HEALTH_SQL_SIZE + 1];
     RRDCALC_STATUS status;
-    uint32_t alarm_id = 0, alarm_event_id = 0, unique_id = 0, max_unique_id = 0;
+    uint32_t alarm_id, alarm_event_id, unique_id, max_unique_id = 0;
 
     sqlite3_stmt *res = NULL;
 
@@ -683,8 +683,7 @@ void sql_health_alarm_log_load(RRDHOST *host) {
         }
 
         // Check if we got last_repeat field
-        time_t last_repeat = 0;
-        last_repeat = (time_t)sqlite3_column_int64(res, 27);
+        time_t last_repeat = (time_t)sqlite3_column_int64(res, 27);
 
         rc = dictionary_get(all_rrdcalcs, (char *) sqlite3_column_text(res, 14));
         if(unlikely(rc)) {
@@ -999,17 +998,17 @@ int sql_store_alert_config_hash(uuid_t *hash_id, struct alert_config *cfg)
             goto bind_fail;
 
         param++;
-        rc = sqlite3_bind_int(res, 31, cfg->p_db_lookup_options);
+        rc = sqlite3_bind_int(res, 31, (int) cfg->p_db_lookup_options);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
         param++;
-        rc = sqlite3_bind_int(res, 32, cfg->p_db_lookup_after);
+        rc = sqlite3_bind_int(res, 32, (int) cfg->p_db_lookup_after);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
 
         param++;
-        rc = sqlite3_bind_int(res, 33, cfg->p_db_lookup_before);
+        rc = sqlite3_bind_int(res, 33, (int) cfg->p_db_lookup_before);
         if (unlikely(rc != SQLITE_OK))
             goto bind_fail;
     } else {

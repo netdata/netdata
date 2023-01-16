@@ -700,7 +700,6 @@ static void cleanup_health_log(void)
 //
 // EVENT LOOP STARTS HERE
 //
-static uv_mutex_t metadata_async_lock;
 
 static void metadata_init_cmd_queue(struct metadata_wc *wc)
 {
@@ -856,6 +855,7 @@ static void start_metadata_cleanup(uv_work_t *req)
     struct metadata_wc *wc = req->data;
     check_dimension_metadata(wc);
     cleanup_health_log();
+    (void) sqlite3_wal_checkpoint(db_meta, NULL);
     worker_is_idle();
 }
 
@@ -1312,8 +1312,6 @@ void metadata_sync_shutdown_prepare(void)
 void metadata_sync_init(void)
 {
     struct metadata_wc *wc = &metasync_worker;
-
-    fatal_assert(0 == uv_mutex_init(&metadata_async_lock));
 
     memset(wc, 0, sizeof(*wc));
     metadata_init_cmd_queue(wc);

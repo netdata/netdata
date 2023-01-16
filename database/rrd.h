@@ -796,13 +796,14 @@ typedef enum __attribute__ ((__packed__)) rrdhost_flags {
 
     // ACLK
     RRDHOST_FLAG_ACLK_STREAM_CONTEXTS           = (1 << 24), // when set, we should send ACLK stream context updates
+    RRDHOST_FLAG_ACLK_STREAM_ALERTS             = (1 << 25), // set when the receiver part is disconnected
     // Metadata
-    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 25), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_LABELS                = (1 << 26), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_INFO                  = (1 << 27), // metadata needs to be stored in the database
-    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 28), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_UPDATE                = (1 << 26), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_LABELS                = (1 << 27), // metadata needs to be stored in the database
+    RRDHOST_FLAG_METADATA_INFO                  = (1 << 28), // metadata needs to be stored in the database
 
-    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 29), // set when the receiver part is disconnected
+    RRDHOST_FLAG_METADATA_CLAIMID               = (1 << 29), // metadata needs to be stored in the database
+    RRDHOST_FLAG_RRDPUSH_RECEIVER_DISCONNECTED  = (1 << 30), // set when the receiver part is disconnected
 } RRDHOST_FLAGS;
 
 #define rrdhost_flag_check(host, flag) (__atomic_load_n(&((host)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1028,7 +1029,7 @@ struct rrdhost {
     struct sender_state *sender;
     netdata_thread_t rrdpush_sender_thread;         // the sender thread
     size_t rrdpush_sender_replicating_charts;       // the number of charts currently being replicated to a parent
-    void *dbsync_worker;
+    void *aclk_sync_host_config;
 
     // ------------------------------------------------------------------------
     // streaming of data from remote hosts - rrdpush receiver

@@ -348,6 +348,7 @@ void netdata_cleanup_and_exit(int ret) {
             | ABILITY_WEB_REQUESTS
             | ABILITY_STREAMING_CONNECTIONS
             | SERVICE_ACLK
+            | SERVICE_ACLKSYNC
             );
 
     delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
@@ -387,11 +388,6 @@ void netdata_cleanup_and_exit(int ret) {
     delta_shutdown_time("prepare metasync shutdown");
 
     metadata_sync_shutdown_prepare();
-
-#ifdef ENABLE_ACLK
-    delta_shutdown_time("signal aclk sync to stop");
-    aclk_sync_exit_all();
-#endif
 
     delta_shutdown_time("stop aclk threads");
 

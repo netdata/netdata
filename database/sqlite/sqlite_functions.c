@@ -545,7 +545,7 @@ static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
         return;
     }
 
-    struct aclk_database_worker_config *wc = host->dbsync_worker;
+    struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
 
     if (unlikely(!host->node_id))
         host->node_id = mallocz(sizeof(*host->node_id));
@@ -607,48 +607,6 @@ failed:
         error_report("Failed to finalize the prepared statement when storing node instance information");
 
     return rc - 1;
-}
-
-#define SQL_SELECT_HOSTNAME_BY_NODE_ID  "SELECT h.hostname FROM node_instance ni, " \
-"host h WHERE ni.host_id = h.host_id AND ni.node_id = @node_id;"
-
-char *get_hostname_by_node_id(char *node)
-{
-    sqlite3_stmt *res = NULL;
-    char  *hostname = NULL;
-    int rc;
-
-    if (unlikely(!db_meta)) {
-        if (default_rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-            error_report("Database has not been initialized");
-        return NULL;
-    }
-
-    uuid_t node_id;
-    if (uuid_parse(node, node_id))
-        return NULL;
-
-    rc = sqlite3_prepare_v2(db_meta, SQL_SELECT_HOSTNAME_BY_NODE_ID, -1, &res, 0);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to prepare statement to fetch hostname by node id");
-        return NULL;
-    }
-
-    rc = sqlite3_bind_blob(res, 1, &node_id, sizeof(node_id), SQLITE_STATIC);
-    if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
-        goto failed;
-    }
-
-    rc = sqlite3_step_monitored(res);
-    if (likely(rc == SQLITE_ROW))
-        hostname = strdupz((char *)sqlite3_column_text(res, 0));
-
-failed:
-    if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
-        error_report("Failed to finalize the prepared statement when search for hostname by node id");
-
-    return hostname;
 }
 
 #define SQL_SELECT_HOST_BY_NODE_ID  "select host_id from node_instance where node_id = @node_id;"
