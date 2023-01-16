@@ -1025,7 +1025,8 @@ void init_page_cache(void)
                 main_cache_free_clean_page_callback,
                 (size_t) rrdeng_pages_per_extent,
                 main_cache_flush_dirty_page_callback,
-                20,                                //
+                10,
+                10240,                                      // if there are that many threads, evict so many at once!
                 1000,                           //
                 5,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
@@ -1038,7 +1039,8 @@ void init_page_cache(void)
                 open_cache_free_clean_page_callback,
                 1,
                 open_cache_flush_dirty_page_callback,
-                20,                                //
+                10,
+                10240,                                      // if there are that many threads, evict that many at once!
                 1000,                           //
                 3,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
@@ -1052,7 +1054,8 @@ void init_page_cache(void)
                 extent_cache_free_clean_page_callback,
                 1,
                 extent_cache_flush_dirty_page_callback,
-                5,                                  //
+                5,
+                5,                                          // it will lose up to that extents at once!
                 100,                            //
                 2,                                          // don't delay too much other threads
                 PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,

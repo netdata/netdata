@@ -1708,7 +1708,8 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 
 PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_flush, save_dirty_page_callback pgc_save_dirty_cb,
-                size_t max_pages_per_inline_eviction, size_t max_skip_pages_per_inline_eviction,
+                size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
+                size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
                 PGC_OPTIONS options, size_t partitions, size_t additional_bytes_per_page) {
 
@@ -1733,7 +1734,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.partitions = partitions < 1 ? (size_t)get_system_cpus() : partitions;
     cache->config.additional_bytes_per_page = additional_bytes_per_page;
 
-    cache->config.max_workers_evict_inline    =   10;
+    cache->config.max_workers_evict_inline    = max_inline_evictors;
     cache->config.severe_pressure_per1000     = 1010;
     cache->config.aggressive_evict_per1000    =  990;
     cache->config.healthy_size_per1000        =  980;
