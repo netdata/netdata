@@ -2251,6 +2251,9 @@ int main(int argc, char **argv)
     //Plugin will be killed when it receives a signal
     while (ebpf_exit_plugin != 2) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin == 2)
+            break;
+
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
         if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
