@@ -2244,7 +2244,7 @@ int main(int argc, char **argv)
         }
     }
 
-    usec_t step = 3 * USEC_PER_SEC;
+    usec_t step = USEC_PER_SEC;
     int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
