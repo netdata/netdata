@@ -101,7 +101,7 @@ static void proc_main_cleanup(void *ptr)
 bool inside_lxc_container = false;
 
 static bool is_lxcfs_proc_mounted() {
-    static procfile *ff = NULL;
+    procfile *ff = NULL;
 
     if (unlikely(!ff)) {
         char filename[FILENAME_MAX + 1];
@@ -125,6 +125,8 @@ static bool is_lxcfs_proc_mounted() {
         if (!strcmp(procfile_lineword(ff, l, 0), "lxcfs") && !strncmp(procfile_lineword(ff, l, 1), "/proc", 5))
             return true;
     }
+
+    procfile_close(ff);
 
     return false;
 }
