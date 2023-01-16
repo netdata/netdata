@@ -173,8 +173,6 @@ void load_claiming_state(void)
     metaqueue_store_claim_id(&localhost->host_uuid, claimed_id ? &uuid : NULL);
     rrdhost_aclk_state_unlock(localhost);
 
-    rrdhost_flag_set(localhost, RRDHOST_FLAG_METADATA_CLAIMID | RRDHOST_FLAG_METADATA_UPDATE);
-
     if (!claimed_id) {
         info("Unable to load '%s', setting state to AGENT_UNCLAIMED", filename);
         return;
