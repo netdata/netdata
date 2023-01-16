@@ -45,7 +45,7 @@ UNIT_STATIC char *sanitise_string(char *const s){
 }
 
 LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
-    if(unlikely(!p_file_infos_arr->count)) return NO_RESULTS_FOUND;
+    if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) return NO_RESULTS_FOUND;
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
         buffer_sprintf( wb, "\t\t \"%s\":{\n"
