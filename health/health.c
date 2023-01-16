@@ -302,7 +302,7 @@ void health_init(void) {
  * @param host the structure of the host that the function will reload the configuration.
  */
 static void health_reload_host(RRDHOST *host) {
-    if(unlikely(!host->health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
+    if(unlikely(!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))
         return;
 
     log_health("[%s]: Reloading health.", rrdhost_hostname(host));
@@ -450,8 +450,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     log_health("[%s]: Sending notification for alarm '%s.%s' status %s.", rrdhost_hostname(host), ae_chart_name(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
 
-    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health_default_exec);
-    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health_default_recipient);
+    const char *exec      = (ae->exec)      ? ae_exec(ae)      : string2str(host->health.health_default_exec);
+    const char *recipient = (ae->recipient) ? ae_recipient(ae) : string2str(host->health.health_default_recipient);
 
     int n_warn=0, n_crit=0;
     RRDCALC *rc;
@@ -753,7 +753,7 @@ static void health_main_cleanup(void *ptr) {
 }
 
 static void initialize_health(RRDHOST *host, int is_localhost) {
-    if(!host->health_enabled ||
+    if(!host->health.health_enabled ||
         rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH) ||
         !service_running(SERVICE_HEALTH))
         return;
@@ -762,8 +762,8 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
 
     log_health("[%s]: Initializing health.", rrdhost_hostname(host));
 
-    host->health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
-    host->health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
+    host->health.health_default_warn_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat warning", "never");
+    host->health.health_default_crit_repeat_every = config_get_duration(CONFIG_SECTION_HEALTH, "default repeat critical", "never");
 
     host->health_log.next_log_id = 1;
     host->health_log.next_alarm_id = 1;
@@ -798,13 +798,13 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
             error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
     }
     snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health_log_filename = strdupz(filename);
+    host->health.health_log_filename = strdupz(filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
-    host->health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
-    host->health_default_recipient = string_strdupz("root");
+    host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
+    host->health.health_default_recipient = string_strdupz("root");
 
-    if (!file_is_migrated(host->health_log_filename)) {
+    if (!file_is_migrated(host->health.health_log_filename)) {
         int rc = sql_create_health_log_table(host);
         if (unlikely(rc)) {
             log_health("[%s]: Failed to create health log table in the database", rrdhost_hostname(host));
@@ -813,7 +813,7 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
         }
         else {
             health_alarm_log_load(host);
-            add_migrated_file(host->health_log_filename, 0);
+            add_migrated_file(host->health.health_log_filename, 0);
         }
     } else {
         // TODO: This needs to go to the metadata thread
@@ -1060,7 +1060,7 @@ void *health_main(void *ptr) {
 
         rrdhost_foreach_read(host) {
 
-            if (unlikely(!host->health_enabled))
+            if (unlikely(!host->health.health_enabled))
                 continue;
 
             if (unlikely(!rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH))) {
@@ -1079,16 +1079,16 @@ void *health_main(void *ptr) {
                            rrdhost_hostname(host),
                            (int64_t)hibernation_delay);
 
-                host->health_delay_up_to = now + hibernation_delay;
+                host->health.health_delay_up_to = now + hibernation_delay;
             }
 
-            if (unlikely(host->health_delay_up_to)) {
-                if (unlikely(now < host->health_delay_up_to)) {
+            if (unlikely(host->health.health_delay_up_to)) {
+                if (unlikely(now < host->health.health_delay_up_to)) {
                     continue;
                 }
 
                 log_health("[%s]: Resuming health checks after delay.", rrdhost_hostname(host));
-                host->health_delay_up_to = 0;
+                host->health.health_delay_up_to = 0;
             }
 
             // wait until cleanup of obsolete charts on children is complete
@@ -1104,7 +1104,7 @@ void *health_main(void *ptr) {
                 health_running_logged = true;
             }
 
-            if(likely(!host->health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
+            if(likely(!host->health.health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
                 sql_health_alarm_log_cleanup(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
@@ -1551,7 +1551,7 @@ void *health_main(void *ptr) {
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
             rrdhost_foreach_read(host) {
-                if (unlikely(!host->health_enabled))
+                if (unlikely(!host->health.health_enabled))
                     continue;
                 sql_queue_removed_alerts_to_aclk(host);
             }

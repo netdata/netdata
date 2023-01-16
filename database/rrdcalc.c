@@ -755,7 +755,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if (unlikely(!host->health_enabled))
+        if (unlikely(!host->health.health_enabled))
             continue;
 
         if (host->rrdlabels)

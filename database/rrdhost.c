@@ -281,8 +281,8 @@ int is_legacy = 1;
 
     rrdhost_init_hostname(host, hostname, false);
 
-    host->rrd_history_entries = align_entries_to_pagesize(memory_mode, entries);
-    host->health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
+    host->rrd_history_entries        = align_entries_to_pagesize(memory_mode, entries);
+    host->health.health_enabled      = ((memory_mode == RRD_MEMORY_MODE_NONE)) ? 0 : health_enabled;
 
     if (likely(!archived)) {
         rrdfunctions_init(host);
@@ -512,12 +512,12 @@ int is_legacy = 1;
          , rrdhost_has_rrdpush_sender_enabled(host)?"enabled":"disabled"
          , host->rrdpush_send_destination?host->rrdpush_send_destination:""
          , host->rrdpush_send_api_key?host->rrdpush_send_api_key:""
-         , host->health_enabled?"enabled":"disabled"
+         , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
          , host->varlib_dir
-         , host->health_log_filename
-         , string2str(host->health_default_exec)
-         , string2str(host->health_default_recipient)
+         , host->health.health_log_filename
+         , string2str(host->health.health_default_exec)
+         , string2str(host->health.health_default_recipient)
     );
 
     if(!archived)
@@ -562,7 +562,7 @@ static void rrdhost_update(RRDHOST *host
 
     netdata_spinlock_lock(&host->rrdhost_update_lock);
 
-    host->health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
+    host->health.health_enabled = (mode == RRD_MEMORY_MODE_NONE) ? 0 : health_enabled;
 
     {
         struct rrdhost_system_info *old = host->system_info;
@@ -1168,9 +1168,9 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     freez(host->rrdpush_send_api_key);
     freez(host->rrdpush_send_destination);
     rrdpush_destinations_free(host);
-    string_freez(host->health_default_exec);
-    string_freez(host->health_default_recipient);
-    freez(host->health_log_filename);
+    string_freez(host->health.health_default_exec);
+    string_freez(host->health.health_default_recipient);
+    freez(host->health.health_log_filename);
     string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);

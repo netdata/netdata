@@ -7,25 +7,25 @@
 // no need for locking - only one thread is reading / writing the alarms log
 
 inline int health_alarm_log_open(RRDHOST *host) {
-    if(host->health_log_fp)
-        fclose(host->health_log_fp);
+    if(host->health.health_log_fp)
+        fclose(host->health.health_log_fp);
 
-    host->health_log_fp = fopen(host->health_log_filename, "a");
+    host->health.health_log_fp = fopen(host->health.health_log_filename, "a");
 
-    if(host->health_log_fp) {
-        if (setvbuf(host->health_log_fp, NULL, _IOLBF, 0) != 0)
-            error("HEALTH [%s]: cannot set line buffering on health log file '%s'.", rrdhost_hostname(host), host->health_log_filename);
+    if(host->health.health_log_fp) {
+        if (setvbuf(host->health.health_log_fp, NULL, _IOLBF, 0) != 0)
+            error("HEALTH [%s]: cannot set line buffering on health log file '%s'.", rrdhost_hostname(host), host->health.health_log_filename);
         return 0;
     }
 
-    error("HEALTH [%s]: cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", rrdhost_hostname(host), host->health_log_filename);
+    error("HEALTH [%s]: cannot open health log file '%s'. Health data will be lost in case of netdata or server crash.", rrdhost_hostname(host), host->health.health_log_filename);
     return -1;
 }
 
 static inline void health_alarm_log_close(RRDHOST *host) {
-    if(host->health_log_fp) {
-        fclose(host->health_log_fp);
-        host->health_log_fp = NULL;
+    if(host->health.health_log_fp) {
+        fclose(host->health.health_log_fp);
+        host->health.health_log_fp = NULL;
     }
 }
 
@@ -37,33 +37,33 @@ static inline void health_log_rotate(RRDHOST *host) {
         if(rotate_every < 100) rotate_every = 100;
     }
 
-    if(unlikely(host->health_log_entries_written > rotate_every)) {
-        if(unlikely(host->health_log_fp)) {
+    if(unlikely(host->health.health_log_entries_written > rotate_every)) {
+        if(unlikely(host->health.health_log_fp)) {
             health_alarm_log_close(host);
 
             char old_filename[FILENAME_MAX + 1];
-            snprintfz(old_filename, FILENAME_MAX, "%s.old", host->health_log_filename);
+            snprintfz(old_filename, FILENAME_MAX, "%s.old", host->health.health_log_filename);
 
             if(unlink(old_filename) == -1 && errno != ENOENT)
                 error("HEALTH [%s]: cannot remove old alarms log file '%s'", rrdhost_hostname(host), old_filename);
 
-            if(link(host->health_log_filename, old_filename) == -1 && errno != ENOENT)
-                error("HEALTH [%s]: cannot move file '%s' to '%s'.", rrdhost_hostname(host), host->health_log_filename, old_filename);
+            if(link(host->health.health_log_filename, old_filename) == -1 && errno != ENOENT)
+                error("HEALTH [%s]: cannot move file '%s' to '%s'.", rrdhost_hostname(host), host->health.health_log_filename, old_filename);
 
-            if(unlink(host->health_log_filename) == -1 && errno != ENOENT)
-                error("HEALTH [%s]: cannot remove old alarms log file '%s'", rrdhost_hostname(host), host->health_log_filename);
+            if(unlink(host->health.health_log_filename) == -1 && errno != ENOENT)
+                error("HEALTH [%s]: cannot remove old alarms log file '%s'", rrdhost_hostname(host), host->health.health_log_filename);
 
             // open it with truncate
-            host->health_log_fp = fopen(host->health_log_filename, "w");
+            host->health.health_log_fp = fopen(host->health.health_log_filename, "w");
 
-            if(host->health_log_fp)
-                fclose(host->health_log_fp);
+            if(host->health.health_log_fp)
+                fclose(host->health.health_log_fp);
             else
-                error("HEALTH [%s]: cannot truncate health log '%s'", rrdhost_hostname(host), host->health_log_filename);
+                error("HEALTH [%s]: cannot truncate health log '%s'", rrdhost_hostname(host), host->health.health_log_filename);
 
-            host->health_log_fp = NULL;
+            host->health.health_log_fp = NULL;
 
-            host->health_log_entries_written = 0;
+            host->health.health_log_entries_written = 0;
             health_alarm_log_open(host);
         }
     }
@@ -72,17 +72,17 @@ static inline void health_log_rotate(RRDHOST *host) {
 inline void health_label_log_save(RRDHOST *host) {
     health_log_rotate(host);
 
-    if(unlikely(host->health_log_fp)) {
+    if(unlikely(host->health.health_log_fp)) {
         BUFFER *wb = buffer_create(1024);
 
         rrdlabels_to_buffer(localhost->rrdlabels, wb, "", "=", "", "\t ", NULL, NULL, NULL, NULL);
         char *write = (char *) buffer_tostring(wb);
 
-        if (unlikely(fprintf(host->health_log_fp, "L\t%s", write) < 0))
+        if (unlikely(fprintf(host->health.health_log_fp, "L\t%s", write) < 0))
             error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.",
-                  rrdhost_hostname(host), host->health_log_filename);
+                  rrdhost_hostname(host), host->health.health_log_filename);
         else
-            host->health_log_entries_written++;
+            host->health.health_log_entries_written++;
 
         buffer_free(wb);
     }
@@ -90,8 +90,8 @@ inline void health_label_log_save(RRDHOST *host) {
 
 inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
     health_log_rotate(host);
-    if(unlikely(host->health_log_fp)) {
-        if(unlikely(fprintf(host->health_log_fp
+    if(unlikely(host->health.health_log_fp)) {
+        if(unlikely(fprintf(host->health.health_log_fp
                             , "%c\t%s"
                         "\t%08x\t%08x\t%08x\t%08x\t%08x"
                         "\t%08x\t%08x\t%08x"
@@ -139,10 +139,10 @@ inline void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae) {
                             , (ae->component)?ae_component(ae):"Unknown"
                             , (ae->type)?ae_type(ae):"Unknown"
         ) < 0))
-            error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", rrdhost_hostname(host), host->health_log_filename);
+            error("HEALTH [%s]: failed to save alarm log entry to '%s'. Health data may be lost in case of abnormal restart.", rrdhost_hostname(host), host->health.health_log_filename);
         else {
             ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
-            host->health_log_entries_written++;
+            host->health.health_log_entries_written++;
         }
     }else
         sql_health_alarm_log_save(host, ae);
@@ -193,7 +193,7 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
     netdata_rwlock_rdlock(&host->health_log.alarm_log_rwlock);
 
     while((s = fgets_trim_len(buf, 65536, fp, &len))) {
-        host->health_log_entries_written++;
+        host->health.health_log_entries_written++;
         line++;
 
         int max_entries = 33, entries = 0;
@@ -419,7 +419,7 @@ inline void health_alarm_log_load(RRDHOST *host) {
     health_alarm_log_close(host);
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s.old", host->health_log_filename);
+    snprintfz(filename, FILENAME_MAX, "%s.old", host->health.health_log_filename);
     FILE *fp = fopen(filename, "r");
     if(!fp)
         error("HEALTH [%s]: cannot open health file: %s", rrdhost_hostname(host), filename);
@@ -428,12 +428,12 @@ inline void health_alarm_log_load(RRDHOST *host) {
         fclose(fp);
     }
 
-    host->health_log_entries_written = 0;
-    fp = fopen(host->health_log_filename, "r");
+    host->health.health_log_entries_written = 0;
+    fp = fopen(host->health.health_log_filename, "r");
     if(!fp)
-        error("HEALTH [%s]: cannot open health file: %s", rrdhost_hostname(host), host->health_log_filename);
+        error("HEALTH [%s]: cannot open health file: %s", rrdhost_hostname(host), host->health.health_log_filename);
     else {
-        health_alarm_log_read(host, fp, host->health_log_filename);
+        health_alarm_log_read(host, fp, host->health.health_log_filename);
         fclose(fp);
     }
 }

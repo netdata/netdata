@@ -327,7 +327,7 @@ static int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int ) host->health_enabled);
+    rc = sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 

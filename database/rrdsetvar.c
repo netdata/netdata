@@ -43,7 +43,7 @@ static inline void rrdsetvar_free_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // HOST
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id);
         rs->rrdvar_host_chart_id = NULL;
 
@@ -93,7 +93,7 @@ static inline void rrdsetvar_update_rrdvars_unsafe(RRDSET *st, RRDSETVAR *rs) {
     // ------------------------------------------------------------------------
     // HOST
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rs->rrdvar_host_chart_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id, rs->type, options, rs->value);
         rs->rrdvar_host_chart_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name, rs->type, options, rs->value);
     }

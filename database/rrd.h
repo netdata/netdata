@@ -888,6 +888,17 @@ typedef struct alarm_log {
     netdata_rwlock_t alarm_log_rwlock;
 } ALARM_LOG;
 
+typedef struct health {
+    unsigned int health_enabled;                   // 1 when this host has health enabled
+    time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
+    STRING *health_default_exec;                   // the full path of the alarms notifications program
+    STRING *health_default_recipient;              // the default recipient for all alarms
+    char *health_log_filename;                     // the alarms event log filename
+    size_t health_log_entries_written;             // the number of alarm events written to the alarms event log
+    FILE *health_log_fp;                           // the FILE pointer to the open alarms event log file
+    uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
+    uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+} HEALTH;
 
 // ----------------------------------------------------------------------------
 // RRD HOST
@@ -1005,15 +1016,8 @@ struct rrdhost {
     // ------------------------------------------------------------------------
     // health monitoring options
 
-    unsigned int health_enabled;                   // 1 when this host has health enabled
-    time_t health_delay_up_to;                     // a timestamp to delay alarms processing up to
-    STRING *health_default_exec;                   // the full path of the alarms notifications program
-    STRING *health_default_recipient;              // the default recipient for all alarms
-    char *health_log_filename;                     // the alarms event log filename
-    size_t health_log_entries_written;             // the number of alarm events written to the alarms event log
-    FILE *health_log_fp;                           // the FILE pointer to the open alarms event log file
-    uint32_t health_default_warn_repeat_every;     // the default value for the interval between repeating warning notifications
-    uint32_t health_default_crit_repeat_every;     // the default value for the interval between repeating critical notifications
+    // health variables
+    HEALTH health;
 
     // all RRDCALCs are primarily allocated and linked here
     DICTIONARY *rrdcalc_root_index;
