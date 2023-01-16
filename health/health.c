@@ -1010,8 +1010,6 @@ void *health_main(void *ptr) {
     int min_run_every = (int)config_get_number(CONFIG_SECTION_HEALTH, "run at least every seconds", 10);
     if(min_run_every < 1) min_run_every = 1;
 
-    int cleanup_sql_every_loop = 7200 / min_run_every;
-
     time_t hibernation_delay  = config_get_number(CONFIG_SECTION_HEALTH, "postpone alarms during hibernation for seconds", 60);
 
     bool health_running_logged = false;
@@ -1103,9 +1101,6 @@ void *health_main(void *ptr) {
                 log_health("[%s]: Health is running.", rrdhost_hostname(host));
                 health_running_logged = true;
             }
-
-            if(likely(!host->health.health_log_fp) && (loop == 1 || loop % cleanup_sql_every_loop == 0))
-                sql_health_alarm_log_cleanup(host);
 
             worker_is_busy(WORKER_HEALTH_JOB_HOST_LOCK);
 
