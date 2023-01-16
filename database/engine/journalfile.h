@@ -28,14 +28,14 @@ typedef enum __attribute__ ((__packed__)) {
 struct rrdengine_journalfile {
     struct {
         SPINLOCK spinlock;
-        int32_t refcount;
-        time_t last_madvise_dontneed_time_s;
         JOURNALFILE_FLAGS flags;
         void *journal_data;                         // MMAPed file of journal v2
         uint32_t journal_data_size;                 // Total file size mapped
+        int32_t refcount;
         time_t first_time_s;
         time_t last_time_s;
         size_t journalfile_not_needed_counter;
+        time_t last_madvise_dontneed_time_s;
     } unsafe;
 
     uv_file file;
