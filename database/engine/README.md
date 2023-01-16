@@ -37,7 +37,7 @@ When data points are stored in higher tiers (time aggregations - see [Tiers](#Ti
 
 This design allows Netdata to accurately know the **average**, **minimum**, **maximum** and **anomaly rate** values even when using higher tiers to satisfy a query.
 
-### Pages of Data Points
+### Pages
 Data points are organized into **pages**, i.e. segments of contiguous data collections of the same metric.
 
 Each page:
@@ -68,7 +68,7 @@ Pages are configured like this:
 | Collections per Point                                                                 |                   1                   | 60x Tier0<br/><small>configurable in<br/>`netdata.conf`</small> | 60x Tier1<br/><small>configurable in<br/>`netdata.conf`</small> |
 | Points per Page                                                                       | 1024<br/><small>512 in 32bit</small>  |               128<br/><small>64 in 32bit</small>                |                24<br/><small>12 in 32bit</small>                |
 
-### Disk Format
+### Files
 
 To minimize the amount of data written to disk and the amount of storage required for storing metrics, Netdata aggregates up to 64 **dirty pages** of independent metrics, packs them all together into one bigger buffer, compresses this buffer with LZ4 (about 75% savings on the average) and commits a transaction to the disk files.
 
@@ -78,9 +78,9 @@ Multiple **extents** are appended to **datafiles** (filename suffix `.ndf`), unt
 
 Each **datafile** has two **journal files** with metadata related to the stored data in the **datafile**.
 
-- journal file v1, with filename suffix `.njf`, holds information about the transactions in its **datafile** and provides the ability to recover as much data as possible, in case either the datafile or the journal files get corrupted. This journal file has a maximum transaction size of 4KB, so in case data are corrupted on disk transactions of 4KB are lost. Each transaction holds the metadata of one **extent** (this is why DBENGINE supports up to 64 pages per extent).
+- **journal file v1**, with filename suffix `.njf`, holds information about the transactions in its **datafile** and provides the ability to recover as much data as possible, in case either the datafile or the journal files get corrupted. This journal file has a maximum transaction size of 4KB, so in case data are corrupted on disk transactions of 4KB are lost. Each transaction holds the metadata of one **extent** (this is why DBENGINE supports up to 64 pages per extent).
 
-- journal file v2, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. This journal file is automatically re-created from **journal file v1** if it is missing. It is safe to delete these files (when Netdata does not run). Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
+- **journal file v2**, with filename suffix `.njfv2`, which is a disk-based index for all the **pages** and **extents**. This file is memory mapped at runtime and is consulted to find where the data of a metric are in the datafile. This journal file is automatically re-created from **journal file v1** if it is missing. It is safe to delete these files (when Netdata does not run). Netdata will re-create them on the next run. Journal files v2 are supported in Netdata Agents with version `netdata-1.37.0-115-nightly`. Older versions maintain the journal index in memory.
 
 Database rotation is achieved by deleting the oldest **datafile** (and its journals) and creating a new one (with its journals).
 
@@ -144,13 +144,66 @@ At tier 2 (per hour):
 
 Of course double the metrics, half the retention. There are more factors that affect retention. The number of ephemeral metrics (i.e. metrics that are collected for part of the time). The number of metrics that are usually constant over time (affecting compression efficiency). The number of restarts a Netdata Agents gets through time (because it has to break pages prematurely, increasing the metadata overhead). But the actual numbers should not deviate significantly from the above. 
 
-### Data Loss Warning
+### Data Loss
 
 Until **hot pages** and **dirty pages** are **flushed** to disk they are at risk (e.g. due to a crash, or
 power failure), as they are stored only in memory.
 
 The supported way of ensuring high data availability is the use of Netdata Parents to stream the data in real-time to
 multiple other Netdata agents.
+
+## Memory Requirements
+
+DBENGINE memory is related to the number of metrics concurrently being collected, the retention of the metrics on disk in relation with the queries running, and the number of metrics for which retention is maintained.
+
+### Memory for concurrently collected metrics
+
+DBENGINE is automatically sized to use memory according to this equation:
+
+```
+memory in KiB = METRICS x (TIERS - 1) x 2 x 4KiB + 32768 KiB
+```
+
+Where:
+- `METRICS`: the maximum number of concurrently collected metrics (dimensions) from the time the agent started.
+- `TIERS`: the number of storage tiers configured, by default 3 ( `-1` when using 3+ tiers)
+- `x 2`, to accommodate room for flushing data to disk
+- `x 4KiB`, the data segment size of each metric
+- `+ 32768 KiB`, 32 MB for operational caches
+
+So, for 2000 metrics (dimensions) in 3 storage tiers:
+
+```
+memory for 2k metrics = 2000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 64 MiB
+```
+
+For 100k concurrently collected metrics in 3 storage tiers:
+
+```
+memory for 100k metrics = 100000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 1.6 GiB
+```
+
+#### Exceptions
+
+Netdata has several protection mechanisms to prevent the use of more memory (than the above), by incrementally fetching data from disk and aggressively evicting old data to make room for new data, but still memory may grow beyond the above limit under the following conditions:
+
+1. The number of pages concurrently used in queries do not fit the in the above size. This can happen when multiple queries of unreasonably long time-frames run on lower, higher resolution, tiers. The Netdata query planner attempts to avoid such situations by gradually loading pages, but still under extreme conditions the system may use more memory to satisfy these queries.
+
+2. The disks that host Netdata files are extremely slow for the workload required by the database so that data cannot be flushed to disk quickly to free memory. Netdata will automatically spawn more flushing workers in an attempt to parallelize and speed up flushing, but still if the disks cannot write the data quickly enough, they will remain in memory until they are written to disk.
+
+#### Operational Caches
+
+
+#### How to find the number of concurrently collected metrics
+
+In the dashboard of the agent, at the `Netdata Monitoring` section, the `dbengine main cache` subsection, the chart `netdata.dbengine_main_cache_pages` shows the number of currently `hot` pages used. The `hot` pages is also the number of metrics `x` storage tiers. So, if you use 3 storage tiers (the default), divide the number of hot pages by 3 to find the number of concurrently collected metrics.
+
+## Memory for archived metrics
+
+DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
+
+### How to find the number of archived metrics
+
 
 ## Legacy configuration
 
@@ -358,59 +411,3 @@ An interesting observation to make is that the CPU-bound run (16 GiB page cache)
 and generate a read load of 1.7M/sec, whereas in the CPU-bound scenario the read load is 70 times higher at 118M/sec.
 Consequently, there is a significant degree of interference by the reader threads, that slow down the writer threads.
 This is also possible because the interference effects are greater than the SSD impact on data generation throughput.
-
-
-# DBENGINE Memory Requirements
-
-DBENGINE memory is mainly related to the number of metrics concurrently being collected, the retention of the metrics on disk and the number of metrics for which history is maintained.
-
-## Memory for concurrently collected metrics
-
-DBENGINE is automatically sized to use memory according to this equation:
-
-```
-memory in KiB = METRICS x (TIERS - 1) x 2 x 4KiB + 32768 KiB
-```
-
-Where:
-- `METRICS`: the maximum number of concurrently collected metrics (dimensions) from the time the agent started.
-- `TIERS`: the number of storage tiers configured, by default 3 ( `-1` when using 3+ tiers)
-- `x 2`, to accommodate room for flushing data to disk
-- `x 4KiB`, the data segment size of each metric
-- `+ 32768 KiB`, 32 MB for operational caches
-
-So, for 2000 metrics (dimensions) in 3 storage tiers:
-
-```
-memory for 2k metrics = 2000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 64 MiB
-```
-
-For 100k concurrently collected metrics in 3 storage tiers:
-
-```
-memory for 100k metrics = 100000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 1.6 GiB
-```
-
-### Exceptions
-
-DBENGINE has several protection mechanisms to prevent the use of more memory, by incrementally fetching data from disk and aggressively evicting old data to make room for the new, but still memory may grow beyond the above limit under the following conditions:
-
-1. The number of pages (metrics data segments) concurrently used in queries do not fit the in the above size. This can happen when multiple queries of unreasonably long time-frames run on lower, higher resolution, tiers. The query planner attempts to avoid such situations by gradually loading pages, but still under extreme conditions the system may use more memory to satisfy these queries.
-
-2. The disks that host DBENGINE files are extremely slow for the workload required by the database so that data cannot be flushed to disk quickly to free memory. DBENGINE will automatically spawn more flushing workers in an attempt to parallelize and speed up flushing, but still if the disks cannot write the data quickly enough, they will remain in memory until they are written to disk.
-
-### Operational Caches
-
-
-### How to find the number of concurrently collected metrics
-
-In the dashboard of the agent, at the `Netdata Monitoring` section, the `dbengine main cache` subsection, the chart `netdata.dbengine_main_cache_pages` shows the number of currently `hot` pages used. The `hot` pages is also the number of metrics `x` storage tiers. So, if you use 3 storage tiers (the default), divide the number of hot pages by 3 to find the number of concurrently collected metrics.
-
-## Memory for archived metrics
-
-DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
-
-### How to find the number of archived metrics
-<!--stackedit_data:
-eyJoaXN0b3J5IjpbLTI0NDI0MjEyNV19
--->
