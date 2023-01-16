@@ -39,17 +39,18 @@ void ml_dimension_delete(RRDDIM *RD) {
     UNUSED(RD);
 }
 
-void ml_start_anomaly_detection_threads(RRDHOST *RH) {
+void ml_start_training_thread(RRDHOST *RH) {
     UNUSED(RH);
 }
 
-void ml_stop_anomaly_detection_threads(RRDHOST *RH) {
+void ml_stop_training_thread(RRDHOST *RH) {
     UNUSED(RH);
 }
 
-void ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
+char *ml_get_host_info(RRDHOST *RH, BUFFER *wb) {
     (void) RH;
     (void) wb;
+    return NULL;
 }
 
 char *ml_get_host_runtime_info(RRDHOST *RH) {

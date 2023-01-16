@@ -235,37 +235,20 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/ADCharts.h \
-    ml/ADCharts.cc \
-    ml/Config.h \
+    ml/ad_charts.h \
+    ml/ad_charts.cc \
     ml/Config.cc \
-    ml/Chart.cc \
-    ml/Chart.h \
-    ml/Stats.h \
-    ml/Dimension.cc \
-    ml/Dimension.h \
-    ml/Host.h \
-    ml/Host.cc \
-    ml/Mutex.h \
-    ml/Queue.h \
-    ml/Query.h \
-    ml/KMeans.h \
-    ml/KMeans.cc \
-    ml/SamplesBuffer.h \
-    ml/SamplesBuffer.cc \
     ml/dlib/dlib/all/source.cpp \
     ml/json/single_include/nlohmann/json.hpp \
+    ml/nml.h \
+    ml/nml.cc \
     ml/ml.cc \
-    ml/ml-private.h \
     $(NULL)
 
 # Disable warnings from dlib library
 ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow -Wno-psabi
 
 # Disable ml warnings
-ml/Dimension.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
-ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
 endif
@@ -290,6 +273,10 @@ DISKSPACE_PLUGIN_FILES = \
 
 TIMEX_PLUGIN_FILES = \
     collectors/timex.plugin/plugin_timex.c \
+    $(NULL)
+
+PROFILE_PLUGIN_FILES = \
+    collectors/profile.plugin/plugin_profile.cc \
     $(NULL)
 
 FREEIPMI_PLUGIN_FILES = \
@@ -953,6 +940,7 @@ NETDATA_FILES = \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
     $(TIMEX_PLUGIN_FILES) \
+    $(PROFILE_PLUGIN_FILES) \
     $(NULL)
 
 if FREEBSD
