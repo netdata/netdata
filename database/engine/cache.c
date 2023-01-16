@@ -328,32 +328,31 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     return per1000;
 }
 
-static inline bool cache_under_severe_pressure(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache, NULL) >= cache->config.severe_pressure_per1000)) {
+static inline bool cache_under_pressure(PGC *cache, size_t limit) {
+    size_t per1000 = cache_usage_per1000(cache, NULL);
+
+    if(per1000 >= cache->config.severe_pressure_per1000)
         __atomic_add_fetch(&cache->stats.events_cache_under_severe_pressure, 1, __ATOMIC_RELAXED);
-        return true;
-    }
 
-    return false;
-}
-
-static inline bool cache_needs_space_aggressively(PGC *cache) {
-    if(unlikely(cache_usage_per1000(cache, NULL) >= cache->config.aggressive_evict_per1000)) {
+    else if(per1000 >= cache->config.aggressive_evict_per1000)
         __atomic_add_fetch(&cache->stats.events_cache_needs_space_aggressively, 1, __ATOMIC_RELAXED);
+
+    if(per1000 >= limit)
         return true;
-    }
 
     return false;
 }
 
-#define cache_above_healthy_limit(cache) (cache_usage_per1000(cache, NULL) >= (cache)->config.healthy_size_per1000)
+#define cache_under_severe_pressure(cache) cache_under_pressure(cache, (cache)->config.severe_pressure_per1000)
+#define cache_needs_space_aggressively(cache) cache_under_pressure(cache, (cache)->config.aggressive_evict_per1000)
+#define cache_above_healthy_limit(cache) cache_under_pressure(cache, (cache)->config.healthy_size_per1000)
 
 typedef bool (*evict_filter)(PGC_PAGE *page, void *data);
 static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evict, bool wait, bool all_of_them, evict_filter filter, void *data);
 #define evict_pages(cache, max_skip, max_evict, wait, all_of_them) evict_pages_with_filter(cache, max_skip, max_evict, wait, all_of_them, NULL, NULL)
 
 static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
-    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache)) {
+    if((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_needs_space_aggressively(cache)) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -362,7 +361,7 @@ static inline void evict_on_clean_page_added(PGC *cache __maybe_unused) {
 }
 
 static inline void evict_on_page_release_when_permitted(PGC *cache __maybe_unused) {
-    if (unlikely((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache))) {
+    if ((cache->config.options & PGC_OPTIONS_EVICT_PAGES_INLINE) || cache_under_severe_pressure(cache)) {
         evict_pages(cache,
                     cache->config.max_skip_pages_per_inline_eviction,
                     cache->config.max_pages_per_inline_eviction,
@@ -2583,7 +2582,7 @@ void unittest_stress_test(void) {
 int pgc_unittest(void) {
     PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, unittest_save_dirty_page_callback,
-                            10, 1000, 10,
+                            10, 10, 1000, 10,
                             PGC_OPTIONS_DEFAULT, 1, 11);
 
     // FIXME - unit tests
