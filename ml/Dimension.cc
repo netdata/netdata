@@ -176,7 +176,7 @@ TrainingResult Dimension::trainModel(const TrainingRequest &TrainingReq) {
 
     SamplesBuffer SB = SamplesBuffer(CNs, N, 1, Cfg.DiffN, Cfg.SmoothN, Cfg.LagN,
                                      SamplingRatio, Cfg.RandomNums);
-    std::vector<DSample> Samples;
+    DVector Samples;
     SB.preprocess(Samples);
 
     KMeans KM;

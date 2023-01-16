@@ -18,7 +18,7 @@ public:
         MaxDist = std::numeric_limits<CalculatedNumber>::min();
     };
 
-    void train(const std::vector<DSample> &Samples, size_t MaxIterations);
+    void train(const DVector &Samples, size_t MaxIterations);
     CalculatedNumber anomalyScore(const DSample &Sample) const;
 
     void toJson(nlohmann::json &J) const {

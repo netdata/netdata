@@ -3,7 +3,7 @@
 #include "KMeans.h"
 #include <dlib/clustering.h>
 
-void KMeans::train(const std::vector<DSample> &Samples, size_t MaxIterations) {
+void KMeans::train(const DVector &Samples, size_t MaxIterations) {
     MinDist = std::numeric_limits<CalculatedNumber>::max();
     MaxDist = std::numeric_limits<CalculatedNumber>::min();
 

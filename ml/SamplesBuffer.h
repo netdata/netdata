@@ -11,9 +11,16 @@
 #include <cstring>
 
 #include <dlib/matrix.h>
+#include <dlib/std_allocator.h>
+#include <dlib/memory_manager.h>
+#include <dlib/memory_manager_stateless.h>
+
 
 typedef double CalculatedNumber;
-typedef dlib::matrix<CalculatedNumber, 0, 1> DSample;
+typedef dlib::matrix<CalculatedNumber, 6, 1> DSample;
+
+typedef dlib::std_allocator<DSample, dlib::memory_manager_stateless<DSample>::kernel_2_3a> alloc_dsample_with_global_memory_pool;
+typedef std::vector<DSample, alloc_dsample_with_global_memory_pool > DVector;
 
 class Sample {
 public:
@@ -90,7 +97,7 @@ public:
         assert(NumDimsPerSample == 1 && "SamplesBuffer supports only one dimension per sample");
     };
 
-    void preprocess(std::vector<DSample> &Samples);
+    void preprocess(DVector &Samples);
     void preprocess(DSample &Feature);
     std::vector<Sample> getPreprocessedSamples() const;
 
