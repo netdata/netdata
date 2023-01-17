@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
 - fix\(health\): don't assume 2 cores if the number is unknown [\#14265](https://github.com/netdata/netdata/pull/14265) ([ilyam8](https://github.com/ilyam8))
 - More 32bit fixes [\#14264](https://github.com/netdata/netdata/pull/14264) ([ktsaou](https://github.com/ktsaou))
+- Replace individual collector images/links on infographic [\#14262](https://github.com/netdata/netdata/pull/14262) ([cakrit](https://github.com/cakrit))
 - Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
 - DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
+- fix\(pacakging\): fix cpu/memory metrics when running inside LXC container as systemd service [\#14255](https://github.com/netdata/netdata/pull/14255) ([ilyam8](https://github.com/ilyam8))
 - fix\(proc.plugin\): handle disabled IPv6 [\#14252](https://github.com/netdata/netdata/pull/14252) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 1 [\#14251](https://github.com/netdata/netdata/pull/14251) ([ktsaou](https://github.com/ktsaou))
 - Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
@@ -95,7 +98,9 @@
 - Add workflow dispatch trigger for parent/child with cloud integration smoke tests [\#14070](https://github.com/netdata/netdata/pull/14070) ([dimko](https://github.com/dimko))
 - MQTT 5 publish topic alias support [\#14067](https://github.com/netdata/netdata/pull/14067) ([underhood](https://github.com/underhood))
 - Refactor ML code and add support for multiple KMeans models. [\#14065](https://github.com/netdata/netdata/pull/14065) ([vkalintiris](https://github.com/vkalintiris))
+- Adds some introspection into the MQTT\_WSS [\#14039](https://github.com/netdata/netdata/pull/14039) ([underhood](https://github.com/underhood))
 - add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
+- Switch nightlies to GitHub releases. [\#14020](https://github.com/netdata/netdata/pull/14020) ([Ferroin](https://github.com/Ferroin))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
 - Finish renaming the `--install` option to `--install-prefix`. [\#13881](https://github.com/netdata/netdata/pull/13881) ([Ferroin](https://github.com/Ferroin))
 - Support HTTP proxy Basic auth [\#13762](https://github.com/netdata/netdata/pull/13762) ([underhood](https://github.com/underhood))
@@ -341,11 +346,6 @@
 - Update uninstaller documentation. [\#13627](https://github.com/netdata/netdata/pull/13627) ([Ferroin](https://github.com/Ferroin))
 - eBPF different improvements [\#13624](https://github.com/netdata/netdata/pull/13624) ([thiagoftsm](https://github.com/thiagoftsm))
 - adjust systemdunits alarms [\#13623](https://github.com/netdata/netdata/pull/13623) ([ilyam8](https://github.com/ilyam8))
-- fix apps plugin users charts descriptipon [\#13621](https://github.com/netdata/netdata/pull/13621) ([ilyam8](https://github.com/ilyam8))
-- add Postgres total connection utilization alarm [\#13620](https://github.com/netdata/netdata/pull/13620) ([ilyam8](https://github.com/ilyam8))
-- update Postgres "connections" dashboard info [\#13619](https://github.com/netdata/netdata/pull/13619) ([ilyam8](https://github.com/ilyam8))
-- Assorted updates for apps\_groups.conf. [\#13618](https://github.com/netdata/netdata/pull/13618) ([Ferroin](https://github.com/Ferroin))
-- add spiceproxy to proxmox group [\#13615](https://github.com/netdata/netdata/pull/13615) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
