@@ -12,7 +12,7 @@ netdata -W buildinfo
 echo "::endgroup::"
 echo ">>> Updating Netdata..."
 export NETDATA_BASE_URL="http://localhost:8080/artifacts/" # Pull the tarball from the local web server.
-timeout 3600 /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
+timeout 1200 /netdata/packaging/installer/netdata-updater.sh --not-running-from-cron --no-updater-self-update
 
 case "$?" in
     124) echo "!!! Updater timed out." ; exit 1 ;;

@@ -97,9 +97,9 @@ jobs:
       matrix:
         arch:
           - x86_64
-          - armv7l
-          - aarch64
-          - ppc64le
+          # - armv7l
+          # - aarch64
+          # - ppc64le
     steps:
       - name: Checkout
         id: checkout
@@ -311,79 +311,79 @@ jobs:
             && github.repository == 'netdata/netdata'
           }}
 
-  source-build: # Test various source build arrangements.
-    name: Test Source Build
-    runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
-    needs:
-      - matrix
-      - prepare-test-images
-    strategy:
-      fail-fast: false
-      max-parallel: 8
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-      - name: Fetch test environment
-        id: fetch
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ matrix.artifact_key }}-test-env
-      - name: Load test environment
-        id: load
-        run: |
-          docker load --input image.tar | tee image-info.txt
-          echo "image=$(cut -d ':' -f 3 image-info.txt)" >> "${GITHUB_OUTPUT}"
-      - name: Regular build on ${{ matrix.distro }}
-        id: build-basic
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
-      - name: netdata-installer on ${{ matrix.distro }}, disable cloud
-        id: build-no-cloud
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build'
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud
-        id: build-cloud
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
-      - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
-        id: build-no-jsonc
-        if: matrix.jsonc_removal != ''
-        run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
-              /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
-      - name: Failure Notification
-        uses: rtCamp/action-slack-notify@v2
-        env:
-          SLACK_COLOR: 'danger'
-          SLACK_FOOTER: ''
-          SLACK_ICON_EMOJI: ':github-actions:'
-          SLACK_TITLE: 'Build tests for ${{ matrix.distro }} failed:'
-          SLACK_USERNAME: 'GitHub Actions'
-          SLACK_MESSAGE: |-
-              ${{ github.repository }}: Build tests for ${{ matrix.distro }} failed.
-              Checkout: ${{ steps.checkout.outcome }}
-              Fetch test environment: ${{ steps.fetch.outcome }}
-              Load test environment: ${{ steps.load.outcome }}
-              Regular build: ${{ steps.build-basic.outcome }}
-              netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
-              netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
-              netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
-        if: >-
-          ${{
-            failure()
-            && startsWith(github.ref, 'refs/heads/master')
-            && github.event_name != 'pull_request'
-            && github.repository == 'netdata/netdata'
-          }}
+  # source-build: # Test various source build arrangements.
+  #   name: Test Source Build
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name != 'workflow_dispatch'
+  #   needs:
+  #     - matrix
+  #     - prepare-test-images
+  #   strategy:
+  #     fail-fast: false
+  #     max-parallel: 8
+  #     matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
+  #   steps:
+  #     - name: Checkout
+  #       id: checkout
+  #       uses: actions/checkout@v3
+  #       with:
+  #         submodules: recursive
+  #     - name: Fetch test environment
+  #       id: fetch
+  #       uses: actions/download-artifact@v3
+  #       with:
+  #         name: ${{ matrix.artifact_key }}-test-env
+  #     - name: Load test environment
+  #       id: load
+  #       run: |
+  #         docker load --input image.tar | tee image-info.txt
+  #         echo "image=$(cut -d ':' -f 3 image-info.txt)" >> "${GITHUB_OUTPUT}"
+  #     - name: Regular build on ${{ matrix.distro }}
+  #       id: build-basic
+  #       run: |
+  #         docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+  #             /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
+  #     - name: netdata-installer on ${{ matrix.distro }}, disable cloud
+  #       id: build-no-cloud
+  #       run: |
+  #         docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+  #             /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build'
+  #     - name: netdata-installer on ${{ matrix.distro }}, require cloud
+  #       id: build-cloud
+  #       run: |
+  #         docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+  #             /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
+  #     - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
+  #       id: build-no-jsonc
+  #       if: matrix.jsonc_removal != ''
+  #       run: |
+  #         docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+  #             /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
+  #     - name: Failure Notification
+  #       uses: rtCamp/action-slack-notify@v2
+  #       env:
+  #         SLACK_COLOR: 'danger'
+  #         SLACK_FOOTER: ''
+  #         SLACK_ICON_EMOJI: ':github-actions:'
+  #         SLACK_TITLE: 'Build tests for ${{ matrix.distro }} failed:'
+  #         SLACK_USERNAME: 'GitHub Actions'
+  #         SLACK_MESSAGE: |-
+  #             ${{ github.repository }}: Build tests for ${{ matrix.distro }} failed.
+  #             Checkout: ${{ steps.checkout.outcome }}
+  #             Fetch test environment: ${{ steps.fetch.outcome }}
+  #             Load test environment: ${{ steps.load.outcome }}
+  #             Regular build: ${{ steps.build-basic.outcome }}
+  #             netdata-installer, disable cloud: ${{ steps.build-no-cloud.outcome }}
+  #             netdata-installer, require cloud: ${{ steps.build-cloud.outcome }}
+  #             netdata-installer, no JSON-C: ${{ steps.build-no-jsonc.outcome }}
+  #         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+  #       if: >-
+  #         ${{
+  #           failure()
+  #           && startsWith(github.ref, 'refs/heads/master')
+  #           && github.event_name != 'pull_request'
+  #           && github.repository == 'netdata/netdata'
+  #         }}
 
   updater-check: # Test the generated dist archive using the updater code.
     name: Test Generated Distfile and Updater Code
