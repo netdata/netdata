@@ -2219,7 +2219,7 @@ parse_args() {
         esac
         ;;
       "--local-build-options")
-        LOCAL_BUILD_OPTIONS="${2}"
+        LOCAL_BUILD_OPTIONS="${LOCAL_BUILD_OPTIONS} ${2}"
         shift 1
         ;;
       "--static-install-options")
