@@ -732,7 +732,7 @@ stop_all_netdata() {
 
     # Any of these may fail, but we need to not bail if they do.
     if [ -n "${NETDATA_STOP_CMD}" ]; then
-      echo >&2 "D stop_all_netdata() 2."
+      echo >&2 "D stop_all_netdata() 2 ${NETDATA_STOP_CMD}."
       if ${NETDATA_STOP_CMD}; then
         stop_success=1
         sleep 5
