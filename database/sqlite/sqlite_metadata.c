@@ -62,6 +62,7 @@ enum metadata_opcode {
     METADATA_DATABASE_TIMER,
     METADATA_DEL_DIMENSION,
     METADATA_STORE_CLAIM_ID,
+    METADATA_ADD_HOST_INFO,
     METADATA_SCAN_HOSTS,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
@@ -1014,6 +1015,7 @@ static void metadata_event_loop(void *arg)
     worker_register_job_name(METADATA_DATABASE_TIMER,       "timer");
     worker_register_job_name(METADATA_DEL_DIMENSION,        "delete dimension");
     worker_register_job_name(METADATA_STORE_CLAIM_ID,       "add claim id");
+    worker_register_job_name(METADATA_ADD_HOST_INFO,        "add host info");
     worker_register_job_name(METADATA_MAINTENANCE,          "maintenance");
 
     int ret;
@@ -1063,6 +1065,8 @@ static void metadata_event_loop(void *arg)
 
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         uuid_t  *uuid;
+        RRDHOST *host = NULL;
+        int rc;
 
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
@@ -1101,6 +1105,12 @@ static void metadata_event_loop(void *arg)
                     store_claim_id((uuid_t *) cmd.param[0], (uuid_t *) cmd.param[1]);
                     freez((void *) cmd.param[0]);
                     freez((void *) cmd.param[1]);
+                    break;
+                case METADATA_ADD_HOST_INFO:
+                    host = (RRDHOST *) cmd.param[0];
+                    rc = sql_store_host_info(host);
+                    if (unlikely(rc))
+                        error_report("Failed to store host info in the database for %s", string2str(host->hostname));
                     break;
                 case METADATA_SCAN_HOSTS:
                     if (unlikely(metadata_flag_check(wc, METADATA_FLAG_SCANNING_HOSTS)))
@@ -1279,6 +1289,29 @@ void metaqueue_delete_dimension_uuid(uuid_t *uuid)
     uuid_t *use_uuid = mallocz(sizeof(*uuid));
     uuid_copy(*use_uuid, *uuid);
     queue_metadata_cmd(METADATA_DEL_DIMENSION, use_uuid, NULL);
+}
+
+void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
+{
+    if (unlikely(!host_uuid))
+        return;
+
+    uuid_t *local_host_uuid = mallocz(sizeof(*host_uuid));
+    uuid_t *local_claim_uuid = NULL;
+
+    uuid_copy(*local_host_uuid, *host_uuid);
+    if (likely(claim_uuid)) {
+        local_claim_uuid = mallocz(sizeof(*claim_uuid));
+        uuid_copy(*local_claim_uuid, *claim_uuid);
+    }
+    queue_metadata_cmd(METADATA_STORE_CLAIM_ID, local_host_uuid, local_claim_uuid);
+}
+
+void metaqueue_host_update_info(RRDHOST *host)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
 }
 
 //

@@ -364,6 +364,7 @@ int is_legacy = 1;
     rrdfamily_index_init(host);
     rrdcalctemplate_index_init(host);
     rrdcalc_rrdhost_index_init(host);
+    metaqueue_host_update_info(host);
 
     if (health_enabled)
         health_thread_spawn(host);
