@@ -3,7 +3,7 @@
 echo ">>> Installing CI support packages..."
 /netdata/.github/scripts/ci-support-pkgs.sh
 echo ">>> Installing Netdata..."
-/netdata/packaging/installer/kickstart.sh --dont-wait --build-only --disable-telemetry --disable-cloud || exit 1
+/netdata/packaging/installer/kickstart.sh --dont-wait --build-only --disable-telemetry --disable-cloud --local-build-options "--disable-ml --disable-ebpf --disable-go --use-system-protobuf"|| exit 1
 echo "::group::>>> Pre-Update Environment File Contents"
 cat /etc/netdata/.environment
 echo "::endgroup::"

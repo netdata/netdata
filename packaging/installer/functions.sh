@@ -697,6 +697,7 @@ stop_netdata_on_pid() {
 }
 
 netdata_pids() {
+  echo >&2 "Executing 'netdata_pids()'."
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
 
   for p in \
@@ -709,6 +710,7 @@ netdata_pids() {
       pidisnetdata "${p}" && echo "${p}"
     fi
   done
+  echo >&2 "Finish 'netdata_pids()'."
 }
 
 stop_all_netdata() {
