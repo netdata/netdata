@@ -964,7 +964,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
-    struct journal_v2_header *j2_header = journalfile_acquire_data(datafile->journalfile, NULL, 0, 0);
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
     void *data_start = (void *)j2_header;
 
     if(unlikely(!j2_header))
@@ -1027,7 +1027,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
         metric++;
     }
 
-    journalfile_release_data(datafile->journalfile);
+    journalfile_v2_data_release(datafile->journalfile);
 }
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {

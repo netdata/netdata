@@ -472,7 +472,9 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *datafile;
     for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
-        struct journal_v2_header *j2_header = journalfile_acquire_data(datafile->journalfile, NULL, wanted_start_time_s, wanted_end_time_s);
+        struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL,
+                                                                          wanted_start_time_s,
+                                                                          wanted_end_time_s);
         if (unlikely(!j2_header))
             continue;
 
@@ -486,7 +488,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
 
         if (unlikely(!uuid_entry)) {
             // our UUID is not in this datafile
-            journalfile_release_data(datafile->journalfile);
+            journalfile_v2_data_release(datafile->journalfile);
             continue;
         }
 
@@ -545,7 +547,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
             }
         }
 
-        journalfile_release_data(datafile->journalfile);
+        journalfile_v2_data_release(datafile->journalfile);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 

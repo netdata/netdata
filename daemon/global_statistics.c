@@ -2078,7 +2078,8 @@ static void dbengine2_statistics_charts(void) {
 
     {
         static RRDSET *st_events = NULL;
-        static RRDDIM *rd_madvise_dontneed = NULL;
+        static RRDDIM *rd_journal_v2_mapped = NULL;
+        static RRDDIM *rd_journal_v2_unmapped = NULL;
         static RRDDIM *rd_datafile_creation = NULL;
         static RRDDIM *rd_datafile_deletion = NULL;
         static RRDDIM *rd_datafile_deletion_spin = NULL;
@@ -2100,7 +2101,8 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_LINE);
 
-            rd_madvise_dontneed = rrddim_add(st_events, "madvise dontneed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_v2_mapped = rrddim_add(st_events, "journal v2 mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_v2_unmapped = rrddim_add(st_events, "journal v2 unmapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_datafile_creation = rrddim_add(st_events, "datafile creation", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_datafile_deletion = rrddim_add(st_events, "datafile deletion", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_datafile_deletion_spin = rrddim_add(st_events, "datafile deletion spin", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
@@ -2109,7 +2111,8 @@ static void dbengine2_statistics_charts(void) {
         }
         priority++;
 
-        rrddim_set_by_pointer(st_events, rd_madvise_dontneed, (collected_number)cache_efficiency_stats.madvise_dontneed_called);
+        rrddim_set_by_pointer(st_events, rd_journal_v2_mapped, (collected_number)cache_efficiency_stats.journal_v2_mapped);
+        rrddim_set_by_pointer(st_events, rd_journal_v2_unmapped, (collected_number)cache_efficiency_stats.journal_v2_unmapped);
         rrddim_set_by_pointer(st_events, rd_datafile_creation, (collected_number)cache_efficiency_stats.datafile_creation_started);
         rrddim_set_by_pointer(st_events, rd_datafile_deletion, (collected_number)cache_efficiency_stats.datafile_deletion_started);
         rrddim_set_by_pointer(st_events, rd_datafile_deletion_spin, (collected_number)cache_efficiency_stats.datafile_deletion_spin);

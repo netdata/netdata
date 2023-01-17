@@ -192,7 +192,8 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_invalid_entries_fixed;
 
     // database events
-    size_t madvise_dontneed_called;
+    size_t journal_v2_mapped;
+    size_t journal_v2_unmapped;
     size_t datafile_creation_started;
     size_t datafile_deletion_started;
     size_t datafile_deletion_spin;
