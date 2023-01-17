@@ -14,10 +14,12 @@ static void web_client_reuse_ssl(struct web_client *w) {
             SSL_SESSION *session = SSL_get_session(w->ssl.conn);
             SSL *old = w->ssl.conn;
             w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
+            if (session) {
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
-            if (SSL_SESSION_is_resumable(session))
+                if (SSL_SESSION_is_resumable(session))
 #endif
-                SSL_set_session(w->ssl.conn, session);
+                    SSL_set_session(w->ssl.conn, session);
+            }
             SSL_free(old);
         }
     }
