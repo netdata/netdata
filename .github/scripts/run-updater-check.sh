@@ -27,6 +27,10 @@ case "$?" in
 0) ;;
 *)
     echo "!!! Updater failed."
+    ps aux | grep "[/]netdata"
+    echo "::group::>>> Netdata error.log"
+    cat /var/log/netdata/error.log
+    echo "::endgroup::"
     exit 1
     ;;
 esac
