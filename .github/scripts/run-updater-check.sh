@@ -18,6 +18,7 @@ timeout 900 /netdata/packaging/installer/netdata-updater.sh --not-running-from-c
 case "$?" in
 124)
     echo "!!! Updater timed out."
+    ps aux | grep "[/]netdata"
     echo "::group::>>> Netdata error.log"
     cat /var/log/netdata/error.log
     echo "::endgroup::"
