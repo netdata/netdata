@@ -119,43 +119,51 @@ void journalfile_generate_path(struct rrdengine_datafile *datafile, char *str, s
                     datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
 }
 
-struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+static void journalfile_v2_unmount_unsafe(struct rrdengine_journalfile *journalfile) {
+    if(munmap(journalfile->v2.mmap_data, journalfile->v2.mmap_size)) {
+        char path[RRDENG_PATH_MAX];
+        journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
+        error("DBENGINE: failed to unmap index file '%s'", path);
+        internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
+    }
+    else {
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
+        journalfile->v2.mmap_data = NULL;
+        journalfile->v2.flags &= ~(JOURNALFILE_FLAG_MAPPED_READ_WRITE | JOURNALFILE_FLAG_MAPPED_READ_ONLY);
+    }
+}
 
-    bool has_data = (journalfile->unsafe.fd != -1);
-    bool is_mounted = (journalfile->unsafe.journal_data != NULL);
+struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s) {
+    netdata_spinlock_lock(&journalfile->v2.spinlock);
+
+    bool has_data = (journalfile->v2.fd != -1);
+    bool is_mounted = (journalfile->v2.mmap_data != NULL);
     bool do_we_need_it = false;
 
-    if(has_data && (!wanted_first_time_s || !wanted_last_time_s || is_page_in_time_range(journalfile->unsafe.first_time_s, journalfile->unsafe.last_time_s, wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE)) {
+    if(has_data && (!wanted_first_time_s || !wanted_last_time_s || is_page_in_time_range(journalfile->v2.first_time_s, journalfile->v2.last_time_s, wanted_first_time_s, wanted_last_time_s) == PAGE_IS_IN_RANGE)) {
         do_we_need_it = true;
-        journalfile->unsafe.not_needed_counter = 0;
+        journalfile->v2.not_needed_counter = 0;
+
+        if(!wanted_first_time_s && !wanted_last_time_s && !is_mounted)
+            journalfile->v2.flags |= JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
+        else
+            journalfile->v2.flags &= ~JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION;
     }
     else if(has_data && is_mounted) {
         // this journal has data, but it does not match our query
 
-        if(!journalfile->unsafe.refcount) {
+        if(!journalfile->v2.refcount) {
             // this journal has no references
 
-            if(!journalfile->unsafe.not_needed_counter)
-                journalfile->unsafe.not_needed_since_s = now_monotonic_sec();
+            if(!journalfile->v2.not_needed_counter)
+                journalfile->v2.not_needed_since_s = now_monotonic_sec();
 
-            if((++journalfile->unsafe.not_needed_counter) % 1000 == 0) {
-                // at least 1000 times it has been evaluated since last use
+            if((++journalfile->v2.not_needed_counter) % 100 == 0) {
+                // at least 100 times it has been evaluated since last use
 
-                if(now_monotonic_sec() - journalfile->unsafe.not_needed_since_s >= 120) {
+                if(now_monotonic_sec() - journalfile->v2.not_needed_since_s >= 120)
                     // 2 minutes have passed since last use
-
-                    if(munmap(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size)) {
-                        char path[RRDENG_PATH_MAX];
-                        journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
-                        error("DBENGINE: failed to unmap index file '%s'", path);
-                    }
-                    else {
-                        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
-                        journalfile->unsafe.journal_data = NULL;
-                        journalfile->unsafe.flags &= ~(JOURNALFILE_FLAG_MAPPED_READ_WRITE|JOURNALFILE_FLAG_MAPPED_READ_ONLY);
-                    }
-                }
+                    journalfile_v2_unmount_unsafe(journalfile);
             }
         }
     }
@@ -165,98 +173,99 @@ struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfi
     if(do_we_need_it) {
         if(!is_mounted) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_mapped, 1, __ATOMIC_RELAXED);
-            journalfile->unsafe.journal_data = mmap(NULL, journalfile->unsafe.journal_data_size, PROT_READ, MAP_SHARED, journalfile->unsafe.fd, 0);
-            if (journalfile->unsafe.journal_data == MAP_FAILED) {
+            journalfile->v2.mmap_data = mmap(NULL, journalfile->v2.mmap_size, PROT_READ, MAP_SHARED, journalfile->v2.fd, 0);
+            if (journalfile->v2.mmap_data == MAP_FAILED) {
                 internal_fatal(true, "DBENGINE: failed to re-mmap() journal file v2");
-                close(journalfile->unsafe.fd);
-                journalfile->unsafe.fd = -1;
-                journalfile->unsafe.journal_data = NULL;
-                journalfile->unsafe.journal_data_size = 0;
-                journalfile->unsafe.flags = 0;
+                close(journalfile->v2.fd);
+                journalfile->v2.fd = -1;
+                journalfile->v2.mmap_data = NULL;
+                journalfile->v2.mmap_size = 0;
+                journalfile->v2.flags = 0;
 
                 has_data = false;
                 is_mounted = false;
             }
             else {
-                journalfile->unsafe.flags |= JOURNALFILE_FLAG_MAPPED_READ_ONLY;
-                journalfile->unsafe.flags &= ~JOURNALFILE_FLAG_MAPPED_READ_WRITE;
+                journalfile->v2.flags |= JOURNALFILE_FLAG_MAPPED_READ_ONLY;
+                journalfile->v2.flags &= ~JOURNALFILE_FLAG_MAPPED_READ_WRITE;
 
-                madvise_dontfork(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-                madvise_dontdump(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-                madvise_random(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-                madvise_dontneed(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
+                madvise_dontfork(journalfile->v2.mmap_data, journalfile->v2.mmap_size);
+                madvise_dontdump(journalfile->v2.mmap_data, journalfile->v2.mmap_size);
+                madvise_random(journalfile->v2.mmap_data, journalfile->v2.mmap_size);
+                madvise_dontneed(journalfile->v2.mmap_data, journalfile->v2.mmap_size);
                 is_mounted = true;
             }
         }
 
-        if(journalfile->unsafe.journal_data) {
-            journalfile->unsafe.refcount++;
+        if(journalfile->v2.mmap_data) {
+            journalfile->v2.refcount++;
 
-            j2_header = journalfile->unsafe.journal_data;
+            j2_header = journalfile->v2.mmap_data;
 
             if (data_size)
-                *data_size = journalfile->unsafe.journal_data_size;
+                *data_size = journalfile->v2.mmap_size;
         }
     }
 
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_unlock(&journalfile->v2.spinlock);
 
     return j2_header;
 }
 
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile) {
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_lock(&journalfile->v2.spinlock);
 
-    internal_fatal(!journalfile->unsafe.journal_data, "trying to release a journalfile without data");
-    internal_fatal(journalfile->unsafe.refcount < 1, "trying to release a non-acquired journalfile");
+    internal_fatal(!journalfile->v2.mmap_data, "trying to release a journalfile without data");
+    internal_fatal(journalfile->v2.refcount < 1, "trying to release a non-acquired journalfile");
 
-    if(journalfile->unsafe.refcount == 1)
-        journalfile->unsafe.not_needed_counter = 0;
+    journalfile->v2.refcount--;
 
-    journalfile->unsafe.refcount--;
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    if(journalfile->v2.refcount == 0) {
+        journalfile->v2.not_needed_counter = 0;
+
+        if(journalfile->v2.flags & JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION)
+            journalfile_v2_unmount_unsafe(journalfile);
+    }
+    netdata_spinlock_unlock(&journalfile->v2.spinlock);
 }
 
 bool journalfile_v2_data_available(struct rrdengine_journalfile *journalfile) {
     bool has_data;
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
-    has_data = (journalfile->unsafe.fd != -1);
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_lock(&journalfile->v2.spinlock);
+    has_data = (journalfile->v2.fd != -1);
+    netdata_spinlock_unlock(&journalfile->v2.spinlock);
 
     return has_data;
 }
 
 size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile) {
     size_t data_size;
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
-    data_size = journalfile->unsafe.journal_data_size;
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_lock(&journalfile->v2.spinlock);
+    data_size = journalfile->v2.mmap_size;
+    netdata_spinlock_unlock(&journalfile->v2.spinlock);
 
     return data_size;
 }
 
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size) {
-    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_lock(&journalfile->v2.spinlock);
 
-    internal_fatal(journalfile->unsafe.fd != -1, "DBENGINE JOURNALFILE: trying to re-set journal fd");
-    internal_fatal(journalfile->unsafe.journal_data, "DBENGINE JOURNALFILE: trying to re-set journal_data");
-    internal_fatal(journalfile->unsafe.refcount, "DBENGINE JOURNALFILE: trying to re-set journal_data of referenced journalfile");
+    internal_fatal(journalfile->v2.fd != -1, "DBENGINE JOURNALFILE: trying to re-set journal fd");
+    internal_fatal(journalfile->v2.mmap_data, "DBENGINE JOURNALFILE: trying to re-set journal_data");
+    internal_fatal(journalfile->v2.refcount, "DBENGINE JOURNALFILE: trying to re-set journal_data of referenced journalfile");
 
-    journalfile->unsafe.fd = fd;
-    journalfile->unsafe.journal_data = journal_data;
-    journalfile->unsafe.journal_data_size = journal_data_size;
-    journalfile->unsafe.not_needed_since_s = now_monotonic_sec();
+    journalfile->v2.fd = fd;
+    journalfile->v2.mmap_data = journal_data;
+    journalfile->v2.mmap_size = journal_data_size;
+    journalfile->v2.not_needed_since_s = now_monotonic_sec();
 
-    struct journal_v2_header *j2_header = journalfile->unsafe.journal_data;
-    journalfile->unsafe.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
-    journalfile->unsafe.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
+    struct journal_v2_header *j2_header = journalfile->v2.mmap_data;
+    journalfile->v2.first_time_s = (time_t)(j2_header->start_time_ut / USEC_PER_SEC);
+    journalfile->v2.last_time_s = (time_t)(j2_header->end_time_ut / USEC_PER_SEC);
 
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
-    munmap(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size);
-    journalfile->unsafe.journal_data = NULL;
-    journalfile->unsafe.flags &= ~(JOURNALFILE_FLAG_MAPPED_READ_WRITE | JOURNALFILE_FLAG_MAPPED_READ_ONLY);
+    journalfile_v2_unmount_unsafe(journalfile);
 
-    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    netdata_spinlock_unlock(&journalfile->v2.spinlock);
 }
 
 static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *journalfile) {
@@ -266,12 +275,12 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
         if (has_references)
             sleep_usec(10 * USEC_PER_MS);
 
-        netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+        netdata_spinlock_lock(&journalfile->v2.spinlock);
 
-        has_references = (journalfile->unsafe.refcount > 0);
+        has_references = (journalfile->v2.refcount > 0);
 
         if (!has_references) {
-            if(journalfile->unsafe.journal_data && munmap(journalfile->unsafe.journal_data, journalfile->unsafe.journal_data_size)) {
+            if(journalfile->v2.mmap_data && munmap(journalfile->v2.mmap_data, journalfile->v2.mmap_size)) {
                 char path[RRDENG_PATH_MAX];
                 journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
                 error("DBENGINE: failed to unmap index file '%s'", path);
@@ -279,18 +288,18 @@ static void journalfile_v2_data_unmap_permanently(struct rrdengine_journalfile *
                 rrd_stat_atomic_add(&global_fs_errors, 1);
             }
 
-            close(journalfile->unsafe.fd);
-            journalfile->unsafe.fd = -1;
-            journalfile->unsafe.journal_data = NULL;
-            journalfile->unsafe.journal_data_size = 0;
-            journalfile->unsafe.first_time_s = 0;
-            journalfile->unsafe.last_time_s = 0;
+            close(journalfile->v2.fd);
+            journalfile->v2.fd = -1;
+            journalfile->v2.mmap_data = NULL;
+            journalfile->v2.mmap_size = 0;
+            journalfile->v2.first_time_s = 0;
+            journalfile->v2.last_time_s = 0;
         }
         else {
             internal_error(true, "DBENGINE JOURNALFILE: waiting for journalfile to be available to unmap...");
         }
 
-        netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+        netdata_spinlock_unlock(&journalfile->v2.spinlock);
     } while(has_references);
 }
 
@@ -298,8 +307,8 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
 {
     struct rrdengine_journalfile *journalfile = callocz(1, sizeof(struct rrdengine_journalfile));
     journalfile->datafile = datafile;
-    netdata_spinlock_init(&journalfile->unsafe.spinlock);
-    journalfile->unsafe.fd = -1;
+    netdata_spinlock_init(&journalfile->v2.spinlock);
+    journalfile->v2.fd = -1;
     datafile->journalfile = journalfile;
     return journalfile;
 }

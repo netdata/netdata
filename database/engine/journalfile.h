@@ -20,6 +20,7 @@ struct rrdengine_journalfile;
 typedef enum __attribute__ ((__packed__)) {
     JOURNALFILE_FLAG_MAPPED_READ_WRITE = (1 << 0),
     JOURNALFILE_FLAG_MAPPED_READ_ONLY  = (1 << 1),
+    JOURNALFILE_FLAG_MOUNTED_FOR_RETENTION = (1 << 2),
 } JOURNALFILE_FLAGS;
 
 /* only one event loop is supported for now */
@@ -27,15 +28,15 @@ struct rrdengine_journalfile {
     struct {
         SPINLOCK spinlock;
         JOURNALFILE_FLAGS flags;
-        void *journal_data;                         // MMAPed file of journal v2
-        uint32_t journal_data_size;                 // Total file size mapped
+        void *mmap_data;                    // MMAPed file of journal v2
+        uint32_t mmap_size;                 // Total file size mapped
         int32_t refcount;
         time_t first_time_s;
         time_t last_time_s;
         size_t not_needed_counter;
         time_t not_needed_since_s;
         int fd;
-    } unsafe;
+    } v2;
     uv_file file;
     uint64_t pos;
     void *data;
