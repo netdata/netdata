@@ -689,7 +689,7 @@ static void cleanup_health_log(void)
 {
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host) {
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
         sql_health_alarm_log_cleanup(host);
     }
