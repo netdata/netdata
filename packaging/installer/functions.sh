@@ -709,6 +709,7 @@ netdata_pids() {
 }
 
 stop_all_netdata() {
+  echo >&2 "Start 'stop_all_netdata()'."
   stop_success=0
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
@@ -741,6 +742,7 @@ stop_all_netdata() {
         sleep 5
       fi
     else
+      echo >&2 "Executing 'service netdata stop'."
       if service netdata stop; then
         stop_success=1
         sleep 5
@@ -750,15 +752,18 @@ stop_all_netdata() {
 
   if [ "$stop_success" = "0" ]; then
     if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
+      echo >&2 "Executing 'netdatacli shutdown-agent'."
       netdatacli shutdown-agent
       sleep 20
     fi
 
     for p in $(netdata_pids); do
       # shellcheck disable=SC2086
+      echo >&2 "Executing 'stop_netdata_on_pid ${p}'."
       stop_netdata_on_pid ${p}
     done
   fi
+  echo >&2 "Finish 'stop_all_netdata()'."
 }
 
 # -----------------------------------------------------------------------------
