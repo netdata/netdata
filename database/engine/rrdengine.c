@@ -1231,6 +1231,8 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     char path[RRDENG_PATH_MAX];
 
     uv_rwlock_wrlock(&ctx->datafiles.rwlock);
+    datafile_list_delete_unsafe(ctx, datafile);
+    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
@@ -1238,7 +1240,6 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
     info("DBENGINE: deleting data and journal files to maintain disk quota");
-    datafile_list_delete_unsafe(ctx, datafile);
     ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
         journalfile_generate_path(datafile, path, sizeof(path));
@@ -1258,7 +1259,6 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     ctx->disk_space -= deleted_bytes;
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
 
     rrdcontext_db_rotation();
 }
