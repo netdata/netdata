@@ -827,7 +827,7 @@ ndtmpdir=
 
 trap cleanup EXIT
 
-if [ -t 2 ]; then
+if [ -t 2 ] || true; then
   # we are running on a terminal
   # open fd 3 and send it to stderr
   exec 3>&2
