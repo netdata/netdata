@@ -174,19 +174,21 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
         netdata_spinlock_lock(&journalfile->v2.spinlock);
     }
 
-    if(!journalfile->v2.refcount && journalfile->mmap.data) {
-        if (munmap(journalfile->mmap.data, journalfile->mmap.size)) {
-            char path[RRDENG_PATH_MAX];
-            journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
-            error("DBENGINE: failed to unmap index file '%s'", path);
-            internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
-            ++journalfile->datafile->ctx->stats.fs_errors;
-            rrd_stat_atomic_add(&global_fs_errors, 1);
-        }
-        else {
-            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
-            journalfile->mmap.data = NULL;
-            journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_MOUNTED;
+    if(!journalfile->v2.refcount) {
+        if(journalfile->mmap.data) {
+            if (munmap(journalfile->mmap.data, journalfile->mmap.size)) {
+                char path[RRDENG_PATH_MAX];
+                journalfile_v2_generate_path(journalfile->datafile, path, sizeof(path));
+                error("DBENGINE: failed to unmap index file '%s'", path);
+                internal_fatal(true, "DBENGINE: failed to unmap file '%s'", path);
+                ++journalfile->datafile->ctx->stats.fs_errors;
+                rrd_stat_atomic_add(&global_fs_errors, 1);
+            }
+            else {
+                __atomic_add_fetch(&rrdeng_cache_efficiency_stats.journal_v2_unmapped, 1, __ATOMIC_RELAXED);
+                journalfile->mmap.data = NULL;
+                journalfile->v2.flags &= ~JOURNALFILE_FLAG_IS_MOUNTED;
+            }
         }
 
         unmounted = true;
