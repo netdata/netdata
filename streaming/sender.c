@@ -275,6 +275,9 @@ static void rrdpush_sender_charts_and_replication_reset(RRDHOST *host) {
 static void rrdpush_sender_on_connect(RRDHOST *host) {
     rrdpush_sender_cbuffer_flush(host);
     rrdpush_sender_charts_and_replication_reset(host);
+}
+
+static void rrdpush_sender_after_connect(RRDHOST *host) {
     rrdpush_sender_thread_send_custom_host_variables(host);
 }
 
@@ -738,6 +741,8 @@ static bool attempt_to_connect(struct sender_state *state)
 
         // let the data collection threads know we are ready
         rrdhost_flag_set(state->host, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED);
+
+        rrdpush_sender_after_connect(state->host);
 
         return true;
     }
