@@ -723,33 +723,40 @@ stop_all_netdata() {
     echo >&2 "Finish 'run_install_service_script --cmds-only'."
   fi
 
-  if [ "${UID}" -eq 0 ]; then
+  echo >&2 "D stop_all_netdata() 0."
 
+  if [ "${UID}" -eq 0 ]; then
+  
+    echo >&2 "D stop_all_netdata() 1."
     uname="$(uname 2>/dev/null)"
 
     # Any of these may fail, but we need to not bail if they do.
     if [ -n "${NETDATA_STOP_CMD}" ]; then
+      echo >&2 "D stop_all_netdata() 2."
       if ${NETDATA_STOP_CMD}; then
         stop_success=1
         sleep 5
       fi
     elif issystemd; then
+      echo >&2 "D stop_all_netdata() 3."
       if systemctl stop netdata; then
         stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "Darwin" ]; then
+      echo >&2 "D stop_all_netdata() 4."
       if launchctl stop netdata; then
         stop_success=1
         sleep 5
       fi
     elif [ "${uname}" = "FreeBSD" ]; then
+      echo >&2 "D stop_all_netdata() 5."
       if /etc/rc.d/netdata stop; then
         stop_success=1
         sleep 5
       fi
     else
-      echo >&2 "Executing 'service netdata stop'."
+      echo >&2 "D stop_all_netdata() 6."
       if service netdata stop; then
         stop_success=1
         sleep 5
@@ -757,13 +764,17 @@ stop_all_netdata() {
     fi
   fi
 
+  echo >&2 "D stop_all_netdata() 7."
+
   if [ "$stop_success" = "0" ]; then
+    echo >&2 "D stop_all_netdata() 8."
     if [ -n "$(netdata_pids)" ] && [ -n "$(command -v netdatacli)" ]; then
       echo >&2 "Executing 'netdatacli shutdown-agent'."
       netdatacli shutdown-agent
       sleep 20
     fi
 
+    echo >&2 "D stop_all_netdata() 9."
     for p in $(netdata_pids); do
       # shellcheck disable=SC2086
       echo >&2 "Executing 'stop_netdata_on_pid ${p}'."
