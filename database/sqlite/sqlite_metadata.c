@@ -1309,6 +1309,8 @@ void metaqueue_store_claim_id(uuid_t *host_uuid, uuid_t *claim_uuid)
 
 void metaqueue_host_update_info(RRDHOST *host)
 {
+    if (unlikely(!metasync_worker.loop))
+        return;
     queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
 }
 
