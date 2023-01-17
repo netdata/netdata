@@ -177,7 +177,7 @@ DBENGINE memory is related to the number of metrics concurrently being collected
 DBENGINE is automatically sized to use memory according to this equation:
 
 ```
-memory in KiB = METRICS x (TIERS - 1) x 2 x 4KiB + 32768 KiB
+memory in KiB = METRICS x (TIERS - 1) x 4KiB x 2 + 32768 KiB
 ```
 
 Where:
@@ -190,13 +190,13 @@ Where:
 So, for 2000 metrics (dimensions) in 3 storage tiers:
 
 ```
-memory for 2k metrics = 2000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 64 MiB
+memory for 2k metrics = 2000 x (3 - 1) x 4 KiB x 2 + 32768 KiB = 64 MiB
 ```
 
 For 100k concurrently collected metrics in 3 storage tiers:
 
 ```
-memory for 100k metrics = 100000 x (3 - 1) x 2 x 4 KiB + 32768 KiB = 1.6 GiB
+memory for 100k metrics = 100000 x (3 - 1) x 4 KiB x 2 + 32768 KiB = 1.6 GiB
 ```
 
 #### Exceptions
@@ -209,17 +209,61 @@ Netdata has several protection mechanisms to prevent the use of more memory (tha
 
 ### Caches
 
+DBENGINE stores metric data to disk. To achieve high performance even under severe stress, it uses several layers of caches.
+
 #### Main Cache
+
+Stores page data. It is the primary storage of hot and dirty pages (before they are saved to disk), and its clean queue is the LRU cache for speeding up queries.
+
+The entire DBENGINE is designed to use the hot queue size (the currently collected metrics) as the key for sizing all its memory consumption. We call this feature **memory ballooning**. More collected metrics, bigger main cache and vice versa.
+
+In the equation:
+
+```
+memory in KiB = METRICS x (TIERS - 1) x 4KiB x 2 + 32768 KiB
+```
+
+the part `METRICS x (TIERS - 1) x 4KiB` is an estimate for the max hot size of the main cache. Tier 0 pages are 4KiB, but tier 1 pages are 2 KiB and tier 2 pages are 384 bytes. So a single metric in 3 tiers uses 4096 + 2048 + 384 = 6528 bytes. The equation estimates 8192 per metric, which includes cache internal structures and leaves some spare.
+
+Then `x 2` is the worst case estimate for the dirty queue. If all collected metrics (hot) become available for saving at once, to avoid stopping data collection all their pages will become dirty and new hot pages will be created instantly. To save memory, when Netdata starts, DBENGINE allocates randomly smaller pages for metrics, to spread their completion evenly across time.
+
+The memory we saved with the above is used to improve the LRU cache. So, although we reserved 32MiB for the LRU, in bigger setups (Netdata Parents) the LRU grows a lot more, within the limits of the equation.
+
+In practice, the main cache sizes itself with `hot x 1.5` instead of `host x 2`. The reason is that 5% of main cache is reserved for expanding open cache, 5% for expanding extent cache and we need room for the extensive buffers that are allocated in these setups. When the main cache exceeds `hot x 1.5` it enters a mode of critical evictions, and aggresively frees pages from the LRU to maintain a healthy memory footprint within its design limits.
 
 #### Open Cache
 
+Stores metadata about on disk pages. Not the data itself. Only metadata about the location of the data on disk.
+
+Its primary use is to index information about the open datafile, the one that still accepts new pages. Once that datafile becomes full, all the hot pages of the open cache are indexed in journal v2 files.
+
+The clean queue is an LRU for reducing the journal v2 scans during quering.
+
+Open cache uses memory ballooning too, like the main cache, based on its own hot pages. Open cache hot size is mainly controlled by the size of the open datafile. This is why on netdata versions with journal files v2, we decreased the maximum datafile size from 1GB to 512MB and we increased the target number of datafiles from 20 to 50.
+
+On bigger setups open cache will get a bigger LRU by automatically sizing it (the whole open cache) to 5% to the size of (the whole) main cache.
+
 #### Extent Cache
 
+Caches compressed **extent** data, to avoid reading too repeatedly the same data from disks.
+
+
 ### Shared Memory
+
+Journal v2 indexes are mapped into memory. Netdata attempts to minimize shared memory use by instructing the kernel about the use of these files, or even unmounting them when they are not needed.
+
+The time-ranges of the queries running control the amount of shared memory required.
 
 ## Metrics Registry
 
 DBENGINE uses 150 bytes of memory for every metric for which retention is maintained but is not currently being collected.
+
+---
+
+--- OLD DOCS BELOW THIS POINT ---
+
+---
+
 
 ## Legacy configuration
 
