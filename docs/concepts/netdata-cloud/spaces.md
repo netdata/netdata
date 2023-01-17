@@ -9,68 +9,43 @@ learn_rel_path: "Concepts/Netdata cloud"
 learn_docs_purpose: "Present the purpose of Spaces"
 -->
 
+A Space is a high-level container. It's a virtual collaboration area where you can organize team members, access
+levels, and the nodes you want to monitor.
 
-**********************************************************************
+You can use any number of Spaces you want, but as you organize your Cloud experience, keep in mind that you can only add
+any given node to a single Space. This 1:1 relationship between node and Space may dictate whether you use one
+encompassing Space for your entire team and separate them by War Rooms, or use different Spaces for teams monitoring
+discrete parts of your infrastructure.
 
-A Space is a high-level container. It's a virtual collaboration area  where you can organize team members, access levels,and the
-nodes you want to monitor.
+If you have been invited to Netdata Cloud by another user by default you will be able to see this space. If you are a new
+user the first space is already created.
 
-[Read here](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/setup-spaces-and-rooms.md#how-to-organize-your-netdata-cloud) to learn some recommended strategies for creating the most intuitive Cloud experience for your team.
+The other consideration for the number of Spaces you use to organize your Netdata Cloud experience is the size and
+complexity of your organization.
 
-## Space Navigation
+For small team and infrastructures we recommend sticking to a single Space so that you can keep all your nodes and their
+respective metrics in one place. You can then use
+multiple [War Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md) to further
+organize your infrastructure monitoring.
 
-Click on any of the boxes to switch between available Spaces.
+Enterprises may want to create multiple Spaces for each of their larger teams, particularly if those teams have
+different responsibilities or parts of the overall infrastructure to monitor. For example, you might have one SRE team
+for your user-facing SaaS application and a second team for infrastructure tooling. If they don't need to monitor the
+same nodes, you can create separate Spaces for each team.
 
-Netdata Cloud abbreviates each Space to the first letter of the name, or the first two letters if the name is two words
-or more. Hover over each icon to see the full name in a tooltip.
-
-To add a new Space, click on the green **+** button . Enter the name of the Space and click **Save**.
-
-<!-- is this a task already
-
-## Space Management
-
-Manage your spaces by selecting in a particular space and clicking in the small gear icon in the lower left corner. This
-will open a side tab in which you can:
-
-1. _Configure this Space*_, in the first tab (**Space**) you can change the name, description or/and some privilege
-   options of this space
-
-2. _Edit the War Rooms*_, click on the **War rooms** tab to add or remove War Rooms.
-
-3. _Connect nodes*_, click on **Nodes** tab. Copy the claiming script to your node and run it. See the
-   [connect to Cloud doc](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md) for details.
-
-4. _Manage the users*_, click on **Users**. The relative [Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md#add-users-to-a-war-room)
-   that details the invitation process.
-
-5. _Manage notification setting*_, click on **Notifications** tab to turn off/on notification methods.
-
-6. _Manage your bookmarks*_, click on the **Bookmarks** tab to add or remove bookmarks that you need.
-
-:::note \* This action requires admin rights for this space
-:::
-
-## Obsolete Offline Nodes
-
-Netdata admin users now have the ability to remove obsolete nodes from a space, with the following conditions recognized:
-
-- Only offline nodes can be marked obsolete (Live nodes and stale nodes cannot be obsoleted)
-- Node obsoletion works across the entire space, so the obsoleted node will be removed from all rooms belonging to the
-  space
-- If the obsoleted nodes eventually become live or online once more they will be automatically re-added to the space
-
--->
+We advise you to also explore the [recommended strategies](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/setup-spaces-and-rooms.md#how-to-organize-your-netdata-cloud) for creating the most intuitive Cloud experience for your team.
 
 ### Related Topics
 
 #### **Related Concepts**
+
 - [Netdata Views](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
 - [Rooms](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md)
 - [Dashboards](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md)
 - [From raw metrics to visualizations](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 #### Related Tasks
+
 - [Space Administration](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/spaces.md)
 - [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
 - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)

@@ -1,65 +1,35 @@
 <!--
-title: "Rooms"
-sidebar_label: "Rooms"
+title: "War Rooms"
+sidebar_label: "War Rooms"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/rooms.md"
 sidebar_position: "1700"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts/Netdata cloud"
-learn_docs_purpose: "Present the concept of a room, it's purpose and use cases"
+learn_docs_purpose: "Present the concept of a War Room, it's purpose and use cases"
 -->
 
-
-**********************************************************************
+### War Room definition
 
 War Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and
 visualizations.
 
-Once you add nodes to a Space, all of your nodes will be visible in the _All nodes_ War Room. This is a special War Room
+Once you add nodes to a Space, all of your nodes will be visible in the All nodes War Room. This is a special War Room
 which gives you an overview of all of your nodes in this particular space. Then you can create functional separations of
-your nodes into more War Rooms. 
+your nodes into more War Rooms. Every War Room has its own dashboards, navigation, indicators, and management tools.
 
-Every War Room has its own dashboards, navigation, indicators, and management tools.
+### **All nodes** War room
 
-## War Room navigation
-
-### Switching between views - static tabs
-
-Every War Rooms provides multiple views. Each view focus on a particular area/subject of the nodes which you monitor in
-this War Rooms. Let's explore what view you have available:
-
-- The default view for any War Room is the **Home** tab, which gives you an overview
-  of this space. Here you can see the number of Nodes claimed, data retention statics, user particate, alerts and more
-
-- The second and most important view is the **Overview** tab which uses composite
-  charts to display real-time metrics from every available node in a given War Room.
-
-- The **Nodes** tab gives you the ability to see the status (offline or online), host details
-  , alarm status and also a short overview of some key metrics from all your nodes at a glance.
-
-- **Kubernetes** tab is a logical grouping of charts regards to your Kubernetes clusters.
-  It contains a subset of the charts available in the _Overview tab_
-
-- The **Dashboards** tab gives you the ability to have tailored made views of
-  specific/targeted interfaces for your infrastructure using any number of charts from any number of nodes.
-
-- The **Alerts** tab provides you with an overview for all the active alerts you receive for the nodes in this War Room,
-  you can also see alla the alerts that are configured to be triggered in any given moment.
-
-- The **Anomalies** tab is dedicated to the [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/guided-troubleshooting.md#anomaly-advisor) tool
-
-### Non static tabs
-
-If you open a new dashboard, jump to a single-node dashboard, or navigate to a dedicated
-alert page, each of these will open in a new War Room tab.
-
-Tabs can be rearranged with drag-and-drop or closed with the **X** button. Open tabs persist between sessions, so you
-can always come right back to your preferred setup.
+The **All nodes** War room is an unique War Room for your each of your Spaces. All the Nodes that are claimed to a
+particular
+space belong to this War Room So you have a comprehensive overview of the Nodes in your Space.
 
 ### Play, pause, force play, and timeframe selector
 
 A War Room has three different states: playing, paused, and force playing. The default playing state refreshes charts
-every second as long as the browser tab is in focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md) pauses
+every second as long as the browser tab is in
+focus. [Interacting with a chart](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
+pauses
 the War Room. Once the tab loses focus, charts pause automatically.
 
 The top navigation bar features a play/pause button to quickly change the state, and a dropdown to select **Force Play**
@@ -76,7 +46,6 @@ node. Click **Clear** to remove any changes and apply the default 15-minute time
 
 The fields beneath the calendar display the beginning and ending timestamps your selected timeframe.
 
-
 ### Node filter
 
 The node filter allows you to quickly filter the nodes visualized in a War Room's views. It appears on all views, but
@@ -84,10 +53,10 @@ not on single-node dashboards.
 
 ![The node filter](https://user-images.githubusercontent.com/12612986/172674440-df224058-2b2c-41da-bb45-f4eb82e342e5.png)
 
+### War Room Organization
 
-## Tips for organizing your War Room
-
-You are free to organize your War Rooms to your liking. We do, however, offer a few recommended trategies for organizing your War Rooms.
+You are free to organize your War Rooms to your liking. We do, however, offer a few recommended trategies for organizing
+your War Rooms.
 
 **Service, purpose, location, etc.**: You can group War Rooms by a service (think Nginx, MySQL, Pulsar, and so on),
 their purpose (webserver, database, application), their physical location, whether they're baremetal or a Docker
@@ -106,34 +75,6 @@ messages rate. You can create a War Room called `$year-$month-$day-pulsar-rate`,
 to nodes they connect to, and begin diagnosing the root cause in a War Room optimized for getting to resolution as fast
 as possible.
 
-## Adding All the War Rooms you want
-
-To add new War Rooms to any Space, click on the green plus icon **+** next the **War Rooms** heading. on the left (
-space's) sidebar.
-
-In the panel, give the War Room a name and description, and choose whether it's public or private. Anyone in your Space
-can join public War Rooms, but can only join private War Rooms with an invitation.
-
-## Managing War Rooms
-
-All the users and nodes involved in a particular space can potentially be part of a War Room.
-
-Any user can change simple settings of a War Room, like the name or the users participating in it. Click on the gear 
-icon of the War Room's name in the top of the page to do that. A sidebar will open with options for this War Room:
-
-1. To _change a War Room's name, description, or public/private status_, click on **War Room** tab of the sidebar.
-
-2. To _include an existing node_ to a War Room or _connect a new node*_ click on **Nodes** tab of the sidebar. Choose any
-connected node you want to add to this War Room by clicking on the checkbox next to its hostname, then click **+ Add**
-at the top of the panel.
-
-3. To _add existing users to a War Room_, click on **Add Users**. See our relative [Task](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md#add-users-to-a-war-room)
-for details on inviting new users to your Space in Netdata Cloud.
-
-:::note
- This action requires admin rights for this space
-:::
-
 ### Bookmarks for  essential resources
 
 When an anomaly or outage strikes, your team needs to access other essential resources quickly. You can use Netdata
@@ -147,24 +88,17 @@ changes in your infrastructure.
 To add a new bookmark, click on the **Add bookmark** link. In the panel, name the bookmark, include its URL, and write a
 short description for your team's reference.
 
-### More actions
-
-To _view or remove nodes_ in a War Room, click on **Nodes view**. To remove a node from the current War Room, click on
-the **🗑** icon. 
-
-:::Note
- Removing a node from a War Room does not remove it from your Space.
-:::
-
 ## Related Topics
 
 ### **Related Concepts**
+
 - [Spaces](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/spaces.md)
 - [Netdata Views](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/netdata-views.md)
 - [Dashboards](https://github.com/netdata/netdata/blob/master/docs/concepts/visualizations/dashboards.md)
 - [From raw metrics to visualizations](https://github.com/netdata/master/blob/master/docs/concepts/visualizations/from-raw-metrics-to-visualization.md)
 
 ### Related Tasks
+
 - [Room Management](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md)
 - [Claiming an existing agent to Cloud](https://github.com/netdata/netdata/blob/master/docs/tasks/setup/claim-existing-agent-to-cloud.md)
 - [Interact with charts](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md)
