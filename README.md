@@ -16,10 +16,20 @@
 
 <img src="https://user-images.githubusercontent.com/1153921/95269366-1b814680-07ee-11eb-8ff4-c1b0b8758499.png" alt="---" style="max-width: 100%;" />
 
-Netdata's **distributed, real-time monitoring Agent** collects thousands of metrics from systems, hardware, containers,
-and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud
-deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any
-preparation.
+Netdata is a distributed, real-time, performance and health monitoring platform for systems, hardware, containers and applications, collecting thousands of useful metrics with zero configuration needed. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices, and is perfectly safe to install on your systems mid-incident without any preparation.
+
+The Netdata [Agent](https://github.com/netdata/netdata) is an enormously powerful, **Open-Sourced**, **Single Node** health monitoring and performance troubleshooting tool.
+It gives you the ability to automatically identify processes, collect and store metrics locally and even more - visualize all metrics without any configuration (of course you can tweak it later on if you need).
+
+[Netdata Cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant agents to display your metrics, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric).
+
+It gives you some extra features, like [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), [Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
+
+Try it for yourself right now by checking out the Netdata Cloud [demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (No sign up or login needed).
+
+Netdata's mission is to help more people troubleshoot ever more complex IT infrastructures, this is why our **free** [community plan](https://www.netdata.cloud/pricing) gives you ability to monitor unlimited number of Nodes, Containers and Metrics (custom or built-in).
+
+Due to the distributed nature of Netdata, and to ensure high-availability of your monitoring system, please check our [Data Replication](https://www.netdata.cloud/blog/why-is-data-replication-important) recommendations to increase the data availability.
 
 You can install Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more), container platforms (Kubernetes
 clusters, Docker), and many other operating systems (FreeBSD, macOS). No `sudo` required.
@@ -106,6 +116,24 @@ Netdata works with tons of applications, notifications platforms, and other time
   <a href="https://hub.docker.com/r/netdata/netdata"><img src="https://registry.my-netdata.io/api/v1/badge.svg?chart=dockerhub.pulls_sum&divide=1000&precision=1&units=k&label=docker+hub+pulls&after=-86400&group=incremental-sum&label=docker%20hub%20pulls%20today&options=unaligned&v44" alt="Docker Hub pulls today"></a>
 </p>
 
+### Infrastructure view
+
+Due to the distributed nature of the Netdata ecosystem, it is recommended to setup not only one Netdata Agent on your production system, but also an additional Netdata Agent acting as a [Parent](https://learn.netdata.cloud/docs/agent/streaming). A local Netdata Agent (child), without any database or alarms, collects metrics and sends them to another Netdata Agent (parent). The same parent can collect data for any number of child nodes and serves as a centralized health check engine for each child by triggering alerts on their behalf.
+
+![Netdata Cloud](https://user-images.githubusercontent.com/423236/205926887-43024984-6d38-46ad-96cb-d0c388117c6d.png)
+
+Get started by [signing in](https://app.netdata.cloud/?utm_source=website&utm_content=top_navigation_sign_up) to Netdata.cloud and follow the setup guide.
+
+Community version is free to use forever. No restriction on number of nodes, clusters or metrics. Unlimited alerts.
+
+#### Claiming existing Agents
+
+You can easily [connect (claim)](https://learn.netdata.cloud/docs/agent/claim) your existing Agents to the Cloud to unlock features for free and to find weaknesses before they turn into outages. 
+
+### Single Node view
+
+In case you do not need the infrastructure view of you system you can install standalone Agent and enjoy the local dashboard.
+
 To install Netdata from source on most Linux systems (physical, virtual, container, IoT, edge), run our [one-line
 installation script](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/packages). This script downloads
 and builds all dependencies, including those required to connect to [Netdata Cloud](https://netdata.cloud/cloud) if you
@@ -160,14 +188,6 @@ Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
-
-### Netdata Cloud
-
-Netdata Cloud works with Netdata's free, open-source monitoring agent to help you monitor and troubleshoot every 
-layer of your systems to find weaknesses before they turn into outages. [Using both tools](https://learn.netdata.cloud/docs/agent/claim) 
-can help you turn data into insights immediately.
-
-[Get Netdata Cloud now!](https://app.netdata.cloud/)
 
 ## How it works
 
