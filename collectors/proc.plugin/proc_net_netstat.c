@@ -356,7 +356,7 @@ static void do_proc_net_snmp6(int update_every) {
     if (unlikely(!ff_snmp6))
         return;
 
-    size_t lines, l, words;
+    size_t lines, l;
 
     lines = procfile_lines(ff_snmp6);
 

@@ -2077,6 +2077,52 @@ static void dbengine2_statistics_charts(void) {
     }
 
     {
+        static RRDSET *st_events = NULL;
+        static RRDDIM *rd_journal_v2_mapped = NULL;
+        static RRDDIM *rd_journal_v2_unmapped = NULL;
+        static RRDDIM *rd_datafile_creation = NULL;
+        static RRDDIM *rd_datafile_deletion = NULL;
+        static RRDDIM *rd_datafile_deletion_spin = NULL;
+        static RRDDIM *rd_jv2_indexing = NULL;
+        static RRDDIM *rd_retention = NULL;
+
+        if (unlikely(!st_events)) {
+            st_events = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_events",
+                    NULL,
+                    "dbengine query router",
+                    NULL,
+                    "Netdata Database Events",
+                    "events/s",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_journal_v2_mapped = rrddim_add(st_events, "journal v2 mapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_journal_v2_unmapped = rrddim_add(st_events, "journal v2 unmapped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_datafile_creation = rrddim_add(st_events, "datafile creation", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_datafile_deletion = rrddim_add(st_events, "datafile deletion", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_datafile_deletion_spin = rrddim_add(st_events, "datafile deletion spin", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_jv2_indexing = rrddim_add(st_events, "journal v2 indexing", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_retention = rrddim_add(st_events, "retention", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_events, rd_journal_v2_mapped, (collected_number)cache_efficiency_stats.journal_v2_mapped);
+        rrddim_set_by_pointer(st_events, rd_journal_v2_unmapped, (collected_number)cache_efficiency_stats.journal_v2_unmapped);
+        rrddim_set_by_pointer(st_events, rd_datafile_creation, (collected_number)cache_efficiency_stats.datafile_creation_started);
+        rrddim_set_by_pointer(st_events, rd_datafile_deletion, (collected_number)cache_efficiency_stats.datafile_deletion_started);
+        rrddim_set_by_pointer(st_events, rd_datafile_deletion_spin, (collected_number)cache_efficiency_stats.datafile_deletion_spin);
+        rrddim_set_by_pointer(st_events, rd_jv2_indexing, (collected_number)cache_efficiency_stats.journal_v2_indexing_started);
+        rrddim_set_by_pointer(st_events, rd_retention, (collected_number)cache_efficiency_stats.metrics_retention_started);
+
+        rrdset_done(st_events);
+    }
+
+    {
         static RRDSET *st_prep_timings = NULL;
         static RRDDIM *rd_routing = NULL;
         static RRDDIM *rd_main_cache = NULL;

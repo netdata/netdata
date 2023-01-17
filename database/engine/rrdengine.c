@@ -733,13 +733,22 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
-void *dbengine_page_alloc(struct rrdengine_instance *ctx __maybe_unused, size_t size) {
+void *dbengine_page_alloc(size_t size) {
     void *page = mallocz(size);
     return page;
 }
 
-void dbengine_page_free(void *page) {
+void dbengine_page_free(void *page, size_t size __maybe_unused) {
     freez(page);
+}
+
+void *dbengine_extent_alloc(size_t size) {
+    void *extent = mallocz(size);
+    return extent;
+}
+
+void dbengine_extent_free(void *extent, size_t size __maybe_unused) {
+    freez(extent);
 }
 
 static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
@@ -1059,15 +1068,15 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     unsigned v2_count = 0;
     unsigned journalfile_count = 0;
     while (datafile) {
-        struct journal_v2_header *journal_header = (struct journal_v2_header *) GET_JOURNAL_DATA(datafile->journalfile);
-        if (!journal_header || !datafile->users.available) {
+        struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
+        if (!j2_header) {
             datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
             continue;
         }
 
-        time_t journal_start_time_s = (time_t) (journal_header->start_time_ut / USEC_PER_SEC);
-        size_t journal_metric_count = (size_t)journal_header->metric_count;
-        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+        time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+        size_t journal_metric_count = (size_t)j2_header->metric_count;
+        struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
         Word_t index = 0;
         bool first_then_next = true;
@@ -1087,6 +1096,7 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             v2_count++;
         }
         journalfile_count++;
+        journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
     }
 
@@ -1117,19 +1127,21 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
+
     if(worker)
         worker_is_busy(UV_EVENT_ANALYZE_V2);
 
-    struct rrdengine_journalfile *journal_file = datafile_to_delete->journalfile;
-    struct journal_v2_header *journal_header = (struct journal_v2_header *)GET_JOURNAL_DATA(journal_file);
-    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) journal_header + journal_header->metric_offset);
+    struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
+    struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
     Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
     Pvoid_t *PValue;
 
     unsigned count = 0;
     struct uuid_first_time_s *uuid_first_t_entry;
-    for (uint32_t index = 0; index < journal_header->metric_count; ++index) {
+    for (uint32_t index = 0; index < j2_header->metric_count; ++index) {
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
         if (!metric)
             continue;
@@ -1146,6 +1158,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             count++;
         }
     }
+    journalfile_v2_data_release(journalfile);
 
     info("DBENGINE: recalculating retention for %u metrics", count);
 
@@ -1198,10 +1211,12 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
                          "it is in use currently by %u users.",
                  ctx->dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno, datafile->users.lockers);
 
+            __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_spin, 1, __ATOMIC_RELAXED);
             sleep_usec(1 * USEC_PER_SEC);
         }
     }
 
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_deletion_started, 1, __ATOMIC_RELAXED);
     info("DBENGINE: deleting data file '%s/"
          DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION
          "'.",
@@ -1220,15 +1235,15 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
     journal_file_bytes = journal_file->pos;
-    deleted_bytes = GET_JOURNAL_DATA_SIZE(journal_file);
+    deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
     info("DBENGINE: deleting data and journal files to maintain disk quota");
     datafile_list_delete_unsafe(ctx, datafile);
-    ret = destroy_journal_file_unsafe(journal_file, datafile);
+    ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
-        generate_journalfilepath(datafile, path, sizeof(path));
+        journalfile_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
-        generate_journalfilepath_v2(datafile, path, sizeof(path));
+        journalfile_v2_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
         deleted_bytes += journal_file_bytes;
     }
@@ -1377,9 +1392,10 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
         if(!available)
             continue;
 
-        if (unlikely(!GET_JOURNAL_DATA(datafile->journalfile))) {
+        if (unlikely(!journalfile_v2_data_available(datafile->journalfile))) {
             info("DBENGINE: journal file %u is ready to be indexed", datafile->fileno);
-            pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type, do_migrate_to_v2_callback, (void *) datafile->journalfile);
+            pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type,
+                                         journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
             count++;
         }
 

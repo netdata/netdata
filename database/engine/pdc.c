@@ -1078,7 +1078,7 @@ static bool epdl_populate_pages_from_extent_data(
         if(worker)
             worker_is_busy(UV_EVENT_PAGE_POPULATION);
 
-        void *page_data = dbengine_page_alloc(ctx, vd.page_length);
+        void *page_data = dbengine_page_alloc(vd.page_length);
 
         if (unlikely(!vd.data_on_disk_valid)) {
             fill_page_with_nulls(page_data, vd.page_length, vd.type);
@@ -1120,7 +1120,7 @@ static bool epdl_populate_pages_from_extent_data(
         bool added = true;
         PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
         if (false == added) {
-            dbengine_page_free(page_data);
+            dbengine_page_free(page_data, vd.page_length);
             stats_cache_hit_while_inserting++;
             stats_data_from_main_cache++;
         }
@@ -1227,7 +1227,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(mmap_data != MAP_FAILED) {
             extent_compressed_data = mmap_data + (epdl->extent_offset - map_start);
 
-            void *copied_extent_compressed_data = mallocz(epdl->extent_size);
+            void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
             memcpy(copied_extent_compressed_data, extent_compressed_data, epdl->extent_size);
 
             int ret = munmap(mmap_data, length);
@@ -1249,7 +1249,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
             }, &added);
 
             if (!added) {
-                freez(copied_extent_compressed_data);
+                dbengine_extent_free(copied_extent_compressed_data, epdl->extent_size);
                 internal_fatal(epdl->extent_size != pgc_page_data_size(extent_cache, extent_cache_page),
                                "DBENGINE: cache size does not match the expected size");
             }

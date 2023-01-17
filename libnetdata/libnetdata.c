@@ -1184,6 +1184,14 @@ inline int madvise_sequential(void *mem, size_t len) {
     return ret;
 }
 
+inline int madvise_random(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_RANDOM);
+
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_RANDOM) failed.");
+    return ret;
+}
+
 inline int madvise_dontfork(void *mem, size_t len) {
     static int logger = 1;
     int ret = madvise(mem, len, MADV_DONTFORK);
@@ -1197,6 +1205,14 @@ inline int madvise_willneed(void *mem, size_t len) {
     int ret = madvise(mem, len, MADV_WILLNEED);
 
     if (ret != 0 && logger-- > 0) error("madvise(MADV_WILLNEED) failed.");
+    return ret;
+}
+
+inline int madvise_dontneed(void *mem, size_t len) {
+    static int logger = 1;
+    int ret = madvise(mem, len, MADV_DONTNEED);
+
+    if (ret != 0 && logger-- > 0) error("madvise(MADV_DONTNEED) failed.");
     return ret;
 }
 
@@ -1224,7 +1240,7 @@ inline int madvise_mergeable(void *mem __maybe_unused, size_t len __maybe_unused
 #endif
 }
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only)
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd)
 {
     // info("netdata_mmap('%s', %zu", filename, size);
 
@@ -1281,15 +1297,20 @@ void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool r
             else info("Cannot seek to beginning of file '%s'.", filename);
         }
 
-        madvise_sequential(mem, size);
+        // madvise_sequential(mem, size);
         madvise_dontfork(mem, size);
         madvise_dontdump(mem, size);
-        if(flags & MAP_SHARED) madvise_willneed(mem, size);
+        // if(flags & MAP_SHARED) madvise_willneed(mem, size);
         if(ksm) madvise_mergeable(mem, size);
     }
 
 cleanup:
-    if(fd != -1) close(fd);
+    if(fd != -1) {
+        if (open_fd)
+            *open_fd = fd;
+        else
+            close(fd);
+    }
     if(mem == MAP_FAILED) return NULL;
     errno = 0;
     return mem;

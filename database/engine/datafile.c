@@ -447,10 +447,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (0 != ret) {
             must_delete_pair = 1;
         }
-        journalfile = mallocz(sizeof(*journalfile));
-        datafile->journalfile = journalfile;
-        journalfile_init(journalfile, datafile);
-        ret = load_journal_file(ctx, journalfile, datafile);
+        journalfile = journalfile_alloc_and_init(datafile);
+        ret = journalfile_load(ctx, journalfile, datafile);
         if (0 != ret) {
             if (!must_delete_pair) /* If datafile is still open close it */
                 close_data_file(datafile);
@@ -460,9 +458,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             char path[RRDENG_PATH_MAX];
 
             error("DBENGINE: deleting invalid data and journal file pair.");
-            ret = unlink_journal_file(journalfile);
+            ret = journalfile_unlink(journalfile);
             if (!ret) {
-                generate_journalfilepath(datafile, path, sizeof(path));
+                journalfile_generate_path(datafile, path, sizeof(path));
                 info("DBENGINE: deleted journal file \"%s\".", path);
             }
             ret = unlink_data_file(datafile);
@@ -488,6 +486,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 /* Creates a datafile and a journalfile pair */
 int create_new_datafile_pair(struct rrdengine_instance *ctx)
 {
+    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.datafile_creation_started, 1, __ATOMIC_RELAXED);
+
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
     unsigned fileno = __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED) + 1;
@@ -497,23 +497,20 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     info("DBENGINE: creating new data and journal files in path %s", ctx->dbfiles_path);
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
-    if (!ret) {
-        generate_datafilepath(datafile, path, sizeof(path));
-        info("DBENGINE: created data file \"%s\".", path);
-    } else {
+    if(ret)
         goto error_after_datafile;
-    }
 
-    journalfile = mallocz(sizeof(*journalfile));
-    datafile->journalfile = journalfile;
-    journalfile_init(journalfile, datafile);
-    ret = create_journal_file(journalfile, datafile);
-    if (!ret) {
-        generate_journalfilepath(datafile, path, sizeof(path));
-        info("DBENGINE: created journal file \"%s\".", path);
-    } else {
+    generate_datafilepath(datafile, path, sizeof(path));
+    info("DBENGINE: created data file \"%s\".", path);
+
+    journalfile = journalfile_alloc_and_init(datafile);
+    ret = journalfile_create(journalfile, datafile);
+    if (ret)
         goto error_after_journalfile;
-    }
+
+    journalfile_generate_path(datafile, path, sizeof(path));
+    info("DBENGINE: created journal file \"%s\".", path);
+
     datafile_list_insert(ctx, datafile);
     ctx->disk_space += datafile->pos + journalfile->pos;
 
@@ -524,10 +521,9 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
 error_after_journalfile:
     destroy_data_file_unsafe(datafile);
     freez(journalfile);
+
 error_after_datafile:
     freez(datafile);
-
-    uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
     return ret;
 }
 
@@ -587,7 +583,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
             }
         } while(!available);
 
-        close_journal_file(journalfile, datafile);
+        journalfile_close(journalfile, datafile);
         close_data_file(datafile);
         datafile_list_delete_unsafe(ctx, datafile);
         netdata_spinlock_unlock(&datafile->writers.spinlock);

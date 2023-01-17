@@ -31,11 +31,6 @@ struct rrdeng_cmd;
 
 #define MAX_PAGES_PER_EXTENT (64) /* TODO: can go higher only when journal supports bigger than 4KiB transactions */
 
-#define GET_JOURNAL_DATA(x) __atomic_load_n(&(x)->journal_data, __ATOMIC_ACQUIRE)
-#define GET_JOURNAL_DATA_SIZE(x) __atomic_load_n(&(x)->journal_data_size, __ATOMIC_ACQUIRE)
-#define SET_JOURNAL_DATA(x, y) __atomic_store_n(&(x)->journal_data, (y), __ATOMIC_RELEASE)
-#define SET_JOURNAL_DATA_SIZE(x, y) __atomic_store_n(&(x)->journal_data_size, (y), __ATOMIC_RELEASE)
-
 #define RRDENG_FILE_NUMBER_SCAN_TMPL "%1u-%10u"
 #define RRDENG_FILE_NUMBER_PRINT_TMPL "%1.1u-%10.10u"
 
@@ -397,8 +392,11 @@ struct rrdengine_instance {
 
 #define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce, __ATOMIC_RELAXED) == NO_QUIESCE)
 
-void *dbengine_page_alloc(struct rrdengine_instance *ctx, size_t size);
-void dbengine_page_free(void *page);
+void *dbengine_page_alloc(size_t size);
+void dbengine_page_free(void *page, size_t size);
+
+void *dbengine_extent_alloc(size_t size);
+void dbengine_extent_free(void *extent, size_t size);
 
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
@@ -445,5 +443,13 @@ typedef struct validated_page_descriptor {
         ((page_length_in_bytes) / (point_size_in_bytes))
 
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
+
+typedef enum {
+    PAGE_IS_IN_THE_PAST   = -1,
+    PAGE_IS_IN_RANGE      =  0,
+    PAGE_IS_IN_THE_FUTURE =  1,
+} TIME_RANGE_COMPARE;
+
+TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s);
 
 #endif /* NETDATA_RRDENGINE_H */

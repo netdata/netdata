@@ -190,6 +190,15 @@ struct rrdeng_cache_efficiency_stats {
     size_t pages_invalid_size_skipped;
     size_t pages_invalid_update_every_fixed;
     size_t pages_invalid_entries_fixed;
+
+    // database events
+    size_t journal_v2_mapped;
+    size_t journal_v2_unmapped;
+    size_t datafile_creation_started;
+    size_t datafile_deletion_started;
+    size_t datafile_deletion_spin;
+    size_t journal_v2_indexing_started;
+    size_t metrics_retention_started;
 };
 
 struct rrdeng_buffer_sizes {

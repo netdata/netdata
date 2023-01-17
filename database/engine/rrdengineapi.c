@@ -290,7 +290,7 @@ time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
         memcpy(pgc_page_data(page), data, PAGE_POINT_CTX_SIZE_BYTES(ctx));
 
         // free data
-        dbengine_page_free(page_entry.data);
+        dbengine_page_free(page_entry.data, data_size);
 
         handle->page_entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
     }
@@ -338,7 +338,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     }
 
     *data_size = size;
-    return dbengine_page_alloc(ctx, size);
+    return dbengine_page_alloc(size);
 }
 
 static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection_handle,
@@ -964,11 +964,11 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
 {
-    void *data_start = GET_JOURNAL_DATA(datafile->journalfile);
-    if (unlikely(!data_start))
-        return;
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
+    void *data_start = (void *)j2_header;
 
-    struct journal_v2_header *j2_header = (void *) data_start;
+    if(unlikely(!j2_header))
+        return;
 
     stats->extents += j2_header->extent_count;
 
@@ -1026,6 +1026,8 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
         }
         metric++;
     }
+
+    journalfile_v2_data_release(datafile->journalfile);
 }
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
@@ -1034,11 +1036,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next) {
         stats.datafiles++;
-
-        if (GET_JOURNAL_DATA(df->journalfile)) {
-            // FIXME: Rework statistics based only on V2
-            populate_v2_statistics(df, &stats);
-        }
+        populate_v2_statistics(df, &stats);
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 

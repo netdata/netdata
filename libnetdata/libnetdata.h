@@ -308,8 +308,10 @@ char *trim(char *s); // remove leading and trailing spaces; may return NULL
 char *trim_all(char *buffer); // like trim(), but also remove duplicate spaces inside the string; may return NULL
 
 int madvise_sequential(void *mem, size_t len);
+int madvise_random(void *mem, size_t len);
 int madvise_dontfork(void *mem, size_t len);
 int madvise_willneed(void *mem, size_t len);
+int madvise_dontneed(void *mem, size_t len);
 int madvise_dontdump(void *mem, size_t len);
 int madvise_mergeable(void *mem, size_t len);
 
@@ -347,7 +349,7 @@ void posix_memfree(void *ptr);
 void json_escape_string(char *dst, const char *src, size_t size);
 void json_fix_string(char *s);
 
-void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only);
+void *netdata_mmap(const char *filename, size_t size, int flags, int ksm, bool read_only, int *open_fd);
 int netdata_munmap(void *ptr, size_t size);
 int memory_file_save(const char *filename, void *mem, size_t size);
 
