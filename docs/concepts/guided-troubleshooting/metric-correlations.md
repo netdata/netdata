@@ -1,7 +1,7 @@
 <!--
 title: "Metric Correlations"
 sidebar_label: "Metric Correlations"
-custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/machine-learning/metric-correlations.md"
+custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/concepts/guided-troubleshooting/metric-correlations.md"
 learn_status: "Published"
 sidebar_position: "4"
 learn_topic_type: "Concepts"
