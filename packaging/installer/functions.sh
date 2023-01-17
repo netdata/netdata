@@ -397,6 +397,7 @@ get_os_key() {
 }
 
 issystemd() {
+  echo >&2 "Start 'issystemd()'."
   pids=''
   p=''
   myns=''
@@ -411,15 +412,16 @@ issystemd() {
   # if there is no systemctl command, it is not systemd
   systemctl=$(command -v systemctl 2> /dev/null)
   if [ -z "${systemctl}" ] || [ ! -x "${systemctl}" ]; then
+    echo >&2 "Finish 'issystemd()'."
     return 1
   fi
 
   # if pid 1 is systemd, it is systemd
-  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && return 0
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && echo >&2 "Finish 'issystemd()'." && return 0
 
   # if systemd is not running, it is not systemd
   pids=$(safe_pidof systemd 2> /dev/null)
-  [ -z "${pids}" ] && return 1
+  [ -z "${pids}" ] && echo >&2 "Finish 'issystemd()'." && return 1
 
   # check if the running systemd processes are not in our namespace
   myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
@@ -427,9 +429,10 @@ issystemd() {
     ns="$(readlink "/proc/${p}/ns/pid" 2> /dev/null)"
 
     # if pid of systemd is in our namespace, it is systemd
-    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && return 0
+    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && echo >&2 "Finish 'issystemd()'." && return 0
   done
 
+  echo >&2 "Finish 'issystemd()'."
   # else, it is not systemd
   return 1
 }
@@ -713,7 +716,9 @@ stop_all_netdata() {
   stop_success=0
 
   if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/install-service.sh" ]; then
+    echo >&2 "Start 'run_install_service_script --cmds-only'."
     run_install_service_script --cmds-only
+    echo >&2 "Finish 'run_install_service_script --cmds-only'."
   fi
 
   if [ "${UID}" -eq 0 ]; then
