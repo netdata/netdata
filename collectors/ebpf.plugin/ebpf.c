@@ -548,32 +548,35 @@ static void ebpf_stop_threads(int sig)
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
-    //Unload threads(except sync and filesystem)
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
-            i != EBPF_MODULE_SYNC_IDX)
-            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    //Unload filesystem
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-        for (i = 0; localfs[i].filesystem != NULL; i++) {
-            ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    if (!i)  {
+        //Unload threads(except sync and filesystem)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        for (i = 0; ebpf_threads[i].name != NULL; i++) {
+            if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
+                i != EBPF_MODULE_SYNC_IDX)
+                ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
         }
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    //Unload Sync
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-        for (i = 0; local_syscalls[i].syscall != NULL; i++) {
-            ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+        //Unload filesystem
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
+            for (i = 0; localfs[i].filesystem != NULL; i++) {
+                ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+            }
         }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+        //Unload Sync
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
+            for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+                ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+            }
+        }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+
     }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit();
 }
