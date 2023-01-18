@@ -731,8 +731,8 @@ void *aclk_main(void *ptr)
         stats_thread->client = mqttwss_client;
         aclk_stats_thread_prepare(query_threads.count, proto_hdl_cnt);
         netdata_thread_create(
-            stats_thread->thread, ACLK_STATS_THREAD_NAME, NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
-            stats_thread);
+                stats_thread->thread, "ACLK_STATS", NETDATA_THREAD_OPTION_JOINABLE, aclk_stats_main_thread,
+                stats_thread);
     }
 
     // Keep reconnecting and talking until our time has come

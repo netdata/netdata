@@ -1553,13 +1553,15 @@ void *replication_thread_main(void *ptr __maybe_unused) {
         threads = 1;
     }
 
-    if(--threads) {
+    if(threads > 1) {
         replication_globals.main_thread.threads = threads;
         replication_globals.main_thread.threads_ptrs = mallocz(threads * sizeof(netdata_thread_t *));
 
-        for(int i = 0; i < threads ;i++) {
+        for(int i = 1; i < threads ;i++) {
+            char tag[NETDATA_THREAD_TAG_MAX + 1];
+            snprintfz(tag, NETDATA_THREAD_TAG_MAX, "REPLAY[%d]", i + 1);
             replication_globals.main_thread.threads_ptrs[i] = mallocz(sizeof(netdata_thread_t));
-            netdata_thread_create(replication_globals.main_thread.threads_ptrs[i], "REPLICATION",
+            netdata_thread_create(replication_globals.main_thread.threads_ptrs[i], tag,
                                   NETDATA_THREAD_OPTION_JOINABLE, replication_worker_thread, NULL);
         }
     }

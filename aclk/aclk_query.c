@@ -4,8 +4,6 @@
 #include "aclk_stats.h"
 #include "aclk_tx_msgs.h"
 
-#define ACLK_QUERY_THREAD_NAME "ACLK_Query"
-
 #define WEB_HDR_ACCEPT_ENC "Accept-Encoding:"
 
 pthread_cond_t query_cond_wait = PTHREAD_COND_INITIALIZER;
@@ -368,7 +366,7 @@ void aclk_query_threads_start(struct aclk_query_threads *query_threads, mqtt_wss
         query_threads->thread_list[i].idx = i; //thread needs to know its index for statistics
         query_threads->thread_list[i].client = client;
 
-        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "%s_%d", ACLK_QUERY_THREAD_NAME, i) < 0))
+        if(unlikely(snprintfz(thread_name, TASK_LEN_MAX, "ACLK_QRY[%d]", i) < 0))
             error("snprintf encoding error");
         netdata_thread_create(
             &query_threads->thread_list[i].thread, thread_name, NETDATA_THREAD_OPTION_JOINABLE, aclk_query_main_thread,

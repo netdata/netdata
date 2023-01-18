@@ -460,7 +460,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             error("DBENGINE: deleting invalid data and journal file pair.");
             ret = journalfile_unlink(journalfile);
             if (!ret) {
-                journalfile_generate_path(datafile, path, sizeof(path));
+                journalfile_v1_generate_path(datafile, path, sizeof(path));
                 info("DBENGINE: deleted journal file \"%s\".", path);
             }
             ret = unlink_data_file(datafile);
@@ -508,7 +508,7 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     if (ret)
         goto error_after_journalfile;
 
-    journalfile_generate_path(datafile, path, sizeof(path));
+    journalfile_v1_generate_path(datafile, path, sizeof(path));
     info("DBENGINE: created journal file \"%s\".", path);
 
     datafile_list_insert(ctx, datafile);

@@ -2548,7 +2548,7 @@ void *statsd_main(void *ptr) {
     for(i = 0; i < statsd.threads ;i++) {
         statsd.collection_threads_status[i].max_sockets = max_sockets / statsd.threads;
         char tag[NETDATA_THREAD_TAG_MAX + 1];
-        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_COLLECTOR[%d]", i + 1);
+        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "STATSD_IN[%d]", i + 1);
         netdata_spinlock_init(&statsd.collection_threads_status[i].spinlock);
         netdata_thread_create(&statsd.collection_threads_status[i].thread, tag, NETDATA_THREAD_OPTION_DEFAULT, statsd_collector_thread, &statsd.collection_threads_status[i]);
     }

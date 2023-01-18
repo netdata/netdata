@@ -271,7 +271,7 @@ void *pluginsd_main(void *ptr)
 
                     if (cd->enabled) {
                         char tag[NETDATA_THREAD_TAG_MAX + 1];
-                        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PLUGINSD[%s]", pluginname);
+                        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PD[%s]", pluginname);
                         // spawn a new thread for it
                         netdata_thread_create(
                             &cd->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, pluginsd_worker_thread, cd);

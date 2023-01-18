@@ -1242,7 +1242,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     info("DBENGINE: deleting data and journal files to maintain disk quota");
     ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
-        journalfile_generate_path(datafile, path, sizeof(path));
+        journalfile_v1_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
         journalfile_v2_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
@@ -1259,6 +1259,9 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     ctx->disk_space -= deleted_bytes;
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+
+    if (rrdeng_ctx_exceeded_disk_quota(ctx))
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
 
     rrdcontext_db_rotation();
 }
@@ -1322,6 +1325,14 @@ unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
     target_size = MIN(target_size, MAX_DATAFILE_SIZE);
     target_size = MAX(target_size, MIN_DATAFILE_SIZE);
     return target_size;
+}
+
+bool rrdeng_ctx_exceeded_disk_quota(struct rrdengine_instance *ctx)
+{
+    uint64_t estimated_disk_space = ctx->disk_space + rrdeng_target_data_file_size(ctx) -
+                                    (ctx->datafiles.first->prev ? ctx->datafiles.first->prev->pos : 0);
+
+    return estimated_disk_space > ctx->max_disk_space;
 }
 
 /* return 0 on success */
@@ -1470,6 +1481,15 @@ void timer_cb(uv_timer_t* handle) {
     extent_buffer_cleanup1();
     epdl_cleanup1();
     deol_cleanup1();
+
+    {
+        static time_t last_run_s = 0;
+        time_t now_s = now_monotonic_sec();
+        if(now_s - last_run_s >= 10) {
+            last_run_s = now_s;
+            journalfile_v2_data_unmount_cleanup(now_s);
+        }
+    }
 
 #ifdef PDC_USE_JULYL
     julyl_cleanup1();
@@ -1662,7 +1682,7 @@ void dbengine_event_loop(void* arg) {
                     if (!ctx->worker_config.now_deleting_files &&
                          ctx->datafiles.first->next != NULL &&
                          ctx->datafiles.first->next->next != NULL &&
-                         ctx->disk_space > MAX(ctx->max_disk_space, 2 * ctx->metric_API_max_producers * RRDENG_BLOCK_SIZE)) {
+                         rrdeng_ctx_exceeded_disk_quota(ctx)) {
 
                         ctx->worker_config.now_deleting_files = true;
                         if(!work_dispatch(ctx, NULL, NULL, opcode, database_rotate_tp_worker, after_database_rotate))

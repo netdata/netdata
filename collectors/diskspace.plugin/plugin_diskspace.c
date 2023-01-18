@@ -3,7 +3,6 @@
 #include "../proc.plugin/plugin_proc.h"
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
-#define THREAD_DISKSPACE_SLOW_NAME "PLUGIN[diskspace slow]"
 
 #define DEFAULT_EXCLUDED_PATHS "/proc/* /sys/* /var/run/user/* /run/user/* /snap/* /var/lib/docker/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs"
@@ -632,7 +631,7 @@ void *diskspace_main(void *ptr) {
 
     netdata_thread_create(
         diskspace_slow_thread,
-        THREAD_DISKSPACE_SLOW_NAME,
+        "P[diskspace slow]",
         NETDATA_THREAD_OPTION_JOINABLE,
         diskspace_slow_worker,
         &slow_worker_data);

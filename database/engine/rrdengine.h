@@ -378,7 +378,6 @@ struct rrdengine_instance {
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned last_flush_fileno;
-    unsigned long metric_API_max_producers;
 
     bool create_new_datafile_pair;
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
@@ -398,6 +397,7 @@ void dbengine_page_free(void *page, size_t size);
 void *dbengine_extent_alloc(size_t size);
 void dbengine_extent_free(void *extent, size_t size);
 
+bool rrdeng_ctx_exceeded_disk_quota(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);

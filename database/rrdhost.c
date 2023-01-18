@@ -870,8 +870,11 @@ void dbengine_init(char *hostname) {
                   hostname, tier, dbenginepath);
             break;
         }
-        else
+        else {
+            if (rrdeng_ctx_exceeded_disk_quota(multidb_ctx[created_tiers]))
+                rrdeng_enq_cmd( multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
             created_tiers++;
+        }
     }
 
     if(created_tiers && created_tiers < storage_tiers) {

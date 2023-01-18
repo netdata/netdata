@@ -1372,7 +1372,7 @@ static void *metadata_unittest_threads(void)
     tu.join = 0;
     for (int i = 0; i < threads_to_create; i++) {
         char buf[100 + 1];
-        snprintf(buf, 100, "meta%d", i);
+        snprintf(buf, 100, "META[%d]", i);
         netdata_thread_create(
             &threads[i],
             buf,

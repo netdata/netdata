@@ -896,7 +896,6 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     else
         strncpyz(ctx->machine_guid, host->machine_guid, GUID_LEN);
 
-    ctx->metric_API_max_producers = 0;
     ctx->quiesce = NO_QUIESCE;
     ctx->host = host;
 
@@ -1041,7 +1040,6 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     stats.currently_collected_metrics = ctx->stats.metric_API_producers;
-    stats.max_concurrently_collected_metrics = ctx->metric_API_max_producers;
 
     internal_error(stats.metrics_pages != stats.extents_pages + stats.currently_collected_metrics,
                    "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",

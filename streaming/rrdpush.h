@@ -306,6 +306,9 @@ void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);
 void rrdpush_claimed_id(RRDHOST *host);
 
+#define THREAD_TAG_STREAM_RECEIVER "RCVR" // "[host]" is appended
+#define THREAD_TAG_STREAM_SENDER "SNDR" // "[host]" is appended
+
 int rrdpush_receiver_thread_spawn(struct web_client *w, char *url);
 void rrdpush_sender_thread_stop(RRDHOST *host, const char *reason, bool wait);
 
