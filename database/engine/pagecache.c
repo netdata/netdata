@@ -430,19 +430,16 @@ static size_t list_has_time_gaps(
                 pd->status &= ~PDC_PAGE_DISK_PENDING;
                 pd->status |= PDC_PAGE_READY | PDC_PAGE_PRELOADED | PDC_PAGE_PRELOADED_PASS4;
             }
-            else {
+            else if(!(pd->status & PDC_PAGE_FAILED) && (pd->status & PDC_PAGE_DATAFILE_ACQUIRED)) {
                 (*pages_pending)++;
 
-                if (pd->status & PDC_PAGE_DISK_PENDING) {
-                    internal_fatal(pd->status & PDC_PAGE_SKIP, "page is disk pending and skipped");
-                    internal_fatal(!pd->datafile.ptr, "datafile is NULL");
-                    internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
-                    internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
-                    internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
-                }
-                else
-                    internal_fatal(!(pd->status & PDC_PAGE_FAILED),
-                                   "DBENGINE: pdc has a disk pending page, without proper tagging");
+                pd->status |= PDC_PAGE_DISK_PENDING;
+
+                internal_fatal(pd->status & PDC_PAGE_SKIP, "page is disk pending and skipped");
+                internal_fatal(!pd->datafile.ptr, "datafile is NULL");
+                internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
+                internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
+                internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
             }
         }
         else {
