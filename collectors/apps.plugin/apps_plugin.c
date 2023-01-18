@@ -3589,6 +3589,13 @@ static void send_collected_data_to_netdata(struct target *root, const char *type
     }
     send_END();
 
+    send_BEGIN(type, "rss", dt);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed && w->processes))
+            send_SET(w->name, w->status_vmrss);
+    }
+    send_END();
+
     send_BEGIN(type, "vmem", dt);
     for (w = root; w ; w = w->next) {
         if(unlikely(w->exposed && w->processes))
@@ -3728,6 +3735,12 @@ static void send_charts_updates_to_netdata(struct target *root, const char *type
     }
     APPS_PLUGIN_FUNCTIONS();
 
+    fprintf(stdout, "CHART %s.rss '' '%s Resident Set Size (w/shared)' 'MiB' mem %s.rss stacked 20004 %d\n", type, title, type, update_every);
+    for (w = root; w ; w = w->next) {
+        if(unlikely(w->exposed))
+            fprintf(stdout, "DIMENSION %s '' absolute %ld %ld\n", w->name, 1L, 1024L);
+    }
+    APPS_PLUGIN_FUNCTIONS();
 
     fprintf(stdout, "CHART %s.vmem '' '%s Virtual Memory Size' 'MiB' mem %s.vmem stacked 20005 %d\n", type, title, type, update_every);
     for (w = root; w ; w = w->next) {
