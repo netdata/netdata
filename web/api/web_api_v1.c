@@ -1544,7 +1544,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    ",\n\t\t\"average_page_size_bytes\":%0.2f"
                    ",\n\t\t\"estimated_concurrently_collected_metrics\":%zu"
                    ",\n\t\t\"currently_collected_metrics\":%zu"
-                   ",\n\t\t\"max_concurrently_collected_metrics\":%zu"
                    ",\n\t\t\"disk_space\":%zu"
                    ",\n\t\t\"max_disk_space\":%zu"
                    , stats.default_granularity_secs
@@ -1573,7 +1572,6 @@ static void web_client_api_v1_dbengine_stats_for_tier(BUFFER *wb, size_t tier) {
                    , stats.average_page_size_bytes
                    , stats.estimated_concurrently_collected_metrics
                    , stats.currently_collected_metrics
-                   , stats.max_concurrently_collected_metrics
                    , stats.disk_space
                    , stats.max_disk_space
                    );

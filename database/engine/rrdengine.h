@@ -378,7 +378,6 @@ struct rrdengine_instance {
     int tier;
     unsigned last_fileno; /* newest index of datafile and journalfile */
     unsigned last_flush_fileno;
-    unsigned long metric_API_max_producers;
 
     bool create_new_datafile_pair;
     uint8_t quiesce;   /* set to SET_QUIESCE before shutdown of the engine */
