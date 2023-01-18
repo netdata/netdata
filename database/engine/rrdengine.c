@@ -1242,7 +1242,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     info("DBENGINE: deleting data and journal files to maintain disk quota");
     ret = journalfile_destroy_unsafe(journal_file, datafile);
     if (!ret) {
-        journalfile_generate_path(datafile, path, sizeof(path));
+        journalfile_v1_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
         journalfile_v2_generate_path(datafile, path, sizeof(path));
         info("DBENGINE: deleted journal file \"%s\".", path);
@@ -1470,6 +1470,15 @@ void timer_cb(uv_timer_t* handle) {
     extent_buffer_cleanup1();
     epdl_cleanup1();
     deol_cleanup1();
+
+    {
+        static time_t last_run_s = 0;
+        time_t now_s = now_monotonic_sec();
+        if(now_s - last_run_s >= 10) {
+            last_run_s = now_s;
+            journalfile_v2_data_unmount_cleanup(now_s);
+        }
+    }
 
 #ifdef PDC_USE_JULYL
     julyl_cleanup1();

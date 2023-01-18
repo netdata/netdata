@@ -38,7 +38,6 @@ struct rrdengine_journalfile {
         int32_t refcount;
         time_t first_time_s;
         time_t last_time_s;
-        size_t not_needed_counter;
         time_t not_needed_since_s;
     } v2;
 
@@ -115,8 +114,8 @@ struct journal_v2_header {
     uint32_t page_offset;
     uint32_t extent_trailer_offset;     // CRC for entent list
     uint32_t metric_trailer_offset;     // CRC for metric list
-    uint32_t original_file_size;        // This is the original journal file
-    uint32_t total_file_size;           // This is the total file size
+    uint32_t journal_v1_file_size;      // This is the original journal file
+    uint32_t journal_v2_file_size;      // This is the total file size
     void *data;                         // Used when building the index
 };
 
@@ -131,7 +130,7 @@ struct transaction_commit_log {
 
 struct wal;
 
-void journalfile_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
+void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
 struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafile *datafile);
 void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, struct wal *wal, uv_loop_t *loop);
@@ -153,5 +152,6 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
 struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
+void journalfile_v2_data_unmount_cleanup(time_t now_s);
 
 #endif /* NETDATA_JOURNALFILE_H */
