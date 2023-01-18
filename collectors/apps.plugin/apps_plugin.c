@@ -420,6 +420,7 @@ struct pid_stat {
     int sortlist;                   // higher numbers = top on the process tree
                                     // each process gets a unique number
 
+    bool matched_by_config;
     struct target *target;          // app_groups.conf targets
     struct target *user_target;     // uid based targets
     struct target *group_target;    // gid based targets
@@ -1103,6 +1104,7 @@ static inline void assign_target_to_pid(struct pid_stat *p) {
                       || (proc_pid_cmdline_is_needed && w->starts_with && w->ends_with && p->cmdline && strstr(p->cmdline, w->compare))
                     ))) {
 
+            p->matched_by_config = true;
             if(w->target) p->target = w->target;
             else p->target = w;
 
@@ -2832,11 +2834,11 @@ static void apply_apps_groups_targets_inheritance(void) {
     }
 
     // init goes always to default target
-    if(all_pids[INIT_PID])
+    if(all_pids[INIT_PID] && !all_pids[INIT_PID]->matched_by_config)
         all_pids[INIT_PID]->target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if(all_pids[0])
+    if(all_pids[0] && !all_pids[INIT_PID]->matched_by_config)
         all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
