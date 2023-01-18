@@ -1,3 +1,10 @@
+netdata-repo (2-1) unstable; urgency=medium
+
+  * Switched to new package hosting infrastructure
+  * Removed apt-transport-https requirement
+
+ -- Netdata Builder <bot@netdata.cloud>  Wed, 18 Jan 2023 08:30:00 -0500
+
 netdata-repo (1-2) unstable; urgency=medium
 
   * Fixed package file naming for repo layout compliance
