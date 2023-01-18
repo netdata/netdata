@@ -401,7 +401,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index) {
-        host->rrdset_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        host->rrdset_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
@@ -410,8 +410,9 @@ void rrdset_index_init(RRDHOST *host) {
     }
 
     if(!host->rrdset_root_index_name) {
-        host->rrdset_root_index_name = dictionary_create(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        host->rrdset_root_index_name = dictionary_create_advanced(
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+            &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
         dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
@@ -1238,12 +1239,16 @@ struct rda_item {
 static __thread struct rda_item *thread_rda = NULL;
 static __thread size_t thread_rda_entries = 0;
 
-struct rda_item *rrdset_thread_rda(size_t *dimensions) {
+struct rda_item *rrdset_thread_rda_get(size_t *dimensions) {
 
     if(unlikely(!thread_rda || (*dimensions) > thread_rda_entries)) {
+        size_t old_mem = thread_rda_entries * sizeof(struct rda_item);
         freez(thread_rda);
-        thread_rda = mallocz((*dimensions) * sizeof(struct rda_item));
         thread_rda_entries = *dimensions;
+        size_t new_mem = thread_rda_entries * sizeof(struct rda_item);
+        thread_rda = mallocz(new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.rrdset_done_rda_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
 
     *dimensions = thread_rda_entries;
@@ -1251,6 +1256,8 @@ struct rda_item *rrdset_thread_rda(size_t *dimensions) {
 }
 
 void rrdset_thread_rda_free(void) {
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdset_done_rda_size, thread_rda_entries * sizeof(struct rda_item), __ATOMIC_RELAXED);
+
     freez(thread_rda);
     thread_rda = NULL;
     thread_rda_entries = 0;
@@ -1585,7 +1592,7 @@ after_first_database_work:
     uint32_t has_reset_value = 0;
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
-    struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
+    struct rda_item *rda_base = rrdset_thread_rda_get(&rda_slots);
 
     size_t dim_id;
     size_t dimensions = 0;

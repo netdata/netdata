@@ -171,8 +171,8 @@ void simple_connector_init(struct instance *instance)
     if (connector_specific_data->first_buffer)
         return;
 
-    connector_specific_data->header = buffer_create(0);
-    connector_specific_data->buffer = buffer_create(0);
+    connector_specific_data->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    connector_specific_data->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
     // create a ring buffer
     struct simple_connector_buffer *first_buffer = NULL;
@@ -195,7 +195,7 @@ void simple_connector_init(struct instance *instance)
     connector_specific_data->last_buffer = connector_specific_data->first_buffer;
 
     if (*instance->config.username || *instance->config.password) {
-        BUFFER *auth_string = buffer_create(0);
+        BUFFER *auth_string = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
         buffer_sprintf(auth_string, "%s:%s", instance->config.username, instance->config.password);
 

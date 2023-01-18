@@ -65,7 +65,7 @@ void send_internal_metrics(struct instance *instance)
 
     if (!stats->initialized) {
         char id[RRD_ID_LENGTH_MAX + 1];
-        BUFFER *family = buffer_create(0);
+        BUFFER *family = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
         buffer_sprintf(family, "exporting_%s", instance->config.name);
 

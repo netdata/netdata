@@ -4396,7 +4396,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     unsigned int memory_divisor = 1024;
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
-    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX);
+    BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
     buffer_sprintf(wb,
                    "{"
                    "\n   \"status\":%d"

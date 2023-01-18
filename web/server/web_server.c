@@ -37,7 +37,7 @@ LISTEN_SOCKETS api_sockets = {
 };
 
 void debug_sockets() {
-	BUFFER *wb = buffer_create(256 * sizeof(char));
+	BUFFER *wb = buffer_create(256 * sizeof(char), NULL);
 	int i;
 
 	for(i = 0 ; i < (int)api_sockets.opened ; i++) {

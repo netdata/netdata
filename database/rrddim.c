@@ -299,7 +299,7 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
-        st->rrddim_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);

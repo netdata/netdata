@@ -442,28 +442,28 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
     buffer_need_bytes(wb, 36);
 
     char *b = &wb->buffer[wb->len];
-  char *p = b;
+    char *p = b;
 
-  *p++ = '0' + year / 1000; year %= 1000;
-  *p++ = '0' + year / 100;  year %= 100;
-  *p++ = '0' + year / 10;
-  *p++ = '0' + year % 10;
-  *p++ = '-';
-  *p++ = '0' + month / 10;
-  *p++ = '0' + month % 10;
-  *p++ = '-';
-  *p++ = '0' + day / 10;
-  *p++ = '0' + day % 10;
-  *p++ = ' ';
-  *p++ = '0' + hours / 10;
-  *p++ = '0' + hours % 10;
-  *p++ = ':';
-  *p++ = '0' + minutes / 10;
-  *p++ = '0' + minutes % 10;
-  *p++ = ':';
-  *p++ = '0' + seconds / 10;
-  *p++ = '0' + seconds % 10;
-  *p = '\0';
+    *p++ = '0' + year / 1000; year %= 1000;
+    *p++ = '0' + year / 100;  year %= 100;
+    *p++ = '0' + year / 10;
+    *p++ = '0' + year % 10;
+    *p++ = '-';
+    *p++ = '0' + month / 10;
+    *p++ = '0' + month % 10;
+    *p++ = '-';
+    *p++ = '0' + day / 10;
+    *p++ = '0' + day % 10;
+    *p++ = ' ';
+    *p++ = '0' + hours / 10;
+    *p++ = '0' + hours % 10;
+    *p++ = ':';
+    *p++ = '0' + minutes / 10;
+    *p++ = '0' + minutes % 10;
+    *p++ = ':';
+    *p++ = '0' + seconds / 10;
+    *p++ = '0' + seconds % 10;
+    *p = '\0';
 
     wb->len += (size_t)(p - b);
 
@@ -472,7 +472,7 @@ void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minute
     buffer_overflow_check(wb);
 }
 
-BUFFER *buffer_create(size_t size)
+BUFFER *buffer_create(size_t size, size_t *statistics)
 {
     BUFFER *b;
 
@@ -483,8 +483,12 @@ BUFFER *buffer_create(size_t size)
     b->buffer[0] = '\0';
     b->size = size;
     b->contenttype = CT_TEXT_PLAIN;
+    b->statistics = statistics;
     buffer_overflow_init(b);
     buffer_overflow_check(b);
+
+    if(b->statistics)
+        __atomic_add_fetch(b->statistics, b->size + sizeof(BUFFER) + sizeof(BUFFER_OVERFLOW_EOF) + 2, __ATOMIC_RELAXED);
 
     return(b);
 }
@@ -495,6 +499,9 @@ void buffer_free(BUFFER *b) {
     buffer_overflow_check(b);
 
     debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", b->size);
+
+    if(b->statistics)
+        __atomic_sub_fetch(b->statistics, b->size + sizeof(BUFFER) + sizeof(BUFFER_OVERFLOW_EOF) + 2, __ATOMIC_RELAXED);
 
     freez(b->buffer);
     freez(b);
@@ -510,15 +517,16 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t minimum = WEB_DATA_LENGTH_INCREASE_STEP;
     if(minimum > wanted) wanted = minimum;
 
-    size_t optimal = b->size;
-    if(b->size > 5*1024*1024) optimal = b->size / 2;
-
+    size_t optimal = (b->size > 5*1024*1024) ? b->size / 2 : b->size;
     if(optimal > wanted) wanted = optimal;
 
     debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", b->size, b->size + wanted);
 
     b->buffer = reallocz(b->buffer, b->size + wanted + sizeof(BUFFER_OVERFLOW_EOF) + 2);
     b->size += wanted;
+
+    if(b->statistics)
+        __atomic_add_fetch(b->statistics, wanted, __ATOMIC_RELAXED);
 
     buffer_overflow_init(b);
     buffer_overflow_check(b);

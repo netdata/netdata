@@ -439,7 +439,7 @@ int unit_test_str2ld() {
 }
 
 int unit_test_buffer() {
-    BUFFER *wb = buffer_create(1);
+    BUFFER *wb = buffer_create(1, NULL);
     char string[2048 + 1];
     char final[9000 + 1];
     int i;
@@ -1349,7 +1349,7 @@ static int test_variable_renames(void) {
     rrddim_reset_name(st, rd2, "DIM2NAME2");
     fprintf(stderr, "Renamed dimension with id '%s' to name '%s'\n", rrddim_id(rd2), rrddim_name(rd2));
 
-    BUFFER *buf = buffer_create(1);
+    BUFFER *buf = buffer_create(1, NULL);
     health_api_v1_chart_variables2json(st, buf);
     fprintf(stderr, "%s", buffer_tostring(buf));
     buffer_free(buf);
@@ -1604,7 +1604,7 @@ int test_sqlite(void) {
         return 1;
     }
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, NULL);
     char *uuid_str = "0000_000";
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);

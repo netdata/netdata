@@ -227,8 +227,9 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
     struct mountinfo *root = NULL, *last = NULL, *mi = NULL;
 
     // create a dictionary to track uniqueness
-    DICTIONARY *dict = dictionary_create(
-        DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_NAME_LINK_DONT_CLONE);
+    DICTIONARY *dict = dictionary_create_advanced(
+            DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_NAME_LINK_DONT_CLONE,
+            &dictionary_stats_category_collectors);
 
     unsigned long l, lines = procfile_lines(ff);
     for(l = 0; l < lines ;l++) {

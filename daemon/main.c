@@ -174,8 +174,8 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
 }
 
 static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
-    BUFFER *service_list = buffer_create(1024);
-    BUFFER *thread_list = buffer_create(1024);
+    BUFFER *service_list = buffer_create(1024, NULL);
+    BUFFER *thread_list = buffer_create(1024, NULL);
     usec_t started_ut = now_monotonic_usec(), ended_ut;
     size_t running;
     SERVICE_TYPE running_services = 0;

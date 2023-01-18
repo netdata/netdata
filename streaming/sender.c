@@ -57,7 +57,7 @@ BUFFER *sender_start(struct sender_state *s __maybe_unused) {
     }
 
     if(!sender_thread_buffer) {
-        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE);
+        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
         sender_thread_buffer_recreate = false;
     }
 
@@ -932,7 +932,7 @@ void execute_commands(struct sender_state *s) {
                 tmp->received_ut = now_realtime_usec();
                 tmp->sender = s;
                 tmp->transaction = string_strdupz(transaction);
-                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
+                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
                 if(code != HTTP_RESP_OK) {
@@ -1271,7 +1271,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 last_reset_time_t = now_t;
                 size_t max = s->host->sender->buffer->max_size;
                 cbuffer_free(s->host->sender->buffer);
-                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
+                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.buffers_streaming);
                 sender_thread_buffer_recreate = true;
             }
         }

@@ -357,7 +357,7 @@ inline int parser_action(PARSER *parser, char *input)
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(rc == PARSER_RC_ERROR) {
-        BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX);
+        BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
         for(size_t i = 0; i < num_words ;i++) {
             if(i) buffer_fast_strcat(wb, " ", 1);
 

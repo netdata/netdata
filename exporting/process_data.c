@@ -397,7 +397,7 @@ int simple_connector_end_batch(struct instance *instance)
     struct simple_connector_buffer *last_buffer = simple_connector_data->last_buffer;
 
     if (!last_buffer->buffer) {
-        last_buffer->buffer = buffer_create(0);
+        last_buffer->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     }
 
     if (last_buffer->used) {
@@ -419,7 +419,7 @@ int simple_connector_end_batch(struct instance *instance)
     if (last_buffer->header)
         buffer_flush(last_buffer->header);
     else
-        last_buffer->header = buffer_create(0);
+        last_buffer->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
     if (instance->prepare_header)
         instance->prepare_header(instance);

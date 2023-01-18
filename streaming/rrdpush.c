@@ -1069,7 +1069,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {
-    BUFFER *wb = buffer_create(100);
+    BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, rpt->capabilities);
 
     info("STREAM %s [receive from [%s]:%s]: established link with negotiated capabilities: %s",
@@ -1079,7 +1079,7 @@ void log_receiver_capabilities(struct receiver_state *rpt) {
 }
 
 void log_sender_capabilities(struct sender_state *s) {
-    BUFFER *wb = buffer_create(100);
+    BUFFER *wb = buffer_create(100, NULL);
     stream_capabilities_to_string(wb, s->capabilities);
 
     info("STREAM %s [send to %s]: established link with negotiated capabilities: %s",

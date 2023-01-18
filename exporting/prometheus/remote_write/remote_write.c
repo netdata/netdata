@@ -104,7 +104,7 @@ int init_prometheus_remote_write_instance(struct instance *instance)
     instance->prepare_header = prometheus_remote_write_prepare_header;
     instance->check_response = process_prometheus_remote_write_response;
 
-    instance->buffer = (void *)buffer_create(0);
+    instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
     if (uv_mutex_init(&instance->mutex))
         return 1;

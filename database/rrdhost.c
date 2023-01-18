@@ -51,13 +51,15 @@ static DICTIONARY *rrdhost_root_index_hostname = NULL;
 
 static inline void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
-        rrdhost_root_index = dictionary_create(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        rrdhost_root_index = dictionary_create_advanced(
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+            &dictionary_stats_category_rrdhost);
     }
 
     if(unlikely(!rrdhost_root_index_hostname)) {
-        rrdhost_root_index_hostname = dictionary_create(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        rrdhost_root_index_hostname = dictionary_create_advanced(
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+            &dictionary_stats_category_rrdhost);
     }
 }
 
@@ -1029,7 +1031,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     host->sender = callocz(1, sizeof(*host->sender));
     host->sender->host = host;
-    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024);
+    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.buffers_streaming);
     host->sender->capabilities = STREAM_OUR_CAPABILITIES;
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;

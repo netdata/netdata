@@ -1126,7 +1126,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
         return NULL;
     }
 
-    BUFFER *out = buffer_create(1024);
+    BUFFER *out = buffer_create(1024, NULL);
     print_parsed_as_node(out, op, &err);
     if(err != EVAL_ERROR_OK) {
         error("failed to re-generate expression '%s' with reason: %s", string, expression_strerror(err));
@@ -1141,7 +1141,7 @@ EVAL_EXPRESSION *expression_parse(const char *string, const char **failed_at, in
     exp->parsed_as = strdupz(buffer_tostring(out));
     buffer_free(out);
 
-    exp->error_msg = buffer_create(100);
+    exp->error_msg = buffer_create(100, NULL);
     exp->nodes = (void *)op;
 
     return exp;

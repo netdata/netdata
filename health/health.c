@@ -459,8 +459,8 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
     BUFFER *warn_alarms, *crit_alarms;
     active_alerts_t *active_alerts = callocz(ACTIVE_ALARMS_LIST_EXAMINE, sizeof(active_alerts_t));
 
-    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    warn_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_health);
+    crit_alarms = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_health);
 
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
@@ -517,7 +517,7 @@ static inline void health_alarm_execute(RRDHOST *host, ALARM_ENTRY *ae) {
 
     char *edit_command = ae->source ? health_edit_command_from_source(ae_source(ae)) : strdupz("UNKNOWN=0=UNKNOWN");
 
-    BUFFER *wb = buffer_create(8192);
+    BUFFER *wb = buffer_create(8192, &netdata_buffers_statistics.buffers_health);
     bool ok = prepare_command(wb,
                               exec,
                               recipient,

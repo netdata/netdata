@@ -62,19 +62,19 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
     int retval = 0;
     usec_t t;
     BUFFER *local_buffer = NULL;
-    BUFFER *log_buffer = buffer_create(NETDATA_WEB_REQUEST_URL_SIZE);
+    BUFFER *log_buffer = buffer_create(NETDATA_WEB_REQUEST_URL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     RRDHOST *query_host = localhost;
 
 #ifdef NETDATA_WITH_ZLIB
     int z_ret;
-    BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    BUFFER *z_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     char *start, *end;
 #endif
 
     struct web_client *w = (struct web_client *)callocz(1, sizeof(struct web_client));
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_aclk);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_aclk);
     strcpy(w->origin, "*"); // Simulate web_client_create_on_fd()
     w->cookie1[0] = 0;      // Simulate web_client_create_on_fd()
     w->cookie2[0] = 0;      // Simulate web_client_create_on_fd()
@@ -191,7 +191,7 @@ static int http_api_v2(struct aclk_query_thread *query_thr, aclk_query_t query)
 
     w->response.data->date = w->tv_ready.tv_sec;
     web_client_build_http_header(w);
-    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
+    local_buffer = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_aclk);
     local_buffer->contenttype = CT_APPLICATION_JSON;
 
     buffer_strcat(local_buffer, w->response.header_output->buffer);
