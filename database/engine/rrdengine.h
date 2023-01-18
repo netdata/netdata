@@ -397,6 +397,7 @@ void dbengine_page_free(void *page, size_t size);
 void *dbengine_extent_alloc(size_t size);
 void dbengine_extent_free(void *extent, size_t size);
 
+bool rrdeng_ctx_exceeded_disk_quota(struct rrdengine_instance *ctx);
 int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
