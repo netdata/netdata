@@ -437,7 +437,7 @@ jobs:
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         id: updater-check
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --init --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
                 /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
