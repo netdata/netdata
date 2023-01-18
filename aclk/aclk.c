@@ -49,6 +49,8 @@ float last_backoff_value = 0;
 
 time_t aclk_block_until = 0;
 
+int aclk_alert_reloaded = 0; //1 on health log exchange, and again on health_reload
+
 #ifdef ENABLE_ACLK
 mqtt_wss_client mqttwss_client;
 

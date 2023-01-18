@@ -49,9 +49,6 @@ int health_alarm_log_open(RRDHOST *host);
 void health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae);
 void health_alarm_log_load(RRDHOST *host);
 
-void health_thread_spawn(RRDHOST *host);
-void health_thread_stop(RRDHOST *host);
-
 ALARM_ENTRY* health_create_alarm_entry(
     RRDHOST *host,
     uint32_t alarm_id,
@@ -79,10 +76,6 @@ ALARM_ENTRY* health_create_alarm_entry(
     uint32_t flags);
 
 void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
-
-struct health_state {
-    RRDHOST *host;
-};
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath);
 char *health_user_config_dir(void);

@@ -314,7 +314,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         alarm_log.utc_offset = wc->host->utc_offset;
         alarm_log.timezone = strdupz(rrdhost_abbrev_timezone(wc->host));
         alarm_log.exec_path = sqlite3_column_bytes(res, 14) > 0 ? strdupz((char *)sqlite3_column_text(res, 14)) :
-                                                                  strdupz((char *)string2str(wc->host->health_default_exec));
+                                                                  strdupz((char *)string2str(wc->host->health.health_default_exec));
         alarm_log.conf_source = strdupz((char *)sqlite3_column_text(res, 16));
 
         char *edit_command = sqlite3_column_bytes(res, 16) > 0 ?
@@ -531,7 +531,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     alarm_log.node_id =  wc->node_id;
     alarm_log.log_entries = log_entries;
     alarm_log.status = wc->alert_updates == 0 ? 2 : 1;
-    alarm_log.enabled = (int)host->health_enabled;
+    alarm_log.enabled = (int)host->health.health_enabled;
 
     wc->alert_sequence_id = last_sequence;
 
@@ -544,6 +544,8 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
 
     freez(claim_id);
     buffer_free(sql);
+
+    aclk_alert_reloaded = 1;
 #endif
 
     return;
@@ -709,7 +711,7 @@ void aclk_start_alert_streaming(char *node_id, uint64_t batch_id, uint64_t start
                  (struct aclk_database_worker_config *)host->dbsync_worker :
                  (struct aclk_database_worker_config *)find_inactive_wc_by_node_id(node_id);
 
-        if (unlikely(!host->health_enabled)) {
+        if (unlikely(!host->health.health_enabled)) {
             log_access("ACLK STA [%s (N/A)]: Ignoring request to stream alert state changes, health is disabled.", node_id);
             return;
         }
@@ -849,7 +851,7 @@ void health_alarm_entry2proto_nolock(struct alarm_log_entry *alarm_log, ALARM_EN
 
     alarm_log->utc_offset = host->utc_offset;
     alarm_log->timezone = strdupz(rrdhost_abbrev_timezone(host));
-    alarm_log->exec_path = ae->exec ? strdupz(ae_exec(ae)) : strdupz((char *)string2str(host->health_default_exec));
+    alarm_log->exec_path = ae->exec ? strdupz(ae_exec(ae)) : strdupz((char *)string2str(host->health.health_default_exec));
     alarm_log->conf_source = ae->source ? strdupz(ae_source(ae)) : strdupz((char *)"");
 
     alarm_log->command = strdupz((char *)edit_command);

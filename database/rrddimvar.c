@@ -65,7 +65,7 @@ static inline void rrddimvar_free_variables_unsafe(RRDDIMVAR *rs) {
 
     // HOST VARIABLES FOR THIS DIMENSION
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rrdvar_release_and_del(host->rrdvars, rs->rrdvar_host_chart_id_dim_id);
         rs->rrdvar_host_chart_id_dim_id = NULL;
 
@@ -152,7 +152,7 @@ static inline void rrddimvar_update_variables_unsafe(RRDDIMVAR *rs) {
     // - $chart-name.id
     // - $chart-name.name
 
-    if(host->rrdvars && host->health_enabled) {
+    if(host->rrdvars && host->health.health_enabled) {
         rs->rrdvar_host_chart_id_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);
         rs->rrdvar_host_chart_id_dim_name = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_id_dim_name, rs->type, RRDVAR_FLAG_NONE, rs->value);
         rs->rrdvar_host_chart_name_dim_id = rrdvar_add_and_acquire("host", host->rrdvars, key_chart_name_dim_id, rs->type, RRDVAR_FLAG_NONE, rs->value);

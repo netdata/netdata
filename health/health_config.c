@@ -573,8 +573,8 @@ static int health_readfile(const char *filename, void *data) {
                 rc->old_value = NAN;
                 rc->delay_multiplier = 1.0;
                 rc->old_status = RRDCALC_STATUS_UNINITIALIZED;
-                rc->warn_repeat_every = host->health_default_warn_repeat_every;
-                rc->crit_repeat_every = host->health_default_crit_repeat_every;
+                rc->warn_repeat_every = host->health.health_default_warn_repeat_every;
+                rc->crit_repeat_every = host->health.health_default_crit_repeat_every;
                 if (alert_cfg)
                     alert_config_free(alert_cfg);
                 alert_cfg = callocz(1, sizeof(struct alert_config));
@@ -619,8 +619,8 @@ static int health_readfile(const char *filename, void *data) {
                 rt->green = NAN;
                 rt->red = NAN;
                 rt->delay_multiplier = (float)1.0;
-                rt->warn_repeat_every = host->health_default_warn_repeat_every;
-                rt->crit_repeat_every = host->health_default_crit_repeat_every;
+                rt->warn_repeat_every = host->health.health_default_warn_repeat_every;
+                rt->crit_repeat_every = host->health.health_default_crit_repeat_every;
                 if (alert_cfg)
                     alert_config_free(alert_cfg);
                 alert_cfg = callocz(1, sizeof(struct alert_config));
@@ -1171,7 +1171,7 @@ void sql_refresh_hashes(void)
 }
 
 void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path, const char *subpath) {
-    if(unlikely((!host->health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) ||
+    if(unlikely((!host->health.health_enabled) && !rrdhost_flag_check(host, RRDHOST_FLAG_INITIALIZED_HEALTH)) ||
         !service_running(SERVICE_HEALTH)) {
         debug(D_HEALTH, "CONFIG health is not enabled for host '%s'", rrdhost_hostname(host));
         return;

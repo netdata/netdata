@@ -328,7 +328,7 @@ static int sql_store_host_info(RRDHOST *host)
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int(res, ++param, (int ) host->health_enabled);
+    rc = sqlite3_bind_int(res, ++param, (int ) host->health.health_enabled);
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -686,6 +686,16 @@ skip_run:
         error_report("Failed to finalize the prepared statement when reading dimensions");
 }
 
+static void cleanup_health_log(void)
+{
+    RRDHOST *host;
+    dfe_start_reentrant(rrdhost_root_index, host) {
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
+            continue;
+        sql_health_alarm_log_cleanup(host);
+    }
+    dfe_done(host);
+}
 
 //
 // EVENT LOOP STARTS HERE
@@ -845,6 +855,7 @@ static void start_metadata_cleanup(uv_work_t *req)
     worker_is_busy(UV_EVENT_METADATA_CLEANUP);
     struct metadata_wc *wc = req->data;
     check_dimension_metadata(wc);
+    cleanup_health_log();
     worker_is_idle();
 }
 

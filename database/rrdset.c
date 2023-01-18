@@ -168,7 +168,7 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // chart variables - we need this for data collection to work (collector given chart variables) - not only health
     rrdsetvar_index_init(st);
 
-    if (host->health_enabled) {
+    if (host->health.health_enabled) {
         st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
         st->rrdvars = rrdvariables_create();
         rrddimvar_index_init(st);
@@ -366,7 +366,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     st->last_accessed_time_s = now_realtime_sec();
 
-    if(host->health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
+    if(host->health.health_enabled && (ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_CHART_ACTIVATED))) {
         rrdset_flag_set(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
     }

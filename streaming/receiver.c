@@ -449,7 +449,7 @@ bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {
 
         if (rpt->config.health_enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.alarms_delay > 0) {
-                host->health_delay_up_to = now_realtime_sec() + rpt->config.alarms_delay;
+                host->health.health_delay_up_to = now_realtime_sec() + rpt->config.alarms_delay;
                 log_health(
                         "[%s]: Postponing health checks for %" PRId64 " seconds, because it was just connected.",
                         rrdhost_hostname(host),
@@ -491,7 +491,7 @@ static void rrdhost_clear_receiver(struct receiver_state *rpt) {
             host->child_disconnected_time = now_realtime_sec();
 
             if (rpt->config.health_enabled == CONFIG_BOOLEAN_AUTO)
-                host->health_enabled = 0;
+                host->health.health_enabled = 0;
 
             rrdpush_sender_thread_stop(host, "RECEIVER LEFT", false);
 

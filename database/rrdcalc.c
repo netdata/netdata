@@ -739,7 +739,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_this_host(RRDHOST *host
             continue;
 
         if(!rrdlabels_match_simple_pattern_parsed(host->rrdlabels, rc->host_labels_pattern, '=')) {
-            info("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
+            log_health("Health configuration for alarm '%s' cannot be applied, because the host %s does not have the label(s) '%s'",
                  rrdcalc_name(rc),
                  rrdhost_hostname(host),
                  rrdcalc_host_labels(rc));
@@ -755,7 +755,7 @@ void rrdcalc_delete_alerts_not_matching_host_labels_from_all_hosts() {
 
     RRDHOST *host;
     rrdhost_foreach_read(host) {
-        if (unlikely(!host->health_enabled))
+        if (unlikely(!host->health.health_enabled))
             continue;
 
         if (host->rrdlabels)

@@ -201,7 +201,7 @@ static void svc_rrd_cleanup_obsolete_charts_from_all_hosts() {
             && (
                    (
                     host->child_last_chart_command
-                 && host->child_last_chart_command + host->health_delay_up_to < now_realtime_sec()
+                 && host->child_last_chart_command + host->health.health_delay_up_to < now_realtime_sec()
                    )
                 || (host->child_connect_time + TIME_TO_RUN_OBSOLETIONS_ON_CHILD_CONNECT < now_realtime_sec())
                 )
