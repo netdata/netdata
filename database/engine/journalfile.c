@@ -170,14 +170,18 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
     bool unmounted = false;
 
     if(!have_locks) {
-        if(!wait && !netdata_spinlock_trylock(&journalfile->mmap.spinlock))
-            return false;
+        if(!wait) {
+            if (!netdata_spinlock_trylock(&journalfile->mmap.spinlock))
+                return false;
+        }
         else
             netdata_spinlock_lock(&journalfile->mmap.spinlock);
 
-        if(!wait && !netdata_spinlock_trylock(&journalfile->v2.spinlock)) {
-            netdata_spinlock_unlock(&journalfile->mmap.spinlock);
-            return false;
+        if(!wait) {
+            if(!netdata_spinlock_trylock(&journalfile->v2.spinlock)) {
+                netdata_spinlock_unlock(&journalfile->mmap.spinlock);
+                return false;
+            }
         }
         else
             netdata_spinlock_lock(&journalfile->v2.spinlock);
