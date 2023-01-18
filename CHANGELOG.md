@@ -6,9 +6,17 @@
 
 **Merged pull requests:**
 
+- DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
+- fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
+- Make sure variables are streamed after SENDER\_CONNECTED flag is set [\#14283](https://github.com/netdata/netdata/pull/14283) ([MrZammler](https://github.com/MrZammler))
+- Check session variable before resuming it [\#14279](https://github.com/netdata/netdata/pull/14279) ([MrZammler](https://github.com/MrZammler))
+- Update infographic image on main README [\#14276](https://github.com/netdata/netdata/pull/14276) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
+- DBENGINE v2 - improvements part 3 [\#14269](https://github.com/netdata/netdata/pull/14269) ([ktsaou](https://github.com/ktsaou))
+- minor - add kaitaistruct for journal v2 files [\#14267](https://github.com/netdata/netdata/pull/14267) ([underhood](https://github.com/underhood))
 - fix\(health\): don't assume 2 cores if the number is unknown [\#14265](https://github.com/netdata/netdata/pull/14265) ([ilyam8](https://github.com/ilyam8))
 - More 32bit fixes [\#14264](https://github.com/netdata/netdata/pull/14264) ([ktsaou](https://github.com/ktsaou))
+- Store host and claim info in sqlite as soon as possible [\#14263](https://github.com/netdata/netdata/pull/14263) ([MrZammler](https://github.com/MrZammler))
 - Replace individual collector images/links on infographic [\#14262](https://github.com/netdata/netdata/pull/14262) ([cakrit](https://github.com/cakrit))
 - Fix binpkg updates on OpenSUSE [\#14260](https://github.com/netdata/netdata/pull/14260) ([Dim-P](https://github.com/Dim-P))
 - DBENGINE v2 - improvements 2 [\#14257](https://github.com/netdata/netdata/pull/14257) ([ktsaou](https://github.com/ktsaou))
@@ -24,6 +32,7 @@
 - pre gcc v5 support and allow building without dbengine [\#14239](https://github.com/netdata/netdata/pull/14239) ([ktsaou](https://github.com/ktsaou))
 - Drop ARMv7 native packages for Fedora 36. [\#14233](https://github.com/netdata/netdata/pull/14233) ([Ferroin](https://github.com/Ferroin))
 - fix consul\_raft\_leadership\_transitions alarm units [\#14232](https://github.com/netdata/netdata/pull/14232) ([ilyam8](https://github.com/ilyam8))
+- readme updates [\#14224](https://github.com/netdata/netdata/pull/14224) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
 - remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
 - Remove temporary allocations when preprocessing a samples buffer [\#14208](https://github.com/netdata/netdata/pull/14208) ([vkalintiris](https://github.com/vkalintiris))
@@ -338,14 +347,6 @@
 - Fix a memory leak on archived host creation [\#13641](https://github.com/netdata/netdata/pull/13641) ([stelfrag](https://github.com/stelfrag))
 - fix compile issues [\#13640](https://github.com/netdata/netdata/pull/13640) ([ktsaou](https://github.com/ktsaou))
 - Obsolete RRDSET state [\#13635](https://github.com/netdata/netdata/pull/13635) ([ktsaou](https://github.com/ktsaou))
-- Updated tc.plugin \(linux bandwidth QoS\) [\#13634](https://github.com/netdata/netdata/pull/13634) ([ktsaou](https://github.com/ktsaou))
-- Fix worker utilization cleanup [\#13633](https://github.com/netdata/netdata/pull/13633) ([stelfrag](https://github.com/stelfrag))
-- remove forgotten avl structure from rrdcalc [\#13632](https://github.com/netdata/netdata/pull/13632) ([ktsaou](https://github.com/ktsaou))
-- Deaggregate the `gui` and `email` app groupx and improve GUI coverage. [\#13631](https://github.com/netdata/netdata/pull/13631) ([Ferroin](https://github.com/Ferroin))
-- Faster rrdcontext [\#13629](https://github.com/netdata/netdata/pull/13629) ([ktsaou](https://github.com/ktsaou))
-- Update uninstaller documentation. [\#13627](https://github.com/netdata/netdata/pull/13627) ([Ferroin](https://github.com/Ferroin))
-- eBPF different improvements [\#13624](https://github.com/netdata/netdata/pull/13624) ([thiagoftsm](https://github.com/thiagoftsm))
-- adjust systemdunits alarms [\#13623](https://github.com/netdata/netdata/pull/13623) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
