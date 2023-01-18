@@ -8,7 +8,7 @@
 #define PLUGIN_PROC_CONFIG_NAME "proc"
 #define PLUGIN_PROC_NAME PLUGIN_PROC_CONFIG_NAME ".plugin"
 
-#define THREAD_NETDEV_NAME "PLUGIN[proc netdev]"
+#define THREAD_NETDEV_NAME "P[proc netdev]"
 void *netdev_main(void *ptr);
 
 int do_proc_net_wireless(int update_every, usec_t dt);

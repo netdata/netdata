@@ -10,7 +10,7 @@ extern void *timex_main(void *ptr);
 
 const struct netdata_static_thread static_threads_linux[] = {
     {
-        .name = "PLUGIN[tc]",
+        .name = "P[tc]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "tc",
         .enabled = 1,
@@ -19,7 +19,7 @@ const struct netdata_static_thread static_threads_linux[] = {
         .start_routine = tc_main
     },
     {
-        .name = "PLUGIN[diskspace]",
+        .name = "P[diskspace]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "diskspace",
         .enabled = 1,
@@ -28,7 +28,7 @@ const struct netdata_static_thread static_threads_linux[] = {
         .start_routine = diskspace_main
     },
     {
-        .name = "PLUGIN[proc]",
+        .name = "P[proc]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "proc",
         .enabled = 1,
@@ -37,7 +37,7 @@ const struct netdata_static_thread static_threads_linux[] = {
         .start_routine = proc_main
     },
     {
-        .name = "PLUGIN[cgroups]",
+        .name = "P[cgroups]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "cgroups",
         .enabled = 1,

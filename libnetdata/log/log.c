@@ -986,7 +986,15 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     snprintfz(action_data, 70, "%04lu@%-10.10s:%-15.15s/%d", line, file, function, __errno);
     char action_result[60+1];
 
-    snprintfz(action_result, 60, "%s:%s", program_name, strncmp(thread_tag, "STREAM_RECEIVER", strlen("STREAM_RECEIVER")) ? thread_tag : "[x]");
+    const char *tag_to_send =  thread_tag;
+
+    // anonymize thread names
+    if(strncmp(thread_tag, THREAD_TAG_STREAM_RECEIVER, strlen(THREAD_TAG_STREAM_RECEIVER)) == 0)
+        tag_to_send = THREAD_TAG_STREAM_RECEIVER;
+    if(strncmp(thread_tag, THREAD_TAG_STREAM_SENDER, strlen(THREAD_TAG_STREAM_SENDER)) == 0)
+        tag_to_send = THREAD_TAG_STREAM_SENDER;
+
+    snprintfz(action_result, 60, "%s:%s", program_name, tag_to_send);
     send_statistics("FATAL", action_result, action_data);
 
 #ifdef HAVE_BACKTRACE

@@ -19,7 +19,7 @@ extern bool global_statistics_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
     {
-        .name = "PLUGIN[timex]",
+        .name = "P[timex]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "timex",
         .enabled = 1,
@@ -28,7 +28,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = timex_main
     },
     {
-        .name = "PLUGIN[idlejitter]",
+        .name = "P[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "idlejitter",
         .enabled = 1,
@@ -124,7 +124,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = exporting_main
     },
     {
-        .name = "STREAM",
+        .name = "SNDR",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
@@ -133,7 +133,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = rrdpush_sender_thread
     },
     {
-        .name = "WEB_SERVER[static1]",
+        .name = "WEB[static1]",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
@@ -165,7 +165,7 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 
     {
-            .name = "REPLICATION",
+            .name = "REPLAY[1]",
             .config_section = NULL,
             .config_name = NULL,
             .enabled = 1,

@@ -8,8 +8,6 @@
 #include "aclk_query_queue.h"
 #include "mqtt_wss_client.h"
 
-#define ACLK_STATS_THREAD_NAME "ACLK_Stats"
-
 extern netdata_mutex_t aclk_stats_mutex;
 
 #define ACLK_STATS_LOCK netdata_mutex_lock(&aclk_stats_mutex)
