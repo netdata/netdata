@@ -1033,10 +1033,10 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
         return;
 
     host->sender = callocz(1, sizeof(*host->sender));
-    __atomic_add_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*host->sender), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
     host->sender->host = host;
-    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.buffers_streaming);
+    host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
     host->sender->capabilities = STREAM_OUR_CAPABILITIES;
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
@@ -1071,7 +1071,7 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
 #endif
     replication_cleanup_sender(host->sender);
 
-    __atomic_sub_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*host->sender), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(*host->sender), __ATOMIC_RELAXED);
 
     freez(host->sender);
     host->sender = NULL;

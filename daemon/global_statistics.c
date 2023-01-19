@@ -288,6 +288,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_functions = NULL;
         static RRDDIM *rd_labels = NULL;
         static RRDDIM *rd_strings = NULL;
+        static RRDDIM *rd_streaming = NULL;
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_other = NULL;
 
@@ -315,6 +316,7 @@ static void global_statistics_charts(void) {
             rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -343,6 +345,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_functions, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
         rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
         rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
+        rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
@@ -360,6 +363,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_buffers_exporters = NULL;
         static RRDDIM *rd_buffers_health = NULL;
         static RRDDIM *rd_buffers_streaming = NULL;
+        static RRDDIM *rd_cbuffers_streaming = NULL;
         static RRDDIM *rd_buffers_web = NULL;
 
         if (unlikely(!st_memory_buffers)) {
@@ -386,6 +390,7 @@ static void global_statistics_charts(void) {
             rd_buffers_exporters = rrddim_add(st_memory_buffers, "exporters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -398,6 +403,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
 
         rrdset_done(st_memory_buffers);

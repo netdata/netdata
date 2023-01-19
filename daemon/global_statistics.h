@@ -7,6 +7,8 @@
 
 extern struct netdata_buffers_statistics {
     size_t rrdhost_allocations_size;
+    size_t rrdhost_senders;
+    size_t rrdhost_receivers;
     size_t query_targets_size;
     size_t rrdset_done_rda_size;
     size_t buffers_aclk;
@@ -16,6 +18,7 @@ extern struct netdata_buffers_statistics {
     size_t buffers_exporters;
     size_t buffers_health;
     size_t buffers_streaming;
+    size_t cbuffers_streaming;
     size_t buffers_web;
 } netdata_buffers_statistics;
 

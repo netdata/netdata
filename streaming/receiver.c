@@ -44,7 +44,7 @@ void receiver_state_free(struct receiver_state *rpt) {
     if(rpt->system_info)
         rrdhost_system_info_free(rpt->system_info);
 
-    __atomic_add_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*rpt), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_receivers, sizeof(*rpt), __ATOMIC_RELAXED);
 
     freez(rpt);
 }

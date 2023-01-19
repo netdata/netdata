@@ -1271,7 +1271,7 @@ void *rrdpush_sender_thread(void *ptr) {
                 last_reset_time_t = now_t;
                 size_t max = s->host->sender->buffer->max_size;
                 cbuffer_free(s->host->sender->buffer);
-                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.buffers_streaming);
+                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
                 sender_thread_buffer_recreate = true;
             }
         }
