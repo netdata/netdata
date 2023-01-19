@@ -967,29 +967,28 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
             decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
-            --temp_msg.text_size; // --temp_msg.text_size to get rid of '\0' 
-            res_hdr.text_size = temp_msg.text_size;
+            res_hdr.text_size = temp_msg.text_size - 1; // temp_msg.text_size - 1 to get rid of last '\0' or '\n' 
         } 
         else {
             decompress_text(&temp_msg, NULL);
-            size_t res_size = 0;
             res_hdr.matches = search_keyword(   temp_msg.data, temp_msg.text_size, 
                                                 &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)], 
-                                                &res_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
+                                                &res_hdr.text_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
             freez(temp_msg.data);
 
             if(likely(res_hdr.matches > 0)) {
-                m_assert(res_size > 0, "res_size can't be <= 0");
-                --res_size; // --res_size to get rid of last '\0' or '\n' 
-                res_hdr.text_size = res_size;
+                m_assert(res_hdr.text_size > 0, "res_hdr.text_size can't be <= 0");
+                res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
             }
-            else if(unlikely(res_hdr.matches == 0)) m_assert(res_size == 0, "res_size must be == 0");
+            else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
             else break; /* res_hdr.matches < 0 - error during keyword search */   
         }
 
-        memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
-        p_query_params->results_buff->len += res_hdr.text_size ? sizeof(res_hdr) + res_hdr.text_size : 0; 
-        p_query_params->keyword_matches += res_hdr.matches;
+        if(res_hdr.text_size){
+            memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
+            p_query_params->results_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
+            p_query_params->keyword_matches += res_hdr.matches;
+        }
         
         freez(temp_msg.text_compressed);
         
@@ -1122,29 +1121,28 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
             decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
-            --temp_msg.text_size; // --temp_msg.text_size to get rid of '\0' 
-            res_hdr.text_size = temp_msg.text_size;
+            res_hdr.text_size = temp_msg.text_size - 1; // temp_msg.text_size - 1 to get rid of last '\0' or '\n' 
         } 
         else {
             decompress_text(&temp_msg, NULL);
-            size_t res_size = 0;
             res_hdr.matches = search_keyword(   temp_msg.data, temp_msg.text_size, 
                                                 &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)], 
-                                                &res_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
+                                                &res_hdr.text_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
             freez(temp_msg.data);
 
             if(likely(res_hdr.matches > 0)) {
-                m_assert(res_size > 0, "res_size can't be <= 0");
-                --res_size; // --res_size to get rid of last '\0' or '\n' 
-                res_hdr.text_size = res_size;
+                m_assert(res_hdr.text_size > 0, "res_hdr.text_size can't be <= 0");
+                res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
             }
-            else if(unlikely(res_hdr.matches == 0)) m_assert(res_size == 0, "res_size must be == 0");
+            else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
             else break; /* res_hdr.matches < 0 - error during keyword search */   
         }
 
-        memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
-        p_query_params->results_buff->len += res_hdr.text_size ? sizeof(res_hdr) + res_hdr.text_size : 0; 
-        p_query_params->keyword_matches += res_hdr.matches;
+        if(res_hdr.text_size){
+            memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
+            p_query_params->results_buff->len += sizeof(res_hdr) + res_hdr.text_size; 
+            p_query_params->keyword_matches += res_hdr.matches;
+        }
         
         freez(temp_msg.text_compressed);
         
