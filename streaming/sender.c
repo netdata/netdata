@@ -191,6 +191,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQU
         BUFFER *wb = sender_start(host->sender);
         rrdpush_sender_add_host_variable_to_buffer(wb, rva);
         sender_commit(host->sender, wb);
+        sender_thread_buffer_free();
     }
 }
 
@@ -219,6 +220,7 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
         int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
         (void)ret;
         sender_commit(host->sender, wb);
+        sender_thread_buffer_free();
 
         debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }
@@ -897,6 +899,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
         pluginsd_function_result_end_to_buffer(wb);
 
         sender_commit(s, wb);
+        sender_thread_buffer_free();
 
         internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
                        rrdhost_hostname(s->host), s->connected_to,

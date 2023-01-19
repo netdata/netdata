@@ -10,7 +10,7 @@
 
 #define CONNECTED_TO_SIZE 100
 #define CBUFFER_INITIAL_SIZE (16 * 1024)
-#define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 4)
+#define THREAD_BUFFER_INITIAL_SIZE (CBUFFER_INITIAL_SIZE / 2)
 
 // ----------------------------------------------------------------------------
 // obsolete versions - do not use anymore

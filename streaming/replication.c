@@ -1691,15 +1691,16 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             // the timeout also defines now frequently we will traverse all the pending requests
             // when the outbound buffers of all senders is full
             usec_t timeout;
-            if(slow)
+            if(slow) {
                 // no work to be done, wait for a request to come in
                 timeout = 1000 * USEC_PER_MS;
+                sender_thread_buffer_free();
+            }
 
             else if(replication_globals.unsafe.pending > 0) {
-                if(replication_globals.unsafe.sender_resets == last_sender_resets) {
+                if(replication_globals.unsafe.sender_resets == last_sender_resets)
                     timeout = 1000 * USEC_PER_MS;
-                    sender_thread_buffer_free();
-                }
+
                 else {
                     // there are pending requests waiting to be executed,
                     // but none could be executed at this time.

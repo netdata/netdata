@@ -373,6 +373,7 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     BUFFER *wb = sender_start(host->sender);
     rrdpush_send_chart_definition(wb, st);
     sender_commit(host->sender, wb);
+    sender_thread_buffer_free();
 
     return true;
 }
@@ -437,6 +438,8 @@ void rrdpush_send_host_labels(RRDHOST *host) {
     buffer_sprintf(wb, "OVERWRITE %s\n", "labels");
 
     sender_commit(host->sender, wb);
+
+    sender_thread_buffer_free();
 }
 
 void rrdpush_claimed_id(RRDHOST *host)
@@ -454,6 +457,8 @@ void rrdpush_claimed_id(RRDHOST *host)
 
     rrdhost_aclk_state_unlock(host);
     sender_commit(host->sender, wb);
+
+    sender_thread_buffer_free();
 }
 
 int connect_to_one_of_destinations(
