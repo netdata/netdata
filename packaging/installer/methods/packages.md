@@ -66,7 +66,7 @@ Under each of these directories is a directory for each supported release, corre
 
 These repositories are set up as what Debian calls ‘flat repositories’, and are available via both HTTP and HTTPS.
 
-As a result of this structure, the required APT sources entry for stable packages for Debin 11 (Bullseye) is:
+As a result of this structure, the required APT sources entry for stable packages for Debian 11 (Bullseye) is:
 
 ```
 deb http://repo.netdata.cloud/repos/stable/debian/ bullseye/
