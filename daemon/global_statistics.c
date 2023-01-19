@@ -289,6 +289,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_labels = NULL;
         static RRDDIM *rd_strings = NULL;
         static RRDDIM *rd_streaming = NULL;
+        static RRDDIM *rd_replication = NULL;
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_other = NULL;
@@ -318,6 +319,7 @@ static void global_statistics_charts(void) {
             rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -334,7 +336,8 @@ static void global_statistics_charts(void) {
             netdata_buffers_statistics.buffers_health +
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
-            netdata_buffers_statistics.buffers_web;
+            netdata_buffers_statistics.buffers_web +
+            replication_allocated_buffers();
 
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
@@ -349,6 +352,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
         rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
         rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
+        rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
         rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
@@ -368,6 +372,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_buffers_health = NULL;
         static RRDDIM *rd_buffers_streaming = NULL;
         static RRDDIM *rd_cbuffers_streaming = NULL;
+        static RRDDIM *rd_buffers_replication = NULL;
         static RRDDIM *rd_buffers_web = NULL;
 
         if (unlikely(!st_memory_buffers)) {
@@ -395,6 +400,7 @@ static void global_statistics_charts(void) {
             rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -408,6 +414,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
 
         rrdset_done(st_memory_buffers);
@@ -2705,6 +2712,7 @@ struct dictionary_stats dictionary_stats_category_rrdcontext = { .name = "contex
 struct dictionary_stats dictionary_stats_category_rrdlabels = { .name = "labels" };
 struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health" };
 struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
+struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
 
 struct dictionary_categories {
     struct dictionary_stats *stats;
@@ -2758,6 +2766,7 @@ struct dictionary_categories {
     { .stats = &dictionary_stats_category_rrdlabels, "dictionaries labels", "dictionaries", 900000 },
     { .stats = &dictionary_stats_category_rrdhealth, "dictionaries health", "dictionaries", 900000 },
     { .stats = &dictionary_stats_category_functions, "dictionaries functions", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_replication, "dictionaries replication", "dictionaries", 900000 },
     { .stats = &dictionary_stats_category_other, "dictionaries other", "dictionaries", 900000 },
 
     // terminator
