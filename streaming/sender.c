@@ -1264,15 +1264,24 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-        if(unlikely(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE)) {
+        if (unlikely(!outstanding)) {
             static __thread time_t last_reset_time_t = 0;
-            time_t now_t = now_monotonic_sec();
-            if(now_t - last_reset_time_t > 600) {
-                last_reset_time_t = now_t;
-                size_t max = s->host->sender->buffer->max_size;
-                cbuffer_free(s->host->sender->buffer);
-                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
-                sender_thread_buffer_recreate = true;
+            static __thread size_t empty_counter = 0;
+
+            if ((++empty_counter) % 1000 == 0 || s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
+                time_t now_t = now_monotonic_sec();
+                if (now_t - last_reset_time_t > 600) {
+                    last_reset_time_t = now_t;
+
+                    if(s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
+                        size_t max = s->host->sender->buffer->max_size;
+                        cbuffer_free(s->host->sender->buffer);
+                        s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max,
+                                                              &netdata_buffers_statistics.cbuffers_streaming);
+                    }
+
+                    sender_thread_buffer_recreate = true;
+                }
             }
         }
         netdata_mutex_unlock(&s->mutex);
