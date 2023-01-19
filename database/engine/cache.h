@@ -160,10 +160,10 @@ struct pgc_statistics {
 
 typedef void (*free_clean_page_callback)(PGC *cache, PGC_ENTRY entry);
 typedef void (*save_dirty_page_callback)(PGC *cache, PGC_ENTRY *entries_array, PGC_PAGE **pages_array, size_t entries);
-
+typedef void (*save_dirty_init_callback)(PGC *cache, Word_t section);
 // create a cache
 PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_clean_cb,
-                size_t max_dirty_pages_per_flush, save_dirty_page_callback pgc_save_dirty_cb,
+                size_t max_dirty_pages_per_flush, save_dirty_init_callback pgc_save_init_cb, save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
                 size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,

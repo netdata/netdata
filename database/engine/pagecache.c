@@ -14,13 +14,16 @@ static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_E
     // Release storage associated with the page
     dbengine_page_free(entry.data, entry.size);
 }
+static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused, Word_t section) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
+
+    // mark ctx as having flushing in progress
+    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+}
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
-
-     // mark ctx as having flushing in progress
-    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
 
     size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
 
@@ -1023,6 +1026,7 @@ void init_page_cache(void)
                 main_cache_size,
                 main_cache_free_clean_page_callback,
                 (size_t) rrdeng_pages_per_extent,
+                main_cache_flush_dirty_page_init_callback,
                 main_cache_flush_dirty_page_callback,
                 10,
                 10240,                                      // if there are that many threads, evict so many at once!
@@ -1037,6 +1041,7 @@ void init_page_cache(void)
                 open_cache_size,                             // the default is 1MB
                 open_cache_free_clean_page_callback,
                 1,
+                NULL,
                 open_cache_flush_dirty_page_callback,
                 10,
                 10240,                                      // if there are that many threads, evict that many at once!
@@ -1052,6 +1057,7 @@ void init_page_cache(void)
                 extent_cache_size,
                 extent_cache_free_clean_page_callback,
                 1,
+                NULL,
                 extent_cache_flush_dirty_page_callback,
                 5,
                 10,                                         // it will lose up to that extents at once!

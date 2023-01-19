@@ -564,6 +564,14 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         struct rrdengine_datafile *datafile = ctx->datafiles.first;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
+        if(datafile == ctx->datafiles.first->prev) {
+            // this is the last file
+            while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
+                info("Waiting to inflight flush to finish on tier %d", ctx->tier);
+                sleep_usec(500 * USEC_PER_MS);
+            }
+        }
+
         while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
             info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->tier);
             sleep_usec(500 * USEC_PER_MS);
