@@ -244,6 +244,28 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdhost_sender_replicating_charts_zero(host);
 }
 
+static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
+    static __thread time_t last_reset_time_s = 0;
+
+    if(!force && now_s - last_reset_time_s < 300)
+        return;
+
+    if(!have_mutex)
+        netdata_mutex_lock(&s->mutex);
+
+    rrdpush_sender_last_buffer_recreate_set(s, now_s);
+    last_reset_time_s = now_s;
+
+    if(s->buffer && s->buffer->size > CBUFFER_INITIAL_SIZE) {
+        size_t max = s->buffer->max_size;
+        cbuffer_free(s->buffer);
+        s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
+    }
+
+    if(!have_mutex)
+        netdata_mutex_unlock(&s->mutex);
+}
+
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
     rrdpush_sender_set_flush_time(host->sender);
 
@@ -251,6 +273,7 @@ static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
 
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->buffer);
+    rrdpush_sender_cbuffer_recreate_timed(host->sender, now_monotonic_sec(), true, true);
     replication_recalculate_buffer_used_ratio_unsafe(host->sender);
 
     netdata_mutex_unlock(&host->sender->mutex);
@@ -1118,28 +1141,6 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
 
     freez(s->pipe_buffer);
     freez(s);
-}
-
-void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
-    static __thread time_t last_reset_time_s = 0;
-
-    if(!force && now_s - last_reset_time_s < 300)
-        return;
-
-    if(!have_mutex)
-        netdata_mutex_lock(&s->mutex);
-
-    rrdpush_sender_last_buffer_recreate_set(s, now_s);
-    last_reset_time_s = now_s;
-
-    if(s->buffer && s->buffer->size > CBUFFER_INITIAL_SIZE) {
-        size_t max = s->buffer->max_size;
-        cbuffer_free(s->buffer);
-        s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
-    }
-
-    if(!have_mutex)
-        netdata_mutex_unlock(&s->mutex);
 }
 
 void *rrdpush_sender_thread(void *ptr) {
