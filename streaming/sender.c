@@ -36,38 +36,35 @@ extern char *netdata_ssl_ca_file;
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
-static __thread bool sender_thread_buffer_recreate = false;
 
 void sender_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
     sender_thread_buffer = NULL;
+    sender_thread_buffer_used = false;
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_start(struct sender_state *s __maybe_unused) {
+BUFFER *sender_start(struct sender_state *s) {
     if(unlikely(sender_thread_buffer_used))
         fatal("STREAMING: thread buffer is used multiple times concurrently.");
 
-    if(unlikely(sender_thread_buffer_recreate)) {
-        sender_thread_buffer_recreate = false;
-        if(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE) {
+    if(unlikely(rrdpush_sender_buffer_recreate_check(s))) {
+        if(unlikely(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE)) {
             buffer_free(sender_thread_buffer);
             sender_thread_buffer = NULL;
         }
+
+        rrdpush_sender_buffer_recreate_set(s, false);
     }
 
     if(!sender_thread_buffer) {
         sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
-        sender_thread_buffer_recreate = false;
+        rrdpush_sender_buffer_recreate_set(s, false);
     }
 
     sender_thread_buffer_used = true;
     buffer_flush(sender_thread_buffer);
     return sender_thread_buffer;
-}
-
-void sender_cancel(struct sender_state *s __maybe_unused) {
-    sender_thread_buffer_used = false;
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
@@ -1272,7 +1269,7 @@ void *rrdpush_sender_thread(void *ptr) {
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
         if (unlikely(!outstanding && now_s - last_reset_time_s > 300)) {
-            sender_thread_buffer_recreate = true;
+            rrdpush_sender_buffer_recreate_set(s, true);
             last_reset_time_s = now_s;
 
             if(s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
