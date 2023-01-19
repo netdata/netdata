@@ -2,7 +2,7 @@
 title: "Interact with the charts"
 sidebar_label: "Interact with the charts"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/interact-with-the-charts.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Tasks"
 sidebar_position: "1"
 learn_rel_path: "Operations"

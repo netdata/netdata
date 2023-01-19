@@ -2,7 +2,7 @@
 title: "Rooms"
 sidebar_label: "Rooms"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/space-administration/rooms.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Tasks"
 sidebar_position: "1"
 learn_rel_path: "Setup/Space administration"

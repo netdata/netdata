@@ -2,7 +2,7 @@
 title: "Detect anomalies with Anomaly Advisor"
 sidebar_label: "Detect anomalies with Anomaly Advisor"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/detect-anomalies-with-anomaly-advisor.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 sidebar_position: "4"
 learn_topic_type: "Tasks"
 learn_rel_path: "Operations"

@@ -2,7 +2,7 @@
 title: "Agent configuration"
 sidebar_label: "Agent configuration"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/agent-configuration.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 sidebar_position: "40"
 learn_topic_type: "Tasks"
 learn_rel_path: "Setup"

@@ -2,7 +2,7 @@
 title: "Overview"
 sidebar_label: "Netdata Architecture"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-architecture/overview.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 learn_topic_type: "Concepts"
 learn_rel_path: "Concepts"
 sidebar_position: "000"

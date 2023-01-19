@@ -2,7 +2,7 @@
 title: "Deploy the Agent"
 sidebar_label: "Deploy the Agent"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/setup/deploy-the-agent.md"
-learn_status: "Published"
+learn_status: "Unpublished"
 sidebar_position: "20"
 learn_topic_type: "Tasks"
 learn_rel_path: "Setup"
