@@ -561,18 +561,6 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     return HTTP_RESP_OK;
 }
 
-inline int web_client_api_request_v1_archivedcharts(RRDHOST *host __maybe_unused, struct web_client *w, char *url) {
-    (void)url;
-
-    buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
-#ifdef ENABLE_DBENGINE
-    if (host->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE)
-        sql_rrdset2json(host, w->response.data);
-#endif
-    return HTTP_RESP_OK;
-}
-
 inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, char *url) {
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
@@ -1620,7 +1608,6 @@ static struct api_command {
         { "charts",          0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_charts                     },
         { "context",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_context                    },
         { "contexts",        0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_contexts                   },
-        { "archivedcharts",  0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_archivedcharts             },
 
         // registry checks the ACL by itself, so we allow everything
         { "registry",        0, WEB_CLIENT_ACL_NOCHECK,                         web_client_api_request_v1_registry                   },
