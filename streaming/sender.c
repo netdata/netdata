@@ -1223,7 +1223,11 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
+    size_t iterations = 0;
+    time_t now_s = now_monotonic_sec();
+    time_t last_reset_time_s = now_s;
     while(!rrdhost_sender_should_exit(s)) {
+        iterations++;
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
@@ -1240,7 +1244,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(rrdhost_sender_should_exit(s))
                 break;
 
-            s->last_traffic_seen_t = now_monotonic_sec();
+            now_s = s->last_traffic_seen_t = now_monotonic_sec();
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
 
@@ -1250,8 +1254,11 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
+        if(iterations % 1000 == 0)
+            now_s = now_monotonic_sec();
+
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(now_monotonic_sec() - s->last_traffic_seen_t > s->timeout &&
+        if(unlikely(now_s - s->last_traffic_seen_t > s->timeout &&
             !rrdpush_sender_pending_replication_requests(s) &&
             !rrdpush_sender_replicating_charts(s)
         )) {
@@ -1264,24 +1271,14 @@ void *rrdpush_sender_thread(void *ptr) {
         netdata_mutex_lock(&s->mutex);
         size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
         size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-        if (unlikely(!outstanding)) {
-            static __thread time_t last_reset_time_t = 0;
-            static __thread size_t empty_counter = 0;
+        if (unlikely(!outstanding && now_s - last_reset_time_s > 300)) {
+            sender_thread_buffer_recreate = true;
+            last_reset_time_s = now_s;
 
-            if ((++empty_counter) % 1000 == 0 || s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
-                time_t now_t = now_monotonic_sec();
-                if (now_t - last_reset_time_t > 600) {
-                    last_reset_time_t = now_t;
-
-                    if(s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
-                        size_t max = s->host->sender->buffer->max_size;
-                        cbuffer_free(s->host->sender->buffer);
-                        s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max,
-                                                              &netdata_buffers_statistics.cbuffers_streaming);
-                    }
-
-                    sender_thread_buffer_recreate = true;
-                }
+            if(s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
+                size_t max = s->host->sender->buffer->max_size;
+                cbuffer_free(s->host->sender->buffer);
+                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
             }
         }
         netdata_mutex_unlock(&s->mutex);
@@ -1338,6 +1335,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
             netdata_thread_testcancel();
             debug(D_STREAM, "Spurious wakeup");
+            now_s = now_monotonic_sec();
             continue;
         }
 
