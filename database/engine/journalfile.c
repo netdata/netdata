@@ -9,7 +9,7 @@ static void update_metric_retention_and_granularity_by_uuid(
         time_t first_time_s, time_t last_time_s,
         time_t update_every_s, time_t now_s)
 {
-    if(last_time_s > now_s) {
+    if(unlikely(last_time_s > now_s)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
                           "fixing last time to now",
@@ -17,7 +17,7 @@ static void update_metric_retention_and_granularity_by_uuid(
         last_time_s = now_s;
     }
 
-    if(first_time_s > last_time_s) {
+    if(unlikely(first_time_s > last_time_s)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
                           "fixing first time to last time",
@@ -26,9 +26,7 @@ static void update_metric_retention_and_granularity_by_uuid(
         first_time_s = last_time_s;
     }
 
-    if(first_time_s == 0 ||
-            last_time_s == 0
-        ) {
+    if(unlikely(first_time_s == 0 || last_time_s == 0)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
                           "using them as-is",
@@ -949,7 +947,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    usec_t start_loading = now_realtime_usec();
+    usec_t mmap_start_ut = now_monotonic_usec();
     uint8_t *data_start = mmap(NULL, journal_v2_file_size, PROT_READ, MAP_SHARED, fd, 0);
     if (data_start == MAP_FAILED) {
         close(fd);
@@ -957,6 +955,7 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     }
 
     info("DBENGINE: checking integrity of '%s'", path_v2);
+    usec_t validation_start_ut = now_monotonic_usec();
     int rc = journalfile_v2_validate(data_start, journal_v2_file_size, journal_v1_file_size);
     if (unlikely(rc)) {
         if (rc == 2)
@@ -987,10 +986,9 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     madvise_dontfork(data_start, journal_v2_file_size);
     madvise_dontdump(data_start, journal_v2_file_size);
 
+    usec_t mrg_start_ut = now_monotonic_usec();
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-
     time_t now_s = now_realtime_sec();
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
@@ -1007,8 +1005,17 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         metric++;
     }
 
-    info("DBENGINE: journal file '%s' loaded (size:%"PRIu64") with %u metrics in %d ms", path_v2, journal_v2_file_size, entries,
-         (int) ((now_realtime_usec() - start_loading) / USEC_PER_MS));
+    usec_t finished_ut = now_monotonic_usec();
+
+    info("DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
+         "mmap: %0.2f ms, validate: %0.2f ms, populate: %0.2f ms"
+         , path_v2
+         , (double)journal_v2_file_size / 1024 / 1024
+         , (double)entries / 1000
+         , ((double)(validation_start_ut - mmap_start_ut) / USEC_PER_MS)
+         , ((double)(mrg_start_ut - validation_start_ut) / USEC_PER_MS)
+         , ((double)(finished_ut - mrg_start_ut) / USEC_PER_MS)
+         );
 
     // Initialize the journal file to be able to access the data
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);

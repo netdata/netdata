@@ -277,16 +277,16 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
 
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-    if(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s))
+    if(unlikely(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s)))
         metric->first_time_s = first_time_s;
 
-    if(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean)) {
+    if(likely(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean))) {
         metric->latest_time_s_clean = last_time_s;
 
-        if(update_every_s)
+        if(likely(update_every_s))
             metric->latest_update_every_s = update_every_s;
     }
-    else if(!metric->latest_update_every_s && update_every_s)
+    else if(unlikely(!metric->latest_update_every_s && update_every_s))
         metric->latest_update_every_s = update_every_s;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);
