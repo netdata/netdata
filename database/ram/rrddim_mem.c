@@ -60,7 +60,7 @@ rrddim_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE *db_instance __maybe_un
             mh->refcount = 1;
             update_metric_handle_from_rrddim(mh, rd);
             *PValue = mh;
-            __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
         }
         else {
             if(__atomic_add_fetch(&mh->refcount, 1, __ATOMIC_RELAXED) <= 0)
@@ -111,7 +111,7 @@ void rrddim_metric_release(STORAGE_METRIC_HANDLE *db_metric_handle __maybe_unuse
             netdata_rwlock_unlock(&rrddim_JudyHS_rwlock);
 
             freez(mh);
-            __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_metric_handle) + JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
         }
     }
 }

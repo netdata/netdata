@@ -75,11 +75,11 @@ static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl
 }
 
 static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg) {
-    __atomic_add_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
 }
 
 static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg) {
-    __atomic_sub_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
 }
 
 static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {

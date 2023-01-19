@@ -220,7 +220,7 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
 }
 
 #define dictionary_stats_memory_total(stats) \
-    ((stats).memory.dict + (stats).memory.values + ((stats).memory.indexed * 3))
+    ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
 
 static void global_statistics_charts(void) {
     static unsigned long long old_web_requests = 0,
@@ -290,6 +290,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_strings = NULL;
         static RRDDIM *rd_streaming = NULL;
         static RRDDIM *rd_buffers = NULL;
+        static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -318,6 +319,7 @@ static void global_statistics_charts(void) {
             rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -348,6 +350,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
         rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
+        rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
@@ -395,7 +398,7 @@ static void global_statistics_charts(void) {
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
-        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size);
+        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
         rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
@@ -2965,7 +2968,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     total = 0;
-    load_dictionary_stats_entry(memory.indexed);
+    load_dictionary_stats_entry(memory.index);
     load_dictionary_stats_entry(memory.values);
     load_dictionary_stats_entry(memory.dict);
 
@@ -2999,7 +3002,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             rrdlabels_add(c->st_memory->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
 
-        rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.indexed);
+        rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.index);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_values, (collected_number)stats.memory.values);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_dict, (collected_number)stats.memory.dict);
 

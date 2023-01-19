@@ -201,7 +201,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         *ptr = string;
         string_base.inserts++;
         string_base.entries++;
-        string_base.memory += (long)(mem_size + length * 3); // x3 for Judy
+        string_base.memory += (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(length));
     }
     else {
         // the item is already in the index
@@ -255,7 +255,7 @@ static inline void string_index_delete(STRING *string) {
         size_t mem_size = sizeof(STRING) + string->length;
         string_base.deletes++;
         string_base.entries--;
-        string_base.memory -= (long)(mem_size + string->length * 3); // x3 for Judy
+        string_base.memory -= (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(string->length));
         freez(string);
     }
 
