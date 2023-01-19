@@ -189,12 +189,12 @@ struct sender_state {
     struct {
         size_t buffer_used_percentage;          // the current utilization of the sending buffer
         usec_t last_flush_time_ut;              // the last time the sender flushed the sending buffer in USEC
-        bool buffer_recreate;                   // true when the sender buffer should be re-created
+        time_t last_buffer_recreate_s;          // true when the sender buffer should be re-created
     } atomic;
 };
 
-#define rrdpush_sender_buffer_recreate_check(sender) __atomic_load_n(&(sender)->atomic.buffer_recreate, __ATOMIC_RELAXED)
-#define rrdpush_sender_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.buffer_recreate, value, __ATOMIC_RELAXED)
+#define rrdpush_sender_last_buffer_recreate_get(sender) __atomic_load_n(&(sender)->atomic.last_buffer_recreate_s, __ATOMIC_RELAXED)
+#define rrdpush_sender_last_buffer_recreate_set(sender, value) __atomic_store_n(&(sender)->atomic.last_buffer_recreate_s, value, __ATOMIC_RELAXED)
 
 #define rrdpush_sender_replication_buffer_full_set(sender, value) __atomic_store_n(&((sender)->replication.atomic.reached_max), value, __ATOMIC_SEQ_CST)
 #define rrdpush_sender_replication_buffer_full_get(sender) __atomic_load_n(&((sender)->replication.atomic.reached_max), __ATOMIC_SEQ_CST)
