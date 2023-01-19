@@ -342,6 +342,8 @@ int32_t stream_capabilities_to_vn(uint32_t caps);
 void receiver_state_free(struct receiver_state *rpt);
 bool stop_streaming_receiver(RRDHOST *host, const char *reason);
 
+void sender_thread_buffer_free(void);
+
 #include "replication.h"
 
 #endif //NETDATA_RRDPUSH_H
