@@ -355,6 +355,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+
     system_info->hops = str2i((const char *) argv[IDX_HOPS]);
 
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);

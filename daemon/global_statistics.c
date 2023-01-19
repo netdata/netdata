@@ -334,9 +334,9 @@ static void global_statistics_charts(void) {
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
-        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + rrddim_db_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + (collected_number)rrddim_db_memory_size);
         rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
-        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost));
+        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
         rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));
         rrddim_set_by_pointer(st_memory, rd_contexts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
         rrddim_set_by_pointer(st_memory, rd_health, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));

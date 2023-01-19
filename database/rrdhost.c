@@ -275,6 +275,7 @@ int is_legacy = 1;
 
     int is_in_multihost = (memory_mode == RRD_MEMORY_MODE_DBENGINE && !is_legacy);
     RRDHOST *host = callocz(1, sizeof(RRDHOST));
+    __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
 
     strncpyz(host->machine_guid, guid, GUID_LEN + 1);
 
@@ -990,6 +991,8 @@ int rrd_init(char *hostname, struct rrdhost_system_info *system_info, bool unitt
 
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
     if(likely(system_info)) {
+        __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+
         freez(system_info->cloud_provider_type);
         freez(system_info->cloud_instance_type);
         freez(system_info->cloud_instance_region);
@@ -1030,6 +1033,8 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
         return;
 
     host->sender = callocz(1, sizeof(*host->sender));
+    __atomic_add_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*host->sender), __ATOMIC_RELAXED);
+
     host->sender->host = host;
     host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.buffers_streaming);
     host->sender->capabilities = STREAM_OUR_CAPABILITIES;
@@ -1065,6 +1070,9 @@ static void rrdhost_streaming_sender_structures_free(RRDHOST *host)
         host->sender->compressor->destroy(&host->sender->compressor);
 #endif
     replication_cleanup_sender(host->sender);
+
+    __atomic_sub_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*host->sender), __ATOMIC_RELAXED);
+
     freez(host->sender);
     host->sender = NULL;
     rrdhost_flag_clear(host, RRDHOST_FLAG_RRDPUSH_SENDER_INITIALIZED);
@@ -1189,6 +1197,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdhost_destroy_rrdcontexts(host);
 
     string_freez(host->hostname);
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(RRDHOST), __ATOMIC_RELAXED);
     freez(host);
 #ifdef ENABLE_ACLK
     if (wc)

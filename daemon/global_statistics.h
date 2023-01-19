@@ -6,6 +6,7 @@
 #include "database/rrd.h"
 
 extern struct netdata_buffers_statistics {
+    size_t rrdhost_allocations_size;
     size_t query_targets_size;
     size_t rrdset_done_rda_size;
     size_t buffers_aclk;

@@ -515,6 +515,8 @@ bool destinations_init_add_one(char *entry, void *data) {
     struct rrdpush_destinations *d = callocz(1, sizeof(struct rrdpush_destinations));
     d->destination = string_strdupz(entry);
 
+    __atomic_add_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
+
     DOUBLE_LINKED_LIST_APPEND_UNSAFE(t->list, d, prev, next);
 
     t->count++;
@@ -545,6 +547,7 @@ void rrdpush_destinations_free(RRDHOST *host) {
         DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
+        __atomic_sub_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
     }
 
     host->destinations = NULL;
@@ -634,6 +637,9 @@ int rrdpush_receiver_thread_spawn(struct web_client *w, char *url) {
     rpt->last_msg_t = now_realtime_sec();
     rpt->capabilities = STREAM_CAP_INVALID;
     rpt->hops = 1;
+
+    __atomic_add_fetch(&netdata_buffers_statistics.buffers_streaming, sizeof(*rpt), __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
 
     rpt->system_info = callocz(1, sizeof(struct rrdhost_system_info));
     rpt->system_info->hops = rpt->hops;
