@@ -264,6 +264,8 @@ static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t
         s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
     }
 
+    sender_thread_buffer_free();
+
     if(!have_mutex)
         netdata_mutex_unlock(&s->mutex);
 }
