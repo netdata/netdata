@@ -2449,8 +2449,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every_s = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every_s);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
-            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
+        if(rm->rrddim && rm->rrddim->tiers[tier].db_metric_handle)
+            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier].db_metric_handle);
         else
             tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid);
 

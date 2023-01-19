@@ -736,8 +736,8 @@ void rrdset_reset(RRDSET *st) {
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             for(size_t tier = 0; tier < storage_tiers ;tier++) {
-                if(rd->tiers[tier])
-                    rd->tiers[tier]->collect_ops->flush(rd->tiers[tier]->db_collection_handle);
+                if(rd->tiers[tier].db_collection_handle)
+                    rd->tiers[tier].collect_ops->flush(rd->tiers[tier].db_collection_handle);
             }
         }
     }
@@ -1194,7 +1194,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    rd->tiers[0].collect_ops->store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
@@ -1211,9 +1211,9 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     };
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
+        if(unlikely(!rd->tiers[tier].db_metric_handle)) continue;
 
-        struct rrddim_tier *t = rd->tiers[tier];
+        struct rrddim_tier *t = &rd->tiers[tier];
 
         if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
             // we have not collected this tier before
@@ -1963,8 +1963,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+            if (rd->tiers[tier].db_collection_handle)
+                rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
         assert(rd->update_every == prev_update_every_s &&
@@ -2076,6 +2076,7 @@ void rrdset_memory_file_free(RRDSET *st) {
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    __atomic_sub_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     netdata_munmap(st_on_file, st_on_file->memsize);
 
     // remove the pointers from the RRDDIM
@@ -2172,5 +2173,6 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     // copy the useful values back to st_on_file
     rrdset_memory_file_update(st);
 
+    __atomic_add_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     return true;
 }

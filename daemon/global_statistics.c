@@ -23,6 +23,7 @@ bool global_statistics_enabled = true;
 struct netdata_buffers_statistics netdata_buffers_statistics = {};
 
 static size_t dbengine_total_memory = 0;
+size_t rrddim_db_memory_size = 0;
 
 static struct global_statistics {
     uint16_t connected_clients;
@@ -333,7 +334,7 @@ static void global_statistics_charts(void) {
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
-        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory);
+        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + rrddim_db_memory_size);
         rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
         rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost));
         rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));

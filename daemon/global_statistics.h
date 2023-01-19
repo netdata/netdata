@@ -26,6 +26,7 @@ extern struct dictionary_stats dictionary_stats_category_rrdlabels;
 extern struct dictionary_stats dictionary_stats_category_rrdhealth;
 extern struct dictionary_stats dictionary_stats_category_functions;
 
+extern size_t rrddim_db_memory_size;
 
 // ----------------------------------------------------------------------------
 // global statistics
