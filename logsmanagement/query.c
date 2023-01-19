@@ -79,10 +79,6 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 
     if(unlikely(p_query_params->quota > MAX_LOG_MSG_SIZE)) p_query_params->quota = MAX_LOG_MSG_SIZE;
 
-    // printf( "Query params: start:%lu end:%lu chart_name:%s filename:%s keyword:%s\n", 
-    //         p_query_params->start_timestamp, p_query_params->end_timestamp, p_query_params->chart_name, 
-    //         p_query_params->filename, p_query_params->keyword);
-
     /* Check all required query parameters are present */
     if(unlikely( !p_query_params->start_timestamp || 
                  !p_query_params->end_timestamp || 
@@ -154,17 +150,6 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 
     for(int pfi_off = 0; p_file_infos[pfi_off]; pfi_off++){
         uv_mutex_unlock(p_file_infos[pfi_off]->db_mut);
-    }
-
-    /* Results are terminated as ",\n" but should actually be null-terminated, 
-     * so replace those 2 characters with '\0' */
-    if(likely(p_query_params->results_buff->len >= 2)){
-        p_query_params->results_buff->len -= 2;
-        p_query_params->results_buff->buffer[p_query_params->results_buff->len] = '\0';
-    } else {
-        /* Ensure null-termination, we don't want to print garbage */
-        buffer_need_bytes(p_query_params->results_buff, 1);
-        p_query_params->results_buff->buffer[0] = '\0';
     }
 
 #if MEASURE_QUERY_TIME

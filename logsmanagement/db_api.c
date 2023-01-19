@@ -956,49 +956,40 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         uv_fs_req_cleanup(&read_req);
 
         /* Append retrieved results to BUFFER */
-        size_t old_results_len = p_query_params->results_buff->len;
-        buffer_sprintf(p_query_params->results_buff, "\t\t[ %" PRIu64 ", \"", temp_msg.timestamp);
-        /* In case of search_keyword, less than item.text_size space is 
-         * required, but go for worst case scenario for now */
-        buffer_increase(p_query_params->results_buff, temp_msg.text_size);
+        logs_query_res_hdr_t res_hdr = {0}; // result header
+        
+        /* In case of search_keyword, less than sizeof(res_hdr) + temp_msg.text_size 
+         * space is required, but go for worst case scenario for now */
+        buffer_increase(p_query_params->results_buff, sizeof(res_hdr) + temp_msg.text_size);
+
+        res_hdr.timestamp = temp_msg.timestamp;
+                                                        
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
-            decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len]);
-            p_query_params->results_buff->len += temp_msg.text_size;
-            p_query_params->results_buff->len--; // get rid of '\0'
-            // Watch out! Changing the next line will break web_client_api_request_v1_logsmanagement()! 
-            buffer_strcat(p_query_params->results_buff, "\", \t0],\n");
+            decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
+            --temp_msg.text_size; // --temp_msg.text_size to get rid of '\0' 
+            res_hdr.text_size = temp_msg.text_size;
         } 
         else {
             decompress_text(&temp_msg, NULL);
             size_t res_size = 0;
-            const int matches = search_keyword(temp_msg.data, temp_msg.text_size, 
-                                               &p_query_params->results_buff->buffer[p_query_params->results_buff->len], 
-                                               &res_size, 
-                                               p_query_params->keyword, NULL, 
-                                               p_query_params->ignore_case);
+            res_hdr.matches = search_keyword(   temp_msg.data, temp_msg.text_size, 
+                                                &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)], 
+                                                &res_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
             freez(temp_msg.data);
 
-            if(likely(matches > 0)) {
+            if(likely(res_hdr.matches > 0)) {
                 m_assert(res_size > 0, "res_size can't be <= 0");
-                p_query_params->results_buff->len += res_size;
-                p_query_params->results_buff->len--; // get rid of '\0'
-                // buffer_strcat(p_query_params->results_buff, "\"],\n");
-                // Watch out! Changing the next line will break web_client_api_request_v1_logsmanagement()! 
-                buffer_sprintf(p_query_params->results_buff, "\", \t%d],\n", matches);
-                p_query_params->keyword_matches += matches;
+                --res_size; // --res_size to get rid of last '\0' or '\n' 
+                res_hdr.text_size = res_size;
             }
-            else if(unlikely(matches == 0)){
-                m_assert(res_size == 0, "res_size must be == 0");
-                /* No keyword matches, undo timestamp buffer_sprintf() */
-                p_query_params->results_buff->len = old_results_len;
-            }
-            else { 
-                /* matches < 0 - error during keyword search */
-                freez(temp_msg.text_compressed);
-                break;
-            }
+            else if(unlikely(res_hdr.matches == 0)) m_assert(res_size == 0, "res_size must be == 0");
+            else break; /* res_hdr.matches < 0 - error during keyword search */   
         }
+
+        memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
+        p_query_params->results_buff->len += res_hdr.text_size ? sizeof(res_hdr) + res_hdr.text_size : 0; 
+        p_query_params->keyword_matches += res_hdr.matches;
         
         freez(temp_msg.text_compressed);
         
@@ -1120,49 +1111,40 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         uv_fs_req_cleanup(&read_req);
 
         /* Append retrieved results to BUFFER */
-        size_t old_results_len = p_query_params->results_buff->len;
-        buffer_sprintf(p_query_params->results_buff, "\t\t[ %" PRIu64 ", \"", temp_msg.timestamp);
-        /* In case of search_keyword, less than item.text_size space is 
-         * required, but go for worst case scenario for now */
-        buffer_increase(p_query_params->results_buff, temp_msg.text_size);
+        logs_query_res_hdr_t res_hdr = {0}; // result header
+        
+        /* In case of search_keyword, less than sizeof(res_hdr) + temp_msg.text_size 
+         * space is required, but go for worst case scenario for now */
+        buffer_increase(p_query_params->results_buff, sizeof(res_hdr) + temp_msg.text_size);
+
+        res_hdr.timestamp = temp_msg.timestamp;
+                                                        
         if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
             // TODO: decompress_text does not handle or return any errors currently. How should any errors be handled?
-            decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len]);
-            p_query_params->results_buff->len += temp_msg.text_size;
-            p_query_params->results_buff->len--; // get rid of '\0'
-            // Watch out! Changing the next line will break web_client_api_request_v1_logsmanagement()! 
-            buffer_strcat(p_query_params->results_buff, "\", \t0],\n");
+            decompress_text(&temp_msg, &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)]);
+            --temp_msg.text_size; // --temp_msg.text_size to get rid of '\0' 
+            res_hdr.text_size = temp_msg.text_size;
         } 
         else {
             decompress_text(&temp_msg, NULL);
             size_t res_size = 0;
-            const int matches = search_keyword(temp_msg.data, temp_msg.text_size, 
-                                               &p_query_params->results_buff->buffer[p_query_params->results_buff->len], 
-                                               &res_size, 
-                                               p_query_params->keyword, NULL,
-                                               p_query_params->ignore_case);
+            res_hdr.matches = search_keyword(   temp_msg.data, temp_msg.text_size, 
+                                                &p_query_params->results_buff->buffer[p_query_params->results_buff->len + sizeof(res_hdr)], 
+                                                &res_size, p_query_params->keyword, NULL, p_query_params->ignore_case);
             freez(temp_msg.data);
 
-            if(likely(matches > 0)) {
+            if(likely(res_hdr.matches > 0)) {
                 m_assert(res_size > 0, "res_size can't be <= 0");
-                p_query_params->results_buff->len += res_size;
-                p_query_params->results_buff->len--; // get rid of '\0'
-                // buffer_strcat(p_query_params->results_buff, "\"],\n");
-                // Watch out! Changing the next line will break web_client_api_request_v1_logsmanagement()! 
-                buffer_sprintf(p_query_params->results_buff, "\", \t%d],\n", matches);
-                p_query_params->keyword_matches += matches;
+                --res_size; // --res_size to get rid of last '\0' or '\n' 
+                res_hdr.text_size = res_size;
             }
-            else if(unlikely(matches == 0)){
-                m_assert(res_size == 0, "res_size must be == 0");
-                /* No keyword matches, undo timestamp buffer_sprintf() */
-                p_query_params->results_buff->len = old_results_len;
-            }
-            else { 
-                /* matches < 0 - error during keyword search */
-                freez(temp_msg.text_compressed);
-                break;
-            }    
+            else if(unlikely(res_hdr.matches == 0)) m_assert(res_size == 0, "res_size must be == 0");
+            else break; /* res_hdr.matches < 0 - error during keyword search */   
         }
+
+        memcpy(&p_query_params->results_buff->buffer[p_query_params->results_buff->len], &res_hdr, sizeof(res_hdr));
+        p_query_params->results_buff->len += res_hdr.text_size ? sizeof(res_hdr) + res_hdr.text_size : 0; 
+        p_query_params->keyword_matches += res_hdr.matches;
         
         freez(temp_msg.text_compressed);
         

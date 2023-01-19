@@ -1674,6 +1674,9 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         else if(!strcmp(name, "sanitise_keyword")) {
             query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
+        else if(unlikely(!strcmp(name, "data_format") && !strcmp(value, "newline"))) {
+            query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
+        }
     }
 
     fn_off = cn_off = 0;
@@ -1698,49 +1701,64 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     if(query_params.chart_name[0])  w->response.data->len -= 2;
     buffer_strcat(w->response.data, "\n\t],\n");
     buffer_strcat(w->response.data, "\t\"data\":[\n");
+    
+    size_t res_off = 0;
+    logs_query_res_hdr_t res_hdr;
+    while(query_params.results_buff->len - res_off > 0){
+        memcpy(&res_hdr, &query_params.results_buff->buffer[res_off], sizeof(res_hdr));
+        
+        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%" PRIu64 ",\n" , res_hdr.timestamp);
 
-    /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
-     * through the query_params.results_buff->buffer characters one by one. 
-     * Careful not to escape valid new lines, backslashes and double quotes. */
-    char *p = query_params.results_buff->buffer;
-    int f_quote = 0;
-    while (*p){
-        if(unlikely(*p == '\n' && *(p-1) != ','  && *(p-2) != ']')){
-            buffer_need_bytes(w->response.data, 2);
-            w->response.data->buffer[w->response.data->len++] = '\\';
-            w->response.data->buffer[w->response.data->len++] = 'n';
-        } 
-        else if(unlikely(*p == '\\')) {
-            buffer_need_bytes(w->response.data, 2);
-            w->response.data->buffer[w->response.data->len++] = '\\';
-            w->response.data->buffer[w->response.data->len++] = '\\';
-        }
-        else if(unlikely(*p == '"')) {
-            if(unlikely(f_quote == 0)){
-                f_quote = 1;
-                buffer_need_bytes(w->response.data, 1);
-                w->response.data->buffer[w->response.data->len++] = *p;
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\t\t\t[\n\t");
+
+        buffer_strcat(w->response.data, "\t\t\t\"");
+
+        /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
+         * through the result characters one by one. */
+        char *p = &query_params.results_buff->buffer[res_off] + sizeof(res_hdr);
+        size_t remaining = res_hdr.text_size;
+        while (remaining--){
+            if(unlikely(*p == '\n')){
+                if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
+                    buffer_strcat(w->response.data, "\",\n\t\t\t\t\"");
+                } else {
+                    buffer_need_bytes(w->response.data, 2);
+                    w->response.data->buffer[w->response.data->len++] = '\\';
+                    w->response.data->buffer[w->response.data->len++] = 'n';
+                }
+                
+            } 
+            else if(unlikely(*p == '\\')) {
+                buffer_need_bytes(w->response.data, 2);
+                w->response.data->buffer[w->response.data->len++] = '\\';
+                w->response.data->buffer[w->response.data->len++] = '\\';
             }
-            else if(unlikely(*(p+1) == ',' && *(p+2) == ' ' && *(p+3) == '\t')){
-                f_quote = 0;
-                buffer_need_bytes(w->response.data, 1);
-                w->response.data->buffer[w->response.data->len++] = *p;
-            } else {
+            else if(unlikely(*p == '"')) {
                 buffer_need_bytes(w->response.data, 2);
                 w->response.data->buffer[w->response.data->len++] = '\\';
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
+            else {
+                buffer_need_bytes(w->response.data, 1);
+                w->response.data->buffer[w->response.data->len++] = *p;
+            }
+            p++;
         }
-        else {
-            buffer_need_bytes(w->response.data, 1);
-            w->response.data->buffer[w->response.data->len++] = *p;
-        }
-        p++;
-    }
-    // buffer_overflow_check(w->response.data);
+        buffer_strcat(w->response.data, "\"");
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\n\t\t\t]");
+        buffer_sprintf(w->response.data, ",\n\t\t\t%zu" , res_hdr.text_size);
+        buffer_sprintf(w->response.data, ",\n\t\t\t%d\n\t\t]" , res_hdr.matches);
 
+
+        res_off += sizeof(res_hdr) + res_hdr.text_size;
+
+        // Add comma and new line if there are more data to be printed
+        if(query_params.results_buff->len - res_off > 0) buffer_strcat(w->response.data, ",\n");
+    }
+
+
+    
     buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"data array length\": %zu,\n", query_params.results_buff->len);
     buffer_sprintf(w->response.data, "\t\"keyword matches\": %d,\n", query_params.keyword_matches);
     getrusage(RUSAGE_THREAD, &end);
     buffer_sprintf(w->response.data, "\t\"user time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 

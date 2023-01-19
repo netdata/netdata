@@ -24,6 +24,11 @@ typedef enum logs_query_result_type {
 
 LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb);
 
+typedef enum logs_query_data_format {
+    LOGS_QUERY_DATA_FORMAT_JSON_ARRAY, // default
+    LOGS_QUERY_DATA_FORMAT_NEW_LINE
+} LOGS_QUERY_DATA_FORMAT;
+
 /**
  * @brief Parameters of the query.
  * @param[in] start_timestamp Start timestamp of query in epoch milliseconds.
@@ -62,9 +67,16 @@ typedef struct logs_query_params {
     char *keyword;
     int ignore_case;
     int sanitise_keyword;
+    LOGS_QUERY_DATA_FORMAT data_format;
     BUFFER *results_buff;
     int keyword_matches;
 } logs_query_params_t;
+
+typedef struct logs_query_res_hdr {
+    uint64_t timestamp;
+    size_t text_size;
+    int matches;
+} logs_query_res_hdr_t;
 
 /** 
  * @brief Primary query API. 
