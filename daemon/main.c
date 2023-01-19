@@ -1700,15 +1700,12 @@ int main(int argc, char **argv) {
         }
     }
 
-#ifdef _SC_OPEN_MAX
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
-        for(int fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
-            if(fd_is_valid(fd))
-                close(fd);
+        for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
     }
-#endif
+
 
     if(!config_loaded) {
         load_netdata_conf(NULL, 0);

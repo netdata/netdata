@@ -432,6 +432,17 @@ static inline char *get_word(char **words, size_t num_words, size_t index) {
 
 bool run_command_and_copy_output_to_stdout(const char *command, int max_line_length);
 
+typedef enum {
+    OPEN_FD_ACTION_CLOSE,
+    OPEN_FD_ACTION_FD_CLOEXEC
+} OPEN_FD_ACTION;
+typedef enum {
+    OPEN_FD_EXCLUDE_STDIN   = 0x01,
+    OPEN_FD_EXCLUDE_STDOUT  = 0x02,
+    OPEN_FD_EXCLUDE_STDERR  = 0x04
+} OPEN_FD_EXCLUDE;
+void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds);
+
 void netdata_cleanup_and_exit(int ret) NORETURN;
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 extern char *netdata_configured_host_prefix;
