@@ -98,7 +98,7 @@ static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
 static void tc_class_index_init(struct tc_device *d) {
     if(!d->classes) {
-        d->classes = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED);
+        d->classes = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors);
 
         dictionary_register_delete_callback(d->classes, tc_class_free_callback, d);
         dictionary_register_conflict_callback(d->classes, tc_class_conflict_callback, d);
@@ -144,8 +144,9 @@ static void tc_device_free_callback(const DICTIONARY_ITEM *item __maybe_unused, 
 
 static void tc_device_index_init() {
     if(!tc_device_root_index) {
-        tc_device_root_index = dictionary_create(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT);
+        tc_device_root_index = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_SINGLE_THREADED | DICT_OPTION_ADD_IN_FRONT,
+            &dictionary_stats_category_collectors);
 
         dictionary_register_insert_callback(tc_device_root_index, tc_device_add_callback, NULL);
         dictionary_register_delete_callback(tc_device_root_index, tc_device_free_callback, NULL);

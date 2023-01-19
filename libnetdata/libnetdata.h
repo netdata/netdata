@@ -11,6 +11,8 @@ extern "C" {
 #include <config.h>
 #endif
 
+#define JUDYHS_INDEX_SIZE_ESTIMATE(key_bytes) (((key_bytes) + sizeof(Word_t) - 1) / sizeof(Word_t) * 4)
+
 #if defined(NETDATA_DEV_MODE) && !defined(NETDATA_INTERNAL_CHECKS)
 #define NETDATA_INTERNAL_CHECKS 1
 #endif

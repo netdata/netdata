@@ -220,7 +220,7 @@ static cmd_status_t cmd_reload_labels_execute(char *args, char **message)
     info("COMMAND: reloading host labels.");
     reload_host_labels();
 
-    BUFFER *wb = buffer_create(10);
+    BUFFER *wb = buffer_create(10, NULL);
     rrdlabels_log_to_buffer(localhost->rrdlabels, wb);
     (*message)=strdupz(buffer_tostring(wb));
     buffer_free(wb);

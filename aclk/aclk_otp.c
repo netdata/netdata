@@ -314,7 +314,7 @@ int aclk_get_otp_challenge(url_t *target, const char *agent_id, unsigned char **
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;
 
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
 
     req.host = target->host;
     req.port = target->port;
@@ -394,8 +394,8 @@ int aclk_send_otp_response(const char *agent_id, const unsigned char *response, 
 
     base64_encode_helper(base64, &len, response, response_bytes);
 
-    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
-    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20);
+    BUFFER *url = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
+    BUFFER *resp_json = buffer_create(strlen(OTP_URL_PREFIX) + UUID_STR_LEN + 20, &netdata_buffers_statistics.buffers_aclk);
 
     buffer_sprintf(url, "%s/node/%s/password", target->path, agent_id);
     buffer_sprintf(resp_json, "{\"response\":\"%s\"}", base64);
@@ -814,7 +814,7 @@ exit:
 }
 
 int aclk_get_env(aclk_env_t *env, const char* aclk_hostname, int aclk_port) {
-    BUFFER *buf = buffer_create(1024);
+    BUFFER *buf = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
 
     https_req_t req = HTTPS_REQ_T_INITIALIZER;
     https_req_response_t resp = HTTPS_REQ_RESPONSE_T_INITIALIZER;

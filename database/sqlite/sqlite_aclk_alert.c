@@ -156,7 +156,7 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(
         sql,
@@ -245,7 +245,7 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
         return;
     }
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     if (wc->alerts_start_seq_id != 0) {
         buffer_sprintf(
@@ -410,7 +410,7 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
 {
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"delete from aclk_alert_%s; " \
                        "insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
@@ -487,7 +487,7 @@ void aclk_push_alarm_health_log(struct aclk_database_worker_config *wc, struct a
     struct timeval first_timestamp;
     struct timeval last_timestamp;
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     sqlite3_stmt *res = NULL;
 
@@ -656,7 +656,7 @@ int aclk_push_alert_config_event(struct aclk_database_worker_config *wc, struct 
             alarm_config.p_db_lookup_dimensions = sqlite3_column_bytes(res, 27) > 0 ? strdupz((char *)sqlite3_column_text(res, 27)) : NULL;
             alarm_config.p_db_lookup_method = sqlite3_column_bytes(res, 28) > 0 ? strdupz((char *)sqlite3_column_text(res, 28)) : NULL;
 
-            BUFFER *tmp_buf = buffer_create(1024);
+            BUFFER *tmp_buf = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
             buffer_data_options2string(tmp_buf, sqlite3_column_int(res, 29));
             alarm_config.p_db_lookup_options = strdupz((char *)buffer_tostring(tmp_buf));
             buffer_free(tmp_buf);
@@ -740,7 +740,7 @@ void sql_process_queue_removed_alerts_to_aclk(struct aclk_database_worker_config
 {
     UNUSED(cmd);
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
         "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log_%s " \
@@ -818,7 +818,7 @@ void aclk_process_send_alarm_snapshot(char *node_id, char *claim_id, uint64_t sn
 
 void aclk_mark_alert_cloud_ack(char *uuid_str, uint64_t alerts_ack_sequence_id)
 {
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     if (alerts_ack_sequence_id != 0) {
         buffer_sprintf(
@@ -1027,7 +1027,7 @@ void sql_aclk_alert_clean_dead_entries(RRDHOST *host)
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"delete from aclk_alert_%s where filtered_alert_unique_id not in "
                    " (select unique_id from health_log_%s); ", uuid_str, uuid_str);
@@ -1053,7 +1053,7 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     proto_alert_status->alert_updates = wc->alert_updates;
     proto_alert_status->alerts_batch_id = wc->alerts_batch_id;
 
-    BUFFER *sql = buffer_create(1024);
+    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
     sqlite3_stmt *res = NULL;
 
     buffer_sprintf(sql, "SELECT MIN(sequence_id), MAX(sequence_id), " \

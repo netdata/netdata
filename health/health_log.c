@@ -73,7 +73,7 @@ inline void health_label_log_save(RRDHOST *host) {
     health_log_rotate(host);
 
     if(unlikely(host->health.health_log_fp)) {
-        BUFFER *wb = buffer_create(1024);
+        BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
 
         rrdlabels_to_buffer(localhost->rrdlabels, wb, "", "=", "", "\t ", NULL, NULL, NULL, NULL);
         char *write = (char *) buffer_tostring(wb);
@@ -182,8 +182,10 @@ static inline ssize_t health_alarm_log_read(RRDHOST *host, FILE *fp, const char 
     size_t line = 0, len = 0;
     ssize_t loaded = 0, updated = 0, errored = 0, duplicate = 0;
 
-    DICTIONARY *all_rrdcalcs = dictionary_create(
-        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+    DICTIONARY *all_rrdcalcs = dictionary_create_advanced(
+        DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+        &dictionary_stats_category_rrdhealth);
+
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         dictionary_set(all_rrdcalcs, rrdcalc_name(rc), rc, sizeof(*rc));

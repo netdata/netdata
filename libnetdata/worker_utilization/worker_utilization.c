@@ -52,6 +52,7 @@ struct workers_workname {                           // this is what we add to Ju
 static struct workers_globals {
     SPINLOCK spinlock;
     Pvoid_t worknames_JudyHS;
+    size_t memory;
 
 } workers_globals = {                               // workers globals, the base of all worknames
         .spinlock = NETDATA_SPINLOCK_INITIALIZER,   // a lock for the worknames index
@@ -59,6 +60,14 @@ static struct workers_globals {
 };
 
 static __thread struct worker *worker = NULL; // the current thread worker
+
+size_t workers_allocated_memory(void) {
+    netdata_spinlock_lock(&workers_globals.spinlock);
+    size_t memory = workers_globals.memory;
+    netdata_spinlock_unlock(&workers_globals.spinlock);
+
+    return memory;
+}
 
 void worker_register(const char *name) {
     if(unlikely(worker)) return;
@@ -76,9 +85,9 @@ void worker_register(const char *name) {
     size_t name_size = strlen(name) + 1;
     netdata_spinlock_lock(&workers_globals.spinlock);
 
-    Pvoid_t *PValue = JudyHSGet(workers_globals.worknames_JudyHS, (void *)name, name_size);
-    if(!PValue)
-        PValue = JudyHSIns(&workers_globals.worknames_JudyHS, (void *)name, name_size, PJE0);
+    workers_globals.memory += sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
+
+    Pvoid_t *PValue = JudyHSIns(&workers_globals.worknames_JudyHS, (void *)name, name_size, PJE0);
 
     struct workers_workname *workname = *PValue;
     if(!workname) {
@@ -86,6 +95,8 @@ void worker_register(const char *name) {
         netdata_spinlock_init(&workname->spinlock);
         workname->base = NULL;
         *PValue = workname;
+
+        workers_globals.memory += sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(name_size);
     }
 
     netdata_spinlock_lock(&workname->spinlock);
@@ -136,8 +147,10 @@ void worker_unregister(void) {
         if(!workname->base) {
             JudyHSDel(&workers_globals.worknames_JudyHS, (void *) worker->workname, workname_size, PJE0);
             freez(workname);
+            workers_globals.memory -= sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(workname_size);
         }
     }
+    workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
     netdata_spinlock_unlock(&workers_globals.spinlock);
 
     for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {

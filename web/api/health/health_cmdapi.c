@@ -196,7 +196,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
     if (ret == HTTP_RESP_OK && config_changed) {
-        BUFFER *jsonb = buffer_create(200);
+        BUFFER *jsonb = buffer_create(200, &netdata_buffers_statistics.buffers_health);
         health_silencers2json(jsonb);
         health_silencers2file(jsonb);
         buffer_free(jsonb);

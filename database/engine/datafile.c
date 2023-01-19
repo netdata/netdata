@@ -560,15 +560,34 @@ int init_data_files(struct rrdengine_instance *ctx)
 
 void finalize_data_files(struct rrdengine_instance *ctx)
 {
+    bool logged = false;
+
     do {
         struct rrdengine_datafile *datafile = ctx->datafiles.first;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
-        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
-            info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->tier);
-            sleep_usec(500 * USEC_PER_MS);
+        logged = false;
+        if(datafile == ctx->datafiles.first->prev) {
+            // this is the last file
+            while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
+                if(!logged) {
+                    info("Waiting for inflight flush to finish on tier %d to close last datafile %u...", ctx->tier, datafile->fileno);
+                    logged = true;
+                }
+                sleep_usec(100 * USEC_PER_MS);
+            }
         }
 
+        logged = false;
+        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
+            if(!logged) {
+                info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->tier);
+                logged = true;
+            }
+            sleep_usec(100 * USEC_PER_MS);
+        }
+
+        logged = false;
         bool available = false;
         do {
             uv_rwlock_wrlock(&ctx->datafiles.rwlock);
@@ -578,8 +597,11 @@ void finalize_data_files(struct rrdengine_instance *ctx)
             if(!available) {
                 netdata_spinlock_unlock(&datafile->writers.spinlock);
                 uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
-                info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->tier);
-                sleep_usec(500 * USEC_PER_MS);
+                if(!logged) {
+                    info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->tier);
+                    logged = true;
+                }
+                sleep_usec(100 * USEC_PER_MS);
             }
         } while(!available);
 

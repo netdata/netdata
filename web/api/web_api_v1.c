@@ -312,7 +312,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
             else if (!strcmp("CLEAR", value)) status = RRDCALC_STATUS_CLEAR;
         }
         else if(!strcmp(name, "context") || !strcmp(name, "ctx")) {
-            if(!contexts) contexts = buffer_create(255);
+            if(!contexts) contexts = buffer_create(255, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(contexts, "|");
             buffer_strcat(contexts, value);
         }
@@ -460,7 +460,7 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
@@ -521,7 +521,7 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }
@@ -626,7 +626,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
-            if(!dimensions) dimensions = buffer_create(100);
+            if(!dimensions) dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);
         }

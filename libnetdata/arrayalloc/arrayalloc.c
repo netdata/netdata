@@ -144,10 +144,10 @@ static void arrayalloc_init(ARAL *ar) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
 static inline void arrayalloc_free_validate_internal_check(ARAL *ar, ARAL_FREE *fr) {
-    if(fr->size < ar->internal.element_size)
+    if(unlikely(fr->size < ar->internal.element_size))
         fatal("ARRAYALLOC: free item of size %zu, less than the expected element size %zu", fr->size, ar->internal.element_size);
 
-    if(fr->size % ar->internal.element_size)
+    if(unlikely(fr->size % ar->internal.element_size))
         fatal("ARRAYALLOC: free item of size %zu is not multiple to element size %zu", fr->size, ar->internal.element_size);
 }
 #else
@@ -234,13 +234,13 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
     arrayalloc_free_validate_internal_check(ar, fr);
 }
 
-static void arrayalloc_lock(ARAL *ar) {
-    if(!ar->internal.lockless)
+static inline void arrayalloc_lock(ARAL *ar) {
+    if(likely(!ar->internal.lockless))
         netdata_spinlock_lock(&ar->internal.spinlock);
 }
 
-static void arrayalloc_unlock(ARAL *ar) {
-    if(!ar->internal.lockless)
+static inline void arrayalloc_unlock(ARAL *ar) {
+    if(likely(!ar->internal.lockless))
         netdata_spinlock_unlock(&ar->internal.spinlock);
 }
 

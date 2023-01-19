@@ -92,6 +92,7 @@ struct pgc {
         size_t additional_bytes_per_page;
         free_clean_page_callback pgc_free_clean_cb;
         save_dirty_page_callback pgc_save_dirty_cb;
+        save_dirty_init_callback pgc_save_init_cb;
         PGC_OPTIONS options;
 
         size_t severe_pressure_per1000;
@@ -205,7 +206,7 @@ static inline void pointer_del(PGC *cache __maybe_unused, PGC_PAGE *page __maybe
 // ----------------------------------------------------------------------------
 // locking
 
-static size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
+static inline size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
     static __thread Word_t last_metric_id = 0;
     static __thread size_t last_partition = 0;
 
@@ -218,19 +219,19 @@ static size_t pgc_indexing_partition(PGC *cache, Word_t metric_id) {
     return last_partition;
 }
 
-static void pgc_index_read_lock(PGC *cache, size_t partition) {
+static inline void pgc_index_read_lock(PGC *cache, size_t partition) {
     netdata_rwlock_rdlock(&cache->index[partition].rwlock);
 }
-static void pgc_index_read_unlock(PGC *cache, size_t partition) {
+static inline void pgc_index_read_unlock(PGC *cache, size_t partition) {
     netdata_rwlock_unlock(&cache->index[partition].rwlock);
 }
-//static bool pgc_index_write_trylock(PGC *cache, size_t partition) {
+//static inline bool pgc_index_write_trylock(PGC *cache, size_t partition) {
 //    return !netdata_rwlock_trywrlock(&cache->index[partition].rwlock);
 //}
-static void pgc_index_write_lock(PGC *cache, size_t partition) {
+static inline void pgc_index_write_lock(PGC *cache, size_t partition) {
     netdata_rwlock_wrlock(&cache->index[partition].rwlock);
 }
-static void pgc_index_write_unlock(PGC *cache, size_t partition) {
+static inline void pgc_index_write_unlock(PGC *cache, size_t partition) {
     netdata_rwlock_unlock(&cache->index[partition].rwlock);
 }
 
@@ -382,11 +383,11 @@ static inline bool flushing_critical(PGC *cache) {
 // ----------------------------------------------------------------------------
 // helpers
 
-static size_t page_assumed_size(PGC *cache, size_t size) {
+static inline size_t page_assumed_size(PGC *cache, size_t size) {
     return size + (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
 }
 
-static size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
+static inline size_t page_size_from_assumed_size(PGC *cache, size_t assumed_size) {
     return assumed_size - (sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page + sizeof(Word_t) * 3);
 }
 
@@ -422,7 +423,7 @@ static ARAL section_pages_aral = {
         .requested_element_size = sizeof(struct section_pages),
 };
 
-static void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
+static inline void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
     if(mem_after_judyl > mem_before_judyl) {
         __atomic_add_fetch(&ll->stats->size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
         __atomic_add_fetch(&cache->stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
@@ -433,7 +434,7 @@ static void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, siz
     }
 }
 
-static void pgc_stats_index_judy_change(PGC *cache, size_t mem_before_judyl, size_t mem_after_judyl) {
+static inline void pgc_stats_index_judy_change(PGC *cache, size_t mem_before_judyl, size_t mem_after_judyl) {
     if(mem_after_judyl > mem_before_judyl) {
         __atomic_add_fetch(&cache->stats.size, mem_after_judyl - mem_before_judyl, __ATOMIC_RELAXED);
     }
@@ -556,7 +557,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         pgc_ll_unlock(cache, ll);
 }
 
-static void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
+static inline void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
     PGC_PAGE_FLAGS flags = page_flag_check(page, PGC_PAGE_CLEAN | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES);
 
     if (!(flags & PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES)) {
@@ -604,7 +605,7 @@ static inline void page_set_clean(PGC *cache, PGC_PAGE *page, bool having_transi
         page_transition_unlock(cache, page);
 }
 
-static void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
+static inline void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lock) {
     if(!having_hot_lock)
         // to avoid deadlocks, we have to get the hot lock before the page transition
         // since this is what all_hot_to_dirty() does
@@ -830,7 +831,7 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
 // ----------------------------------------------------------------------------
 // Indexing
 
-static void free_this_page(PGC *cache, PGC_PAGE *page) {
+static inline void free_this_page(PGC *cache, PGC_PAGE *page) {
     // call the callback to free the user supplied memory
     cache->config.pgc_free_clean_cb(cache, (PGC_ENTRY){
             .section = page->section,
@@ -916,7 +917,7 @@ static void remove_this_page_from_index_unsafe(PGC *cache, PGC_PAGE *page, size_
     pointer_del(cache, page);
 }
 
-static void remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(PGC *cache, PGC_PAGE *page) {
+static inline void remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(PGC *cache, PGC_PAGE *page) {
     size_t partition = pgc_indexing_partition(cache, page->metric_id);
     pgc_index_write_lock(cache, partition);
     remove_this_page_from_index_unsafe(cache, page, partition);
@@ -924,7 +925,7 @@ static void remove_and_free_page_not_in_any_queue_and_acquired_for_deletion(PGC 
     free_this_page(cache, page);
 }
 
-static bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
+static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
     pointer_check(cache, page);
 
     page_transition_lock(cache, page);
@@ -1632,6 +1633,9 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
             continue;
         }
 
+        if(cache->config.pgc_save_init_cb)
+            cache->config.pgc_save_init_cb(cache, last_section);
+
         pgc_ll_unlock(cache, &cache->dirty);
         have_dirty_lock = false;
 
@@ -1704,7 +1708,9 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // public API
 
 PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
-                size_t max_dirty_pages_per_flush, save_dirty_page_callback pgc_save_dirty_cb,
+                size_t max_dirty_pages_per_flush,
+                save_dirty_init_callback pgc_save_init_cb,
+                save_dirty_page_callback pgc_save_dirty_cb,
                 size_t max_pages_per_inline_eviction, size_t max_inline_evictors,
                 size_t max_skip_pages_per_inline_eviction,
                 size_t max_flushes_inline,
@@ -1723,7 +1729,8 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->config.options = options;
     cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
-    cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush,
+    cache->config.max_dirty_pages_per_call = max_dirty_pages_per_flush;
+    cache->config.pgc_save_init_cb = pgc_save_init_cb;
     cache->config.pgc_save_dirty_cb = pgc_save_dirty_cb;
     cache->config.max_pages_per_inline_eviction = (max_pages_per_inline_eviction < 2) ? 2 : max_pages_per_inline_eviction;
     cache->config.max_skip_pages_per_inline_eviction = (max_skip_pages_per_inline_eviction < 2) ? 2 : max_skip_pages_per_inline_eviction;
@@ -2579,7 +2586,7 @@ void unittest_stress_test(void) {
 
 int pgc_unittest(void) {
     PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
-                            64, unittest_save_dirty_page_callback,
+                            64, NULL, unittest_save_dirty_page_callback,
                             10, 10, 1000, 10,
                             PGC_OPTIONS_DEFAULT, 1, 11);
 

@@ -372,7 +372,7 @@ static BUFFER *sql_store_host_system_info(RRDHOST *host)
     if (unlikely(!system_info))
         return NULL;
 
-    BUFFER *work_buffer = buffer_create(1024);
+    BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     struct query_build key_data = {.sql = work_buffer, .count = 0};
     uuid_unparse_lower(host->host_uuid, key_data.uuid_str);
@@ -887,7 +887,7 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
 
     bool more_to_do = false;
     uint32_t scan_count = 1;
-    BUFFER *work_buffer = buffer_create(1024);
+    BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
 
     rrdset_foreach_reentrant(st, host) {
         if (scan_count == max_count) {
@@ -969,12 +969,13 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
         internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
+        rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_LABELS);
             int rc = exec_statement_with_uuid(SQL_DELETE_HOST_LABELS, &host->host_uuid);
             if (likely(rc == SQLITE_OK)) {
-                BUFFER *work_buffer = buffer_create(1024);
+                BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
                 struct query_build tmp = {.sql = work_buffer, .count = 0};
                 uuid_unparse_lower(host->host_uuid, tmp.uuid_str);
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);

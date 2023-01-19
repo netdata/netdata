@@ -54,16 +54,16 @@ static inline void MRG_STATS_DELETE_MISS(MRG *mrg) {
     __atomic_add_fetch(&mrg->stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
-static void mrg_index_read_lock(MRG *mrg) {
+static inline void mrg_index_read_lock(MRG *mrg) {
     netdata_rwlock_rdlock(&mrg->index.rwlock);
 }
-static void mrg_index_read_unlock(MRG *mrg) {
+static inline void mrg_index_read_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
 }
-static void mrg_index_write_lock(MRG *mrg) {
+static inline void mrg_index_write_lock(MRG *mrg) {
     netdata_rwlock_wrlock(&mrg->index.rwlock);
 }
-static void mrg_index_write_unlock(MRG *mrg) {
+static inline void mrg_index_write_unlock(MRG *mrg) {
     netdata_rwlock_unlock(&mrg->index.rwlock);
 }
 
@@ -75,11 +75,11 @@ static inline void mrg_stats_size_judyl_change(MRG *mrg, size_t mem_before_judyl
 }
 
 static inline void mrg_stats_size_judyhs_added_uuid(MRG *mrg) {
-    __atomic_add_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
 }
 
 static inline void mrg_stats_size_judyhs_removed_uuid(MRG *mrg) {
-    __atomic_sub_fetch(&mrg->stats.size, sizeof(uuid_t) * 3, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->stats.size, JUDYHS_INDEX_SIZE_ESTIMATE(sizeof(uuid_t)), __ATOMIC_RELAXED);
 }
 
 static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
@@ -88,10 +88,10 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     size_t mem_before_judyl, mem_after_judyl;
 
     Pvoid_t *sections_judy_pptr = JudyHSIns(&mrg->index.uuid_judy, &entry->uuid, sizeof(uuid_t), PJE0);
-    if(!sections_judy_pptr || sections_judy_pptr == PJERR)
+    if(unlikely(!sections_judy_pptr || sections_judy_pptr == PJERR))
         fatal("DBENGINE METRIC: corrupted UUIDs JudyHS array");
 
-    if(!*sections_judy_pptr)
+    if(unlikely(!*sections_judy_pptr))
         mrg_stats_size_judyhs_added_uuid(mrg);
 
     mem_before_judyl = JudyLMemUsed(*sections_judy_pptr);
@@ -99,7 +99,7 @@ static METRIC *metric_add(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
 
-    if(!PValue || PValue == PJERR)
+    if(unlikely(!PValue || PValue == PJERR))
         fatal("DBENGINE METRIC: corrupted section JudyL array");
 
     if(*PValue != NULL) {
@@ -137,14 +137,14 @@ static METRIC *metric_get(MRG *mrg, uuid_t *uuid, Word_t section) {
     mrg_index_read_lock(mrg);
 
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, uuid, sizeof(uuid_t));
-    if(!sections_judy_pptr) {
+    if(unlikely(!sections_judy_pptr)) {
         mrg_index_read_unlock(mrg);
         MRG_STATS_SEARCH_MISS(mrg);
         return NULL;
     }
 
     Pvoid_t *PValue = JudyLGet(*sections_judy_pptr, section, PJE0);
-    if(!PValue) {
+    if(unlikely(!PValue)) {
         mrg_index_read_unlock(mrg);
         MRG_STATS_SEARCH_MISS(mrg);
         return NULL;
@@ -164,7 +164,7 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
     mrg_index_write_lock(mrg);
 
     Pvoid_t *sections_judy_pptr = JudyHSGet(mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t));
-    if(!sections_judy_pptr || !*sections_judy_pptr) {
+    if(unlikely(!sections_judy_pptr || !*sections_judy_pptr)) {
         mrg_index_write_unlock(mrg);
         MRG_STATS_DELETE_MISS(mrg);
         return false;
@@ -175,7 +175,7 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
     mem_after_judyl = JudyLMemUsed(*sections_judy_pptr);
     mrg_stats_size_judyl_change(mrg, mem_before_judyl, mem_after_judyl);
 
-    if(!rc) {
+    if(unlikely(!rc)) {
         mrg_index_write_unlock(mrg);
         MRG_STATS_DELETE_MISS(mrg);
         return false;
@@ -183,7 +183,7 @@ static bool metric_del(MRG *mrg, METRIC *metric) {
 
     if(!*sections_judy_pptr) {
         rc = JudyHSDel(&mrg->index.uuid_judy, &metric->uuid, sizeof(uuid_t), PJE0);
-        if(!rc)
+        if(unlikely(!rc))
             fatal("DBENGINE METRIC: cannot delete UUID from JudyHS");
         mrg_stats_size_judyhs_removed_uuid(mrg);
     }
@@ -277,16 +277,16 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
 
     netdata_spinlock_lock(&metric->timestamps_lock);
 
-    if(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s))
+    if(unlikely(first_time_s && (!metric->first_time_s || first_time_s < metric->first_time_s)))
         metric->first_time_s = first_time_s;
 
-    if(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean)) {
+    if(likely(last_time_s && (!metric->latest_time_s_clean || last_time_s > metric->latest_time_s_clean))) {
         metric->latest_time_s_clean = last_time_s;
 
-        if(update_every_s)
+        if(likely(update_every_s))
             metric->latest_update_every_s = update_every_s;
     }
-    else if(!metric->latest_update_every_s && update_every_s)
+    else if(unlikely(!metric->latest_update_every_s && update_every_s))
         metric->latest_update_every_s = update_every_s;
 
     netdata_spinlock_unlock(&metric->timestamps_lock);

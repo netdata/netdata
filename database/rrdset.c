@@ -401,7 +401,7 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index) {
-        host->rrdset_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        host->rrdset_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
@@ -410,8 +410,9 @@ void rrdset_index_init(RRDHOST *host) {
     }
 
     if(!host->rrdset_root_index_name) {
-        host->rrdset_root_index_name = dictionary_create(
-            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE);
+        host->rrdset_root_index_name = dictionary_create_advanced(
+            DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
+            &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
         dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
@@ -735,8 +736,8 @@ void rrdset_reset(RRDSET *st) {
 
         if(!rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
             for(size_t tier = 0; tier < storage_tiers ;tier++) {
-                if(rd->tiers[tier])
-                    rd->tiers[tier]->collect_ops->flush(rd->tiers[tier]->db_collection_handle);
+                if(rd->tiers[tier].db_collection_handle)
+                    rd->tiers[tier].collect_ops->flush(rd->tiers[tier].db_collection_handle);
             }
         }
     }
@@ -1193,7 +1194,7 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 #endif // NETDATA_LOG_COLLECTION_ERRORS
 
     // store the metric on tier 0
-    rd->tiers[0]->collect_ops->store_metric(rd->tiers[0]->db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
+    rd->tiers[0].collect_ops->store_metric(rd->tiers[0].db_collection_handle, point_end_time_ut, n, 0, 0, 1, 0, flags);
     rrdset_done_statistics_points_stored_per_tier[0]++;
 
     time_t now_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
@@ -1210,9 +1211,9 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
     };
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
+        if(unlikely(!rd->tiers[tier].db_metric_handle)) continue;
 
-        struct rrddim_tier *t = rd->tiers[tier];
+        struct rrddim_tier *t = &rd->tiers[tier];
 
         if(!rrddim_option_check(rd, RRDDIM_OPTION_BACKFILLED_HIGH_TIERS)) {
             // we have not collected this tier before
@@ -1238,12 +1239,16 @@ struct rda_item {
 static __thread struct rda_item *thread_rda = NULL;
 static __thread size_t thread_rda_entries = 0;
 
-struct rda_item *rrdset_thread_rda(size_t *dimensions) {
+struct rda_item *rrdset_thread_rda_get(size_t *dimensions) {
 
     if(unlikely(!thread_rda || (*dimensions) > thread_rda_entries)) {
+        size_t old_mem = thread_rda_entries * sizeof(struct rda_item);
         freez(thread_rda);
-        thread_rda = mallocz((*dimensions) * sizeof(struct rda_item));
         thread_rda_entries = *dimensions;
+        size_t new_mem = thread_rda_entries * sizeof(struct rda_item);
+        thread_rda = mallocz(new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.rrdset_done_rda_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
 
     *dimensions = thread_rda_entries;
@@ -1251,6 +1256,8 @@ struct rda_item *rrdset_thread_rda(size_t *dimensions) {
 }
 
 void rrdset_thread_rda_free(void) {
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdset_done_rda_size, thread_rda_entries * sizeof(struct rda_item), __ATOMIC_RELAXED);
+
     freez(thread_rda);
     thread_rda = NULL;
     thread_rda_entries = 0;
@@ -1585,7 +1592,7 @@ after_first_database_work:
     uint32_t has_reset_value = 0;
 
     size_t rda_slots = dictionary_entries(st->rrddim_root_index);
-    struct rda_item *rda_base = rrdset_thread_rda(&rda_slots);
+    struct rda_item *rda_base = rrdset_thread_rda_get(&rda_slots);
 
     size_t dim_id;
     size_t dimensions = 0;
@@ -1956,8 +1963,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier] && rd->tiers[tier]->db_collection_handle)
-                rd->tiers[tier]->collect_ops->change_collection_frequency(rd->tiers[tier]->db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
+            if (rd->tiers[tier].db_collection_handle)
+                rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
         assert(rd->update_every == prev_update_every_s &&
@@ -2069,6 +2076,7 @@ void rrdset_memory_file_free(RRDSET *st) {
     rrdset_memory_file_update(st);
 
     struct rrdset_map_save_v019 *st_on_file = st->st_on_file;
+    __atomic_sub_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     netdata_munmap(st_on_file, st_on_file->memsize);
 
     // remove the pointers from the RRDDIM
@@ -2165,5 +2173,6 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
     // copy the useful values back to st_on_file
     rrdset_memory_file_update(st);
 
+    __atomic_add_fetch(&rrddim_db_memory_size, st_on_file->memsize, __ATOMIC_RELAXED);
     return true;
 }

@@ -260,7 +260,7 @@ static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM 
 
 static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
     if(key_size)
-        __atomic_fetch_add(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+        __atomic_fetch_add(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
 
     if(item_size)
         __atomic_fetch_add(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
@@ -270,7 +270,7 @@ static inline void DICTIONARY_STATS_PLUS_MEMORY(DICTIONARY *dict, size_t key_siz
 }
 static inline void DICTIONARY_STATS_MINUS_MEMORY(DICTIONARY *dict, size_t key_size, size_t item_size, size_t value_size) {
     if(key_size)
-        __atomic_fetch_sub(&dict->stats->memory.indexed, (long)key_size, __ATOMIC_RELAXED);
+        __atomic_fetch_sub(&dict->stats->memory.index, (long)JUDYHS_INDEX_SIZE_ESTIMATE(key_size), __ATOMIC_RELAXED);
 
     if(item_size)
         __atomic_fetch_sub(&dict->stats->memory.dict, (long)item_size, __ATOMIC_RELAXED);
@@ -380,7 +380,7 @@ size_t dictionary_referenced_items(DICTIONARY *dict) {
 
 long int dictionary_stats_for_registry(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
-    return (dict->stats->memory.indexed + dict->stats->memory.dict);
+    return (dict->stats->memory.index + dict->stats->memory.dict);
 }
 void dictionary_version_increment(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);

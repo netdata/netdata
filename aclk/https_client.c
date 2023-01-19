@@ -8,6 +8,8 @@
 
 #include "aclk_util.h"
 
+#include "daemon/global_statistics.h"
+
 enum http_parse_state {
     HTTP_PARSE_INITIAL = 0,
     HTTP_PARSE_HEADERS,
@@ -354,7 +356,7 @@ static int read_parse_response(https_req_ctx_t *ctx) {
 #define TX_BUFFER_SIZE 8192
 #define RX_BUFFER_SIZE (TX_BUFFER_SIZE*2)
 static int handle_http_request(https_req_ctx_t *ctx) {
-    BUFFER *hdr = buffer_create(TX_BUFFER_SIZE);
+    BUFFER *hdr = buffer_create(TX_BUFFER_SIZE, &netdata_buffers_statistics.buffers_aclk);
     int rc = 0;
 
     http_parse_ctx_clear(&ctx->parse_ctx);

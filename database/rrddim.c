@@ -69,7 +69,10 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             info("Failed to use memory mode ram for chart '%s', dimension '%s', falling back to alloc", rrdset_name(st), rrddim_name(rd));
             ctr->memory_mode = RRD_MEMORY_MODE_ALLOC;
         }
-        else rd->memsize = entries * sizeof(storage_number);
+        else {
+            rd->memsize = entries * sizeof(storage_number);
+            __atomic_add_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
+        }
     }
 
     if(ctr->memory_mode == RRD_MEMORY_MODE_ALLOC || ctr->memory_mode == RRD_MEMORY_MODE_NONE) {
@@ -78,6 +81,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
         rd->db = rrddim_alloc_db(entries);
         rd->memsize = entries * sizeof(storage_number);
+        __atomic_add_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
     }
 
     rd->rrd_memory_mode = ctr->memory_mode;
@@ -108,12 +112,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         size_t initialized = 0;
         for(size_t tier = 0; tier < storage_tiers ; tier++) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            rd->tiers[tier] = callocz(1, sizeof(struct rrddim_tier));
-            rd->tiers[tier]->tier_grouping = host->db[tier].tier_grouping;
-            rd->tiers[tier]->collect_ops = &eng->api.collect_ops;
-            rd->tiers[tier]->query_ops = &eng->api.query_ops;
-            rd->tiers[tier]->db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
-            storage_point_unset(rd->tiers[tier]->virtual_point);
+            rd->tiers[tier].tier_grouping = host->db[tier].tier_grouping;
+            rd->tiers[tier].collect_ops = &eng->api.collect_ops;
+            rd->tiers[tier].query_ops = &eng->api.query_ops;
+            rd->tiers[tier].db_metric_handle = eng->api.metric_get_or_create(rd, host->db[tier].instance);
+            storage_point_unset(rd->tiers[tier].virtual_point);
             initialized++;
 
             // internal_error(true, "TIER GROUPING of chart '%s', dimension '%s' for tier %d is set to %d", rd->rrdset->name, rd->name, tier, rd->tiers[tier]->tier_grouping);
@@ -122,7 +125,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         if(!initialized)
             error("Failed to initialize all db tiers for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
 
-        if(!rd->tiers[0])
+        if(!rd->tiers[0].db_metric_handle)
             error("Failed to initialize the first db tier for chart '%s', dimension '%s", rrdset_name(st), rrddim_name(rd));
     }
 
@@ -130,8 +133,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     {
         size_t initialized = 0;
         for (size_t tier = 0; tier < storage_tiers; tier++) {
-            if (rd->tiers[tier]) {
-                rd->tiers[tier]->db_collection_handle = rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+            if (rd->tiers[tier].db_metric_handle) {
+                rd->tiers[tier].db_collection_handle = rd->tiers[tier].collect_ops->init(rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
                 initialized++;
             }
         }
@@ -197,13 +200,13 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     size_t tiers_available = 0, tiers_said_no_retention = 0;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(rd->tiers[tier] && rd->tiers[tier]->db_collection_handle) {
+        if(rd->tiers[tier].db_collection_handle) {
             tiers_available++;
 
-            if(rd->tiers[tier]->collect_ops->finalize(rd->tiers[tier]->db_collection_handle))
+            if(rd->tiers[tier].collect_ops->finalize(rd->tiers[tier].db_collection_handle))
                 tiers_said_no_retention++;
 
-            rd->tiers[tier]->db_collection_handle = NULL;
+            rd->tiers[tier].db_collection_handle = NULL;
         }
     }
 
@@ -224,16 +227,16 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     rrddim_memory_file_free(rd);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(!rd->tiers[tier]) continue;
+        if(!rd->tiers[tier].db_metric_handle) continue;
 
         STORAGE_ENGINE* eng = host->db[tier].eng;
-        eng->api.metric_release(rd->tiers[tier]->db_metric_handle);
-
-        freez(rd->tiers[tier]);
-        rd->tiers[tier] = NULL;
+        eng->api.metric_release(rd->tiers[tier].db_metric_handle);
+        rd->tiers[tier].db_metric_handle = NULL;
     }
 
     if(rd->db) {
+        __atomic_sub_fetch(&rrddim_db_memory_size, rd->memsize, __ATOMIC_RELAXED);
+
         if(rd->rrd_memory_mode == RRD_MEMORY_MODE_RAM)
             netdata_munmap(rd->db, rd->memsize);
         else
@@ -259,9 +262,9 @@ static bool rrddim_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused,
     rc += rrddim_set_divisor(st, rd, ctr->divisor);
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (rd->tiers[tier] && !rd->tiers[tier]->db_collection_handle)
-            rd->tiers[tier]->db_collection_handle =
-                rd->tiers[tier]->collect_ops->init(rd->tiers[tier]->db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
+        if (!rd->tiers[tier].db_collection_handle)
+            rd->tiers[tier].db_collection_handle =
+                rd->tiers[tier].collect_ops->init(rd->tiers[tier].db_metric_handle, st->rrdhost->db[tier].tier_grouping * st->update_every, rd->rrdset->storage_metrics_groups[tier]);
     }
 
     if(rrddim_flag_check(rd, RRDDIM_FLAG_ARCHIVED)) {
@@ -299,7 +302,7 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
-        st->rrddim_root_index = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+        st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
 
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);
@@ -420,10 +423,10 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, collected_number divisor) 
 // ----------------------------------------------------------------------------
 
 time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
         return 0;
 
-    return rd->tiers[tier]->query_ops->latest_time_s(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier].query_ops->latest_time_s(rd->tiers[tier].db_metric_handle);
 }
 
 // get the timestamp of the last entry in the round-robin database
@@ -431,7 +434,7 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
     time_t latest_time_s = rrddim_last_entry_s_of_tier(rd, 0);
 
     for(size_t tier = 1; tier < storage_tiers ;tier++) {
-        if(unlikely(!rd->tiers[tier])) continue;
+        if(unlikely(!rd->tiers[tier].db_metric_handle)) continue;
 
         time_t t = rrddim_last_entry_s_of_tier(rd, tier);
         if(t > latest_time_s)
@@ -442,10 +445,10 @@ time_t rrddim_last_entry_s(RRDDIM *rd) {
 }
 
 time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
-    if(unlikely(tier > storage_tiers || !rd->tiers[tier]))
+    if(unlikely(tier > storage_tiers || !rd->tiers[tier].db_metric_handle))
         return 0;
 
-    return rd->tiers[tier]->query_ops->oldest_time_s(rd->tiers[tier]->db_metric_handle);
+    return rd->tiers[tier].query_ops->oldest_time_s(rd->tiers[tier].db_metric_handle);
 }
 
 time_t rrddim_first_entry_s(RRDDIM *rd) {
@@ -657,6 +660,7 @@ void rrddim_memory_file_free(RRDDIM *rd) {
     rrddim_memory_file_update(rd);
 
     struct rrddim_map_save_v019 *rd_on_file = rd->rd_on_file;
+    __atomic_sub_fetch(&rrddim_db_memory_size, rd_on_file->memsize + strlen(rd_on_file->cache_filename), __ATOMIC_RELAXED);
     freez(rd_on_file->cache_filename);
     netdata_munmap(rd_on_file, rd_on_file->memsize);
 
@@ -753,6 +757,8 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     rd_on_file->memsize = size;
     rd_on_file->rrd_memory_mode = memory_mode;
     rd_on_file->cache_filename = strdupz(fullfilename);
+
+    __atomic_add_fetch(&rrddim_db_memory_size, rd_on_file->memsize + strlen(rd_on_file->cache_filename), __ATOMIC_RELAXED);
 
     rd->db = &rd_on_file->values[0];
     rd->rd_on_file = rd_on_file;

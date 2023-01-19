@@ -317,7 +317,7 @@ void format_host_labels_prometheus(struct instance *instance, RRDHOST *host)
         return;
 
     if (!instance->labels_buffer)
-        instance->labels_buffer = buffer_create(1024);
+        instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
     struct format_prometheus_label_callback tmp = {
         .instance = instance,

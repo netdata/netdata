@@ -36,38 +36,34 @@ extern char *netdata_ssl_ca_file;
 
 static __thread BUFFER *sender_thread_buffer = NULL;
 static __thread bool sender_thread_buffer_used = false;
-static __thread bool sender_thread_buffer_recreate = false;
+static __thread time_t sender_thread_buffer_last_reset_s = 0;
 
 void sender_thread_buffer_free(void) {
     buffer_free(sender_thread_buffer);
     sender_thread_buffer = NULL;
+    sender_thread_buffer_used = false;
 }
 
 // Collector thread starting a transmission
-BUFFER *sender_start(struct sender_state *s __maybe_unused) {
+BUFFER *sender_start(struct sender_state *s) {
     if(unlikely(sender_thread_buffer_used))
         fatal("STREAMING: thread buffer is used multiple times concurrently.");
 
-    if(unlikely(sender_thread_buffer_recreate)) {
-        sender_thread_buffer_recreate = false;
-        if(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE) {
+    if(unlikely(rrdpush_sender_last_buffer_recreate_get(s) > sender_thread_buffer_last_reset_s)) {
+        if(unlikely(sender_thread_buffer && sender_thread_buffer->size > THREAD_BUFFER_INITIAL_SIZE)) {
             buffer_free(sender_thread_buffer);
             sender_thread_buffer = NULL;
         }
     }
 
-    if(!sender_thread_buffer) {
-        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE);
-        sender_thread_buffer_recreate = false;
+    if(unlikely(!sender_thread_buffer)) {
+        sender_thread_buffer = buffer_create(THREAD_BUFFER_INITIAL_SIZE, &netdata_buffers_statistics.buffers_streaming);
+        sender_thread_buffer_last_reset_s = rrdpush_sender_last_buffer_recreate_get(s);
     }
 
     sender_thread_buffer_used = true;
     buffer_flush(sender_thread_buffer);
     return sender_thread_buffer;
-}
-
-void sender_cancel(struct sender_state *s __maybe_unused) {
-    sender_thread_buffer_used = false;
 }
 
 static inline void rrdpush_sender_thread_close_socket(RRDHOST *host);
@@ -108,11 +104,11 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 
     netdata_mutex_lock(&s->mutex);
 
-    if(unlikely(s->host->sender->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+    if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
-              rrdhost_hostname(s->host), s->connected_to, s->host->sender->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
+              rrdhost_hostname(s->host), s->connected_to, s->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
 
-        s->host->sender->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
+        s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
 #ifdef ENABLE_COMPRESSION
@@ -159,17 +155,17 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
                 }
             }
 
-            if(cbuffer_add_unsafe(s->host->sender->buffer, dst, dst_len))
+            if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
                 s->flags |= SENDER_FLAG_OVERFLOW;
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
         }
     }
-    else if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+    else if(cbuffer_add_unsafe(s->buffer, src, src_len))
         s->flags |= SENDER_FLAG_OVERFLOW;
 #else
-    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+    if(cbuffer_add_unsafe(s->buffer, src, src_len))
         s->flags |= SENDER_FLAG_OVERFLOW;
 #endif
 
@@ -195,6 +191,7 @@ void rrdpush_sender_send_this_host_variable_now(RRDHOST *host, const RRDVAR_ACQU
         BUFFER *wb = sender_start(host->sender);
         rrdpush_sender_add_host_variable_to_buffer(wb, rva);
         sender_commit(host->sender, wb);
+        sender_thread_buffer_free();
     }
 }
 
@@ -223,6 +220,7 @@ static void rrdpush_sender_thread_send_custom_host_variables(RRDHOST *host) {
         int ret = rrdvar_walkthrough_read(host->rrdvars, rrdpush_sender_thread_custom_host_variables_callback, &tmp);
         (void)ret;
         sender_commit(host->sender, wb);
+        sender_thread_buffer_free();
 
         debug(D_STREAM, "RRDVAR sent %d VARIABLES", ret);
     }
@@ -248,6 +246,30 @@ static void rrdpush_sender_thread_reset_all_charts(RRDHOST *host) {
     rrdhost_sender_replicating_charts_zero(host);
 }
 
+static void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
+    static __thread time_t last_reset_time_s = 0;
+
+    if(!force && now_s - last_reset_time_s < 300)
+        return;
+
+    if(!have_mutex)
+        netdata_mutex_lock(&s->mutex);
+
+    rrdpush_sender_last_buffer_recreate_set(s, now_s);
+    last_reset_time_s = now_s;
+
+    if(s->buffer && s->buffer->size > CBUFFER_INITIAL_SIZE) {
+        size_t max = s->buffer->max_size;
+        cbuffer_free(s->buffer);
+        s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
+    }
+
+    sender_thread_buffer_free();
+
+    if(!have_mutex)
+        netdata_mutex_unlock(&s->mutex);
+}
+
 static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
     rrdpush_sender_set_flush_time(host->sender);
 
@@ -255,6 +277,7 @@ static void rrdpush_sender_cbuffer_flush(RRDHOST *host) {
 
     // flush the output buffer from any data it may have
     cbuffer_flush(host->sender->buffer);
+    rrdpush_sender_cbuffer_recreate_timed(host->sender, now_monotonic_sec(), true, true);
     replication_recalculate_buffer_used_ratio_unsafe(host->sender);
 
     netdata_mutex_unlock(&host->sender->mutex);
@@ -781,8 +804,8 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
-    SSL *conn = s->host->sender->ssl.conn ;
-    if(conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+    SSL *conn = s->ssl.conn ;
+    if(conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
         ret = netdata_ssl_write(conn, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
@@ -817,9 +840,9 @@ static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret = 0;
 
 #ifdef ENABLE_HTTPS
-    if (s->host->sender->ssl.conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+    if (s->ssl.conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = netdata_ssl_read(s->host->sender->ssl.conn, s->read_buffer, desired);
+        ret = netdata_ssl_read(s->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += (int)ret;
             return ret;
@@ -878,6 +901,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
         pluginsd_function_result_end_to_buffer(wb);
 
         sender_commit(s, wb);
+        sender_thread_buffer_free();
 
         internal_error(true, "STREAM %s [send to %s] FUNCTION transaction %s sending back response (%zu bytes, %llu usec).",
                        rrdhost_hostname(s->host), s->connected_to,
@@ -932,7 +956,7 @@ void execute_commands(struct sender_state *s) {
                 tmp->received_ut = now_realtime_usec();
                 tmp->sender = s;
                 tmp->transaction = string_strdupz(transaction);
-                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1);
+                BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions);
 
                 int code = rrd_call_function_async(s->host, wb, timeout, function, stream_execute_function_callback, tmp);
                 if(code != HTTP_RESP_OK) {
@@ -1223,11 +1247,18 @@ void *rrdpush_sender_thread(void *ptr) {
 
     netdata_thread_cleanup_push(rrdpush_sender_thread_cleanup_callback, thread_data);
 
+    size_t iterations = 0;
+    time_t now_s = now_monotonic_sec();
     while(!rrdhost_sender_should_exit(s)) {
+        iterations++;
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+
+            now_s = now_monotonic_sec();
+            rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
+
             rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
             s->flags &= ~SENDER_FLAG_OVERFLOW;
             s->read_len = 0;
@@ -1240,7 +1271,7 @@ void *rrdpush_sender_thread(void *ptr) {
             if(rrdhost_sender_should_exit(s))
                 break;
 
-            s->last_traffic_seen_t = now_monotonic_sec();
+            now_s = s->last_traffic_seen_t = now_monotonic_sec();
             rrdpush_claimed_id(s->host);
             rrdpush_send_host_labels(s->host);
 
@@ -1250,8 +1281,11 @@ void *rrdpush_sender_thread(void *ptr) {
             continue;
         }
 
+        if(iterations % 1000 == 0)
+            now_s = now_monotonic_sec();
+
         // If the TCP window never opened then something is wrong, restart connection
-        if(unlikely(now_monotonic_sec() - s->last_traffic_seen_t > s->timeout &&
+        if(unlikely(now_s - s->last_traffic_seen_t > s->timeout &&
             !rrdpush_sender_pending_replication_requests(s) &&
             !rrdpush_sender_replicating_charts(s)
         )) {
@@ -1262,22 +1296,13 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         netdata_mutex_lock(&s->mutex);
-        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
-        size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-        if(unlikely(!outstanding && s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE)) {
-            static __thread time_t last_reset_time_t = 0;
-            time_t now_t = now_monotonic_sec();
-            if(now_t - last_reset_time_t > 600) {
-                last_reset_time_t = now_t;
-                size_t max = s->host->sender->buffer->max_size;
-                cbuffer_free(s->host->sender->buffer);
-                s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max);
-                sender_thread_buffer_recreate = true;
-            }
-        }
+        size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
+        size_t available = cbuffer_available_size_unsafe(s->buffer);
+        if (unlikely(!outstanding))
+            rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         netdata_mutex_unlock(&s->mutex);
 
-        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);
+        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);
 
         if(outstanding)
             s->send_attempts++;
@@ -1329,6 +1354,7 @@ void *rrdpush_sender_thread(void *ptr) {
         if (poll_rc == 0 || ((poll_rc == -1) && (errno == EAGAIN || errno == EINTR))) {
             netdata_thread_testcancel();
             debug(D_STREAM, "Spurious wakeup");
+            now_s = now_monotonic_sec();
             continue;
         }
 

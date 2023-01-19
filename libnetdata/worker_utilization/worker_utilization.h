@@ -15,6 +15,7 @@ typedef enum {
     WORKER_METRIC_INCREMENTAL_TOTAL = 4,
 } WORKER_METRIC_TYPE;
 
+size_t workers_allocated_memory(void);
 void worker_register(const char *name);
 void worker_register_job_name(size_t job_id, const char *name);
 void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type);

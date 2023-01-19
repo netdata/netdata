@@ -424,7 +424,7 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 void rrdfunctions_init(RRDHOST *host) {
     if(host->functions) return;
 
-    host->functions = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    host->functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions);
     dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
     dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
     dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);
@@ -629,7 +629,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
         pthread_cond_init(&tmp->cond, NULL);
 
         bool we_should_free = true;
-        BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1); // we need it because we may give up on it
+        BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
         temp_wb->contenttype = wb->contenttype;
         code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp);
         if (code == HTTP_RESP_OK) {

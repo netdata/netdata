@@ -91,7 +91,7 @@ struct dictionary_stats {
 
     // memory
     struct {
-        long indexed;               // bytes of keys indexed (indication of the index size)
+        long index;               // bytes of keys indexed (indication of the index size)
         long values;                // bytes of caller structures
         long dict;                  // bytes of the structures dictionary needs
     } memory;

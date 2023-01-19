@@ -45,7 +45,7 @@ static void sql_maint_aclk_sync_database(struct aclk_database_worker_config *wc,
 
     debug(D_ACLK, "Checking database for %s", wc->host_guid);
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
                         "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", wc->uuid_str, ACLK_DELETE_ACK_ALERTS_INTERNAL);
@@ -120,7 +120,7 @@ void sql_delete_aclk_table_list(struct aclk_database_worker_config *wc, struct a
     debug(D_ACLK_SYNC, "Host %s does NOT exist, can delete aclk sync tables", host_str);
 
     sqlite3_stmt *res = NULL;
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql,"SELECT 'drop '||type||' IF EXISTS '||name||';' FROM sqlite_schema " \
                         "WHERE name LIKE 'aclk_%%_%s' AND type IN ('table', 'trigger', 'index');", uuid_str);
@@ -355,6 +355,8 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
     uuid_unparse_lower(*(uuid_t *)argv[IDX_HOST_ID], guid);
 
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
+
     system_info->hops = str2i((const char *) argv[IDX_HOPS]);
 
     sql_build_host_system_info((uuid_t *)argv[IDX_HOST_ID], system_info);
@@ -731,7 +733,7 @@ void sql_create_aclk_table(RRDHOST *host, uuid_t *host_uuid, uuid_t *node_id)
 
     uuid_unparse_lower(*host_uuid, host_guid);
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE);
+    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
     db_execute(buffer_tostring(sql));

@@ -947,7 +947,7 @@ char *aclk_state(void)
 #ifndef ENABLE_ACLK
     return strdupz("ACLK Available: No");
 #else
-    BUFFER *wb = buffer_create(1024);
+    BUFFER *wb = buffer_create(1024, &netdata_buffers_statistics.buffers_aclk);
     struct tm *tmptr, tmbuf;
     char *ret;
 

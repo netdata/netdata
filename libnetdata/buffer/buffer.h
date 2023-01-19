@@ -15,6 +15,7 @@ typedef struct web_buffer {
     uint8_t options;		// options related to the content
     time_t date;    		// the timestamp this content has been generated
     time_t expires;			// the timestamp this content expires
+    size_t *statistics;
 } BUFFER;
 
 // options
@@ -61,7 +62,7 @@ void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value);
 void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 void buffer_jsdate(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
 
-BUFFER *buffer_create(size_t size);
+BUFFER *buffer_create(size_t size, size_t *statistics);
 void buffer_free(BUFFER *b);
 void buffer_increase(BUFFER *b, size_t free_size_required);
 

@@ -20,6 +20,11 @@
 
 bool global_statistics_enabled = true;
 
+struct netdata_buffers_statistics netdata_buffers_statistics = {};
+
+static size_t dbengine_total_memory = 0;
+size_t rrddim_db_memory_size = 0;
+
 static struct global_statistics {
     uint16_t connected_clients;
 
@@ -214,6 +219,9 @@ static inline void global_statistics_copy(struct global_statistics *gs, uint8_t 
     }
 }
 
+#define dictionary_stats_memory_total(stats) \
+    ((stats).memory.dict + (stats).memory.values + (stats).memory.index)
+
 static void global_statistics_charts(void) {
     static unsigned long long old_web_requests = 0,
                               old_web_usec = 0,
@@ -270,23 +278,168 @@ static void global_statistics_charts(void) {
     // ----------------------------------------------------------------
 
     {
+        static RRDSET *st_memory = NULL;
+        static RRDDIM *rd_database = NULL;
+        static RRDDIM *rd_collectors = NULL;
+        static RRDDIM *rd_hosts = NULL;
+        static RRDDIM *rd_rrd = NULL;
+        static RRDDIM *rd_contexts = NULL;
+        static RRDDIM *rd_health = NULL;
+        static RRDDIM *rd_functions = NULL;
+        static RRDDIM *rd_labels = NULL;
+        static RRDDIM *rd_strings = NULL;
+        static RRDDIM *rd_streaming = NULL;
+        static RRDDIM *rd_replication = NULL;
+        static RRDDIM *rd_buffers = NULL;
+        static RRDDIM *rd_workers = NULL;
+        static RRDDIM *rd_other = NULL;
+
+        if (unlikely(!st_memory)) {
+            st_memory = rrdset_create_localhost(
+                    "netdata",
+                    "memory",
+                    NULL,
+                    "netdata",
+                    NULL,
+                    "Netdata Memory",
+                    "bytes",
+                    "netdata",
+                    "stats",
+                    130100,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_STACKED);
+
+            rd_database = rrddim_add(st_memory, "db", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_collectors = rrddim_add(st_memory, "collectors", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_hosts = rrddim_add(st_memory, "hosts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_rrd = rrddim_add(st_memory, "rrdset rrddim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_contexts = rrddim_add(st_memory, "contexts", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_health = rrddim_add(st_memory, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_functions = rrddim_add(st_memory, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_labels = rrddim_add(st_memory, "labels", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_strings = rrddim_add(st_memory, "strings", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_streaming = rrddim_add(st_memory, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        size_t buffers =
+            netdata_buffers_statistics.query_targets_size +
+            netdata_buffers_statistics.rrdset_done_rda_size +
+            netdata_buffers_statistics.buffers_aclk +
+            netdata_buffers_statistics.buffers_api +
+            netdata_buffers_statistics.buffers_functions +
+            netdata_buffers_statistics.buffers_sqlite +
+            netdata_buffers_statistics.buffers_exporters +
+            netdata_buffers_statistics.buffers_health +
+            netdata_buffers_statistics.buffers_streaming +
+            netdata_buffers_statistics.cbuffers_streaming +
+            netdata_buffers_statistics.buffers_web +
+            replication_allocated_buffers();
+
+        size_t strings = 0;
+        string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
+
+        rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + (collected_number)rrddim_db_memory_size);
+        rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
+        rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
+        rrddim_set_by_pointer(st_memory, rd_rrd, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdset_rrddim));
+        rrddim_set_by_pointer(st_memory, rd_contexts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdcontext));
+        rrddim_set_by_pointer(st_memory, rd_health, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhealth));
+        rrddim_set_by_pointer(st_memory, rd_functions, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_functions));
+        rrddim_set_by_pointer(st_memory, rd_labels, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdlabels));
+        rrddim_set_by_pointer(st_memory, rd_strings, (collected_number)strings);
+        rrddim_set_by_pointer(st_memory, rd_streaming, (collected_number)netdata_buffers_statistics.rrdhost_senders + (collected_number)netdata_buffers_statistics.rrdhost_receivers);
+        rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
+        rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
+
+        rrdset_done(st_memory);
+    }
+
+    {
+        static RRDSET *st_memory_buffers = NULL;
+        static RRDDIM *rd_queries = NULL;
+        static RRDDIM *rd_collectors = NULL;
+        static RRDDIM *rd_buffers_aclk = NULL;
+        static RRDDIM *rd_buffers_api = NULL;
+        static RRDDIM *rd_buffers_functions = NULL;
+        static RRDDIM *rd_buffers_sqlite = NULL;
+        static RRDDIM *rd_buffers_exporters = NULL;
+        static RRDDIM *rd_buffers_health = NULL;
+        static RRDDIM *rd_buffers_streaming = NULL;
+        static RRDDIM *rd_cbuffers_streaming = NULL;
+        static RRDDIM *rd_buffers_replication = NULL;
+        static RRDDIM *rd_buffers_web = NULL;
+
+        if (unlikely(!st_memory_buffers)) {
+            st_memory_buffers = rrdset_create_localhost(
+                "netdata",
+                "memory_buffers",
+                NULL,
+                "netdata",
+                NULL,
+                "Netdata Memory Buffers",
+                "bytes",
+                "netdata",
+                "stats",
+                130101,
+                localhost->rrd_update_every,
+                RRDSET_TYPE_STACKED);
+
+            rd_queries = rrddim_add(st_memory_buffers, "queries", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_collectors = rrddim_add(st_memory_buffers, "collection", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_aclk = rrddim_add(st_memory_buffers, "aclk", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_api = rrddim_add(st_memory_buffers, "api", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_functions = rrddim_add(st_memory_buffers, "functions", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_sqlite = rrddim_add(st_memory_buffers, "sqlite", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_exporters = rrddim_add(st_memory_buffers, "exporters", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_health = rrddim_add(st_memory_buffers, "health", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_streaming = rrddim_add(st_memory_buffers, "streaming", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+
+        rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
+        rrddim_set_by_pointer(st_memory_buffers, rd_collectors, (collected_number)netdata_buffers_statistics.rrdset_done_rda_size);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aclk, (collected_number)netdata_buffers_statistics.buffers_aclk);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_api, (collected_number)netdata_buffers_statistics.buffers_api);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_functions, (collected_number)netdata_buffers_statistics.buffers_functions);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_sqlite, (collected_number)netdata_buffers_statistics.buffers_sqlite);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_exporters, (collected_number)netdata_buffers_statistics.buffers_exporters);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_health, (collected_number)netdata_buffers_statistics.buffers_health);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_streaming, (collected_number)netdata_buffers_statistics.buffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
+
+        rrdset_done(st_memory_buffers);
+    }
+
+    // ----------------------------------------------------------------
+
+    {
         static RRDSET *st_uptime = NULL;
         static RRDDIM *rd_uptime = NULL;
 
         if (unlikely(!st_uptime)) {
             st_uptime = rrdset_create_localhost(
-                "netdata",
-                "uptime",
-                NULL,
-                "netdata",
-                NULL,
-                "Netdata uptime",
-                "seconds",
-                "netdata",
-                "stats",
-                130100,
-                localhost->rrd_update_every,
-                RRDSET_TYPE_LINE);
+                    "netdata",
+                    "uptime",
+                    NULL,
+                    "netdata",
+                    NULL,
+                    "Netdata uptime",
+                    "seconds",
+                    "netdata",
+                    "stats",
+                    130150,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
 
             rd_uptime = rrddim_add(st_uptime, "uptime", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
@@ -1076,13 +1229,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_cache_hit_ratio)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_hit_ratio", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Hit Ratio", name);
 
             ptrs->st_cache_hit_ratio = rrdset_create_localhost(
@@ -1124,13 +1277,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_operations)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_operations", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Operations", name);
 
             ptrs->st_operations = rrdset_create_localhost(
@@ -1178,13 +1331,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Memory", name);
 
             ptrs->st_pgc_memory = rrdset_create_localhost(
@@ -1232,13 +1385,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_tm)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_target_memory", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Target Cache Memory", name);
 
             ptrs->st_pgc_tm = rrdset_create_localhost(
@@ -1282,13 +1435,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_pages)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_pages", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Pages", name);
 
             ptrs->st_pgc_pages = rrdset_create_localhost(
@@ -1326,13 +1479,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_changes)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory_changes", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Memory Changes", name);
 
             ptrs->st_pgc_memory_changes = rrdset_create_localhost(
@@ -1368,13 +1521,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_migrations)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_memory_migrations", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Memory Migrations", name);
 
             ptrs->st_pgc_memory_migrations = rrdset_create_localhost(
@@ -1408,13 +1561,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_memory_events)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_events", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Events", name);
 
             ptrs->st_pgc_memory_events = rrdset_create_localhost(
@@ -1450,13 +1603,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_waste)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_waste_events", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Waste Events", name);
 
             ptrs->st_pgc_waste = rrdset_create_localhost(
@@ -1502,13 +1655,13 @@ static void dbengine2_cache_statistics_charts(struct dbengine2_cache_pointers *p
 
     {
         if (unlikely(!ptrs->st_pgc_workers)) {
-            BUFFER *id = buffer_create(100);
+            BUFFER *id = buffer_create(100, NULL);
             buffer_sprintf(id, "dbengine_%s_cache_workers", name);
 
-            BUFFER *family = buffer_create(100);
+            BUFFER *family = buffer_create(100, NULL);
             buffer_sprintf(family, "dbengine %s cache", name);
 
-            BUFFER *title = buffer_create(100);
+            BUFFER *title = buffer_create(100, NULL);
             buffer_sprintf(title, "Netdata %s Cache Workers", name);
 
             ptrs->st_pgc_workers = rrdset_create_localhost(
@@ -1587,6 +1740,8 @@ static void dbengine2_statistics_charts(void) {
     buffers_total_size += buffers.julyl;
 #endif
 
+    dbengine_total_memory = pgc_main_stats.size + pgc_open_stats.size + pgc_extent_stats.size + mrg_stats.size + buffers_total_size;
+
     size_t priority = 135000;
 
     {
@@ -1619,6 +1774,7 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_memory_buffers = rrddim_add(st_pgc_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
+
 
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_main, (collected_number)pgc_main_stats.size);
         rrddim_set_by_pointer(st_pgc_memory, rd_pgc_memory_open, (collected_number)pgc_open_stats.size);
@@ -2549,6 +2705,15 @@ static void update_heartbeat_charts() {
 // ---------------------------------------------------------------------------------------------------------------------
 // dictionary statistics
 
+struct dictionary_stats dictionary_stats_category_collectors = { .name = "collectors" };
+struct dictionary_stats dictionary_stats_category_rrdhost = { .name = "rrdhost" };
+struct dictionary_stats dictionary_stats_category_rrdset_rrddim = { .name = "rrdset_rrddim" };
+struct dictionary_stats dictionary_stats_category_rrdcontext = { .name = "context" };
+struct dictionary_stats dictionary_stats_category_rrdlabels = { .name = "labels" };
+struct dictionary_stats dictionary_stats_category_rrdhealth = { .name = "health" };
+struct dictionary_stats dictionary_stats_category_functions = { .name = "functions" };
+struct dictionary_stats dictionary_stats_category_replication = { .name = "replication" };
+
 struct dictionary_categories {
     struct dictionary_stats *stats;
     const char *family;
@@ -2594,7 +2759,15 @@ struct dictionary_categories {
     RRDDIM *rd_spins_delete;
 
 } dictionary_categories[] = {
-    { .stats = &dictionary_stats_category_other, "dictionaries", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_collectors, "dictionaries collectors", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_rrdhost, "dictionaries hosts", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_rrdset_rrddim, "dictionaries rrd", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_rrdcontext, "dictionaries contexts", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_rrdlabels, "dictionaries labels", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_rrdhealth, "dictionaries health", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_functions, "dictionaries functions", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_replication, "dictionaries replication", "dictionaries", 900000 },
+    { .stats = &dictionary_stats_category_other, "dictionaries other", "dictionaries", 900000 },
 
     // terminator
     { .stats = NULL, NULL, NULL, 0 },
@@ -2804,7 +2977,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     total = 0;
-    load_dictionary_stats_entry(memory.indexed);
+    load_dictionary_stats_entry(memory.index);
     load_dictionary_stats_entry(memory.values);
     load_dictionary_stats_entry(memory.dict);
 
@@ -2838,7 +3011,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
             rrdlabels_add(c->st_memory->rrdlabels, "category", stats.name, RRDLABEL_SRC_AUTO);
         }
 
-        rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.indexed);
+        rrddim_set_by_pointer(c->st_memory, c->rd_memory_indexed, (collected_number)stats.memory.index);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_values, (collected_number)stats.memory.values);
         rrddim_set_by_pointer(c->st_memory, c->rd_memory_dict, (collected_number)stats.memory.dict);
 

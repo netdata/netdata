@@ -241,7 +241,7 @@ void analytics_exporters(void)
 {
     //when no exporters are available, an empty string will be sent
     //decide if something else is more suitable (but probably not null)
-    BUFFER *bi = buffer_create(1000);
+    BUFFER *bi = buffer_create(1000, NULL);
     analytics_exporting_connectors(bi);
     analytics_set_data_str(&analytics_data.netdata_exporting_connectors, (char *)buffer_tostring(bi));
     buffer_free(bi);
@@ -278,7 +278,7 @@ void analytics_collectors(void)
     RRDSET *st;
     DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     char name[500];
-    BUFFER *bt = buffer_create(1000);
+    BUFFER *bt = buffer_create(1000, NULL);
 
     rrdset_foreach_read(st, localhost) {
         if(!rrdset_is_available_for_viewers(st))
@@ -333,7 +333,7 @@ void analytics_alarms_notifications(void)
 
     debug(D_ANALYTICS, "Executing %s", script);
 
-    BUFFER *b = buffer_create(1000);
+    BUFFER *b = buffer_create(1000, NULL);
     int cnt = 0;
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
@@ -380,7 +380,7 @@ void analytics_get_install_type(void)
  */
 void analytics_https(void)
 {
-    BUFFER *b = buffer_create(30);
+    BUFFER *b = buffer_create(30, NULL);
 #ifdef ENABLE_HTTPS
     analytics_exporting_connectors_ssl(b);
     buffer_strcat(b, netdata_ssl_client_ctx && rrdhost_flag_check(localhost, RRDHOST_FLAG_RRDPUSH_SENDER_CONNECTED) && localhost->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ? "streaming|" : "|");
@@ -675,7 +675,7 @@ void set_late_global_environment()
     analytics_set_data_str(&analytics_data.netdata_config_release_channel, (char *)get_release_channel());
 
     {
-        BUFFER *bi = buffer_create(1000);
+        BUFFER *bi = buffer_create(1000, NULL);
         analytics_build_info(bi);
         analytics_set_data_str(&analytics_data.netdata_buildinfo, (char *)buffer_tostring(bi));
         buffer_free(bi);
@@ -836,7 +836,7 @@ void set_global_environment()
     setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
     {
-        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX);
+        BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);
 
         for (size_t i = 1; i < PLUGINSD_MAX_DIRECTORIES && plugin_directories[i]; i++) {
             if (i > 1)

@@ -913,7 +913,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         if(!strcmp(name, "chart")) chart = value;
         else if(!strcmp(name, "dimension") || !strcmp(name, "dim") || !strcmp(name, "dimensions") || !strcmp(name, "dims")) {
             if(!dimensions)
-                dimensions = buffer_create(100);
+                dimensions = buffer_create(100, &netdata_buffers_statistics.buffers_api);
 
             buffer_strcat(dimensions, "|");
             buffer_strcat(dimensions, value);

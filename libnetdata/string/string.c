@@ -56,14 +56,29 @@ static struct string_hashtable {
 #define string_stats_atomic_decrement(var) __atomic_sub_fetch(&string_base.var, 1, __ATOMIC_RELAXED)
 
 void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_t *entries, size_t *references, size_t *memory, size_t *duplications, size_t *releases) {
-    *inserts = string_base.inserts;
-    *deletes = string_base.deletes;
-    *searches = string_base.searches;
-    *entries = (size_t)string_base.entries;
-    *references = (size_t)string_base.active_references;
-    *memory = (size_t)string_base.memory;
-    *duplications = string_base.duplications;
-    *releases = string_base.releases;
+    if(inserts)
+        *inserts = string_base.inserts;
+
+    if(deletes)
+        *deletes = string_base.deletes;
+
+    if(searches)
+        *searches = string_base.searches;
+
+    if(entries)
+        *entries = (size_t)string_base.entries;
+
+    if(references)
+        *references = (size_t)string_base.active_references;
+
+    if(memory)
+        *memory = (size_t)string_base.memory;
+
+    if(duplications)
+        *duplications = string_base.duplications;
+
+    if(releases)
+        *releases = string_base.releases;
 }
 
 #define string_entry_acquire(se) __atomic_add_fetch(&((se)->refcount), 1, __ATOMIC_SEQ_CST);
@@ -186,7 +201,7 @@ static inline STRING *string_index_insert(const char *str, size_t length) {
         *ptr = string;
         string_base.inserts++;
         string_base.entries++;
-        string_base.memory += (long)mem_size;
+        string_base.memory += (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(length));
     }
     else {
         // the item is already in the index
@@ -240,7 +255,7 @@ static inline void string_index_delete(STRING *string) {
         size_t mem_size = sizeof(STRING) + string->length;
         string_base.deletes++;
         string_base.entries--;
-        string_base.memory -= (long)mem_size;
+        string_base.memory -= (long)(mem_size + JUDYHS_INDEX_SIZE_ESTIMATE(string->length));
         freez(string);
     }
 

@@ -611,7 +611,7 @@ static void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
     if(unlikely(!ri)) return;
     if(likely(ri->rrdmetrics)) return;
 
-    ri->rrdmetrics = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    ri->rrdmetrics = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback(ri->rrdmetrics, rrdmetric_insert_callback, ri);
     dictionary_register_delete_callback(ri->rrdmetrics, rrdmetric_delete_callback, ri);
     dictionary_register_conflict_callback(ri->rrdmetrics, rrdmetric_conflict_callback, ri);
@@ -914,7 +914,7 @@ static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unuse
 void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
     if(unlikely(!rc || rc->rrdinstances)) return;
 
-    rc->rrdinstances = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    rc->rrdinstances = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback(rc->rrdinstances, rrdinstance_insert_callback, rc);
     dictionary_register_delete_callback(rc->rrdinstances, rrdinstance_delete_callback, rc);
     dictionary_register_conflict_callback(rc->rrdinstances, rrdinstance_conflict_callback, rc);
@@ -1392,18 +1392,18 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(likely(host->rrdctx)) return;
 
-    host->rrdctx = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    host->rrdctx = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, host);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, host);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, host);
     dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, host);
 
-    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
 
-    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE);
+    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_conflict_callback, NULL);
@@ -1845,7 +1845,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     BUFFER *wb_metrics = NULL;
     if(options & RRDCONTEXT_OPTION_SHOW_METRICS || t_parent->chart_dimensions) {
 
-        wb_metrics = buffer_create(4096);
+        wb_metrics = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
 
         struct rrdcontext_to_json t_metrics = {
             .wb = wb_metrics,
@@ -1983,7 +1983,7 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
         || t_parent->chart_labels_filter
         || t_parent->chart_dimensions) {
 
-        wb_instances = buffer_create(4096);
+        wb_instances = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
 
         struct rrdcontext_to_json t_instances = {
             .wb = wb_instances,
@@ -2211,7 +2211,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
     if(!host || !host->rrdctx)
         return NULL;
 
-    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
     dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
     dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
     dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);
@@ -2380,28 +2380,35 @@ void query_target_release(QUERY_TARGET *qt) {
     qt->used = false;
 }
 void query_target_free(void) {
-    if(thread_query_target.used)
-        query_target_release(&thread_query_target);
+    QUERY_TARGET *qt = &thread_query_target;
 
-    freez(thread_query_target.query.array);
-    thread_query_target.query.array = NULL;
-    thread_query_target.query.size = 0;
+    if(qt->used)
+        query_target_release(qt);
 
-    freez(thread_query_target.metrics.array);
-    thread_query_target.metrics.array = NULL;
-    thread_query_target.metrics.size = 0;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->query.size * sizeof(QUERY_METRIC), __ATOMIC_RELAXED);
+    freez(qt->query.array);
+    qt->query.array = NULL;
+    qt->query.size = 0;
 
-    freez(thread_query_target.instances.array);
-    thread_query_target.instances.array = NULL;
-    thread_query_target.instances.size = 0;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->metrics.array);
+    qt->metrics.array = NULL;
+    qt->metrics.size = 0;
 
-    freez(thread_query_target.contexts.array);
-    thread_query_target.contexts.array = NULL;
-    thread_query_target.contexts.size = 0;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->instances.array);
+    qt->instances.array = NULL;
+    qt->instances.size = 0;
 
-    freez(thread_query_target.hosts.array);
-    thread_query_target.hosts.array = NULL;
-    thread_query_target.hosts.size = 0;
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *), __ATOMIC_RELAXED);
+    freez(qt->contexts.array);
+    qt->contexts.array = NULL;
+    qt->contexts.size = 0;
+
+    __atomic_sub_fetch(&netdata_buffers_statistics.query_targets_size, qt->hosts.size * sizeof(RRDHOST *), __ATOMIC_RELAXED);
+    freez(qt->hosts.array);
+    qt->hosts.array = NULL;
+    qt->hosts.size = 0;
 }
 
 static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri,
@@ -2413,8 +2420,12 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         return;
 
     if(qt->metrics.used == qt->metrics.size) {
+        size_t old_mem = qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *);
         qt->metrics.size = (qt->metrics.size) ? qt->metrics.size * 2 : 1;
-        qt->metrics.array = reallocz(qt->metrics.array, qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *));
+        size_t new_mem = qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *);
+        qt->metrics.array = reallocz(qt->metrics.array, new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
     qt->metrics.array[qt->metrics.used++] = rrdmetric_acquired_dup(rma);
 
@@ -2438,8 +2449,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         tier_retention[tier].eng = eng;
         tier_retention[tier].db_update_every_s = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every_s);
 
-        if(rm->rrddim && rm->rrddim->tiers[tier] && rm->rrddim->tiers[tier]->db_metric_handle)
-            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier]->db_metric_handle);
+        if(rm->rrddim && rm->rrddim->tiers[tier].db_metric_handle)
+            tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier].db_metric_handle);
         else
             tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid);
 
@@ -2523,8 +2534,12 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 ri->rrdset->last_accessed_time_s = qtl->start_s;
 
             if (qt->query.used == qt->query.size) {
+                size_t old_mem = qt->query.size * sizeof(QUERY_METRIC);
                 qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
-                qt->query.array = reallocz(qt->query.array, qt->query.size * sizeof(QUERY_METRIC));
+                size_t new_mem = qt->query.size * sizeof(QUERY_METRIC);
+                qt->query.array = reallocz(qt->query.array, new_mem);
+
+                __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
             }
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
@@ -2578,8 +2593,12 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
         return;
 
     if(qt->instances.used == qt->instances.size) {
+        size_t old_mem = qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *);
         qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
-        qt->instances.array = reallocz(qt->instances.array, qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *));
+        size_t new_mem = qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *);
+        qt->instances.array = reallocz(qt->instances.array, new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
 
     qtl->ria = qt->instances.array[qt->instances.used++] = rrdinstance_acquired_dup(ria);
@@ -2622,8 +2641,12 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
         return;
 
     if(qt->contexts.used == qt->contexts.size) {
+        size_t old_mem = qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *);
         qt->contexts.size = (qt->contexts.size) ? qt->contexts.size * 2 : 1;
-        qt->contexts.array = reallocz(qt->contexts.array, qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *));
+        size_t new_mem = qt->contexts.size * sizeof(RRDCONTEXT_ACQUIRED *);
+        qt->contexts.array = reallocz(qt->contexts.array, new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
     qtl->rca = qt->contexts.array[qt->contexts.used++] = rrdcontext_acquired_dup(rca);
 
@@ -2662,8 +2685,12 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     QUERY_TARGET *qt = qtl->qt;
 
     if(qt->hosts.used == qt->hosts.size) {
+        size_t old_mem = qt->hosts.size * sizeof(RRDHOST *);
         qt->hosts.size = (qt->hosts.size) ? qt->hosts.size * 2 : 1;
-        qt->hosts.array = reallocz(qt->hosts.array, qt->hosts.size * sizeof(RRDHOST *));
+        size_t new_mem = qt->hosts.size * sizeof(RRDHOST *);
+        qt->hosts.array = reallocz(qt->hosts.array, new_mem);
+
+        __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
     qtl->host = qt->hosts.array[qt->hosts.used++] = host;
 

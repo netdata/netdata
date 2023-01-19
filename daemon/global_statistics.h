@@ -5,6 +5,34 @@
 
 #include "database/rrd.h"
 
+extern struct netdata_buffers_statistics {
+    size_t rrdhost_allocations_size;
+    size_t rrdhost_senders;
+    size_t rrdhost_receivers;
+    size_t query_targets_size;
+    size_t rrdset_done_rda_size;
+    size_t buffers_aclk;
+    size_t buffers_api;
+    size_t buffers_functions;
+    size_t buffers_sqlite;
+    size_t buffers_exporters;
+    size_t buffers_health;
+    size_t buffers_streaming;
+    size_t cbuffers_streaming;
+    size_t buffers_web;
+} netdata_buffers_statistics;
+
+extern struct dictionary_stats dictionary_stats_category_collectors;
+extern struct dictionary_stats dictionary_stats_category_rrdhost;
+extern struct dictionary_stats dictionary_stats_category_rrdset_rrddim;
+extern struct dictionary_stats dictionary_stats_category_rrdcontext;
+extern struct dictionary_stats dictionary_stats_category_rrdlabels;
+extern struct dictionary_stats dictionary_stats_category_rrdhealth;
+extern struct dictionary_stats dictionary_stats_category_functions;
+extern struct dictionary_stats dictionary_stats_category_replication;
+
+extern size_t rrddim_db_memory_size;
+
 // ----------------------------------------------------------------------------
 // global statistics
 
