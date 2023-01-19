@@ -11,8 +11,6 @@ learn_docs_purpose: "Present netdata in a nutshell"
 
 ## What is Netdata ?
 
-## Why use Netdata?
-
 Netdata is designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
 metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
 
