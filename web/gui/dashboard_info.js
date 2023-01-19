@@ -4328,6 +4328,9 @@ netdataDashboard.context = {
     'consul.raft_boltdb_store_logs_time': {
         info: 'The amount of time spent writing logs to the database.'
     },
+    'consul.license_expiration_time': {
+        info: 'The amount of time remaining before Consul Enterprise license expires. When the license expires, some Consul Enterprise features will stop working.'
+    },
 
     // ------------------------------------------------------------------------
     // WMI (Process)
