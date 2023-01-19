@@ -331,6 +331,7 @@ static void global_statistics_charts(void) {
             netdata_buffers_statistics.buffers_exporters +
             netdata_buffers_statistics.buffers_health +
             netdata_buffers_statistics.buffers_streaming +
+            netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web;
 
         size_t strings = 0;

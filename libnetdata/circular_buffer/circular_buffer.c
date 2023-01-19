@@ -1,7 +1,7 @@
 #include "../libnetdata.h"
 
 struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statistics) {
-    struct circular_buffer *buf = mallocz(sizeof(*buf));
+    struct circular_buffer *buf = mallocz(sizeof(struct circular_buffer));
     buf->size = initial;
     buf->data = mallocz(initial);
     buf->write = 0;
@@ -10,14 +10,14 @@ struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statisti
     buf->statistics = statistics;
 
     if(buf->statistics)
-        __atomic_add_fetch(buf->statistics, sizeof(*buf) + buf->size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(buf->statistics, sizeof(struct circular_buffer) + buf->size, __ATOMIC_RELAXED);
 
     return buf;
 }
 
 void cbuffer_free(struct circular_buffer *buf) {
-    if(buf->statistics)
-        __atomic_sub_fetch(buf->statistics, sizeof(*buf) + buf->size, __ATOMIC_RELAXED);
+    if(buf && buf->statistics)
+        __atomic_sub_fetch(buf->statistics, sizeof(struct circular_buffer) + buf->size, __ATOMIC_RELAXED);
 
     freez(buf->data);
     freez(buf);
@@ -55,7 +55,7 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
     buf->size = new_size;
 
     if(buf->statistics)
-        __atomic_sub_fetch(buf->statistics, new_size - old_size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(buf->statistics, new_size - old_size, __ATOMIC_RELAXED);
 
     return 0;
 }
