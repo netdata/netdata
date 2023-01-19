@@ -874,21 +874,19 @@ struct statsd_tcp {
     char buffer[];
 };
 
-#ifdef HAVE_RECVMMSG
 struct statsd_udp {
     struct collection_thread_status *status;
     STATSD_SOCKET_DATA_TYPE type;
+
+#ifdef HAVE_RECVMMSG
     size_t size;
     struct iovec *iovecs;
     struct mmsghdr *msgs;
-};
 #else
-struct statsd_udp {
     int *running;
-    STATSD_SOCKET_DATA_TYPE type;
     char buffer[STATSD_UDP_BUFFER_SIZE];
-};
 #endif
+};
 
 // new TCP client connected
 static void *statsd_add_callback(POLLINFO *pi, short int *events, void *data) {
