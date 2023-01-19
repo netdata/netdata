@@ -104,11 +104,11 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
 
     netdata_mutex_lock(&s->mutex);
 
-    if(unlikely(s->host->sender->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
+    if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
-              rrdhost_hostname(s->host), s->connected_to, s->host->sender->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
+              rrdhost_hostname(s->host), s->connected_to, s->buffer->max_size, buffer_strlen(wb) + 1, SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE);
 
-        s->host->sender->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
+        s->buffer->max_size = (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE;
     }
 
 #ifdef ENABLE_COMPRESSION
@@ -155,17 +155,17 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
                 }
             }
 
-            if(cbuffer_add_unsafe(s->host->sender->buffer, dst, dst_len))
+            if(cbuffer_add_unsafe(s->buffer, dst, dst_len))
                 s->flags |= SENDER_FLAG_OVERFLOW;
 
             src = src + size_to_compress;
             src_len -= size_to_compress;
         }
     }
-    else if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+    else if(cbuffer_add_unsafe(s->buffer, src, src_len))
         s->flags |= SENDER_FLAG_OVERFLOW;
 #else
-    if(cbuffer_add_unsafe(s->host->sender->buffer, src, src_len))
+    if(cbuffer_add_unsafe(s->buffer, src, src_len))
         s->flags |= SENDER_FLAG_OVERFLOW;
 #endif
 
@@ -777,8 +777,8 @@ static ssize_t attempt_to_send(struct sender_state *s) {
     debug(D_STREAM, "STREAM: Sending data. Buffer r=%zu w=%zu s=%zu, next chunk=%zu", cb->read, cb->write, cb->size, outstanding);
 
 #ifdef ENABLE_HTTPS
-    SSL *conn = s->host->sender->ssl.conn ;
-    if(conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
+    SSL *conn = s->ssl.conn ;
+    if(conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE)
         ret = netdata_ssl_write(conn, chunk, outstanding);
     else
         ret = send(s->rrdpush_sender_socket, chunk, outstanding, MSG_DONTWAIT);
@@ -813,9 +813,9 @@ static ssize_t attempt_read(struct sender_state *s) {
     ssize_t ret = 0;
 
 #ifdef ENABLE_HTTPS
-    if (s->host->sender->ssl.conn && s->host->sender->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+    if (s->ssl.conn && s->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE) {
         size_t desired = sizeof(s->read_buffer) - s->read_len - 1;
-        ret = netdata_ssl_read(s->host->sender->ssl.conn, s->read_buffer, desired);
+        ret = netdata_ssl_read(s->ssl.conn, s->read_buffer, desired);
         if (ret > 0 ) {
             s->read_len += (int)ret;
             return ret;
@@ -1120,6 +1120,28 @@ static void rrdpush_sender_thread_cleanup_callback(void *ptr) {
     freez(s);
 }
 
+void rrdpush_sender_cbuffer_recreate_timed(struct sender_state *s, time_t now_s, bool have_mutex, bool force) {
+    static __thread time_t last_reset_time_s = 0;
+
+    if(!force && now_s - last_reset_time_s < 300)
+        return;
+
+    if(!have_mutex)
+        netdata_mutex_lock(&s->mutex);
+
+    rrdpush_sender_last_buffer_recreate_set(s, now_s);
+    last_reset_time_s = now_s;
+
+    if(s->buffer && s->buffer->size > CBUFFER_INITIAL_SIZE) {
+        size_t max = s->buffer->max_size;
+        cbuffer_free(s->buffer);
+        s->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
+    }
+
+    if(!have_mutex)
+        netdata_mutex_unlock(&s->mutex);
+}
+
 void *rrdpush_sender_thread(void *ptr) {
     worker_register("STREAMSND");
     worker_register_job_name(WORKER_SENDER_JOB_CONNECT, "connect");
@@ -1221,13 +1243,16 @@ void *rrdpush_sender_thread(void *ptr) {
 
     size_t iterations = 0;
     time_t now_s = now_monotonic_sec();
-    time_t last_reset_time_s = now_s;
     while(!rrdhost_sender_should_exit(s)) {
         iterations++;
 
         // The connection attempt blocks (after which we use the socket in nonblocking)
         if(unlikely(s->rrdpush_sender_socket == -1)) {
             worker_is_busy(WORKER_SENDER_JOB_CONNECT);
+
+            now_s = now_monotonic_sec();
+            rrdpush_sender_cbuffer_recreate_timed(s, now_s, false, true);
+
             rrdhost_flag_clear(s->host, RRDHOST_FLAG_RRDPUSH_SENDER_READY_4_METRICS);
             s->flags &= ~SENDER_FLAG_OVERFLOW;
             s->read_len = 0;
@@ -1265,23 +1290,13 @@ void *rrdpush_sender_thread(void *ptr) {
         }
 
         netdata_mutex_lock(&s->mutex);
-        size_t outstanding = cbuffer_next_unsafe(s->host->sender->buffer, NULL);
-        size_t available = cbuffer_available_size_unsafe(s->host->sender->buffer);
-        if (unlikely(!outstanding)) {
-            if(now_s - last_reset_time_s > 300) {
-                rrdpush_sender_last_buffer_recreate_set(s, now_s);
-                last_reset_time_s = now_s;
-
-                if(s->host->sender->buffer->size > CBUFFER_INITIAL_SIZE) {
-                    size_t max = s->host->sender->buffer->max_size;
-                    cbuffer_free(s->host->sender->buffer);
-                    s->host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, max, &netdata_buffers_statistics.cbuffers_streaming);
-                }
-            }
-        }
+        size_t outstanding = cbuffer_next_unsafe(s->buffer, NULL);
+        size_t available = cbuffer_available_size_unsafe(s->buffer);
+        if (unlikely(!outstanding))
+            rrdpush_sender_cbuffer_recreate_timed(s, now_s, true, false);
         netdata_mutex_unlock(&s->mutex);
 
-        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->host->sender->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->host->sender->buffer->max_size);
+        worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, (NETDATA_DOUBLE)(s->buffer->max_size - available) * 100.0 / (NETDATA_DOUBLE)s->buffer->max_size);
 
         if(outstanding)
             s->send_attempts++;
