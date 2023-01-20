@@ -242,7 +242,7 @@ jobs:
             BASE=${{ matrix.distro }}
             PRE=${{ matrix.env_prep }}
             RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=oci,dest=/tmp/image.tar
+          outputs: type=docker,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
         if: ${{ steps.build1.outcome == 'failure' }}
@@ -260,7 +260,7 @@ jobs:
             BASE=${{ matrix.distro }}
             PRE=${{ matrix.env_prep }}
             RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=oci,dest=/tmp/image.tar
+          outputs: type=docker,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Retry delay
         if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
@@ -277,7 +277,7 @@ jobs:
             BASE=${{ matrix.distro }}
             PRE=${{ matrix.env_prep }}
             RMJSONC=${{ matrix.jsonc_removal }}
-          outputs: type=oci,dest=/tmp/image.tar
+          outputs: type=docker,dest=/tmp/image.tar
           tags: test:${{ matrix.artifact_key }}
       - name: Upload image artifact
         id: upload
@@ -335,29 +335,27 @@ jobs:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
         id: load
-        run: |
-          docker load --input image.tar | tee image-info.txt
-          echo "image=$(cut -d ':' -f 3 image-info.txt)" >> "${GITHUB_OUTPUT}"
+        run: docker load --input image.tar
       - name: Regular build on ${{ matrix.distro }}
         id: build-basic
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c 'autoreconf -ivf && ./configure --disable-dependency-tracking && make -j2'
       - name: netdata-installer on ${{ matrix.distro }}, disable cloud
         id: build-no-cloud
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --disable-cloud --one-time-build'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud
         id: build-cloud
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c './netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
       - name: netdata-installer on ${{ matrix.distro }}, require cloud, no JSON-C
         id: build-no-jsonc
         if: matrix.jsonc_removal != ''
         run: |
-          docker run --security-opt seccomp=unconfined -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -w /netdata test:${{ matrix.artifact_key }} \
               /bin/sh -c '/rmjsonc.sh && ./netdata-installer.sh --dont-wait --dont-start-it --require-cloud --one-time-build'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -431,13 +429,11 @@ jobs:
           name: ${{ matrix.artifact_key }}-test-env
       - name: Load test environment
         id: load
-        run: |
-          docker load --input image.tar | tee image-info.txt
-          echo "image=$(cut -d ':' -f 3 image-info.txt)" >> "${GITHUB_OUTPUT}"
+        run: docker load --input image.tar
       - name: Install netdata and run the updater on ${{ matrix.distro }}
         id: updater-check
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata sha256:${{ steps.load.outputs.image }} \
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 --network host -w /netdata test:${{ matrix.artifact_key }} \
                 /netdata/.github/scripts/run-updater-check.sh
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
