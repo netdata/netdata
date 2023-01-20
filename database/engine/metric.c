@@ -16,8 +16,6 @@ struct metric {
     // YOU HAVE TO INITIALIZE IT YOURSELF !
 };
 
-#define MRG_PARTITIONS 10
-
 struct mrg {
     struct pgc_index {
         ARAL *aral;

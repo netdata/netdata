@@ -868,6 +868,9 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
 
+    if(cpus > MRG_PARTITIONS)
+        cpus = MRG_PARTITIONS;
+
     info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
 
     if(datafiles > 2) {
@@ -912,6 +915,9 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
+void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
+    __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
+}
 /*
  * Returns 0 on success, negative on error
  */

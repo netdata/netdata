@@ -381,6 +381,7 @@ struct rrdengine_instance {
     } atomic;
 
     struct {
+        bool exit_mode;
         bool enabled;                               // when set (before shutdown), queries are prohibited
         struct completion completion;
     } quiesce;
@@ -415,7 +416,7 @@ static inline void ctx_last_flush_fileno_set(struct rrdengine_instance *ctx, uns
     } while(!__atomic_compare_exchange_n(&ctx->atomic.last_flush_fileno, &old_fileno, fileno, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
 }
 
-#define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce.enabled, __ATOMIC_RELAXED) == false)
+#define ctx_is_available_for_queries(ctx) (__atomic_load_n(&(ctx)->quiesce.enabled, __ATOMIC_RELAXED) == false && __atomic_load_n(&(ctx)->quiesce.exit_mode, __ATOMIC_RELAXED) == false)
 
 void *dbengine_page_alloc(size_t size);
 void dbengine_page_free(void *page, size_t size);

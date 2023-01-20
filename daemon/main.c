@@ -327,6 +327,14 @@ void netdata_cleanup_and_exit(int ret) {
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
+#ifdef ENABLE_DBENGINE
+    if(dbengine_enabled) {
+        delta_shutdown_time("dbengine exit mode");
+        for (size_t tier = 0; tier < storage_tiers; tier++)
+            rrdeng_exit_mode(multidb_ctx[tier]);
+    }
+#endif
+
     delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
 
     service_signal_exit(

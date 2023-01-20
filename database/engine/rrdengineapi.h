@@ -65,6 +65,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
                        unsigned disk_space_mb, size_t tier);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
+void rrdeng_exit_mode(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);
