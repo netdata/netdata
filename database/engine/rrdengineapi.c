@@ -858,12 +858,12 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    size_t cpus = get_system_cpus();
+    size_t cpus = get_system_cpus() / 2;
     if(cpus > datafiles)
         cpus = datafiles;
 
-    if(cpus < 1)
-        cpus = 1;
+    if(cpus < 2)
+        cpus = 2;
 
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
@@ -896,8 +896,6 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         completion_init(&ctx->loading.populate_mrg.array[i]);
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_POPULATE_MRG, NULL, &ctx->loading.populate_mrg.array[i],
                        STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-
-        sleep_usec(1 * USEC_PER_MS);
     }
 }
 
