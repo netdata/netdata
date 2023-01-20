@@ -612,7 +612,7 @@ static void test_exporting_discard_response(void **state)
 {
     struct engine *engine = *state;
 
-    BUFFER *response = buffer_create(0);
+    BUFFER *response = buffer_create(0, NULL);
     buffer_sprintf(response, "Test response");
 
     assert_int_equal(exporting_discard_response(response, engine->instance_root), 0);
@@ -651,8 +651,8 @@ static void test_simple_connector_send_buffer(void **state)
     int sock = 1;
     int failures = 3;
     size_t buffered_metrics = 1;
-    BUFFER *header = buffer_create(0);
-    BUFFER *buffer = buffer_create(0);
+    BUFFER *header = buffer_create(0, NULL);
+    BUFFER *buffer = buffer_create(0, NULL);
     buffer_strcat(header, "test header\n");
     buffer_strcat(buffer, "test buffer\n");
 
@@ -695,10 +695,10 @@ static void test_simple_connector_worker(void **state)
     instance->connector_specific_data = simple_connector_data;
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
     simple_connector_data->first_buffer = simple_connector_data->last_buffer;
-    simple_connector_data->header = buffer_create(0);
-    simple_connector_data->buffer = buffer_create(0);
-    simple_connector_data->last_buffer->header = buffer_create(0);
-    simple_connector_data->last_buffer->buffer = buffer_create(0);
+    simple_connector_data->header = buffer_create(0, NULL);
+    simple_connector_data->buffer = buffer_create(0, NULL);
+    simple_connector_data->last_buffer->header = buffer_create(0, NULL);
+    simple_connector_data->last_buffer->buffer = buffer_create(0, NULL);
     strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->header, "test header");
@@ -822,7 +822,7 @@ static void test_flush_host_labels(void **state)
     struct engine *engine = *state;
     struct instance *instance = engine->instance_root;
 
-    instance->labels_buffer = buffer_create(12);
+    instance->labels_buffer = buffer_create(12, NULL);
     buffer_strcat(instance->labels_buffer, "check string");
     assert_int_equal(buffer_strlen(instance->labels_buffer), 12);
 
@@ -1133,7 +1133,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(void **state)
 {
     (void)state;
 
-    BUFFER *buffer = buffer_create(0);
+    BUFFER *buffer = buffer_create(0, NULL);
 
     RRDSET *st;
     rrdset_foreach_read(st, localhost);
@@ -1241,8 +1241,8 @@ static void test_prometheus_remote_write_prepare_header(void **state)
     struct simple_connector_data *simple_connector_data = callocz(1, sizeof(struct simple_connector_data));
     instance->connector_specific_data = simple_connector_data;
     simple_connector_data->last_buffer = callocz(1, sizeof(struct simple_connector_buffer));
-    simple_connector_data->last_buffer->header = buffer_create(0);
-    simple_connector_data->last_buffer->buffer = buffer_create(0);
+    simple_connector_data->last_buffer->header = buffer_create(0, NULL);
+    simple_connector_data->last_buffer->buffer = buffer_create(0, NULL);
     strcpy(simple_connector_data->connected_to, "localhost");
 
     buffer_sprintf(simple_connector_data->last_buffer->buffer, "test buffer");
@@ -1269,7 +1269,7 @@ static void test_prometheus_remote_write_prepare_header(void **state)
 static void test_process_prometheus_remote_write_response(void **state)
 {
     (void)state;
-    BUFFER *buffer = buffer_create(0);
+    BUFFER *buffer = buffer_create(0, NULL);
 
     buffer_sprintf(buffer, "HTTP/1.1 200 OK\r\n");
     assert_int_equal(process_prometheus_remote_write_response(buffer, NULL), 0);
@@ -1834,7 +1834,7 @@ static void test_format_batch_mongodb(void **state)
     connector_specific_data->first_buffer->next = current_buffer;
     connector_specific_data->last_buffer = current_buffer;
 
-    BUFFER *buffer = buffer_create(0);
+    BUFFER *buffer = buffer_create(0, NULL);
     buffer_sprintf(buffer, "{ \"metric\": \"test_metric\" }\n");
     instance->buffer = buffer;
     stats->buffered_metrics = 1;

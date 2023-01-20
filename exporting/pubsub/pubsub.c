@@ -30,7 +30,7 @@ int init_pubsub_instance(struct instance *instance)
     instance->prepare_header = NULL;
     instance->check_response = NULL;
 
-    instance->buffer = (void *)buffer_create(0);
+    instance->buffer = (void *)buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     if (!instance->buffer) {
         error("EXPORTING: cannot create buffer for Pub/Sub exporting connector instance %s", instance->config.name);
         return 1;
