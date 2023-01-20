@@ -907,46 +907,6 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
-void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
-    usec_t started_ut = now_monotonic_usec();
-
-    size_t data_size = 0;
-    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
-    if(!j2_header)
-        return;
-
-    uint8_t *data_start = (uint8_t *)j2_header;
-    uint32_t entries = j2_header->metric_count;
-
-    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-    time_t now_s = now_realtime_sec();
-    for (size_t i=0; i < entries; i++) {
-        time_t start_time_s = header_start_time_s + metric->delta_start_s;
-        time_t end_time_s = header_start_time_s + metric->delta_end_s;
-        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
-        update_metric_retention_and_granularity_by_uuid(
-                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
-        fatal_assert(metric->entries == metric_list_header->entries);
-#endif
-        metric++;
-    }
-
-    journalfile_v2_data_release(journalfile);
-    usec_t ended_ut = now_monotonic_usec();
-
-    info("DBENGINE: journal v2 of tier %u datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
-        , ctx->tier, journalfile->datafile->fileno
-        , (double)data_size / 1024 / 1024
-        , (double)entries / 1000
-        , ((double)(ended_ut - started_ut) / USEC_PER_MS)
-        );
-}
-
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     int ret, fd;
@@ -1023,15 +983,38 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
+    madvise_dontfork(data_start, journal_v2_file_size);
+    madvise_dontdump(data_start, journal_v2_file_size);
+
+    usec_t mrg_start_ut = now_monotonic_usec();
+    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+    time_t now_s = now_realtime_sec();
+    for (size_t i=0; i < entries; i++) {
+        time_t start_time_s = header_start_time_s + metric->delta_start_s;
+        time_t end_time_s = header_start_time_s + metric->delta_end_s;
+        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
+        update_metric_retention_and_granularity_by_uuid(
+                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
+        fatal_assert(metric->entries == metric_list_header->entries);
+#endif
+        metric++;
+    }
+
     usec_t finished_ut = now_monotonic_usec();
 
     info("DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
-         "mmap: %0.2f ms, validate: %0.2f ms"
+         "mmap: %0.2f ms, validate: %0.2f ms, populate: %0.2f ms"
          , path_v2
          , (double)journal_v2_file_size / 1024 / 1024
          , (double)entries / 1000
          , ((double)(validation_start_ut - mmap_start_ut) / USEC_PER_MS)
-         , ((double)(finished_ut - validation_start_ut) / USEC_PER_MS)
+         , ((double)(mrg_start_ut - validation_start_ut) / USEC_PER_MS)
+         , ((double)(finished_ut - mrg_start_ut) / USEC_PER_MS)
          );
 
     // Initialize the journal file to be able to access the data

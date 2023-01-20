@@ -851,43 +851,13 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     fatal_assert(RRDENG_NR_STATS == 38);
 }
 
-static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    size_t datafiles = 0;
-    for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next)
-        datafiles++;
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-
-    size_t cpus = get_system_cpus();
-    if(cpus > datafiles)
-        cpus = datafiles;
-
-    if(cpus < 1)
-        cpus = 1;
-
-    if(cpus > (size_t)libuv_worker_threads)
-        cpus = (size_t)libuv_worker_threads;
-
-    struct completion cs[cpus];
-
-    for (size_t i = 0; i < cpus; i++) {
-        completion_init(&cs[i]);
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_POPULATE_MRG, NULL, &cs[i],
-                       STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    }
-
-    for (size_t i = 0; i < cpus; i++) {
-        completion_wait_for(&cs[i]);
-        completion_destroy(&cs[i]);
-    }
-}
-
 /*
  * Returns 0 on success, negative on error
  */
 int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
                 unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
+    int error;
     uint32_t max_open_files;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
@@ -933,12 +903,12 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     init_page_cache();
     init_commit_log(ctx);
-    if (!init_rrd_files(ctx)) {
-        if(rrdeng_dbengine_spawn(ctx)) {
+    error = init_rrd_files(ctx);
+    if (!error) {
+
+        if(rrdeng_dbengine_spawn(ctx))
             // success - we run this ctx too
-            rrdeng_populate_mrg(ctx);
             return 0;
-        }
 
         finalize_rrd_files(ctx);
     }
