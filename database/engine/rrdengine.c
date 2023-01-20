@@ -1487,7 +1487,7 @@ void timer_cb(uv_timer_t* handle) {
         time_t now_s = now_monotonic_sec();
         if(now_s - last_run_s >= 10) {
             last_run_s = now_s;
-            journalfile_v2_data_unmount_cleanup(now_s);
+            journalfile_v2_data_unmount_cleanup(now_s, storage_tiers);
         }
     }
 
