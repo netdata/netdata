@@ -3,6 +3,8 @@
 
 #include "../rrd.h"
 
+#define MRG_PARTITIONS 10
+
 typedef struct metric METRIC;
 typedef struct mrg MRG;
 

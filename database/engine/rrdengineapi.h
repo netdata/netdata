@@ -24,8 +24,7 @@ extern struct rrdengine_instance *multidb_ctx[RRD_STORAGE_TIERS];
 extern size_t page_type_size[];
 extern size_t tier_page_size[];
 
-#define PAGE_POINT_SIZE_BYTES(x) page_type_size[(x)->type]
-#define PAGE_POINT_CTX_SIZE_BYTES(x) page_type_size[(x)->page_type]
+#define CTX_POINT_SIZE_BYTES(ctx) page_type_size[(ctx)->config.page_type]
 
 void rrdeng_generate_legacy_uuid(const char *dim_id, const char *chart_id, uuid_t *ret_uuid);
 void rrdeng_convert_legacy_uuid_to_multihost(char machine_guid[GUID_LEN + 1], uuid_t *legacy_uuid,
@@ -62,8 +61,11 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *r
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
-int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
                        unsigned disk_space_mb, size_t tier);
+
+void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
+void rrdeng_exit_mode(struct rrdengine_instance *ctx);
 
 int rrdeng_exit(struct rrdengine_instance *ctx);
 void rrdeng_prepare_exit(struct rrdengine_instance *ctx);

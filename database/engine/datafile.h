@@ -47,6 +47,11 @@ struct rrdengine_datafile {
 
     struct {
         SPINLOCK spinlock;
+        bool populated;
+    } populate_mrg;
+
+    struct {
+        SPINLOCK spinlock;
         size_t running;
         size_t flushed_to_open_running;
     } writers;
@@ -69,11 +74,6 @@ void datafile_acquire_dup(struct rrdengine_datafile *df);
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
-
-struct rrdengine_datafile_list {
-    uv_rwlock_t rwlock;
-    struct rrdengine_datafile *first; /* oldest - the newest with ->first->prev */
-};
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);

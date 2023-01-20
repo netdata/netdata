@@ -120,7 +120,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted shortly "
                                          "(scanned open cache in %llu usecs)",
-                                   df->fileno, df->ctx->tier,
+                                   df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -137,7 +137,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                          "%zu clean and %zu hot open cache pages "
                                          "- will be deleted now "
                                          "(scanned open cache in %llu usecs)",
-                                   df->fileno, df->ctx->tier,
+                                   df->fileno, df->ctx->config.tier,
                                    df->users.lockers,
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                    df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -151,7 +151,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
                                      "has %u lockers (oc:%u, pd:%u), "
                                      "%zu clean and %zu hot open cache pages "
                                      "(scanned open cache in %llu usecs)",
-                               df->fileno, df->ctx->tier,
+                               df->fileno, df->ctx->config.tier,
                                df->users.lockers,
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
                                df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
@@ -168,7 +168,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df) {
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
-                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 int close_data_file(struct rrdengine_datafile *datafile)
@@ -407,16 +407,16 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;
 
-    ret = uv_fs_scandir(NULL, &req, ctx->dbfiles_path, 0, NULL);
+    ret = uv_fs_scandir(NULL, &req, ctx->config.dbfiles_path, 0, NULL);
     if (ret < 0) {
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
-        error("DBENGINE: uv_fs_scandir(%s): %s", ctx->dbfiles_path, uv_strerror(ret));
+        error("DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         return ret;
     }
-    info("DBENGINE: found %d files in path %s", ret, ctx->dbfiles_path);
+    info("DBENGINE: found %d files in path %s", ret, ctx->config.dbfiles_path);
 
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
@@ -437,7 +437,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
     qsort(datafiles, matched_files, sizeof(*datafiles), scan_data_files_cmp);
     /* TODO: change this when tiering is implemented */
-    ctx->last_fileno = datafiles[matched_files - 1]->fileno;
+    ctx->atomic.last_fileno = datafiles[matched_files - 1]->fileno;
 
     for (failed_to_load = 0, i = 0 ; i < matched_files ; ++i) {
         uint8_t must_delete_pair = 0;
@@ -475,7 +475,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         }
 
         datafile_list_insert(ctx, datafile);
-        ctx->disk_space += datafile->pos + journalfile->pos;
+        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
     }
     matched_files -= failed_to_load;
     freez(datafiles);
@@ -490,11 +490,11 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
 
     struct rrdengine_datafile *datafile;
     struct rrdengine_journalfile *journalfile;
-    unsigned fileno = __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED) + 1;
+    unsigned fileno = ctx_last_fileno_get(ctx) + 1;
     int ret;
     char path[RRDENG_PATH_MAX];
 
-    info("DBENGINE: creating new data and journal files in path %s", ctx->dbfiles_path);
+    info("DBENGINE: creating new data and journal files in path %s", ctx->config.dbfiles_path);
     datafile = datafile_alloc_and_init(ctx, 1, fileno);
     ret = create_data_file(datafile);
     if(ret)
@@ -512,9 +512,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     info("DBENGINE: created journal file \"%s\".", path);
 
     datafile_list_insert(ctx, datafile);
-    ctx->disk_space += datafile->pos + journalfile->pos;
-
-    __atomic_add_fetch(&ctx->last_fileno, 1, __ATOMIC_RELAXED);
+    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
+    ctx_last_fileno_increment(ctx);
 
     return 0;
 
@@ -535,26 +534,24 @@ int init_data_files(struct rrdengine_instance *ctx)
     int ret;
 
     fatal_assert(0 == uv_rwlock_init(&ctx->datafiles.rwlock));
-    __atomic_store_n(&ctx->journal_initialization, true, __ATOMIC_RELAXED);
     ret = scan_data_files(ctx);
     if (ret < 0) {
-        error("DBENGINE: failed to scan path \"%s\".", ctx->dbfiles_path);
+        error("DBENGINE: failed to scan path \"%s\".", ctx->config.dbfiles_path);
         return ret;
     } else if (0 == ret) {
-        info("DBENGINE: data files not found, creating in path \"%s\".", ctx->dbfiles_path);
-        ctx->last_fileno = 0;
+        info("DBENGINE: data files not found, creating in path \"%s\".", ctx->config.dbfiles_path);
+        ctx->atomic.last_fileno = 0;
         ret = create_new_datafile_pair(ctx);
         if (ret) {
-            error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->dbfiles_path);
+            error("DBENGINE: failed to create data and journal files in path \"%s\".", ctx->config.dbfiles_path);
             return ret;
         }
     }
-    else if(ctx->create_new_datafile_pair)
+    else if(ctx->loading.create_new_datafile_pair)
         create_new_datafile_pair(ctx);
 
     pgc_reset_hot_max(open_cache);
-    ctx->create_new_datafile_pair = false;
-    __atomic_store_n(&ctx->journal_initialization, false, __ATOMIC_RELAXED);
+    ctx->loading.create_new_datafile_pair = false;
     return 0;
 }
 
@@ -569,9 +566,9 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         logged = false;
         if(datafile == ctx->datafiles.first->prev) {
             // this is the last file
-            while(__atomic_load_n(&ctx->worker_config.atomics.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
+            while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
                 if(!logged) {
-                    info("Waiting for inflight flush to finish on tier %d to close last datafile %u...", ctx->tier, datafile->fileno);
+                    info("Waiting for inflight flush to finish on tier %d to close last datafile %u...", ctx->config.tier, datafile->fileno);
                     logged = true;
                 }
                 sleep_usec(100 * USEC_PER_MS);
@@ -581,7 +578,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         logged = false;
         while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
             if(!logged) {
-                info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->tier);
+                info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
             }
             sleep_usec(100 * USEC_PER_MS);
@@ -598,7 +595,7 @@ void finalize_data_files(struct rrdengine_instance *ctx)
                 netdata_spinlock_unlock(&datafile->writers.spinlock);
                 uv_rwlock_wrunlock(&ctx->datafiles.rwlock);
                 if(!logged) {
-                    info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->tier);
+                    info("Waiting for writers to data file %u of tier %d to finish...", datafile->fileno, ctx->config.tier);
                     logged = true;
                 }
                 sleep_usec(100 * USEC_PER_MS);

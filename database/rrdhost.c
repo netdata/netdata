@@ -390,7 +390,6 @@ int is_legacy = 1;
             host->db[0].tier_grouping = get_tier_grouping(0);
 
             ret = rrdeng_init(
-                host,
                 (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
                 default_rrdeng_page_cache_mb,
@@ -398,8 +397,11 @@ int is_legacy = 1;
                 0); // may fail here for legacy dbengine initialization
 
             if(ret == 0) {
+                rrdeng_readiness_wait((struct rrdengine_instance *)host->db[0].instance);
+
                 // assign the rest of the shared storage instances to it
                 // to allow them collect its metrics too
+
                 for(size_t tier = 1; tier < storage_tiers ; tier++) {
                     host->db[tier].mode = RRD_MEMORY_MODE_DBENGINE;
                     host->db[tier].eng = storage_engine_get(host->db[tier].mode);
@@ -867,7 +869,7 @@ void dbengine_init(char *hostname) {
         }
 
         internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
-        ret = rrdeng_init(NULL, NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
+        ret = rrdeng_init(NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
         if(ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
                   hostname, tier, dbenginepath);
@@ -875,7 +877,7 @@ void dbengine_init(char *hostname) {
         }
         else {
             if (rrdeng_ctx_exceeded_disk_quota(multidb_ctx[created_tiers]))
-                rrdeng_enq_cmd( multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+                rrdeng_enq_cmd(multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
             created_tiers++;
         }
     }
@@ -887,6 +889,9 @@ void dbengine_init(char *hostname) {
     }
     else if(!created_tiers)
         fatal("DBENGINE on '%s', failed to initialize databases at '%s'.", hostname, netdata_configured_cache_dir);
+
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        rrdeng_readiness_wait(multidb_ctx[tier]);
 
     dbengine_enabled = true;
 #else

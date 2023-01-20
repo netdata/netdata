@@ -17,7 +17,7 @@ static void update_metric_retention_and_granularity_by_uuid(
         last_time_s = now_s;
     }
 
-    if(unlikely(first_time_s > last_time_s)) {
+    if (unlikely(first_time_s > last_time_s)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
                           "fixing first time to last time",
@@ -26,23 +26,25 @@ static void update_metric_retention_and_granularity_by_uuid(
         first_time_s = last_time_s;
     }
 
-    if(unlikely(first_time_s == 0 || last_time_s == 0)) {
+    if (unlikely(first_time_s == 0 || last_time_s == 0)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
                           "using them as-is",
                     first_time_s, last_time_s, now_s);
     }
 
-    MRG_ENTRY entry = {
-            .section = (Word_t)ctx,
-            .first_time_s = first_time_s,
-            .last_time_s = last_time_s,
-            .latest_update_every_s = update_every_s
-    };
-    uuid_copy(entry.uuid, *uuid);
-
-    bool added;
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    bool added = false;
+    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
+    if (!metric) {
+        MRG_ENTRY entry = {
+                .section = (Word_t) ctx,
+                .first_time_s = first_time_s,
+                .last_time_s = last_time_s,
+                .latest_update_every_s = update_every_s
+        };
+        uuid_copy(entry.uuid, *uuid);
+        metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    }
 
     if (likely(!added))
         mrg_metric_expand_retention(main_mrg, metric, first_time_s, last_time_s, update_every_s);
@@ -70,7 +72,7 @@ static void wal_flush_transaction_buffer_cb(uv_fs_t* req)
     uv_fs_req_cleanup(req);
     wal_release(wal);
 
-    __atomic_sub_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -100,7 +102,7 @@ void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengi
                       journalfile->pos, wal_flush_transaction_buffer_cb);
     fatal_assert(-1 != ret);
     journalfile->pos += wal->buf_size;
-    ctx->disk_space += wal->buf_size;
+    ctx_current_disk_space_increase(ctx, wal->buf_size);
     ctx->stats.io_write_bytes += wal->buf_size;
     ++ctx->stats.io_write_requests;
 }
@@ -108,13 +110,13 @@ void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengi
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
@@ -213,10 +215,10 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
     return unmounted;
 }
 
-void journalfile_v2_data_unmount_cleanup(time_t now_s, int storage_tiers) {
+void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < (size_t)storage_tiers ;tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
         if(!ctx) continue;
 
@@ -907,6 +909,46 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
     return 0;
 }
 
+void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile) {
+    usec_t started_ut = now_monotonic_usec();
+
+    size_t data_size = 0;
+    struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, &data_size, 0, 0);
+    if(!j2_header)
+        return;
+
+    uint8_t *data_start = (uint8_t *)j2_header;
+    uint32_t entries = j2_header->metric_count;
+
+    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
+    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
+    time_t now_s = now_realtime_sec();
+    for (size_t i=0; i < entries; i++) {
+        time_t start_time_s = header_start_time_s + metric->delta_start_s;
+        time_t end_time_s = header_start_time_s + metric->delta_end_s;
+        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
+        update_metric_retention_and_granularity_by_uuid(
+                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
+        fatal_assert(metric->entries == metric_list_header->entries);
+#endif
+        metric++;
+    }
+
+    journalfile_v2_data_release(journalfile);
+    usec_t ended_ut = now_monotonic_usec();
+
+    info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
+        , ctx->config.tier, journalfile->datafile->fileno
+        , (double)data_size / 1024 / 1024
+        , (double)entries / 1000
+        , ((double)(ended_ut - started_ut) / USEC_PER_MS)
+        );
+}
+
 int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile)
 {
     int ret, fd;
@@ -983,38 +1025,15 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    madvise_dontfork(data_start, journal_v2_file_size);
-    madvise_dontdump(data_start, journal_v2_file_size);
-
-    usec_t mrg_start_ut = now_monotonic_usec();
-    struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
-    time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-    time_t now_s = now_realtime_sec();
-    for (size_t i=0; i < entries; i++) {
-        time_t start_time_s = header_start_time_s + metric->delta_start_s;
-        time_t end_time_s = header_start_time_s + metric->delta_end_s;
-        time_t update_every_s = (metric->entries > 1) ? ((end_time_s - start_time_s) / (entries - 1)) : 0;
-        update_metric_retention_and_granularity_by_uuid(
-                ctx, &metric->uuid, start_time_s, end_time_s, update_every_s, now_s);
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
-        fatal_assert(uuid_compare(metric_list_header->uuid, metric->uuid) == 0);
-        fatal_assert(metric->entries == metric_list_header->entries);
-#endif
-        metric++;
-    }
-
     usec_t finished_ut = now_monotonic_usec();
 
     info("DBENGINE: journal v2 '%s' loaded, size: %0.2f MiB, metrics: %0.2f k, "
-         "mmap: %0.2f ms, validate: %0.2f ms, populate: %0.2f ms"
+         "mmap: %0.2f ms, validate: %0.2f ms"
          , path_v2
          , (double)journal_v2_file_size / 1024 / 1024
          , (double)entries / 1000
          , ((double)(validation_start_ut - mmap_start_ut) / USEC_PER_MS)
-         , ((double)(mrg_start_ut - validation_start_ut) / USEC_PER_MS)
-         , ((double)(finished_ut - mrg_start_ut) / USEC_PER_MS)
+         , ((double)(finished_ut - validation_start_ut) / USEC_PER_MS)
          );
 
     // Initialize the journal file to be able to access the data
@@ -1350,7 +1369,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
         internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
-        ctx->disk_space += total_file_size;
+        ctx_current_disk_space_increase(ctx, total_file_size);
         freez(uuid_list);
         return;
     }
@@ -1370,13 +1389,13 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     int ret = truncate(path, (long) resize_file_to);
     if (ret < 0) {
-        ctx->disk_space += total_file_size;
+        ctx_current_disk_space_increase(ctx, total_file_size);
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         error("DBENGINE: failed to resize file '%s'", path);
     }
     else
-        ctx->disk_space += sizeof(struct journal_v2_header);
+        ctx_current_disk_space_increase(ctx, sizeof(struct journal_v2_header));
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
@@ -1389,7 +1408,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     char path[RRDENG_PATH_MAX];
 
     // Do not try to load the latest file (always rebuild and live migrate)
-    if (datafile->fileno != ctx->last_fileno) {
+    if (datafile->fileno != ctx_last_fileno_get(ctx)) {
         if (!journalfile_v2_load(ctx, journalfile, datafile)) {
 //            unmap_journal_file(journalfile);
             return 0;
@@ -1422,28 +1441,28 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     journalfile->file = file;
     journalfile->pos = file_size;
 
-    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx->last_fileno), NULL);
+    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx_last_fileno_get(ctx)), NULL);
     info("DBENGINE: loading journal file '%s' using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
-    ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
+    __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
     info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
     if (likely(journalfile->data))
         netdata_munmap(journalfile->data, file_size);
 
-    bool is_last_file = (ctx->last_fileno == journalfile->datafile->fileno);
+    bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
-        ctx->create_new_datafile_pair = false;
+        ctx->loading.create_new_datafile_pair = false;
         return 0;
     }
 
-    pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type,
+    pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                  journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
 
     if (is_last_file)
-        ctx->create_new_datafile_pair = true;
+        ctx->loading.create_new_datafile_pair = true;
 
     return 0;
 
@@ -1457,9 +1476,4 @@ error:
     }
     uv_fs_req_cleanup(&req);
     return error;
-}
-
-void init_commit_log(struct rrdengine_instance *ctx)
-{
-    ctx->commit_log.transaction_id = 1;
 }

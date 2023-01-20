@@ -227,7 +227,7 @@ static bool page_has_only_empty_metrics(struct rrdeng_collect_handle *handle) {
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->page_type);
+                error("DBENGINE: cannot check page for nulls on unknown page type id %d", (mrg_metric_ctx(handle->metric))->config.page_type);
                 logged = true;
             }
             return false;
@@ -283,19 +283,19 @@ time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
                        "DBENGINE CACHE: requested to add a hot page to the main cache, "
                        "but the page returned is not hot");
 
-        if(unlikely(pgc_page_data_size(main_cache, page) < PAGE_POINT_CTX_SIZE_BYTES(ctx)))
+        if(unlikely(pgc_page_data_size(main_cache, page) < CTX_POINT_SIZE_BYTES(ctx)))
             fatal("DBENGINE: hot page returned from main cache does not have the size for storing 1 point");
 
         // copy the point in data
-        memcpy(pgc_page_data(page), data, PAGE_POINT_CTX_SIZE_BYTES(ctx));
+        memcpy(pgc_page_data(page), data, CTX_POINT_SIZE_BYTES(ctx));
 
         // free data
         dbengine_page_free(page_entry.data, data_size);
 
-        handle->page_entries_max = pgc_page_data_size(main_cache, page) / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        handle->page_entries_max = pgc_page_data_size(main_cache, page) / CTX_POINT_SIZE_BYTES(ctx);
     }
     else
-        handle->page_entries_max = data_size / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
 
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
@@ -308,13 +308,13 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
 
     if(handle->options & RRDENG_FIRST_PAGE_ALLOCATED) {
         // any page except the first
-        size = tier_page_size[ctx->tier];
+        size = tier_page_size[ctx->config.tier];
     }
     else {
         // the first page
         handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
-        size_t max_size = tier_page_size[ctx->tier];
-        size_t max_slots = max_size / PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        size_t max_size = tier_page_size[ctx->config.tier];
+        size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
         size_t min_slots = max_slots / 5;
         size_t distribution = max_slots - min_slots;
         size_t this_page_end_slot = indexing_partition((Word_t)handle->alignment, distribution);
@@ -334,7 +334,7 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
         if(final_slots < min_slots)
             final_slots = min_slots;
 
-        size = final_slots * PAGE_POINT_CTX_SIZE_BYTES(ctx);
+        size = final_slots * CTX_POINT_SIZE_BYTES(ctx);
     }
 
     *data_size = size;
@@ -385,7 +385,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
     else
         data = rrdeng_alloc_new_metric_data(handle, &data_size);
 
-    switch (ctx->page_type) {
+    switch (ctx->config.page_type) {
         case PAGE_METRICS: {
             storage_number *tier0_metric_data = data;
             tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
@@ -407,7 +407,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: cannot store metric on unknown page type id %d", ctx->page_type);
+                error("DBENGINE: cannot store metric on unknown page type id %d", ctx->config.page_type);
                 logged = true;
             }
         }
@@ -580,9 +580,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
-    if(unlikely(priority == STORAGE_PRIORITY_CRITICAL))
-        // critical is reserved for dbengine internal use
+    if(unlikely(priority < STORAGE_PRIORITY_HIGH))
         priority = STORAGE_PRIORITY_HIGH;
+    else if(unlikely(priority > STORAGE_PRIORITY_BEST_EFFORT))
+        priority = STORAGE_PRIORITY_BEST_EFFORT;
 
     handle->ctx = ctx;
     handle->metric = metric;
@@ -678,7 +679,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
     sp.start_time_s = handle->now_s - handle->dt_s;
     sp.end_time_s = handle->now_s;
 
-    switch(handle->ctx->page_type) {
+    switch(handle->ctx->config.page_type) {
         case PAGE_METRICS: {
             storage_number n = handle->metric_data[handle->position];
             sp.min = sp.max = sp.sum = unpack_storage_number(n);
@@ -703,7 +704,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         default: {
             static bool logged = false;
             if(!logged) {
-                error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->page_type);
+                error("DBENGINE: unknown page type %d found. Cannot decode it. Ignoring its metrics.", handle->ctx->config.page_type);
                 logged = true;
             }
             storage_point_empty(sp, sp.start_time_s, sp.end_time_s);
@@ -850,13 +851,79 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     fatal_assert(RRDENG_NR_STATS == 38);
 }
 
+static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    size_t datafiles = 0;
+    for(struct rrdengine_datafile *df = ctx->datafiles.first; df ;df = df->next)
+        datafiles++;
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    size_t cpus = get_system_cpus() / 2;
+    if(cpus > datafiles)
+        cpus = datafiles;
+
+    if(cpus < 2)
+        cpus = 2;
+
+    if(cpus > (size_t)libuv_worker_threads)
+        cpus = (size_t)libuv_worker_threads;
+
+    if(cpus > MRG_PARTITIONS)
+        cpus = MRG_PARTITIONS;
+
+    info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->config.tier, cpus);
+
+    if(datafiles > 2) {
+        struct rrdengine_datafile *datafile;
+
+        datafile = ctx->datafiles.first->prev;
+        if(!(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE))
+            datafile = datafile->prev;
+
+        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            datafile->populate_mrg.populated = true;
+        }
+
+        datafile = ctx->datafiles.first;
+        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            datafile->populate_mrg.populated = true;
+        }
+    }
+
+    ctx->loading.populate_mrg.size = cpus;
+    ctx->loading.populate_mrg.array = callocz(ctx->loading.populate_mrg.size, sizeof(struct completion));
+
+    for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
+        completion_init(&ctx->loading.populate_mrg.array[i]);
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_POPULATE_MRG, NULL, &ctx->loading.populate_mrg.array[i],
+                       STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    }
+}
+
+void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
+    for (size_t i = 0; i < ctx->loading.populate_mrg.size; i++) {
+        completion_wait_for(&ctx->loading.populate_mrg.array[i]);
+        completion_destroy(&ctx->loading.populate_mrg.array[i]);
+    }
+
+    freez(ctx->loading.populate_mrg.array);
+    ctx->loading.populate_mrg.array = NULL;
+    ctx->loading.populate_mrg.size = 0;
+
+    info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
+}
+
+void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
+    __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
+}
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
                 unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
-    int error;
     uint32_t max_open_files;
 
     max_open_files = rlimit_nofile.rlim_cur / 4;
@@ -881,33 +948,27 @@ int rrdeng_init(RRDHOST *host, struct rrdengine_instance **ctxp, char *dbfiles_p
     else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
     }
-    ctx->tier = tier;
-    ctx->page_type = tier_page_type[tier];
-    ctx->global_compress_alg = RRD_LZ4;
+    ctx->config.tier = (int)tier;
+    ctx->config.page_type = tier_page_type[tier];
+    ctx->config.global_compress_alg = RRD_LZ4;
     if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
         page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
-    ctx->max_disk_space = disk_space_mb * 1048576LLU;
-    strncpyz(ctx->dbfiles_path, dbfiles_path, sizeof(ctx->dbfiles_path) - 1);
-    ctx->dbfiles_path[sizeof(ctx->dbfiles_path) - 1] = '\0';
-    if (NULL == host)
-        strncpyz(ctx->machine_guid, registry_get_this_machine_guid(), GUID_LEN);
-    else
-        strncpyz(ctx->machine_guid, host->machine_guid, GUID_LEN);
+    ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
+    strncpyz(ctx->config.dbfiles_path, dbfiles_path, sizeof(ctx->config.dbfiles_path) - 1);
+    ctx->config.dbfiles_path[sizeof(ctx->config.dbfiles_path) - 1] = '\0';
 
-    ctx->quiesce = NO_QUIESCE;
-    ctx->host = host;
+    ctx->atomic.transaction_id = 1;
+    ctx->quiesce.enabled = false;
 
-    memset(&ctx->worker_config, 0, sizeof(ctx->worker_config));
     init_page_cache();
-    init_commit_log(ctx);
-    error = init_rrd_files(ctx);
-    if (!error) {
-
-        if(rrdeng_dbengine_spawn(ctx))
+    if (!init_rrd_files(ctx)) {
+        if(rrdeng_dbengine_spawn(ctx)) {
             // success - we run this ctx too
+            rrdeng_populate_mrg(ctx);
             return 0;
+        }
 
         finalize_rrd_files(ctx);
     }
@@ -957,8 +1018,8 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
 
-    completion_init(&ctx->quiesce_completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    completion_init(&ctx->quiesce.completion);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)
@@ -992,7 +1053,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
 
             time_t update_every_s;
 
-            size_t points = descr->page_length / PAGE_POINT_CTX_SIZE_BYTES(datafile->ctx);
+            size_t points = descr->page_length / CTX_POINT_SIZE_BYTES(datafile->ctx);
 
             time_t start_time_s = journal_start_time_s + descr->delta_start_s;
             time_t end_time_s = journal_start_time_s + descr->delta_end_s;
@@ -1000,7 +1061,7 @@ static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_S
             if(likely(points > 1))
                 update_every_s = (time_t) ((end_time_s - start_time_s) / (points - 1));
             else {
-                update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->tier));
+                update_every_s = (time_t) (default_rrd_update_every * get_tier_grouping(datafile->ctx->config.tier));
                 stats->single_point_pages++;
             }
 
@@ -1045,8 +1106,8 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
                    "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",
                    stats.metrics_pages, stats.extents_pages, stats.currently_collected_metrics);
 
-    stats.disk_space = ctx->disk_space;
-    stats.max_disk_space = ctx->max_disk_space;
+    stats.disk_space = ctx_current_disk_space_get(ctx);
+    stats.max_disk_space = ctx->config.max_disk_space;
 
     stats.database_retention_secs = (time_t)(stats.last_time_s - stats.first_time_s);
 
@@ -1075,14 +1136,14 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
 //    stats.sizeof_metric = 0;
     stats.sizeof_datafile = struct_natural_alignment(sizeof(struct rrdengine_datafile)) + struct_natural_alignment(sizeof(struct rrdengine_journalfile));
     stats.sizeof_page_in_cache = 0; // struct_natural_alignment(sizeof(struct page_cache_descr));
-    stats.sizeof_point_data = page_type_size[ctx->page_type];
-    stats.sizeof_page_data = tier_page_size[ctx->tier];
+    stats.sizeof_point_data = page_type_size[ctx->config.page_type];
+    stats.sizeof_page_data = tier_page_size[ctx->config.tier];
     stats.pages_per_extent = rrdeng_pages_per_extent;
 
 //    stats.sizeof_metric_in_index = 40;
 //    stats.sizeof_page_in_index = 24;
 
-    stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->tier);
+    stats.default_granularity_secs = (size_t)default_rrd_update_every * get_tier_grouping(ctx->config.tier);
 
     return stats;
 }

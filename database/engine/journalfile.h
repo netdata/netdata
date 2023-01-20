@@ -121,13 +121,6 @@ struct journal_v2_header {
 
 #define JOURNAL_V2_HEADER_PADDING_SZ (RRDENG_BLOCK_SIZE - (sizeof(struct journal_v2_header)))
 
-
-
-/* only one event loop is supported for now */
-struct transaction_commit_log {
-    uint64_t transaction_id;
-};
-
 struct wal;
 
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
@@ -140,7 +133,7 @@ int journalfile_destroy_unsafe(struct rrdengine_journalfile *journalfile, struct
 int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengine_datafile *datafile);
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
                      struct rrdengine_datafile *datafile);
-void init_commit_log(struct rrdengine_instance *ctx);
+void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile);
 
 void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno __maybe_unused, uint8_t type __maybe_unused,
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
@@ -152,6 +145,6 @@ size_t journalfile_v2_data_size_get(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_set(struct rrdengine_journalfile *journalfile, int fd, void *journal_data, uint32_t journal_data_size);
 struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfile *journalfile, size_t *data_size, time_t wanted_first_time_s, time_t wanted_last_time_s);
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
-void journalfile_v2_data_unmount_cleanup(time_t now_s, int storage_tiers);
+void journalfile_v2_data_unmount_cleanup(time_t now_s);
 
 #endif /* NETDATA_JOURNALFILE_H */

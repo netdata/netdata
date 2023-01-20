@@ -18,14 +18,14 @@ static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused,
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
 
     // mark ctx as having flushing in progress
-    __atomic_add_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
 }
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
 
-    size_t bytes_per_point =  PAGE_POINT_CTX_SIZE_BYTES(ctx);
+    size_t bytes_per_point =  CTX_POINT_SIZE_BYTES(ctx);
 
     struct page_descr_with_data *base = NULL;
 
@@ -39,7 +39,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         descr->start_time_ut = start_time_s * USEC_PER_SEC;
         descr->end_time_ut = end_time_s * USEC_PER_SEC;
         descr->update_every_s = entries_array[Index].update_every_s;
-        descr->type = ctx->page_type;
+        descr->type = ctx->config.page_type;
 
         descr->page_length = (end_time_s - (start_time_s - descr->update_every_s)) / descr->update_every_s * bytes_per_point;
 
@@ -58,7 +58,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }
@@ -760,7 +760,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
     if (unlikely(!handle || !handle->metric))
         return;
 
-    __atomic_add_fetch(&handle->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&handle->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
     handle->pdc = pdc_get();
     handle->pdc->metric = mrg_metric_dup(main_mrg, handle->metric);
@@ -873,7 +873,7 @@ struct pgc_page *pg_cache_lookup_next(
                 pd->update_every_s = page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
             }
 
-            size_t entries_by_size = page_entries_by_size(page_length, PAGE_POINT_CTX_SIZE_BYTES(ctx));
+            size_t entries_by_size = page_entries_by_size(page_length, CTX_POINT_SIZE_BYTES(ctx));
             size_t entries_by_time = page_entries_by_time(page_start_time_s, page_end_time_s, page_update_every_s);
             if(unlikely(entries_by_size < entries_by_time)) {
                 time_t fixed_page_end_time_s = (time_t)(page_start_time_s + (entries_by_size - 1) * page_update_every_s);
