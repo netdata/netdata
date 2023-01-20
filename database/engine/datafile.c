@@ -480,7 +480,6 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     matched_files -= failed_to_load;
     freez(datafiles);
 
-    journalfile_tmp_loading_commit(ctx);
     return matched_files;
 }
 
