@@ -870,6 +870,25 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
 
     info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->tier, cpus);
 
+    if(datafiles > 2) {
+        struct rrdengine_datafile *datafile;
+
+        datafile = ctx->datafiles.first->prev;
+        if(!(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE))
+            datafile = datafile->prev;
+
+        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            datafile->populate_mrg.populated = true;
+        }
+
+        datafile = ctx->datafiles.first;
+        if(datafile->journalfile->v2.flags & JOURNALFILE_FLAG_IS_AVAILABLE) {
+            journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+            datafile->populate_mrg.populated = true;
+        }
+    }
+
     struct completion cs[cpus];
 
     for (size_t i = 0; i < cpus; i++) {
