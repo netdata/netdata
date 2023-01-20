@@ -591,6 +591,32 @@ int killpid(pid_t pid) {
     return ret;
 }
 
+static void set_nofile_limit(struct rlimit *rl) {
+    // get the num files allowed
+    if(getrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("getrlimit(RLIMIT_NOFILE) failed");
+        return;
+    }
+
+    info("resources control: allowed file descriptors: soft = %zu, max = %zu",
+         (size_t) rl->rlim_cur, (size_t) rl->rlim_max);
+
+    // make the soft/hard limits equal
+    rl->rlim_cur = rl->rlim_max;
+    if (setrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("setrlimit(RLIMIT_NOFILE, { %llu, %llu }) failed", rl->rlim_cur, rl->rlim_max);
+    }
+
+    // sanity check to make sure we have enough file descriptors available to open
+    if (getrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("getrlimit(RLIMIT_NOFILE) failed");
+        return;
+    }
+
+    if (rl->rlim_cur < 1024)
+        error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t) rl->rlim_cur);
+}
+
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
@@ -1883,12 +1909,7 @@ int main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-    // get the max file limit
-    if(getrlimit(RLIMIT_NOFILE, &rlimit_nofile) != 0)
-        error("getrlimit(RLIMIT_NOFILE) failed");
-    else
-        info("resources control: allowed file descriptors: soft = %zu, max = %zu", (size_t)rlimit_nofile.rlim_cur, (size_t)rlimit_nofile.rlim_max);
-
+    set_nofile_limit(&rlimit_nofile);
 
     delta_startup_time("become daemon");
 
