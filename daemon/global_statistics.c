@@ -2822,7 +2822,7 @@ static void update_dictionary_category_charts(struct dictionary_categories *c) {
     // ------------------------------------------------------------------------
 
     total = 0;
-    load_dictionary_stats_entry(items.entries_per_partition);
+    load_dictionary_stats_entry(items.entries);
     load_dictionary_stats_entry(items.referenced);
     load_dictionary_stats_entry(items.pending_deletion);
 
