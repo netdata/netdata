@@ -566,8 +566,8 @@ static struct {
     struct {
         SPINLOCK spinlock;
         size_t waiting;
-        struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIO_MAX_DONT_USE];
-        size_t executed_by_priority[STORAGE_PRIO_MAX_DONT_USE];
+        struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
+        size_t executed_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
     } queue;
 
 
@@ -605,6 +605,22 @@ static void rrdeng_cmd_cleanup1(void) {
     }
 }
 
+static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng_opcode opcode, STORAGE_PRIORITY priority) {
+    if(unlikely(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE))
+        priority = STORAGE_PRIORITY_BEST_EFFORT;
+
+    switch(opcode) {
+        case RRDENG_OPCODE_PREP_QUERY:
+            priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
+            break;
+
+        default:
+            break;
+    }
+
+    return priority;
+}
+
 void rrdeng_enqueue_epdl_cmd(struct rrdeng_cmd *cmd) {
     epdl_cmd_queued(cmd->data, cmd);
 }
@@ -617,10 +633,14 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
     netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
 
     struct rrdeng_cmd *cmd = get_cmd_cb(data);
-    if(cmd && cmd->priority > priority) {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
-        cmd->priority = priority;
+    if(cmd) {
+        priority = rrdeng_enq_cmd_map_opcode_to_priority(cmd->opcode, priority);
+
+        if (cmd->priority > priority) {
+            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            cmd->priority = priority;
+        }
     }
 
     netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
@@ -630,8 +650,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
                enum storage_priority priority, enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb) {
     struct rrdeng_cmd *cmd = NULL;
 
-    if(unlikely(priority >= STORAGE_PRIO_MAX_DONT_USE))
-        priority = STORAGE_PRIORITY_NORMAL;
+    priority = rrdeng_enq_cmd_map_opcode_to_priority(opcode, priority);
 
     netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
     if(likely(rrdeng_cmd_globals.cache.available_items)) {
@@ -675,16 +694,16 @@ static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PR
 static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     struct rrdeng_cmd *cmd = NULL;
 
-    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_CRITICAL : STORAGE_PRIORITY_BEST_EFFORT;
+    STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_BEST_EFFORT;
 
     // find an opcode to execute from the queue
     netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
-    for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_CRITICAL; priority <= max_priority ; priority++) {
+    for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_INTERNAL_DBENGINE; priority <= max_priority ; priority++) {
         cmd = rrdeng_cmd_globals.queue.waiting_items_by_priority[priority];
         if(cmd) {
 
             // avoid starvation of lower priorities
-            if(unlikely(priority > STORAGE_PRIORITY_CRITICAL &&
+            if(unlikely(priority >= STORAGE_PRIORITY_HIGH &&
                         priority < STORAGE_PRIORITY_BEST_EFFORT &&
                         ++rrdeng_cmd_globals.queue.executed_by_priority[priority] % 50 == 0 &&
                         rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority))) {
@@ -793,7 +812,7 @@ static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_
         completion_mark_complete(completion);
 
     if(ctx_is_available_for_queries(ctx))
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
@@ -839,7 +858,7 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
 
     if(datafile->fileno != __atomic_load_n(&ctx->last_fileno, __ATOMIC_RELAXED) && still_running)
         // we just finished a flushing on a datafile that is not the active one
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 // Main event loop callback
@@ -856,7 +875,7 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
 
     datafile->writers.flushed_to_open_running++;
     rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, xt_io_descr->completion,
-                   STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+                   STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 
@@ -974,7 +993,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
         static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
         netdata_spinlock_lock(&sp);
         if(create_new_datafile_pair(ctx) == 0)
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL, NULL,
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
                            NULL);
         netdata_spinlock_unlock(&sp);
 
@@ -1261,7 +1280,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
 
     if (rrdeng_ctx_exceeded_disk_quota(ctx))
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     rrdcontext_db_rotation();
 }
@@ -1436,7 +1455,7 @@ static void after_extent_read(struct rrdengine_instance *ctx __maybe_unused, voi
 
 static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ctx->worker_config.migration_to_v2_running = false;
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
@@ -1467,8 +1486,8 @@ void timer_cb(uv_timer_t* handle) {
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
 
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     rrdeng_cmd_cleanup1();
     work_request_cleanup1();

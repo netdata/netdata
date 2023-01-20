@@ -580,9 +580,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct sto
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
-    if(unlikely(priority == STORAGE_PRIORITY_CRITICAL))
-        // critical is reserved for dbengine internal use
+    if(unlikely(priority < STORAGE_PRIORITY_HIGH))
         priority = STORAGE_PRIORITY_HIGH;
+    else if(unlikely(priority > STORAGE_PRIORITY_BEST_EFFORT))
+        priority = STORAGE_PRIORITY_BEST_EFFORT;
 
     handle->ctx = ctx;
     handle->metric = metric;
@@ -958,7 +959,7 @@ void rrdeng_prepare_exit(struct rrdengine_instance *ctx) {
     // 1. make sure all collectors are stopped
 
     completion_init(&ctx->quiesce_completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_QUIESCE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
 static void populate_v2_statistics(struct rrdengine_datafile *datafile, RRDENG_SIZE_STATS *stats)

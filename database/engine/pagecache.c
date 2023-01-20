@@ -58,7 +58,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }

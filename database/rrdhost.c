@@ -875,7 +875,7 @@ void dbengine_init(char *hostname) {
         }
         else {
             if (rrdeng_ctx_exceeded_disk_quota(multidb_ctx[created_tiers]))
-                rrdeng_enq_cmd( multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_CRITICAL, NULL, NULL);
+                rrdeng_enq_cmd(multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
             created_tiers++;
         }
     }

@@ -45,13 +45,16 @@ typedef enum __attribute__ ((__packed__)) {
 } QUERY_SOURCE;
 
 typedef enum __attribute__ ((__packed__)) storage_priority {
-    STORAGE_PRIORITY_CRITICAL = 0,
+    STORAGE_PRIORITY_INTERNAL_DBENGINE = 0,
+    STORAGE_PRIORITY_INTERNAL_QUERY_PREP,
+
+    // query priorities
     STORAGE_PRIORITY_HIGH,
     STORAGE_PRIORITY_NORMAL,
     STORAGE_PRIORITY_LOW,
     STORAGE_PRIORITY_BEST_EFFORT,
 
-    STORAGE_PRIO_MAX_DONT_USE,
+    STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE,
 } STORAGE_PRIORITY;
 
 // forward declarations
