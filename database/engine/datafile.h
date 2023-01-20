@@ -75,11 +75,6 @@ bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS re
 void datafile_release(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
-struct rrdengine_datafile_list {
-    uv_rwlock_t rwlock;
-    struct rrdengine_datafile *first; /* oldest - the newest with ->first->prev */
-};
-
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);

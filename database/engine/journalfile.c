@@ -72,7 +72,7 @@ static void wal_flush_transaction_buffer_cb(uv_fs_t* req)
     uv_fs_req_cleanup(req);
     wal_release(wal);
 
-    __atomic_sub_fetch(&ctx->worker_config.atomics.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -102,7 +102,7 @@ void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengi
                       journalfile->pos, wal_flush_transaction_buffer_cb);
     fatal_assert(-1 != ret);
     journalfile->pos += wal->buf_size;
-    ctx->disk_space += wal->buf_size;
+    ctx_current_disk_space_increase(ctx, wal->buf_size);
     ctx->stats.io_write_bytes += wal->buf_size;
     ++ctx->stats.io_write_requests;
 }
@@ -110,13 +110,13 @@ void wal_flush_transaction_buffer(struct rrdengine_instance *ctx, struct rrdengi
 void journalfile_v2_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION_V2,
-                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 void journalfile_v1_generate_path(struct rrdengine_datafile *datafile, char *str, size_t maxlen)
 {
     (void) snprintfz(str, maxlen, "%s/" WALFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL WALFILE_EXTENSION,
-                    datafile->ctx->dbfiles_path, datafile->tier, datafile->fileno);
+                    datafile->ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 }
 
 static struct journal_v2_header *journalfile_v2_mounted_data_get(struct rrdengine_journalfile *journalfile, size_t *data_size) {
@@ -215,10 +215,10 @@ static bool journalfile_v2_mounted_data_unmount(struct rrdengine_journalfile *jo
     return unmounted;
 }
 
-void journalfile_v2_data_unmount_cleanup(time_t now_s, int storage_tiers) {
+void journalfile_v2_data_unmount_cleanup(time_t now_s) {
     // DO NOT WAIT ON ANY LOCK!!!
 
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+    for(size_t tier = 0; tier < (size_t)storage_tiers ;tier++) {
         struct rrdengine_instance *ctx = multidb_ctx[tier];
         if(!ctx) continue;
 
@@ -942,7 +942,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     usec_t ended_ut = now_monotonic_usec();
 
     info("DBENGINE: journal v2 of tier %d, datafile %u populated, size: %0.2f MiB, metrics: %0.2f k, %0.2f ms"
-        , ctx->tier, journalfile->datafile->fileno
+        , ctx->config.tier, journalfile->datafile->fileno
         , (double)data_size / 1024 / 1024
         , (double)entries / 1000
         , ((double)(ended_ut - started_ut) / USEC_PER_MS)
@@ -1369,7 +1369,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
         internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
-        ctx->disk_space += total_file_size;
+        ctx_current_disk_space_increase(ctx, total_file_size);
         freez(uuid_list);
         return;
     }
@@ -1389,13 +1389,13 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
 
     int ret = truncate(path, (long) resize_file_to);
     if (ret < 0) {
-        ctx->disk_space += total_file_size;
+        ctx_current_disk_space_increase(ctx, total_file_size);
         ++ctx->stats.fs_errors;
         rrd_stat_atomic_add(&global_fs_errors, 1);
         error("DBENGINE: failed to resize file '%s'", path);
     }
     else
-        ctx->disk_space += sizeof(struct journal_v2_header);
+        ctx_current_disk_space_increase(ctx, sizeof(struct journal_v2_header));
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
@@ -1408,7 +1408,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     char path[RRDENG_PATH_MAX];
 
     // Do not try to load the latest file (always rebuild and live migrate)
-    if (datafile->fileno != ctx->last_fileno) {
+    if (datafile->fileno != ctx_last_fileno_get(ctx)) {
         if (!journalfile_v2_load(ctx, journalfile, datafile)) {
 //            unmap_journal_file(journalfile);
             return 0;
@@ -1441,28 +1441,28 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     journalfile->file = file;
     journalfile->pos = file_size;
 
-    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx->last_fileno), NULL);
+    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx_last_fileno_get(ctx)), NULL);
     info("DBENGINE: loading journal file '%s' using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
-    ctx->commit_log.transaction_id = MAX(ctx->commit_log.transaction_id, max_id + 1);
+    __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
     info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
     if (likely(journalfile->data))
         netdata_munmap(journalfile->data, file_size);
 
-    bool is_last_file = (ctx->last_fileno == journalfile->datafile->fileno);
+    bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
-        ctx->create_new_datafile_pair = false;
+        ctx->loading.create_new_datafile_pair = false;
         return 0;
     }
 
-    pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->page_type,
+    pgc_open_cache_to_journal_v2(open_cache, (Word_t) ctx, (int) datafile->fileno, ctx->config.page_type,
                                  journalfile_migrate_to_v2_callback, (void *) datafile->journalfile);
 
     if (is_last_file)
-        ctx->create_new_datafile_pair = true;
+        ctx->loading.create_new_datafile_pair = true;
 
     return 0;
 
@@ -1476,9 +1476,4 @@ error:
     }
     uv_fs_req_cleanup(&req);
     return error;
-}
-
-void init_commit_log(struct rrdengine_instance *ctx)
-{
-    ctx->commit_log.transaction_id = 1;
 }

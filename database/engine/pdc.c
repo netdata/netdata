@@ -585,7 +585,7 @@ static void pdc_destroy(PDC *pdc) {
     PDCJudyLFreeArray(&pdc->page_list_JudyL, PJE0);
 
     __atomic_sub_fetch(&rrdeng_cache_efficiency_stats.currently_running_queries, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&pdc->ctx->inflight_queries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&pdc->ctx->atomic.inflight_queries, 1, __ATOMIC_RELAXED);
     pdc_release(pdc);
 
     if(unroutable)
