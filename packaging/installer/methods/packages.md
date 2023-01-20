@@ -39,7 +39,44 @@ For example, for stable release packages for RHEL 9 on 64-bit x86, the full URL 
 https://repo.netdata.cloud/repos/stable/el/9/x86\_64/
 
 Our RPM packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
-current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`
+current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
+`https://repo.netdata.cloud/netdatabot.gpg.key`.
+
+If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
+appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
+directly on the target system using the system package manager. This will ensure any packages needed to use the
+repository are also installed, and will help enable a seamless transition if we ever need to change our infrastructure.
+
+## Manual setup of DEB packages.
+
+Netdata’s official DEB repositories are hosted at https://repo.netdata.cloud/repos. We provide four groups of
+repositories at that top level:
+
+- `stable`: Contains packages for stable releases of the Netdata Agent.
+- `edge`: Contains packages for nightly builds of the Netdata Agent.
+- `repoconfig`: Provides packages that set up configuration files for using the other repositories.
+- `devel`: Is used for one-off development builds of the Netdata Agent, and can simply be ignored by users.
+
+Within each top level group of repositories, there are directories for each supported group of distributions:
+
+- `debian`: Is for Debian Linux and binary compatible distros.
+- `ubuntu`: Is for Ubuntu Linux and binary compatible distros.
+
+Under each of these directories is a directory for each supported release, corresponding to the release codename.
+
+These repositories are set up as what Debian calls ‘flat repositories’, and are available via both HTTP and HTTPS.
+
+As a result of this structure, the required APT sources entry for stable packages for Debian 11 (Bullseye) is:
+
+```
+deb http://repo.netdata.cloud/repos/stable/debian/ bullseye/
+```
+
+Note the `/` at the end of the codename, this is required for the repository to be processed correctly.
+
+Our DEB packages and repository metadata are signed using a GPG key with a user name of ‘Netdatabot’. The
+current key fingerprint is `6588FDD7B14721FE7C3115E6F9177B5265F56346`. The associated public key can be fetched from
+`https://repo.netdata.cloud/netdatabot.gpg.key`.
 
 If you are explicitly configuring a system to use our repositories, the recommended setup is to download the
 appropriate repository configuration package from https://repo.netdata.cloud/repos/repoconfig and install it
