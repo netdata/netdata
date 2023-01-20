@@ -1298,6 +1298,42 @@ static void flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_
     completion_mark_complete(&ctx->quiesce_completion);
 }
 
+static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    ;
+}
+
+static void populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    do {
+        struct rrdengine_datafile *datafile = NULL;
+
+        // find a datafile to work
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+        for(datafile = ctx->datafiles.first; datafile ; datafile = datafile->next) {
+            if(!netdata_spinlock_trylock(&datafile->populate_mrg.spinlock))
+                continue;
+
+            if(datafile->populate_mrg.populated) {
+                netdata_spinlock_unlock(&datafile->populate_mrg.spinlock);
+                continue;
+            }
+
+            // we have the spinlock and it is not populated
+            break;
+        }
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        if(!datafile)
+            break;
+
+        journalfile_v2_populate_retention_to_mrg(ctx, datafile->journalfile);
+        datafile->populate_mrg.populated = true;
+        netdata_spinlock_unlock(&datafile->populate_mrg.spinlock);
+
+    } while(1);
+
+    completion_mark_complete(completion);
+}
+
 static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
 }
@@ -1708,6 +1744,13 @@ void dbengine_event_loop(void* arg) {
                             ctx->worker_config.now_deleting_files = false;
 
                     }
+                    break;
+                }
+
+                case RRDENG_OPCODE_CTX_POPULATE_MRG: {
+                    struct rrdengine_instance *ctx = cmd.ctx;
+                    struct completion *completion = cmd.completion;
+                    work_dispatch(ctx, NULL, completion, opcode, populate_mrg_tp_worker, after_populate_mrg);
                     break;
                 }
 
