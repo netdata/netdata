@@ -604,7 +604,7 @@ static void set_nofile_limit(struct rlimit *rl) {
     // make the soft/hard limits equal
     rl->rlim_cur = rl->rlim_max;
     if (setrlimit(RLIMIT_NOFILE, rl) != 0) {
-        error("setrlimit(RLIMIT_NOFILE, { %llu, %llu }) failed", rl->rlim_cur, rl->rlim_max);
+        error("setrlimit(RLIMIT_NOFILE, { %zu, %zu }) failed", (size_t)rl->rlim_cur, (size_t)rl->rlim_max);
     }
 
     // sanity check to make sure we have enough file descriptors available to open
@@ -614,7 +614,7 @@ static void set_nofile_limit(struct rlimit *rl) {
     }
 
     if (rl->rlim_cur < 1024)
-        error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t) rl->rlim_cur);
+        error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
 }
 
 void cancel_main_threads() {
