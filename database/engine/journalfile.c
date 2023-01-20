@@ -4,8 +4,65 @@
 
 // DBENGINE2: Helper
 
+struct jv2_loading_tmp_metric {
+    uuid_t uuid;
+    time_t first_time_s;
+    time_t last_time_s;
+    time_t update_every_s;
+
+    struct jv2_loading_tmp_metric *next;
+};
+
+struct {
+    Pvoid_t JudyHS;
+    struct jv2_loading_tmp_metric *head;
+
+} jv2_loading_tmp_globals = {
+        .JudyHS = NULL,
+        .head = NULL,
+};
+
+void journalfile_tmp_loading_commit(struct rrdengine_instance *ctx) {
+    usec_t started_ut = now_monotonic_usec();
+
+    size_t count = 0;
+    struct jv2_loading_tmp_metric *m;
+
+    while((m = jv2_loading_tmp_globals.head)) {
+        count++;
+
+        MRG_ENTRY entry = {
+                .section = (Word_t)ctx,
+                .first_time_s = m->first_time_s,
+                .last_time_s = m->last_time_s,
+                .latest_update_every_s = m->update_every_s
+        };
+        uuid_copy(entry.uuid, m->uuid);
+
+        bool added;
+        METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+
+        if (likely(!added))
+            mrg_metric_expand_retention(main_mrg, metric, m->first_time_s, m->last_time_s, m->update_every_s);
+
+        mrg_metric_release(main_mrg, metric);
+
+        jv2_loading_tmp_globals.head = m->next;
+        freez(m);
+    }
+
+    JudyHSFreeArray(&jv2_loading_tmp_globals.JudyHS, PJE0);
+    jv2_loading_tmp_globals.JudyHS = NULL;
+    jv2_loading_tmp_globals.head = NULL;
+
+    usec_t ended_ut = now_monotonic_usec();
+
+    info("DBENGINE: committed tier %d retention to MRG, %0.2f k metrics, in %0.2f ms",
+         ctx->tier, (double)count / 1000, (double)(ended_ut - started_ut) / USEC_PER_MS);
+}
+
 static void update_metric_retention_and_granularity_by_uuid(
-        struct rrdengine_instance *ctx, uuid_t *uuid,
+        struct rrdengine_instance *ctx __maybe_unused, uuid_t *uuid,
         time_t first_time_s, time_t last_time_s,
         time_t update_every_s, time_t now_s)
 {
@@ -33,21 +90,31 @@ static void update_metric_retention_and_granularity_by_uuid(
                     first_time_s, last_time_s, now_s);
     }
 
-    MRG_ENTRY entry = {
-            .section = (Word_t)ctx,
-            .first_time_s = first_time_s,
-            .last_time_s = last_time_s,
-            .latest_update_every_s = update_every_s
-    };
-    uuid_copy(entry.uuid, *uuid);
+    Pvoid_t *PValue = JudyHSIns(&jv2_loading_tmp_globals.JudyHS, uuid, sizeof(*uuid), PJE0);
+    struct jv2_loading_tmp_metric *m = *PValue;
+    if(!m) {
+        m = mallocz(sizeof(struct jv2_loading_tmp_metric));
+        uuid_copy(m->uuid, *uuid);
+        m->first_time_s = first_time_s;
+        m->last_time_s = last_time_s;
+        m->update_every_s = update_every_s;
+        m->next = jv2_loading_tmp_globals.head;
+        jv2_loading_tmp_globals.head = m;
+        *PValue = m;
+    }
+    else {
+        if(unlikely(first_time_s && (!m->first_time_s || first_time_s < m->first_time_s)))
+            m->first_time_s = first_time_s;
 
-    bool added;
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+        if(likely(last_time_s && (!m->last_time_s || last_time_s > m->last_time_s))) {
+            m->last_time_s = last_time_s;
 
-    if (likely(!added))
-        mrg_metric_expand_retention(main_mrg, metric, first_time_s, last_time_s, update_every_s);
-
-    mrg_metric_release(main_mrg, metric);
+            if(likely(update_every_s))
+                m->update_every_s = update_every_s;
+        }
+        else if(unlikely(!m->update_every_s && update_every_s))
+            m->update_every_s = update_every_s;
+    }
 }
 
 static void wal_flush_transaction_buffer_cb(uv_fs_t* req)

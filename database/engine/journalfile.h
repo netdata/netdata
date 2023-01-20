@@ -154,4 +154,6 @@ struct journal_v2_header *journalfile_v2_data_acquire(struct rrdengine_journalfi
 void journalfile_v2_data_release(struct rrdengine_journalfile *journalfile);
 void journalfile_v2_data_unmount_cleanup(time_t now_s);
 
+void journalfile_tmp_loading_commit(struct rrdengine_instance *ctx);
+
 #endif /* NETDATA_JOURNALFILE_H */
