@@ -618,7 +618,11 @@ Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
 Requires: netdata-plugin-apps = %{version}
+%if 0%{?centos_ver} != 7
+Recommends: netdata-plugin-ebpf-code >= %{version}
+%else
 Requires: netdata-plugin-ebpf-code >= %{version}
+%endif
 
 %description plugin-ebpf
  This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
@@ -646,6 +650,7 @@ Group: Applications/System
 %package plugin-pythond
 Summary: The python.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
+Requires: netdata = %{version}
 %if 0%{?centos_ver} == 7 || 0%{?centos_ver} == 6
 Requires: python
 %else
@@ -655,11 +660,13 @@ Requires: python38
 Requires: python3
 %endif
 %endif
-Requires: netdata = %{version}
+%if 0%{?centos_ver} != 7
+Suggests: sudo
+%endif
 
 %description plugin-pythond
  This plugin adds a selection of additional collectors written in Python to the Netdata Agent.
-Many of the collectors provided by this package are also available in netdata-plugin-god. In msot cases, you probably
+Many of the collectors provided by this package are also available in netdata-plugin-go. In msot cases, you probably
 want to use those versions instead of the Python versions.
 
 %files plugin-pythond
@@ -674,6 +681,10 @@ want to use those versions instead of the Python versions.
 Summary: The go.d metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
+%if 0%{?centos_ver} != 7
+Suggests: nvme-cli
+Suggests: sudo
+%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent

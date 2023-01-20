@@ -90,11 +90,11 @@ Description: The charts.d metrics collection plugin for the Netdata Agent
  LibreSWAN, OpenSIPS, and Wireless access point statistics.
 
 Package: netdata-plugin-ebpf
-Architecture: i386 amd64
+Architecture: any
 Depends: ${shlibs:Depends},
          netdata-plugin-apps (>= ${source:Version}),
-         netdata-plugin-ebpf-code (>= ${source:Version}),
          netdata (>= ${source:Version})
+Recommends: netdata-plugin-ebpf-code (>= ${source:Version}),
 Description: The eBPF metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to use eBPF code to collect more
  detailed kernel-level metrics for the system.
@@ -109,6 +109,7 @@ Package: netdata-plugin-pythond
 Architecture: all
 Depends: ${shlibs:Depends},
          netdata (>= ${source:Version})
+Suggests: sudo
 Description: The python.d metrics collection plugin for the Netdata Agent
  Many of the collectors provided by this package are also available
  in netdata-plugin-god. In msot cases, you probably want to use those
@@ -119,6 +120,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (>= ${source:Version})
+Suggests: nvme-cli sudo
 Description: The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
  the Netdata Agent A significant percentage of the application specific
