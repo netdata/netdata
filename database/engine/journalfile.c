@@ -17,7 +17,7 @@ static void update_metric_retention_and_granularity_by_uuid(
         last_time_s = now_s;
     }
 
-    if(unlikely(first_time_s > last_time_s)) {
+    if (unlikely(first_time_s > last_time_s)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
                           "fixing first time to last time",
@@ -26,23 +26,25 @@ static void update_metric_retention_and_granularity_by_uuid(
         first_time_s = last_time_s;
     }
 
-    if(unlikely(first_time_s == 0 || last_time_s == 0)) {
+    if (unlikely(first_time_s == 0 || last_time_s == 0)) {
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
                           "using them as-is",
                     first_time_s, last_time_s, now_s);
     }
 
-    MRG_ENTRY entry = {
-            .section = (Word_t)ctx,
-            .first_time_s = first_time_s,
-            .last_time_s = last_time_s,
-            .latest_update_every_s = update_every_s
-    };
-    uuid_copy(entry.uuid, *uuid);
-
-    bool added;
-    METRIC *metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    bool added = false;
+    METRIC *metric = mrg_metric_get_and_acquire(main_mrg, uuid, (Word_t) ctx);
+    if (!metric) {
+        MRG_ENTRY entry = {
+                .section = (Word_t) ctx,
+                .first_time_s = first_time_s,
+                .last_time_s = last_time_s,
+                .latest_update_every_s = update_every_s
+        };
+        uuid_copy(entry.uuid, *uuid);
+        metric = mrg_metric_add_and_acquire(main_mrg, entry, &added);
+    }
 
     if (likely(!added))
         mrg_metric_expand_retention(main_mrg, metric, first_time_s, last_time_s, update_every_s);
