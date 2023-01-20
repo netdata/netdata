@@ -868,6 +868,8 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
 
+    info("DBENGINE: populating retention to MRG from %zu journal files of tier %d, using %zu threads...", datafiles, ctx->tier, cpus);
+
     struct completion cs[cpus];
 
     for (size_t i = 0; i < cpus; i++) {
