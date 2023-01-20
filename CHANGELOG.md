@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Fix macos struct definition. [\#14297](https://github.com/netdata/netdata/pull/14297) ([vkalintiris](https://github.com/vkalintiris))
+- Remove archivedcharts endpoint, optimize indices [\#14296](https://github.com/netdata/netdata/pull/14296) ([stelfrag](https://github.com/stelfrag))
+- track memory footprint of Netdata [\#14294](https://github.com/netdata/netdata/pull/14294) ([ktsaou](https://github.com/ktsaou))
+- DBENGINE v2 - improvements part 5 [\#14289](https://github.com/netdata/netdata/pull/14289) ([ktsaou](https://github.com/ktsaou))
+- allow multiple local-build/static-install options in kickstart [\#14287](https://github.com/netdata/netdata/pull/14287) ([ilyam8](https://github.com/ilyam8))
+- fix\(alarms\): treat 0 processors as unknown in load\_cpu\_number [\#14286](https://github.com/netdata/netdata/pull/14286) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
 - fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
 - Make sure variables are streamed after SENDER\_CONNECTED flag is set [\#14283](https://github.com/netdata/netdata/pull/14283) ([MrZammler](https://github.com/MrZammler))
@@ -26,6 +32,7 @@
 - Remove daemon/common.h header from libnetdata [\#14248](https://github.com/netdata/netdata/pull/14248) ([vkalintiris](https://github.com/vkalintiris))
 - allow the cache to grow when huge queries are running that exceed the cache size [\#14247](https://github.com/netdata/netdata/pull/14247) ([ktsaou](https://github.com/ktsaou))
 - Update netdata-overview.xml [\#14245](https://github.com/netdata/netdata/pull/14245) ([andrewm4894](https://github.com/andrewm4894))
+- Revert health to run in a single thread [\#14244](https://github.com/netdata/netdata/pull/14244) ([MrZammler](https://github.com/MrZammler))
 - profile startup and shutdown timings [\#14243](https://github.com/netdata/netdata/pull/14243) ([ktsaou](https://github.com/ktsaou))
 - `ml - machine learning` to just `machine learning` [\#14242](https://github.com/netdata/netdata/pull/14242) ([andrewm4894](https://github.com/andrewm4894))
 - cancel ml threads on shutdown and join them on host free [\#14240](https://github.com/netdata/netdata/pull/14240) ([ktsaou](https://github.com/ktsaou))
@@ -35,6 +42,7 @@
 - readme updates [\#14224](https://github.com/netdata/netdata/pull/14224) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d v0.49.0 [\#14220](https://github.com/netdata/netdata/pull/14220) ([ilyam8](https://github.com/ilyam8))
 - remove lgtm.com [\#14216](https://github.com/netdata/netdata/pull/14216) ([ilyam8](https://github.com/ilyam8))
+- Improve file descriptor closing loops [\#14213](https://github.com/netdata/netdata/pull/14213) ([Dim-P](https://github.com/Dim-P))
 - Remove temporary allocations when preprocessing a samples buffer [\#14208](https://github.com/netdata/netdata/pull/14208) ([vkalintiris](https://github.com/vkalintiris))
 - Create ML charts on child hosts. [\#14207](https://github.com/netdata/netdata/pull/14207) ([vkalintiris](https://github.com/vkalintiris))
 - Use brackets around info variables [\#14206](https://github.com/netdata/netdata/pull/14206) ([MrZammler](https://github.com/MrZammler))
@@ -341,12 +349,6 @@
 - Remove Chart/Dim based communication [\#13650](https://github.com/netdata/netdata/pull/13650) ([underhood](https://github.com/underhood))
 - Improve agent shutdown time [\#13649](https://github.com/netdata/netdata/pull/13649) ([stelfrag](https://github.com/stelfrag))
 - add \_collect\_job label to python.d/\* charts [\#13648](https://github.com/netdata/netdata/pull/13648) ([ilyam8](https://github.com/ilyam8))
-- RRD structures managed by dictionaries [\#13646](https://github.com/netdata/netdata/pull/13646) ([ktsaou](https://github.com/ktsaou))
-- fix rrdcontexts left in the post-processing queue from the garbage collector [\#13645](https://github.com/netdata/netdata/pull/13645) ([ktsaou](https://github.com/ktsaou))
-- apps.plugin: Re-add `chrome` to the `webbrowser` group. [\#13642](https://github.com/netdata/netdata/pull/13642) ([Ferroin](https://github.com/Ferroin))
-- Fix a memory leak on archived host creation [\#13641](https://github.com/netdata/netdata/pull/13641) ([stelfrag](https://github.com/stelfrag))
-- fix compile issues [\#13640](https://github.com/netdata/netdata/pull/13640) ([ktsaou](https://github.com/ktsaou))
-- Obsolete RRDSET state [\#13635](https://github.com/netdata/netdata/pull/13635) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
