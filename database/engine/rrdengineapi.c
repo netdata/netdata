@@ -235,8 +235,11 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)db_metric_handle);
 
-    if(!mrg_metric_writer_acquire(main_mrg, metric))
-        fatal("DBENGINE: metric is already collected and another collector asked to collect it");
+    if(!mrg_metric_writer_acquire(main_mrg, metric)) {
+        char uuid[UUID_STR_LEN + 1];
+        uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
+        fatal("DBENGINE: metric '%s' is already collected and should not be collected twice", uuid);
+    }
 
     struct rrdeng_collect_handle *handle;
 
