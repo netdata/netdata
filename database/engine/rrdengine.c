@@ -25,6 +25,7 @@ struct rrdeng_main {
 
     size_t flushes_running;
     size_t evictions_running;
+    size_t cleanup_running;
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -32,6 +33,7 @@ struct rrdeng_main {
         .timer = {},
         .flushes_running = 0,
         .evictions_running = 0,
+        .cleanup_running = 0,
 };
 
 static void sanity_check(void)
@@ -1513,18 +1515,11 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
     };
 }
 
-void timer_cb(uv_timer_t* handle) {
-    worker_is_busy(RRDENG_TIMER_CB);
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
+static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.cleanup_running--;
+}
 
-    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.queue.waiting);
-    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
-    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
-
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-
+static void cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     rrdeng_cmd_cleanup1();
     work_request_cleanup1();
     page_descriptor_cleanup1();
@@ -1549,6 +1544,20 @@ void timer_cb(uv_timer_t* handle) {
 #ifdef PDC_USE_JULYL
     julyl_cleanup1();
 #endif
+}
+
+void timer_cb(uv_timer_t* handle) {
+    worker_is_busy(RRDENG_TIMER_CB);
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+
+    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.queue.waiting);
+    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
+    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
+
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     worker_is_idle();
 }
@@ -1700,6 +1709,14 @@ void dbengine_event_loop(void* arg) {
                     if(!rrdeng_main.evictions_running) {
                         rrdeng_main.evictions_running++;
                         work_dispatch(NULL, NULL, NULL, opcode, cache_evict_tp_worker, after_do_cache_evict);
+                    }
+                    break;
+                }
+
+                case RRDENG_OPCODE_CLEANUP: {
+                    if(!rrdeng_main.cleanup_running) {
+                        rrdeng_main.cleanup_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cleanup_tp_worker, after_cleanup);
                     }
                     break;
                 }
