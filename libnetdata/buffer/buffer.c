@@ -531,3 +531,140 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     buffer_overflow_init(b);
     buffer_overflow_check(b);
 }
+
+// ----------------------------------------------------------------------------
+
+static char json_spacing[BUFFER_JSON_MAX_DEPTH + 1] = "                                 ";
+
+void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote) {
+    wb->json.key_quote = key_quote;
+    wb->json.value_quote = value_quote;
+
+    wb->json.depth = 0;
+    wb->json.stack[wb->json.depth].count = 0;
+    wb->json.stack[wb->json.depth].type = BUFFER_JSON_ANONYMOUS_OBJECT;
+
+    buffer_fast_strcat(wb, "{", 1);
+}
+
+static inline void buffer_json_check_membership(BUFFER *wb) {
+    switch(wb->json.stack[wb->json.depth].type) {
+        case BUFFER_JSON_ANONYMOUS_OBJECT:
+        case BUFFER_JSON_MEMBER_OBJECT:
+            break;
+
+        default:
+            internal_fatal(true, "BUFFER: membership check failed");
+            break;
+    }
+}
+
+static inline void buffer_json_add_comma_newline_spacing(BUFFER *wb) {
+    if(wb->json.stack[wb->json.depth].count)
+        buffer_fast_strcat(wb, ",\n", 2);
+    else
+        buffer_fast_strcat(wb, "\n", 1);
+
+    buffer_fast_strcat(wb, json_spacing, wb->json.depth);
+}
+
+static inline void buffer_json_add_key(BUFFER *wb, const char *key) {
+    buffer_strcat(wb, wb->json.key_quote);
+    buffer_strcat_jsonescape(wb, key);
+    buffer_strcat(wb, wb->json.key_quote);
+}
+
+static inline void buffer_json_add_string_value(BUFFER *wb, const char *value) {
+    buffer_strcat(wb, wb->json.value_quote);
+    buffer_strcat_jsonescape(wb, value);
+    buffer_strcat(wb, wb->json.value_quote);
+}
+
+void buffer_json_member_object_open(BUFFER *wb, const char *key) {
+    buffer_json_check_membership(wb);
+
+    buffer_json_add_comma_newline_spacing(wb);
+    buffer_json_add_key(wb, key);
+    buffer_fast_strcat(wb, ":{", 3);
+
+    wb->json.depth++;
+    wb->json.stack[wb->json.depth].count = 0;
+    wb->json.stack[wb->json.depth].type = BUFFER_JSON_MEMBER_OBJECT;
+}
+
+void buffer_json_member_object_close(BUFFER *wb) {
+    internal_fatal(wb->json.stack[wb->json.depth].type != BUFFER_JSON_MEMBER_OBJECT, "A member object is expected");
+    buffer_fast_strcat(wb, "\n", 1);
+    buffer_fast_strcat(wb, json_spacing, wb->json.depth - 1);
+    buffer_fast_strcat(wb, "}", 1);
+    wb->json.depth--;
+}
+
+void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value) {
+    buffer_json_check_membership(wb);
+
+    buffer_json_add_comma_newline_spacing(wb);
+    buffer_json_add_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_json_add_string_value(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+void buffer_json_member_add_uint64_t(BUFFER *wb, const char *key, uint64_t value) {
+    buffer_json_check_membership(wb);
+
+    buffer_json_add_comma_newline_spacing(wb);
+    buffer_json_add_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_print_llu(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+void buffer_json_member_add_int64_t(BUFFER *wb, const char *key, int64_t value) {
+    buffer_json_check_membership(wb);
+
+    buffer_json_add_comma_newline_spacing(wb);
+    buffer_json_add_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_print_ll(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value) {
+    buffer_json_check_membership(wb);
+
+    buffer_json_add_comma_newline_spacing(wb);
+    buffer_json_add_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_rrd_value(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+void buffer_json_finalize(BUFFER *wb) {
+    while(wb->json.depth > 0) {
+        switch(wb->json.stack[wb->json.depth].type) {
+            case BUFFER_JSON_MEMBER_OBJECT:
+                buffer_json_member_object_close(wb);
+                break;
+
+            case BUFFER_JSON_ANONYMOUS_OBJECT:
+                buffer_json_anonymous_object_close(wb);
+                break;
+
+            case BUFFER_JSON_ARRAY:
+                buffer_json_array_close(wb);
+                break;
+
+            default:
+                internal_fatal(true, "BUFFER: unknown json member type in stack");
+                break;
+        }
+    }
+
+    buffer_fast_strcat(wb, "\n}", 2);
+}
+

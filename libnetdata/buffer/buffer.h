@@ -7,6 +7,20 @@
 
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
+#define BUFFER_JSON_MAX_DEPTH 32
+
+typedef enum __attribute__ ((__packed__)) {
+    BUFFER_JSON_EMPTY,
+    BUFFER_JSON_ANONYMOUS_OBJECT,
+    BUFFER_JSON_MEMBER_OBJECT,
+    BUFFER_JSON_ARRAY,
+} BUFFER_JSON_NODE_TYPE;
+
+typedef struct web_buffer_json_node {
+    BUFFER_JSON_NODE_TYPE type;
+    uint32_t count:24;
+} BUFFER_JSON_NODE;
+
 typedef struct web_buffer {
     size_t size;        	// allocation size of buffer, in bytes
     size_t len;     		// current data length in buffer, in bytes
@@ -16,6 +30,13 @@ typedef struct web_buffer {
     time_t date;    		// the timestamp this content has been generated
     time_t expires;			// the timestamp this content expires
     size_t *statistics;
+
+    struct {
+        const char *key_quote;
+        const char *value_quote;
+        size_t depth;
+        BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
+    } json;
 } BUFFER;
 
 // options
