@@ -178,6 +178,18 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
 // ----------------------------------------------------------------------------
 // collect ops
 
+static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *handle) {
+    if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
+        error("DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
+              (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
+
+        if(!handle->update_every_ut)
+            handle->update_every_ut = mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+        else
+            mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
+    }
+}
+
 /*
  * Gets a handle for storing metrics to the database.
  * The handle must be released with rrdeng_store_metric_final().
@@ -257,12 +269,11 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->page_position = 0;
     handle->page_entries_max = 0;
 
-    internal_fatal((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric),
-                   "DBENGINE: the collection handle update every and the metric registry update every are not the same");
+    check_and_fix_mrg_update_every(handle);
 }
 
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle, struct rrdengine_instance *ctx, usec_t point_in_time_ut, void *data, size_t data_size) {
-time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+    time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
     PGC_ENTRY page_entry = {
@@ -300,6 +311,8 @@ time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
     handle->page_end_time_ut = point_in_time_ut;
     handle->page_position = 1; // zero is already in our data
     handle->page = page;
+
+    check_and_fix_mrg_update_every(handle);
 }
 
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size) {
@@ -491,16 +504,6 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         }
     }
 
-    if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
-        error("DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
-              (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
-
-        if(!handle->update_every_ut)
-            handle->update_every_ut = mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
-        else
-            mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
-    }
-
 //    FIXME - is this a problem?
 //    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
 //        "DBENGINE: new point is not aligned to update every");
@@ -525,11 +528,10 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 
 void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *collection_handle, int update_every) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    check_and_fix_mrg_update_every(handle);
+
     METRIC *metric = handle->metric;
     usec_t update_every_ut = update_every * USEC_PER_SEC;
-
-    internal_fatal((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, metric),
-                   "DBENGINE: the collection handle update every and the metric registry update every are not the same");
 
     if(update_every_ut == handle->update_every_ut)
         return;
