@@ -183,11 +183,49 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
         error("DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
               (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
-        if(!handle->update_every_ut)
+        if(unlikely(!handle->update_every_ut))
             handle->update_every_ut = mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
         else
             mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
     }
+}
+
+static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle) {
+    if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
+        return false;
+
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+
+    time_t start_time_s = pgc_page_start_time_s(handle->page);
+    time_t end_time_s = pgc_page_end_time_s(handle->page);
+    time_t update_every_s = pgc_page_update_every_s(handle->page);
+    size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
+    time_t now_s = now_realtime_sec();
+    time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
+    bool have_read_error = false;
+
+    VALIDATED_PAGE_DESCRIPTOR vd = validate_page(
+            start_time_s,
+            end_time_s,
+            update_every_s,
+            page_length,
+            ctx->config.page_type,
+            now_s,
+            overwrite_zero_update_every_s,
+            have_read_error
+            );
+
+    if(!vd.is_valid ||
+        vd.start_time_s != start_time_s ||
+        vd.end_time_s != end_time_s ||
+        vd.update_every_s != update_every_s ||
+        vd.page_length != page_length ||
+        vd.entries != handle->page_position) {
+        internal_fatal(true, "DBENGINE: completed hot page is invalid");
+        return false;
+    }
+
+    return true;
 }
 
 /*
@@ -259,6 +297,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
         pgc_page_to_clean_evict_or_release(main_cache, handle->page);
 
     else {
+        check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->page));
         pgc_page_hot_to_dirty_and_release(main_cache, handle->page);
     }
@@ -268,6 +307,8 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->page = NULL;
     handle->page_position = 0;
     handle->page_entries_max = 0;
+    handle->page_start_time_ut = 0;
+    handle->page_end_time_ut = 0;
 
     check_and_fix_mrg_update_every(handle);
 }
@@ -294,23 +335,45 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
                        "DBENGINE CACHE: requested to add a hot page to the main cache, "
                        "but the page returned is not hot");
 
-        if(unlikely(pgc_page_data_size(main_cache, page) < CTX_POINT_SIZE_BYTES(ctx)))
-            fatal("DBENGINE: hot page returned from main cache does not have the size for storing 1 point");
+        handle->page_entries_max = pgc_page_data_size(main_cache, page) / CTX_POINT_SIZE_BYTES(ctx);
+        handle->page_start_time_ut = pgc_page_start_time_s(page) * USEC_PER_SEC;
+        handle->page_end_time_ut = pgc_page_end_time_s(page) * USEC_PER_SEC;
+        usec_t page_update_every_ut = pgc_page_update_every_s(page) * USEC_PER_SEC;
+        handle->page_position = (handle->page_end_time_ut - handle->page_start_time_ut + page_update_every_ut) / page_update_every_ut;
+        handle->page = page;
+
+        if(handle->page_position + 1 >= handle->page_entries_max ||
+            page_update_every_ut != handle->update_every_ut ||
+            handle->page_end_time_ut + handle->update_every_ut != point_in_time_ut) {
+            rrdeng_store_metric_flush_current_page((STORAGE_COLLECT_HANDLE *) handle);
+            rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);
+            return;
+        }
+
+        handle->page_position++; // for the point to be stored
+        handle->page_end_time_ut += handle->update_every_ut;
+        pgc_page_hot_set_end_time_s(main_cache, page, point_in_time_s);
+
+        // find the offset of our point to add
+        uint8_t *point_offset = (uint8_t *)pgc_page_data(page) + handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
 
         // copy the point in data
-        memcpy(pgc_page_data(page), data, CTX_POINT_SIZE_BYTES(ctx));
+        memcpy(point_offset, data, CTX_POINT_SIZE_BYTES(ctx));
 
         // free data
         dbengine_page_free(page_entry.data, data_size);
 
-        handle->page_entries_max = pgc_page_data_size(main_cache, page) / CTX_POINT_SIZE_BYTES(ctx);
+        // for the next point
+        if(++handle->page_position > handle->page_entries_max)
+            rrdeng_store_metric_flush_current_page((STORAGE_COLLECT_HANDLE *) handle);
     }
-    else
+    else {
         handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
-
-    handle->page_end_time_ut = point_in_time_ut;
-    handle->page_position = 1; // zero is already in our data
-    handle->page = page;
+        handle->page_start_time_ut = point_in_time_ut;
+        handle->page_end_time_ut = point_in_time_ut;
+        handle->page_position = 1; // zero is already in our data
+        handle->page = page;
+    }
 
     check_and_fix_mrg_update_every(handle);
 }

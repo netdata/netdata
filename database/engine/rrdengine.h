@@ -180,6 +180,7 @@ struct rrdeng_collect_handle {
     // 2 bytes remaining here for future use
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
+    usec_t page_start_time_ut;
     usec_t page_end_time_ut;
     usec_t update_every_ut;
 };
@@ -461,7 +462,7 @@ typedef struct validated_page_descriptor {
     size_t point_size;
     size_t entries;
     uint8_t type;
-    bool data_on_disk_valid;
+    bool is_valid;
 } VALIDATED_PAGE_DESCRIPTOR;
 
 #define page_entries_by_time(start_time_s, end_time_s, update_every_s) \
@@ -470,6 +471,7 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
+VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, time_t update_every_s, size_t page_length, uint8_t page_type, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
 
 typedef enum {

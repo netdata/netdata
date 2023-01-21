@@ -828,15 +828,28 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
 }
 
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+    return validate_page(
+            (time_t) (descr->start_time_ut / USEC_PER_SEC),
+            (time_t) (descr->end_time_ut / USEC_PER_SEC),
+            0,
+            descr->page_length,
+            descr->type,
+            now_s, overwrite_zero_update_every_s, have_read_error);
+}
+
+VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, time_t update_every_s, size_t page_length, uint8_t page_type, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
     VALIDATED_PAGE_DESCRIPTOR vd = {
-            .start_time_s = (time_t) (descr->start_time_ut / USEC_PER_SEC),
-            .end_time_s = (time_t) (descr->end_time_ut / USEC_PER_SEC),
-            .page_length = descr->page_length,
-            .type = descr->type,
+            .start_time_s = start_time_s,
+            .end_time_s = end_time_s,
+            .update_every_s = update_every_s,
+            .page_length = page_length,
+            .type = page_type,
     };
     vd.point_size = page_type_size[vd.type];
     vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
-    vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
+
+    if(!vd.update_every_s)
+        vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
 
     bool is_valid = true;
 
@@ -896,7 +909,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
         }
     }
 
-    vd.data_on_disk_valid = is_valid;
+    vd.is_valid = is_valid;
     return vd;
 }
 
@@ -1080,7 +1093,7 @@ static bool epdl_populate_pages_from_extent_data(
 
         void *page_data = dbengine_page_alloc(vd.page_length);
 
-        if (unlikely(!vd.data_on_disk_valid)) {
+        if (unlikely(!vd.is_valid)) {
             fill_page_with_nulls(page_data, vd.page_length, vd.type);
             stats_load_invalid_page++;
         }

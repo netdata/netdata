@@ -610,7 +610,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                 (metric) ? mrg_metric_get_update_every_s(main_mrg, metric) : 0,
                 false);
 
-        if(!vd.data_on_disk_valid) {
+        if(!vd.is_valid) {
             mrg_metric_release(main_mrg, metric);
             continue;
         }
