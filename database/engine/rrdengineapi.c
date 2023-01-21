@@ -221,7 +221,24 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
         vd.update_every_s != update_every_s ||
         vd.page_length != page_length ||
         vd.entries != handle->page_position) {
-        internal_fatal(true, "DBENGINE: completed hot page is invalid");
+
+        const char *valid = (vd.is_valid) ? "" : "found invalid, ";
+        const char *start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
+        const char *end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
+        const char *ue = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
+        const char *pl = (vd.page_length == page_length) ? "" : "page length updated, ";
+        const char *entries = (vd.entries == handle->page_position) ? "" : "entries updated, ";
+
+        char uuid[UUID_STR_LEN + 1];
+        uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
+        internal_error(true, "DBENGINE: metric '%s' completed page %ld to %ld, ue %ld, pl %zu, entries %u "
+                             "found inconsistent - should be: %ld to %ld, ue %ld, pl %zu, entries %zu: "
+                             "%s%s%s%s%s%s",
+                             uuid,
+                             start_time_s, end_time_s, update_every_s, page_length, handle->page_position,
+                             vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
+                             valid, start, end, ue, pl, entries
+                             );
         return false;
     }
 
@@ -233,13 +250,15 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  * The handle must be released with rrdeng_store_metric_final().
  */
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
-    METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)db_metric_handle);
+    METRIC *metric = (METRIC *)db_metric_handle;
 
     if(!mrg_metric_writer_acquire(main_mrg, metric)) {
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
         fatal("DBENGINE: metric '%s' is already collected and should not be collected twice", uuid);
     }
+
+    metric = mrg_metric_dup(main_mrg, metric);
 
     struct rrdeng_collect_handle *handle;
 
