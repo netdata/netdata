@@ -1975,7 +1975,7 @@ void pgc_page_hot_set_end_time_s(PGC *cache __maybe_unused, PGC_PAGE *page, time
     internal_fatal(!is_page_hot(page),
                    "DBENGINE CACHE: end_time_s update on non-hot page");
 
-    internal_fatal(end_time_s <= __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
+    internal_fatal(end_time_s < __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
                    "DBENGINE CACHE: end_time_s is not bigger than existing");
 
     __atomic_store_n(&page->end_time_s, end_time_s, __ATOMIC_RELAXED);
