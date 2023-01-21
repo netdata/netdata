@@ -6,15 +6,22 @@
 
 **Merged pull requests:**
 
+- Fix Exporiting compilaton error [\#14306](https://github.com/netdata/netdata/pull/14306) ([thiagoftsm](https://github.com/thiagoftsm))
+- bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
+- Fixes required to make the agent work without crashes on MacOS [\#14304](https://github.com/netdata/netdata/pull/14304) ([vkalintiris](https://github.com/vkalintiris))
+- DBENGINE v2 - improvements part 6 [\#14299](https://github.com/netdata/netdata/pull/14299) ([ktsaou](https://github.com/ktsaou))
+- add consul license expiration time alarm [\#14298](https://github.com/netdata/netdata/pull/14298) ([ilyam8](https://github.com/ilyam8))
 - Fix macos struct definition. [\#14297](https://github.com/netdata/netdata/pull/14297) ([vkalintiris](https://github.com/vkalintiris))
 - Remove archivedcharts endpoint, optimize indices [\#14296](https://github.com/netdata/netdata/pull/14296) ([stelfrag](https://github.com/stelfrag))
 - track memory footprint of Netdata [\#14294](https://github.com/netdata/netdata/pull/14294) ([ktsaou](https://github.com/ktsaou))
+- Switch to self-hosted infrastructure for DEB package distribution. [\#14290](https://github.com/netdata/netdata/pull/14290) ([Ferroin](https://github.com/Ferroin))
 - DBENGINE v2 - improvements part 5 [\#14289](https://github.com/netdata/netdata/pull/14289) ([ktsaou](https://github.com/ktsaou))
 - allow multiple local-build/static-install options in kickstart [\#14287](https://github.com/netdata/netdata/pull/14287) ([ilyam8](https://github.com/ilyam8))
 - fix\(alarms\): treat 0 processors as unknown in load\_cpu\_number [\#14286](https://github.com/netdata/netdata/pull/14286) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 4 [\#14285](https://github.com/netdata/netdata/pull/14285) ([ktsaou](https://github.com/ktsaou))
 - fix for dbengine2 improvements part 3 [\#14284](https://github.com/netdata/netdata/pull/14284) ([ktsaou](https://github.com/ktsaou))
 - Make sure variables are streamed after SENDER\_CONNECTED flag is set [\#14283](https://github.com/netdata/netdata/pull/14283) ([MrZammler](https://github.com/MrZammler))
+- Update to SQLITE version 3.40.1 [\#14282](https://github.com/netdata/netdata/pull/14282) ([stelfrag](https://github.com/stelfrag))
 - Check session variable before resuming it [\#14279](https://github.com/netdata/netdata/pull/14279) ([MrZammler](https://github.com/MrZammler))
 - Update infographic image on main README [\#14276](https://github.com/netdata/netdata/pull/14276) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
@@ -343,12 +350,6 @@
 - update Postgres dashboard info [\#13661](https://github.com/netdata/netdata/pull/13661) ([ilyam8](https://github.com/ilyam8))
 - Use mmap if possible during startup for journal replay [\#13660](https://github.com/netdata/netdata/pull/13660) ([stelfrag](https://github.com/stelfrag))
 - Remove anomaly detector [\#13657](https://github.com/netdata/netdata/pull/13657) ([vkalintiris](https://github.com/vkalintiris))
-- Update dashboard to version v2.29.0. [\#13654](https://github.com/netdata/netdata/pull/13654) ([netdatabot](https://github.com/netdatabot))
-- Fix container virtualization info [\#13653](https://github.com/netdata/netdata/pull/13653) ([vlvkobal](https://github.com/vlvkobal))
-- Do not free AR dimensions from within ML. [\#13651](https://github.com/netdata/netdata/pull/13651) ([vkalintiris](https://github.com/vkalintiris))
-- Remove Chart/Dim based communication [\#13650](https://github.com/netdata/netdata/pull/13650) ([underhood](https://github.com/underhood))
-- Improve agent shutdown time [\#13649](https://github.com/netdata/netdata/pull/13649) ([stelfrag](https://github.com/stelfrag))
-- add \_collect\_job label to python.d/\* charts [\#13648](https://github.com/netdata/netdata/pull/13648) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
