@@ -200,7 +200,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     time_t end_time_s = pgc_page_end_time_s(handle->page);
     time_t update_every_s = pgc_page_update_every_s(handle->page);
     size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
-    time_t now_s = now_realtime_sec();
+    time_t now_s = now_realtime_sec() + 1;
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
     bool have_read_error = false;
 
