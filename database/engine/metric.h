@@ -27,6 +27,7 @@ struct mrg_statistics {
     size_t search_misses;
     size_t pointer_validation_hits;
     size_t pointer_validation_misses;
+    size_t writers;
 };
 
 MRG *mrg_create(void);
@@ -56,6 +57,9 @@ bool mrg_metric_set_update_every(MRG *mrg, METRIC *metric, time_t update_every_s
 time_t mrg_metric_get_update_every_s(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_update_every_s_if_zero(MRG *mrg, METRIC *metric, time_t update_every_s);
+
+bool mrg_metric_writer_acquire(MRG *mrg, METRIC *metric);
+bool mrg_metric_writer_release(MRG *mrg, METRIC *metric);
 
 struct mrg_statistics mrg_get_statistics(MRG *mrg);
 

@@ -234,6 +234,10 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  */
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)db_metric_handle);
+
+    if(!mrg_metric_writer_acquire(main_mrg, metric))
+        fatal("DBENGINE: metric is already collected and another collector asked to collect it");
+
     struct rrdeng_collect_handle *handle;
 
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
@@ -599,6 +603,10 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
 
     rrdeng_store_metric_flush_current_page(collection_handle);
     rrdeng_page_alignment_release(handle->alignment);
+
+    if(!mrg_metric_writer_release(main_mrg, handle->metric))
+        fatal("DBENGINE: metric is already released");
+
     mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
 
