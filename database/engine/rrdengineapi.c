@@ -243,6 +243,12 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->page_entries_max = 0;
     handle->update_every_ut = update_every * USEC_PER_SEC;
 
+    // this is important!
+    // if we don't set the page_end_time_ut during the first collection
+    // data collection may be able to go back in time and during the addition of new pages
+    // clean pages may be found matching ours!
+    handle->page_end_time_ut = mrg_metric_get_latest_time_s(main_mrg, metric) * USEC_PER_SEC;
+
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
     handle->alignment = (struct pg_alignment *)smg;
@@ -308,7 +314,11 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->page_start_time_ut = 0;
-    handle->page_end_time_ut = 0;
+
+    // important!
+    // we should never zero page end time ut, because this will allow
+    // collection to go back in time
+    // handle->page_end_time_ut = 0;
 
     check_and_fix_mrg_update_every(handle);
 }
@@ -331,6 +341,12 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     if (unlikely(!added)) {
+        internal_fatal(pgc_page_section(page) != (Word_t)ctx,
+                       "DBENGINE CACHE: page returned from main cache does not match our section");
+
+        internal_fatal(pgc_page_metric(page) != (Word_t)handle->metric,
+                       "DBENGINE CACHE: page returned from main cache does not match our metric");
+
         internal_fatal(!pgc_is_page_hot(page),
                        "DBENGINE CACHE: requested to add a hot page to the main cache, "
                        "but the page returned is not hot");
