@@ -491,9 +491,15 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         }
     }
 
-    internal_fatal((time_t)(handle->update_every_ut / USEC_PER_SEC) !=
-                           mrg_metric_get_update_every_s(main_mrg, handle->metric),
-                   "DBENGINE: the collection handle update every and the metric registry update every are not the same");
+    if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
+        error("DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
+              (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
+
+        if(!handle->update_every_ut)
+            handle->update_every_ut = mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+        else
+            mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
+    }
 
 //    FIXME - is this a problem?
 //    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
