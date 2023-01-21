@@ -142,7 +142,7 @@ static inline void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
 }
 
-void work_standard_worker(uv_work_t *req) {
+static void work_standard_worker(uv_work_t *req) {
     __atomic_add_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
 
     register_libuv_worker_jobs();
@@ -160,7 +160,7 @@ void work_standard_worker(uv_work_t *req) {
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
-void after_work_standard_callback(uv_work_t* req, int status) {
+static void after_work_standard_callback(uv_work_t* req, int status) {
     struct rrdeng_work *work_request = req->data;
 
     worker_is_busy(RRDENG_OPCODE_MAX + work_request->opcode);
