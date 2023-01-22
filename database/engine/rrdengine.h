@@ -171,13 +171,26 @@ typedef enum __attribute__ ((__packed__)) {
     RRDENG_FIRST_PAGE_ALLOCATED = (1 << 1), // set when this metric has allocated its first page
 } RRDENG_COLLECT_HANDLE_OPTIONS;
 
+typedef enum __attribute__ ((__packed__)) {
+    RRDENG_PAGE_PAST_COLLECTION       = (1 << 0),
+    RRDENG_PAGE_REPEATED_COLLECTION   = (1 << 1),
+    RRDENG_PAGE_BIG_GAP               = (1 << 2),
+    RRDENG_PAGE_GAP                   = (1 << 3),
+    RRDENG_PAGE_FUTURE_POINT          = (1 << 4),
+    RRDENG_PAGE_CREATED_IN_FUTURE     = (1 << 5),
+    RRDENG_PAGE_COMPLETED_IN_FUTURE   = (1 << 6),
+    RRDENG_PAGE_UNALIGNED             = (1 << 7),
+    RRDENG_PAGE_FOUND_IN_CACHE        = (1 << 8),
+    RRDENG_PAGE_FOUND_IN_CACHE_GAP    = (1 << 9),
+} RRDENG_COLLECT_PAGE_FLAGS;
+
 struct rrdeng_collect_handle {
     struct metric *metric;
     struct pgc_page *page;
     struct pg_alignment *alignment;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;
-    // 2 bytes remaining here for future use
+    RRDENG_COLLECT_PAGE_FLAGS page_flags;
     uint32_t page_entries_max;
     uint32_t page_position;                   // keep track of the current page size, to make sure we don't exceed it
     usec_t page_start_time_ut;
@@ -481,7 +494,8 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
                                         time_t overwrite_zero_update_every_s,
                                         bool have_read_error,
                                         bool minimize_invalid_size,
-                                        const char *msg);
+                                        const char *msg,
+                                        RRDENG_COLLECT_PAGE_FLAGS flags);
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
 
 typedef enum {

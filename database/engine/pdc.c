@@ -827,6 +827,29 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
+static void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
+    if(flags & RRDENG_PAGE_PAST_COLLECTION)
+        buffer_strcat(wb, "PAST_COLLECTION ");
+    if(flags & RRDENG_PAGE_REPEATED_COLLECTION)
+        buffer_strcat(wb, "REPEATED_COLLECTION ");
+    if(flags & RRDENG_PAGE_BIG_GAP)
+        buffer_strcat(wb, "BIG_GAP ");
+    if(flags & RRDENG_PAGE_GAP)
+        buffer_strcat(wb, "GAP ");
+    if(flags & RRDENG_PAGE_FUTURE_POINT)
+        buffer_strcat(wb, "FUTURE_POINT ");
+    if(flags & RRDENG_PAGE_CREATED_IN_FUTURE)
+        buffer_strcat(wb, "CREATED_IN_FUTURE ");
+    if(flags & RRDENG_PAGE_COMPLETED_IN_FUTURE)
+        buffer_strcat(wb, "COMPLETED_IN_FUTURE ");
+    if(flags & RRDENG_PAGE_UNALIGNED)
+        buffer_strcat(wb, "UNALIGNED ");
+    if(flags & RRDENG_PAGE_FOUND_IN_CACHE)
+        buffer_strcat(wb, "FOUND_IN_CACHE ");
+    if(flags & RRDENG_PAGE_FOUND_IN_CACHE_GAP)
+        buffer_strcat(wb, "FOUND_IN_CACHE_GAP ");
+}
+
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
     return validate_page(
             (uuid_t *)descr->uuid,
@@ -840,7 +863,7 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
             overwrite_zero_update_every_s,
             have_read_error,
             true,
-            "loaded");
+            "loaded", 0);
 }
 
 VALIDATED_PAGE_DESCRIPTOR validate_page(
@@ -855,7 +878,8 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         time_t overwrite_zero_update_every_s,
         bool have_read_error,
         bool minimize_invalid_size,
-        const char *msg) {
+        const char *msg,
+        RRDENG_COLLECT_PAGE_FLAGS flags) {
 
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = start_time_s,
@@ -938,17 +962,23 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         char uuid_str[UUID_STR_LEN + 1];
         uuid_unparse(*uuid, uuid_str);
 
-        if(!vd.is_valid) {
+        BUFFER *wb = NULL;
 
+        if(flags) {
+            wb = buffer_create(0, NULL);
+            collect_page_flags_to_buffer(wb, flags);
+        }
+
+        if(!vd.is_valid) {
 #ifdef NETDATA_INTERNAL_CHECKS
             internal_error(true,
 #else
             error_limit(&erl,
 #endif
                         "DBENGINE: metric '%s' %s invalid page of type %u "
-                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu ",
+                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s)",
                         uuid_str, msg, vd.type,
-                        vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries
+                        vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries, wb?buffer_tostring(wb):""
             );
 
             if(minimize_invalid_size) {
@@ -981,16 +1011,18 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             error_limit(&erl,
 #endif
                         "DBENGINE: metric '%s' %s page of type %u "
-                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu "
+                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu (flags: %s), "
                         "found inconsistent - the right is "
                         "from %ld to %ld, update every %ld, page length %zu, entries %zu: "
                         "%s%s%s%s%s%s%s",
                         uuid_str, msg, vd.type,
-                        start_time_s, end_time_s, now_s, update_every_s, page_length, entries,
+                        start_time_s, end_time_s, now_s, update_every_s, page_length, entries, wb?buffer_tostring(wb):"",
                         vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
                         err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
             );
         }
+
+        buffer_free(wb);
     }
 
     return vd;

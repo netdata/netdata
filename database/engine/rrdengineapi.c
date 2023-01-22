@@ -205,6 +205,9 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     time_t now_s = max_acceptable_collected_time();
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
+    if(end_time_s > max_acceptable_collected_time())
+        handle->page_flags |= RRDENG_PAGE_COMPLETED_IN_FUTURE;
+
     VALIDATED_PAGE_DESCRIPTOR vd = validate_page(
             uuid,
             start_time_s,
@@ -217,8 +220,8 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
             overwrite_zero_update_every_s,
             false,
             false,
-            "collected"
-            );
+            "collected",
+            handle->page_flags);
 
     return vd.is_valid;
 }
@@ -315,6 +318,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, 0);
 
     handle->page = NULL;
+    handle->page_flags = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->page_start_time_ut = 0;
@@ -360,11 +364,13 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         handle->page_end_time_ut = pgc_page_end_time_s(page) * USEC_PER_SEC;
         usec_t page_update_every_ut = pgc_page_update_every_s(page) * USEC_PER_SEC;
         handle->page_position = (handle->page_end_time_ut - handle->page_start_time_ut + page_update_every_ut) / page_update_every_ut;
+        handle->page_flags = RRDENG_PAGE_FOUND_IN_CACHE;
         handle->page = page;
 
         if(handle->page_position + 1 >= handle->page_entries_max ||
             page_update_every_ut != handle->update_every_ut ||
             handle->page_end_time_ut + handle->update_every_ut != point_in_time_ut) {
+            handle->page_flags |= RRDENG_PAGE_FOUND_IN_CACHE_GAP;
             rrdeng_store_metric_flush_current_page((STORAGE_COLLECT_HANDLE *) handle);
             rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);
             return;
@@ -393,6 +399,10 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         handle->page_end_time_ut = point_in_time_ut;
         handle->page_position = 1; // zero is already in our data
         handle->page = page;
+        handle->page_flags = 0;
+
+        if(point_in_time_s > max_acceptable_collected_time())
+            handle->page_flags |= RRDENG_PAGE_CREATED_IN_FUTURE;
     }
 
     check_and_fix_mrg_update_every(handle);
@@ -468,7 +478,7 @@ static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection
                      /* did the other metrics change page? */
                      handle->alignment->page_position <= 1)) {
             handle->options &= ~RRDENG_CHO_UNALIGNED;
-
+            handle->page_flags |= RRDENG_PAGE_UNALIGNED;
             rrdeng_store_metric_flush_current_page(collection_handle);
 
             data = rrdeng_alloc_new_metric_data(handle, &data_size);
@@ -548,11 +558,17 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(point_in_time_ut > max_acceptable_collected_time() * USEC_PER_SEC))
+        handle->page_flags |= RRDENG_PAGE_FUTURE_POINT;
+#endif
+
     if(likely(handle->page_end_time_ut + handle->update_every_ut == point_in_time_ut)) {
         // happy path
         ;
     }
     else if(unlikely(point_in_time_ut < handle->page_end_time_ut)) {
+        handle->page_flags |= RRDENG_PAGE_PAST_COLLECTION;
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE: new point at %llu is older than the last collected %llu, ignoring it",
                        point_in_time_ut, handle->page_end_time_ut);
@@ -560,6 +576,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     }
 
     else if(unlikely(point_in_time_ut == handle->page_end_time_ut)) {
+        handle->page_flags |= RRDENG_PAGE_REPEATED_COLLECTION;
         error_limit_static_global_var(erl, 1, 0);
         error_limit(&erl, "DBENGINE: new point time %llu has the same timestamp to the last collected point, ignoring it",
                        point_in_time_ut);
@@ -570,9 +587,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         size_t points_gap = (point_in_time_ut - handle->page_end_time_ut) / handle->update_every_ut;
         size_t page_remaining_points = handle->page_entries_max - handle->page_position;
 
-        if(points_gap > page_remaining_points)
+        if(points_gap > page_remaining_points) {
+            handle->page_flags |= RRDENG_PAGE_BIG_GAP;
             rrdeng_store_metric_flush_current_page(collection_handle);
+        }
         else {
+            handle->page_flags |= RRDENG_PAGE_GAP;
+
             // loop to fill the gap
             usec_t last_point_filled_ut = handle->page_end_time_ut + handle->update_every_ut;
 
