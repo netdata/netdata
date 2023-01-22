@@ -190,7 +190,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
     }
 }
 
-static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle) {
+static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle __maybe_unused) {
 #ifdef NETDATA_INTERNAL_CHECKS
     if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
