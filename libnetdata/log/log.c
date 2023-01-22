@@ -626,7 +626,7 @@ int error_log_limit(int reset) {
     static time_t start = 0;
     static unsigned long counter = 0, prevented = 0;
 
-    // fprintf(stderr, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
+    // fprintf(stdcollector, "FLOOD: counter=%lu, allowed=%lu, backup=%lu, period=%llu\n", counter, error_log_errors_per_period, error_log_errors_per_period_backup, (unsigned long long)error_log_throttle_period);
 
     // do not throttle if the period is 0
     if(error_log_throttle_period == 0)
@@ -648,7 +648,7 @@ int error_log_limit(int reset) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
-                stderr,
+                stdcollector,
                 "%s: %s LOG FLOOD PROTECTION reset for process '%s' "
                 "(prevented %lu logs in the last %"PRId64" seconds).\n",
                 date,
@@ -671,7 +671,7 @@ int error_log_limit(int reset) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
-                stderr,
+                stdcollector,
                 "%s: %s LOG FLOOD PROTECTION resuming logging from process '%s' "
                 "(prevented %lu logs in the last %"PRId64" seconds).\n",
                 date,
@@ -695,7 +695,7 @@ int error_log_limit(int reset) {
             char date[LOG_DATE_LENGTH];
             log_date(date, LOG_DATE_LENGTH, now_realtime_sec());
             fprintf(
-                stderr,
+                stdcollector,
                 "%s: %s LOG FLOOD PROTECTION too many logs (%lu logs in %"PRId64" seconds, threshold is set to %lu logs "
                 "in %"PRId64" seconds). Preventing more logs from process '%s' for %"PRId64" seconds.\n",
                 date,
@@ -791,14 +791,14 @@ void info_int( const char *file __maybe_unused, const char *function __maybe_unu
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderr, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+    fprintf(stdcollector, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
 #else
-    fprintf(stderr, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
+    fprintf(stdcollector, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
 #endif
-    vfprintf( stderr, fmt, args );
+    vfprintf( stdcollector, fmt, args );
     va_end( args );
 
-    fputc('\n', stderr);
+    fputc('\n', stdcollector);
 
     log_unlock();
 }
@@ -863,26 +863,26 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    fprintf(stdcollector, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
 #else
-    fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+    fprintf(stdcollector, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
 #endif
-    vfprintf( stderr, fmt, args );
+    vfprintf( stdcollector, fmt, args );
     va_end( args );
 
     if(erl->count > 1)
-        fprintf(stderr, " (similar messages repeated %zu times in the last %llu secs)", erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
+        fprintf(stdcollector, " (similar messages repeated %zu times in the last %llu secs)", erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
 
     if(erl->sleep_ut)
-        fprintf(stderr, " (sleeping for %llu microseconds every time this happens)", erl->sleep_ut);
+        fprintf(stdcollector, " (sleeping for %llu microseconds every time this happens)", erl->sleep_ut);
 
     if(__errno) {
         char buf[1024];
-        fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        fprintf(stdcollector, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
-        fputc('\n', stderr);
+        fputc('\n', stdcollector);
 
     erl->last_logged = now;
     erl->count = 0;
@@ -915,20 +915,20 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderr, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    fprintf(stdcollector, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
 #else
-    fprintf(stderr, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+    fprintf(stdcollector, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
 #endif
-    vfprintf( stderr, fmt, args );
+    vfprintf( stdcollector, fmt, args );
     va_end( args );
 
     if(__errno) {
         char buf[1024];
-        fprintf(stderr, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        fprintf(stdcollector, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
-        fputc('\n', stderr);
+        fputc('\n', stdcollector);
 
     log_unlock();
 }
@@ -948,7 +948,7 @@ static void print_call_stack(void) {
 
     nptrs = backtrace(buffer, BT_BUF_SIZE);
     if(nptrs)
-        backtrace_symbols_fd(buffer, nptrs, fileno(stderr));
+        backtrace_symbols_fd(buffer, nptrs, fileno(stdcollector));
 }
 #endif
 
@@ -980,15 +980,15 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderr, "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
+    fprintf(stdcollector, "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
 #else
-    fprintf(stderr, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
+    fprintf(stdcollector, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
 #endif
-    vfprintf( stderr, fmt, args );
+    vfprintf( stdcollector, fmt, args );
     va_end( args );
 
     perror(" # ");
-    fputc('\n', stderr);
+    fputc('\n', stdcollector);
 
     log_unlock();
 
