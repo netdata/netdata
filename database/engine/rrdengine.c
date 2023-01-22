@@ -908,14 +908,24 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
     // get the latest datafile
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     datafile = ctx->datafiles.first->prev;
+    // become a writer on this datafile, to prevent it from vanishing
     netdata_spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running++;
     netdata_spinlock_unlock(&datafile->writers.spinlock);
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
     if(datafile_is_full(ctx, datafile)) {
+        // remember the datafile we have become writers to
+        struct rrdengine_datafile *old_datafile = datafile;
+
+        // only 1 datafile creation at a time
         static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
         netdata_mutex_lock(&mutex);
+
+        // take the latest datafile again - without this, multiple threads may create multiple files
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+        datafile = ctx->datafiles.first->prev;
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
         if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
@@ -923,11 +933,10 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
 
         netdata_mutex_unlock(&mutex);
 
-        struct rrdengine_datafile *old_datafile = datafile;
-
-        // get the new datafile
+        // get the new latest datafile again, like above
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
         datafile = ctx->datafiles.first->prev;
+        // become a writer on this datafile, to prevent it from vanishing
         netdata_spinlock_lock(&datafile->writers.spinlock);
         datafile->writers.running++;
         netdata_spinlock_unlock(&datafile->writers.spinlock);
@@ -976,7 +985,7 @@ static struct extent_io_descriptor *flush_extent_prepare(struct rrdengine_instan
             completion_mark_complete(completion);
 
         __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
-        return 0;
+        return NULL;
     }
 
     xt_io_descr = extent_io_descriptor_get();
@@ -1080,15 +1089,17 @@ static struct extent_io_descriptor *flush_extent_prepare(struct rrdengine_instan
 static void after_flush_pages(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused) {
     struct extent_io_descriptor *xt_io_descr = data;
 
-    int ret = uv_fs_write(&rrdeng_main.loop,
-                      &xt_io_descr->uv_fs_request,
-                      xt_io_descr->datafile->file,
-                      &xt_io_descr->iov,
-                      1,
-                      (int64_t)xt_io_descr->pos,
-                      extent_flush_io_callback);
+    if(xt_io_descr) {
+        int ret = uv_fs_write(&rrdeng_main.loop,
+                              &xt_io_descr->uv_fs_request,
+                              xt_io_descr->datafile->file,
+                              &xt_io_descr->iov,
+                              1,
+                              (int64_t) xt_io_descr->pos,
+                              extent_flush_io_callback);
 
-    fatal_assert(-1 != ret);
+        fatal_assert(-1 != ret);
+    }
 }
 
 static void *flush_pages_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
