@@ -610,7 +610,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     rrdeng_page_alignment_release(handle->alignment);
 
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
-        fatal("DBENGINE: metric is already released");
+        internal_fatal(true, "DBENGINE: metric is already released");
 
     mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
