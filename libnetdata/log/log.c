@@ -791,8 +791,8 @@ void info_int( const char *file __maybe_unused, const char *function __maybe_unu
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(
-        stderror, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, netdata_thread_tag(), line, file, function);
+    fprintf(stderror, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ",
+            date, program_name, netdata_thread_tag(), line, file, function);
 #else
     fprintf(stderror, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
 #endif
@@ -864,8 +864,8 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(
-        stderror, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    fprintf(stderror, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
+            date, program_name, prefix, netdata_thread_tag(), line, file, function);
 #else
     fprintf(stderror, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
 #endif
@@ -873,15 +873,16 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     va_end( args );
 
     if(erl->count > 1)
-        fprintf(
-            stderror, " (similar messages repeated %zu times in the last %llu secs)", erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
+        fprintf(stderror, " (similar messages repeated %zu times in the last %llu secs)",
+                erl->count, (unsigned long long)(erl->last_logged ? now - erl->last_logged : 0));
 
     if(erl->sleep_ut)
         fprintf(stderror, " (sleeping for %llu microseconds every time this happens)", erl->sleep_ut);
 
     if(__errno) {
         char buf[1024];
-        fprintf(stderror, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        fprintf(stderror,
+                " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
@@ -918,8 +919,8 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(
-        stderror, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, prefix, netdata_thread_tag(), line, file, function);
+    fprintf(stderror, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
+            date, program_name, prefix, netdata_thread_tag(), line, file, function);
 #else
     fprintf(stderror, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
 #endif
@@ -928,7 +929,8 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
 
     if(__errno) {
         char buf[1024];
-        fprintf(stderror, " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
+        fprintf(stderror,
+                " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
@@ -984,8 +986,8 @@ void fatal_int( const char *file, const char *function, const unsigned long line
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(
-        stderror, "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
+    fprintf(stderror,
+            "%s: %s FATAL : %s : (%04lu@%-20.20s:%-15.15s): ", date, program_name, thread_tag, line, file, function);
 #else
     fprintf(stderror, "%s: %s FATAL : %s : ", date, program_name, thread_tag);
 #endif
