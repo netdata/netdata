@@ -497,6 +497,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
                                         const char *msg,
                                         RRDENG_COLLECT_PAGE_FLAGS flags);
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
+void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags);
 
 typedef enum {
     PAGE_IS_IN_THE_PAST   = -1,

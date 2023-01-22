@@ -827,7 +827,7 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
     }
 }
 
-static void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
+void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
     if(flags & RRDENG_PAGE_PAST_COLLECTION)
         buffer_strcat(wb, "PAST_COLLECTION ");
     if(flags & RRDENG_PAGE_REPEATED_COLLECTION)

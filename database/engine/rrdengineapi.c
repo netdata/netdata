@@ -327,12 +327,12 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->page_flags = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
-    handle->page_start_time_ut = 0;
 
     // important!
     // we should never zero page end time ut, because this will allow
     // collection to go back in time
     // handle->page_end_time_ut = 0;
+    // handle->page_start_time_ut;
 
     check_and_fix_mrg_update_every(handle);
 }
@@ -360,7 +360,14 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
-        error("DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        internal_error(true,
+#else
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl,
+#endif
+              "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
               "with existing %s page from %ld to %ld, update every %ld - "
               "is it collected more than once?",
               uuid,
@@ -530,6 +537,40 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
 }
 
+static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut, const char *msg) {
+    time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+    char uuid[UUID_STR_LEN + 1];
+    uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
+
+    BUFFER *wb = NULL;
+    if(handle->page && handle->page_flags) {
+        wb = buffer_create(0, NULL);
+        collect_page_flags_to_buffer(wb, handle->page_flags);
+    }
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(true,
+#else
+    error_limit_static_global_var(erl, 1, 0);
+    error_limit(&erl,
+#endif
+                "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
+                "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
+                uuid,
+                point_in_time_s,
+                msg,
+                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                (time_t)(handle->update_every_ut / USEC_PER_SEC),
+                handle->page ? "current" : "*LAST*",
+                (time_t)(handle->page_start_time_ut / USEC_PER_SEC),
+                (time_t)(handle->page_end_time_ut / USEC_PER_SEC),
+                handle->page_position, handle->page_entries_max,
+                wb ? buffer_tostring(wb) : ""
+    );
+
+    buffer_free(wb);
+}
+
 void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                               usec_t point_in_time_ut,
                               NETDATA_DOUBLE n,
@@ -552,17 +593,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     }
     else if(unlikely(point_in_time_ut < handle->page_end_time_ut)) {
         handle->page_flags |= RRDENG_PAGE_PAST_COLLECTION;
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: new point at %llu is older than the last collected %llu, ignoring it",
-                       point_in_time_ut, handle->page_end_time_ut);
+        store_metric_next_error_log(handle, point_in_time_ut, "is older than the");
         return;
     }
 
     else if(unlikely(point_in_time_ut == handle->page_end_time_ut)) {
         handle->page_flags |= RRDENG_PAGE_REPEATED_COLLECTION;
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: new point time %llu has the same timestamp to the last collected point, ignoring it",
-                       point_in_time_ut);
+        store_metric_next_error_log(handle, point_in_time_ut, "is at the same time as the");
         return;
     }
 
