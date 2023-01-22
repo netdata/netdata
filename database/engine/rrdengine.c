@@ -890,38 +890,56 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
     worker_is_idle();
 }
 
-static struct rrdengine_datafile *datafile_writer_lock(struct rrdengine_instance *ctx) {
+static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
+    bool ret = false;
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+
+    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx))
+        ret = true;
+
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+    return ret;
+}
+
+static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
     struct rrdengine_datafile *datafile;
 
     // get the latest datafile
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     datafile = ctx->datafiles.first->prev;
     netdata_spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.running++;
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
-        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-        netdata_spinlock_lock(&sp);
-        if(create_new_datafile_pair(ctx) == 0)
+    if(datafile_is_full(ctx, datafile)) {
+        static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+        netdata_mutex_lock(&mutex);
+
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
                            NULL);
-        netdata_spinlock_unlock(&sp);
 
-        // unlock the old datafile
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        netdata_mutex_lock(&mutex);
+
+        struct rrdengine_datafile *old_datafile = datafile;
 
         // get the new datafile
         uv_rwlock_rdlock(&ctx->datafiles.rwlock);
         datafile = ctx->datafiles.first->prev;
         netdata_spinlock_lock(&datafile->writers.spinlock);
+        datafile->writers.running++;
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
         uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        // release the writers on the old datafile
+        netdata_spinlock_lock(&old_datafile->writers.spinlock);
+        old_datafile->writers.running--;
+        netdata_spinlock_unlock(&old_datafile->writers.spinlock);
     }
 
     return datafile;
-}
-
-static void datafile_write_unlock(struct rrdengine_datafile *datafile) {
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
 }
 
 /*
@@ -1029,12 +1047,12 @@ static struct extent_io_descriptor *flush_extent_prepare(struct rrdengine_instan
 
     real_io_size = ALIGN_BYTES_CEILING(size_bytes);
 
-    datafile = datafile_writer_lock(ctx);
-    datafile->writers.running++;
+    datafile = get_datafile_to_write_extent(ctx);
+    netdata_spinlock_lock(&datafile->writers.spinlock);
     xt_io_descr->datafile = datafile;
     xt_io_descr->pos = datafile->pos;
     datafile->pos += real_io_size;
-    datafile_write_unlock(datafile);
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
 
     xt_io_descr->bytes = size_bytes;
     xt_io_descr->uv_fs_request.data = xt_io_descr;
