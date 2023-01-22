@@ -352,6 +352,17 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     while (unlikely(!added)) {
         conflicts++;
 
+        char uuid[UUID_STR_LEN + 1];
+        uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
+        error("DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
+              "with existing %s page from %ld to %ld, update every %ld - "
+              "is it collected more than once?",
+              uuid,
+              page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
+              pgc_is_page_hot(page) ? "hot" : "not-hot",
+              pgc_page_start_time_s(page), pgc_page_end_time_s(page), pgc_page_update_every_s(page)
+              );
+
         pgc_page_release(main_cache, page);
 
         point_in_time_ut -= handle->update_every_ut;
@@ -562,14 +573,15 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 
             // loop to fill the gap
             usec_t point_in_time_to_stop_ut = point_in_time_ut - handle->update_every_ut;
-            while (handle->page_end_time_ut <= point_in_time_to_stop_ut) {
+            for(usec_t next_point_in_time = handle->page_end_time_ut + handle->update_every_ut;
+                next_point_in_time <= point_in_time_to_stop_ut ;
+                next_point_in_time = handle->page_end_time_ut + handle->update_every_ut)
                 rrdeng_store_metric_append_point(
                         collection_handle,
                         handle->page_end_time_ut + handle->update_every_ut,
                         NAN, NAN, NAN,
                         1, 0,
                         SN_EMPTY_SLOT);
-            }
         }
     }
 
