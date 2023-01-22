@@ -1074,6 +1074,7 @@ static void after_flush_pages(struct rrdengine_instance *ctx __maybe_unused, voi
 }
 
 static void *flush_pages_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_FLUSH_PAGES);
     struct page_descr_with_data *base = data;
     struct extent_io_descriptor *xt_io_descr = flush_extent_prepare(ctx, base, completion);
     return xt_io_descr;
@@ -1332,6 +1333,7 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 }
 
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
     completion_mark_complete(&ctx->quiesce.completion);
     return data;
@@ -1342,6 +1344,8 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_POPULATE_MRG);
+
     do {
         struct rrdengine_datafile *datafile = NULL;
 
@@ -1380,6 +1384,8 @@ static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_SHUTDOWN);
+
     completion_wait_for(&ctx->quiesce.completion);
     completion_destroy(&ctx->quiesce.completion);
 
@@ -1569,6 +1575,8 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_BUFFERS_CLEANUP);
+
     rrdeng_cmd_cleanup1();
     work_request_cleanup1();
     page_descriptor_cleanup1();
