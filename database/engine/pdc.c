@@ -844,10 +844,8 @@ static void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS f
         buffer_strcat(wb, "COMPLETED_IN_FUTURE ");
     if(flags & RRDENG_PAGE_UNALIGNED)
         buffer_strcat(wb, "UNALIGNED ");
-    if(flags & RRDENG_PAGE_FOUND_IN_CACHE)
-        buffer_strcat(wb, "FOUND_IN_CACHE ");
-    if(flags & RRDENG_PAGE_FOUND_IN_CACHE_GAP)
-        buffer_strcat(wb, "FOUND_IN_CACHE_GAP ");
+    if(flags & RRDENG_PAGE_CONFLICT)
+        buffer_strcat(wb, "CONFLICT ");
 }
 
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {

@@ -236,7 +236,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     if(!mrg_metric_writer_acquire(main_mrg, metric)) {
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
-        fatal("DBENGINE: metric '%s' is already collected and should not be collected twice", uuid);
+        error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
     }
 
     metric = mrg_metric_dup(main_mrg, metric);
@@ -346,64 +346,30 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .hot = true
     };
 
+    size_t conflicts = 0;
     bool added = true;
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
-    if (unlikely(!added)) {
-        internal_fatal(pgc_page_section(page) != (Word_t)ctx,
-                       "DBENGINE CACHE: page returned from main cache does not match our section");
+    while (unlikely(!added)) {
+        conflicts++;
 
-        internal_fatal(pgc_page_metric(page) != (Word_t)handle->metric,
-                       "DBENGINE CACHE: page returned from main cache does not match our metric");
+        pgc_page_release(main_cache, page);
 
-        internal_fatal(!pgc_is_page_hot(page),
-                       "DBENGINE CACHE: requested to add a hot page to the main cache, "
-                       "but the page returned is not hot");
-
-        handle->page_entries_max = pgc_page_data_size(main_cache, page) / CTX_POINT_SIZE_BYTES(ctx);
-        handle->page_start_time_ut = pgc_page_start_time_s(page) * USEC_PER_SEC;
-        handle->page_end_time_ut = pgc_page_end_time_s(page) * USEC_PER_SEC;
-        usec_t page_update_every_ut = pgc_page_update_every_s(page) * USEC_PER_SEC;
-        handle->page_position = (handle->page_end_time_ut - handle->page_start_time_ut + page_update_every_ut) / page_update_every_ut;
-        handle->page_flags = RRDENG_PAGE_FOUND_IN_CACHE;
-        handle->page = page;
-
-        if(handle->page_position + 1 >= handle->page_entries_max ||
-            page_update_every_ut != handle->update_every_ut ||
-            handle->page_end_time_ut + handle->update_every_ut != point_in_time_ut) {
-            handle->page_flags |= RRDENG_PAGE_FOUND_IN_CACHE_GAP;
-            rrdeng_store_metric_flush_current_page((STORAGE_COLLECT_HANDLE *) handle);
-            rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);
-            return;
-        }
-
-        handle->page_position++; // for the point to be stored
-        handle->page_end_time_ut += handle->update_every_ut;
-        pgc_page_hot_set_end_time_s(main_cache, page, point_in_time_s);
-
-        // find the offset of our point to add
-        uint8_t *point_offset = (uint8_t *)pgc_page_data(page) + handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
-
-        // copy the point in data
-        memcpy(point_offset, data, CTX_POINT_SIZE_BYTES(ctx));
-
-        // free data
-        dbengine_page_free(page_entry.data, data_size);
-
-        // for the next point
-        if(++handle->page_position > handle->page_entries_max)
-            rrdeng_store_metric_flush_current_page((STORAGE_COLLECT_HANDLE *) handle);
+        point_in_time_ut -= handle->update_every_ut;
+        point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+        page_entry.start_time_s = point_in_time_s;
+        page_entry.end_time_s = point_in_time_s;
+        page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
     }
-    else {
-        handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
-        handle->page_start_time_ut = point_in_time_ut;
-        handle->page_end_time_ut = point_in_time_ut;
-        handle->page_position = 1; // zero is already in our data
-        handle->page = page;
-        handle->page_flags = 0;
 
-        if(point_in_time_s > max_acceptable_collected_time())
-            handle->page_flags |= RRDENG_PAGE_CREATED_IN_FUTURE;
-    }
+    handle->page_entries_max = data_size / CTX_POINT_SIZE_BYTES(ctx);
+    handle->page_start_time_ut = point_in_time_ut;
+    handle->page_end_time_ut = point_in_time_ut;
+    handle->page_position = 1; // zero is already in our data
+    handle->page = page;
+    handle->page_flags = conflicts? RRDENG_PAGE_CONFLICT : 0;
+
+    if(point_in_time_s > max_acceptable_collected_time())
+        handle->page_flags |= RRDENG_PAGE_CREATED_IN_FUTURE;
 
     check_and_fix_mrg_update_every(handle);
 }

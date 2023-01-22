@@ -180,8 +180,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRDENG_PAGE_CREATED_IN_FUTURE     = (1 << 5),
     RRDENG_PAGE_COMPLETED_IN_FUTURE   = (1 << 6),
     RRDENG_PAGE_UNALIGNED             = (1 << 7),
-    RRDENG_PAGE_FOUND_IN_CACHE        = (1 << 8),
-    RRDENG_PAGE_FOUND_IN_CACHE_GAP    = (1 << 9),
+    RRDENG_PAGE_CONFLICT              = (1 << 8),
 } RRDENG_COLLECT_PAGE_FLAGS;
 
 struct rrdeng_collect_handle {
