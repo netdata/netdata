@@ -62,7 +62,7 @@ extern int stdhealth_fd;
 extern FILE *stdhealth;
 
 extern int stdcollector_fd;
-extern FILE *stdcollector;
+extern FILE *stderror;
 
 extern const char *stdaccess_filename;
 extern const char *stderr_filename;
