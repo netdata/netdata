@@ -1239,7 +1239,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         time_t started = st->rrdhost->receiver->replication_first_time_t;
         time_t current = ((PARSER_USER_OBJECT *) user)->replay.end_time;
 
-        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+        if(started && current > started)
+            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
                           (NETDATA_DOUBLE)(current - started) * 100.0 / (NETDATA_DOUBLE)(now - started));
     }
 
