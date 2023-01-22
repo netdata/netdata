@@ -233,7 +233,9 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = (METRIC *)db_metric_handle;
 
+    bool is_1st_metric_writer = true;
     if(!mrg_metric_writer_acquire(main_mrg, metric)) {
+        is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
         error("DBENGINE: metric '%s' is already collected and should not be collected twice - expect gaps on the charts", uuid);
@@ -249,6 +251,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = update_every * USEC_PER_SEC;
+    handle->options = is_1st_metric_writer ? RRDENG_1ST_METRIC_WRITER : 0;
 
     // this is important!
     // if we don't set the page_end_time_ut during the first collection
@@ -606,7 +609,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     rrdeng_store_metric_flush_current_page(collection_handle);
     rrdeng_page_alignment_release(handle->alignment);
 
-    if(!mrg_metric_writer_release(main_mrg, handle->metric))
+    if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
         fatal("DBENGINE: metric is already released");
 
     mrg_metric_release(main_mrg, handle->metric);
