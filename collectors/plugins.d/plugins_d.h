@@ -50,9 +50,6 @@ struct plugind {
     char fullfilename[FILENAME_MAX+1];  // with path
     char cmd[PLUGINSD_CMD_MAX+1];       // the command that it executes
 
-    volatile pid_t pid;
-    netdata_thread_t thread;
-
     size_t successful_collections;      // the number of times we have seen
                                         // values collected from this plugin
 
@@ -60,8 +57,14 @@ struct plugind {
                                         // without collecting values
 
     int update_every;                   // the plugin default data collection frequency
-    volatile sig_atomic_t obsolete;     // do not touch this structure after setting this to 1
-    volatile sig_atomic_t enabled;      // if this is enabled or not
+
+    struct {
+        SPINLOCK spinlock;
+        bool running;                  // do not touch this structure after setting this to 1
+        bool enabled;                   // if this is enabled or not
+        netdata_thread_t thread;
+        pid_t pid;
+    } unsafe;
 
     time_t started_t;
     uint32_t capabilities;              // follows the same principles as streaming capabilities

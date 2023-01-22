@@ -1301,10 +1301,10 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
-    int enabled = cd->enabled;
+    int enabled = cd->unsafe.enabled;
 
     if (!fp_plugin_input || !fp_plugin_output || !enabled) {
-        cd->enabled = 0;
+        cd->unsafe.enabled = 0;
         return 0;
     }
 
@@ -1324,7 +1324,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     clearerr(fp_plugin_output);
 
     PARSER_USER_OBJECT user = {
-        .enabled = cd->enabled,
+        .enabled = cd->unsafe.enabled,
         .host = host,
         .cd = cd,
         .trust_durations = trust_durations
@@ -1349,7 +1349,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
 
-    cd->enabled = user.enabled;
+    cd->unsafe.enabled = user.enabled;
     size_t count = user.count;
 
     if (likely(count)) {
