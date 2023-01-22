@@ -932,15 +932,23 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
     }
 
     if(unlikely(!vd.is_valid || updated)) {
+#ifndef NETDATA_INTERNAL_CHECKS
         error_limit_static_global_var(erl, 1, 0);
+#endif
         char uuid_str[UUID_STR_LEN + 1];
         uuid_unparse(*uuid, uuid_str);
 
         if(!vd.is_valid) {
-            error_limit(&erl, "DBENGINE: metric '%s' %s invalid page of type %u "
-                              "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu ",
-                              uuid_str, msg, vd.type,
-                              vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries
+
+#ifdef NETDATA_INTERNAL_CHECKS
+            internal_error(true,
+#else
+            error_limit(&erl,
+#endif
+                        "DBENGINE: metric '%s' %s invalid page of type %u "
+                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu ",
+                        uuid_str, msg, vd.type,
+                        vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries
             );
 
             if(minimize_invalid_size) {
@@ -967,15 +975,20 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             const char *err_entries = (vd.entries == entries) ? "" : "entries updated, ";
             const char *err_future = (vd.end_time_s <= now_s) ? "" : "future end time, ";
 
-            error_limit(&erl, "DBENGINE: metric '%s' %s page of type %u "
-                              "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu "
-                              "found inconsistent - the right is "
-                              "from %ld to %ld, update every %ld, page length %zu, entries %zu: "
-                              "%s%s%s%s%s%s%s",
-                              uuid_str, msg, vd.type,
-                              start_time_s, end_time_s, now_s, update_every_s, page_length, entries,
-                              vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
-                              err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
+#ifdef NETDATA_INTERNAL_CHECKS
+            internal_error(true,
+#else
+            error_limit(&erl,
+#endif
+                        "DBENGINE: metric '%s' %s page of type %u "
+                        "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu "
+                        "found inconsistent - the right is "
+                        "from %ld to %ld, update every %ld, page length %zu, entries %zu: "
+                        "%s%s%s%s%s%s%s",
+                        uuid_str, msg, vd.type,
+                        start_time_s, end_time_s, now_s, update_every_s, page_length, entries,
+                        vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
+                        err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
             );
         }
     }
