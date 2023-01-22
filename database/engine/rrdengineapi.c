@@ -447,14 +447,14 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     return dbengine_page_alloc(size);
 }
 
-static void rrdeng_store_metric_next_internal(STORAGE_COLLECT_HANDLE *collection_handle,
-                              usec_t point_in_time_ut,
-                              NETDATA_DOUBLE n,
-                              NETDATA_DOUBLE min_value,
-                              NETDATA_DOUBLE max_value,
-                              uint16_t count,
-                              uint16_t anomaly_count,
-                              SN_FLAGS flags)
+static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_handle,
+                                             usec_t point_in_time_ut,
+                                             NETDATA_DOUBLE n,
+                                             NETDATA_DOUBLE min_value,
+                                             NETDATA_DOUBLE max_value,
+                                             uint16_t count,
+                                             uint16_t anomaly_count,
+                                             SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
@@ -587,7 +587,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         size_t points_gap = (point_in_time_ut - handle->page_end_time_ut) / handle->update_every_ut;
         size_t page_remaining_points = handle->page_entries_max - handle->page_position;
 
-        if(points_gap > page_remaining_points) {
+        if(points_gap >= page_remaining_points) {
             handle->page_flags |= RRDENG_PAGE_BIG_GAP;
             rrdeng_store_metric_flush_current_page(collection_handle);
         }
@@ -595,15 +595,14 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
             handle->page_flags |= RRDENG_PAGE_GAP;
 
             // loop to fill the gap
-            usec_t last_point_filled_ut = handle->page_end_time_ut + handle->update_every_ut;
-
-            while (last_point_filled_ut < point_in_time_ut) {
-                rrdeng_store_metric_next_internal(
-                        collection_handle, last_point_filled_ut,
+            usec_t point_in_time_to_stop_ut = point_in_time_ut - handle->update_every_ut;
+            while (handle->page_end_time_ut <= point_in_time_to_stop_ut) {
+                rrdeng_store_metric_append_point(
+                        collection_handle,
+                        handle->page_end_time_ut + handle->update_every_ut,
                         NAN, NAN, NAN,
-                        1, 0, SN_EMPTY_SLOT);
-
-                last_point_filled_ut += handle->update_every_ut;
+                        1, 0,
+                        SN_EMPTY_SLOT);
             }
         }
     }
@@ -612,7 +611,11 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
 //    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
 //        "DBENGINE: new point is not aligned to update every");
 
-    rrdeng_store_metric_next_internal(collection_handle, point_in_time_ut, n, min_value, max_value, count, anomaly_count, flags);
+    rrdeng_store_metric_append_point(collection_handle,
+                                     point_in_time_ut,
+                                     n, min_value, max_value,
+                                     count, anomaly_count,
+                                     flags);
 }
 
 /*
