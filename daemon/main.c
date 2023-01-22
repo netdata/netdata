@@ -808,6 +808,9 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
     stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 

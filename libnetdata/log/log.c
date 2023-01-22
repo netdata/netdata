@@ -28,6 +28,7 @@ const char *stderr_filename = NULL;
 const char *stdout_filename = NULL;
 const char *facility_log = NULL;
 const char *stdhealth_filename = NULL;
+const char *stdcollector_filename = NULL;
 
 #ifdef ENABLE_ACLK
 const char *aclklog_filename = NULL;

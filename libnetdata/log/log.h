@@ -65,6 +65,7 @@ extern const char *stdaccess_filename;
 extern const char *stderr_filename;
 extern const char *stdout_filename;
 extern const char *stdhealth_filename;
+extern const char *stdcollector_filename;
 extern const char *facility_log;
 
 #ifdef ENABLE_ACLK
