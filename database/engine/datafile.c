@@ -565,7 +565,8 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         }
 
         logged = false;
-        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
+        size_t iterations = 100;
+        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
             if(!logged) {
                 info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
