@@ -772,7 +772,7 @@ void dbengine_extent_free(void *extent, size_t size __maybe_unused) {
     freez(extent);
 }
 
-static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
+static void journalfile_prepare_extent(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
     unsigned count, payload_length, descr_size, size_bytes;
     void *buf;
     /* persistent structures */
@@ -884,6 +884,40 @@ static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
     worker_is_idle();
 }
 
+static struct rrdengine_datafile *datafile_writer_lock(struct rrdengine_instance *ctx) {
+    struct rrdengine_datafile *datafile;
+
+    // get the latest datafile
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    datafile = ctx->datafiles.first->prev;
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
+        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
+        netdata_spinlock_lock(&sp);
+        if(create_new_datafile_pair(ctx) == 0)
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
+                           NULL);
+        netdata_spinlock_unlock(&sp);
+
+        // unlock the old datafile
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+        // get the new datafile
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+        datafile = ctx->datafiles.first->prev;
+        netdata_spinlock_lock(&datafile->writers.spinlock);
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    }
+
+    return datafile;
+}
+
+static void datafile_write_unlock(struct rrdengine_datafile *datafile) {
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
+}
+
 /*
  * Take a page list in a judy array and write them
  */
@@ -968,52 +1002,35 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
         pos += descr->page_length;
     }
 
-    switch (compression_algorithm) {
-        case RRD_NO_COMPRESSION:
-            header->payload_length = uncompressed_payload_length;
-            break;
-        default: /* Compress */
-            compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
-                                               uncompressed_payload_length, max_compressed_size);
-            ctx->stats.before_compress_bytes += uncompressed_payload_length;
-            ctx->stats.after_compress_bytes += compressed_size;
-            debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
-            (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
-            extent_buffer_release(eb);
-            size_bytes = payload_offset + compressed_size + sizeof(*trailer);
-            header->payload_length = compressed_size;
-        break;
+    if(likely(compression_algorithm == RRD_LZ4)) {
+        compressed_size = LZ4_compress_default(
+                xt_io_descr->buf + payload_offset,
+                compressed_buf,
+                (int)uncompressed_payload_length,
+                max_compressed_size);
+
+        ctx->stats.before_compress_bytes += uncompressed_payload_length;
+        ctx->stats.after_compress_bytes += compressed_size;
+        debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
+        (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
+        extent_buffer_release(eb);
+        size_bytes = payload_offset + compressed_size + sizeof(*trailer);
+        header->payload_length = compressed_size;
+    }
+    else { // RRD_NO_COMPRESSION
+        header->payload_length = uncompressed_payload_length;
     }
 
-    // get the latest datafile
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    datafile = ctx->datafiles.first->prev;
-    netdata_spinlock_lock(&datafile->writers.spinlock);
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
 
-    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
-        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-        netdata_spinlock_lock(&sp);
-        if(create_new_datafile_pair(ctx) == 0)
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
-                           NULL);
-        netdata_spinlock_unlock(&sp);
-
-        // unlock the old datafile
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
-
-        // get the new datafile
-        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-        datafile = ctx->datafiles.first->prev;
-        netdata_spinlock_lock(&datafile->writers.spinlock);
-        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-    }
-
+    datafile = datafile_writer_lock(ctx);
     datafile->writers.running++;
-
     xt_io_descr->datafile = datafile;
-    xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = datafile->pos;
+    datafile->pos += real_io_size;
+    datafile_write_unlock(datafile);
+
+    xt_io_descr->bytes = size_bytes;
     xt_io_descr->uv_fs_request.data = xt_io_descr;
     xt_io_descr->completion = completion;
 
@@ -1022,24 +1039,26 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     crc = crc32(crc, xt_io_descr->buf, size_bytes - sizeof(*trailer));
     crc32set(trailer->checksum, crc);
 
-    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
+    journalfile_prepare_extent(ctx, xt_io_descr);
 
-    ctx->stats.io_write_bytes += real_io_size;
-    ++ctx->stats.io_write_requests;
-    ctx->stats.io_write_extent_bytes += real_io_size;
-    ++ctx->stats.io_write_extents;
-    commit_data_extent(ctx, xt_io_descr);
-    datafile->pos += real_io_size;
-    ctx_current_disk_space_increase(ctx, real_io_size);
     ctx_last_flush_fileno_set(ctx, datafile->fileno);
 
-    ret = uv_fs_write(&rrdeng_main.loop, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov,
-                      1, xt_io_descr->pos, extent_flush_io_callback);
+    ctx_current_disk_space_increase(ctx, real_io_size);
+    __atomic_add_fetch(&ctx->stats.io_write_bytes, real_io_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.io_write_requests, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.io_write_extent_bytes, real_io_size, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.io_write_extents, 1, __ATOMIC_RELAXED);
+
+    ret = uv_fs_write(&rrdeng_main.loop,
+                      &xt_io_descr->uv_fs_request,
+                      datafile->file,
+                      &xt_io_descr->iov,
+                      1,
+                      (int64_t)xt_io_descr->pos,
+                      extent_flush_io_callback);
 
     fatal_assert(-1 != ret);
-
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
 
     return real_io_size;
 }
