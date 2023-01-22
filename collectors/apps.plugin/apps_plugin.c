@@ -4850,6 +4850,7 @@ void *reader_main(void *arg __maybe_unused) {
 
 int main(int argc, char **argv) {
     // debug_flags = D_PROCFILE;
+    stderror = stderr;
 
     clocks_init();
 
