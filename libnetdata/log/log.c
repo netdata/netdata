@@ -14,6 +14,7 @@ uint64_t debug_flags = 0;
 
 int access_log_syslog = 1;
 int error_log_syslog = 1;
+int collector_log_syslog = 1;
 int output_log_syslog = 1;  // debug log
 int health_log_syslog = 1;
 
@@ -22,6 +23,9 @@ FILE *stdaccess = NULL;
 
 int stdhealth_fd = -1;
 FILE *stdhealth = NULL;
+
+int stdcollector_fd = -1;
+FILE *stdcollector = NULL;
 
 const char *stdaccess_filename = NULL;
 const char *stderr_filename = NULL;
@@ -577,6 +581,9 @@ void reopen_all_log_files() {
     if(stderr_filename)
         open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
 
+    if(stdcollector_filename)
+        stdcollector = open_log_file(stdcollector_fd, stdcollector, stdcollector_filename, &collector_log_syslog, 1, &stdcollector_fd);
+
 #ifdef ENABLE_ACLK
     if (aclklog_enabled)
         aclklog = open_log_file(aclklog_fd, aclklog, aclklog_filename, NULL, 0, &aclklog_fd);
@@ -595,6 +602,8 @@ void open_all_log_files() {
 
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
     open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+
+    stdcollector = open_log_file(stdcollector_fd, stdcollector, stdcollector_filename, &collector_log_syslog, 1, &stdcollector_fd);
 
 #ifdef ENABLE_ACLK
     if(aclklog_enabled)
