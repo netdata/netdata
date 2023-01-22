@@ -145,6 +145,7 @@ static struct replication_query *replication_query_prepare(
         q->query.locked_data_collection = true;
 
         if (st->last_updated.tv_sec > q->query.before) {
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
             internal_error(true,
                            "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
                            "has start_streaming = true, "
@@ -153,6 +154,7 @@ static struct replication_query *replication_query_prepare(
                            (unsigned long long) q->query.before,
                            (unsigned long long) st->last_updated.tv_sec
             );
+#endif
             q->query.before = st->last_updated.tv_sec;
         }
     }
