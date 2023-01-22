@@ -191,6 +191,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
 }
 
 static inline bool check_completed_page_consistency(struct rrdeng_collect_handle *handle) {
+#ifdef NETDATA_INTERNAL_CHECKS
     if (unlikely(!handle->page || !handle->page_entries_max || !handle->page_position || !handle->page_end_time_ut))
         return false;
 
@@ -202,7 +203,6 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
     time_t update_every_s = pgc_page_update_every_s(handle->page);
     size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
     size_t entries = handle->page_position;
-    time_t now_s = max_acceptable_collected_time();
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
     if(end_time_s > max_acceptable_collected_time())
@@ -216,7 +216,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
             page_length,
             ctx->config.page_type,
             entries,
-            now_s,
+            0, // do not check for future timestamps - we inherit the timestamps of the children
             overwrite_zero_update_every_s,
             false,
             false,
@@ -224,6 +224,9 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
             handle->page_flags);
 
     return vd.is_valid;
+#else
+    return true;
+#endif
 }
 
 /*

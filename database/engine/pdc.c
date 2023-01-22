@@ -868,12 +868,12 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         uuid_t *uuid,
         time_t start_time_s,
         time_t end_time_s,
-        time_t update_every_s,
+        time_t update_every_s,                  // can be zero, if unknown
         size_t page_length,
         uint8_t page_type,
-        size_t entries,
-        time_t now_s,
-        time_t overwrite_zero_update_every_s,
+        size_t entries,                         // can be zero, if unknown
+        time_t now_s,                           // can be zero, to disable future timestamp check
+        time_t overwrite_zero_update_every_s,   // can be zero, if unknown
         bool have_read_error,
         bool minimize_invalid_size,
         const char *msg,
@@ -913,7 +913,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         vd.page_length == 0                                     ||
         vd.page_length > RRDENG_BLOCK_SIZE                      ||
         vd.start_time_s > vd.end_time_s                         ||
-        vd.end_time_s > now_s                                   ||
+        (now_s && vd.end_time_s > now_s)                        ||
         vd.start_time_s == 0                                    ||
         vd.end_time_s == 0                                      ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
@@ -1001,7 +1001,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
             const char *err_update = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
             const char *err_length = (vd.page_length == page_length) ? "" : "page length updated, ";
             const char *err_entries = (vd.entries == entries) ? "" : "entries updated, ";
-            const char *err_future = (vd.end_time_s <= now_s) ? "" : "future end time, ";
+            const char *err_future = (now_s && vd.end_time_s <= now_s) ? "" : "future end time, ";
 
 #ifdef NETDATA_INTERNAL_CHECKS
             internal_error(true,
