@@ -1300,6 +1300,8 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
+    // Initialize stderror avoiding coredump when info() or error() is called
+    stderror = stderr;
 
     int i;
     int config_loaded = 0;
