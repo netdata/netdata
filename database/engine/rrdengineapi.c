@@ -196,53 +196,31 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
 
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
+    uuid_t *uuid = mrg_metric_uuid(main_mrg, handle->metric);
     time_t start_time_s = pgc_page_start_time_s(handle->page);
     time_t end_time_s = pgc_page_end_time_s(handle->page);
     time_t update_every_s = pgc_page_update_every_s(handle->page);
     size_t page_length = handle->page_position * CTX_POINT_SIZE_BYTES(ctx);
-    time_t now_s = now_realtime_sec() + 1;
+    size_t entries = handle->page_position;
+    time_t now_s = max_acceptable_collected_time();
     time_t overwrite_zero_update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
-    bool have_read_error = false;
 
     VALIDATED_PAGE_DESCRIPTOR vd = validate_page(
+            uuid,
             start_time_s,
             end_time_s,
             update_every_s,
             page_length,
             ctx->config.page_type,
+            entries,
             now_s,
             overwrite_zero_update_every_s,
-            have_read_error
+            false,
+            false,
+            "collected"
             );
 
-    if(!vd.is_valid ||
-        vd.start_time_s != start_time_s ||
-        vd.end_time_s != end_time_s ||
-        vd.update_every_s != update_every_s ||
-        vd.page_length != page_length ||
-        vd.entries != handle->page_position) {
-
-        const char *valid = (vd.is_valid) ? "" : "found invalid, ";
-        const char *start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
-        const char *end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
-        const char *ue = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
-        const char *pl = (vd.page_length == page_length) ? "" : "page length updated, ";
-        const char *entries = (vd.entries == handle->page_position) ? "" : "entries updated, ";
-
-        char uuid[UUID_STR_LEN + 1];
-        uuid_unparse(*mrg_metric_uuid(main_mrg, handle->metric), uuid);
-        internal_error(true, "DBENGINE: metric '%s' completed page %ld to %ld, ue %ld, pl %zu, entries %u "
-                             "found inconsistent - should be: %ld to %ld, ue %ld, pl %zu, entries %zu: "
-                             "%s%s%s%s%s%s",
-                             uuid,
-                             start_time_s, end_time_s, update_every_s, page_length, handle->page_position,
-                             vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
-                             valid, start, end, ue, pl, entries
-                             );
-        return false;
-    }
-
-    return true;
+    return vd.is_valid;
 }
 
 /*

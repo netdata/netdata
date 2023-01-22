@@ -471,7 +471,18 @@ typedef struct validated_page_descriptor {
 #define page_entries_by_size(page_length_in_bytes, point_size_in_bytes) \
         ((page_length_in_bytes) / (point_size_in_bytes))
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, time_t update_every_s, size_t page_length, uint8_t page_type, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
+VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
+                                        time_t start_time_s,
+                                        time_t end_time_s,
+                                        time_t update_every_s,
+                                        size_t page_length,
+                                        uint8_t page_type,
+                                        size_t entries,
+                                        time_t now_s,
+                                        time_t overwrite_zero_update_every_s,
+                                        bool have_read_error,
+                                        bool minimize_invalid_size,
+                                        const char *msg);
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
 
 typedef enum {
@@ -481,5 +492,9 @@ typedef enum {
 } TIME_RANGE_COMPARE;
 
 TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_last_time_s, time_t wanted_start_time_s, time_t wanted_end_time_s);
+
+static inline time_t max_acceptable_collected_time(void) {
+    return now_realtime_sec() + 1;
+}
 
 #endif /* NETDATA_RRDENGINE_H */

@@ -244,7 +244,7 @@ void mrg_destroy(MRG *mrg __maybe_unused) {
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret) {
     // FIXME - support refcount
 
-//    internal_fatal(entry.latest_time_s > now_realtime_sec(),
+//    internal_fatal(entry.latest_time_s > max_acceptable_collected_time(),
 //        "DBENGINE METRIC: metric latest time is in the future");
 
     return metric_add(mrg, &entry, ret);
@@ -292,9 +292,9 @@ bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t
 
 void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
 
-    internal_fatal(first_time_s > now_realtime_sec() + 1,
+    internal_fatal(first_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric first time is in the future");
-    internal_fatal(last_time_s > now_realtime_sec() + 1,
+    internal_fatal(last_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric last time is in the future");
 
     netdata_spinlock_lock(&metric->spinlock);
@@ -353,7 +353,7 @@ time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
     netdata_spinlock_lock(&metric->spinlock);
 
-//    internal_fatal(latest_time_s > now_realtime_sec() + 1,
+//    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
 //    internal_fatal(metric->latest_time_s_clean > latest_time_s,
@@ -372,7 +372,7 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
 }
 
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
-//    internal_fatal(latest_time_s > now_realtime_sec(),
+//    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
 
     netdata_spinlock_lock(&metric->spinlock);
@@ -640,7 +640,7 @@ int mrg_unittest(void) {
         fatal("DBENGINE METRIC: invalid entries counter");
 
 #ifdef MRG_STRESS_TEST
-    usec_t started_ut = now_realtime_usec();
+    usec_t started_ut = now_monotonic_usec();
     pthread_t thread1;
     netdata_thread_create(&thread1, "TH1",
                           NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
@@ -666,7 +666,7 @@ int mrg_unittest(void) {
     netdata_thread_join(thread1, NULL);
     netdata_thread_join(thread2, NULL);
     netdata_thread_join(thread3, NULL);
-    usec_t ended_ut = now_realtime_usec();
+    usec_t ended_ut = now_monotonic_usec();
 
     info("DBENGINE METRIC: did %zu additions, %zu duplicate additions, "
          "%zu deletions, %zu wrong deletions, "

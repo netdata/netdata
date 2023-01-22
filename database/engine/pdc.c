@@ -829,32 +829,63 @@ static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type)
 
 inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
     return validate_page(
+            (uuid_t *)descr->uuid,
             (time_t) (descr->start_time_ut / USEC_PER_SEC),
             (time_t) (descr->end_time_ut / USEC_PER_SEC),
             0,
             descr->page_length,
             descr->type,
-            now_s, overwrite_zero_update_every_s, have_read_error);
+            0,
+            now_s,
+            overwrite_zero_update_every_s,
+            have_read_error,
+            true,
+            "loaded");
 }
 
-VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, time_t update_every_s, size_t page_length, uint8_t page_type, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error) {
+VALIDATED_PAGE_DESCRIPTOR validate_page(
+        uuid_t *uuid,
+        time_t start_time_s,
+        time_t end_time_s,
+        time_t update_every_s,
+        size_t page_length,
+        uint8_t page_type,
+        size_t entries,
+        time_t now_s,
+        time_t overwrite_zero_update_every_s,
+        bool have_read_error,
+        bool minimize_invalid_size,
+        const char *msg) {
+
     VALIDATED_PAGE_DESCRIPTOR vd = {
             .start_time_s = start_time_s,
             .end_time_s = end_time_s,
             .update_every_s = update_every_s,
             .page_length = page_length,
             .type = page_type,
+            .is_valid = true,
     };
+
+    // always calculate entries by size
     vd.point_size = page_type_size[vd.type];
     vd.entries = page_entries_by_size(vd.page_length, vd.point_size);
 
-    if(!vd.update_every_s)
-        vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t)(vd.entries - 1)) : overwrite_zero_update_every_s;
+    // allow to be called without entries (when loading pages from disk)
+    if(!entries)
+        entries = vd.entries;
 
-    bool is_valid = true;
+    // allow to be called without update every (when loading pages from disk)
+    if(!update_every_s) {
+        vd.update_every_s = (vd.entries > 1) ? ((vd.end_time_s - vd.start_time_s) / (time_t) (vd.entries - 1))
+                                             : overwrite_zero_update_every_s;
+
+        update_every_s = vd.update_every_s;
+    }
 
     // another such set of checks exists in
     // update_metric_retention_and_granularity_by_uuid()
+
+    bool updated = false;
 
     if( have_read_error                                         ||
         vd.page_length == 0                                     ||
@@ -865,15 +896,14 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, 
         vd.end_time_s == 0                                      ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
         (vd.update_every_s == 0 && vd.entries > 1)
-            ) {
-        is_valid = false;
+        )
+        vd.is_valid = false;
 
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "DBENGINE: ignoring invalid page of type %u from %ld to %ld (now %ld), update every %ld, page length %zu, point size %zu, entries %zu.",
-                    vd.type, vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.point_size, vd.entries);
-    }
     else {
-        if (vd.update_every_s) {
+        if(unlikely(vd.entries != entries || vd.update_every_s != update_every_s))
+            updated = true;
+
+        if (likely(vd.update_every_s)) {
             size_t entries_by_time = page_entries_by_time(vd.start_time_s, vd.end_time_s, vd.update_every_s);
 
             if (vd.entries != entries_by_time) {
@@ -891,25 +921,65 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(time_t start_time_s, time_t end_time_s, 
                     vd.update_every_s = overwrite_zero_update_every_s;
                     vd.end_time_s = (time_t)(vd.start_time_s + (vd.entries - 1) * vd.update_every_s);
                 }
+
+                updated = true;
             }
         }
-        else
+        else if(overwrite_zero_update_every_s) {
             vd.update_every_s = overwrite_zero_update_every_s;
+            updated = true;
+        }
     }
 
-    if(!is_valid) {
-        if(vd.start_time_s == vd.end_time_s) {
-            vd.page_length = vd.point_size;
-            vd.entries = 1;
+    if(unlikely(!vd.is_valid || updated)) {
+        error_limit_static_global_var(erl, 1, 0);
+        char uuid_str[UUID_STR_LEN + 1];
+        uuid_unparse(*uuid, uuid_str);
+
+        if(!vd.is_valid) {
+            error_limit(&erl, "DBENGINE: metric '%s' %s invalid page of type %u "
+                              "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu ",
+                              uuid_str, msg, vd.type,
+                              vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries
+            );
+
+            if(minimize_invalid_size) {
+                // since the page is going to be loaded
+                // let's minimize the memory the invalid page will occupy
+
+                if(vd.start_time_s == vd.end_time_s) {
+                    vd.page_length = vd.point_size;
+                    vd.entries = 1;
+                }
+                else {
+                    vd.page_length = vd.point_size * 2;
+                    vd.update_every_s = vd.end_time_s - vd.start_time_s;
+                    vd.entries = 2;
+                }
+            }
         }
         else {
-            vd.page_length = vd.point_size * 2;
-            vd.update_every_s = vd.end_time_s - vd.start_time_s;
-            vd.entries = 2;
+            const char *err_valid = (vd.is_valid) ? "" : "found invalid, ";
+            const char *err_start = (vd.start_time_s == start_time_s) ? "" : "start time updated, ";
+            const char *err_end = (vd.end_time_s == end_time_s) ? "" : "end time updated, ";
+            const char *err_update = (vd.update_every_s == update_every_s) ? "" : "update every updated, ";
+            const char *err_length = (vd.page_length == page_length) ? "" : "page length updated, ";
+            const char *err_entries = (vd.entries == entries) ? "" : "entries updated, ";
+            const char *err_future = (vd.end_time_s <= now_s) ? "" : "future end time, ";
+
+            error_limit(&erl, "DBENGINE: metric '%s' %s page of type %u "
+                              "from %ld to %ld (now %ld), update every %ld, page length %zu, entries %zu "
+                              "found inconsistent - the right is "
+                              "from %ld to %ld, update every %ld, page length %zu, entries %zu: "
+                              "%s%s%s%s%s%s%s",
+                              uuid_str, msg, vd.type,
+                              start_time_s, end_time_s, now_s, update_every_s, page_length, entries,
+                              vd.start_time_s, vd.end_time_s, vd.update_every_s, vd.page_length, vd.entries,
+                              err_valid, err_start, err_end, err_update, err_length, err_entries, err_future
+            );
         }
     }
 
-    vd.is_valid = is_valid;
     return vd;
 }
 
@@ -1057,7 +1127,7 @@ static bool epdl_populate_pages_from_extent_data(
     size_t stats_cache_hit_while_inserting = 0;
 
     uint32_t page_offset = 0, page_length;
-    time_t now_s = now_realtime_sec();
+    time_t now_s = max_acceptable_collected_time();
     for (i = 0; i < count; i++, page_offset += page_length) {
         page_length = header->descr[i].page_length;
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);

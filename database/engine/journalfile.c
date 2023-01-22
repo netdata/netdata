@@ -588,7 +588,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
         return;
     }
 
-    time_t now_s = now_realtime_sec();
+    time_t now_s = max_acceptable_collected_time();
     for (i = 0; i < count ; ++i) {
         uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
@@ -922,7 +922,7 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     struct journal_metric_list *metric = (struct journal_metric_list *) (data_start + j2_header->metric_offset);
     time_t header_start_time_s  = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-    time_t now_s = now_realtime_sec();
+    time_t now_s = max_acceptable_collected_time();
     for (size_t i=0; i < entries; i++) {
         time_t start_time_s = header_start_time_s + metric->delta_start_s;
         time_t end_time_s = header_start_time_s + metric->delta_end_s;
@@ -1200,7 +1200,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         number_of_pages);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    usec_t start_loading = now_realtime_usec();
+    usec_t start_loading = now_monotonic_usec();
 #endif
 
     size_t total_file_size = 0;
@@ -1257,7 +1257,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     struct journal_v2_block_trailer *journal_v2_trailer;
 
     data = journalfile_v2_write_extent_list(JudyL_extents_pos, data_start + extent_offset);
-    internal_error(true, "DBENGINE: write extent list so far %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: write extent list so far %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
     fatal_assert(data == data_start + extent_offset_trailer);
 
@@ -1268,7 +1268,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     crc = crc32(crc, (uint8_t *) data_start + extent_offset, number_of_extents * sizeof(struct journal_extent_list));
     crc32set(journal_v2_trailer->checksum, crc);
 
-    internal_error(true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: CALCULATE CRC FOR EXTENT %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
     // Skip the trailer, point to the metrics off
     data += sizeof(struct journal_v2_block_trailer);
 
@@ -1295,7 +1295,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     j2_header.end_time_ut = max_time_s * USEC_PER_SEC;
 
     qsort(&uuid_list[0], number_of_metrics, sizeof(struct journal_metric_list_to_sort), journalfile_metric_compare);
-    internal_error(true, "DBENGINE: traverse and qsort  UUID %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+    internal_error(true, "DBENGINE: traverse and qsort  UUID %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
     uint32_t resize_file_to = total_file_size;
 
@@ -1341,7 +1341,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     }
 
     if (data == data_start + metric_offset_trailer) {
-        internal_error(true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: WRITE METRICS AND PAGES  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
         // Calculate CRC for metrics
         journal_v2_trailer = (struct journal_v2_block_trailer *)(data_start + metric_offset_trailer);
@@ -1349,7 +1349,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         crc =
             crc32(crc, (uint8_t *)data_start + metrics_offset, number_of_metrics * sizeof(struct journal_metric_list));
         crc32set(journal_v2_trailer->checksum, crc);
-        internal_error(true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: CALCULATE CRC FOR UUIDs  %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
         // Prepare to write checksum for the file
         j2_header.data = NULL;
@@ -1361,14 +1361,14 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         // Write header to the file
         memcpy(data_start, &j2_header, sizeof(j2_header));
 
-        internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: FILE COMPLETED --------> %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
 
         info("DBENGINE: migrated journal file '%s', file size %zu", path, total_file_size);
 
         // msync(data_start, total_file_size, MS_SYNC);
         journalfile_v2_data_set(journalfile, fd_v2, data_start, total_file_size);
 
-        internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_realtime_usec() - start_loading) / USEC_PER_MS);
+        internal_error(true, "DBENGINE: ACTIVATING NEW INDEX JNL %llu", (now_monotonic_usec() - start_loading) / USEC_PER_MS);
         ctx_current_disk_space_increase(ctx, total_file_size);
         freez(uuid_list);
         return;
