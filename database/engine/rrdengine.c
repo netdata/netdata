@@ -921,7 +921,7 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
             rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
                            NULL);
 
-        netdata_mutex_lock(&mutex);
+        netdata_mutex_unlock(&mutex);
 
         struct rrdengine_datafile *old_datafile = datafile;
 
