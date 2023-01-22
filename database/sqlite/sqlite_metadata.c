@@ -1022,6 +1022,7 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
 static void metadata_event_loop(void *arg)
 {
+    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
     worker_register("METASYNC");
     worker_register_job_name(METADATA_DATABASE_NOOP,        "noop");
     worker_register_job_name(METADATA_DATABASE_TIMER,       "timer");

@@ -492,6 +492,7 @@ static void timer_cb(uv_timer_t* handle)
 
 static void aclk_database_worker(void *arg)
 {
+    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
     worker_register("ACLKSYNC");
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
     worker_register_job_name(ACLK_DATABASE_ORPHAN_HOST,          "node orphan");
