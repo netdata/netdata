@@ -235,6 +235,7 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
  */
 STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle, uint32_t update_every, STORAGE_METRICS_GROUP *smg) {
     METRIC *metric = (METRIC *)db_metric_handle;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     bool is_1st_metric_writer = true;
     if(!mrg_metric_writer_acquire(main_mrg, metric)) {
@@ -255,6 +256,10 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->page_entries_max = 0;
     handle->update_every_ut = update_every * USEC_PER_SEC;
     handle->options = is_1st_metric_writer ? RRDENG_1ST_METRIC_WRITER : 0;
+
+    __atomic_add_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
+    if(!is_1st_metric_writer)
+        __atomic_add_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     // this is important!
     // if we don't set the page_end_time_ut during the first collection
@@ -645,9 +650,14 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
  */
 int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     rrdeng_store_metric_flush_current_page(collection_handle);
     rrdeng_page_alignment_release(handle->alignment);
+
+    __atomic_sub_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
+    if(!(handle->options & RRDENG_1ST_METRIC_WRITER))
+        __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
@@ -949,43 +959,43 @@ void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long
     if (ctx == NULL)
         return;
 
-    array[0] = (uint64_t)ctx->stats.metric_API_producers;
-    array[1] = (uint64_t)ctx->stats.metric_API_consumers;
+    array[0] = (uint64_t)__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED); // API producers
+    array[1] = (uint64_t)__atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED);   // API consumers
     array[2] = 0;
     array[3] = 0;
     array[4] = 0;
-    array[5] = (uint64_t)ctx->stats.pg_cache_insertions;
-    array[6] = (uint64_t)ctx->stats.pg_cache_deletions;
-    array[7] = (uint64_t)ctx->stats.pg_cache_hits;
-    array[8] = (uint64_t)ctx->stats.pg_cache_misses;
-    array[9] = (uint64_t)ctx->stats.pg_cache_backfills;
-    array[10] = (uint64_t)ctx->stats.pg_cache_evictions;
-    array[11] = (uint64_t)ctx->stats.before_compress_bytes;
-    array[12] = (uint64_t)ctx->stats.after_compress_bytes;
-    array[13] = (uint64_t)ctx->stats.before_decompress_bytes;
-    array[14] = (uint64_t)ctx->stats.after_decompress_bytes;
-    array[15] = (uint64_t)ctx->stats.io_write_bytes;
-    array[16] = (uint64_t)ctx->stats.io_write_requests;
-    array[17] = (uint64_t)ctx->stats.io_read_bytes;
-    array[18] = (uint64_t)ctx->stats.io_read_requests;
-    array[19] = (uint64_t)ctx->stats.io_write_extent_bytes;
-    array[20] = (uint64_t)ctx->stats.io_write_extents;
-    array[21] = (uint64_t)ctx->stats.io_read_extent_bytes;
-    array[22] = (uint64_t)ctx->stats.io_read_extents;
-    array[23] = (uint64_t)ctx->stats.datafile_creations;
-    array[24] = (uint64_t)ctx->stats.datafile_deletions;
-    array[25] = (uint64_t)ctx->stats.journalfile_creations;
-    array[26] = (uint64_t)ctx->stats.journalfile_deletions;
-    array[27] = (uint64_t)ctx->stats.page_cache_descriptors;
-    array[28] = (uint64_t)ctx->stats.io_errors;
-    array[29] = (uint64_t)ctx->stats.fs_errors;
-    array[30] = (uint64_t)global_io_errors;
-    array[31] = (uint64_t)global_fs_errors;
-    array[32] = (uint64_t)rrdeng_reserved_file_descriptors;
-    array[33] = (uint64_t)ctx->stats.pg_cache_over_half_dirty_events;
-    array[34] = (uint64_t)global_pg_cache_over_half_dirty_events;
-    array[35] = (uint64_t)ctx->stats.flushing_pressure_page_deletions;
-    array[36] = (uint64_t)global_flushing_pressure_page_deletions;
+    array[5] = 0; // (uint64_t)ctx->stats.pg_cache_insertions;
+    array[6] = 0; // (uint64_t)ctx->stats.pg_cache_deletions;
+    array[7] = 0; // (uint64_t)ctx->stats.pg_cache_hits;
+    array[8] = 0; // (uint64_t)ctx->stats.pg_cache_misses;
+    array[9] = 0; // (uint64_t)ctx->stats.pg_cache_backfills;
+    array[10] = 0; // (uint64_t)ctx->stats.pg_cache_evictions;
+    array[11] = (uint64_t)__atomic_load_n(&ctx->stats.before_compress_bytes, __ATOMIC_RELAXED); // used
+    array[12] = (uint64_t)__atomic_load_n(&ctx->stats.after_compress_bytes, __ATOMIC_RELAXED); // used
+    array[13] = (uint64_t)__atomic_load_n(&ctx->stats.before_decompress_bytes, __ATOMIC_RELAXED);
+    array[14] = (uint64_t)__atomic_load_n(&ctx->stats.after_decompress_bytes, __ATOMIC_RELAXED);
+    array[15] = (uint64_t)__atomic_load_n(&ctx->stats.io_write_bytes, __ATOMIC_RELAXED); // used
+    array[16] = (uint64_t)__atomic_load_n(&ctx->stats.io_write_requests, __ATOMIC_RELAXED); // used
+    array[17] = (uint64_t)__atomic_load_n(&ctx->stats.io_read_bytes, __ATOMIC_RELAXED);
+    array[18] = (uint64_t)__atomic_load_n(&ctx->stats.io_read_requests, __ATOMIC_RELAXED); // used
+    array[19] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.io_write_extent_bytes, __ATOMIC_RELAXED);
+    array[20] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.io_write_extents, __ATOMIC_RELAXED);
+    array[21] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.io_read_extent_bytes, __ATOMIC_RELAXED);
+    array[22] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.io_read_extents, __ATOMIC_RELAXED);
+    array[23] = (uint64_t)__atomic_load_n(&ctx->stats.datafile_creations, __ATOMIC_RELAXED);
+    array[24] = (uint64_t)__atomic_load_n(&ctx->stats.datafile_deletions, __ATOMIC_RELAXED);
+    array[25] = (uint64_t)__atomic_load_n(&ctx->stats.journalfile_creations, __ATOMIC_RELAXED);
+    array[26] = (uint64_t)__atomic_load_n(&ctx->stats.journalfile_deletions, __ATOMIC_RELAXED);
+    array[27] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.page_cache_descriptors, __ATOMIC_RELAXED);
+    array[28] = (uint64_t)__atomic_load_n(&ctx->stats.io_errors, __ATOMIC_RELAXED);
+    array[29] = (uint64_t)__atomic_load_n(&ctx->stats.fs_errors, __ATOMIC_RELAXED);
+    array[30] = (uint64_t)__atomic_load_n(&global_io_errors, __ATOMIC_RELAXED); // used
+    array[31] = (uint64_t)__atomic_load_n(&global_fs_errors, __ATOMIC_RELAXED); // used
+    array[32] = (uint64_t)__atomic_load_n(&rrdeng_reserved_file_descriptors, __ATOMIC_RELAXED); // used
+    array[33] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.pg_cache_over_half_dirty_events, __ATOMIC_RELAXED);
+    array[34] = (uint64_t)__atomic_load_n(&global_pg_cache_over_half_dirty_events, __ATOMIC_RELAXED); // used
+    array[35] = 0; // (uint64_t)__atomic_load_n(&ctx->stats.flushing_pressure_page_deletions, __ATOMIC_RELAXED);
+    array[36] = (uint64_t)__atomic_load_n(&global_flushing_pressure_page_deletions, __ATOMIC_RELAXED); // used
     array[37] = 0; //(uint64_t)pg_cache->active_descriptors;
 
     fatal_assert(RRDENG_NR_STATS == 38);
@@ -1240,7 +1250,7 @@ RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx) {
     }
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    stats.currently_collected_metrics = ctx->stats.metric_API_producers;
+    stats.currently_collected_metrics = __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
 
     internal_error(stats.metrics_pages != stats.extents_pages + stats.currently_collected_metrics,
                    "DBENGINE: metrics pages is %zu, but extents pages is %zu and API consumers is %zu",

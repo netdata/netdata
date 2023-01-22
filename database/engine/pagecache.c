@@ -58,7 +58,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
 
     struct completion completion;
     completion_init(&completion);
-    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_FLUSH_PAGES, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(ctx, RRDENG_OPCODE_EXTENT_WRITE, base, &completion, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     completion_wait_for(&completion);
     completion_destroy(&completion);
 }
@@ -776,7 +776,7 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
 
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
-        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_PREP_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
+        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);

@@ -92,7 +92,6 @@ static inline int open_file_buffered_io(char *path, int flags, uv_file *file)
 {
     return open_file_for_io(path, flags, file, 0);
 }
-char *get_rrdeng_statistics(struct rrdengine_instance *ctx, char *str, size_t size);
 int compute_multidb_diskspace();
 int is_legacy_child(const char *machine_guid);
 

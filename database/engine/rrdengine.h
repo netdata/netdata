@@ -236,14 +236,14 @@ enum rrdeng_opcode {
     /* can be used to return empty status or flush the command queue */
     RRDENG_OPCODE_NOOP = 0,
 
+    RRDENG_OPCODE_QUERY,
+    RRDENG_OPCODE_EXTENT_WRITE,
     RRDENG_OPCODE_EXTENT_READ,
-    RRDENG_OPCODE_PREP_QUERY,
-    RRDENG_OPCODE_FLUSH_PAGES,
     RRDENG_OPCODE_FLUSHED_TO_OPEN,
+    RRDENG_OPCODE_DATABASE_ROTATE,
+    RRDENG_OPCODE_JOURNAL_INDEX,
     RRDENG_OPCODE_FLUSH_INIT,
     RRDENG_OPCODE_EVICT_INIT,
-    RRDENG_OPCODE_JOURNAL_FILE_INDEX,
-    RRDENG_OPCODE_DATABASE_ROTATE,
     RRDENG_OPCODE_CTX_SHUTDOWN,
     RRDENG_OPCODE_CTX_QUIESCE,
     RRDENG_OPCODE_CTX_POPULATE_MRG,
@@ -323,35 +323,23 @@ void wal_release(WAL *wal);
  * They only describe operations since DB engine instance load time.
  */
 struct rrdengine_statistics {
-    rrdeng_stats_t metric_API_producers;
-    rrdeng_stats_t metric_API_consumers;
-    rrdeng_stats_t pg_cache_insertions;
-    rrdeng_stats_t pg_cache_deletions;
-    rrdeng_stats_t pg_cache_hits;
-    rrdeng_stats_t pg_cache_misses;
-    rrdeng_stats_t pg_cache_backfills;
-    rrdeng_stats_t pg_cache_evictions;
     rrdeng_stats_t before_decompress_bytes;
     rrdeng_stats_t after_decompress_bytes;
     rrdeng_stats_t before_compress_bytes;
     rrdeng_stats_t after_compress_bytes;
+
     rrdeng_stats_t io_write_bytes;
     rrdeng_stats_t io_write_requests;
     rrdeng_stats_t io_read_bytes;
     rrdeng_stats_t io_read_requests;
-    rrdeng_stats_t io_write_extent_bytes;
-    rrdeng_stats_t io_write_extents;
-    rrdeng_stats_t io_read_extent_bytes;
-    rrdeng_stats_t io_read_extents;
+
     rrdeng_stats_t datafile_creations;
     rrdeng_stats_t datafile_deletions;
     rrdeng_stats_t journalfile_creations;
     rrdeng_stats_t journalfile_deletions;
-    rrdeng_stats_t page_cache_descriptors;
+
     rrdeng_stats_t io_errors;
     rrdeng_stats_t fs_errors;
-    rrdeng_stats_t pg_cache_over_half_dirty_events;
-    rrdeng_stats_t flushing_pressure_page_deletions;
 };
 
 /* I/O errors global counter */
@@ -384,6 +372,8 @@ struct rrdengine_instance {
         unsigned last_fileno;                       // newest index of datafile and journalfile
         unsigned last_flush_fileno;                 // newest index of datafile received data
 
+        size_t collectors_running;
+        size_t collectors_running_duplicate;
         size_t inflight_queries;                    // the number of queries currently running
         uint64_t current_disk_space;                // the current disk space size used
 
@@ -415,6 +405,26 @@ struct rrdengine_instance {
 #define ctx_current_disk_space_get(ctx) __atomic_load_n(&(ctx)->atomic.current_disk_space, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_increase(ctx, size) __atomic_add_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
 #define ctx_current_disk_space_decrease(ctx, size) __atomic_sub_fetch(&(ctx)->atomic.current_disk_space, size, __ATOMIC_RELAXED)
+
+static inline void ctx_io_read_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
+    __atomic_add_fetch(&ctx->stats.io_read_bytes, bytes, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.io_read_requests, 1, __ATOMIC_RELAXED);
+}
+
+static inline void ctx_io_write_op_bytes(struct rrdengine_instance *ctx, size_t bytes) {
+    __atomic_add_fetch(&ctx->stats.io_write_bytes, bytes, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&ctx->stats.io_write_requests, 1, __ATOMIC_RELAXED);
+}
+
+static inline void ctx_io_error(struct rrdengine_instance *ctx) {
+    __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
+    rrd_stat_atomic_add(&global_io_errors, 1);
+}
+
+static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
+    __atomic_add_fetch(&ctx->stats.fs_errors, 1, __ATOMIC_RELAXED);
+    rrd_stat_atomic_add(&global_fs_errors, 1);
+}
 
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
 #define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)

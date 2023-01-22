@@ -1119,8 +1119,7 @@ static bool epdl_populate_pages_from_extent_data(
     crc = crc32(crc, data, epdl->extent_size - sizeof(*trailer));
     ret = crc32cmp(trailer->checksum, crc);
     if (unlikely(ret)) {
-        ++ctx->stats.io_errors;
-        rrd_stat_atomic_add(&global_io_errors, 1);
+        ctx_io_error(ctx);
         have_read_error = true;
 
         error_limit_static_global_var(erl, 1, 0);
@@ -1153,9 +1152,9 @@ static bool epdl_populate_pages_from_extent_data(
 
             ret = LZ4_decompress_safe(data + payload_offset, uncompressed_buf,
                                       (int) payload_length, (int) uncompressed_payload_length);
-            ctx->stats.before_decompress_bytes += payload_length;
-            ctx->stats.after_decompress_bytes += ret;
-            debug(D_RRDENGINE, "LZ4 decompressed %u bytes to %d bytes.", payload_length, ret);
+
+            __atomic_add_fetch(&ctx->stats.before_decompress_bytes, payload_length, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&ctx->stats.after_decompress_bytes, ret, __ATOMIC_RELAXED);
         }
     }
 
