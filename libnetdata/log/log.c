@@ -578,11 +578,11 @@ void reopen_all_log_files() {
     if(stdout_filename)
         open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
 
-    if(stderr_filename)
-        open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
-
     if(stdcollector_filename)
-        stdcollector = open_log_file(stdcollector_fd, stdcollector, stdcollector_filename, &collector_log_syslog, 1, &stdcollector_fd);
+        open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
+
+    if(stderr_filename)
+        stdcollector = open_log_file(stdcollector_fd, stdcollector, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
 
 #ifdef ENABLE_ACLK
     if (aclklog_enabled)
@@ -601,9 +601,9 @@ void open_all_log_files() {
     open_log_file(STDIN_FILENO, stdin, "/dev/null", NULL, 0, NULL);
 
     open_log_file(STDOUT_FILENO, stdout, stdout_filename, &output_log_syslog, 0, NULL);
-    open_log_file(STDERR_FILENO, stderr, stderr_filename, &error_log_syslog, 0, NULL);
+    open_log_file(STDERR_FILENO, stderr, stdcollector_filename, &collector_log_syslog, 0, NULL);
 
-    stdcollector = open_log_file(stdcollector_fd, stdcollector, stdcollector_filename, &collector_log_syslog, 1, &stdcollector_fd);
+    stdcollector = open_log_file(stdcollector_fd, stdcollector, stderr_filename, &error_log_syslog, 1, &stdcollector_fd);
 
 #ifdef ENABLE_ACLK
     if(aclklog_enabled)
@@ -780,7 +780,7 @@ void info_int( const char *file __maybe_unused, const char *function __maybe_unu
         return;
     }
 
-    if(error_log_syslog) {
+    if(collector_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_INFO,  fmt, args );
         va_end( args );
@@ -852,7 +852,7 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
         return;
     }
 
-    if(error_log_syslog) {
+    if(collector_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_ERR,  fmt, args );
         va_end( args );
@@ -904,7 +904,7 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
         return;
     }
 
-    if(error_log_syslog) {
+    if(collector_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_ERR,  fmt, args );
         va_end( args );
@@ -959,7 +959,7 @@ void fatal_int( const char *file, const char *function, const unsigned long line
     const char *thread_tag;
     char os_threadname[NETDATA_THREAD_NAME_MAX + 1];
 
-    if(error_log_syslog) {
+    if(collector_log_syslog) {
         va_start( args, fmt );
         vsyslog(LOG_CRIT,  fmt, args );
         va_end( args );
