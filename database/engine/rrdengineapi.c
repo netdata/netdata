@@ -180,7 +180,7 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
 
 static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *handle) {
     if(unlikely((time_t)(handle->update_every_ut / USEC_PER_SEC) != mrg_metric_get_update_every_s(main_mrg, handle->metric))) {
-        error("DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
+        internal_error(true, "DBENGINE: collection handle has update every %ld, but the metric registry has %ld. Fixing it.",
               (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
