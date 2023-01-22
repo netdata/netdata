@@ -336,6 +336,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     program_name = argv[0];
