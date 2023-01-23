@@ -147,14 +147,20 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     METRIC *metric;
 
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
-    if(!metric) {
-        metric = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset));
-        if(metric)
-            uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
-    }
 
-    if(!metric)
-        metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
+    if(unlikely(!metric)) {
+        if(unlikely(ctx->config.legacy)) {
+            // this is a single host database
+            // generate uuid from the chart and dimensions ids
+            // and overwrite the one supplied by rrddim
+            metric = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset));
+            if (metric)
+                uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
+        }
+
+        if(likely(!metric))
+            metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(uuid_compare(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric)) != 0) {
@@ -1094,10 +1100,13 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     if(NULL == ctxp) {
         ctx = multidb_ctx[tier];
         memset(ctx, 0, sizeof(*ctx));
+        ctx->config.legacy = false;
     }
     else {
         *ctxp = ctx = callocz(1, sizeof(*ctx));
+        ctx->config.legacy = true;
     }
+
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
     ctx->config.global_compress_alg = RRD_LZ4;
