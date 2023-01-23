@@ -1058,6 +1058,9 @@ void *health_main(void *ptr) {
 
         rrdhost_foreach_read(host) {
 
+            if(unlikely(!service_running(SERVICE_HEALTH)))
+                break;
+
             if (unlikely(!host->health.health_enabled))
                 continue;
 
@@ -1106,6 +1109,9 @@ void *health_main(void *ptr) {
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
+
+                if(unlikely(!service_running(SERVICE_HEALTH)))
+                    break;
 
                 rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -1251,6 +1257,9 @@ void *health_main(void *ptr) {
 
             if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
@@ -1431,6 +1440,9 @@ void *health_main(void *ptr) {
 
                 // process repeating alarms
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
@@ -1514,6 +1526,9 @@ void *health_main(void *ptr) {
                 // wait for all notifications to finish before allowing health to be cleaned up
                 ALARM_ENTRY *ae;
                 while (NULL != (ae = alarm_notifications_in_progress.head)) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     health_alarm_wait_for_execution(ae);
                 }
                 break;
@@ -1525,14 +1540,21 @@ void *health_main(void *ptr) {
         // wait for all notifications to finish before allowing health to be cleaned up
         ALARM_ENTRY *ae;
         while (NULL != (ae = alarm_notifications_in_progress.head)) {
+            if(unlikely(!service_running(SERVICE_HEALTH)))
+                break;
+
             health_alarm_wait_for_execution(ae);
         }
 
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
             rrdhost_foreach_read(host) {
+                if(unlikely(!service_running(SERVICE_HEALTH)))
+                    break;
+
                 if (unlikely(!host->health.health_enabled))
                     continue;
+
                 sql_queue_removed_alerts_to_aclk(host);
             }
             aclk_alert_reloaded = 0;
