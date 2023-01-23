@@ -13,7 +13,6 @@
 #define _GNU_SOURCE
 
 #include "mqtt_wss_client.h"
-#include "mqtt.h"
 #include "mqtt_ng.h"
 #include "ws_client.h"
 #include "common_internal.h"
@@ -42,6 +41,11 @@
 #if (OPENSSL_VERSION_NUMBER < OPENSSL_VERSION_110) && (SSLEAY_VERSION_NUMBER >= OPENSSL_VERSION_097)
 #include <openssl/conf.h>
 #endif
+
+//TODO MQTT_PUBLISH_RETAIN should not be needed anymore
+#define MQTT_PUBLISH_RETAIN 0x01
+#define MQTT_CONNECT_CLEAN_SESSION 0x02
+#define MQTT_CONNECT_WILL_RETAIN 0x20
 
 char *util_openssl_ret_err(int err)
 {
@@ -80,16 +84,6 @@ char *util_openssl_ret_err(int err)
     return "UNKNOWN";
 }
 
-struct mqtt_c_client {
-    struct mqtt_client *mqtt_client;
-    size_t mqtt_send_buf_size;
-    uint8_t *mqtt_send_buf;
-    size_t mqtt_recv_buf_size;
-    uint8_t *mqtt_recv_buf;
-
-    size_t mqtt_buf_max_size;
-};
-
 struct mqtt_wss_client_struct {
     ws_client *ws_client;
 
@@ -116,13 +110,7 @@ struct mqtt_wss_client_struct {
     SSL *ssl;
     int ssl_flags;
 
-    union {
-        struct mqtt_c_client* mqtt_c;
-        struct mqtt_ng_client *mqtt_ctx;
-    } mqtt;
-    int internal_mqtt;
-
-    int last_ec;
+    struct mqtt_ng_client *mqtt;
 
     int mqtt_keepalive;
 
@@ -136,8 +124,6 @@ struct mqtt_wss_client_struct {
     unsigned int mqtt_connected:1;
     unsigned int mqtt_disconnecting:1;
 
-    unsigned int mqtt_drop_on_pub_fail:1;
-
 // Application layer callback pointers
     void (*msg_callback)(const char *, const void *, size_t, int);
     void (*puback_callback)(uint16_t packet_id);
@@ -149,33 +135,6 @@ struct mqtt_wss_client_struct {
     void (*ssl_ctx_keylog_cb)(const SSL *ssl, const char *line);
 #endif
 };
-
-static void mws_connack_callback(struct mqtt_client* client, enum MQTTConnackReturnCode code)
-{
-    switch(code) {
-        case MQTT_CONNACK_ACCEPTED:
-            mws_debug(client->socketfd->log, "MQTT Connection Accepted");
-            client->socketfd->mqtt_connected = 1;
-            return;
-        case MQTT_CONNACK_REFUSED_PROTOCOL_VERSION:
-            mws_error(client->socketfd->log, "MQTT Connection refused \"Unsuported Protocol Version\"");
-            return;
-        case MQTT_CONNACK_REFUSED_IDENTIFIER_REJECTED:
-            mws_error(client->socketfd->log, "MQTT Connection refused \"The Client identifier is correct UTF-8 but not allowed by the Server\"");
-            return;
-        case MQTT_CONNACK_REFUSED_SERVER_UNAVAILABLE:
-            mws_error(client->socketfd->log, "MQTT Connection refused \"The Network Connection has been made but the MQTT service is unavailable\"");
-            return;
-        case MQTT_CONNACK_REFUSED_BAD_USER_NAME_OR_PASSWORD:
-            mws_error(client->socketfd->log, "MQTT Connection refused \"The data in the user name or password is malformed\"");
-            return;
-        case MQTT_CONNACK_REFUSED_NOT_AUTHORIZED:
-            mws_error(client->socketfd->log, "MQTT Connection refused \"The Client is not authorized to connect\"");
-            return;
-        default:
-            mws_fatal(client->socketfd->log, "MQTT Unknown CONNACK code");
-    }
-}
 
 static void mws_connack_callback_ng(void *user_ctx, int code)
 {
@@ -191,105 +150,26 @@ static void mws_connack_callback_ng(void *user_ctx, int code)
     }
 }
 
-static void mws_puback_callback(struct mqtt_client* client, uint16_t packet_id)
+static ssize_t mqtt_send_cb(void *user_ctx, const void* buf, size_t len)
 {
+    mqtt_wss_client mqtt_wss_client = user_ctx;
 #ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(client->socketfd->log, "PUBACK Received for %d", packet_id);
+    mws_debug(mqtt_wss_client->log, "mqtt_pal_sendall(len=%d)", len);
 #endif
-    if (client->socketfd->puback_callback)
-        client->socketfd->puback_callback(packet_id);
-}
-
-
-// TODO create permanent buffer in mqtt_wss_client
-// to not need so much stack
-#define TOPIC_MAX 512
-static void mqtt_rx_msg_callback(void **state, struct mqtt_response_publish *publish)
-{
-    mqtt_wss_client client = *state;
-    char topic[TOPIC_MAX];
-    size_t len = (publish->topic_name_size < TOPIC_MAX - 1) ? publish->topic_name_size : (TOPIC_MAX - 1);
-    memcpy(topic,
-           publish->topic_name,
-           len);
-    topic[len] = 0;
-
+    int ret = ws_client_send(mqtt_wss_client->ws_client, WS_OP_BINARY_FRAME, buf, len);
+    if (ret >= 0 && (size_t)ret != len) {
 #ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(client->log, "Got message on topic \"%s\" size %d", topic, (int)publish->application_message_size);
+        mws_debug(mqtt_wss_client->log, "Not complete message sent (Msg=%d,Sent=%d). Need to arm POLLOUT!", len, ret);
 #endif
-    if (client->msg_callback)
-        client->msg_callback(topic, publish->application_message, publish->application_message_size, publish->qos_level);
-}
-
-void mqtt_c_client_destroy(struct mqtt_c_client *mqtt_c) {
-    mw_free(mqtt_c->mqtt_recv_buf);
-    mw_free(mqtt_c->mqtt_send_buf);
-    mw_free(mqtt_c->mqtt_client);
-    mw_free(mqtt_c);
-}
-
-#define MQTT_BUFFER_SIZE 1024*1024*3
-static int mqtt_c_init(mqtt_wss_client client, msg_callback_fnc_t msg_callback) {
-    enum MQTTErrors ret;
-    client->mqtt.mqtt_c = mw_calloc(1, sizeof(struct mqtt_c_client));
-    if (!client->mqtt.mqtt_c)
-        return 1;
-
-    struct mqtt_c_client *mqtt_c = client->mqtt.mqtt_c;
-
-    mqtt_c->mqtt_client = mw_calloc(1, sizeof(struct mqtt_client));
-    if (!mqtt_c->mqtt_client) {
-        mqtt_c_client_destroy(client->mqtt.mqtt_c);
-        return 1;
+        mqtt_wss_client->mqtt_didnt_finish_write = 1;
     }
-
-    mqtt_c->mqtt_send_buf_size = MQTT_BUFFER_SIZE;
-    mqtt_c->mqtt_send_buf = mw_malloc(mqtt_c->mqtt_send_buf_size);
-    if (!mqtt_c->mqtt_send_buf) {
-        mqtt_c_client_destroy(client->mqtt.mqtt_c);
-        return 1;
-    }
-    mqtt_c->mqtt_recv_buf_size = MQTT_BUFFER_SIZE;
-    mqtt_c->mqtt_recv_buf = mw_malloc(mqtt_c->mqtt_recv_buf_size);
-    if (!mqtt_c->mqtt_send_buf) {
-        mqtt_c_client_destroy(client->mqtt.mqtt_c);
-        return 1;
-    }
-
-    ret = mqtt_init(mqtt_c->mqtt_client,
-                    client, mqtt_c->mqtt_send_buf,
-                    mqtt_c->mqtt_send_buf_size,
-                    mqtt_c->mqtt_recv_buf,
-                    mqtt_c->mqtt_recv_buf_size,
-                    (msg_callback ? mqtt_rx_msg_callback : NULL)
-          );
-    if (ret != MQTT_OK) {
-//        mws_error(log, "Error initializing MQTT \"%s\"", mqtt_error_str(ret));
-// TODO coverity reported bug in mqtt library here function mqtt_init can return
-// -2 acording to coverity resulting in out of bounds access in mqtt_error_str
-        mws_error(client->log, "Error initializing MQTT-C Client");
-        mqtt_c_client_destroy(client->mqtt.mqtt_c);
-        return 1;
-    }
-
-    mqtt_c->mqtt_client->publish_response_callback_state = client;
-    mqtt_c->mqtt_client->connack_callback = mws_connack_callback;
-    mqtt_c->mqtt_client->puback_callback = mws_puback_callback;
-    return 0;
-}
-
-ssize_t mqtt_ng_send(void *user_ctx, const void* buf, size_t len)
-{
-//    mqtt_wss_client *ctx = (mqtt_wss_client*)user_ctx;
-    mqtt_pal_socket_handle ctx = (mqtt_pal_socket_handle)user_ctx;
-    return mqtt_pal_sendall(ctx, buf, len, 0);
+    return ret;
 }
 
 mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              mqtt_wss_log_callback_t log_callback,
                              msg_callback_fnc_t msg_callback,
-                             void (*puback_callback)(uint16_t packet_id),
-                             int mqtt5)
+                             void (*puback_callback)(uint16_t packet_id))
 {
     mqtt_wss_log_ctx_t log;
 
@@ -311,8 +191,6 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
 
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
-
-    client->internal_mqtt = mqtt5 ? 1 : 0;
 
     client->ws_client = ws_client_new(0, &client->target_host, log);
     if (!client->ws_client) {
@@ -336,25 +214,18 @@ mqtt_wss_client mqtt_wss_new(const char *log_prefix,
 
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
 
-    if (client->internal_mqtt) {
-        struct mqtt_ng_init settings = {
-            .log = log,
-            .data_in = client->ws_client->buf_to_mqtt,
-            .data_out_fnc = &mqtt_ng_send,
-            .user_ctx = client,
-            .connack_callback = &mws_connack_callback_ng,
-            .puback_callback = puback_callback,
-            .msg_callback = msg_callback
-        };
-        if ( (client->mqtt.mqtt_ctx = mqtt_ng_init(&settings)) == NULL ) {
-            mws_error(log, "Error initializing internal MQTT client");
-            goto fail_3;
-        }
-    } else {
-        if (mqtt_c_init(client, msg_callback)) {
-            mws_error(log, "Error initializing MQTT");
-            goto fail_3;
-        }
+    struct mqtt_ng_init settings = {
+        .log = log,
+        .data_in = client->ws_client->buf_to_mqtt,
+        .data_out_fnc = &mqtt_send_cb,
+        .user_ctx = client,
+        .connack_callback = &mws_connack_callback_ng,
+        .puback_callback = puback_callback,
+        .msg_callback = msg_callback
+    };
+    if ( (client->mqtt = mqtt_ng_init(&settings)) == NULL ) {
+        mws_error(log, "Error initializing internal MQTT client");
+        goto fail_3;
     }
 
     return client;
@@ -373,18 +244,12 @@ fail:
 
 void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size)
 {
-    if (client->internal_mqtt)
-        mqtt_ng_set_max_mem(client->mqtt.mqtt_ctx, size);
-    else
-        client->mqtt.mqtt_c->mqtt_buf_max_size = size;
+    mqtt_ng_set_max_mem(client->mqtt, size);
 }
 
 void mqtt_wss_destroy(mqtt_wss_client client)
 {
-    if (client->internal_mqtt)
-        mqtt_ng_destroy(client->mqtt.mqtt_ctx);
-    else
-        mqtt_c_client_destroy(client->mqtt.mqtt_c);
+    mqtt_ng_destroy(client->mqtt);
 
     close(client->write_notif_pipe[PIPE_WRITE_END]);
     close(client->write_notif_pipe[PIPE_READ_END]);
@@ -661,23 +526,6 @@ cleanup:
     return rc;
 }
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-static int mqtt_wss_grow_mqtt_buf(uint8_t **buffer, size_t *buffer_size, size_t max_size)
-{
-    size_t new_size = MIN(*buffer_size * 2, max_size);
-    if (new_size == *buffer_size)
-        return 0;
-
-    uint8_t *new_ptr = mw_realloc(*buffer, new_size);
-    if (!new_ptr)
-        return -1;
-
-    *buffer = new_ptr;
-    *buffer_size = new_size;
-
-    return 0;
-}
-
 int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_connect_params *mqtt_params, int ssl_flags, struct mqtt_wss_proxy *proxy)
 {
     struct sockaddr_in addr;
@@ -723,8 +571,6 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
     }
 
     client->ssl_flags = ssl_flags;
-
-    client->mqtt_drop_on_pub_fail = mqtt_params->drop_on_publish_fail ? 1 : 0;
 
     //TODO gethostbyname -> getaddinfo
     //     hstrerror -> gai_strerror
@@ -839,65 +685,28 @@ int mqtt_wss_connect(mqtt_wss_client client, char *host, int port, struct mqtt_c
         mqtt_flags |= MQTT_CONNECT_WILL_RETAIN;
     mqtt_flags |= MQTT_CONNECT_CLEAN_SESSION;
 
-    struct mqtt_c_client *mqtt_c = client->mqtt.mqtt_c;
-    if (!client->internal_mqtt && (mqtt_flags &= MQTT_CONNECT_CLEAN_SESSION)) {
-        if (mqtt_c->mqtt_buf_max_size && client->last_ec) {
-            if (client->last_ec == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-                mws_info(client->log, "Last error was MQTT_WSS_ERR_TX_BUF_TOO_SMALL and buffer growth enabled. Attempting size increase.");
-                if (mqtt_wss_grow_mqtt_buf(&mqtt_c->mqtt_send_buf, &mqtt_c->mqtt_send_buf_size, mqtt_c->mqtt_buf_max_size))
-                    mws_error(client->log, "Failed to increase send buffer size. Continuing with original buffer.");
-            }else if(client->last_ec == MQTT_WSS_ERR_RX_BUF_TOO_SMALL) {
-                mws_info(client->log, "Last error was MQTT_WSS_ERR_RX_BUF_TOO_SMALL and buffer growth enabled. Attempting size increase.");
-                if (mqtt_wss_grow_mqtt_buf(&mqtt_c->mqtt_recv_buf, &mqtt_c->mqtt_recv_buf_size, mqtt_c->mqtt_buf_max_size))
-                    mws_error(client->log, "Failed to increase receive buffer size. Continuing with original buffer.");
-            }
-        }
-        mqtt_reinit(mqtt_c->mqtt_client, client,
-            mqtt_c->mqtt_send_buf, mqtt_c->mqtt_send_buf_size,
-            mqtt_c->mqtt_recv_buf, mqtt_c->mqtt_recv_buf_size);
-    }
-
-    client->last_ec = 0;
-
     client->mqtt_keepalive = (mqtt_params->keep_alive ? mqtt_params->keep_alive : 400);
 
-    if (client->internal_mqtt) {
-        mws_info(client->log, "Going to connect using internal MQTT 5 implementation");
-        struct mqtt_auth_properties auth;
-        auth.client_id = (char*)mqtt_params->clientid;
-        auth.client_id_free = NULL;
-        auth.username = (char*)mqtt_params->username;
-        auth.username_free = NULL;
-        auth.password = (char*)mqtt_params->password;
-        auth.password_free = NULL;
-        struct mqtt_lwt_properties lwt;
-        lwt.will_topic = (char*)mqtt_params->will_topic;
-        lwt.will_topic_free = NULL;
-        lwt.will_message = (void*)mqtt_params->will_msg;
-        lwt.will_message_free = NULL; // TODO expose no copy version to API
-        lwt.will_message_size = mqtt_params->will_msg_len;
-        lwt.will_qos = (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK);
-        lwt.will_retain = mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN;
-        int ret = mqtt_ng_connect(client->mqtt.mqtt_ctx, &auth, mqtt_params->will_msg ? &lwt : NULL, 1, client->mqtt_keepalive);
-        if (ret) {
-            mws_error(client->log, "Error generating MQTT connect");
-            return 1;
-        }
-    } else {
-        mws_info(client->log, "Going to connect using MQTT-C (forked) as MQTT implementation");
-        enum MQTTErrors ret = mqtt_connect(mqtt_c->mqtt_client,
-                                           mqtt_params->clientid,
-                                           mqtt_params->will_topic,
-                                           mqtt_params->will_msg,
-                                           (mqtt_params->will_msg ? mqtt_params->will_msg_len : 0),
-                                           mqtt_params->username,
-                                           mqtt_params->password,
-                                           mqtt_flags,
-                                           client->mqtt_keepalive);
-        if (ret != MQTT_OK) {
-            mws_error(client->log, "Error with MQTT connect \"%s\"", mqtt_error_str(ret));
-            return 1;
-        }
+    mws_info(client->log, "Going to connect using internal MQTT 5 implementation");
+    struct mqtt_auth_properties auth;
+    auth.client_id = (char*)mqtt_params->clientid;
+    auth.client_id_free = NULL;
+    auth.username = (char*)mqtt_params->username;
+    auth.username_free = NULL;
+    auth.password = (char*)mqtt_params->password;
+    auth.password_free = NULL;
+    struct mqtt_lwt_properties lwt;
+    lwt.will_topic = (char*)mqtt_params->will_topic;
+    lwt.will_topic_free = NULL;
+    lwt.will_message = (void*)mqtt_params->will_msg;
+    lwt.will_message_free = NULL; // TODO expose no copy version to API
+    lwt.will_message_size = mqtt_params->will_msg_len;
+    lwt.will_qos = (mqtt_params->will_flags & MQTT_WSS_PUB_QOSMASK);
+    lwt.will_retain = mqtt_params->will_flags & MQTT_WSS_PUB_RETAIN;
+    int ret = mqtt_ng_connect(client->mqtt, &auth, mqtt_params->will_msg ? &lwt : NULL, 1, client->mqtt_keepalive);
+    if (ret) {
+        mws_error(client->log, "Error generating MQTT connect");
+        return 1;
     }
 
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
@@ -979,13 +788,9 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
                   mqtt_wss_error_tos(ret));
 
     // schedule and send MQTT disconnect
-    if (client->internal_mqtt) {
-        mqtt_ng_disconnect(client->mqtt.mqtt_ctx, 0);
-        mqtt_ng_sync(client->mqtt.mqtt_ctx);
-    } else {
-        mqtt_disconnect(client->mqtt.mqtt_c->mqtt_client);
-        mqtt_sync(client->mqtt.mqtt_c->mqtt_client);
-    }
+    mqtt_ng_disconnect(client->mqtt, 0);
+    mqtt_ng_sync(client->mqtt);
+
     ret = mqtt_wss_service_all(client, timeout_ms / 4);
     if(ret)
         mws_error(client->log,
@@ -1038,27 +843,9 @@ static inline void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
         client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
 }
 
-static int handle_mqtt_mqtt_c(mqtt_wss_client client)
-{
-    // we need to call this only if there has been some movements
-    // - read side is handled by POLLIN and ws_client_process
-    // - write side is handled by PIPE write every time we send MQTT
-    // message ensuring we wake up from poll
-    enum MQTTErrors mqtt_ret = mqtt_sync(client->mqtt.mqtt_c->mqtt_client);
-    if (mqtt_ret != MQTT_OK) {
-//            mws_error(client->log, "Error mqtt_sync MQTT \"%s\"", mqtt_error_str(mqtt_ret));
-// TODO coverity reported bug in mqtt library here function mqtt_sync can return
-// -2 acording to coverity resulting in out of bounds access in mqtt_error_str
-        mws_error(client->log, "Error mqtt_sync");
-        client->mqtt_connected = 0;
-        return 1;
-    }
-    return 0;
-}
-
 static int handle_mqtt_internal(mqtt_wss_client client)
 {
-    int rc = mqtt_ng_sync(client->mqtt.mqtt_ctx);
+    int rc = mqtt_ng_sync(client->mqtt);
     if (rc) {
         mws_error(client->log, "mqtt_ng_sync returned %d != 0", rc);
         client->mqtt_connected = 0;
@@ -1067,24 +854,13 @@ static int handle_mqtt_internal(mqtt_wss_client client)
     return 0;
 }
 
-static int handle_mqtt(mqtt_wss_client client)
-{
-    if(client->ws_client->state == WS_ESTABLISHED) {
-        if(client->internal_mqtt)
-            return handle_mqtt_internal(client);
-
-        return handle_mqtt_mqtt_c(client);
-    }
-    return 0;
-}
-
 #define SEC_TO_MSEC 1000
 static inline long long int t_till_next_keepalive_ms(mqtt_wss_client client)
 {
-    time_t last_send = client->internal_mqtt ? mqtt_ng_last_send_time(client->mqtt.mqtt_ctx) : client->mqtt.mqtt_c->mqtt_client->time_of_last_send;
+    time_t last_send = mqtt_ng_last_send_time(client->mqtt);
     long long int next_mqtt_keep_alive = (last_send * SEC_TO_MSEC)
         + (client->mqtt_keepalive * (SEC_TO_MSEC * 0.75 /* SEND IN ADVANCE */));
-    return(next_mqtt_keep_alive - (MQTT_PAL_TIME() * SEC_TO_MSEC));
+    return(next_mqtt_keep_alive - (time(NULL) * SEC_TO_MSEC));
 }
 
 #ifdef MQTT_WSS_CPUSTATS
@@ -1150,11 +926,6 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
         (!ret) ? "POLL_TIMEOUT" : "");
 #endif
 
-    if (client->mqtt_drop_on_pub_fail && client->poll_fds[POLLFD_PIPE].revents & POLLIN && client->last_ec) {
-        client->mqtt_connected = 0;
-        return client->last_ec;
-    }
-
 #ifdef MQTT_WSS_CPUSTATS
     t1 = mqtt_wss_now_usec(client);
 #endif
@@ -1166,10 +937,7 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
 #ifdef DEBUG_ULTRA_VERBOSE
             mws_debug(client->log, "Forcing MQTT Ping/keep-alive");
 #endif
-            if (client->internal_mqtt)
-                mqtt_ng_ping(client->mqtt.mqtt_ctx);
-            else
-                mqtt_ping(client->mqtt.mqtt_c->mqtt_client);
+            mqtt_ng_ping(client->mqtt);
         } else {
             // if poll timed out and user requested timeout was being used
             // return here let user do his work and he will call us back soon
@@ -1234,8 +1002,10 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     client->stats.time_process_websocket += t2 - t1;
 #endif
 
-    if (handle_mqtt(client))
-        return MQTT_WSS_ERR_PROTO_MQTT;
+    // process MQTT stuff
+    if(client->ws_client->state == WS_ESTABLISHED)
+        if (handle_mqtt_internal(client))
+            return MQTT_WSS_ERR_PROTO_MQTT;
 
     if (client->mqtt_didnt_finish_write) {
         client->mqtt_didnt_finish_write = 0;
@@ -1287,199 +1057,6 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     return MQTT_WSS_OK;
 }
 
-ssize_t mqtt_pal_sendall(mqtt_pal_socket_handle mqtt_wss_client, const void* buf, size_t len, int flags)
-{
-    (void)flags;
-#ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(mqtt_wss_client->log, "mqtt_pal_sendall(len=%d)", len);
-#endif
-    int ret = ws_client_send(mqtt_wss_client->ws_client, WS_OP_BINARY_FRAME, buf, len);
-    if (ret >= 0 && (size_t)ret != len) {
-#ifdef DEBUG_ULTRA_VERBOSE
-        mws_debug(mqtt_wss_client->log, "Not complete message sent (Msg=%d,Sent=%d). Need to arm POLLOUT!", len, ret);
-#endif
-        mqtt_wss_client->mqtt_didnt_finish_write = 1;
-    }
-    return ret;
-}
-
-ssize_t mqtt_pal_recvall(mqtt_pal_socket_handle mqtt_wss_client, void* buf, size_t bufsz, int flags)
-{
-    (void)flags;
-#ifdef DEBUG_ULTRA_VERBOSE
-    mws_debug(mqtt_wss_client->log, "mqtt_pal_rcvall()");
-    size_t size;
-    if ((size = rbuf_pop(mqtt_wss_client->ws_client->buf_to_mqtt, buf, bufsz)))
-        mws_debug(mqtt_wss_client->log, "Passing data to MQTT: %d bytes", (int)size);
-    return size;
-#else
-    return rbuf_pop(mqtt_wss_client->ws_client->buf_to_mqtt, buf, bufsz);
-#endif
-}
-
-static int _mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
-{
-    int ret;
-    int rc = 0;
-    uint8_t mqtt_flags = 0;
-
-    if (client->mqtt_disconnecting) {
-        mws_error(client->log, "mqtt_wss is disconnecting can't publish");
-        return 1;
-    }
-
-    if (!client->mqtt_connected) {
-        mws_error(client->log, "MQTT is offline. Can't send message.");
-        return 1;
-    }
-
-    mqtt_flags = (publish_flags & MQTT_WSS_PUB_QOSMASK) << 1;
-    if (publish_flags & MQTT_WSS_PUB_RETAIN)
-        mqtt_flags |= MQTT_PUBLISH_RETAIN;
-
-    ret = mqtt_publish_pid(client->mqtt.mqtt_c->mqtt_client, topic, msg, msg_len, mqtt_flags, packet_id);
-    if (ret != MQTT_OK) {
-        mws_error(client->log, "Error Publishing MQTT msg. Desc: \"%s\"", mqtt_error_str(ret));
-        switch (ret) {
-        case MQTT_ERROR_SEND_BUFFER_IS_FULL:
-            client->last_ec = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
-            rc = MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
-            if (!client->mqtt_drop_on_pub_fail)
-                return rc;
-            break;
-        case MQTT_ERROR_RECV_BUFFER_TOO_SMALL:
-            client->last_ec = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
-            rc = MQTT_WSS_ERR_RX_BUF_TOO_SMALL;
-            if (!client->mqtt_drop_on_pub_fail)
-                return rc;
-            break;
-        default:
-            return 1;
-        }
-    }
-#ifdef DEBUG_ULTRA_VERBOSE
-    else
-        mws_debug(client->log, "Publishing Message to topic \"%s\" with size %d as packet_id=%d", topic, msg_len, *packet_id);
-#endif
-
-    mqtt_wss_wakeup(client);
-    return rc;
-}
-
-static int mqtt_wss_handle_buffer_growth(mqtt_wss_client client, size_t msg_len)
-{
-    struct mqtt_c_client *mqtt_c = client->mqtt.mqtt_c;
-    if (mqtt_c->mqtt_buf_max_size && mqtt_wss_able_to_send(client, msg_len) == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-        MQTT_PAL_MUTEX_LOCK(&mqtt_c->mqtt_client->mutex);
-        size_t grow_by = msg_len * 1.5 - mqtt_c->mqtt_client->mq.curr_sz;
-        size_t new_size = MIN(mqtt_c->mqtt_send_buf_size + grow_by, mqtt_c->mqtt_buf_max_size);
-        if (new_size == mqtt_c->mqtt_send_buf_size) {
-            MQTT_PAL_MUTEX_UNLOCK(&mqtt_c->mqtt_client->mutex);
-            mws_error(client->log, "Message bigger than maximum allowed MQTT buffer size.");
-            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
-        }
-        mws_info(client->log, "Growing TX buffer to %zu (on the fly).", new_size);
-
-        void *new_buf = mqtt_mq_realloc(&mqtt_c->mqtt_client->mq, new_size, realloc);
-        if (!new_buf) {
-            MQTT_PAL_MUTEX_UNLOCK(&mqtt_c->mqtt_client->mutex);
-            mws_error(client->log, "Realocation failed.");
-            return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
-        }
-        mqtt_c->mqtt_send_buf = new_buf;
-        mqtt_c->mqtt_send_buf_size = new_size;
-        MQTT_PAL_MUTEX_UNLOCK(&mqtt_c->mqtt_client->mutex);
-    }
-    return mqtt_wss_able_to_send(client, msg_len);
-}
-
-int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id)
-{
-    if (client->internal_mqtt) {
-        mws_error(client->log, "MQTT 5 used but legacy MQTT 3 %s was called. Ignoring.", __FUNCTION__);
-        return MQTT_WSS_ERR_CANT_DO;
-    }
-    pthread_mutex_lock(&client->pub_lock);
-    int rc = mqtt_wss_handle_buffer_growth(client, msg_len);
-    if (rc != MQTT_WSS_OK) {
-        pthread_mutex_unlock(&client->pub_lock);
-        return rc;
-    }
-    rc = _mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, packet_id);
-    pthread_mutex_unlock(&client->pub_lock);
-    return rc;
-}
-
-/* timeout_ms negative - block forever */
-/* timeout_ms == 0 instant fail */
-#define BLOCK_POLL_SLEEP_MS 100
-int mqtt_wss_publish_pid_block(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id, int timeout_ms)
-{
-    if (client->internal_mqtt) {
-        mws_error(client->log, "MQTT 5 used but legacy MQTT 3 %s was called. Ignoring", __FUNCTION__);
-        return MQTT_WSS_ERR_CANT_DO;
-    }
-    pthread_mutex_lock(&client->pub_lock);
-    int rc = mqtt_wss_handle_buffer_growth(client, msg_len);
-    if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-        pthread_mutex_unlock(&client->pub_lock);
-        return rc;
-    }
-
-    while (rc == MQTT_WSS_ERR_CANT_SEND_NOW) {
-        if (timeout_ms > 0) {
-            if (timeout_ms >= BLOCK_POLL_SLEEP_MS) {
-                timeout_ms -= BLOCK_POLL_SLEEP_MS;
-                usleep(BLOCK_POLL_SLEEP_MS * 1000);
-            } else {
-                usleep(timeout_ms * 1000);
-                timeout_ms = 0;
-            }
-        }
-        if (timeout_ms == 0) {
-            pthread_mutex_unlock(&client->pub_lock);
-            return MQTT_WSS_ERR_BLOCK_TIMEOUT;
-        }
-
-        rc = mqtt_wss_able_to_send(client, msg_len);
-    }
-
-    rc = _mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, packet_id);
-    pthread_mutex_unlock(&client->pub_lock);
-    return rc;
-}
-
-#define MQTT_MSG_RESERVE 100 // this is a hack
-int mqtt_wss_able_to_send(mqtt_wss_client client, size_t bytes)
-{
-    struct mqtt_c_client *mqtt_c = client->mqtt.mqtt_c;
-    if ((size_t)(mqtt_c->mqtt_client->mq.mem_end - mqtt_c->mqtt_client->mq.mem_start) <= bytes + MQTT_MSG_RESERVE)
-        return MQTT_WSS_ERR_TX_BUF_TOO_SMALL;
-    if (mqtt_c->mqtt_client->mq.curr_sz < bytes + MQTT_MSG_RESERVE) {
-        MQTT_PAL_MUTEX_LOCK(&mqtt_c->mqtt_client->mutex);
-        mqtt_mq_clean(&mqtt_c->mqtt_client->mq);
-        if (mqtt_c->mqtt_client->mq.curr_sz < (bytes + MQTT_MSG_RESERVE)) {
-            MQTT_PAL_MUTEX_UNLOCK(&mqtt_c->mqtt_client->mutex);
-            return MQTT_WSS_ERR_CANT_SEND_NOW;
-        }
-        MQTT_PAL_MUTEX_UNLOCK(&mqtt_c->mqtt_client->mutex);
-        return MQTT_WSS_OK;
-    }
-    return MQTT_WSS_OK;
-}
-
-int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags)
-{
-    if (client->internal_mqtt) {
-        mws_error(client->log, "MQTT 5 used but legacy MQTT 3 %s was called. Ignoring.", __FUNCTION__);
-        return MQTT_WSS_ERR_CANT_DO;
-    }
-
-    uint16_t pid;
-
-    return mqtt_wss_publish_pid(client, topic, msg, msg_len, publish_flags, &pid);
-}
-
 int mqtt_wss_publish5(mqtt_wss_client client,
                       char *topic,
                       free_fnc_t topic_free,
@@ -1489,11 +1066,6 @@ int mqtt_wss_publish5(mqtt_wss_client client,
                       uint8_t publish_flags,
                       uint16_t *packet_id)
 {
-    if (!client->internal_mqtt) {
-        mws_error(client->log, "MQTT 3 used but called MQTT 5 publish. Ignoring!");
-        return MQTT_WSS_ERR_CANT_DO;
-    }
-
     if (client->mqtt_disconnecting) {
         mws_error(client->log, "mqtt_wss is disconnecting can't publish");
         return 1;
@@ -1509,15 +1081,14 @@ int mqtt_wss_publish5(mqtt_wss_client client,
     if (publish_flags & MQTT_WSS_PUB_RETAIN)
         mqtt_flags |= MQTT_PUBLISH_RETAIN;
 
-    int rc = mqtt_ng_publish(client->mqtt.mqtt_ctx, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
+    int rc = mqtt_ng_publish(client->mqtt, topic, topic_free, msg, msg_free, msg_len, mqtt_flags, packet_id);
     mqtt_wss_wakeup(client);
     return rc;
 }
 
 int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)
 {
-    int ret;
-
+    (void)max_qos_level; //TODO now hardcoded
     if (!client->mqtt_connected) {
         mws_error(client->log, "MQTT is offline. Can't subscribe.");
         return 1;
@@ -1528,20 +1099,12 @@ int mqtt_wss_subscribe(mqtt_wss_client client, char *topic, int max_qos_level)
         return 1;
     }
 
-    if (client->internal_mqtt) {
-        struct mqtt_sub sub = {
-            .topic = topic,
-            .topic_free = NULL,
-            .options = /* max_qos_level & 0x3 TODO when QOS > 1 implemented */ 0x01 | (0x01 << 3)
-        };
-        mqtt_ng_subscribe(client->mqtt.mqtt_ctx, &sub, 1);
-    } else {
-        ret = mqtt_subscribe(client->mqtt.mqtt_c->mqtt_client, topic, max_qos_level);
-        if (ret != MQTT_OK) {
-            mws_error(client->log, "Error Subscribing. Desc: \"%s\"", mqtt_error_str(ret));
-            return 1;
-        }
-    }
+    struct mqtt_sub sub = {
+        .topic = topic,
+        .topic_free = NULL,
+        .options = /* max_qos_level & 0x3 TODO when QOS > 1 implemented */ 0x01 | (0x01 << 3)
+    };
+    mqtt_ng_subscribe(client->mqtt, &sub, 1);
 
     mqtt_wss_wakeup(client);
     return 0;
@@ -1554,16 +1117,13 @@ struct mqtt_wss_stats mqtt_wss_get_stats(mqtt_wss_client client)
     current = client->stats;
     memset(&client->stats, 0, sizeof(client->stats));
     pthread_mutex_unlock(&client->stat_lock);
-    mqtt_ng_get_stats(client->mqtt.mqtt_ctx, &current.mqtt);
+    mqtt_ng_get_stats(client->mqtt, &current.mqtt);
     return current;
 }
 
 int mqtt_wss_set_topic_alias(mqtt_wss_client client, const char *topic)
 {
-    if(!client->internal_mqtt)
-        return 0;
-    
-    return mqtt_ng_set_topic_alias(client->mqtt.mqtt_ctx, topic);
+    return mqtt_ng_set_topic_alias(client->mqtt, topic);
 }
 
 #ifdef MQTT_WSS_DEBUG

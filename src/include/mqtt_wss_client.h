@@ -60,12 +60,9 @@ typedef void (*msg_callback_fnc_t)(const char *topic, const void *msg, size_t ms
 mqtt_wss_client mqtt_wss_new(const char *log_prefix,
                              mqtt_wss_log_callback_t log_callback,
                              msg_callback_fnc_t msg_callback,
-                             void (*puback_callback)(uint16_t packet_id),
-                             int mqtt5);
+                             void (*puback_callback)(uint16_t packet_id));
 
 void mqtt_wss_set_max_buf_size(mqtt_wss_client client, size_t size);
-
-int mqtt_wss_able_to_send(mqtt_wss_client client, size_t bytes);
 
 void mqtt_wss_destroy(mqtt_wss_client client);
 
@@ -122,17 +119,8 @@ struct mqtt_wss_proxy {
     const char *password;
 };
 
-/* Publishes MQTT message
- * @param client mqtt_wss_client which should transfer the message
- * @param topic MQTT topic to publish message to (0 terminated C string)
- * @param msg Message to be published (no need for 0 termination)
- * @param msg_len Length of the message to be published
- * @param publish_flags see enum mqtt_wss_publish_flags e.g. (MQTT_WSS_PUB_QOS1 | MQTT_WSS_PUB_RETAIN)
- * @return Returns 0 on success
- */
-int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags);
-
-/* Publishes MQTT message and gets message id
+/* TODO!!! update the description
+ * Publishes MQTT message and gets message id
  * @param client mqtt_wss_client which should transfer the message
  * @param topic MQTT topic to publish message to (0 terminated C string)
  * @param msg Message to be published (no need for 0 termination)
@@ -141,12 +129,6 @@ int mqtt_wss_publish(mqtt_wss_client client, const char *topic, const void *msg,
  * @param packet_id is 16 bit unsigned int representing ID that can be used to pair with PUBACK callback
  *        for usages where application layer wants to know which messages are delivered when
  * @return Returns 0 on success
- */
-int mqtt_wss_publish_pid(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id);
-
-int mqtt_wss_publish_pid_block(mqtt_wss_client client, const char *topic, const void *msg, int msg_len, uint8_t publish_flags, uint16_t *packet_id, int timeout_ms);
-
-/* Publishes MQTT 5 message
  */
 int mqtt_wss_publish5(mqtt_wss_client client,
                       char *topic,

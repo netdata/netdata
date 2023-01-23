@@ -1,9 +1,6 @@
 [submodule "c-rbuf"]
 	path = c-rbuf
 	url = https://github.com/underhood/c-rbuf.git
-[submodule "MQTT-C"]
-	path = MQTT-C
-	url = https://github.com/underhood/MQTT-C.git
 [submodule "c_rhash"]
 	path = c_rhash
 	url = https://github.com/underhood/c_rhash.git

@@ -67,7 +67,6 @@ int client_handle(mqtt_wss_client client)
     printf("Connection succeeded\n");
 
     mqtt_wss_subscribe(client, "test", 1);
-    mqtt_wss_publish(client, "test", TESTMSG, strlen(TESTMSG), MQTT_WSS_PUB_QOS1);
 
     while (!test_exit) {
         if(mqtt_wss_service(client, -1) < 0)
@@ -84,7 +83,7 @@ int main(int argc, char **argv)
         port = 9002;
     printf("Using port %d\n", port);
 
-    mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL, 1);
+    mqtt_wss_client client = mqtt_wss_new("main", mqtt_wss_log_cb, msg_callback, NULL);
     if (!client) {
         printf("Couldn't initialize mqtt_wss\n");
         return 1;
