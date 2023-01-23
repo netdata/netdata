@@ -617,10 +617,11 @@ It includes collectors for NUT, APCUPSD, LibreSWAN, OpenSIPS, and Wireless acces
 Summary: The eBPF metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: netdata = %{version}
-Requires: netdata-plugin-apps = %{version}
 %if 0%{?centos_ver} != 7
+Recommends: netdata-plugin-apps = %{version}
 Recommends: netdata-plugin-ebpf-code >= %{version}
 %else
+Requires: netdata-plugin-apps = %{version}
 Requires: netdata-plugin-ebpf-code >= %{version}
 %endif
 

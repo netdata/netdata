@@ -92,9 +92,9 @@ Description: The charts.d metrics collection plugin for the Netdata Agent
 Package: netdata-plugin-ebpf
 Architecture: any
 Depends: ${shlibs:Depends},
-         netdata-plugin-apps (>= ${source:Version}),
          netdata (>= ${source:Version})
 Recommends: netdata-plugin-ebpf-code (>= ${source:Version}),
+            netdata-plugin-apps (>= ${source:Version})
 Description: The eBPF metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to use eBPF code to collect more
  detailed kernel-level metrics for the system.
@@ -120,7 +120,7 @@ Architecture: any
 Depends: ${shlibs:Depends},
          libcap2-bin,
          netdata (>= ${source:Version})
-Suggests: nvme-cli sudo
+Suggests: nvme-cli, sudo
 Description: The go.d metrics collection plugin for the Netdata Agent
  This plugin adds a selection of additional collectors written in Go to
  the Netdata Agent A significant percentage of the application specific
