@@ -86,26 +86,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrd_memory_mode = ctr->memory_mode;
 
-    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
+    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid))))
         uuid_generate(rd->metric_uuid);
-        bool found_in_sql = false; (void)found_in_sql;
-
-//        bool found_in_sql = true;
-//        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
-//            found_in_sql = false;
-//            uuid_generate(rd->metric_uuid);
-//        }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(rd->metric_uuid, uuid_str);
-        error_report("Dimension UUID for host %s chart [%s] dimension [%s] not found in context. It is now set to %s (%s)",
-                     string2str(host->hostname),
-                     string2str(st->name),
-                     string2str(rd->name),
-                     uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
-#endif
-    }
 
     // initialize the db tiers
     {
