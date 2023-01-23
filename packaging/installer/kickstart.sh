@@ -28,8 +28,8 @@ KICKSTART_SOURCE="$(
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PATH="${PATH}:/usr/local/bin:/usr/local/sbin"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
-REPOCONFIG_DEB_URL_PREFIX="https://packagecloud.io/netdata/netdata-repoconfig/packages"
-REPOCONFIG_DEB_VERSION="1-2"
+REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+REPOCONFIG_DEB_VERSION="2-1"
 REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
 REPOCONFIG_RPM_VERSION="2-1"
 START_TIME="$(date +%s)"
@@ -1283,7 +1283,7 @@ pkg_installed() {
 netdata_avail_check() {
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
-      env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q packagecloud.io/netdata/netdata;
+      env DEBIAN_FRONTEND=noninteractive apt-cache policy netdata | grep -q repo.netdata.cloud/repos/;
       return $?
       ;;
     centos|fedora|ol)
@@ -1362,7 +1362,7 @@ try_package_install() {
       repo_subcmd="update"
       repo_prefix="debian/${SYSCODENAME}"
       pkg_type="deb"
-      pkg_suffix="_all"
+      pkg_suffix="+debian${SYSVERSION}_all"
       pkg_vsep="_"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
@@ -1376,7 +1376,7 @@ try_package_install() {
       repo_subcmd="update"
       repo_prefix="ubuntu/${SYSCODENAME}"
       pkg_type="deb"
-      pkg_suffix="_all"
+      pkg_suffix="+ubuntu${SYSVERSION}_all"
       pkg_vsep="_"
       pkg_install_opts="${interactive_opts}"
       repo_update_opts="${interactive_opts}"
@@ -1473,7 +1473,7 @@ try_package_install() {
   case "${pkg_type}" in
     deb)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
-      repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}/download.${pkg_type}"
+      repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}"
       ;;
     rpm)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
