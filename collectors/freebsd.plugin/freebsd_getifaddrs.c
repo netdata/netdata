@@ -73,7 +73,7 @@ static void network_interfaces_cleanup() {
     struct cgroup_network_interface *ifm = network_interfaces_root, *last = NULL;
     while(ifm) {
         if (unlikely(!ifm->updated)) {
-            // info("Removing network interface '%s', linked after '%s'", ifm->name, last?last->name:"ROOT");
+            // collector_info("Removing network interface '%s', linked after '%s'", ifm->name, last?last->name:"ROOT");
 
             if (network_interfaces_last_used == ifm)
                 network_interfaces_last_used = last;
@@ -193,26 +193,26 @@ int do_getifaddrs(int update_every, usec_t dt) {
         struct ifaddrs *ifap;
 
         if (unlikely(getifaddrs(&ifap))) {
-            error("FREEBSD: getifaddrs() failed");
+            collector_error("FREEBSD: getifaddrs() failed");
             do_bandwidth_net = 0;
-            error("DISABLED: system.net chart");
+            collector_error("DISABLED: system.net chart");
             do_packets_net = 0;
-            error("DISABLED: system.packets chart");
+            collector_error("DISABLED: system.packets chart");
             do_bandwidth_ipv4 = 0;
-            error("DISABLED: system.ipv4 chart");
+            collector_error("DISABLED: system.ipv4 chart");
             do_bandwidth_ipv6 = 0;
-            error("DISABLED: system.ipv6 chart");
+            collector_error("DISABLED: system.ipv6 chart");
             do_bandwidth = 0;
-            error("DISABLED: net.* charts");
+            collector_error("DISABLED: net.* charts");
             do_packets = 0;
-            error("DISABLED: net_packets.* charts");
+            collector_error("DISABLED: net_packets.* charts");
             do_errors = 0;
-            error("DISABLED: net_errors.* charts");
+            collector_error("DISABLED: net_errors.* charts");
             do_drops = 0;
-            error("DISABLED: net_drops.* charts");
+            collector_error("DISABLED: net_drops.* charts");
             do_events = 0;
-            error("DISABLED: net_events.* charts");
-            error("DISABLED: getifaddrs module");
+            collector_error("DISABLED: net_events.* charts");
+            collector_error("DISABLED: getifaddrs module");
             return 1;
         } else {
 #define IFA_DATA(s) (((struct if_data *)ifa->ifa_data)->ifi_ ## s)
@@ -589,7 +589,7 @@ int do_getifaddrs(int update_every, usec_t dt) {
             freeifaddrs(ifap);
         }
     } else {
-        error("DISABLED: getifaddrs module");
+        collector_error("DISABLED: getifaddrs module");
         return 1;
     }
 

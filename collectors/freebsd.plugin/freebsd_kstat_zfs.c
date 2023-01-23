@@ -238,9 +238,9 @@ int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
                  GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.success", mib_success, success) ||
                  GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.failed", mib_failed, failed) ||
                  GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported))) {
-        error("DISABLED: zfs.trim_bytes chart");
-        error("DISABLED: zfs.trim_success chart");
-        error("DISABLED: kstat.zfs.misc.zio_trim module");
+        collector_error("DISABLED: zfs.trim_bytes chart");
+        collector_error("DISABLED: zfs.trim_success chart");
+        collector_error("DISABLED: kstat.zfs.misc.zio_trim module");
         return 1;
      } else {
 
