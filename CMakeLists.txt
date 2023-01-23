@@ -944,8 +944,6 @@ set(MQTT_WEBSOCKETS_FILES
         mqtt_websockets/c-rbuf/src/ringbuffer.c
         mqtt_websockets/c-rbuf/include/ringbuffer.h
         mqtt_websockets/c-rbuf/src/ringbuffer_internal.h
-        mqtt_websockets/MQTT-C/src/mqtt.c
-        mqtt_websockets/MQTT-C/include/mqtt.h
         )
 
 set(SPAWN_PLUGIN_FILES
@@ -1273,7 +1271,6 @@ list(APPEND NETDATA_COMMON_INCLUDE_DIRS ${PROTOBUF_INCLUDE_DIRS})
 list(APPEND NETDATA_COMMON_CFLAGS ${PROTOBUF_CFLAGS_OTHER})
 list(APPEND NETDATA_FILES ${ACLK_FILES} ${ACLK_PROTO_BUILT_SRCS} ${ACLK_PROTO_BUILT_HDRS})
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/aclk/aclk-schemas)
-include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/MQTT-C/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/src/include)
 include_directories(BEFORE ${CMAKE_SOURCE_DIR}/mqtt_websockets/c-rbuf/include)
 
