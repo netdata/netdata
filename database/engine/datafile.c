@@ -183,8 +183,7 @@ int close_data_file(struct rrdengine_datafile *datafile)
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
@@ -203,12 +202,11 @@ int unlink_data_file(struct rrdengine_datafile *datafile)
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
-    ++ctx->stats.datafile_deletions;
+    __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
 
     return ret;
 }
@@ -225,28 +223,25 @@ int destroy_data_file_unsafe(struct rrdengine_datafile *datafile)
     ret = uv_fs_ftruncate(NULL, &req, datafile->file, 0, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_ftruncate(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_close(NULL, &req, datafile->file, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
     ret = uv_fs_unlink(NULL, &req, path, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_fsunlink(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
 
-    ++ctx->stats.datafile_deletions;
+    __atomic_add_fetch(&ctx->stats.datafile_deletions, 1, __ATOMIC_RELAXED);
 
     return ret;
 }
@@ -264,12 +259,11 @@ int create_data_file(struct rrdengine_datafile *datafile)
     generate_datafilepath(datafile, path, sizeof(path));
     fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
     if (fd < 0) {
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
         return fd;
     }
     datafile->file = file;
-    ++ctx->stats.datafile_creations;
+    __atomic_add_fetch(&ctx->stats.datafile_creations, 1, __ATOMIC_RELAXED);
 
     ret = posix_memalign((void *)&superblock, RRDFILE_ALIGNMENT, sizeof(*superblock));
     if (unlikely(ret)) {
@@ -286,8 +280,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     if (ret < 0) {
         fatal_assert(req.result < 0);
         error("DBENGINE: uv_fs_write: %s", uv_strerror(ret));
-        ++ctx->stats.io_errors;
-        rrd_stat_atomic_add(&global_io_errors, 1);
+        ctx_io_error(ctx);
     }
     uv_fs_req_cleanup(&req);
     posix_memfree(superblock);
@@ -297,8 +290,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     }
 
     datafile->pos = sizeof(*superblock);
-    ctx->stats.io_write_bytes += sizeof(*superblock);
-    ++ctx->stats.io_write_requests;
+    ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
     return 0;
 }
@@ -350,8 +342,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     generate_datafilepath(datafile, path, sizeof(path));
     fd = open_file_direct_io(path, O_RDWR, &file);
     if (fd < 0) {
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
         return fd;
     }
     info("DBENGINE: initializing data file \"%s\".", path);
@@ -364,8 +355,8 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     ret = check_data_file_superblock(file);
     if (ret)
         goto error;
-    ctx->stats.io_read_bytes += sizeof(struct rrdeng_df_sb);
-    ++ctx->stats.io_read_requests;
+
+    ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_df_sb));
 
     datafile->file = file;
     datafile->pos = file_size;
@@ -378,8 +369,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
     }
     uv_fs_req_cleanup(&req);
     return error;
@@ -412,8 +402,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         fatal_assert(req.result < 0);
         uv_fs_req_cleanup(&req);
         error("DBENGINE: uv_fs_scandir(%s): %s", ctx->config.dbfiles_path, uv_strerror(ret));
-        ++ctx->stats.fs_errors;
-        rrd_stat_atomic_add(&global_fs_errors, 1);
+        ctx_fs_error(ctx);
         return ret;
     }
     info("DBENGINE: found %d files in path %s", ret, ctx->config.dbfiles_path);
@@ -474,8 +463,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             continue;
         }
 
+        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
         datafile_list_insert(ctx, datafile);
-        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
     }
     matched_files -= failed_to_load;
     freez(datafiles);
@@ -511,8 +500,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     info("DBENGINE: created journal file \"%s\".", path);
 
+    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);
-    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
     ctx_last_fileno_increment(ctx);
 
     return 0;
@@ -576,7 +565,8 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         }
 
         logged = false;
-        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev) {
+        size_t iterations = 100;
+        while(!datafile_acquire_for_deletion(datafile) && datafile != ctx->datafiles.first->prev && --iterations > 0) {
             if(!logged) {
                 info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;

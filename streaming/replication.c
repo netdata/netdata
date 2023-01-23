@@ -108,9 +108,10 @@ static struct replication_query *replication_query_prepare(
         time_t db_last_entry,
         time_t requested_after,
         time_t requested_before,
+        bool requested_enable_streaming,
         time_t query_after,
         time_t query_before,
-        bool enable_streaming,
+        bool query_enable_streaming,
         time_t wall_clock_time
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
@@ -125,11 +126,11 @@ static struct replication_query *replication_query_prepare(
 
     q->request.after = requested_after,
     q->request.before = requested_before,
-    q->request.enable_streaming = enable_streaming,
+    q->request.enable_streaming = requested_enable_streaming,
 
     q->query.after = query_after;
     q->query.before = query_before;
-    q->query.enable_streaming = enable_streaming;
+    q->query.enable_streaming = query_enable_streaming;
 
     q->wall_clock_time = wall_clock_time;
 
@@ -144,6 +145,7 @@ static struct replication_query *replication_query_prepare(
         q->query.locked_data_collection = true;
 
         if (st->last_updated.tv_sec > q->query.before) {
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
             internal_error(true,
                            "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
                            "has start_streaming = true, "
@@ -152,6 +154,7 @@ static struct replication_query *replication_query_prepare(
                            (unsigned long long) q->query.before,
                            (unsigned long long) st->last_updated.tv_sec
             );
+#endif
             q->query.before = st->last_updated.tv_sec;
         }
     }
@@ -339,13 +342,15 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 #endif
 
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
-                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'."
-                                     "Interrupting replication query at %ld, before the expected %ld.",
-                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
-                               last_end_time_in_buffer, q->query.before);
-
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
+
+                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'. "
+                                     "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
+                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
+                               q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
+                               q->query.after, q->query.before, q->query.enable_streaming?"true":"false");
+
                 q->query.interrupted = true;
 
                 break;
@@ -424,37 +429,48 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
     );
 }
 
-static struct replication_query *replication_response_prepare(RRDSET *st, bool start_streaming, time_t requested_after, time_t requested_before) {
+static struct replication_query *replication_response_prepare(RRDSET *st, bool requested_enable_streaming, time_t requested_after, time_t requested_before) {
     time_t query_after = requested_after;
     time_t query_before = requested_before;
+    bool query_enable_streaming = requested_enable_streaming;
+
     time_t wall_clock_time = now_realtime_sec();
 
     time_t db_first_entry, db_last_entry;
     rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
-    if (query_after < db_first_entry)
-        query_after = db_first_entry;
-
-    if (query_before > db_last_entry)
-        query_before = db_last_entry;
-
-    // if the parent asked us to start streaming, then fill the rest with the data that we have
-    if (start_streaming)
-        query_before = db_last_entry;
-
-    if (query_after > query_before) {
-        time_t tmp = query_before;
-        query_before = query_after;
-        query_after = tmp;
+    if(requested_after == 0 && requested_before == 0 && requested_enable_streaming == true) {
+        // no data requested - just enable streaming
+        ;
     }
+    else {
+        if (query_after < db_first_entry)
+            query_after = db_first_entry;
 
-    bool enable_streaming = (start_streaming || query_before == db_last_entry || !requested_after || !requested_before) ? true : false;
+        if (query_before > db_last_entry)
+            query_before = db_last_entry;
+
+        // if the parent asked us to start streaming, then fill the rest with the data that we have
+        if (requested_enable_streaming)
+            query_before = db_last_entry;
+
+        if (query_after > query_before) {
+            time_t tmp = query_before;
+            query_before = query_after;
+            query_after = tmp;
+        }
+
+        query_enable_streaming = (requested_enable_streaming ||
+                                  query_before == db_last_entry ||
+                                  !requested_after ||
+                                  !requested_before) ? true : false;
+    }
 
     return replication_query_prepare(
             st,
             db_first_entry, db_last_entry,
-            requested_after, requested_before,
-            query_after, query_before, enable_streaming,
+            requested_after, requested_before, requested_enable_streaming,
+            query_after, query_before, query_enable_streaming,
             wall_clock_time);
 }
 

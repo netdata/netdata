@@ -72,10 +72,12 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
         *PValue = sth;
 
         switch(thread_type) {
+            default:
             case SERVICE_THREAD_TYPE_NETDATA:
                 sth->netdata_thread = netdata_thread_self();
                 break;
 
+            case SERVICE_THREAD_TYPE_EVENT_LOOP:
             case SERVICE_THREAD_TYPE_LIBUV:
                 sth->uv_thread = uv_thread_self();
                 break;
@@ -197,10 +199,12 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 sth->cancelled = true;
 
                 switch(sth->type) {
+                    default:
                     case SERVICE_THREAD_TYPE_NETDATA:
                         netdata_thread_cancel(sth->netdata_thread);
                         break;
 
+                    case SERVICE_THREAD_TYPE_EVENT_LOOP:
                     case SERVICE_THREAD_TYPE_LIBUV:
                         break;
                 }

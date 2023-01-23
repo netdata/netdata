@@ -48,6 +48,7 @@ typedef enum {
 typedef enum {
     SERVICE_THREAD_TYPE_NETDATA,
     SERVICE_THREAD_TYPE_LIBUV,
+    SERVICE_THREAD_TYPE_EVENT_LOOP,
 } SERVICE_THREAD_TYPE;
 
 typedef void (*force_quit_t)(void *data);
