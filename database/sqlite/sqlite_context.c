@@ -195,24 +195,13 @@ void ctx_get_dimension_list(uuid_t *chart_uuid, void (*dict_cb)(SQL_DIMENSION_DA
 
     SQL_DIMENSION_DATA dimension_data;
 
-    char uuid_chart_str[UUID_STR_LEN];
-    uuid_unparse_lower(*chart_uuid, uuid_chart_str);
-
-    bool has_data = false;
     while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         uuid_copy(dimension_data.dim_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         dimension_data.id = (char *) sqlite3_column_text(res, 1);
         dimension_data.name = (char *) sqlite3_column_text(res, 2);
         dimension_data.hidden = sqlite3_column_int(res, 3);
-
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(dimension_data.dim_id, uuid_str);
-        internal_error(true, "CONTEXT DIMENSION LOAD: chart \"%s\" dim \"%s\" on id \"%s\" name \"%s\"", uuid_chart_str, uuid_str,  dimension_data.id, dimension_data.name);
-        has_data = true;
         dict_cb(&dimension_data, data);
     }
-    if (!has_data)
-        internal_error(true, "CONTEXT CHART LOAD: %s HAS NO DIMENSIONS", uuid_chart_str);
 
 failed:
     rc = sqlite3_reset(res);
