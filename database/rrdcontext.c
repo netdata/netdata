@@ -604,13 +604,6 @@ static bool rrdmetric_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 // but the dictionary is now unlocked
 static void rrdmetric_react_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdinstance __maybe_unused) {
     RRDMETRIC *rm = value;
-
-    char uuid[UUID_STR_LEN];
-    uuid_unparse_lower(rm->uuid, uuid);
-    internal_error(true, "RRDCONTEXT UUID DEBUG: host '%s', chart '%s', dimension '%s', uuid '%s', %s %s",
-                   rrdhost_hostname(rm->ri->rc->rrdhost), string2str(rm->ri->id), string2str(rm->id), uuid,
-                   rm->ri->rrdset ? "CHART" : "NOCHART", rm->rrddim ? "DIM" : "NODIM");
-
     rrdmetric_trigger_updates(rm, __FUNCTION__ );
 }
 
