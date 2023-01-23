@@ -754,14 +754,120 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
+#define MAX_PAGE_SIZES_TO_KEEP 3
+#define MAX_PAGES_PER_SIZE_TO_KEEP 100
+
+struct dbengine_page_size {
+    SPINLOCK spinlock;
+    size_t page_size;
+
+    size_t demand;
+    size_t supply;
+
+    size_t hit;
+    size_t miss;
+
+    size_t available;
+    void *pages[MAX_PAGES_PER_SIZE_TO_KEEP];
+};
+
+struct {
+    struct {
+        size_t hit;
+        size_t miss_wrong_size;
+        size_t miss_short_supply;
+        size_t cached_size;
+    } atomic;
+
+    int8_t sizes_to_slots[RRDENG_BLOCK_SIZE + 1];
+    struct dbengine_page_size slots[MAX_PAGE_SIZES_TO_KEEP];
+} dbengine_page_alloc_globals = {};
+
+__attribute__((constructor)) void initialize_sizes_to_slots(void) {
+    for(size_t i = 0; i <= RRDENG_BLOCK_SIZE; i++)
+        dbengine_page_alloc_globals.sizes_to_slots[i] = -1;
+
+    for(int8_t tier = 0; tier < MAX_PAGE_SIZES_TO_KEEP && tier < RRD_STORAGE_TIERS ; tier++) {
+        dbengine_page_alloc_globals.sizes_to_slots[tier_page_size[tier]] = (int8_t) tier;
+        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[tier];
+        memset(dps, 0, sizeof(struct dbengine_page_size));
+        dps->page_size = tier_page_size[tier];
+        netdata_spinlock_init(&dps->spinlock);
+    }
+}
+
+static inline __attribute__ ((__const__)) struct dbengine_page_size *page_size_lookup(size_t size) {
+    int index = (size <= RRDENG_BLOCK_SIZE) ? dbengine_page_alloc_globals.sizes_to_slots[size] : -1;
+
+    if(likely(index >= 0 && index < MAX_PAGE_SIZES_TO_KEEP)) {
+
+        internal_fatal(dbengine_page_alloc_globals.slots[index].page_size != size,
+                       "DBENGINE: corrupted pages sizes array");
+
+        return &dbengine_page_alloc_globals.slots[index];
+    }
+
+    return NULL;
+}
+
 void *dbengine_page_alloc(size_t size) {
-    void *page = mallocz(size);
+    void *page = NULL;
+
+    struct dbengine_page_size *dps = page_size_lookup(size);
+    if(dps) {
+        netdata_spinlock_lock(&dps->spinlock);
+        dps->demand++;
+
+        if(dps->available > 0) {
+            dps->hit++;
+            dps->available--;
+            internal_fatal(!dps->pages[dps->available], "DBENGINE: slot should have a page but is empty");
+            page = dps->pages[dps->available];
+            dps->pages[dps->available] = NULL;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.hit, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+        else {
+            dps->miss++;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_short_supply, 1, __ATOMIC_RELAXED);
+        }
+
+        netdata_spinlock_unlock(&dps->spinlock);
+    }
+    else
+        __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_wrong_size, 1, __ATOMIC_RELAXED);
+
+    if(!page)
+        page = mallocz(size);
+
     return page;
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    freez(page);
+    if(unlikely(!page))
+        return;
+
+    struct dbengine_page_size *dps = page_size_lookup(size);
+    if(dps) {
+        netdata_spinlock_lock(&dps->spinlock);
+        dps->supply++;
+
+        if(dps->available < MAX_PAGES_PER_SIZE_TO_KEEP) {
+            internal_fatal(dps->pages[dps->available], "DBENGINE: slot is already occupied");
+            dps->pages[dps->available] = page;
+            dps->available++;
+            page = NULL;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+
+        netdata_spinlock_unlock(&dps->spinlock);
+    }
+
+    if(page)
+        freez(page);
 }
+
+
 
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
@@ -1589,6 +1695,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
+            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED),
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
 #endif
