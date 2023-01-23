@@ -146,15 +146,19 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
     struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
     METRIC *metric;
 
+    size_t method = 1;
     metric = mrg_metric_get_and_acquire(main_mrg, &rd->metric_uuid, (Word_t) ctx);
     if(!metric) {
+        method = 2;
         metric = rrdeng_metric_get_legacy(db_instance, rrddim_id(rd), rrdset_id(rd->rrdset));
         if(metric)
             uuid_copy(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric));
     }
 
-    if(!metric)
+    if(!metric) {
+        method = 3;
         metric = rrdeng_metric_create(db_instance, &rd->metric_uuid);
+    }
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(uuid_compare(rd->metric_uuid, *mrg_metric_uuid(main_mrg, metric)) != 0) {
@@ -170,6 +174,14 @@ STORAGE_METRIC_HANDLE *rrdeng_metric_get_or_create(RRDDIM *rd, STORAGE_INSTANCE 
         fatal("DBENGINE: mixed up db instances, asked for metric from %p, got from %p",
               ctx, mrg_metric_ctx(metric));
 #endif
+
+    {
+        char uuid[UUID_STR_LEN];
+        uuid_unparse_lower(rd->metric_uuid, uuid);
+        internal_error(true, "RRDENG UUID DEBUG: host '%s', chart '%s', dimension '%s', uuid '%s', method %zu",
+                       rrdhost_hostname(rd->rrdset->rrdhost), rrdset_id(rd->rrdset), rrddim_id(rd), uuid,
+                       method);
+    }
 
     return (STORAGE_METRIC_HANDLE *)metric;
 }
