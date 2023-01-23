@@ -899,9 +899,10 @@ void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __ma
     log_unlock();
 }
 
-void error_int(const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
+void error_int(int is_collector, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... ) {
     // save a copy of errno - just in case this function generates a new error
     int __errno = errno;
+    FILE *fp = (is_collector) ? stderr : stderror;
 
     va_list args;
 
@@ -924,22 +925,22 @@ void error_int(const char *prefix, const char *file __maybe_unused, const char *
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderror, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
+    fprintf(fp, "%s: %s %-5.5s : %s : (%04lu@%-20.20s:%-15.15s): ",
             date, program_name, prefix, netdata_thread_tag(), line, file, function);
 #else
-    fprintf(stderror, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
+    fprintf(fp, "%s: %s %-5.5s : %s : ", date, program_name, prefix, netdata_thread_tag());
 #endif
-    vfprintf(stderror, fmt, args );
+    vfprintf(fp, fmt, args );
     va_end( args );
 
     if(__errno) {
         char buf[1024];
-        fprintf(stderror,
+        fprintf(fp,
                 " (errno %d, %s)\n", __errno, strerror_result(strerror_r(__errno, buf, 1023), buf));
         errno = 0;
     }
     else
-        fputc('\n', stderror);
+        fputc('\n', fp);
 
     log_unlock();
 }
