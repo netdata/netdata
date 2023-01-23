@@ -773,9 +773,10 @@ void debug_int( const char *file, const char *function, const unsigned long line
 // ----------------------------------------------------------------------------
 // info log
 
-void info_int( const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
+void info_int( int is_collector, const char *file __maybe_unused, const char *function __maybe_unused, const unsigned long line __maybe_unused, const char *fmt, ... )
 {
     va_list args;
+    FILE *fp = (is_collector) ? stderr : stderror;
 
     log_lock();
 
@@ -796,15 +797,15 @@ void info_int( const char *file __maybe_unused, const char *function __maybe_unu
 
     va_start( args, fmt );
 #ifdef NETDATA_INTERNAL_CHECKS
-    fprintf(stderror, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ",
+    fprintf(fp, "%s: %s INFO  : %s : (%04lu@%-20.20s:%-15.15s): ",
             date, program_name, netdata_thread_tag(), line, file, function);
 #else
-    fprintf(stderror, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
+    fprintf(fp, "%s: %s INFO  : %s : ", date, program_name, netdata_thread_tag());
 #endif
-    vfprintf(stderror, fmt, args );
+    vfprintf(fp, fmt, args );
     va_end( args );
 
-    fputc('\n', stderror);
+    fputc('\n', fp);
 
     log_unlock();
 }

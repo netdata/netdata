@@ -118,7 +118,8 @@ typedef struct error_with_limit {
 #define internal_fatal(args...) debug_dummy()
 #endif
 
-#define info(args...)    info_int(__FILE__, __FUNCTION__, __LINE__, ##args)
+#define info(args...)    info_int(0, __FILE__, __FUNCTION__, __LINE__, ##args)
+#define collector_info(args...)    info_int(1, __FILE__, __FUNCTION__, __LINE__, ##args)
 #define infoerr(args...) error_int(0, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define error(args...)   error_int(0, "ERROR", __FILE__, __FUNCTION__, __LINE__, ##args)
 #define collector_infoerr(args...) error_int(1, "INFO", __FILE__, __FUNCTION__, __LINE__, ##args)
@@ -129,7 +130,7 @@ typedef struct error_with_limit {
 
 void send_statistics(const char *action, const char *action_result, const char *action_data);
 void debug_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
-void info_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(4, 5);
+void info_int( int is_collector, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(5, 6);
 void error_int( int is_collector, const char *prefix, const char *file, const char *function, const unsigned long line, const char *fmt, ... ) PRINTFLIKE(6, 7);
 void error_limit_int(ERROR_LIMIT *erl, const char *prefix, const char *file __maybe_unused, const char *function __maybe_unused, unsigned long line __maybe_unused, const char *fmt, ... ) PRINTFLIKE(6, 7);;
 void fatal_int( const char *file, const char *function, const unsigned long line, const char *fmt, ... ) NORETURN PRINTFLIKE(4, 5);
