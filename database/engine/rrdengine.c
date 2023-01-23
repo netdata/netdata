@@ -1318,7 +1318,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
-    journal_file_bytes = journal_file->pos;
+    journal_file_bytes = journalfile_current_size(journal_file);
     deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
     info("DBENGINE: deleting data and journal files to maintain disk quota");

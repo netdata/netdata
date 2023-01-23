@@ -41,12 +41,22 @@ struct rrdengine_journalfile {
         time_t not_needed_since_s;
     } v2;
 
+    struct {
+        SPINLOCK spinlock;
+        uint64_t pos;
+    } unsafe;
+
     uv_file file;
-    uint64_t pos;
     void *data;
     struct rrdengine_datafile *datafile;
 };
 
+static inline uint64_t journalfile_current_size(struct rrdengine_journalfile *journalfile) {
+    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    uint64_t size = journalfile->unsafe.pos;
+    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
+    return size;
+}
 
 // Journal v2 structures
 

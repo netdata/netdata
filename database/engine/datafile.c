@@ -463,8 +463,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             continue;
         }
 
+        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
         datafile_list_insert(ctx, datafile);
-        ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
     }
     matched_files -= failed_to_load;
     freez(datafiles);
@@ -500,8 +500,8 @@ int create_new_datafile_pair(struct rrdengine_instance *ctx)
     journalfile_v1_generate_path(datafile, path, sizeof(path));
     info("DBENGINE: created journal file \"%s\".", path);
 
+    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->unsafe.pos);
     datafile_list_insert(ctx, datafile);
-    ctx_current_disk_space_increase(ctx, datafile->pos + journalfile->pos);
     ctx_last_fileno_increment(ctx);
 
     return 0;

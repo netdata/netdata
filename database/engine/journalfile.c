@@ -92,8 +92,10 @@ void journalfile_v1_extent_write(struct rrdengine_instance *ctx, struct rrdengin
     io_descr->buf = wal->buf;
     io_descr->bytes = wal->buf_size;
 
-    io_descr->pos = journalfile->pos;
-    journalfile->pos += wal->buf_size;
+    netdata_spinlock_lock(&journalfile->unsafe.spinlock);
+    io_descr->pos = journalfile->unsafe.pos;
+    journalfile->unsafe.pos += wal->buf_size;
+    netdata_spinlock_unlock(&journalfile->unsafe.spinlock);
 
     io_descr->req.data = wal;
     io_descr->data = journalfile;
@@ -384,6 +386,7 @@ struct rrdengine_journalfile *journalfile_alloc_and_init(struct rrdengine_datafi
     journalfile->datafile = datafile;
     netdata_spinlock_init(&journalfile->mmap.spinlock);
     netdata_spinlock_init(&journalfile->v2.spinlock);
+    netdata_spinlock_init(&journalfile->unsafe.spinlock);
     journalfile->mmap.fd = -1;
     datafile->journalfile = journalfile;
     return journalfile;
@@ -523,7 +526,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
         return ret;
     }
 
-    journalfile->pos = sizeof(*superblock);
+    journalfile->unsafe.pos = sizeof(*superblock);
 
     ctx_io_write_op_bytes(ctx, sizeof(*superblock));
 
@@ -708,7 +711,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     uv_fs_t req;
 
     file = journalfile->file;
-    file_size = journalfile->pos;
+    file_size = journalfile->unsafe.pos;
     //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
@@ -1240,7 +1243,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
     j2_header.extent_trailer_offset = extent_offset_trailer;
     j2_header.metric_trailer_offset = metric_offset_trailer;
     j2_header.journal_v2_file_size = total_file_size;
-    j2_header.journal_v1_file_size = (uint32_t) journalfile->pos;
+    j2_header.journal_v1_file_size = (uint32_t)journalfile_current_size(journalfile);
     j2_header.data = data_start;                        // Used during migration
 
     struct journal_v2_block_trailer *journal_v2_trailer;
@@ -1425,7 +1428,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
 
     journalfile->file = file;
-    journalfile->pos = file_size;
+    journalfile->unsafe.pos = file_size;
 
     journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx_last_fileno_get(ctx)), NULL);
     info("DBENGINE: loading journal file '%s' using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
