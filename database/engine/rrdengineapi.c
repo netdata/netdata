@@ -537,6 +537,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
 
         if(unlikely(++handle->page_position >= handle->page_entries_max)) {
             internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
+            handle->page_flags |= RRDENG_PAGE_FULL;
             rrdeng_store_metric_flush_current_page(collection_handle);
         }
     }
@@ -615,33 +616,42 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
     }
 
     else if(handle->page) {
-        size_t points_gap = (point_in_time_ut - handle->page_end_time_ut) / handle->update_every_ut;
-        size_t page_remaining_points = handle->page_entries_max - handle->page_position;
+        usec_t delta_ut = point_in_time_ut - handle->page_end_time_ut;
 
-        if(points_gap >= page_remaining_points) {
-            handle->page_flags |= RRDENG_PAGE_BIG_GAP;
+        if(unlikely(delta_ut < handle->update_every_ut)) {
+            handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
+            rrdeng_store_metric_flush_current_page(collection_handle);
+        }
+        else if(unlikely(delta_ut % handle->update_every_ut)) {
+            handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
             rrdeng_store_metric_flush_current_page(collection_handle);
         }
         else {
-            handle->page_flags |= RRDENG_PAGE_GAP;
+            size_t points_gap = delta_ut / handle->update_every_ut;
+            size_t page_remaining_points = handle->page_entries_max - handle->page_position;
 
-            // loop to fill the gap
-            usec_t point_in_time_to_stop_ut = point_in_time_ut - handle->update_every_ut;
-            for(usec_t next_point_in_time = handle->page_end_time_ut + handle->update_every_ut;
-                next_point_in_time <= point_in_time_to_stop_ut ;
-                next_point_in_time = handle->page_end_time_ut + handle->update_every_ut)
-                rrdeng_store_metric_append_point(
-                        collection_handle,
-                        handle->page_end_time_ut + handle->update_every_ut,
-                        NAN, NAN, NAN,
-                        1, 0,
-                        SN_EMPTY_SLOT);
+            if(points_gap >= page_remaining_points) {
+                handle->page_flags |= RRDENG_PAGE_BIG_GAP;
+                rrdeng_store_metric_flush_current_page(collection_handle);
+            }
+            else {
+                // loop to fill the gap
+                handle->page_flags |= RRDENG_PAGE_GAP;
+
+                usec_t point_in_time_to_stop_ut = point_in_time_ut - handle->update_every_ut;
+                for(usec_t next_point_in_time = handle->page_end_time_ut + handle->update_every_ut;
+                    next_point_in_time <= point_in_time_to_stop_ut ;
+                    next_point_in_time = handle->page_end_time_ut + handle->update_every_ut) {
+                    rrdeng_store_metric_append_point(
+                            collection_handle,
+                            handle->page_end_time_ut + handle->update_every_ut,
+                            NAN, NAN, NAN,
+                            1, 0,
+                            SN_EMPTY_SLOT);
+                }
+            }
         }
     }
-
-//    FIXME - is this a problem?
-//    internal_fatal((point_in_time_ut - handle->page_end_time_ut) % handle->update_every_ut,
-//        "DBENGINE: new point is not aligned to update every");
 
     rrdeng_store_metric_append_point(collection_handle,
                                      point_in_time_ut,
@@ -658,6 +668,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
+    handle->page_flags |= RRDENG_PAGE_COLLECT_FINALIZE;
     rrdeng_store_metric_flush_current_page(collection_handle);
     rrdeng_page_alignment_release(handle->alignment);
 
@@ -684,6 +695,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
     if(update_every_ut == handle->update_every_ut)
         return;
 
+    handle->page_flags |= RRDENG_PAGE_UPDATE_EVERY_CHANGE;
     rrdeng_store_metric_flush_current_page(collection_handle);
     mrg_metric_set_update_every(main_mrg, metric, update_every);
     handle->update_every_ut = update_every_ut;
