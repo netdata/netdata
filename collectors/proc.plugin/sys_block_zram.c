@@ -144,17 +144,17 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
         snprintfz(filename, FILENAME_MAX, "/dev/%s", de->d_name);
         if (unlikely(stat(filename, &st) != 0))
         {
-            error("ZRAM : Unable to stat %s: %s", filename, strerror(errno));
+            collector_error("ZRAM : Unable to stat %s: %s", filename, strerror(errno));
             continue;
         }
         if (major(st.st_rdev) == zram_id)
         {
-            info("ZRAM : Found device %s", filename);
+            collector_info("ZRAM : Found device %s", filename);
             snprintfz(filename, FILENAME_MAX, "/sys/block/%s/mm_stat", de->d_name);
             ff = procfile_open(filename, " \t:", PROCFILE_FLAG_DEFAULT);
             if (ff == NULL)
             {
-                error("ZRAM : Failed to open %s: %s", filename, strerror(errno));
+                collector_error("ZRAM : Failed to open %s: %s", filename, strerror(errno));
                 continue;
             }
             device.file = ff;
@@ -170,7 +170,7 @@ static int init_devices(DICTIONARY *devices, unsigned int zram_id, int update_ev
 static void free_device(DICTIONARY *dict, const char *name)
 {
     ZRAM_DEVICE *d = (ZRAM_DEVICE*)dictionary_get(dict, name);
-    info("ZRAM : Disabling monitoring of device %s", name);
+    collector_info("ZRAM : Disabling monitoring of device %s", name);
     rrdset_obsolete_and_pointer_null(d->st_usage);
     rrdset_obsolete_and_pointer_null(d->st_savings);
     rrdset_obsolete_and_pointer_null(d->st_alloc_efficiency);
@@ -252,7 +252,7 @@ int do_sys_block_zram(int update_every, usec_t dt) {
         ff = procfile_open("/proc/devices", " \t:", PROCFILE_FLAG_DEFAULT);
         if (ff == NULL)
         {
-            error("Cannot read /proc/devices");
+            collector_error("Cannot read /proc/devices");
             return 1;
         }
         ff = procfile_readall(ff);

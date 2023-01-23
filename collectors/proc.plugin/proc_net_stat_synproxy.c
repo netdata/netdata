@@ -34,7 +34,7 @@ int do_proc_net_stat_synproxy(int update_every, usec_t dt) {
     // make sure we have 3 lines
     size_t lines = procfile_lines(ff), l;
     if(unlikely(lines < 2)) {
-        error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
+        collector_error("/proc/net/stat/synproxy has %zu lines, expected no less than 2. Disabling it.", lines);
         return 1;
     }
 

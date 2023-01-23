@@ -171,7 +171,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
 
             ff = procfile_open(filename, " =", PROCFILE_FLAG_DEFAULT);
             if (unlikely(!ff)) {
-                error("Cannot read pressure information from %s.", filename);
+                collector_error("Cannot read pressure information from %s.", filename);
                 fail_count++;
                 continue;
             }
@@ -186,7 +186,7 @@ int do_proc_pressure(int update_every, usec_t dt) {
 
         size_t lines = procfile_lines(ff);
         if (unlikely(lines < 1)) {
-            error("%s has no lines.", procfile_filename(ff));
+            collector_error("%s has no lines.", procfile_filename(ff));
             fail_count++;
             continue;
         }

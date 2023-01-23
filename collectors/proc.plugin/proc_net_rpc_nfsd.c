@@ -282,7 +282,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
         if(do_rc == 1 && strcmp(type, "rc") == 0) {
             if(unlikely(words < 4)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 4);
                 continue;
             }
 
@@ -296,7 +296,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_fh == 1 && strcmp(type, "fh") == 0) {
             if(unlikely(words < 6)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -309,7 +309,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_io == 1 && strcmp(type, "io") == 0) {
             if(unlikely(words < 3)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 3);
                 continue;
             }
 
@@ -322,7 +322,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_th == 1 && strcmp(type, "th") == 0) {
             if(unlikely(words < 13)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 13);
                 continue;
             }
 
@@ -335,7 +335,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_net == 1 && strcmp(type, "net") == 0) {
             if(unlikely(words < 5)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
@@ -350,7 +350,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
             if(unlikely(words < 6)) {
-                error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfsd has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -377,7 +377,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc2_warning) {
-                    error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_error("Disabling /proc/net/rpc/nfsd v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc2_warning = 1;
                 }
                 do_proc2 = 0;
@@ -398,7 +398,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc3_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc3_warning = 1;
                 }
                 do_proc3 = 0;
@@ -419,7 +419,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc4_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
                 }
                 do_proc4 = 0;
@@ -440,7 +440,7 @@ int do_proc_net_rpc_nfsd(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc4ops_warning) {
-                    info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfsd v4 operations chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4ops_warning = 1;
                 }
                 do_proc4ops = 0;

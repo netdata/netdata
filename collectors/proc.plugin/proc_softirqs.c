@@ -75,7 +75,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     size_t words = procfile_linewords(ff, 0);
 
     if(unlikely(!lines)) {
-        error("Cannot read /proc/softirqs, zero lines reported.");
+        collector_error("Cannot read /proc/softirqs, zero lines reported.");
         return 1;
     }
 
@@ -90,7 +90,7 @@ int do_proc_softirqs(int update_every, usec_t dt) {
     }
 
     if(unlikely(!cpus)) {
-        error("PLUGIN: PROC_SOFTIRQS: Cannot find the number of CPUs in /proc/softirqs");
+        collector_error("PLUGIN: PROC_SOFTIRQS: Cannot find the number of CPUs in /proc/softirqs");
         return 1;
     }
 
