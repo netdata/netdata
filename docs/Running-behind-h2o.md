@@ -142,7 +142,7 @@ If your H2O server is on `localhost`, you can use this to ensure external access
     bind to = 127.0.0.1 ::1
 ```
 
----
+ 
 
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
@@ -157,7 +157,7 @@ In the H2O configuration, use a line like the following to connect to Netdata vi
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
 
----
+
 
 If your H2O server is not on localhost, you can set:
 
