@@ -960,7 +960,7 @@ static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_
 }
 
 static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_FLUSHED_TO_OPEN);
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
     uv_fs_t *uv_fs_request = data;
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
@@ -1241,7 +1241,7 @@ static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *extent_write_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_FLUSH_PAGES);
+    worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
     struct page_descr_with_data *base = data;
     struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, completion);
     return xt_io_descr;
@@ -1354,7 +1354,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
     if(worker)
-        worker_is_busy(UV_EVENT_ANALYZE_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
@@ -1389,12 +1389,12 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     // Update the first time / last time for all metrics we plan to delete
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
 
     find_uuid_first_time(ctx, first_datafile_remaining, metric_first_time_JudyL);
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_UPDATE);
+        worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
     info("DBENGINE: updating metric registry retention for %u metrics", count);
 
@@ -1420,7 +1420,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
 void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
@@ -1429,7 +1429,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
 
     while (!datafile_got_for_deletion) {
         if(worker)
-            worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+            worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
@@ -1452,7 +1452,7 @@ void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *
          ctx->config.dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
 
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_DELETE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
     unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
@@ -1506,7 +1506,7 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 }
 
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_QUIESCE);
+    worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
     completion_mark_complete(&ctx->quiesce.completion);
     return data;
@@ -1517,7 +1517,7 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_POPULATE_MRG);
+    worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
     do {
         struct rrdengine_datafile *datafile = NULL;
@@ -1557,7 +1557,7 @@ static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_SHUTDOWN);
+    worker_is_busy(UV_EVENT_DBENGINE_SHUTDOWN);
 
     completion_wait_for(&ctx->quiesce.completion);
     completion_destroy(&ctx->quiesce.completion);
@@ -1575,7 +1575,7 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_FLUSH_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
     pgc_flush_pages(main_cache, 0);
 
     return data;
@@ -1585,7 +1585,7 @@ static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_EVICT_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
     pgc_evict_pages(main_cache, 0, 0);
 
     return data;
@@ -1596,7 +1596,7 @@ static void after_prep_query(struct rrdengine_instance *ctx __maybe_unused, void
 }
 
 static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
-    worker_is_busy(UV_EVENT_PREP_QUERY);
+    worker_is_busy(UV_EVENT_DBENGINE_QUERY);
     PDC *pdc = data;
     rrdeng_prep_query(pdc);
     return data;
@@ -1664,7 +1664,7 @@ void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details
 #define MAX_RETRIES_TO_START_INDEX (100)
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT);
 
     while (__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
@@ -1675,7 +1675,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
     }
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
 
@@ -1751,7 +1751,7 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_BUFFERS_CLEANUP);
+    worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
     rrdeng_cmd_cleanup1();
     work_request_cleanup1();

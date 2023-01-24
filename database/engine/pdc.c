@@ -1138,7 +1138,7 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_EXT_DECOMPRESSION);
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_DECOMPRESSION);
 
     if (likely(!have_read_error && RRD_NO_COMPRESSION != header->compression_algorithm)) {
         // find the uncompressed extent size
@@ -1169,7 +1169,7 @@ static bool epdl_populate_pages_from_extent_data(
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_PAGE_LOOKUP);
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP);
 
     size_t stats_data_from_main_cache = 0;
     size_t stats_data_from_extent = 0;
@@ -1211,7 +1211,7 @@ static bool epdl_populate_pages_from_extent_data(
                 have_read_error);
 
         if(worker)
-            worker_is_busy(UV_EVENT_PAGE_POPULATION);
+            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION);
 
         void *page_data = dbengine_page_alloc(vd.page_length);
 
@@ -1275,7 +1275,7 @@ static bool epdl_populate_pages_from_extent_data(
         } while(pd);
 
         if(worker)
-            worker_is_busy(UV_EVENT_PAGE_LOOKUP);
+            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP);
     }
 
     if(stats_data_from_main_cache)
@@ -1332,7 +1332,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
     }
 
     if(worker)
-        worker_is_busy(UV_EVENT_EXTENT_CACHE);
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
 
     bool extent_found_in_cache = false;
 
@@ -1353,7 +1353,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
     }
     else {
         if(worker)
-            worker_is_busy(UV_EVENT_EXTENT_MMAP);
+            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
 
         off_t map_start =  ALIGN_BYTES_FLOOR(epdl->extent_offset);
         size_t length = ALIGN_BYTES_CEILING(epdl->extent_offset + epdl->extent_size) - map_start;
@@ -1369,7 +1369,7 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
             fatal_assert(0 == ret);
 
             if(worker)
-                worker_is_busy(UV_EVENT_EXTENT_CACHE);
+                worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
 
             bool added = false;
             extent_cache_page = pgc_page_add_and_acquire(extent_cache, (PGC_ENTRY) {
