@@ -801,6 +801,7 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
+      # shellcheck disable=SC2086
       if ! run_script "${uninstaller}" ${FLAGS}; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -814,6 +815,7 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      # shellcheck disable=SC2086
       if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -1225,16 +1227,16 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! grep -q '\-\-enable-auto-updates' ${updater}; then
+    elif ! grep -q '\-\-enable-auto-updates' "${updater}"; then
       echo
-    elif ! run_as_root ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
+    elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to disable automatic updates."
     else
-      run_as_root ${updater} --disable-auto-updates
+      run_as_root "${updater}" --disable-auto-updates
     fi
   fi
 }
