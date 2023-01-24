@@ -1125,6 +1125,9 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
 
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user)
 {
+    if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
+        return PARSER_RC_OK;
+
     char *dimension = get_word(words, num_words, 1);
     char *last_collected_ut_str = get_word(words, num_words, 2);
     char *last_collected_value_str = get_word(words, num_words, 3);
@@ -1157,6 +1160,9 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
 
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user)
 {
+    if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
+        return PARSER_RC_OK;
+
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
