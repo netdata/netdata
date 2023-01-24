@@ -528,4 +528,6 @@ static inline time_t max_acceptable_collected_time(void) {
     return now_realtime_sec() + 1;
 }
 
+void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
+
 #endif /* NETDATA_RRDENGINE_H */

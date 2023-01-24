@@ -1413,13 +1413,13 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         worker_is_idle();
 }
 
-static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool worker) {
+void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker) {
     if(worker)
         worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
-    if (ctx_is_available_for_queries(ctx))
+    if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
@@ -1483,15 +1483,16 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+}
+
+static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    datafile_delete(ctx, ctx->datafiles.first, ctx_is_available_for_queries(ctx), true);
 
     if (rrdeng_ctx_exceeded_disk_quota(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     rrdcontext_db_rotation();
-}
 
-static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    datafile_delete(ctx, ctx->datafiles.first, true);
     return data;
 }
 

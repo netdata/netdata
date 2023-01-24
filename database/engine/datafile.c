@@ -536,8 +536,13 @@ int init_data_files(struct rrdengine_instance *ctx)
             return ret;
         }
     }
-    else if(ctx->loading.create_new_datafile_pair)
-        create_new_datafile_pair(ctx);
+    else {
+        if (ctx->loading.create_new_datafile_pair)
+            create_new_datafile_pair(ctx);
+
+        while(rrdeng_ctx_exceeded_disk_quota(ctx))
+            datafile_delete(ctx, ctx->datafiles.first, false, false);
+    }
 
     pgc_reset_hot_max(open_cache);
     ctx->loading.create_new_datafile_pair = false;
