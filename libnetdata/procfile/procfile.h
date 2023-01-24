@@ -34,8 +34,9 @@ typedef struct {
 // ----------------------------------------------------------------------------
 // The procfile
 
-#define PROCFILE_FLAG_DEFAULT             0x00000000
-#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001
+#define PROCFILE_FLAG_DEFAULT             0x00000000 // To store inside `collector.log`
+#define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 // Do not store nothing
+#define PROCFILE_FLAG_ERROR_ON_ERROR_LOG  0x00000002 // Store inside `error.log`
 
 typedef enum __attribute__ ((__packed__)) procfile_separator {
     PF_CHAR_IS_SEPARATOR,
