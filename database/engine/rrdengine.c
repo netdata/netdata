@@ -754,14 +754,156 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
+#define MAX_PAGE_SIZES_TO_KEEP 3
+#define MIN_PAGES_PER_SIZE_TO_KEEP 100
+
+struct dbengine_page_size {
+    SPINLOCK spinlock;
+    size_t page_size; // read-only, no lock required to read it
+
+    size_t demand;
+    size_t supply;
+
+    size_t hit;
+    size_t miss;
+
+    size_t used;
+    size_t array_size;
+    void **array;
+};
+
+struct {
+    struct {
+        size_t hit;
+        size_t miss_wrong_size;
+        size_t miss_short_supply;
+        size_t cached_size;
+        size_t struct_size;
+    } atomic;
+
+    struct dbengine_page_size slots[MAX_PAGE_SIZES_TO_KEEP];
+} dbengine_page_alloc_globals = {
+        .atomic = {
+                .struct_size = sizeof(dbengine_page_alloc_globals),
+        }
+};
+
+__attribute__((constructor)) void initialize_sizes_to_slots(void) {
+    uint8_t found[RRDENG_BLOCK_SIZE + 1];
+    memset(found, 0, RRDENG_BLOCK_SIZE + 1);
+
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
+        memset(dps, 0, sizeof(struct dbengine_page_size));
+        netdata_spinlock_init(&dps->spinlock);
+    }
+
+    for(int tier = 0; tier < MAX_PAGE_SIZES_TO_KEEP && tier < RRD_STORAGE_TIERS ; tier++) {
+        size_t size = tier_page_size[tier];
+
+        if(size <= RRDENG_BLOCK_SIZE && !found[size]) {
+            struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[tier];
+            dps->page_size = size;
+            found[size] = 1;
+        }
+    }
+}
+
+static inline struct dbengine_page_size *page_size_lookup(size_t size) {
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        if(size == dbengine_page_alloc_globals.slots[i].page_size)
+            return &dbengine_page_alloc_globals.slots[i];
+    }
+    return NULL;
+}
+
+static void dbengine_page_alloc_cleanup1(void) {
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        void *page = NULL;
+
+        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
+        netdata_spinlock_lock(&dps->spinlock);
+        if(dps->used > MIN_PAGES_PER_SIZE_TO_KEEP) {
+            dps->used--;
+            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
+            page = dps->array[dps->used];
+            dps->array[dps->used] = NULL;
+            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+        netdata_spinlock_unlock(&dps->spinlock);
+
+        if(page)
+            freez(page);
+    }
+}
+
 void *dbengine_page_alloc(size_t size) {
-    void *page = mallocz(size);
+    void *page = NULL;
+
+    struct dbengine_page_size *dps = page_size_lookup(size);
+    if(dps) {
+        netdata_spinlock_lock(&dps->spinlock);
+        dps->demand++;
+
+        if(dps->used > 0) {
+            dps->hit++;
+            dps->used--;
+            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
+            page = dps->array[dps->used];
+            dps->array[dps->used] = NULL;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.hit, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+        else {
+            dps->miss++;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_short_supply, 1, __ATOMIC_RELAXED);
+        }
+
+        netdata_spinlock_unlock(&dps->spinlock);
+    }
+    else
+        __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_wrong_size, 1, __ATOMIC_RELAXED);
+
+    if(!page)
+        page = mallocz(size);
+
     return page;
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    freez(page);
+    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
+        return;
+
+    struct dbengine_page_size *dps = page_size_lookup(size);
+    if(dps) {
+        netdata_spinlock_lock(&dps->spinlock);
+        dps->supply++;
+
+        if(dps->used == dps->array_size) {
+            size_t new_array_size = dps->array_size ? dps->array_size * 2 : MIN_PAGES_PER_SIZE_TO_KEEP;
+            dps->array = reallocz(dps->array, new_array_size * sizeof(void *));
+
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.struct_size,
+                               (new_array_size - dps->array_size) * sizeof(void *), __ATOMIC_RELAXED);
+
+            dps->array_size = new_array_size;
+        }
+
+        if(dps->used < dps->array_size) {
+            dps->array[dps->used] = page;
+            dps->used++;
+            page = NULL;
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+
+        netdata_spinlock_unlock(&dps->spinlock);
+    }
+
+    if(page)
+        freez(page);
 }
+
+// ----------------------------------------------------------------------------
 
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
@@ -818,7 +960,7 @@ static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_
 }
 
 static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_FLUSHED_TO_OPEN);
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
     uv_fs_t *uv_fs_request = data;
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
@@ -1099,7 +1241,7 @@ static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *extent_write_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_FLUSH_PAGES);
+    worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
     struct page_descr_with_data *base = data;
     struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, completion);
     return xt_io_descr;
@@ -1212,7 +1354,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
     if(worker)
-        worker_is_busy(UV_EVENT_ANALYZE_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
@@ -1233,8 +1375,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         if (!*PValue) {
             uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
             uuid_first_t_entry->metric = metric;
-            uuid_first_t_entry->first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
-            uuid_first_t_entry->last_time_s = mrg_metric_get_latest_time_s(main_mrg, metric);
+            uuid_first_t_entry->first_time_s = LONG_MAX;
+            uuid_first_t_entry->last_time_s = 0;
             uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
             *PValue = uuid_first_t_entry;
             count++;
@@ -1242,17 +1384,17 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     }
     journalfile_v2_data_release(journalfile);
 
-    info("DBENGINE: recalculating retention for %u metrics", count);
+    info("DBENGINE: recalculating retention for %u metrics starting with datafile %u", count, first_datafile_remaining->fileno);
 
     // Update the first time / last time for all metrics we plan to delete
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
 
     find_uuid_first_time(ctx, first_datafile_remaining, metric_first_time_JudyL);
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_UPDATE);
+        worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
     info("DBENGINE: updating metric registry retention for %u metrics", count);
 
@@ -1260,7 +1402,12 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     bool first_then_next = true;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
-        mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+
+        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX && uuid_first_t_entry->last_time_s))
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+        else
+            mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, 0);
+
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
@@ -1271,18 +1418,18 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         worker_is_idle();
 }
 
-static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool worker) {
+void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
-    if (ctx_is_available_for_queries(ctx))
+    if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
         if(worker)
-            worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+            worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
@@ -1305,7 +1452,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
          ctx->config.dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
 
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_DELETE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
     unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
@@ -1341,15 +1488,16 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+}
+
+static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    datafile_delete(ctx, ctx->datafiles.first, ctx_is_available_for_queries(ctx), true);
 
     if (rrdeng_ctx_exceeded_disk_quota(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     rrdcontext_db_rotation();
-}
 
-static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    datafile_delete(ctx, ctx->datafiles.first, true);
     return data;
 }
 
@@ -1358,7 +1506,7 @@ static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_inst
 }
 
 static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_QUIESCE);
+    worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
     completion_mark_complete(&ctx->quiesce.completion);
     return data;
@@ -1369,7 +1517,7 @@ static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_POPULATE_MRG);
+    worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
     do {
         struct rrdengine_datafile *datafile = NULL;
@@ -1409,7 +1557,7 @@ static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, vo
 }
 
 static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_SHUTDOWN);
+    worker_is_busy(UV_EVENT_DBENGINE_SHUTDOWN);
 
     completion_wait_for(&ctx->quiesce.completion);
     completion_destroy(&ctx->quiesce.completion);
@@ -1427,7 +1575,7 @@ static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_FLUSH_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
     pgc_flush_pages(main_cache, 0);
 
     return data;
@@ -1437,7 +1585,7 @@ static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     if (!main_cache)
         return data;
 
-    worker_is_busy(UV_EVENT_EVICT_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
     pgc_evict_pages(main_cache, 0, 0);
 
     return data;
@@ -1448,7 +1596,7 @@ static void after_prep_query(struct rrdengine_instance *ctx __maybe_unused, void
 }
 
 static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
-    worker_is_busy(UV_EVENT_PREP_QUERY);
+    worker_is_busy(UV_EVENT_DBENGINE_QUERY);
     PDC *pdc = data;
     rrdeng_prep_query(pdc);
     return data;
@@ -1516,7 +1664,7 @@ void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details
 #define MAX_RETRIES_TO_START_INDEX (100)
 static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT);
 
     while (__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
@@ -1527,7 +1675,7 @@ static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __mayb
     }
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
 
@@ -1589,6 +1737,9 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
+            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED) +
+                            __atomic_load_n(&dbengine_page_alloc_globals.atomic.struct_size, __ATOMIC_RELAXED),
+
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
 #endif
@@ -1600,7 +1751,7 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_BUFFERS_CLEANUP);
+    worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
     rrdeng_cmd_cleanup1();
     work_request_cleanup1();
@@ -1613,6 +1764,7 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     extent_buffer_cleanup1();
     epdl_cleanup1();
     deol_cleanup1();
+    dbengine_page_alloc_cleanup1();
 
     {
         static time_t last_run_s = 0;

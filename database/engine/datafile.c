@@ -536,8 +536,13 @@ int init_data_files(struct rrdengine_instance *ctx)
             return ret;
         }
     }
-    else if(ctx->loading.create_new_datafile_pair)
-        create_new_datafile_pair(ctx);
+    else {
+        if (ctx->loading.create_new_datafile_pair)
+            create_new_datafile_pair(ctx);
+
+        while(rrdeng_ctx_exceeded_disk_quota(ctx))
+            datafile_delete(ctx, ctx->datafiles.first, false, false);
+    }
 
     pgc_reset_hot_max(open_cache);
     ctx->loading.create_new_datafile_pair = false;
@@ -548,21 +553,18 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
 
+    logged = false;
+    while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
+        if(!logged) {
+            info("Waiting for inflight flush to finish on tier %d...", ctx->config.tier);
+            logged = true;
+        }
+        sleep_usec(100 * USEC_PER_MS);
+    }
+
     do {
         struct rrdengine_datafile *datafile = ctx->datafiles.first;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
-
-        logged = false;
-        if(datafile == ctx->datafiles.first->prev) {
-            // this is the last file
-            while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
-                if(!logged) {
-                    info("Waiting for inflight flush to finish on tier %d to close last datafile %u...", ctx->config.tier, datafile->fileno);
-                    logged = true;
-                }
-                sleep_usec(100 * USEC_PER_MS);
-            }
-        }
 
         logged = false;
         size_t iterations = 100;

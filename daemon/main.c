@@ -428,6 +428,25 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            delta_shutdown_time("wait for dbengine collectors to finish");
+
+            size_t running = 1;
+            while(running) {
+                running = 0;
+                for (size_t tier = 0; tier < storage_tiers; tier++)
+                    running += rrdeng_collectors_running(multidb_ctx[tier]);
+
+                if(running)
+                    sleep_usec(100 * USEC_PER_MS);
+            }
+
+            delta_shutdown_time("wait for dbengine main cache to finish flushing");
+
+            while (pgc_hot_and_dirty_entries(main_cache)) {
+                pgc_flush_all_hot_and_dirty_pages(main_cache, PGC_SECTION_ALL);
+                sleep_usec(100 * USEC_PER_MS);
+            }
+
             delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);

@@ -79,6 +79,9 @@ struct pgc_statistics {
     size_t flushing_entries;
     size_t flushing_size;
 
+    size_t hot2dirty_entries;
+    size_t hot2dirty_size;
+
     PGC_CACHE_LINE_PADDING(4);
 
     size_t acquires;
@@ -235,5 +238,6 @@ bool pgc_evict_pages(PGC *cache, size_t max_skip, size_t max_evict);
 bool pgc_flush_pages(PGC *cache, size_t max_flushes);
 
 struct pgc_statistics pgc_get_statistics(PGC *cache);
+size_t pgc_hot_and_dirty_entries(PGC *cache);
 
 #endif // DBENGINE_CACHE_H

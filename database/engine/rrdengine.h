@@ -71,35 +71,38 @@ typedef enum __attribute__ ((__packed__)) {
     PDC_PAGE_FAILED    = (1 << 1),                  // failed to be loaded (pd->page is null)
     PDC_PAGE_SKIP      = (1 << 2),                  // don't use this page, it is not good for us
     PDC_PAGE_INVALID   = (1 << 3),                  // don't use this page, it is invalid
+    PDC_PAGE_EMPTY     = (1 << 4),                  // the page is empty, does not have any data
 
     // other statuses for tracking issues
-    PDC_PAGE_PREPROCESSED              = (1 << 4),  // used during preprocessing
-    PDC_PAGE_PROCESSED                 = (1 << 5),  // processed by the query caller
-    PDC_PAGE_RELEASED                  = (1 << 6),  // already released
+    PDC_PAGE_PREPROCESSED              = (1 << 5),  // used during preprocessing
+    PDC_PAGE_PROCESSED                 = (1 << 6),  // processed by the query caller
+    PDC_PAGE_RELEASED                  = (1 << 7),  // already released
 
     // data found in cache (preloaded) or on disk?
-    PDC_PAGE_PRELOADED                 = (1 << 7),  // data found in memory
-    PDC_PAGE_DISK_PENDING              = (1 << 8),  // data need to be loaded from disk
+    PDC_PAGE_PRELOADED                 = (1 << 8),  // data found in memory
+    PDC_PAGE_DISK_PENDING              = (1 << 9),  // data need to be loaded from disk
 
     // worker related statuses
-    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 9),
-    PDC_PAGE_FAILED_NOT_IN_EXTENT      = (1 << 10),
-    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 11),
-    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 12),
+    PDC_PAGE_FAILED_INVALID_EXTENT     = (1 << 10),
+    PDC_PAGE_FAILED_NOT_IN_EXTENT      = (1 << 11),
+    PDC_PAGE_FAILED_TO_MAP_EXTENT      = (1 << 12),
+    PDC_PAGE_FAILED_TO_ACQUIRE_DATAFILE= (1 << 13),
 
-    PDC_PAGE_EXTENT_FROM_CACHE         = (1 << 13),
-    PDC_PAGE_EXTENT_FROM_DISK          = (1 << 14),
+    PDC_PAGE_EXTENT_FROM_CACHE         = (1 << 14),
+    PDC_PAGE_EXTENT_FROM_DISK          = (1 << 15),
 
-    PDC_PAGE_CANCELLED                 = (1 << 15), // the query thread had left when we try to load the page
+    PDC_PAGE_CANCELLED                 = (1 << 16), // the query thread had left when we try to load the page
 
-    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 16),
-    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 17),
-    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 18),
-    PDC_PAGE_PRELOADED_PASS4           = (1 << 19),
+    PDC_PAGE_SOURCE_MAIN_CACHE         = (1 << 17),
+    PDC_PAGE_SOURCE_OPEN_CACHE         = (1 << 18),
+    PDC_PAGE_SOURCE_JOURNAL_V2         = (1 << 19),
+    PDC_PAGE_PRELOADED_PASS4           = (1 << 20),
 
     // datafile acquired
     PDC_PAGE_DATAFILE_ACQUIRED         = (1 << 30),
 } PDC_PAGE_STATUS;
+
+#define PDC_PAGE_QUERY_GLOBAL_SKIP_LIST (PDC_PAGE_FAILED | PDC_PAGE_SKIP | PDC_PAGE_INVALID | PDC_PAGE_RELEASED)
 
 struct page_details {
     struct {
@@ -494,6 +497,8 @@ typedef struct validated_page_descriptor {
     bool is_valid;
 } VALIDATED_PAGE_DESCRIPTOR;
 
+#define DBENGINE_EMPTY_PAGE (void *)(-1)
+
 #define page_entries_by_time(start_time_s, end_time_s, update_every_s) \
         ((update_every_s) ? (((end_time_s) - ((start_time_s) - (update_every_s))) / (update_every_s)) : 1)
 
@@ -510,7 +515,6 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(uuid_t *uuid,
                                         time_t now_s,
                                         time_t overwrite_zero_update_every_s,
                                         bool have_read_error,
-                                        bool minimize_invalid_size,
                                         const char *msg,
                                         RRDENG_COLLECT_PAGE_FLAGS flags);
 VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_extent_page_descr *descr, time_t now_s, time_t overwrite_zero_update_every_s, bool have_read_error);
@@ -527,5 +531,7 @@ TIME_RANGE_COMPARE is_page_in_time_range(time_t page_first_time_s, time_t page_l
 static inline time_t max_acceptable_collected_time(void) {
     return now_realtime_sec() + 1;
 }
+
+void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker);
 
 #endif /* NETDATA_RRDENGINE_H */

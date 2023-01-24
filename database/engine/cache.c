@@ -625,6 +625,9 @@ static inline void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lo
         return;
     }
 
+    __atomic_add_fetch(&cache->stats.hot2dirty_entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&cache->stats.hot2dirty_size, page->assumed_size, __ATOMIC_RELAXED);
+
     if(likely(flags & PGC_PAGE_HOT))
         pgc_ll_del(cache, &cache->hot, page, true);
 
@@ -637,6 +640,9 @@ static inline void page_set_dirty(PGC *cache, PGC_PAGE *page, bool having_hot_lo
 
     // first add to linked list, the set the flag (required for move_page_last())
     pgc_ll_add(cache, &cache->dirty, page, false);
+
+    __atomic_sub_fetch(&cache->stats.hot2dirty_entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&cache->stats.hot2dirty_size, page->assumed_size, __ATOMIC_RELAXED);
 
     page_transition_unlock(cache, page);
 }
@@ -1592,11 +1598,11 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
                 internal_fatal(page_get_status_flags(tpg) != PGC_PAGE_DIRTY,
                                "DBENGINE CACHE: page should be in the dirty list before saved");
 
-                // remove it from the dirty list
-                pgc_ll_del(cache, &cache->dirty, tpg, true);
-
                 __atomic_add_fetch(&cache->stats.flushing_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.flushing_size, tpg->assumed_size, __ATOMIC_RELAXED);
+
+                // remove it from the dirty list
+                pgc_ll_del(cache, &cache->dirty, tpg, true);
 
                 pages_removed_dirty_size += tpg->assumed_size;
                 pages_removed_dirty++;
@@ -1992,6 +1998,17 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
     // FIXME - get the statistics atomically
     return cache->stats;
+}
+
+size_t pgc_hot_and_dirty_entries(PGC *cache) {
+    size_t entries = 0;
+
+    entries += __atomic_load_n(&cache->hot.stats->entries, __ATOMIC_RELAXED);
+    entries += __atomic_load_n(&cache->dirty.stats->entries, __ATOMIC_RELAXED);
+    entries += __atomic_load_n(&cache->stats.flushing_entries, __ATOMIC_RELAXED);
+    entries += __atomic_load_n(&cache->stats.hot2dirty_entries, __ATOMIC_RELAXED);
+
+    return entries;
 }
 
 void pgc_open_cache_to_journal_v2(PGC *cache, Word_t section, unsigned datafile_fileno, uint8_t type, migrate_to_v2_callback cb, void *data) {

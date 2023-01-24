@@ -155,7 +155,7 @@ static struct replication_query *replication_query_prepare(
                            (unsigned long long) st->last_updated.tv_sec
             );
 #endif
-            q->query.before = st->last_updated.tv_sec;
+            q->query.before = MIN(st->last_updated.tv_sec, wall_clock_time);
         }
     }
 
@@ -209,8 +209,37 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-static void replication_query_finalize(struct replication_query *q, bool executed) {
+static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+                if(!rd->exposed) continue;
+
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
+                               rrddim_id(rd),
+                               (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
+                               rd->last_collected_value,
+                               rd->last_calculated_value,
+                               rd->last_stored_value
+                );
+            }
+    rrddim_foreach_done(rd);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
+                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
+                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
+    );
+}
+
+static void replication_query_finalize(BUFFER *wb, struct replication_query *q, bool executed) {
     size_t dimensions = q->dimensions;
+
+    if(wb && q->query.enable_streaming)
+        replication_send_chart_collection_state(wb, q->st);
+
+    if(q->query.locked_data_collection) {
+        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        q->query.locked_data_collection = false;
+    }
 
     // release all the dictionary items acquired
     // finalize the queries
@@ -226,11 +255,6 @@ static void replication_query_finalize(struct replication_query *q, bool execute
 
         // update global statistics
         queries++;
-    }
-
-    if(q->query.locked_data_collection) {
-        netdata_spinlock_unlock(&q->st->data_collection_lock);
-        q->query.locked_data_collection = false;
     }
 
     if(executed) {
@@ -311,8 +335,8 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 continue;
             }
 
-            if(d->sp.end_time_s < now)
-                // this dimension does not have any more data
+            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s))
+                // this dimension does not provide any data
                 continue;
 
             if(unlikely(!min_start_time))
@@ -325,13 +349,10 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             min_end_time = MIN(min_end_time, d->sp.end_time_s);
         }
 
-        if(unlikely(min_end_time < now))
-            break;
-
-        if(likely(min_start_time <= now)) {
+        if(likely(min_start_time <= now && min_end_time >= now)) {
             // we have a valid point
 
-            if (unlikely(min_end_time <= min_start_time))
+            if (unlikely(min_end_time == min_start_time))
                 min_start_time = min_end_time - q->st->update_every;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -382,7 +403,11 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             now = min_end_time + 1;
         }
+        else if(unlikely(min_end_time < now))
+            // the query does not progress
+            break;
         else
+            // we have gap - all points are in the future
             now = min_start_time;
     }
 
@@ -406,27 +431,6 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
     q->points_read = points_read;
     q->points_generated = points_generated;
-}
-
-static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(!rd->exposed) continue;
-
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
-                       rrddim_id(rd),
-                       (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
-                       rd->last_collected_value,
-                       rd->last_calculated_value,
-                       rd->last_stored_value
-        );
-    }
-    rrddim_foreach_done(rd);
-
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
-                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
-                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
-    );
 }
 
 static struct replication_query *replication_response_prepare(RRDSET *st, bool requested_enable_streaming, time_t requested_after, time_t requested_before) {
@@ -475,7 +479,7 @@ static struct replication_query *replication_response_prepare(RRDSET *st, bool r
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
-    replication_query_finalize(q, false);
+    replication_query_finalize(NULL, q, false);
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
@@ -502,12 +506,8 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
 
-    replication_query_finalize(q, q->query.execute);
+    replication_query_finalize(wb, q, q->query.execute);
     q = NULL; // IMPORTANT: q is invalid now
-
-    // get again the world clock time
-    if(enable_streaming)
-        replication_send_chart_collection_state(wb, st);
 
     // get a fresh retention to send to the parent
     time_t wall_clock_time = now_realtime_sec();

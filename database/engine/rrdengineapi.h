@@ -214,6 +214,7 @@ struct rrdeng_buffer_sizes {
     size_t epdl;
     size_t deol;
     size_t pd;
+    size_t pages;
 #ifdef PDC_USE_JULYL
     size_t julyl;
 #endif
@@ -223,5 +224,6 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
+size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
 
 #endif /* NETDATA_RRDENGINEAPI_H */
