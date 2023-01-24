@@ -1018,14 +1018,15 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
     ops->is_finished = qm->plan.array[plan_id].is_finished;
     ops->finalize = qm->plan.array[plan_id].finalize;
     ops->current_plan = plan_id;
-    ops->current_plan_expire_time = qm->plan.array[plan_id].before;
+
+    if(plan_id + 1 < qm->plan.used && qm->plan.array[plan_id + 1].after < qm->plan.array[plan_id].before)
+        ops->current_plan_expire_time = qm->plan.array[plan_id + 1].after;
+    else
+        ops->current_plan_expire_time = qm->plan.array[plan_id].before;
 }
 
 static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
     QUERY_METRIC *qm = ops->qm;
-
-    internal_fatal(now < ops->current_plan_expire_time && now < qm->plan.array[ops->current_plan].before,
-                   "QUERY: switching query plan too early!");
 
     size_t old_plan = ops->current_plan;
 
@@ -1178,6 +1179,11 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         internal_fatal(qm->plan.array[p].before > before_wanted, "QUERY: too big plan last time");
     }
 #endif
+
+    for(size_t p = 0; p < qm->plan.used ;p++) {
+        size_t tier = qm->plan.array[p].tier;
+        qm->plan.array[p].before += qm->tiers[tier].db_update_every_s - 1;
+    }
 
     query_planer_initialize_plans(ops);
     query_planer_activate_plan(ops, 0, 0);
@@ -1355,7 +1361,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             }
 
             // check if the db is giving us zero duration points
-            if(unlikely(new_point.start_time == new_point.end_time)) {
+            if(unlikely(db_points_read_since_plan_switch > 1 && new_point.start_time == new_point.end_time)) {
                 internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned point %zu start time %ld, end time %ld, that are both equal",
                                qt->id, string2str(qm->dimension.id), new_point.id, new_point.start_time, new_point.end_time);
 
@@ -1363,8 +1369,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             }
 
             // check if the db is advancing the query
-            if(unlikely(new_point.end_time <= last1_point.end_time)) {
-                internal_error(db_points_read_since_plan_switch > 1,
+            if(unlikely(db_points_read_since_plan_switch > 1 && new_point.end_time <= last1_point.end_time)) {
+                internal_error(true,
                                "QUERY: '%s', dimension '%s' next_metric() returned point %zu from %ld to %ld, before the last point %zu from %ld to %ld, now is %ld to %ld",
                                qt->id, string2str(qm->dimension.id), new_point.id, new_point.start_time, new_point.end_time,
                                last1_point.id, last1_point.start_time, last1_point.end_time, now_start_time, now_end_time);
