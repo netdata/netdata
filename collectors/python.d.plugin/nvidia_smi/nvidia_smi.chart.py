@@ -35,9 +35,11 @@ POWER_STATE = 'power_state'
 PROCESSES_MEM = 'processes_mem'
 USER_MEM = 'user_mem'
 USER_NUM = 'user_num'
+PCI_GEN = 'pci_gen'
 
 ORDER = [
     PCI_BANDWIDTH,
+    PCI_GEN,
     FAN_SPEED,
     GPU_UTIL,
     MEM_UTIL,
@@ -146,6 +148,12 @@ def gpu_charts(gpu):
             'lines': [
                 ['user_num', 'users'],
             ]
+        },
+        PCI_GEN: {
+            'options': [None, 'PCI Generation', 'num', fam, 'nvidia_smi.pci_gen', 'line'],
+            'lines': [
+                ['pci_link_gen', 'gen', 'absolute', 1, 1],
+             ]
         },
     }
 
@@ -327,6 +335,14 @@ class GPU:
         return 'gpu{0} {1}'.format(self.num, self.name())
 
     @handle_attr_error
+    def pci_link_gen(self):
+        return self.root.find('pci').find('pci_gpu_link_info').find('pcie_gen').find('current_link_gen').text
+
+    @handle_attr_error
+    def pci_link_width(self):
+        return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('current_link_width').text.split('x')[0]
+
+    @handle_attr_error
     def rx_util(self):
         return self.root.find('pci').find('rx_util').text.split()[0]
 
@@ -437,6 +453,7 @@ class GPU:
             'sm_clock': self.sm_clock(),
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
+            'pci_link_gen': self.pci_link_gen(),
         }
 
         for v in POWER_STATES:
