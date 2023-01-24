@@ -338,11 +338,11 @@ class GPU:
 
     @handle_attr_error
     def pci_link_gen(self):
-        return self.root.find('pci').find('pci_gpu_link_info').find('pcie_gen').find('current_link_gen').text
+        return self.root.find('pci').find('pci_gpu_link_info').find('pcie_gen').find('max_link_gen').text
 
     @handle_attr_error
     def pci_link_width(self):
-        return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('current_link_width').text.split('x')[0]
+        return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('max_link_width').text.split('x')[0]
 
     def pci_bw_max(self):
         link_gen = int(self.pci_link_gen())
@@ -446,8 +446,8 @@ class GPU:
         data = {
             'rx_util': self.rx_util(),
             'tx_util': self.tx_util(),
-            'rx_util_percent': str(int(int(self.rx_util())/self.pci_bw_max())),
-            'tx_util_percent': str(int(int(self.tx_util())/self.pci_bw_max())),
+            'rx_util_percent': str(int(int(self.rx_util())*100/self.pci_bw_max())),
+            'tx_util_percent': str(int(int(self.tx_util())*100/self.pci_bw_max())),
             'fan_speed': self.fan_speed(),
             'gpu_util': self.gpu_util(),
             'memory_util': self.memory_util(),
