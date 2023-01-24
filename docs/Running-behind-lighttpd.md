@@ -27,7 +27,7 @@ $SERVER["socket"] == ":19998" {
 }
 ```
 
----
+
 
 If the only thing the server is exposing via the web is Netdata (and thus no suburl rewriting required),
 then you can get away with just
@@ -51,7 +51,7 @@ auth.require = ( "" => ( "method" => "digest",
 
 other auth methods, and more info on htdigest, can be found in lighttpd's [mod_auth docs](http://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth).
 
----
+
 
 It seems that lighttpd (or some versions of it), fail to proxy compressed web responses.
 To solve this issue, disable web response compression in Netdata.
