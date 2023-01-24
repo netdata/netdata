@@ -492,7 +492,7 @@ run_as_root() {
   confirm_root_support
 
   if [ "$(id -u)" -ne "0" ]; then
-    printf >&2 "Root privileges required to run %s" "${@}"
+    printf >&2 "Root privileges required to run %s\n" "${@}"
   fi
 
   run ${ROOTCMD} "${@}"
