@@ -1,10 +1,10 @@
 <!--
 title: "Health configuration reference"
 sidebar_label: "Health"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/REFERENCE.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/REFERENCE.md"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations"
 -->
 
 # Health configuration reference

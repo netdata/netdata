@@ -1,6 +1,10 @@
 <!--
 title: "Running Netdata behind H2O"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-h2o.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-h2o.md"
+sidebar_label: "Running Netdata behind H2O"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Running Netdata behind H2O

@@ -4,8 +4,8 @@ description: "Netdata's highly-efficient database engine use both RAM and disk f
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/database/engine/README.md"
 sidebar_label: "Database"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts"
 -->
 
 # DBENGINE

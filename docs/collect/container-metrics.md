@@ -2,7 +2,10 @@
 title: "Collect container metrics with Netdata"
 sidebar_label: "Container metrics"
 description: "Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/container-metrics.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collect/container-metrics.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts"
 -->
 
 # Collect container metrics with Netdata

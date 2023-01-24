@@ -1,6 +1,10 @@
 <!--
 title: "Netdata via apache's mod_proxy"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md"
+sidebar_label: "Netdata via apache's mod_proxy"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Netdata via apache's mod_proxy

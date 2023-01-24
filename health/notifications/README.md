@@ -4,8 +4,8 @@ description: "Reference documentation for Netdata's alarm notification feature, 
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/README.md"
 sidebar_label: "Notifications Reference"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/General references"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations"
 -->
 
 # Alarm notifications

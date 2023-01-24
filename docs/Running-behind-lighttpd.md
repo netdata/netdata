@@ -1,6 +1,10 @@
 <!--
 title: "Netdata via lighttpd v1.4.x"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md"
+sidebar_label: "Netdata via lighttpd v1.4.x"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Netdata via lighttpd v1.4.x

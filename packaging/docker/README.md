@@ -1,7 +1,11 @@
 <!--
 title: "Install Netdata with Docker"
-date: 2020-04-23
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
+date: "2020-04-23"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/docker/README.md"
+sidebar_label: "Install Netdata with Docker"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install the Netdata Agent with Docker
