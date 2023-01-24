@@ -1375,8 +1375,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         if (!*PValue) {
             uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
             uuid_first_t_entry->metric = metric;
-            uuid_first_t_entry->first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
-            uuid_first_t_entry->last_time_s = mrg_metric_get_latest_time_s(main_mrg, metric);
+            uuid_first_t_entry->first_time_s = LONG_MAX;
+            uuid_first_t_entry->last_time_s = 0;
             uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
             *PValue = uuid_first_t_entry;
             count++;
@@ -1402,7 +1402,12 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     bool first_then_next = true;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
-        mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+
+        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX && uuid_first_t_entry->last_time_s))
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+        else
+            mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, 0);
+
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
