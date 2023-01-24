@@ -644,7 +644,7 @@ Group: Applications/System
 
 %files plugin-ebpf-code
 %defattr(0640,root,netdata,0640)
-%{_libexecdir}/%{name}/plugins.d/ebpf.d
+%{_libexecdir}/%{name}/plugins.d/ebpf.d/*.o
 
 %endif
 
