@@ -757,12 +757,6 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 #define MAX_PAGE_SIZES_TO_KEEP 3
 #define MIN_PAGES_PER_SIZE_TO_KEEP 100
 
-#if defined(ENV32BIT)
-#define MAX_PAGES_PER_SIZE_TO_KEEP 5000
-#else
-#define MAX_PAGES_PER_SIZE_TO_KEEP 10000
-#endif
-
 struct dbengine_page_size {
     SPINLOCK spinlock;
     size_t page_size; // read-only, no lock required to read it
@@ -773,8 +767,9 @@ struct dbengine_page_size {
     size_t hit;
     size_t miss;
 
-    size_t available;
-    void *pages[MAX_PAGES_PER_SIZE_TO_KEEP];
+    size_t used;
+    size_t array_size;
+    void **array;
 };
 
 struct {
@@ -783,10 +778,15 @@ struct {
         size_t miss_wrong_size;
         size_t miss_short_supply;
         size_t cached_size;
+        size_t struct_size;
     } atomic;
 
     struct dbengine_page_size slots[MAX_PAGE_SIZES_TO_KEEP];
-} dbengine_page_alloc_globals = {};
+} dbengine_page_alloc_globals = {
+        .atomic = {
+                .struct_size = sizeof(dbengine_page_alloc_globals),
+        }
+};
 
 __attribute__((constructor)) void initialize_sizes_to_slots(void) {
     uint8_t found[RRDENG_BLOCK_SIZE + 1];
@@ -823,11 +823,11 @@ static void dbengine_page_alloc_cleanup1(void) {
 
         struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
         netdata_spinlock_lock(&dps->spinlock);
-        if(dps->available > MIN_PAGES_PER_SIZE_TO_KEEP) {
-            dps->available--;
-            internal_fatal(!dps->pages[dps->available], "DBENGINE: slot should have a page but is empty");
-            page = dps->pages[dps->available];
-            dps->pages[dps->available] = NULL;
+        if(dps->used > MIN_PAGES_PER_SIZE_TO_KEEP) {
+            dps->used--;
+            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
+            page = dps->array[dps->used];
+            dps->array[dps->used] = NULL;
             __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
         }
         netdata_spinlock_unlock(&dps->spinlock);
@@ -845,12 +845,12 @@ void *dbengine_page_alloc(size_t size) {
         netdata_spinlock_lock(&dps->spinlock);
         dps->demand++;
 
-        if(dps->available > 0) {
+        if(dps->used > 0) {
             dps->hit++;
-            dps->available--;
-            internal_fatal(!dps->pages[dps->available], "DBENGINE: slot should have a page but is empty");
-            page = dps->pages[dps->available];
-            dps->pages[dps->available] = NULL;
+            dps->used--;
+            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
+            page = dps->array[dps->used];
+            dps->array[dps->used] = NULL;
             __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.hit, 1, __ATOMIC_RELAXED);
             __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
         }
@@ -879,10 +879,19 @@ void dbengine_page_free(void *page, size_t size __maybe_unused) {
         netdata_spinlock_lock(&dps->spinlock);
         dps->supply++;
 
-        if(dps->available < MAX_PAGES_PER_SIZE_TO_KEEP) {
-            internal_fatal(dps->pages[dps->available], "DBENGINE: slot is already occupied");
-            dps->pages[dps->available] = page;
-            dps->available++;
+        if(dps->used == dps->array_size) {
+            size_t new_array_size = dps->array_size ? dps->array_size * 2 : MIN_PAGES_PER_SIZE_TO_KEEP;
+            dps->array = reallocz(dps->array, new_array_size * sizeof(void *));
+
+            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.struct_size,
+                               (new_array_size - dps->array_size) * sizeof(void *), __ATOMIC_RELAXED);
+
+            dps->array_size = new_array_size;
+        }
+
+        if(dps->used < dps->array_size) {
+            dps->array[dps->used] = page;
+            dps->used++;
             page = NULL;
             __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
         }
@@ -894,7 +903,7 @@ void dbengine_page_free(void *page, size_t size __maybe_unused) {
         freez(page);
 }
 
-
+// ----------------------------------------------------------------------------
 
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
@@ -1722,7 +1731,9 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
-            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED) + sizeof(dbengine_page_alloc_globals),
+            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED) +
+                            __atomic_load_n(&dbengine_page_alloc_globals.atomic.struct_size, __ATOMIC_RELAXED),
+
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
 #endif
