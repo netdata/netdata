@@ -1,3 +1,9 @@
+<!--
+title: "Parser"
+custom_edit_url: https://github.com/netdata/netdata/blob/master/parser/README.md
+-->
+
+
 #### Introduction
 
 The parser will be used to process streaming and plugins input as well as metadata
