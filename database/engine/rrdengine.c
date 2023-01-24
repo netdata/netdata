@@ -1384,7 +1384,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     }
     journalfile_v2_data_release(journalfile);
 
-    info("DBENGINE: recalculating retention for %u metrics starting with datafile %zu", count, first_datafile_remaining->fileno);
+    info("DBENGINE: recalculating retention for %u metrics starting with datafile %u", count, first_datafile_remaining->fileno);
 
     // Update the first time / last time for all metrics we plan to delete
 
