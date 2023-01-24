@@ -74,7 +74,8 @@ static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __ma
     char sql[512];
     snprintf(sql,511, "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
                         "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
-    db_execute(sql);
+    if (unlikely(db_execute(sql)))
+        error_report("Failed to clean stale ACLK alert entries");
     return 0;
 }
 
@@ -173,7 +174,9 @@ void sql_delete_aclk_table_list(char *host_guid)
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to clean up aclk tables, rc = %d", rc);
 
-    db_execute(buffer_tostring(sql));
+    rc = db_execute(buffer_tostring(sql));
+    if (unlikely(rc))
+        error("Failed to drop unused ACLK tables");
 
 fail:
     buffer_free(sql);
@@ -499,22 +502,25 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
 #ifdef ENABLE_ACLK
     char uuid_str[GUID_LEN + 1];
     char host_guid[GUID_LEN + 1];
+    int rc;
 
     uuid_unparse_lower_fix(host_uuid, uuid_str);
-
     uuid_unparse_lower(*host_uuid, host_guid);
 
     BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
 
     buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
-    db_execute(buffer_tostring(sql));
-    buffer_flush(sql);
-
-    buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-    db_execute(buffer_tostring(sql));
-
+    rc = db_execute(buffer_tostring(sql));
+    if (unlikely(rc))
+        error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
+    else {
+        buffer_flush(sql);
+        buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
+        rc = db_execute(buffer_tostring(sql));
+        if (unlikely(rc))
+            error_report("Failed to create ACLK alert table index for host %s", host ? string2str(host->hostname) : host_guid);
+    }
     buffer_free(sql);
-
     if (likely(host) && unlikely(host->aclk_sync_host_config))
         return;
 

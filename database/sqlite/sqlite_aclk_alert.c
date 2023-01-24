@@ -285,7 +285,8 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
             wc->alerts_start_seq_id,
             wc->uuid_str,
             wc->alerts_start_seq_id);
-        db_execute(buffer_tostring(sql));
+        if (unlikely(db_execute(buffer_tostring(sql))))
+            error_report("Failed to reset ACLK alert entries");
         buffer_reset(sql);
         wc->alerts_start_seq_id = 0;
     }
@@ -311,10 +312,15 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
 
         BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
         buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
-        db_execute(buffer_tostring(sql_fix));
-        buffer_flush(sql_fix);
-        buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
-        db_execute(buffer_tostring(sql_fix));
+        rc = db_execute(buffer_tostring(sql_fix));
+        if (unlikely(rc))
+            error_report("Failed to create ACLK alert table for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+        else {
+            buffer_flush(sql_fix);
+            buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
+            if (unlikely(db_execute(buffer_tostring(sql_fix))))
+                error_report("Failed to create ACLK alert table for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+        }
         buffer_free(sql_fix);
 
         // Try again
@@ -422,7 +428,9 @@ void aclk_push_alert_event(struct aclk_sync_host_config *wc)
         buffer_sprintf(sql, "UPDATE aclk_alert_%s SET date_submitted=unixepoch() "
                             "WHERE date_submitted IS NULL AND sequence_id BETWEEN %" PRIu64 " AND %" PRIu64 ";",
                        wc->uuid_str, first_sequence_id, last_sequence_id);
-        db_execute(buffer_tostring(sql));
+
+        if (unlikely(db_execute(buffer_tostring(sql))))
+            error_report("Failed to mark ACLK alert entries as submitted for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
 
         // Mark to do one more check
         rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -479,7 +487,8 @@ void sql_queue_existing_alerts_to_aclk(RRDHOST *host)
                        "where new_status <> 0 and new_status <> -2 and config_hash_id is not null and updated_by_id = 0 " \
                        "order by unique_id asc on conflict (alert_unique_id) do nothing;", uuid_str, uuid_str, uuid_str);
 
-    db_execute(buffer_tostring(sql));
+    if (unlikely(db_execute(buffer_tostring(sql))))
+        error_report("Failed to queue existing ACLK alert events for host %s", rrdhost_hostname(host));
 
     buffer_free(sql);
     rrdhost_flag_set(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
@@ -788,8 +797,12 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
         "(select alert_unique_id from aclk_alert_%s) order by unique_id asc " \
         "on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
-    db_execute(buffer_tostring(sql));
-    log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+    if (unlikely(db_execute(buffer_tostring(sql)))) {
+        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
+        error_report("Failed to queue ACLK alert removed entries for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
+    }
+    else
+        log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
     buffer_free(sql);
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
@@ -952,7 +965,8 @@ void aclk_push_alert_snapshot_event(char *node_id __maybe_unused)
     if (wc->alerts_ack_sequence_id) {
         char sql[512];
         snprintfz(sql, 511, "UPDATE aclk_alert_%s SET date_cloud_ack=unixepoch() WHERE sequence_id <= %"PRIu64, wc->uuid_str, wc->alerts_ack_sequence_id);
-        db_execute(sql);
+        if (unlikely(db_execute(sql)))
+            error_report("Failed to set ACLK alert entries cloud ACK status for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
     }
 
     uint32_t cnt = 0;

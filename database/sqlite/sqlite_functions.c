@@ -117,7 +117,6 @@ int execute_insert(sqlite3_stmt *res)
             break;
         }
     }
-
     return rc;
 }
 
@@ -510,8 +509,9 @@ skip:
         error_report("Failed to finalize statement %s, rc = %d", sql, rc);
     return result;
 }
-
-void db_execute(const char *cmd)
+// Return 0 OK
+// Return 1 Failed
+int db_execute(const char *cmd)
 {
     int rc;
     int cnt = 0;
@@ -532,6 +532,7 @@ void db_execute(const char *cmd)
 
         ++cnt;
     }
+    return (rc != SQLITE_OK);
 }
 
 static inline void set_host_node_id(RRDHOST *host, uuid_t *node_id)
@@ -599,7 +600,7 @@ int update_node_id(uuid_t *host_id, uuid_t *node_id)
     rrd_wrlock();
     host = rrdhost_find_by_guid(host_guid);
     if (likely(host))
-            set_host_node_id(host, node_id);
+        set_host_node_id(host, node_id);
     rrd_unlock();
 
 failed:
