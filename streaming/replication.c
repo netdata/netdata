@@ -155,7 +155,7 @@ static struct replication_query *replication_query_prepare(
                            (unsigned long long) st->last_updated.tv_sec
             );
 #endif
-            q->query.before = st->last_updated.tv_sec;
+            q->query.before = MIN(st->last_updated.tv_sec, wall_clock_time);
         }
     }
 
@@ -311,8 +311,8 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 continue;
             }
 
-            if(d->sp.end_time_s < now)
-                // this dimension does not have any more data
+            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
+                // this dimension does not provide any data
                 continue;
 
             if(unlikely(!min_start_time))
@@ -325,13 +325,10 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             min_end_time = MIN(min_end_time, d->sp.end_time_s);
         }
 
-        if(unlikely(min_end_time < now))
-            break;
-
-        if(likely(min_start_time <= now)) {
+        if(likely(min_start_time <= now && min_end_time >= now)) {
             // we have a valid point
 
-            if (unlikely(min_end_time <= min_start_time))
+            if (unlikely(min_end_time == min_start_time))
                 min_start_time = min_end_time - q->st->update_every;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -382,7 +379,11 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             now = min_end_time + 1;
         }
+        else if(unlikely(min_end_time < now))
+            // the query does not progress
+            break;
         else
+            // we have gap - all points are in the future
             now = min_start_time;
     }
 
