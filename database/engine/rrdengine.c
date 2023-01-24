@@ -1722,7 +1722,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
-            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED),
+            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED) + sizeof(dbengine_page_alloc_globals),
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
 #endif
