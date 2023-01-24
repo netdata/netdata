@@ -314,19 +314,25 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
     netdata_spinlock_unlock(&metric->spinlock);
 }
 
+bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
+    bool ret = false;
+
+    netdata_spinlock_lock(&metric->spinlock);
+    if(first_time_s > metric->first_time_s) {
+        metric->first_time_s = first_time_s;
+        ret = true;
+    }
+    netdata_spinlock_unlock(&metric->spinlock);
+
+    return ret;
+}
+
 bool mrg_metric_set_first_time_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
     bool ret = false;
 
     netdata_spinlock_lock(&metric->spinlock);
     if(!metric->first_time_s) {
         metric->first_time_s = first_time_s;
-
-//        if(unlikely(metric->latest_time_s_clean < metric->first_time_s))
-//            metric->latest_time_s_clean = metric->first_time_s;
-//
-//        if(unlikely(metric->latest_time_s_hot < metric->first_time_s))
-//            metric->latest_time_s_hot = metric->first_time_s;
-
         ret = true;
     }
     netdata_spinlock_unlock(&metric->spinlock);

@@ -45,6 +45,7 @@ uuid_t *mrg_metric_uuid(MRG *mrg, METRIC *metric);
 Word_t mrg_metric_section(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_first_time_s(MRG *mrg, METRIC *metric, time_t first_time_s);
+bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg, METRIC *metric, time_t first_time_s);
 bool mrg_metric_set_first_time_s_if_zero(MRG *mrg, METRIC *metric, time_t first_time_s);
 time_t mrg_metric_get_first_time_s(MRG *mrg, METRIC *metric);
 void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s);

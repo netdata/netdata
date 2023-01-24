@@ -1402,7 +1402,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     bool first_then_next = true;
     while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
         uuid_first_t_entry = *PValue;
-        mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+        mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         freez(uuid_first_t_entry);
     }
