@@ -790,43 +790,6 @@ void pdc_to_epdl_router(struct rrdengine_instance *ctx, PDC *pdc, execute_extent
     pdc_release_and_destroy_if_unreferenced(pdc, true, true);
 }
 
-static void fill_page_with_nulls(void *page, uint32_t page_length, uint8_t type) {
-    switch(type) {
-        case PAGE_METRICS: {
-            storage_number n = pack_storage_number(NAN, SN_FLAG_NONE);
-            storage_number *array = (storage_number *)page;
-            size_t slots = page_length / sizeof(n);
-            for(size_t i = 0; i < slots ; i++)
-                array[i] = n;
-        }
-            break;
-
-        case PAGE_TIER: {
-            storage_number_tier1_t n = {
-                    .min_value = NAN,
-                    .max_value = NAN,
-                    .sum_value = NAN,
-                    .count = 1,
-                    .anomaly_count = 0,
-            };
-            storage_number_tier1_t *array = (storage_number_tier1_t *)page;
-            size_t slots = page_length / sizeof(n);
-            for(size_t i = 0; i < slots ; i++)
-                array[i] = n;
-        }
-            break;
-
-        default: {
-            static bool logged = false;
-            if(!logged) {
-                error("DBENGINE: cannot fill page with nulls on unknown page type id %d", type);
-                logged = true;
-            }
-            memset(page, 0, page_length);
-        }
-    }
-}
-
 void collect_page_flags_to_buffer(BUFFER *wb, RRDENG_COLLECT_PAGE_FLAGS flags) {
     if(flags & RRDENG_PAGE_PAST_COLLECTION)
         buffer_strcat(wb, "PAST_COLLECTION ");
@@ -870,7 +833,6 @@ inline VALIDATED_PAGE_DESCRIPTOR validate_extent_page_descr(const struct rrdeng_
             now_s,
             overwrite_zero_update_every_s,
             have_read_error,
-            true,
             "loaded", 0);
 }
 
@@ -885,7 +847,6 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         time_t now_s,                           // can be zero, to disable future timestamp check
         time_t overwrite_zero_update_every_s,   // can be zero, if unknown
         bool have_read_error,
-        bool minimize_invalid_size,
         const char *msg,
         RRDENG_COLLECT_PAGE_FLAGS flags) {
 
@@ -988,21 +949,6 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
                         uuid_str, msg, vd.type,
                         vd.start_time_s, vd.end_time_s, now_s, vd.update_every_s, vd.page_length, vd.entries, wb?buffer_tostring(wb):""
             );
-
-            if(minimize_invalid_size) {
-                // since the page is going to be loaded
-                // let's minimize the memory the invalid page will occupy
-
-                if(vd.start_time_s == vd.end_time_s) {
-                    vd.page_length = vd.point_size;
-                    vd.entries = 1;
-                }
-                else {
-                    vd.page_length = vd.point_size * 2;
-                    vd.update_every_s = (vd.end_time_s - vd.start_time_s) / 2;
-                    vd.entries = 2;
-                }
-            }
         }
         else {
             const char *err_valid = (vd.is_valid) ? "" : "found invalid, ";
@@ -1213,31 +1159,33 @@ static bool epdl_populate_pages_from_extent_data(
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION);
 
-        void *page_data = dbengine_page_alloc(vd.page_length);
+        void *page_data;
 
         if (unlikely(!vd.is_valid)) {
-            fill_page_with_nulls(page_data, vd.page_length, vd.type);
+            page_data = DBENGINE_EMPTY_PAGE;
             stats_load_invalid_page++;
         }
-
-        else if (RRD_NO_COMPRESSION == header->compression_algorithm) {
-            memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
-            stats_load_uncompressed++;
-        }
-
         else {
-            if(unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
-                error_limit_static_global_var(erl, 10, 0);
-                error_limit(&erl,
-                            "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
-                            i, page_offset, vd.page_length, uncompressed_payload_length);
-
-                fill_page_with_nulls(page_data, vd.page_length, vd.type);
-                stats_load_invalid_page++;
+            if (RRD_NO_COMPRESSION == header->compression_algorithm) {
+                page_data = dbengine_page_alloc(vd.page_length);
+                memcpy(page_data, data + payload_offset + page_offset, (size_t) vd.page_length);
+                stats_load_uncompressed++;
             }
             else {
-                memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
-                stats_load_compressed++;
+                if (unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
+                    error_limit_static_global_var(erl, 10, 0);
+                    error_limit(&erl,
+                                "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
+                                i, page_offset, vd.page_length, uncompressed_payload_length);
+
+                    page_data = DBENGINE_EMPTY_PAGE;
+                    stats_load_invalid_page++;
+                }
+                else {
+                    page_data = dbengine_page_alloc(vd.page_length);
+                    memcpy(page_data, uncompressed_buf + page_offset, vd.page_length);
+                    stats_load_compressed++;
+                }
             }
         }
 
@@ -1248,7 +1196,7 @@ static bool epdl_populate_pages_from_extent_data(
                 .start_time_s = vd.start_time_s,
                 .end_time_s = vd.end_time_s,
                 .update_every_s = vd.update_every_s,
-                .size = (size_t) vd.page_length,
+                .size = (size_t) ((page_data == DBENGINE_EMPTY_PAGE) ? 0 : vd.page_length),
                 .data = page_data
         };
 
@@ -1269,7 +1217,7 @@ static bool epdl_populate_pages_from_extent_data(
 
             pd->page = page;
             pd->page_length = pgc_page_data_size(main_cache, page);
-            pdc_page_status_set(pd, PDC_PAGE_READY | tags);
+            pdc_page_status_set(pd, PDC_PAGE_READY | tags | ((page_data == DBENGINE_EMPTY_PAGE) ? PDC_PAGE_EMPTY : 0));
 
             pd = pd->load.next;
         } while(pd);

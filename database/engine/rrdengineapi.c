@@ -225,7 +225,6 @@ static inline bool check_completed_page_consistency(struct rrdeng_collect_handle
             0, // do not check for future timestamps - we inherit the timestamps of the children
             overwrite_zero_update_every_s,
             false,
-            false,
             "collected",
             handle->page_flags);
 
@@ -795,6 +794,8 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     handle->page = pg_cache_lookup_next(ctx, handle->pdc, handle->now_s, handle->dt_s, &entries);
     if (unlikely(!handle->page))
         return false;
+
+    internal_fatal(pgc_page_data(handle->page) == DBENGINE_EMPTY_PAGE, "Empty page returned");
 
     time_t page_start_time_s = pgc_page_start_time_s(handle->page);
     time_t page_end_time_s = pgc_page_end_time_s(handle->page);

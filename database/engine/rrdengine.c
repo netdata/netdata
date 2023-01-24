@@ -871,7 +871,7 @@ void *dbengine_page_alloc(size_t size) {
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    if(unlikely(!page))
+    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
         return;
 
     struct dbengine_page_size *dps = page_size_lookup(size);
