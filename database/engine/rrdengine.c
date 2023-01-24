@@ -755,11 +755,17 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 // ----------------------------------------------------------------------------
 
 #define MAX_PAGE_SIZES_TO_KEEP 3
-#define MAX_PAGES_PER_SIZE_TO_KEEP 100
+#define MIN_PAGES_PER_SIZE_TO_KEEP 100
+
+#if defined(ENV32BIT)
+#define MAX_PAGES_PER_SIZE_TO_KEEP 5000
+#else
+#define MAX_PAGES_PER_SIZE_TO_KEEP 10000
+#endif
 
 struct dbengine_page_size {
     SPINLOCK spinlock;
-    size_t page_size;
+    size_t page_size; // read-only, no lock required to read it
 
     size_t demand;
     size_t supply;
@@ -779,35 +785,56 @@ struct {
         size_t cached_size;
     } atomic;
 
-    int8_t sizes_to_slots[RRDENG_BLOCK_SIZE + 1];
     struct dbengine_page_size slots[MAX_PAGE_SIZES_TO_KEEP];
 } dbengine_page_alloc_globals = {};
 
 __attribute__((constructor)) void initialize_sizes_to_slots(void) {
-    for(size_t i = 0; i <= RRDENG_BLOCK_SIZE; i++)
-        dbengine_page_alloc_globals.sizes_to_slots[i] = -1;
+    uint8_t found[RRDENG_BLOCK_SIZE + 1];
+    memset(found, 0, RRDENG_BLOCK_SIZE + 1);
 
-    for(int8_t tier = 0; tier < MAX_PAGE_SIZES_TO_KEEP && tier < RRD_STORAGE_TIERS ; tier++) {
-        dbengine_page_alloc_globals.sizes_to_slots[tier_page_size[tier]] = (int8_t) tier;
-        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[tier];
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
         memset(dps, 0, sizeof(struct dbengine_page_size));
-        dps->page_size = tier_page_size[tier];
         netdata_spinlock_init(&dps->spinlock);
+    }
+
+    for(int tier = 0; tier < MAX_PAGE_SIZES_TO_KEEP && tier < RRD_STORAGE_TIERS ; tier++) {
+        size_t size = tier_page_size[tier];
+
+        if(size <= RRDENG_BLOCK_SIZE && !found[size]) {
+            struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[tier];
+            dps->page_size = size;
+            found[size] = 1;
+        }
     }
 }
 
-static inline __attribute__ ((__const__)) struct dbengine_page_size *page_size_lookup(size_t size) {
-    int index = (size <= RRDENG_BLOCK_SIZE) ? dbengine_page_alloc_globals.sizes_to_slots[size] : -1;
-
-    if(likely(index >= 0 && index < MAX_PAGE_SIZES_TO_KEEP)) {
-
-        internal_fatal(dbengine_page_alloc_globals.slots[index].page_size != size,
-                       "DBENGINE: corrupted pages sizes array");
-
-        return &dbengine_page_alloc_globals.slots[index];
+static inline struct dbengine_page_size *page_size_lookup(size_t size) {
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        if(size == dbengine_page_alloc_globals.slots[i].page_size)
+            return &dbengine_page_alloc_globals.slots[i];
     }
-
     return NULL;
+}
+
+static void dbengine_page_alloc_cleanup1(void) {
+    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
+        void *page = NULL;
+
+        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
+        netdata_spinlock_lock(&dps->spinlock);
+        if(dps->available > MIN_PAGES_PER_SIZE_TO_KEEP) {
+            dps->available--;
+            internal_fatal(!dps->pages[dps->available], "DBENGINE: slot should have a page but is empty");
+            page = dps->pages[dps->available];
+            dps->pages[dps->available] = NULL;
+            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
+        }
+        netdata_spinlock_unlock(&dps->spinlock);
+
+        if(page)
+            freez(page);
+    }
 }
 
 void *dbengine_page_alloc(size_t size) {
@@ -1720,6 +1747,7 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     extent_buffer_cleanup1();
     epdl_cleanup1();
     deol_cleanup1();
+    dbengine_page_alloc_cleanup1();
 
     {
         static time_t last_run_s = 0;
