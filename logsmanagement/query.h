@@ -14,6 +14,17 @@
 
 #define QUERY_VERSION "1"
 
+#define LOGS_QRY_KW_START_TIME  "from"
+#define LOGS_QRY_KW_END_TIME    "until"
+#define LOGS_QRY_KW_QUOTA       "quota"
+#define LOGS_QRY_KW_FILENAME    "filename"
+#define LOGS_QRY_KW_CHARTNAME   "chart_name"
+#define LOGS_QRY_KW_KEYWORD     "keyword"
+#define LOGS_QRY_KW_IGNORE_CASE "ignore_case"
+#define LOGS_QRY_KW_SANITIZE_KW "sanitize_keyword"
+#define LOGS_QRY_KW_DATA_FORMAT "data_format"
+#define LOGS_QRY_KW_NEWLINE     "newline"
+
 typedef enum logs_query_result_type {
     OK = 0,
     GENERIC_ERROR = -1,
@@ -62,8 +73,8 @@ typedef struct logs_query_params {
     uint64_t start_timestamp;
     uint64_t end_timestamp;
     size_t quota;
-    char *chart_name[MAX_COMPOUND_QUERY_SOURCES];
-    char *filename[MAX_COMPOUND_QUERY_SOURCES];
+    char *chart_name[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
+    char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *keyword;
     int ignore_case;
     int sanitise_keyword;

@@ -21,6 +21,7 @@ enum log_source_t {LOG_SRC_TYPES};
 #undef LST
 #define LST(x) #x,   
 static const char * const log_source_t_str[] = {LOG_SRC_TYPES};
+#undef LST
 
 // Forward declaration to break circular dependency
 struct Circ_buff;

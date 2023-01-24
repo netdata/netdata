@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "plugin_logsmanagement.h"
+#include "../../database/rrdfunctions.h"
+#include "../../logsmanagement/query.h"
 
 /* NETDATA_CHART_PRIO for Stats_chart_data */
 #define NETDATA_CHART_PRIO_CIRC_BUFF_MEM_TOT    NETDATA_CHART_PRIO_LOGS_STATS_BASE + 1
@@ -11,8 +13,10 @@
 
 #define NETDATA_CHART_PRIO_LOGS_INCR            100  /**< PRIO increment step from one log source to another **/
 
-#define WORKER_JOB_COLLECT 0
-#define WORKER_JOB_UPDATE  1
+#define WORKER_JOB_COLLECT                      0
+#define WORKER_JOB_UPDATE                       1
+
+#define FUNCTION_LOGSMANAGEMENT_HELP            "Help text for logsmanagement"
 
 static struct Chart_meta chart_types[] = {
     {.type = GENERIC,       .init = generic_chart_init,   .collect = generic_chart_collect,   .update = generic_chart_update},
@@ -53,6 +57,7 @@ static struct Stats_chart_data *stats_chart_data;
 static struct Chart_meta **chart_data_arr;
 
 static void logsmanagement_plugin_main_cleanup(void *ptr) {
+    rrd_collector_finished();
     worker_unregister();
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
@@ -62,11 +67,196 @@ static void logsmanagement_plugin_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout, 
+                                                const char *function, void *collector_data, 
+                                                void (*callback)(BUFFER *wb, int code, void *callback_data), 
+                                                void *callback_data) {
+
+    logs_query_params_t query_params = {  
+        .start_timestamp = 1,
+        .end_timestamp = UINT64_MAX, /* default from / until to return all timestamps */
+        .quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT,
+        .chart_name = {0},
+        .filename = {0},
+        .keyword = NULL,
+        .ignore_case = 0,
+        .sanitise_keyword = 0,
+        .data_format = LOGS_QUERY_DATA_FORMAT_JSON_ARRAY,
+        .results_buff = buffer_create(query_params.quota),
+        .keyword_matches = 0
+    };
+
+    int fn_off = 0, cn_off = 0;
+
+    while(function){
+        char *value = mystrsep(&function, " ");
+        if (!value || !*value) continue;
+
+        char *key = mystrsep(&value, ":");
+        if(!key || !*key) continue;
+        if(!value || !*value) continue;
+
+        if(!strcmp(key, LOGS_QRY_KW_START_TIME)){
+            query_params.start_timestamp = strtoll(value, NULL, 10);
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_END_TIME)){
+            query_params.end_timestamp = strtoll(value, NULL, 10);
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_QUOTA)){
+            query_params.quota = (size_t) strtoll(value, NULL, 10);
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_FILENAME) && 
+                fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
+            query_params.filename[fn_off++] = value;
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_CHARTNAME) && 
+                cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES){
+            query_params.chart_name[cn_off++] = value;
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_KEYWORD)){
+            query_params.keyword = value;
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_IGNORE_CASE)){
+            query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
+        }
+        else if(!strcmp(key, LOGS_QRY_KW_SANITIZE_KW)){
+            query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
+        }
+        else if(unlikely(!strcmp(key, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
+            query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
+        }
+        else if(strcmp(key, "help") == 0) {
+            buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP);
+            return;
+        }
+        else {
+            error("functions: logsmanagement invalid parameter");
+            return;
+        }
+    }
+
+    fn_off = cn_off = 0;
+
+    buffer_sprintf( dest_wb,
+                    "{\n"
+                    "   \"status\": %d,\n"
+                    "   \"type\": \"table\",\n"
+                    "   \"update_every\": %d,\n"
+                    "   \"api version\": %s,\n"
+                    "   \"requested from\": %" PRIu64 ",\n"
+                    "   \"requested until\": %" PRIu64 ",\n"
+                    "   \"requested keyword\": \"%s\",\n",
+                    HTTP_RESP_OK,
+                    1,
+                    QUERY_VERSION,
+                    query_params.start_timestamp,
+                    query_params.end_timestamp,
+                    query_params.keyword ? query_params.keyword : ""
+    );
+    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
+    buffer_sprintf( dest_wb,
+                    "   \"actual from\": %" PRIu64 ",\n"
+                    "   \"actual until\": %" PRIu64 ",\n"
+                    "   \"quota\": %zu,\n"
+                    "   \"requested filename\": [\n",
+                    query_params.start_timestamp,
+                    query_params.end_timestamp,
+                    query_params.quota
+    );
+    while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "      \"%s\",\n", query_params.filename[fn_off++]);
+    if(query_params.filename[0])  dest_wb->len -= 2;
+
+    buffer_strcat(  dest_wb, 
+                    "\n   ],\n"
+                    "   \"requested chart_name\": [\n"
+    );
+    while(query_params.chart_name[cn_off]) buffer_sprintf(dest_wb, "      \"%s\",\n", query_params.chart_name[cn_off++]);
+    if(query_params.chart_name[0])  dest_wb->len -= 2;
+    buffer_fast_strcat(dest_wb, "\n   ],\n", 7);
+
+
+    buffer_sprintf(dest_wb, "   \"data\":[\n");
+
+    size_t res_off = 0;
+    logs_query_res_hdr_t res_hdr;
+    while(query_params.results_buff->len - res_off > 0){
+        memcpy(&res_hdr, &query_params.results_buff->buffer[res_off], sizeof(res_hdr));
+        
+        buffer_sprintf( dest_wb, 
+                        "      [\n"
+                        "         %" PRIu64 ",\n", 
+                        res_hdr.timestamp
+        );
+
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
+            buffer_strcat(dest_wb, "         [\n   ");
+
+        buffer_strcat(dest_wb, "         \"");
+
+        /* Unfortunately '\n', '\\' and '"' need to be escaped, so we need to go 
+         * through the result characters one by one. */
+        char *p = &query_params.results_buff->buffer[res_off] + sizeof(res_hdr);
+        size_t remaining = res_hdr.text_size;
+        while (remaining--){
+            if(unlikely(*p == '\n')){
+                if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)){
+                    buffer_strcat(dest_wb, "\",\n            \"");
+                } else {
+                    buffer_need_bytes(dest_wb, 2);
+                    dest_wb->buffer[dest_wb->len++] = '\\';
+                    dest_wb->buffer[dest_wb->len++] = 'n';
+                }
+                
+            } 
+            else if(unlikely(*p == '\\')) {
+                buffer_need_bytes(dest_wb, 2);
+                dest_wb->buffer[dest_wb->len++] = '\\';
+                dest_wb->buffer[dest_wb->len++] = '\\';
+            }
+            else if(unlikely(*p == '"')) {
+                buffer_need_bytes(dest_wb, 2);
+                dest_wb->buffer[dest_wb->len++] = '\\';
+                dest_wb->buffer[dest_wb->len++] = '"';
+            }
+            else {
+                buffer_need_bytes(dest_wb, 1);
+                dest_wb->buffer[dest_wb->len++] = *p;
+            }
+            p++;
+        }
+        buffer_strcat(dest_wb, "\"");
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(dest_wb, "\n         ]");
+        buffer_sprintf(dest_wb, ",\n         %zu" , res_hdr.text_size);
+        buffer_sprintf(dest_wb, ",\n         %d\n      ]" , res_hdr.matches);
+
+
+        res_off += sizeof(res_hdr) + res_hdr.text_size;
+
+        // Add comma and new line if there are more data to be printed
+        if(query_params.results_buff->len - res_off > 0) buffer_strcat(dest_wb, ",\n");
+    }
+
+    buffer_fast_strcat(dest_wb, "\n   ]\n", 6);
+
+    buffer_fast_strcat(dest_wb, "}", 1);
+
+    buffer_free(query_params.results_buff);
+
+    // buffer_no_cacheable(w->response.data);  
+
+    if( unlikely(   err_code == INVALID_REQUEST_ERROR || 
+                    err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
+    if( unlikely(err_code == GENERIC_ERROR)) return HTTP_RESP_BACKEND_FETCH_FAILED;
+    return HTTP_RESP_OK;
+}
+
 
 void *logsmanagement_plugin_main(void *ptr){
     worker_register("LOGSMANAGPLG");
     worker_register_job_name(WORKER_JOB_COLLECT, "collection");
     worker_register_job_name(WORKER_JOB_UPDATE, "update");
+
+    rrd_collector_started();
 
 	netdata_thread_cleanup_push(logsmanagement_plugin_main_cleanup, ptr);
 
@@ -245,6 +435,9 @@ void *logsmanagement_plugin_main(void *ptr){
     usec_t step = g_logs_manag_update_every * USEC_PER_SEC;
     heartbeat_t hb;
     heartbeat_init(&hb);
+
+    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, FUNCTION_LOGSMANAGEMENT_HELP, true, 
+                                logsmanagement_function_execute_cb, NULL);
 
 	while(!netdata_exit){
 

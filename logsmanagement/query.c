@@ -75,7 +75,7 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
 }
 
 LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_params) {
-    struct File_info *p_file_infos[MAX_COMPOUND_QUERY_SOURCES] = {NULL};
+    struct File_info *p_file_infos[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
 
     if(unlikely(p_query_params->quota > MAX_LOG_MSG_SIZE)) p_query_params->quota = MAX_LOG_MSG_SIZE;
 

@@ -1637,10 +1637,9 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     w->response.data->contenttype = CT_APPLICATION_JSON;
 
     logs_query_params_t query_params = {0};
-    query_params.quota = 524288; // Default query quota size 0.5 MiB
+    query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
     
-    int fn_off = 0;
-    int cn_off = 0;
+    int fn_off = 0, cn_off = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
@@ -1650,31 +1649,31 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        if(!strcmp(name, "from")) {
+        if(!strcmp(name, LOGS_QRY_KW_START_TIME)) {
             query_params.start_timestamp = strtoll(value, NULL, 10);
         }
-        else if(!strcmp(name, "until")) {
+        else if(!strcmp(name, LOGS_QRY_KW_END_TIME)) {
             query_params.end_timestamp = strtoll(value, NULL, 10);
         }
-        else if(!strcmp(name, "quota")) {
+        else if(!strcmp(name, LOGS_QRY_KW_QUOTA)) {
             query_params.quota = (size_t) strtoll(value, NULL, 10);
         }
-        else if(!strcmp(name, "filename")) {
+        else if(!strcmp(name, LOGS_QRY_KW_FILENAME) && fn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) {
             query_params.filename[fn_off++] = value;
         }
-        else if(!strcmp(name, "chart_name")) {
+        else if(!strcmp(name, LOGS_QRY_KW_CHARTNAME) && cn_off < LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) {
             query_params.chart_name[cn_off++] = value;
         }
-        else if(!strcmp(name, "keyword")) {
+        else if(!strcmp(name, LOGS_QRY_KW_KEYWORD)) {
             query_params.keyword = value;
         }
-        else if(!strcmp(name, "ignore_case")) {
+        else if(!strcmp(name, LOGS_QRY_KW_IGNORE_CASE)) {
             query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
         }
-        else if(!strcmp(name, "sanitise_keyword")) {
+        else if(!strcmp(name, LOGS_QRY_KW_SANITIZE_KW)) {
             query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
-        else if(unlikely(!strcmp(name, "data_format") && !strcmp(value, "newline"))) {
+        else if(unlikely(!strcmp(name, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
             query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
         }
     }
@@ -1794,8 +1793,8 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
     buffer_no_cacheable(w->response.data);
 
-    if( unlikely(err_code == INVALID_REQUEST_ERROR || 
-        err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
+    if( unlikely(   err_code == INVALID_REQUEST_ERROR || 
+                    err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
     if( unlikely(err_code == GENERIC_ERROR)) return HTTP_RESP_BACKEND_FETCH_FAILED;
     return HTTP_RESP_OK;
 }

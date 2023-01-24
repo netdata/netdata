@@ -1047,7 +1047,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
     char tmp_view_query[sizeof(TMP_VIEW_QUERY_PREFIX) + (
                             sizeof(TMP_VIEW_QUERY_BODY_1) + 
                              sizeof(TMP_VIEW_QUERY_BODY_2) + 
-                             sizeof(TMP_VIEW_QUERY_BODY_3) + 4 ) * (MAX_COMPOUND_QUERY_SOURCES - 1) + 
+                             sizeof(TMP_VIEW_QUERY_BODY_3) + 4 ) * (LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES - 1) + 
                         sizeof(TMP_VIEW_QUERY_POSTFIX) + 50] = TMP_VIEW_QUERY_PREFIX; // +50 bytes - play it safe
     int n = sizeof(TMP_VIEW_QUERY_PREFIX) - 1;
     for(pfi_off = 1; p_file_infos[pfi_off]; pfi_off++){ // Skip p_file_infos[0]

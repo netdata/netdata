@@ -74,7 +74,8 @@
 /*                                  Queries                                   */
 /* -------------------------------------------------------------------------- */
 
-#define MAX_COMPOUND_QUERY_SOURCES 10               /**< Maximum allowed number of log sources that can be searched in a single query **/
+#define LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES 10    /**< Maximum allowed number of log sources that can be searched in a single query **/
+#define LOGS_MANAG_QUERY_QUOTA_DEFAULT 524288       /**< Default logs management query quota **/
 
 /* -------------------------------------------------------------------------- */
 
