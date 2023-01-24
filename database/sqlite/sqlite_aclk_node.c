@@ -25,11 +25,9 @@ DICTIONARY *collectors_from_charts(RRDHOST *host, DICTIONARY *dict) {
 
     return dict;
 }
-#endif
 
 static void build_node_collectors(char *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
 
     RRDHOST *host = find_host_by_node_id(node_id);
 
@@ -55,12 +53,10 @@ static void build_node_collectors(char *node_id __maybe_unused)
     log_access("ACLK RES [%s (%s)]: NODE COLLECTORS SENT", node_id, rrdhost_hostname(host));
 
     freez(node_id);
-#endif
 }
 
 static void build_node_info(char *node_id __maybe_unused)
 {
-#ifdef ENABLE_ACLK
     struct update_node_info node_info;
 
     RRDHOST *host = find_host_by_node_id(node_id);
@@ -139,7 +135,7 @@ static void build_node_info(char *node_id __maybe_unused)
 
     wc->node_collectors_send = now_realtime_sec();
     freez(node_id);
-#endif
+
 }
 
 
@@ -168,3 +164,5 @@ void aclk_check_node_info_and_collectors(void)
     }
     dfe_done(host);
 }
+
+#endif
