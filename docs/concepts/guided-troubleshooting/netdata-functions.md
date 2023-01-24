@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/concepts/g
 sidebar_position: "2800"
 learn_status: "Unpublished"
 learn_topic_type: "Concepts"
-learn_rel_path: "Concepts/Guided Troubleshooting"
+learn_rel_path: "Concepts"
 learn_docs_purpose: "Present the Netdata Functions what these are and why they should be used."
 -->
 

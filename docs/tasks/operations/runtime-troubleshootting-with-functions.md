@@ -2,7 +2,7 @@
 title: "Run-time troubleshooting with Functions"
 sidebar_label: "Run-time troubleshooting with Functions"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/tasks/operations/runtime-troubleshootting-with-functions.md"
-learn_status: "Unpublished"
+learn_status: "Published"
 sidebar_position: "4"
 learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
