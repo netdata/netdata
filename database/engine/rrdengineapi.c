@@ -1177,7 +1177,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     // 4. then wait for completion
 
     bool logged = false;
-    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED)) {
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
         if(!logged) {
             info("Waiting for collectors to finish on tier %d...", ctx->config.tier);
             logged = true;
