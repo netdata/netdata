@@ -28,7 +28,7 @@ monitoring two servers on the same page:
 
 ![image](https://cloud.githubusercontent.com/assets/2662304/14252187/d8d5f78e-fa8e-11e5-990d-99821d38c874.png)
 
---
+
 
 ## Web directory
 
@@ -72,7 +72,6 @@ header:
 </html>
 ```
 
----
 
 ## dashboard.js
 
@@ -163,7 +162,7 @@ that do not specify a Netdata server, add this before loading `dashboard.js`:
 <script type="text/javascript">var netdataServer = "http://your.netdata.server:19999";</script>
 ```
 
----
+
 
 ## Adding charts
 
