@@ -61,7 +61,6 @@ POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 def gpu_charts(gpu):
     fam = gpu.full_name()
-    pci_bw_max = gpu.pci_bw_max()
 
     charts = {
         PCI_BANDWIDTH: {
