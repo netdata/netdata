@@ -20,7 +20,7 @@ collectors/cups.plugin/ @simonnagl @thiagoftsm
 exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
-docs/ @DShreve2 @tkatsoulas
+docs/ @tkatsoulas
 health/ @thiagoftsm @vkalintiris @MrZammler
 health/health.d/ @thiagoftsm @MrZammler
 health/notifications/ @Ferroin @thiagoftsm @MrZammler
@@ -36,7 +36,7 @@ web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin
-*.md @DShreve2 @tkatsoulas
+*.md @tkatsoulas
 Dockerfile* @Ferroin
 
 # Ownership of specific files
@@ -52,5 +52,5 @@ netdata.spec.in @Ferroin
 netdata-installer.sh @Ferroin
 packaging/version @netdatabot @Ferroin
 
-LICENSE.md @DShreve2 @Ferroin @vkalintiris
+LICENSE.md @Ferroin @vkalintiris
 CHANGELOG.md @netdatabot @Ferroin
