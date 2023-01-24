@@ -190,7 +190,7 @@ static inline void check_and_fix_mrg_update_every(struct rrdeng_collect_handle *
               (time_t)(handle->update_every_ut / USEC_PER_SEC), mrg_metric_get_update_every_s(main_mrg, handle->metric));
 
         if(unlikely(!handle->update_every_ut))
-            handle->update_every_ut = mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
+            handle->update_every_ut = (usec_t)mrg_metric_get_update_every_s(main_mrg, handle->metric) * USEC_PER_SEC;
         else
             mrg_metric_set_update_every(main_mrg, handle->metric, (time_t)(handle->update_every_ut / USEC_PER_SEC));
     }
@@ -260,7 +260,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle->page = NULL;
     handle->page_position = 0;
     handle->page_entries_max = 0;
-    handle->update_every_ut = update_every * USEC_PER_SEC;
+    handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
     handle->options = is_1st_metric_writer ? RRDENG_1ST_METRIC_WRITER : 0;
 
     __atomic_add_fetch(&ctx->atomic.collectors_running, 1, __ATOMIC_RELAXED);
@@ -271,7 +271,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     // if we don't set the page_end_time_ut during the first collection
     // data collection may be able to go back in time and during the addition of new pages
     // clean pages may be found matching ours!
-    handle->page_end_time_ut = mrg_metric_get_latest_time_s(main_mrg, metric) * USEC_PER_SEC;
+    handle->page_end_time_ut = (usec_t)mrg_metric_get_latest_time_s(main_mrg, metric) * USEC_PER_SEC;
 
     mrg_metric_set_update_every(main_mrg, metric, update_every);
 
@@ -348,9 +348,13 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     check_and_fix_mrg_update_every(handle);
 }
 
-static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle, struct rrdengine_instance *ctx, usec_t point_in_time_ut, void *data, size_t data_size) {
+static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
+                struct rrdengine_instance *ctx,
+                usec_t point_in_time_ut,
+                void *data,
+                size_t data_size) {
     time_t point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
-    time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
+    const time_t update_every_s = (time_t)(handle->update_every_ut / USEC_PER_SEC);
 
     PGC_ENTRY page_entry = {
             .section = (Word_t) ctx,
@@ -449,13 +453,13 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
 }
 
 static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_handle,
-                                             usec_t point_in_time_ut,
-                                             NETDATA_DOUBLE n,
-                                             NETDATA_DOUBLE min_value,
-                                             NETDATA_DOUBLE max_value,
-                                             uint16_t count,
-                                             uint16_t anomaly_count,
-                                             SN_FLAGS flags)
+                                             const usec_t point_in_time_ut,
+                                             const NETDATA_DOUBLE n,
+                                             const NETDATA_DOUBLE min_value,
+                                             const NETDATA_DOUBLE max_value,
+                                             const uint16_t count,
+                                             const uint16_t anomaly_count,
+                                             const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
@@ -584,18 +588,18 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
 }
 
 void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
-                              usec_t point_in_time_ut,
-                              NETDATA_DOUBLE n,
-                              NETDATA_DOUBLE min_value,
-                              NETDATA_DOUBLE max_value,
-                              uint16_t count,
-                              uint16_t anomaly_count,
-                              SN_FLAGS flags)
+                              const usec_t point_in_time_ut,
+                              const NETDATA_DOUBLE n,
+                              const NETDATA_DOUBLE min_value,
+                              const NETDATA_DOUBLE max_value,
+                              const uint16_t count,
+                              const uint16_t anomaly_count,
+                              const SN_FLAGS flags)
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(point_in_time_ut > max_acceptable_collected_time() * USEC_PER_SEC))
+    if(unlikely(point_in_time_ut > (usec_t)max_acceptable_collected_time() * USEC_PER_SEC))
         handle->page_flags |= RRDENG_PAGE_FUTURE_POINT;
 #endif
 
@@ -638,13 +642,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                 // loop to fill the gap
                 handle->page_flags |= RRDENG_PAGE_GAP;
 
-                usec_t point_in_time_to_stop_ut = point_in_time_ut - handle->update_every_ut;
-                for(usec_t next_point_in_time = handle->page_end_time_ut + handle->update_every_ut;
-                    next_point_in_time <= point_in_time_to_stop_ut ;
-                    next_point_in_time = handle->page_end_time_ut + handle->update_every_ut) {
+                usec_t stop_ut = point_in_time_ut - handle->update_every_ut;
+                for(usec_t this_ut = handle->page_end_time_ut + handle->update_every_ut;
+                    this_ut <= stop_ut ;
+                    this_ut = handle->page_end_time_ut + handle->update_every_ut) {
                     rrdeng_store_metric_append_point(
                             collection_handle,
-                            handle->page_end_time_ut + handle->update_every_ut,
+                            this_ut,
                             NAN, NAN, NAN,
                             1, 0,
                             SN_EMPTY_SLOT);
@@ -690,7 +694,7 @@ void rrdeng_store_metric_change_collection_frequency(STORAGE_COLLECT_HANDLE *col
     check_and_fix_mrg_update_every(handle);
 
     METRIC *metric = handle->metric;
-    usec_t update_every_ut = update_every * USEC_PER_SEC;
+    usec_t update_every_ut = (usec_t)update_every * USEC_PER_SEC;
 
     if(update_every_ut == handle->update_every_ut)
         return;
