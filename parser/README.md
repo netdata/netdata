@@ -80,9 +80,9 @@ Input
 - keyword_function
   - The callback that will handle the keyword processing
     * The callback function should return one of the following
-      * PARSER_RC_OK -- Callback was successful (continue with other callbacks)
-      * PARSER_RC_STOP -- Stop processing callbacks (return OK)
-      * PARSER_RC_ERROR -- Callback failed, exit
+      * PARSER_RC_OK - Callback was successful (continue with other callbacks)
+      * PARSER_RC_STOP - Stop processing callbacks (return OK)
+      * PARSER_RC_ERROR - Callback failed, exit
 
 Output
 - The corresponding keyword and callback will be registered
