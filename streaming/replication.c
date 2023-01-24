@@ -335,7 +335,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 continue;
             }
 
-            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s || storage_point_is_unset(d->sp) || storage_point_is_empty(d->sp)))
+            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s))
                 // this dimension does not provide any data
                 continue;
 
