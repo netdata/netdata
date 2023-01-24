@@ -6,9 +6,11 @@
 
 **Merged pull requests:**
 
+- DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
 - Fix Exporiting compilaton error [\#14306](https://github.com/netdata/netdata/pull/14306) ([thiagoftsm](https://github.com/thiagoftsm))
 - bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
 - Fixes required to make the agent work without crashes on MacOS [\#14304](https://github.com/netdata/netdata/pull/14304) ([vkalintiris](https://github.com/vkalintiris))
+- Update kickstart script to use new DEB infrastructure. [\#14301](https://github.com/netdata/netdata/pull/14301) ([Ferroin](https://github.com/Ferroin))
 - DBENGINE v2 - improvements part 6 [\#14299](https://github.com/netdata/netdata/pull/14299) ([ktsaou](https://github.com/ktsaou))
 - add consul license expiration time alarm [\#14298](https://github.com/netdata/netdata/pull/14298) ([ilyam8](https://github.com/ilyam8))
 - Fix macos struct definition. [\#14297](https://github.com/netdata/netdata/pull/14297) ([vkalintiris](https://github.com/vkalintiris))
@@ -62,6 +64,7 @@
 - Fix typos [\#14194](https://github.com/netdata/netdata/pull/14194) ([rex4539](https://github.com/rex4539))
 - add `telegraf` to `apps_groups.conf` monitoring section [\#14188](https://github.com/netdata/netdata/pull/14188) ([andrewm4894](https://github.com/andrewm4894))
 - bump go.d.plugin to v0.47.0 [\#14182](https://github.com/netdata/netdata/pull/14182) ([ilyam8](https://github.com/ilyam8))
+- remove mqtt-c from websockets [\#14181](https://github.com/netdata/netdata/pull/14181) ([underhood](https://github.com/underhood))
 - fix logrotate postrotate [\#14180](https://github.com/netdata/netdata/pull/14180) ([ilyam8](https://github.com/ilyam8))
 - docs: explicitly set the `nofile` limit for Netdata container and document the reason for this [\#14178](https://github.com/netdata/netdata/pull/14178) ([ilyam8](https://github.com/ilyam8))
 - remove interface name from cgroup net family [\#14174](https://github.com/netdata/netdata/pull/14174) ([ilyam8](https://github.com/ilyam8))
@@ -347,9 +350,6 @@
 - Advance the buffer properly to scan the journal file [\#13666](https://github.com/netdata/netdata/pull/13666) ([stelfrag](https://github.com/stelfrag))
 - Add sqlite page cache hit and miss statistics [\#13665](https://github.com/netdata/netdata/pull/13665) ([stelfrag](https://github.com/stelfrag))
 - bump go.d.plugin to v0.39.0 [\#13662](https://github.com/netdata/netdata/pull/13662) ([ilyam8](https://github.com/ilyam8))
-- update Postgres dashboard info [\#13661](https://github.com/netdata/netdata/pull/13661) ([ilyam8](https://github.com/ilyam8))
-- Use mmap if possible during startup for journal replay [\#13660](https://github.com/netdata/netdata/pull/13660) ([stelfrag](https://github.com/stelfrag))
-- Remove anomaly detector [\#13657](https://github.com/netdata/netdata/pull/13657) ([vkalintiris](https://github.com/vkalintiris))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
