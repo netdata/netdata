@@ -548,21 +548,18 @@ void finalize_data_files(struct rrdengine_instance *ctx)
 {
     bool logged = false;
 
+    logged = false;
+    while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
+        if(!logged) {
+            info("Waiting for inflight flush to finish on tier %d...", ctx->config.tier);
+            logged = true;
+        }
+        sleep_usec(100 * USEC_PER_MS);
+    }
+
     do {
         struct rrdengine_datafile *datafile = ctx->datafiles.first;
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
-
-        logged = false;
-        if(datafile == ctx->datafiles.first->prev) {
-            // this is the last file
-            while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED)) {
-                if(!logged) {
-                    info("Waiting for inflight flush to finish on tier %d to close last datafile %u...", ctx->config.tier, datafile->fileno);
-                    logged = true;
-                }
-                sleep_usec(100 * USEC_PER_MS);
-            }
-        }
 
         logged = false;
         size_t iterations = 100;

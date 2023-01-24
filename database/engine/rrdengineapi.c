@@ -1158,6 +1158,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     return UV_EIO;
 }
 
+size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {
+    return __atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED);
+}
+
 /*
  * Returns 0 on success, 1 on error
  */
@@ -1167,9 +1171,20 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     // FIXME - ktsaou - properly cleanup ctx
     // 1. make sure all collectors are stopped
-    // 2. make new queries will not be accepted
+    // 2. make new queries will not be accepted (this is quiesce that has already run)
     // 3. flush this section of the main cache
     // 4. then wait for completion
+
+    bool logged = false;
+    while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED)) {
+        if(!logged) {
+            info("Waiting for collectors to finish on tier %d...", ctx->config.tier);
+            logged = true;
+        }
+        sleep_usec(100 * USEC_PER_MS);
+    }
+
+    pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
     struct completion completion = {};
     completion_init(&completion);
