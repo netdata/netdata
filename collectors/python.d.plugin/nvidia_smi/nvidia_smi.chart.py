@@ -61,6 +61,7 @@ POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 def gpu_charts(gpu):
     fam = gpu.full_name()
+    pci_bw_max = gpu.pci_bw_max()
 
     charts = {
         PCI_BANDWIDTH: {
@@ -68,6 +69,8 @@ def gpu_charts(gpu):
             'lines': [
                 ['rx_util', 'rx', 'absolute', 1, 1],
                 ['tx_util', 'tx', 'absolute', 1, -1],
+                ['rx_util_percent', 'rx_percent'],
+                ['tx_util_percent', 'tx_percent'],
             ]
         },
         FAN_SPEED: {
@@ -342,6 +345,12 @@ class GPU:
     def pci_link_width(self):
         return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('current_link_width').text.split('x')[0]
 
+    def pci_bw_max(self):
+        link_gen = int(self.pci_link_gen())
+        link_width = int(self.pci_link_width())
+        # return max bandwidth in kB/s
+        return link_gen * 250 * 1024 * link_width
+
     @handle_attr_error
     def rx_util(self):
         return self.root.find('pci').find('rx_util').text.split()[0]
@@ -438,6 +447,8 @@ class GPU:
         data = {
             'rx_util': self.rx_util(),
             'tx_util': self.tx_util(),
+            'rx_util_percent': str(int(int(self.rx_util())/self.pci_bw_max())),
+            'tx_util_percent': str(int(int(self.tx_util())/self.pci_bw_max())),
             'fan_speed': self.fan_speed(),
             'gpu_util': self.gpu_util(),
             'memory_util': self.memory_util(),
