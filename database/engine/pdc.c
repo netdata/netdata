@@ -999,7 +999,7 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
                 }
                 else {
                     vd.page_length = vd.point_size * 2;
-                    vd.update_every_s = vd.end_time_s - vd.start_time_s;
+                    vd.update_every_s = (vd.end_time_s - vd.start_time_s) / 2;
                     vd.entries = 2;
                 }
             }
