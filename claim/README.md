@@ -1,7 +1,11 @@
 <!--
 title: "Connect Agent to Cloud"
 description: "Connecting a Netdata Agent, running on a distributed node, to Netdata Cloud securely via the encrypted Agent-Cloud link (ACLK)."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/claim/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/claim/README.md"
+sidebar_label: "Connect Agent to Cloud"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup"
 -->
 
 # Connect Agent to Cloud

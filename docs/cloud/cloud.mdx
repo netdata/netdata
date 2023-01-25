@@ -1,0 +1,74 @@
+---
+title: "Netdata Cloud docs"
+description: "Netdata Cloud is real-time visibility for entire infrastructures. View key metrics, insightful charts, and active alarms from all your nodes."
+custom_edit_url: "https://github.com/netdata/learn/blob/master/docs/cloud.mdx"
+---
+
+import { Grid, Box, BoxList, BoxListItem } from '@site/src/components/Grid/'
+import { RiExternalLinkLine } from 'react-icons/ri'
+
+This is the documentation for the Netdata Cloud web application, which works in parallel with the open-source Netdata
+monitoring agent to help you monitor your entire infrastructure [for free <RiExternalLinkLine className="inline-block"
+/>](https://netdata.cloud/pricing/) in real time and troubleshoot problems that threaten the health of your
+nodes before they occur.
+
+Netdata Cloud requires the open-source [Netdata](/docs/) monitoring agent, which is the basis for the metrics,
+visualizations, and alarms that you'll find in Netdata Cloud. Every time you view a node in Netdata Cloud, its metrics
+and metadata are streamed to Netdata Cloud, then proxied to your browser, with an infrastructure that ensures [data
+privacy <RiExternalLinkLine className="inline-block" />](https://netdata.cloud/privacy/).
+
+
+Read [_What is Netdata?_](/docs/overview/what-is-netdata) for details about how Netdata and Netdata Cloud work together
+and how they're different from other monitoring solutions, or the
+[FAQ <RiExternalLinkLine className="inline-block" />](https://community.netdata.cloud/tags/c/general/29/faq) for answers to common questions.
+
+<Grid columns="1" className="mb-16">
+  <Box 
+    to="/docs/cloud/get-started" 
+    title="Get started with Netdata Cloud"
+    cta="Go"
+    image={true}>
+    Ready to get real-time visibility into your entire infrastructure? This guide will help you get started on Netdata Cloud, from signing in for a free account to connecting your nodes.
+  </Box>
+</Grid>
+
+## Learn about Netdata Cloud's features
+
+<Grid columns="2">
+  <Box
+    title="Spaces and War Rooms">
+    <BoxList>
+      <BoxListItem to="/docs/cloud/spaces" title="Spaces" />
+      <BoxListItem to="/docs/cloud/war-rooms" title="War Rooms" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Dashboards">
+    <BoxList>
+      <BoxListItem to="/docs/cloud/visualize/overview" title="Overview" />
+      <BoxListItem to="/docs/cloud/visualize/nodes" title="Nodes view" />
+      <BoxListItem to="/docs/cloud/visualize/kubernetes" title="Kubernetes" />
+      <BoxListItem to="/docs/cloud/visualize/dashboards" title="Create new dashboards" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Alerts and notifications">
+    <BoxList>
+      <BoxListItem to="/docs/cloud/alerts-notifications/view-active-alerts" title="View active alerts" />
+      <BoxListItem to="/docs/cloud/alerts-notifications/smartboard" title="Alerts Smartboard" />
+      <BoxListItem to="/docs/cloud/alerts-notifications/notifications" title="Alert notifications" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Troubleshooting with Netdata Cloud">
+    <BoxListItem to="/docs/cloud/insights/metric-correlations" title="Metric Correlations" />
+  </Box>
+  <Box
+    title="Management and settings">
+    <BoxList>
+      <BoxListItem to="/docs/cloud/manage/sign-in" title="Sign in with email, Google, or GitHub" />
+      <BoxListItem to="/docs/cloud/manage/invite-your-team" title="Invite your team" />
+      <BoxListItem to="/docs/cloud/manage/themes" title="Choose your Netdata Cloud theme" />
+    </BoxList>
+  </Box>
+</Grid>

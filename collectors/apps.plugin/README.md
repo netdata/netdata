@@ -1,7 +1,10 @@
 <!--
-title: "apps.plugin"
-sidebar_label: "Application monitoring (apps.plugin)"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/apps.plugin/README.md
+title: "Application monitoring (apps.plugin)"
+sidebar_label: "Application monitoring "
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/apps.plugin/README.md"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/System metrics"
 -->
 
 # apps.plugin

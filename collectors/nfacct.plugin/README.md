@@ -1,6 +1,10 @@
 <!--
-title: "nfacct.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/nfacct.plugin/README.md
+title: "Monitor Netfilter statistics (nfacct.plugin)"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/nfacct.plugin/README.md"
+sidebar_label: "Netfilter statistics (nfacct.plugin)"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Networking"
 -->
 
 # nfacct.plugin

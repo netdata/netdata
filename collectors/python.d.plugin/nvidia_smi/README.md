@@ -1,7 +1,10 @@
 <!--
 title: "Nvidia GPU monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md
-sidebar_label: "Nvidia GPUs"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md"
+sidebar_label: "nvidia_smi-python.d.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Devices"
 -->
 
 # Nvidia GPU monitoring with Netdata

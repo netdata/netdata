@@ -1,7 +1,12 @@
 <!--
 title: "Daemon configuration"
 description: "The Netdata Agent's daemon is installed preconfigured to collect thousands of metrics every second, but is highly configurable for real-world workloads."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/config/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/config/README.md"
+sidebar_label: "Daemon"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Configuration"
+learn_doc_purpose: "Explain the daemon options, the log files, the process scheduling, virtual memory, explain how the netdata.conf is used and backlink to the netdata.conf file reference"
 -->
 
 # Daemon configuration

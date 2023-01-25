@@ -1,7 +1,10 @@
 <!--
 title: "1-Wire Sensors monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/w1sensor/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/w1sensor/README.md"
 sidebar_label: "1-Wire sensors"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Remotes/Devices"
 -->
 
 # 1-Wire Sensors monitoring with Netdata

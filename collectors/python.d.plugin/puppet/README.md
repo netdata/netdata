@@ -1,7 +1,10 @@
 <!--
 title: "Puppet monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/puppet/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/puppet/README.md"
 sidebar_label: "Puppet"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Provisioning tools"
 -->
 
 # Puppet monitoring with Netdata

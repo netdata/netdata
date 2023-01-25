@@ -1,6 +1,10 @@
 <!--
 title: "Netdata via Caddy"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-caddy.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-caddy.md"
+sidebar_label: "Netdata via Caddy"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Netdata via Caddy

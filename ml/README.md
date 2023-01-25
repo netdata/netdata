@@ -1,9 +1,13 @@
-<!-- 
-title: Configure machine learning (ML) powered anomaly detection
-custom_edit_url: https://github.com/netdata/netdata/edit/master/ml/README.md
-description: This is an in-depth look at how Netdata uses ML to detect anomalies.
-keywords: [machine learning, anomaly detection, Netdata ML]
+<!--
+title: "Configure machine learning (ML) powered anomaly detection"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/ml/README.md"
+description: "This is an in-depth look at how Netdata uses ML to detect anomalies."
+sidebar_label: "Configure machine learning (ML) powered anomaly detection"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup"
 -->
+
 # Machine learning (ML) powered anomaly detection
 
 ## Overview

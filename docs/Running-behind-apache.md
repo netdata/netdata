@@ -1,6 +1,10 @@
 <!--
 title: "Netdata via apache's mod_proxy"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-apache.md"
+sidebar_label: "Netdata via apache's mod_proxy"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Netdata via apache's mod_proxy
@@ -35,7 +39,6 @@ Also, enable the rewrite module:
 sudo a2enmod rewrite
 ```
 
----
 
 ## Netdata on an existing virtual host
 
@@ -314,7 +317,7 @@ or
     bind to = ::1
 ```
 
----
+
 
 You can also use a unix domain socket. This will also provide a faster route between apache and Netdata:
 
@@ -338,7 +341,7 @@ At the apache side, prepend the 2nd argument to `ProxyPass` with `unix:/tmp/netd
 ProxyPass "/netdata/" "unix:/tmp/netdata.sock|http://localhost:19999/" connectiontimeout=5 timeout=30 keepalive=on
 ```
 
----
+
 
 If your apache server is not on localhost, you can set:
 

@@ -1,8 +1,12 @@
 <!--
 title: "Export metrics to OpenTSDB"
 description: "Archive your Agent's metrics to an OpenTSDB database for long-term storage and further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/opentsdb/README.md
-sidebar_label: OpenTSDB
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/opentsdb/README.md"
+sidebar_label: "OpenTSDB"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Exporting connectors"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Export metrics to OpenTSDB

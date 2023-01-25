@@ -1,7 +1,10 @@
 <!--
 title: "Access point monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md"
 sidebar_label: "Access points"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Remotes/Devices"
 -->
 
 # Access point monitoring with Netdata

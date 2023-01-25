@@ -1,6 +1,10 @@
 <!--
 title: "Collectors configuration reference"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md"
+sidebar_label: "Collectors configuration"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup"
 -->
 
 # Collectors configuration reference
