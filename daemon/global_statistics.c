@@ -3783,7 +3783,7 @@ static int read_thread_cpu_time_from_proc_stat(pid_t pid __maybe_unused, kernel_
 
     // (re)open the procfile to the new filename
     bool set_quotes = (ff == NULL) ? true : false;
-    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_DEFAULT);
+    ff = procfile_reopen(ff, filename, NULL, PROCFILE_FLAG_ERROR_ON_ERROR_LOG);
     if(unlikely(!ff)) return -1;
 
     if(set_quotes)

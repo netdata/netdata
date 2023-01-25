@@ -1,9 +1,11 @@
 <!--
-title: "eBPF monitoring with Netdata"
-description: "Use Netdata's extended Berkeley Packet Filter (eBPF) collector to monitor kernel-level metrics about your
-complex applications with per-second granularity."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md
-sidebar_label: "eBPF"
+title: "Kernel traces/metrics (eBPF) monitoring with Netdata"
+description: "Use Netdata's extended Berkeley Packet Filter (eBPF) collector to monitor kernel-level metrics about yourcomplex applications with per-second granularity."
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/ebpf.plugin/README.md"
+sidebar_label: "Kernel traces/metrics (eBPF)"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/System metrics"
 -->
 
 # eBPF monitoring with Netdata

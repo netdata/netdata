@@ -84,14 +84,14 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     /* Get ports and services for drive statistics. */
     if (unlikely(IOMainPort(bootstrap_port, &main_port))) {
-        error("MACOS: IOMasterPort() failed");
+        collector_error("MACOS: IOMasterPort() failed");
         do_io = 0;
-        error("DISABLED: system.io");
+        collector_error("DISABLED: system.io");
     /* Get the list of all drive objects. */
     } else if (unlikely(IOServiceGetMatchingServices(main_port, IOServiceMatching("IOBlockStorageDriver"), &drive_list))) {
-        error("MACOS: IOServiceGetMatchingServices() failed");
+        collector_error("MACOS: IOServiceGetMatchingServices() failed");
         do_io = 0;
-        error("DISABLED: system.io");
+        collector_error("DISABLED: system.io");
     } else {
         while ((drive = IOIteratorNext(drive_list)) != 0) {
             properties = 0;
@@ -126,9 +126,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
             /* Obtain the properties for this drive object. */
             if (unlikely(IORegistryEntryCreateCFProperties(drive, (CFMutableDictionaryRef *)&properties, kCFAllocatorDefault, 0))) {
                 IOObjectRelease(drive);
-                error("MACOS: IORegistryEntryCreateCFProperties() failed");
+                collector_error("MACOS: IORegistryEntryCreateCFProperties() failed");
                 do_io = 0;
-                error("DISABLED: system.io");
+                collector_error("DISABLED: system.io");
                 break;
             } else if (likely(properties)) {
                 /* Obtain the statistics from the drive properties. */
@@ -413,11 +413,11 @@ int do_macos_iokit(int update_every, usec_t dt) {
     if (likely(do_space || do_inodes)) {
         // there is no mount info in sysctl MIBs
         if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
-            error("MACOS: getmntinfo() failed");
+            collector_error("MACOS: getmntinfo() failed");
             do_space = 0;
-            error("DISABLED: disk_space.X");
+            collector_error("DISABLED: disk_space.X");
             do_inodes = 0;
-            error("DISABLED: disk_inodes.X");
+            collector_error("DISABLED: disk_inodes.X");
         } else {
             for (i = 0; i < mntsize; i++) {
                 if (mntbuf[i].f_flags == MNT_RDONLY ||
@@ -500,9 +500,9 @@ int do_macos_iokit(int update_every, usec_t dt) {
 
     if (likely(do_bandwidth)) {
         if (unlikely(getifaddrs(&ifap))) {
-            error("MACOS: getifaddrs()");
+            collector_error("MACOS: getifaddrs()");
             do_bandwidth = 0;
-            error("DISABLED: system.ipv4");
+            collector_error("DISABLED: system.ipv4");
         } else {
             for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
                 if (ifa->ifa_addr->sa_family != AF_LINK)

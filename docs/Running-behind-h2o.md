@@ -1,6 +1,10 @@
 <!--
 title: "Running Netdata behind H2O"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-h2o.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-h2o.md"
+sidebar_label: "Running Netdata behind H2O"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Running Netdata behind H2O
@@ -142,7 +146,7 @@ If your H2O server is on `localhost`, you can use this to ensure external access
     bind to = 127.0.0.1 ::1
 ```
 
----
+ 
 
 You can also use a unix domain socket. This will provide faster communication between H2O and Netdata as well:
 
@@ -157,7 +161,7 @@ In the H2O configuration, use a line like the following to connect to Netdata vi
 proxy.reverse.url http://[unix:/run/netdata/netdata.sock]
 ```
 
----
+
 
 If your H2O server is not on localhost, you can set:
 

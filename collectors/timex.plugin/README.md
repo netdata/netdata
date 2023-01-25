@@ -1,7 +1,11 @@
 <!--
 title: "timex.plugin"
 description: "Monitor the system clock synchronization state."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/timex.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/timex.plugin/README.md"
+sidebar_label: "timex.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/System metrics"
 -->
 
 # timex.plugin

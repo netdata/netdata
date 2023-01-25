@@ -1,7 +1,10 @@
 <!--
 title: "AM2320 sensor monitoring with netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/am2320/README.md"
 sidebar_label: "AM2320"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Remotes/Devices"
 -->
 
 # AM2320 sensor monitoring with netdata

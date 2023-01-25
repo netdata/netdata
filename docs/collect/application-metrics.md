@@ -2,7 +2,10 @@
 title: "Collect application metrics with Netdata"
 sidebar_label: "Application metrics"
 description: "Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/application-metrics.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collect/application-metrics.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts"
 -->
 
 # Collect application metrics with Netdata

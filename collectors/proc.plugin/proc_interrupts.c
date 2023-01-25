@@ -78,7 +78,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     size_t words = procfile_linewords(ff, 0);
 
     if(unlikely(!lines)) {
-        error("Cannot read /proc/interrupts, zero lines reported.");
+        collector_error("Cannot read /proc/interrupts, zero lines reported.");
         return 1;
     }
 
@@ -93,7 +93,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
     }
 
     if(unlikely(!cpus)) {
-        error("PLUGIN: PROC_INTERRUPTS: Cannot find the number of CPUs in /proc/interrupts");
+        collector_error("PLUGIN: PROC_INTERRUPTS: Cannot find the number of CPUs in /proc/interrupts");
         return 1;
     }
 

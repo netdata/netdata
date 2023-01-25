@@ -43,7 +43,7 @@ unsigned int read_iface_iflink(const char *prefix, const char *iface) {
 
     unsigned long long iflink = 0;
     int ret = read_single_number_file(filename, &iflink);
-    if(ret) error("Cannot read '%s'.", filename);
+    if(ret) collector_error("Cannot read '%s'.", filename);
 
     return (unsigned int)iflink;
 }
@@ -56,7 +56,7 @@ unsigned int read_iface_ifindex(const char *prefix, const char *iface) {
 
     unsigned long long ifindex = 0;
     int ret = read_single_number_file(filename, &ifindex);
-    if(ret) error("Cannot read '%s'.", filename);
+    if(ret) collector_error("Cannot read '%s'.", filename);
 
     return (unsigned int)ifindex;
 }
@@ -70,18 +70,18 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
     snprintfz(filename, FILENAME_MAX, "%s%s", prefix, (*prefix)?"/proc/1/net/dev":"/proc/net/dev");
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("parsing '%s'", filename);
+    collector_info("parsing '%s'", filename);
 #endif
 
     ff = procfile_open(filename, " \t,:|", PROCFILE_FLAG_DEFAULT);
     if(unlikely(!ff)) {
-        error("Cannot open file '%s'", filename);
+        collector_error("Cannot open file '%s'", filename);
         return NULL;
     }
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) {
-        error("Cannot read file '%s'", filename);
+        collector_error("Cannot read file '%s'", filename);
         return NULL;
     }
 
@@ -99,7 +99,7 @@ struct iface *read_proc_net_dev(const char *scope __maybe_unused, const char *pr
         root = t;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        info("added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
+        collector_info("added %s interface '%s', ifindex %u, iflink %u", scope, t->device, t->ifindex, t->iflink);
 #endif
     }
 
@@ -145,7 +145,7 @@ static void continue_as_child(void) {
     pid_t ret;
 
     if (child < 0)
-        error("fork() failed");
+        collector_error("fork() failed");
 
     /* Only the child returns */
     if (child == 0)
@@ -180,7 +180,7 @@ int proc_pid_fd(const char *prefix, const char *ns, pid_t pid) {
     int fd = open(filename, O_RDONLY);
 
     if(fd == -1)
-        error("Cannot open proc_pid_fd() file '%s'", filename);
+        collector_error("Cannot open proc_pid_fd() file '%s'", filename);
 
     return fd;
 }
@@ -230,7 +230,7 @@ int switch_namespace(const char *prefix, pid_t pid) {
                 if(setns(all_ns[i].fd, all_ns[i].nstype) == -1) {
                     if(pass == 1) {
                         all_ns[i].status = 0;
-                        error("Cannot switch to %s namespace of pid %d", all_ns[i].name, (int) pid);
+                        collector_error("Cannot switch to %s namespace of pid %d", all_ns[i].name, (int) pid);
                     }
                 }
                 else
@@ -243,17 +243,17 @@ int switch_namespace(const char *prefix, pid_t pid) {
 
     if(root_fd != -1) {
         if(fchdir(root_fd) < 0)
-            error("Cannot fchdir() to pid %d root directory", (int)pid);
+            collector_error("Cannot fchdir() to pid %d root directory", (int)pid);
 
         if(chroot(".") < 0)
-            error("Cannot chroot() to pid %d root directory", (int)pid);
+            collector_error("Cannot chroot() to pid %d root directory", (int)pid);
 
         close(root_fd);
     }
 
     if(cwd_fd != -1) {
         if(fchdir(cwd_fd) < 0)
-            error("Cannot fchdir() to pid %d current working directory", (int)pid);
+            collector_error("Cannot fchdir() to pid %d current working directory", (int)pid);
 
         close(cwd_fd);
     }
@@ -277,7 +277,7 @@ int switch_namespace(const char *prefix, pid_t pid) {
 #else
 
     errno = ENOSYS;
-    error("setns() is missing on this system.");
+    collector_error("setns() is missing on this system.");
     return 1;
 
 #endif
@@ -286,13 +286,13 @@ int switch_namespace(const char *prefix, pid_t pid) {
 pid_t read_pid_from_cgroup_file(const char *filename) {
     int fd = open(filename, procfile_open_flags);
     if(fd == -1) {
-        error("Cannot open pid_from_cgroup() file '%s'.", filename);
+        collector_error("Cannot open pid_from_cgroup() file '%s'.", filename);
         return 0;
     }
 
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
-        error("Cannot upgrade fd to fp for file '%s'.", filename);
+        collector_error("Cannot upgrade fd to fp for file '%s'.", filename);
         return 0;
     }
 
@@ -308,7 +308,7 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     fclose(fp);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    if(pid > 0) info("found pid %d on file '%s'", pid, filename);
+    if(pid > 0) collector_info("found pid %d on file '%s'", pid, filename);
 #endif
 
     return pid;
@@ -331,7 +331,7 @@ pid_t read_pid_from_cgroup(const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        error("cannot read directory '%s'", path);
+        collector_error("cannot read directory '%s'", path);
         return 0;
     }
 
@@ -369,7 +369,7 @@ struct found_device {
 
 void add_device(const char *host, const char *guest) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("adding device with host '%s', guest '%s'", host, guest);
+    collector_info("adding device with host '%s', guest '%s'", host, guest);
 #endif
 
     uint32_t hash = simple_hash(host);
@@ -422,36 +422,36 @@ void detect_veth_interfaces(pid_t pid) {
     host = read_proc_net_dev("host", netdata_configured_host_prefix);
     if(!host) {
         errno = 0;
-        error("cannot read host interface list.");
+        collector_error("cannot read host interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(host)) {
         errno = 0;
-        info("there are no double-linked host interfaces available.");
+        collector_info("there are no double-linked host interfaces available.");
         goto cleanup;
     }
 
     if(switch_namespace(netdata_configured_host_prefix, pid)) {
         errno = 0;
-        error("cannot switch to the namespace of pid %u", (unsigned int) pid);
+        collector_error("cannot switch to the namespace of pid %u", (unsigned int) pid);
         goto cleanup;
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    info("switched to namespaces of pid %d", pid);
+    collector_info("switched to namespaces of pid %d", pid);
 #endif
 
     cgroup = read_proc_net_dev("cgroup", NULL);
     if(!cgroup) {
         errno = 0;
-        error("cannot read cgroup interface list.");
+        collector_error("cannot read cgroup interface list.");
         goto cleanup;
     }
 
     if(!eligible_ifaces(cgroup)) {
         errno = 0;
-        error("there are not double-linked cgroup interfaces available.");
+        collector_error("there are not double-linked cgroup interfaces available.");
         goto cleanup;
     }
 
@@ -495,7 +495,7 @@ cleanup:
 #define CGROUP_NETWORK_INTERFACE_MAX_LINE 2048
 void call_the_helper(pid_t pid, const char *cgroup) {
     if(setresuid(0, 0, 0) == -1)
-        error("setresuid(0, 0, 0) failed.");
+        collector_error("setresuid(0, 0, 0) failed.");
 
     char command[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     if(cgroup)
@@ -503,7 +503,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
     else
         snprintfz(command, CGROUP_NETWORK_INTERFACE_MAX_LINE, "exec " PLUGINS_DIR "/cgroup-network-helper.sh --pid %d", pid);
 
-    info("running: %s", command);
+    collector_info("running: %s", command);
 
     pid_t cgroup_pid;
     FILE *fp_child_input, *fp_child_output;
@@ -539,7 +539,7 @@ void call_the_helper(pid_t pid, const char *cgroup) {
         netdata_pclose(fp_child_input, fp_child_output, cgroup_pid);
     }
     else
-        error("cannot execute cgroup-network helper script: %s", command);
+        collector_error("cannot execute cgroup-network helper script: %s", command);
 }
 
 int is_valid_path_symbol(char c) {
@@ -570,33 +570,33 @@ int verify_path(const char *path) {
     const char *s = path;
     while((c = *s++)) {
         if(!( isalnum(c) || is_valid_path_symbol(c) )) {
-            error("invalid character in path '%s'", path);
+            collector_error("invalid character in path '%s'", path);
             return -1;
         }
     }
 
     if(strstr(path, "\\") && !strstr(path, "\\x")) {
-        error("invalid escape sequence in path '%s'", path);
+        collector_error("invalid escape sequence in path '%s'", path);
         return 1;
     }
 
     if(strstr(path, "/../")) {
-        error("invalid parent path sequence detected in '%s'", path);
+        collector_error("invalid parent path sequence detected in '%s'", path);
         return 1;
     }
 
     if(path[0] != '/') {
-        error("only absolute path names are supported - invalid path '%s'", path);
+        collector_error("only absolute path names are supported - invalid path '%s'", path);
         return -1;
     }
 
     if (stat(path, &sb) == -1) {
-        error("cannot stat() path '%s'", path);
+        collector_error("cannot stat() path '%s'", path);
         return -1;
     }
 
     if((sb.st_mode & S_IFMT) != S_IFDIR) {
-        error("path '%s' is not a directory", path);
+        collector_error("path '%s' is not a directory", path);
         return -1;
     }
 
@@ -618,10 +618,10 @@ char *fix_path_variable(void) {
         char *s = strsep(&ptr, ":");
         if(s && *s) {
             if(verify_path(s) == -1) {
-                error("the PATH variable includes an invalid path '%s' - removed it.", s);
+                collector_error("the PATH variable includes an invalid path '%s' - removed it.", s);
             }
             else {
-                info("the PATH variable includes a valid path '%s'.", s);
+                collector_info("the PATH variable includes a valid path '%s'.", s);
                 if(added) strcat(safe_path, ":");
                 strcat(safe_path, s);
                 added++;
@@ -629,8 +629,8 @@ char *fix_path_variable(void) {
         }
     }
 
-    info("unsafe PATH:      '%s'.", path);
-    info("  safe PATH: '%s'.", safe_path);
+    collector_info("unsafe PATH:      '%s'.", path);
+    collector_info("  safe PATH: '%s'.", safe_path);
 
     freez(p);
     return safe_path;
@@ -646,6 +646,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     pid_t pid = 0;
 
     program_name = argv[0];
@@ -690,7 +691,7 @@ int main(int argc, char **argv) {
 
         if(pid <= 0) {
             errno = 0;
-            error("Invalid pid %d given", (int) pid);
+            collector_error("Invalid pid %d given", (int) pid);
             return 2;
         }
 
@@ -699,7 +700,7 @@ int main(int argc, char **argv) {
     else if(!strcmp(argv[arg], "--cgroup")) {
         char *cgroup = argv[arg+1];
         if(verify_path(cgroup) == -1) {
-            error("cgroup '%s' does not exist or is not valid.", cgroup);
+            collector_error("cgroup '%s' does not exist or is not valid.", cgroup);
             return 1;
         }
 
@@ -708,7 +709,7 @@ int main(int argc, char **argv) {
 
         if(pid <= 0 && !detected_devices) {
             errno = 0;
-            error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
+            collector_error("Cannot find a cgroup PID from cgroup '%s'", cgroup);
         }
     }
     else

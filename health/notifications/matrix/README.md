@@ -2,7 +2,11 @@
 title: "Send Netdata notifications to Matrix network rooms"
 description: "Stay aware of warning or critical anomalies by sending health alarms to Matrix network rooms with Netdata's health monitoring watchdog."
 sidebar_label: "Matrix"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/matrix/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/matrix/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Matrix

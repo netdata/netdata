@@ -1,6 +1,10 @@
 <!--
 title: "API"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/web/api/README.md"
+sidebar_label: "API"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations"
 -->
 
 # API

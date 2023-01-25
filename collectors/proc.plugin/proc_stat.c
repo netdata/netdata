@@ -69,7 +69,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
         if(unlikely(f->fd == -1)) {
             f->fd = open(f->filename, O_RDONLY);
             if (unlikely(f->fd == -1)) {
-                error("Cannot open file '%s'", f->filename);
+                collector_error("Cannot open file '%s'", f->filename);
                 continue;
             }
         }
@@ -78,7 +78,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
         if(unlikely(ret < 0)) {
             // cannot read that file
 
-            error("Cannot read file '%s'", f->filename);
+            collector_error("Cannot read file '%s'", f->filename);
             close(f->fd);
             f->fd = -1;
             continue;
@@ -94,7 +94,7 @@ static int read_per_core_files(struct cpu_chart *all_cpu_charts, size_t len, siz
                 f->fd = -1;
             }
             else if(lseek(f->fd, 0, SEEK_SET) == -1) {
-                error("Cannot seek in file '%s'", f->filename);
+                collector_error("Cannot seek in file '%s'", f->filename);
                 close(f->fd);
                 f->fd = -1;
             }
@@ -133,14 +133,14 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
             tsf->ff = procfile_open(tsf->filename, " \t:", PROCFILE_FLAG_DEFAULT);
             if(unlikely(!tsf->ff))
             {
-                error("Cannot open file '%s'", tsf->filename);
+                collector_error("Cannot open file '%s'", tsf->filename);
                 continue;
             }
         }
 
         tsf->ff = procfile_readall(tsf->ff);
         if(unlikely(!tsf->ff)) {
-            error("Cannot read file '%s'", tsf->filename);
+            collector_error("Cannot read file '%s'", tsf->filename);
             procfile_close(tsf->ff);
             tsf->ff = NULL;
             continue;
@@ -179,7 +179,7 @@ static int read_per_core_time_in_state_files(struct cpu_chart *all_cpu_charts, s
 
                 words = procfile_linewords(tsf->ff, l);
                 if(unlikely(words < 2)) {
-                    error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
+                    collector_error("Cannot read time_in_state line. Expected 2 params, read %zu.", words);
                     continue;
                 }
                 frequency = str2ull(procfile_lineword(tsf->ff, l, 0));
@@ -273,11 +273,11 @@ static void* wake_cpu_thread(void* core) {
     thread = pthread_self();
     if(unlikely(pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpu_set))) {
         if(unlikely(errors < 8)) {
-            error("Cannot set CPU affinity for core %d", *(int*)core);
+            collector_error("Cannot set CPU affinity for core %d", *(int*)core);
             errors++;
         }
         else if(unlikely(errors < 9)) {
-            error("CPU affinity errors are disabled");
+            collector_error("CPU affinity errors are disabled");
             errors++;
         }
     }
@@ -312,14 +312,14 @@ static int read_schedstat(char *schedstat_filename, struct per_core_cpuidle_char
         if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
             words = procfile_linewords(ff, l);
             if(unlikely(words < 10)) {
-                error("Cannot read /proc/schedstat cpu line. Expected 9 params, read %zu.", words);
+                collector_error("Cannot read /proc/schedstat cpu line. Expected 9 params, read %zu.", words);
                 return 1;
             }
             cores_found++;
 
             size_t core = str2ul(&row_key[3]);
             if(unlikely(core >= cores_found)) {
-                error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
+                collector_error("Core %zu found but no more than %zu cores were expected.", core, cores_found);
                 return 1;
             }
 
@@ -343,7 +343,7 @@ static int read_one_state(char *buf, const char *filename, int *fd) {
 
     if(unlikely(ret <= 0)) {
         // cannot read that file
-        error("Cannot read file '%s'", filename);
+        collector_error("Cannot read file '%s'", filename);
         close(*fd);
         *fd = -1;
         return 0;
@@ -359,7 +359,7 @@ static int read_one_state(char *buf, const char *filename, int *fd) {
             *fd = -1;
         }
         else if(lseek(*fd, 0, SEEK_SET) == -1) {
-            error("Cannot seek in file '%s'", filename);
+            collector_error("Cannot seek in file '%s'", filename);
             close(*fd);
             *fd = -1;
         }
@@ -413,14 +413,14 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
 
             int fd = open(filename, O_RDONLY, 0666);
             if(unlikely(fd == -1)) {
-                error("Cannot open file '%s'", filename);
+                collector_error("Cannot open file '%s'", filename);
                 cc->rescan_cpu_states = 1;
                 return 1;
             }
 
             ssize_t r = read(fd, name_buf, 50);
             if(unlikely(r < 1)) {
-                error("Cannot read file '%s'", filename);
+                collector_error("Cannot read file '%s'", filename);
                 close(fd);
                 cc->rescan_cpu_states = 1;
                 return 1;
@@ -445,7 +445,7 @@ static int read_cpuidle_states(char *cpuidle_name_filename , char *cpuidle_time_
         if(unlikely(cs->time_fd == -1)) {
             cs->time_fd = open(cs->time_filename, O_RDONLY);
             if (unlikely(cs->time_fd == -1)) {
-                error("Cannot open file '%s'", cs->time_filename);
+                collector_error("Cannot open file '%s'", cs->time_filename);
                 cc->rescan_cpu_states = 1;
                 return 1;
             }
@@ -585,7 +585,7 @@ int do_proc_stat(int update_every, usec_t dt) {
         if(likely(row_key[0] == 'c' && row_key[1] == 'p' && row_key[2] == 'u')) {
             words = procfile_linewords(ff, l);
             if(unlikely(words < 9)) {
-                error("Cannot read /proc/stat cpu line. Expected 9 params, read %zu.", words);
+                collector_error("Cannot read /proc/stat cpu line. Expected 9 params, read %zu.", words);
                 continue;
             }
 
@@ -936,7 +936,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(r > 0 && !accurate_freq_is_used) {
                     accurate_freq_is_used = 1;
                     snprintfz(filename, FILENAME_MAX, time_in_state_filename, "cpu*");
-                    info("cpufreq is using %s", filename);
+                    collector_info("cpufreq is using %s", filename);
                 }
             }
             if (r < 1) {
@@ -944,7 +944,7 @@ int do_proc_stat(int update_every, usec_t dt) {
                 if(accurate_freq_is_used) {
                     accurate_freq_is_used = 0;
                     snprintfz(filename, FILENAME_MAX, scaling_cur_freq_filename, "cpu*");
-                    info("cpufreq fell back to %s", filename);
+                    collector_info("cpufreq fell back to %s", filename);
                 }
             }
 
@@ -999,13 +999,13 @@ int do_proc_stat(int update_every, usec_t dt) {
                     }
                 }
                 else
-                    error("Cannot read current process affinity");
+                    collector_error("Cannot read current process affinity");
 
                 // These threads are very ephemeral and don't need to have a specific name
                 if(unlikely(pthread_create(&thread, NULL, wake_cpu_thread, (void *)&core)))
-                    error("Cannot create wake_cpu_thread");
+                    collector_error("Cannot create wake_cpu_thread");
                 else if(unlikely(pthread_join(thread, NULL)))
-                    error("Cannot join wake_cpu_thread");
+                    collector_error("Cannot join wake_cpu_thread");
                 cpu_states_updated = 1;
             }
         }

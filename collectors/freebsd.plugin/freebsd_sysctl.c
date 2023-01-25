@@ -96,17 +96,17 @@ int freebsd_plugin_init()
 {
     system_pagesize = getpagesize();
     if (system_pagesize <= 0) {
-        error("FREEBSD: can't get system page size");
+        collector_error("FREEBSD: can't get system page size");
         return 1;
     }
 
     if (unlikely(GETSYSCTL_BY_NAME("kern.smp.cpus", number_of_cpus))) {
-        error("FREEBSD: can't get number of cpus");
+        collector_error("FREEBSD: can't get number of cpus");
         return 1;
     }
 
     if (unlikely(!number_of_cpus)) {
-        error("FREEBSD: wrong number of cpus");
+        collector_error("FREEBSD: wrong number of cpus");
         return 1;
     }
 
@@ -126,8 +126,8 @@ int do_vm_loadavg(int update_every, usec_t dt){
         struct loadavg sysload;
 
         if (unlikely(GETSYSCTL_SIMPLE("vm.loadavg", mib, sysload))) {
-            error("DISABLED: system.load chart");
-            error("DISABLED: vm.loadavg module");
+            collector_error("DISABLED: system.load chart");
+            collector_error("DISABLED: vm.loadavg module");
             return 1;
         } else {
             static RRDSET *st = NULL;
@@ -185,12 +185,12 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("vm.vmtotal", mib, vmtotal_data))) {
             do_all_processes = 0;
-            error("DISABLED: system.active_processes chart");
+            collector_error("DISABLED: system.active_processes chart");
             do_processes = 0;
-            error("DISABLED: system.processes chart");
+            collector_error("DISABLED: system.processes chart");
             do_mem_real = 0;
-            error("DISABLED: mem.real chart");
-            error("DISABLED: vm.vmtotal module");
+            collector_error("DISABLED: mem.real chart");
+            collector_error("DISABLED: vm.vmtotal module");
             return 1;
         } else {
             if (likely(do_all_processes)) {
@@ -277,7 +277,7 @@ int do_vm_vmtotal(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: vm.vmtotal module");
+        collector_error("DISABLED: vm.vmtotal module");
         return 1;
     }
 
@@ -290,17 +290,17 @@ int do_kern_cp_time(int update_every, usec_t dt) {
     (void)dt;
 
     if (unlikely(CPUSTATES != 5)) {
-        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
-        error("DISABLED: system.cpu chart");
-        error("DISABLED: kern.cp_time module");
+        collector_error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
+        collector_error("DISABLED: system.cpu chart");
+        collector_error("DISABLED: kern.cp_time module");
         return 1;
     } else {
         static int mib[2] = {0, 0};
         long cp_time[CPUSTATES];
 
         if (unlikely(GETSYSCTL_SIMPLE("kern.cp_time", mib, cp_time))) {
-            error("DISABLED: system.cpu chart");
-            error("DISABLED: kern.cp_time module");
+            collector_error("DISABLED: system.cpu chart");
+            collector_error("DISABLED: kern.cp_time module");
             return 1;
         } else {
             static RRDSET *st = NULL;
@@ -348,9 +348,9 @@ int do_kern_cp_times(int update_every, usec_t dt) {
     (void)dt;
 
     if (unlikely(CPUSTATES != 5)) {
-        error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
-        error("DISABLED: cpu.cpuXX charts");
-        error("DISABLED: kern.cp_times module");
+        collector_error("FREEBSD: There are %d CPU states (5 was expected)", CPUSTATES);
+        collector_error("DISABLED: cpu.cpuXX charts");
+        collector_error("DISABLED: kern.cp_times module");
         return 1;
     } else {
         static int mib[2] = {0, 0};
@@ -361,8 +361,8 @@ int do_kern_cp_times(int update_every, usec_t dt) {
         if(unlikely(number_of_cpus != old_number_of_cpus))
             pcpu_cp_time = reallocz(pcpu_cp_time, sizeof(cp_time) * number_of_cpus);
         if (unlikely(GETSYSCTL_WSIZE("kern.cp_times", mib, pcpu_cp_time, sizeof(cp_time) * number_of_cpus))) {
-            error("DISABLED: cpu.cpuXX charts");
-            error("DISABLED: kern.cp_times module");
+            collector_error("DISABLED: cpu.cpuXX charts");
+            collector_error("DISABLED: kern.cp_times module");
             return 1;
         } else {
             int i;
@@ -449,8 +449,8 @@ int do_dev_cpu_temperature(int update_every, usec_t dt) {
         if (unlikely(!(mib[i * 4])))
             sprintf(char_mib, "dev.cpu.%d.temperature", i);
         if (unlikely(getsysctl_simple(char_mib, &mib[i * 4], 4, &pcpu_temperature[i], sizeof(int)))) {
-            error("DISABLED: cpu.temperature chart");
-            error("DISABLED: dev.cpu.temperature module");
+            collector_error("DISABLED: cpu.temperature chart");
+            collector_error("DISABLED: dev.cpu.temperature module");
             return 1;
         }
     }
@@ -505,8 +505,8 @@ int do_dev_cpu_0_freq(int update_every, usec_t dt) {
     int cpufreq;
 
     if (unlikely(GETSYSCTL_SIMPLE("dev.cpu.0.freq", mib, cpufreq))) {
-        error("DISABLED: cpu.scaling_cur_freq chart");
-        error("DISABLED: dev.cpu.0.freq module");
+        collector_error("DISABLED: cpu.scaling_cur_freq chart");
+        collector_error("DISABLED: dev.cpu.0.freq module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -547,9 +547,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
     size_t intrcnt_size = 0;
 
     if (unlikely(GETSYSCTL_SIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt_size))) {
-        error("DISABLED: system.intr chart");
-        error("DISABLED: system.interrupts chart");
-        error("DISABLED: hw.intrcnt module");
+        collector_error("DISABLED: system.intr chart");
+        collector_error("DISABLED: system.interrupts chart");
+        collector_error("DISABLED: hw.intrcnt module");
         return 1;
     } else {
         unsigned long nintr = 0;
@@ -560,9 +560,9 @@ int do_hw_intcnt(int update_every, usec_t dt) {
         if (unlikely(nintr != old_nintr))
             intrcnt = reallocz(intrcnt, nintr * sizeof(u_long));
         if (unlikely(GETSYSCTL_WSIZE("hw.intrcnt", mib_hw_intrcnt, intrcnt, nintr * sizeof(u_long)))) {
-            error("DISABLED: system.intr chart");
-            error("DISABLED: system.interrupts chart");
-            error("DISABLED: hw.intrcnt module");
+            collector_error("DISABLED: system.intr chart");
+            collector_error("DISABLED: system.interrupts chart");
+            collector_error("DISABLED: hw.intrcnt module");
             return 1;
         } else {
             unsigned long long totalintr = 0;
@@ -602,17 +602,17 @@ int do_hw_intcnt(int update_every, usec_t dt) {
             static char *intrnames = NULL;
 
             if (unlikely(GETSYSCTL_SIZE("hw.intrnames", mib_hw_intrnames, size))) {
-                error("DISABLED: system.intr chart");
-                error("DISABLED: system.interrupts chart");
-                error("DISABLED: hw.intrcnt module");
+                collector_error("DISABLED: system.intr chart");
+                collector_error("DISABLED: system.interrupts chart");
+                collector_error("DISABLED: hw.intrcnt module");
                 return 1;
             } else {
                 if (unlikely(nintr != old_nintr))
                     intrnames = reallocz(intrnames, size);
                 if (unlikely(GETSYSCTL_WSIZE("hw.intrnames", mib_hw_intrnames, intrnames, size))) {
-                    error("DISABLED: system.intr chart");
-                    error("DISABLED: system.interrupts chart");
-                    error("DISABLED: hw.intrcnt module");
+                    collector_error("DISABLED: system.intr chart");
+                    collector_error("DISABLED: system.interrupts chart");
+                    collector_error("DISABLED: hw.intrcnt module");
                     return 1;
                 } else {
                     static RRDSET *st_interrupts = NULL;
@@ -666,8 +666,8 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
     u_int int_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_intr", mib, int_number))) {
-        error("DISABLED: system.dev_intr chart");
-        error("DISABLED: vm.stats.sys.v_intr module");
+        collector_error("DISABLED: system.dev_intr chart");
+        collector_error("DISABLED: vm.stats.sys.v_intr module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -707,8 +707,8 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
     u_int soft_intr_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number))) {
-        error("DISABLED: system.dev_intr chart");
-        error("DISABLED: vm.stats.sys.v_soft module");
+        collector_error("DISABLED: system.dev_intr chart");
+        collector_error("DISABLED: vm.stats.sys.v_soft module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -748,8 +748,8 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     u_int ctxt_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_swtch", mib, ctxt_number))) {
-        error("DISABLED: system.ctxt chart");
-        error("DISABLED: vm.stats.sys.v_swtch module");
+        collector_error("DISABLED: system.ctxt chart");
+        collector_error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -789,8 +789,8 @@ int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
     u_int forks_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number))) {
-        error("DISABLED: system.forks chart");
-        error("DISABLED: vm.stats.sys.v_swtch module");
+        collector_error("DISABLED: system.forks chart");
+        collector_error("DISABLED: vm.stats.sys.v_swtch module");
         return 1;
     } else {
 
@@ -834,8 +834,8 @@ int do_vm_swap_info(int update_every, usec_t dt) {
     static int mib[3] = {0, 0, 0};
 
     if (unlikely(getsysctl_mib("vm.swap_info", mib, 2))) {
-        error("DISABLED: system.swap chart");
-        error("DISABLED: vm.swap_info module");
+        collector_error("DISABLED: system.swap chart");
+        collector_error("DISABLED: vm.swap_info module");
         return 1;
     } else {
         int i;
@@ -852,15 +852,15 @@ int do_vm_swap_info(int update_every, usec_t dt) {
             size = sizeof(xsw);
             if (unlikely(sysctl(mib, 3, &xsw, &size, NULL, 0) == -1 )) {
                 if (unlikely(errno != ENOENT)) {
-                    error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
-                    error("DISABLED: system.swap chart");
-                    error("DISABLED: vm.swap_info module");
+                    collector_error("FREEBSD: sysctl(%s...) failed: %s", "vm.swap_info", strerror(errno));
+                    collector_error("DISABLED: system.swap chart");
+                    collector_error("DISABLED: vm.swap_info module");
                     return 1;
                 } else {
                     if (unlikely(size != sizeof(xsw))) {
-                        error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
-                        error("DISABLED: system.swap chart");
-                        error("DISABLED: vm.swap_info module");
+                        collector_error("FREEBSD: sysctl(%s...) expected %lu, got %lu", "vm.swap_info", (unsigned long)sizeof(xsw), (unsigned long)size);
+                        collector_error("DISABLED: system.swap chart");
+                        collector_error("DISABLED: vm.swap_info module");
                         return 1;
                     } else break;
                 }
@@ -932,8 +932,8 @@ int do_system_ram(int update_every, usec_t dt) {
 #endif
                  GETSYSCTL_SIMPLE("vfs.bufspace",                 mib_vfs_bufspace,     vfs_bufspace_count) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_free_count",     mib_free_count,     vmmeter_data.v_free_count))) {
-        error("DISABLED: system.ram chart");
-        error("DISABLED: system.ram module");
+        collector_error("DISABLED: system.ram chart");
+        collector_error("DISABLED: system.ram module");
         return 1;
     } else {
         static RRDSET *st = NULL, *st_mem_available = NULL;
@@ -1026,8 +1026,8 @@ int do_vm_stats_sys_v_swappgs(int update_every, usec_t dt) {
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsin", mib_swappgsin, vmmeter_data.v_swappgsin) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_swappgsout", mib_swappgsout, vmmeter_data.v_swappgsout))) {
-        error("DISABLED: system.swapio chart");
-        error("DISABLED: vm.stats.vm.v_swappgs module");
+        collector_error("DISABLED: system.swapio chart");
+        collector_error("DISABLED: vm.stats.vm.v_swappgs module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -1074,8 +1074,8 @@ int do_vm_stats_sys_v_pgfaults(int update_every, usec_t dt) {
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_faults", mib_cow_faults, vmmeter_data.v_cow_faults) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_cow_optim",  mib_cow_optim,  vmmeter_data.v_cow_optim) ||
                  GETSYSCTL_SIMPLE("vm.stats.vm.v_intrans",    mib_intrans,    vmmeter_data.v_intrans))) {
-        error("DISABLED: mem.pgfaults chart");
-        error("DISABLED: vm.stats.vm.v_pgfaults module");
+        collector_error("DISABLED: mem.pgfaults chart");
+        collector_error("DISABLED: vm.stats.vm.v_pgfaults module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -1131,9 +1131,9 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
     } ipc_sem = {0, 0, 0};
 
     if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.semmni", mib_semmni, ipc_sem.semmni))) {
-        error("DISABLED: system.ipc_semaphores chart");
-        error("DISABLED: system.ipc_semaphore_arrays chart");
-        error("DISABLED: kern.ipc.sem module");
+        collector_error("DISABLED: system.ipc_semaphores chart");
+        collector_error("DISABLED: system.ipc_semaphore_arrays chart");
+        collector_error("DISABLED: kern.ipc.sem module");
         return 1;
     } else {
         static struct semid_kernel *ipc_sem_data = NULL;
@@ -1145,9 +1145,9 @@ int do_kern_ipc_sem(int update_every, usec_t dt) {
             old_semmni = ipc_sem.semmni;
         }
         if (unlikely(GETSYSCTL_WSIZE("kern.ipc.sema", mib_sema, ipc_sem_data, sizeof(struct semid_kernel) * ipc_sem.semmni))) {
-            error("DISABLED: system.ipc_semaphores chart");
-            error("DISABLED: system.ipc_semaphore_arrays chart");
-            error("DISABLED: kern.ipc.sem module");
+            collector_error("DISABLED: system.ipc_semaphores chart");
+            collector_error("DISABLED: system.ipc_semaphore_arrays chart");
+            collector_error("DISABLED: kern.ipc.sem module");
             return 1;
         } else {
             int i;
@@ -1223,9 +1223,9 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
     } ipc_shm = {0, 0, 0};
 
     if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.shmmni", mib_shmmni, ipc_shm.shmmni))) {
-        error("DISABLED: system.ipc_shared_mem_segs chart");
-        error("DISABLED: system.ipc_shared_mem_size chart");
-        error("DISABLED: kern.ipc.shmmodule");
+        collector_error("DISABLED: system.ipc_shared_mem_segs chart");
+        collector_error("DISABLED: system.ipc_shared_mem_size chart");
+        collector_error("DISABLED: kern.ipc.shmmodule");
         return 1;
     } else {
         static struct shmid_kernel *ipc_shm_data = NULL;
@@ -1238,9 +1238,9 @@ int do_kern_ipc_shm(int update_every, usec_t dt) {
         }
         if (unlikely(
                 GETSYSCTL_WSIZE("kern.ipc.shmsegs", mib_shmsegs, ipc_shm_data, sizeof(struct shmid_kernel) * ipc_shm.shmmni))) {
-            error("DISABLED: system.ipc_shared_mem_segs chart");
-            error("DISABLED: system.ipc_shared_mem_size chart");
-            error("DISABLED: kern.ipc.shmmodule");
+            collector_error("DISABLED: system.ipc_shared_mem_segs chart");
+            collector_error("DISABLED: system.ipc_shared_mem_size chart");
+            collector_error("DISABLED: kern.ipc.shmmodule");
             return 1;
         } else {
             unsigned long i;
@@ -1318,10 +1318,10 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
     } ipc_msq = {0, 0, 0, 0, 0};
 
     if (unlikely(GETSYSCTL_SIMPLE("kern.ipc.msgmni", mib_msgmni, ipc_msq.msgmni))) {
-        error("DISABLED: system.ipc_msq_queues chart");
-        error("DISABLED: system.ipc_msq_messages chart");
-        error("DISABLED: system.ipc_msq_size chart");
-        error("DISABLED: kern.ipc.msg module");
+        collector_error("DISABLED: system.ipc_msq_queues chart");
+        collector_error("DISABLED: system.ipc_msq_messages chart");
+        collector_error("DISABLED: system.ipc_msq_size chart");
+        collector_error("DISABLED: kern.ipc.msg module");
         return 1;
     } else {
         static struct msqid_kernel *ipc_msq_data = NULL;
@@ -1334,10 +1334,10 @@ int do_kern_ipc_msq(int update_every, usec_t dt) {
         }
         if (unlikely(
                 GETSYSCTL_WSIZE("kern.ipc.msqids", mib_msqids, ipc_msq_data, sizeof(struct msqid_kernel) * ipc_msq.msgmni))) {
-            error("DISABLED: system.ipc_msq_queues chart");
-            error("DISABLED: system.ipc_msq_messages chart");
-            error("DISABLED: system.ipc_msq_size chart");
-            error("DISABLED: kern.ipc.msg module");
+            collector_error("DISABLED: system.ipc_msq_queues chart");
+            collector_error("DISABLED: system.ipc_msq_messages chart");
+            collector_error("DISABLED: system.ipc_msq_size chart");
+            collector_error("DISABLED: kern.ipc.msg module");
             return 1;
         } else {
             int i;
@@ -1520,11 +1520,11 @@ int do_net_isr(int update_every, usec_t dt) {
         }
         if (unlikely(common_error)) {
             do_netisr = 0;
-            error("DISABLED: system.softnet_stat chart");
+            collector_error("DISABLED: system.softnet_stat chart");
             do_netisr_per_core = 0;
-            error("DISABLED: system.cpuX_softnet_stat chart");
+            collector_error("DISABLED: system.cpuX_softnet_stat chart");
             common_error = 0;
-            error("DISABLED: net.isr module");
+            collector_error("DISABLED: net.isr module");
             return 1;
         } else {
             unsigned long i, n;
@@ -1554,7 +1554,7 @@ int do_net_isr(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.isr module");
+        collector_error("DISABLED: net.isr module");
         return 1;
     }
 
@@ -1662,8 +1662,8 @@ int do_net_inet_tcp_states(int update_every, usec_t dt) {
 
     // see http://net-snmp.sourceforge.net/docs/mibs/tcp.html
     if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.states", mib, tcps_states))) {
-        error("DISABLED: ipv4.tcpsock chart");
-        error("DISABLED: net.inet.tcp.states module");
+        collector_error("DISABLED: ipv4.tcpsock chart");
+        collector_error("DISABLED: net.inet.tcp.states module");
         return 1;
     } else {
         static RRDSET *st = NULL;
@@ -1726,22 +1726,22 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.tcp.stats", mib, tcpstat))) {
             do_tcp_packets = 0;
-            error("DISABLED: ipv4.tcppackets chart");
+            collector_error("DISABLED: ipv4.tcppackets chart");
             do_tcp_errors = 0;
-            error("DISABLED: ipv4.tcperrors  chart");
+            collector_error("DISABLED: ipv4.tcperrors  chart");
             do_tcp_handshake = 0;
-            error("DISABLED: ipv4.tcphandshake  chart");
+            collector_error("DISABLED: ipv4.tcphandshake  chart");
             do_tcpext_connaborts = 0;
-            error("DISABLED: ipv4.tcpconnaborts  chart");
+            collector_error("DISABLED: ipv4.tcpconnaborts  chart");
             do_tcpext_ofo = 0;
-            error("DISABLED: ipv4.tcpofo chart");
+            collector_error("DISABLED: ipv4.tcpofo chart");
             do_tcpext_syncookies = 0;
-            error("DISABLED: ipv4.tcpsyncookies chart");
+            collector_error("DISABLED: ipv4.tcpsyncookies chart");
             do_tcpext_listen = 0;
-            error("DISABLED: ipv4.tcplistenissues chart");
+            collector_error("DISABLED: ipv4.tcplistenissues chart");
             do_ecn = 0;
-            error("DISABLED: ipv4.ecnpkts chart");
-            error("DISABLED: net.inet.tcp.stats module");
+            collector_error("DISABLED: ipv4.ecnpkts chart");
+            collector_error("DISABLED: net.inet.tcp.stats module");
             return 1;
         } else {
             if (likely(do_tcp_packets)) {
@@ -2035,7 +2035,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
         }
     } else {
-        error("DISABLED: net.inet.tcp.stats module");
+        collector_error("DISABLED: net.inet.tcp.stats module");
         return 1;
     }
 
@@ -2060,10 +2060,10 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.udp.stats", mib, udpstat))) {
             do_udp_packets = 0;
-            error("DISABLED: ipv4.udppackets chart");
+            collector_error("DISABLED: ipv4.udppackets chart");
             do_udp_errors = 0;
-            error("DISABLED: ipv4.udperrors chart");
-            error("DISABLED: net.inet.udp.stats module");
+            collector_error("DISABLED: ipv4.udperrors chart");
+            collector_error("DISABLED: net.inet.udp.stats module");
             return 1;
         } else {
             if (likely(do_udp_packets)) {
@@ -2134,7 +2134,7 @@ int do_net_inet_udp_stats(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.inet.udp.stats module");
+        collector_error("DISABLED: net.inet.udp.stats module");
         return 1;
     }
 
@@ -2163,12 +2163,12 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.icmp.stats", mib, icmpstat))) {
             do_icmp_packets = 0;
-            error("DISABLED: ipv4.icmp chart");
+            collector_error("DISABLED: ipv4.icmp chart");
             do_icmp_errors = 0;
-            error("DISABLED: ipv4.icmp_errors chart");
+            collector_error("DISABLED: ipv4.icmp_errors chart");
             do_icmpmsg = 0;
-            error("DISABLED: ipv4.icmpmsg chart");
-            error("DISABLED: net.inet.icmp.stats module");
+            collector_error("DISABLED: ipv4.icmpmsg chart");
+            collector_error("DISABLED: net.inet.icmp.stats module");
             return 1;
         } else {
             int i;
@@ -2275,7 +2275,7 @@ int do_net_inet_icmp_stats(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.inet.icmp.stats module");
+        collector_error("DISABLED: net.inet.icmp.stats module");
         return 1;
     }
 
@@ -2302,14 +2302,14 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet.ip.stats", mib, ipstat))) {
             do_ip_packets = 0;
-            error("DISABLED: ipv4.packets chart");
+            collector_error("DISABLED: ipv4.packets chart");
             do_ip_fragsout = 0;
-            error("DISABLED: ipv4.fragsout chart");
+            collector_error("DISABLED: ipv4.fragsout chart");
             do_ip_fragsin = 0;
-            error("DISABLED: ipv4.fragsin chart");
+            collector_error("DISABLED: ipv4.fragsin chart");
             do_ip_errors = 0;
-            error("DISABLED: ipv4.errors chart");
-            error("DISABLED: net.inet.ip.stats module");
+            collector_error("DISABLED: ipv4.errors chart");
+            collector_error("DISABLED: net.inet.ip.stats module");
             return 1;
         } else {
             if (likely(do_ip_packets)) {
@@ -2456,7 +2456,7 @@ int do_net_inet_ip_stats(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.inet.ip.stats module");
+        collector_error("DISABLED: net.inet.ip.stats module");
         return 1;
     }
 
@@ -2486,14 +2486,14 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet6.ip6.stats", mib, ip6stat))) {
             do_ip6_packets = 0;
-            error("DISABLED: ipv6.packets chart");
+            collector_error("DISABLED: ipv6.packets chart");
             do_ip6_fragsout = 0;
-            error("DISABLED: ipv6.fragsout chart");
+            collector_error("DISABLED: ipv6.fragsout chart");
             do_ip6_fragsin = 0;
-            error("DISABLED: ipv6.fragsin chart");
+            collector_error("DISABLED: ipv6.fragsin chart");
             do_ip6_errors = 0;
-            error("DISABLED: ipv6.errors chart");
-            error("DISABLED: net.inet6.ip6.stats module");
+            collector_error("DISABLED: ipv6.errors chart");
+            collector_error("DISABLED: net.inet6.ip6.stats module");
             return 1;
         } else {
             if (do_ip6_packets == CONFIG_BOOLEAN_YES || (do_ip6_packets == CONFIG_BOOLEAN_AUTO &&
@@ -2674,7 +2674,7 @@ int do_net_inet6_ip6_stats(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.inet6.ip6.stats module");
+        collector_error("DISABLED: net.inet6.ip6.stats module");
         return 1;
     }
 
@@ -2711,20 +2711,20 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
 
         if (unlikely(GETSYSCTL_SIMPLE("net.inet6.icmp6.stats", mib, icmp6stat))) {
             do_icmp6 = 0;
-            error("DISABLED: ipv6.icmp chart");
+            collector_error("DISABLED: ipv6.icmp chart");
             do_icmp6_redir = 0;
-            error("DISABLED: ipv6.icmpredir chart");
+            collector_error("DISABLED: ipv6.icmpredir chart");
             do_icmp6_errors = 0;
-            error("DISABLED: ipv6.icmperrors chart");
+            collector_error("DISABLED: ipv6.icmperrors chart");
             do_icmp6_echos = 0;
-            error("DISABLED: ipv6.icmpechos chart");
+            collector_error("DISABLED: ipv6.icmpechos chart");
             do_icmp6_router = 0;
-            error("DISABLED: ipv6.icmprouter chart");
+            collector_error("DISABLED: ipv6.icmprouter chart");
             do_icmp6_neighbor = 0;
-            error("DISABLED: ipv6.icmpneighbor chart");
+            collector_error("DISABLED: ipv6.icmpneighbor chart");
             do_icmp6_types = 0;
-            error("DISABLED: ipv6.icmptypes chart");
-            error("DISABLED: net.inet6.icmp6.stats module");
+            collector_error("DISABLED: ipv6.icmptypes chart");
+            collector_error("DISABLED: net.inet6.icmp6.stats module");
             return 1;
         } else {
             int i;
@@ -3054,7 +3054,7 @@ int do_net_inet6_icmp6_stats(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: net.inet6.icmp6.stats module");
+        collector_error("DISABLED: net.inet6.icmp6.stats module");
         return 1;
     }
 

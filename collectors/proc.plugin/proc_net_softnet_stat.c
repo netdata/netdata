@@ -40,7 +40,7 @@ int do_proc_net_softnet_stat(int update_every, usec_t dt) {
     size_t words = procfile_linewords(ff, 0), w;
 
     if(unlikely(!lines || !words)) {
-        error("Cannot read /proc/net/softnet_stat, %zu lines and %zu columns reported.", lines, words);
+        collector_error("Cannot read /proc/net/softnet_stat, %zu lines and %zu columns reported.", lines, words);
         return 1;
     }
 

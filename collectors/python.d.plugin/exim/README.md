@@ -1,7 +1,10 @@
 <!--
 title: "Exim monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/exim/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/exim/README.md"
 sidebar_label: "Exim"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Webapps"
 -->
 
 # Exim monitoring with Netdata

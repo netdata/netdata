@@ -2165,6 +2165,7 @@ static void ebpf_manage_pid(pid_t pid)
  */
 int main(int argc, char **argv)
 {
+    stderror = stderr;
     clocks_init();
     main_thread_id = gettid();
 

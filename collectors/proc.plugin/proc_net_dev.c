@@ -391,7 +391,7 @@ void netdev_rename_device_add(
         r->processed        = 0;
         netdev_rename_root  = r;
         netdev_pending_renames++;
-        info("CGROUP: registered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+        collector_info("CGROUP: registered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
     }
     else {
         if(strcmp(r->container_device, container_device) != 0 || strcmp(r->container_name, container_name) != 0) {
@@ -405,7 +405,7 @@ void netdev_rename_device_add(
             
             r->processed        = 0;
             netdev_pending_renames++;
-            info("CGROUP: altered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+            collector_info("CGROUP: altered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
         }
     }
 
@@ -429,7 +429,7 @@ void netdev_rename_device_del(const char *host_device) {
             if(!r->processed)
                 netdev_pending_renames--;
 
-            info("CGROUP: unregistered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+            collector_info("CGROUP: unregistered network interface rename for '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
 
             freez((void *) r->host_device);
             freez((void *) r->container_name);
@@ -445,7 +445,7 @@ void netdev_rename_device_del(const char *host_device) {
 }
 
 static inline void netdev_rename_cgroup(struct netdev *d, struct netdev_rename *r) {
-    info("CGROUP: renaming network interface '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
+    collector_info("CGROUP: renaming network interface '%s' as '%s' under '%s'", r->host_device, r->container_device, r->container_name);
 
     netdev_charts_release(d);
     netdev_free_chart_strings(d);
@@ -560,7 +560,7 @@ static void netdev_cleanup() {
     struct netdev *d = netdev_root, *last = NULL;
     while(d) {
         if(unlikely(!d->updated)) {
-            // info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
+            // collector_info("Removing network device '%s', linked after '%s'", d->name, last?last->name:"ROOT");
 
             if(netdev_last_used == d)
                 netdev_last_used = last;
@@ -874,7 +874,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
              now_monotonic_sec() - d->carrier_file_lost_time > READ_RETRY_PERIOD)) {
             if (read_single_number_file(d->filename_carrier, &d->carrier)) {
                 if (d->carrier_file_exists)
-                    error(
+                    collector_error(
                         "Cannot refresh interface %s carrier state by reading '%s'. Next update is in %d seconds.",
                         d->name,
                         d->filename_carrier,
@@ -896,7 +896,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
             if (read_file(d->filename_duplex, buffer, STATE_LENGTH_MAX)) {
                 if (d->duplex_file_exists)
-                    error("Cannot refresh interface %s duplex state by reading '%s'.", d->name, d->filename_duplex);
+                    collector_error("Cannot refresh interface %s duplex state by reading '%s'.", d->name, d->filename_duplex);
                 d->duplex_file_exists = 0;
                 d->duplex_file_lost_time = now_monotonic_sec();
                 d->duplex = NETDEV_DUPLEX_UNKNOWN;
@@ -919,7 +919,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
             char buffer[STATE_LENGTH_MAX + 1], *trimmed_buffer;
 
             if (read_file(d->filename_operstate, buffer, STATE_LENGTH_MAX)) {
-                error(
+                collector_error(
                     "Cannot refresh %s operstate by reading '%s'. Will not update its status anymore.",
                     d->name, d->filename_operstate);
                 freez(d->filename_operstate);
@@ -932,14 +932,14 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
         if (d->do_mtu != CONFIG_BOOLEAN_NO && d->filename_mtu) {
             if (read_single_number_file(d->filename_mtu, &d->mtu)) {
-                error(
+                collector_error(
                     "Cannot refresh mtu for interface %s by reading '%s'. Stop updating it.", d->name, d->filename_mtu);
                 freez(d->filename_mtu);
                 d->filename_mtu = NULL;
             }
         }
 
-        //info("PROC_NET_DEV: %s speed %zu, bytes %zu/%zu, packets %zu/%zu/%zu, errors %zu/%zu, drops %zu/%zu, fifo %zu/%zu, compressed %zu/%zu, rframe %zu, tcollisions %zu, tcarrier %zu"
+        //collector_info("PROC_NET_DEV: %s speed %zu, bytes %zu/%zu, packets %zu/%zu/%zu, errors %zu/%zu, drops %zu/%zu, fifo %zu/%zu, compressed %zu/%zu, rframe %zu, tcollisions %zu, tcarrier %zu"
         //        , d->name, d->speed
         //        , d->rbytes, d->tbytes
         //        , d->rpackets, d->tpackets, d->rmulticast
@@ -996,7 +996,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
                     d->chart_var_speed =
                         rrdsetvar_custom_chart_variable_add_and_acquire(d->st_bandwidth, "nic_speed_max");
                     if(!d->chart_var_speed) {
-                        error(
+                        collector_error(
                             "Cannot create interface %s chart variable 'nic_speed_max'. Will not update its speed anymore.",
                             d->name);
                         freez(d->filename_speed);
@@ -1016,7 +1016,7 @@ int do_proc_net_dev(int update_every, usec_t dt) {
 
                     if(ret) {
                         if (d->speed_file_exists)
-                            error("Cannot refresh interface %s speed by reading '%s'.", d->name, d->filename_speed);
+                            collector_error("Cannot refresh interface %s speed by reading '%s'.", d->name, d->filename_speed);
                         d->speed_file_exists = 0;
                         d->speed_file_lost_time = now_monotonic_sec();
                     }
@@ -1488,7 +1488,7 @@ static void netdev_main_cleanup(void *ptr)
 {
     UNUSED(ptr);
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     worker_unregister();
 }

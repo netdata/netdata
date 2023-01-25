@@ -2,7 +2,10 @@
 title: "Collect system metrics with Netdata"
 sidebar_label: "System metrics"
 description: "Netdata collects thousands of metrics from physical and virtual systems, IoT/edge devices, and containers with zero configuration."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/collect/system-metrics.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/collect/system-metrics.md"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts"
 -->
 
 # Collect system metrics with Netdata

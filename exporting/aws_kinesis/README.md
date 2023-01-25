@@ -1,8 +1,12 @@
 <!--
 title: "Export metrics to AWS Kinesis Data Streams"
 description: "Archive your Agent's metrics to AWS Kinesis Data Streams for long-term storage, further analysis, or correlation with data from other sources."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/aws_kinesis/README.md
-sidebar_label: AWS Kinesis Data Streams
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/aws_kinesis/README.md"
+sidebar_label: "AWS Kinesis Data Streams"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Exporting connectors"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Export metrics to AWS Kinesis Data Streams

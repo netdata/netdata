@@ -1,7 +1,11 @@
 <!--
 title: "zscores"
 description: "Use statistical anomaly detection to narrow your focus and shorten root cause analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/zscores/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/zscores/README.md"
+sidebar_label: "zscores"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Uncategorized"
 -->
 
 # Z-Scores - basic anomaly detection for your key metrics and charts

@@ -1,6 +1,10 @@
 <!--
-title: "cups.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/cups.plugin/README.md
+title: "Printers (cups.plugin)"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/cups.plugin/README.md"
+sidebar_label: "cups.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Remotes/Devices"
 -->
 
 # cups.plugin

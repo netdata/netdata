@@ -1,7 +1,10 @@
 <!--
 title: "Hard drive temperature monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/hddtemp/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/hddtemp/README.md"
 sidebar_label: "Hard drive temperature"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Hardware"
 -->
 
 # Hard drive temperature monitoring with Netdata

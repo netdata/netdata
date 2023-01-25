@@ -1,7 +1,10 @@
 <!--
 title: "Tor monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md"
 sidebar_label: "Tor"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Apps"
 -->
 
 # Tor monitoring with Netdata
