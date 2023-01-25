@@ -185,6 +185,29 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
+void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
+    RRDHOST *host = st->rrdhost;
+
+    rrdset_flag_set(st, RRDSET_FLAG_COLLECTION_FINISHED);
+
+    if(dimensions_too) {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st)
+            rrddim_finalize_collection_and_check_retention(rd);
+        rrddim_foreach_done(rd);
+    }
+
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
+        if(!eng) continue;
+
+        if(st->storage_metrics_groups[tier]) {
+            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            st->storage_metrics_groups[tier] = NULL;
+        }
+    }
+}
+
 // the destructor - the dictionary is write locked while this runs
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
     RRDHOST *host = rrdhost;
@@ -192,15 +215,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
-    // cleanup storage engines
-    {
-        for(size_t tier = 0; tier < storage_tiers ; tier++) {
-            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-            if(!eng) continue;
-
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
-        }
-    }
+    rrdset_finalize_collection(st, false);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -1467,9 +1482,13 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             next_store_ut = 0,      // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
+    RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
+    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED))
+        return;
+
     netdata_thread_disable_cancelability();
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+    if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
     }
@@ -1554,7 +1573,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
         next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))) {
+        if(unlikely(rrdset_flags & RRDSET_FLAG_STORE_FIRST)) {
             store_this_entry = 1;
             last_collect_ut = next_store_ut - update_every_ut;
 

@@ -682,8 +682,14 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 
+    time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, handle->metric);
+    time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, handle->metric);
+
     mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
+
+    if(!first_time_s && !last_time_s)
+        return 1;
 
     return 0;
 }
