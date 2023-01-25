@@ -1260,10 +1260,15 @@ struct uuid_first_time_s {
     size_t df_index_oldest;
 };
 
-static int journal_metric_uuid_compare(const void *key, const void *metric)
+static int journal_metric_compare(const void *key, const void *metric)
 {
-    return uuid_compare(*(uuid_t *) key, *((struct uuid_first_time_s *) metric)->uuid);
+    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
+
+//static int journal_metric_uuid_compare(const void *key, const void *metric)
+//{
+//    return uuid_compare(*(uuid_t *) key, *((struct uuid_first_time_s *) metric)->uuid);
+//}
 
 struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
 
@@ -1309,34 +1314,58 @@ void find_uuid_first_time(
 
         time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
-
         struct uuid_first_time_s *uuid_original_entry;
-        for (size_t index = 0; index < j2_header->metric_count; ++index) {
-            time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
-            time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
 
-            uuid_original_entry = bsearch(&uuid_list[index].uuid,
-                                          uuid_first_entry_list,
-                                          count,
-                                          sizeof(*uuid_first_entry_list),
-                                          journal_metric_uuid_compare);
+        size_t journal_metric_count = j2_header->metric_count;
 
-            if (likely(uuid_original_entry)) {
-                uuid_original_entry->df_matched++;
+        for (size_t index = 0; index < count; ++index) {
+            uuid_original_entry = &uuid_first_entry_list[index];
+            // Check here if we should skip this
+            if (uuid_original_entry->df_matched > 3)
+                continue;
 
-                time_t old_first_time_s = uuid_original_entry->first_time_s;
-
-                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
-                uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
-
-                if(uuid_original_entry->first_time_s != old_first_time_s)
-                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
-
-                binary_match++;
-            }
-            else
+            struct journal_metric_list *live_entry = bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_compare);
+            if (!live_entry) {
+                // Not found in this journal
                 not_matching_bsearches++;
+                continue;
+            }
+
+            // Calculate first / last for this match
+            time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
+            time_t last_time_s = live_entry->delta_end_s + journal_start_time_s;
+            uuid_original_entry->df_matched++;
+            time_t old_first_time_s = uuid_original_entry->first_time_s;
+            uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+            uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
+            if (uuid_original_entry->first_time_s != old_first_time_s)
+                uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+
+            binary_match++;
         }
+
+//
+//        for (size_t index = 0; index < j2_header->metric_count; ++index) {
+//            time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
+//            time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
+//
+//            uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
+//            if (likely(uuid_original_entry)) {
+//                uuid_original_entry->df_matched++;
+//
+//                time_t old_first_time_s = uuid_original_entry->first_time_s;
+//
+//                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+//                uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
+//
+//                if(uuid_original_entry->first_time_s != old_first_time_s)
+//                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+//
+//                binary_match++;
+//            }
+//            else
+//                not_matching_bsearches++;
+//        }
 
         journalfile_count++;
         journalfile_v2_data_release(datafile->journalfile);
@@ -1436,6 +1465,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         uuid_first_entry_list[added].metric = metric;
         uuid_first_entry_list[added].first_time_s = LONG_MAX;
         uuid_first_entry_list[added].last_time_s = 0;
+        uuid_first_entry_list[added].df_matched = 0;
+        uuid_first_entry_list[added].df_index_oldest = 0;
         uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
         added++;
     }
