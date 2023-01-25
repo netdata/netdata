@@ -712,6 +712,12 @@ int do_proc_stat(int update_every, usec_t dt) {
                     cpu_chart->rd_idle       = rrddim_add(cpu_chart->st, "idle",       NULL, multiplier, divisor, RRD_ALGORITHM_PCENT_OVER_DIFF_TOTAL);
                     rrddim_hide(cpu_chart->st, "idle");
 
+                    if (core > 0) {
+                        char cpu_core[50 + 1];
+                        snprintfz(cpu_core, 50, "cpu%lu", core - 1);
+                        rrdlabels_add(cpu_chart->st->rrdlabels, "cpu", cpu_core, RRDLABEL_SRC_AUTO);
+                    }
+
                     if(unlikely(core == 0 && cpus_var == NULL))
                         cpus_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "active_processors");
                 }
