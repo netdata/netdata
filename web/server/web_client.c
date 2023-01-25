@@ -38,6 +38,18 @@ static inline int web_client_crock_socket(struct web_client *w) {
     return 0;
 }
 
+static inline void web_client_enable_wait_from_ssl(struct web_client *w, int bytes) {
+    int ssl_err = SSL_get_error(w->ssl.conn, bytes);
+    if (ssl_err == SSL_ERROR_WANT_READ)
+        web_client_enable_wait_receive(w);
+    else if (ssl_err == SSL_ERROR_WANT_WRITE)
+        web_client_enable_wait_send(w);
+    else if (ssl_err) {
+        web_client_disable_wait_receive(w);
+        web_client_disable_wait_send(w);
+    }
+}
+
 static inline int web_client_uncrock_socket(struct web_client *w) {
 #ifdef TCP_CORK
     if(likely(w->tcp_cork && w->ofd != -1)) {
@@ -1057,6 +1069,7 @@ static inline ssize_t web_client_send_data(struct web_client *w,const void *buf,
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && ( !w->ssl.flags ) ){
             bytes = netdata_ssl_write(w->ssl.conn, buf, len) ;
+            web_client_enable_wait_from_ssl(w, bytes);
         } else {
             bytes = send(w->ofd,buf, len , flags);
         }
@@ -1212,8 +1225,10 @@ static inline void web_client_send_http_header(struct web_client *w) {
     ssize_t bytes;
 #ifdef ENABLE_HTTPS
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
-        if ( ( w->ssl.conn ) && ( w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ) )
+        if ( ( w->ssl.conn ) && ( w->ssl.flags == NETDATA_SSL_HANDSHAKE_COMPLETE ) ) {
             bytes = netdata_ssl_write(w->ssl.conn, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output));
+            web_client_enable_wait_from_ssl(w, bytes);
+        }
         else {
             while((bytes = send(w->ofd, buffer_tostring(w->response.header_output), buffer_strlen(w->response.header_output), 0)) == -1) {
                 count++;
@@ -1906,6 +1921,7 @@ ssize_t web_client_receive(struct web_client *w)
     if ( (!web_client_check_unix(w)) && (netdata_ssl_srv_ctx) ) {
         if ( ( w->ssl.conn ) && (!w->ssl.flags)) {
             bytes = netdata_ssl_read(w->ssl.conn, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1));
+            web_client_enable_wait_from_ssl(w, bytes);
         }else {
             bytes = recv(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t) (left - 1), MSG_DONTWAIT);
         }
