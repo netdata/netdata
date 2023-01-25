@@ -253,7 +253,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
         for(minor = major; *minor && *minor != ':' ;minor++) ;
 
         if(unlikely(!*minor)) {
-            error("Cannot parse major:minor on '%s' at line %lu of '%s'", major, l + 1, filename);
+            collector_error("Cannot parse major:minor on '%s' at line %lu of '%s'", major, l + 1, filename);
             freez(mi);
             continue;
         }
@@ -443,7 +443,7 @@ struct mountinfo *mountinfo_read(int do_statvfs) {
 
 #ifdef NETDATA_INTERNAL_CHECKS
                     if(unlikely(!mi)) {
-                        error("Mount point '%s' not found in /proc/self/mountinfo", mnt->mnt_dir);
+                        collector_error("Mount point '%s' not found in /proc/self/mountinfo", mnt->mnt_dir);
                     }
 #endif
                 }

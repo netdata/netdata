@@ -831,6 +831,9 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
     stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
 
@@ -1320,6 +1323,8 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
+    // Initialize stderror avoiding coredump when info() or error() is called
+    stderror = stderr;
 
     int i;
     int config_loaded = 0;

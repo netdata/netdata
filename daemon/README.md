@@ -210,25 +210,22 @@ You can send commands during runtime via [netdatacli](/cli/README.md).
 
 ## Log files
 
-Netdata uses 3 log files:
+Netdata uses 4 log files:
 
 1.  `error.log`
-2.  `access.log`
-3.  `debug.log`
+2.  `collector.log`
+3.  `access.log`
+4.  `debug.log`
 
-Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log` and
-`access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled (Netdata needs to be compiled
-with debugging enabled).
+Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log`,
+`collector.log`, and `access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled
+(Netdata needs to be compiled with debugging enabled).
 
 Log files are stored in `/var/log/netdata/` by default.
 
 ### error.log
 
-The `error.log` is the `stderr` of the `netdata` daemon and all external plugins
-run by `netdata`.
-
-So if any process, in the Netdata process tree, writes anything to its standard error,
-it will appear in `error.log`.
+The `error.log` is the `stderr` of the `netdata` daemon .
 
 For most Netdata programs (including standard external plugins shipped by netdata), the following lines may appear:
 
@@ -242,6 +239,16 @@ So, when auto-detection of data collection fail, `ERROR` lines are logged and th
 program continues to run.
 
 When a Netdata program cannot run at all, a `FATAL` line is logged.
+
+### collector.log
+
+The `collector.log` is the `stderr` of all [collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
+ run by `netdata`.
+
+So if any process, in the Netdata process tree, writes anything to its standard error,
+it will appear in `collector.log`.
+
+Data stored inside this file follows pattern already described for `error.log`.
 
 ### access.log
 

@@ -41,16 +41,16 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
 
     if (likely(do_cpu)) {
         if (unlikely(HOST_CPU_LOAD_INFO_COUNT != 4)) {
-            error("MACOS: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
+            collector_error("MACOS: There are %d CPU states (4 was expected)", HOST_CPU_LOAD_INFO_COUNT);
             do_cpu = 0;
-            error("DISABLED: system.cpu");
+            collector_error("DISABLED: system.cpu");
         } else {
             count = HOST_CPU_LOAD_INFO_COUNT;
             kr = host_statistics(host, HOST_CPU_LOAD_INFO, (host_info_t)cp_time, &count);
             if (unlikely(kr != KERN_SUCCESS)) {
-                error("MACOS: host_statistics() failed: %s", mach_error_string(kr));
+                collector_error("MACOS: host_statistics() failed: %s", mach_error_string(kr));
                 do_cpu = 0;
-                error("DISABLED: system.cpu");
+                collector_error("DISABLED: system.cpu");
             } else {
 
                 st = rrdset_find_active_bytype_localhost("system", "cpu");
@@ -95,13 +95,13 @@ int do_macos_mach_smi(int update_every, usec_t dt) {
         kr = host_statistics(host, HOST_VM_INFO, (host_info_t)&vm_statistics, &count);
 #endif
         if (unlikely(kr != KERN_SUCCESS)) {
-            error("MACOS: host_statistics64() failed: %s", mach_error_string(kr));
+            collector_error("MACOS: host_statistics64() failed: %s", mach_error_string(kr));
             do_ram = 0;
-            error("DISABLED: system.ram");
+            collector_error("DISABLED: system.ram");
             do_swapio = 0;
-            error("DISABLED: system.swapio");
+            collector_error("DISABLED: system.swapio");
             do_pgfaults = 0;
-            error("DISABLED: mem.pgfaults");
+            collector_error("DISABLED: mem.pgfaults");
         } else {
             if (likely(do_ram)) {
                 st = rrdset_find_active_localhost("system.ram");

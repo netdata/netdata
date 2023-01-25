@@ -90,7 +90,7 @@ static inline void btrfs_free_disk(BTRFS_DISK *d) {
 }
 
 static inline void btrfs_free_node(BTRFS_NODE *node) {
-    // info("BTRFS: destroying '%s'", node->id);
+    // collector_info("BTRFS: destroying '%s'", node->id);
 
     if(node->st_allocation_disks)
         rrdset_is_obsolete(node->st_allocation_disks);
@@ -136,7 +136,7 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
     DIR *dir = opendir(path);
     if (!dir) {
         if(!node->logged_error) {
-            error("BTRFS: Cannot open directory '%s'.", path);
+            collector_error("BTRFS: Cannot open directory '%s'.", path);
             node->logged_error = 1;
         }
         return 1;
@@ -149,7 +149,7 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
             || !strcmp(de->d_name, ".")
             || !strcmp(de->d_name, "..")
                 ) {
-            // info("BTRFS: ignoring '%s'", de->d_name);
+            // collector_info("BTRFS: ignoring '%s'", de->d_name);
             continue;
         }
 
@@ -200,13 +200,13 @@ static inline int find_btrfs_disks(BTRFS_NODE *node, const char *path) {
         // update the values
 
         if(read_single_number_file(d->size_filename, &d->size) != 0) {
-            error("BTRFS: failed to read '%s'", d->size_filename);
+            collector_error("BTRFS: failed to read '%s'", d->size_filename);
             d->exists = 0;
             continue;
         }
 
         if(read_single_number_file(d->hw_sector_size_filename, &d->hw_sector_size) != 0) {
-            error("BTRFS: failed to read '%s'", d->hw_sector_size_filename);
+            collector_error("BTRFS: failed to read '%s'", d->hw_sector_size_filename);
             d->exists = 0;
             continue;
         }
@@ -257,7 +257,7 @@ static inline int find_all_btrfs_pools(const char *path) {
     DIR *dir = opendir(path);
     if (!dir) {
         if(!logged_error) {
-            error("BTRFS: Cannot open directory '%s'.", path);
+            collector_error("BTRFS: Cannot open directory '%s'.", path);
             logged_error = 1;
         }
         return 1;
@@ -271,7 +271,7 @@ static inline int find_all_btrfs_pools(const char *path) {
            || !strcmp(de->d_name, "..")
            || !strcmp(de->d_name, "features")
                 ) {
-            // info("BTRFS: ignoring '%s'", de->d_name);
+            // collector_info("BTRFS: ignoring '%s'", de->d_name);
             continue;
         }
 
@@ -285,7 +285,7 @@ static inline int find_all_btrfs_pools(const char *path) {
 
         // did we find it?
         if(node) {
-            // info("BTRFS: already exists '%s'", de->d_name);
+            // collector_info("BTRFS: already exists '%s'", de->d_name);
             node->exists = 1;
 
             // update the disk sizes
@@ -295,7 +295,7 @@ static inline int find_all_btrfs_pools(const char *path) {
             continue;
         }
 
-        // info("BTRFS: adding '%s'", de->d_name);
+        // collector_info("BTRFS: adding '%s'", de->d_name);
 
         // not found, create it
         node = callocz(sizeof(BTRFS_NODE), 1);
@@ -309,7 +309,7 @@ static inline int find_all_btrfs_pools(const char *path) {
 
             snprintfz(filename, FILENAME_MAX, "%s/%s/label", path, de->d_name);
             if(read_file(filename, label, FILENAME_MAX) != 0) {
-                error("BTRFS: failed to read '%s'", filename);
+                collector_error("BTRFS: failed to read '%s'", filename);
                 btrfs_free_node(node);
                 continue;
             }
@@ -326,21 +326,21 @@ static inline int find_all_btrfs_pools(const char *path) {
 
         //snprintfz(filename, FILENAME_MAX, "%s/%s/sectorsize", path, de->d_name);
         //if(read_single_number_file(filename, &node->sectorsize) != 0) {
-        //    error("BTRFS: failed to read '%s'", filename);
+        //    collector_error("BTRFS: failed to read '%s'", filename);
         //    btrfs_free_node(node);
         //    continue;
         //}
 
         //snprintfz(filename, FILENAME_MAX, "%s/%s/nodesize", path, de->d_name);
         //if(read_single_number_file(filename, &node->nodesize) != 0) {
-        //    error("BTRFS: failed to read '%s'", filename);
+        //    collector_error("BTRFS: failed to read '%s'", filename);
         //    btrfs_free_node(node);
         //    continue;
         //}
 
         //snprintfz(filename, FILENAME_MAX, "%s/%s/quota_override", path, de->d_name);
         //if(read_single_number_file(filename, &node->quota_override) != 0) {
-        //    error("BTRFS: failed to read '%s'", filename);
+        //    collector_error("BTRFS: failed to read '%s'", filename);
         //    btrfs_free_node(node);
         //    continue;
         //}
@@ -351,7 +351,7 @@ static inline int find_all_btrfs_pools(const char *path) {
         #define init_btrfs_allocation_field(FIELD) {\
             snprintfz(filename, FILENAME_MAX, "%s/%s/allocation/" #FIELD, path, de->d_name); \
             if(read_single_number_file(filename, &node->allocation_ ## FIELD) != 0) {\
-                error("BTRFS: failed to read '%s'", filename);\
+                collector_error("BTRFS: failed to read '%s'", filename);\
                 btrfs_free_node(node);\
                 continue;\
             }\
@@ -362,7 +362,7 @@ static inline int find_all_btrfs_pools(const char *path) {
         #define init_btrfs_allocation_section_field(SECTION, FIELD) {\
             snprintfz(filename, FILENAME_MAX, "%s/%s/allocation/" #SECTION "/" #FIELD, path, de->d_name); \
             if(read_single_number_file(filename, &node->allocation_ ## SECTION ## _ ## FIELD) != 0) {\
-                error("BTRFS: failed to read '%s'", filename);\
+                collector_error("BTRFS: failed to read '%s'", filename);\
                 btrfs_free_node(node);\
                 continue;\
             }\
@@ -411,7 +411,7 @@ static inline int find_all_btrfs_pools(const char *path) {
         // --------------------------------------------------------------------
         // link it
 
-        // info("BTRFS: linking '%s'", node->id);
+        // collector_info("BTRFS: linking '%s'", node->id);
         node->next = nodes;
         nodes = node;
     }
@@ -505,7 +505,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                  || collect_btrfs_allocation_section_field(metadata, disk_used) != 0
                  || collect_btrfs_allocation_section_field(system, disk_total) != 0
                  || collect_btrfs_allocation_section_field(system, disk_used) != 0) {
-                error("BTRFS: failed to collect physical disks allocation for '%s'", node->id);
+                collector_error("BTRFS: failed to collect physical disks allocation for '%s'", node->id);
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
                 continue;
@@ -515,7 +515,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         if(do_allocation_data != CONFIG_BOOLEAN_NO) {
             if (collect_btrfs_allocation_section_field(data, total_bytes) != 0
                 || collect_btrfs_allocation_section_field(data, bytes_used) != 0) {
-                error("BTRFS: failed to collect allocation/data for '%s'", node->id);
+                collector_error("BTRFS: failed to collect allocation/data for '%s'", node->id);
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
                 continue;
@@ -527,7 +527,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
                 || collect_btrfs_allocation_section_field(metadata, bytes_used) != 0
                 || collect_btrfs_allocation_field(global_rsv_size) != 0
                     ) {
-                error("BTRFS: failed to collect allocation/metadata for '%s'", node->id);
+                collector_error("BTRFS: failed to collect allocation/metadata for '%s'", node->id);
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
                 continue;
@@ -537,7 +537,7 @@ int do_sys_fs_btrfs(int update_every, usec_t dt) {
         if(do_allocation_system != CONFIG_BOOLEAN_NO) {
             if (collect_btrfs_allocation_section_field(system, total_bytes) != 0
                 || collect_btrfs_allocation_section_field(system, bytes_used) != 0) {
-                error("BTRFS: failed to collect allocation/system for '%s'", node->id);
+                collector_error("BTRFS: failed to collect allocation/system for '%s'", node->id);
                 // make it refresh btrfs at the next iteration
                 refresh_delta = refresh_every;
                 continue;

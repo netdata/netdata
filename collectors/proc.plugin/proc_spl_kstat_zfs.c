@@ -140,7 +140,7 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     if(likely(!do_zfs_stats)) {
         DIR *dir = opendir(dirname);
         if(unlikely(!dir)) {
-            error("Cannot read directory '%s'", dirname);
+            collector_error("Cannot read directory '%s'", dirname);
             return 1;
         }
 
@@ -177,7 +177,7 @@ int do_proc_spl_kstat_zfs_arcstats(int update_every, usec_t dt) {
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 3)) {
-            if(unlikely(words)) error("Cannot read " ZFS_PROC_ARCSTATS " line %zu. Expected 3 params, read %zu.", l, words);
+            if(unlikely(words)) collector_error("Cannot read " ZFS_PROC_ARCSTATS " line %zu. Expected 3 params, read %zu.", l, words);
             continue;
         }
 
@@ -330,7 +330,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     if (likely(do_zfs_pool_state)) {
         DIR *dir = opendir(dirname);
         if (unlikely(!dir)) {
-            error("Cannot read directory '%s'", dirname);
+            collector_error("Cannot read directory '%s'", dirname);
             return 1;
         }
 
@@ -394,7 +394,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
                         char *c = strchr(state, '\n');
                         if (c)
                             *c = '\0';
-                        error("ZFS POOLS: Undefined state %s for zpool %s, disabling the chart", state, de->d_name);
+                        collector_error("ZFS POOLS: Undefined state %s for zpool %s, disabling the chart", state, de->d_name);
                     }
                 }
             }
@@ -404,7 +404,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
     }
 
     if (do_zfs_pool_state && pool_found && !state_file_found) {
-        info("ZFS POOLS: State files not found. Disabling the module.");
+        collector_info("ZFS POOLS: State files not found. Disabling the module.");
         do_zfs_pool_state = 0;
     }
 

@@ -89,7 +89,7 @@ static bool tc_class_conflict_callback(const DICTIONARY_ITEM *item __maybe_unuse
     struct tc_class *c = old_value; (void)c;
     struct tc_class *new_c = new_value; (void)new_c;
 
-    error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
+    collector_error("TC: class '%s' is already in device '%s'. Ignoring duplicate.", dictionary_acquired_item_name(item), string2str(d->id));
 
     tc_class_free_callback(item, new_value, data);
 
@@ -277,7 +277,7 @@ static inline void tc_device_commit(struct tc_device *d) {
     }
 
     if(unlikely(updated_classes && updated_qdiscs)) {
-        error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
+        collector_error("TC: device '%s' has active both classes (%d) and qdiscs (%d). Will render only qdiscs.", string2str(d->id), updated_classes, updated_qdiscs);
 
         // set all classes to !updated
         dfe_start_read(d->classes, c) {
@@ -353,7 +353,7 @@ static inline void tc_device_commit(struct tc_device *d) {
         }
 
         //if(unlikely(!c->hasparent)) {
-        //    if(root) error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
+        //    if(root) collector_error("TC: multiple root class/qdisc for device '%s' (old: '%s', new: '%s')", d->id, root->id, c->id);
         //    root = c;
         //    debug(D_TC_LOOP, "TC: found root class/qdisc '%s'", root->id);
         //}
@@ -856,14 +856,14 @@ static void tc_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if(tc_child_pid) {
-        info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
+        collector_info("TC: killing with SIGTERM tc-qos-helper process %d", tc_child_pid);
         if(killpid(tc_child_pid) != -1) {
             siginfo_t info;
 
-            info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
+            collector_info("TC: waiting for tc plugin child process pid %d to exit...", tc_child_pid);
             waitid(P_PID, (id_t) tc_child_pid, &info, WEXITED);
         }
 
@@ -940,7 +940,7 @@ void *tc_main(void *ptr) {
 
         fp_child_output = netdata_popen(command, (pid_t *)&tc_child_pid, &fp_child_input);
         if(unlikely(!fp_child_output)) {
-            error("TC: Cannot popen(\"%s\", \"r\").", command);
+            collector_error("TC: Cannot popen(\"%s\", \"r\").", command);
             goto cleanup;
         }
 
@@ -1169,7 +1169,7 @@ void *tc_main(void *ptr) {
         if(code == 1 || code == 127) {
             // 1 = DISABLE
             // 127 = cannot even run it
-            error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
+            collector_error("TC: tc-qos-helper.sh exited with code %d. Disabling it.", code);
             goto cleanup;
         }
 

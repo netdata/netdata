@@ -181,7 +181,7 @@ static void calculate_values_and_show_charts(
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("DISKSPACE: disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
+        collector_error("DISKSPACE: disk block statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)btotal, (unsigned long long)bavail, (unsigned long long)breserved_root, (unsigned long long)bused);
 #endif
 
     // --------------------------------------------------------------------------
@@ -200,7 +200,7 @@ static void calculate_values_and_show_charts(
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(btotal != bavail + breserved_root + bused))
-        error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
+        collector_error("DISKSPACE: disk inode statistics for '%s' (disk '%s') do not sum up: total = %llu, available = %llu, reserved = %llu, used = %llu", mi->mount_point, disk, (unsigned long long)ftotal, (unsigned long long)favail, (unsigned long long)freserved_root, (unsigned long long)fused);
 #endif
 
     int rendered = 0;
@@ -348,23 +348,23 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             struct stat bs;
 
             if(stat(mi->mount_point, &bs) == -1) {
-                error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                      , mi->mount_point
-                      , disk
-                      , mi->filesystem?mi->filesystem:""
-                      , mi->root?mi->root:""
-                );
+                collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
+                               , mi->mount_point
+                               , disk
+                               , mi->filesystem?mi->filesystem:""
+                               , mi->root?mi->root:""
+                               );
                 def_space = CONFIG_BOOLEAN_NO;
                 def_inodes = CONFIG_BOOLEAN_NO;
             }
             else {
                 if((bs.st_mode & S_IFMT) != S_IFDIR) {
-                    error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
-                          , mi->mount_point
-                          , disk
-                          , mi->filesystem?mi->filesystem:""
-                          , mi->root?mi->root:""
-                    );
+                    collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                                   , mi->mount_point
+                                   , disk
+                                   , mi->filesystem?mi->filesystem:""
+                                   , mi->root?mi->root:""
+                                   );
                     def_space = CONFIG_BOOLEAN_NO;
                     def_inodes = CONFIG_BOOLEAN_NO;
                 }
@@ -430,12 +430,12 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         if(!m->shown_error) {
-            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                  , mi->mount_point
-                  , disk
-                  , mi->filesystem?mi->filesystem:""
-                  , mi->root?mi->root:""
-            );
+            collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                            , mi->mount_point
+                            , disk
+                            , mi->filesystem?mi->filesystem:""
+                            , mi->root?mi->root:""
+                            );
             m->shown_error = 1;
         }
         return;
@@ -463,12 +463,12 @@ static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int upda
     struct statvfs buff_statvfs;
     if (statvfs(mi->mount_point, &buff_statvfs) < 0) {
         if(!m->shown_error) {
-            error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
-                  , mi->mount_point
-                  , mi->persistent_id
-                  , mi->filesystem?mi->filesystem:""
-                  , mi->root?mi->root:""
-            );
+            collector_error("DISKSPACE: failed to statvfs() mount point '%s' (disk '%s', filesystem '%s', root '%s')"
+                            , mi->mount_point
+                            , mi->persistent_id
+                            , mi->filesystem?mi->filesystem:""
+                            , mi->root?mi->root:""
+                           );
             m->shown_error = 1;
         }
         return;
@@ -482,7 +482,7 @@ static void diskspace_slow_worker_cleanup(void *ptr)
 {
     UNUSED(ptr);
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     worker_unregister();
 }
@@ -583,7 +583,7 @@ static void diskspace_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if (diskspace_slow_thread) {
         netdata_thread_join(*diskspace_slow_thread, NULL);

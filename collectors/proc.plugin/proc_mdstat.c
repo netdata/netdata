@@ -135,7 +135,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
     size_t words = 0;
 
     if (unlikely(lines < 2)) {
-        error("Cannot read /proc/mdstat. Expected 2 or more lines, read %zu.", lines);
+        collector_error("Cannot read /proc/mdstat. Expected 2 or more lines, read %zu.", lines);
         return 1;
     }
 
@@ -212,7 +212,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
 
             s = procfile_lineword(ff, l, words - 2);
             if (unlikely(s[0] != '[')) {
-                error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
+                collector_error("Cannot read /proc/mdstat raid health status. Unexpected format: missing opening bracket.");
                 continue;
             }
             str_total = ++s;
@@ -227,7 +227,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 s++;
             }
             if (unlikely(str_total[0] == '\0' || !str_inuse || str_inuse[0] == '\0')) {
-                error("Cannot read /proc/mdstat raid health status. Unexpected format.");
+                collector_error("Cannot read /proc/mdstat raid health status. Unexpected format.");
                 continue;
             }
 
@@ -260,7 +260,7 @@ int do_proc_mdstat(int update_every, usec_t dt)
                 continue;
 
             if (unlikely(words < 7)) {
-                error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
+                collector_error("Cannot read /proc/mdstat line. Expected 7 params, read %zu.", words);
                 continue;
             }
 
@@ -326,9 +326,9 @@ int do_proc_mdstat(int update_every, usec_t dt)
                     raid->mismatch_cnt_filename = strdupz(filename);
                 }
                 if (unlikely(read_single_number_file(raid->mismatch_cnt_filename, &raid->mismatch_cnt))) {
-                    error("Cannot read file '%s'", raid->mismatch_cnt_filename);
+                    collector_error("Cannot read file '%s'", raid->mismatch_cnt_filename);
                     do_mismatch = CONFIG_BOOLEAN_NO;
-                    error("Monitoring for mismatch count has been disabled");
+                    collector_error("Monitoring for mismatch count has been disabled");
                     break;
                 }
             }

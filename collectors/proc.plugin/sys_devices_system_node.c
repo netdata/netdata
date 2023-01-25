@@ -19,7 +19,7 @@ static int find_all_nodes() {
 
     DIR *dir = opendir(dirname);
     if(!dir) {
-        error("Cannot read NUMA node directory '%s'", dirname);
+        collector_error("Cannot read NUMA node directory '%s'", dirname);
         return 0;
     }
 
@@ -134,7 +134,7 @@ int do_proc_sys_devices_system_node(int update_every, usec_t dt) {
 
                     if(unlikely(words < 2)) {
                         if(unlikely(words))
-                            error("Cannot read %s numastat line %zu. Expected 2 params, read %zu.", m->name, l, words);
+                            collector_error("Cannot read %s numastat line %zu. Expected 2 params, read %zu.", m->name, l, words);
                         continue;
                     }
 

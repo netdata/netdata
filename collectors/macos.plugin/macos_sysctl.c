@@ -222,7 +222,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         if (likely(do_loadavg)) {
             if (unlikely(GETSYSCTL_BY_NAME("vm.loadavg", sysload))) {
                 do_loadavg = 0;
-                error("DISABLED: system.load");
+                collector_error("DISABLED: system.load");
             } else {
 
                 st = rrdset_find_active_bytype_localhost("system", "load");
@@ -260,7 +260,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_swap)) {
         if (unlikely(GETSYSCTL_BY_NAME("vm.swapusage", swap_usage))) {
             do_swap = 0;
-            error("DISABLED: system.swap");
+            collector_error("DISABLED: system.swap");
         } else {
             st = rrdset_find_active_localhost("system.swap");
             if (unlikely(!st)) {
@@ -298,15 +298,15 @@ int do_macos_sysctl(int update_every, usec_t dt) {
         mib[4] = NET_RT_IFLIST2;
         mib[5] = 0;
         if (unlikely(sysctl(mib, 6, NULL, &size, NULL, 0))) {
-            error("MACOS: sysctl(%s...) failed: %s", "net interfaces", strerror(errno));
+            collector_error("MACOS: sysctl(%s...) failed: %s", "net interfaces", strerror(errno));
             do_bandwidth = 0;
-            error("DISABLED: system.ipv4");
+            collector_error("DISABLED: system.ipv4");
         } else {
             ifstatdata = reallocz(ifstatdata, size);
             if (unlikely(sysctl(mib, 6, ifstatdata, &size, NULL, 0) < 0)) {
-                error("MACOS: sysctl(%s...) failed: %s", "net interfaces", strerror(errno));
+                collector_error("MACOS: sysctl(%s...) failed: %s", "net interfaces", strerror(errno));
                 do_bandwidth = 0;
-                error("DISABLED: system.ipv4");
+                collector_error("DISABLED: system.ipv4");
             } else {
                 lim = ifstatdata + size;
                 iftot.ift_ibytes = iftot.ift_obytes = 0;
@@ -353,19 +353,19 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_tcp_packets || do_tcp_errors || do_tcp_handshake || do_tcpext_connaborts || do_tcpext_ofo || do_tcpext_syscookies || do_ecn)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet.tcp.stats", tcpstat))){
             do_tcp_packets = 0;
-            error("DISABLED: ipv4.tcppackets");
+            collector_error("DISABLED: ipv4.tcppackets");
             do_tcp_errors = 0;
-            error("DISABLED: ipv4.tcperrors");
+            collector_error("DISABLED: ipv4.tcperrors");
             do_tcp_handshake = 0;
-            error("DISABLED: ipv4.tcphandshake");
+            collector_error("DISABLED: ipv4.tcphandshake");
             do_tcpext_connaborts = 0;
-            error("DISABLED: ipv4.tcpconnaborts");
+            collector_error("DISABLED: ipv4.tcpconnaborts");
             do_tcpext_ofo = 0;
-            error("DISABLED: ipv4.tcpofo");
+            collector_error("DISABLED: ipv4.tcpofo");
             do_tcpext_syscookies = 0;
-            error("DISABLED: ipv4.tcpsyncookies");
+            collector_error("DISABLED: ipv4.tcpsyncookies");
             do_ecn = 0;
-            error("DISABLED: ipv4.ecnpkts");
+            collector_error("DISABLED: ipv4.ecnpkts");
         } else {
             if (likely(do_tcp_packets)) {
                 st = rrdset_find_active_localhost("ipv4.tcppackets");
@@ -597,9 +597,9 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_udp_packets || do_udp_errors)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet.udp.stats", udpstat))) {
             do_udp_packets = 0;
-            error("DISABLED: ipv4.udppackets");
+            collector_error("DISABLED: ipv4.udppackets");
             do_udp_errors = 0;
-            error("DISABLED: ipv4.udperrors");
+            collector_error("DISABLED: ipv4.udperrors");
         } else {
             if (likely(do_udp_packets)) {
                 st = rrdset_find_active_localhost("ipv4.udppackets");
@@ -673,10 +673,10 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_icmp_packets || do_icmpmsg)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet.icmp.stats", icmpstat))) {
             do_icmp_packets = 0;
-            error("DISABLED: ipv4.icmp");
-            error("DISABLED: ipv4.icmp_errors");
+            collector_error("DISABLED: ipv4.icmp");
+            collector_error("DISABLED: ipv4.icmp_errors");
             do_icmpmsg = 0;
-            error("DISABLED: ipv4.icmpmsg");
+            collector_error("DISABLED: ipv4.icmpmsg");
         } else {
             for (i = 0; i <= ICMP_MAXTYPE; i++) {
                 icmp_total.msgs_in += icmpstat.icps_inhist[i];
@@ -777,13 +777,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_ip_packets || do_ip_fragsout || do_ip_fragsin || do_ip_errors)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet.ip.stats", ipstat))) {
             do_ip_packets = 0;
-            error("DISABLED: ipv4.packets");
+            collector_error("DISABLED: ipv4.packets");
             do_ip_fragsout = 0;
-            error("DISABLED: ipv4.fragsout");
+            collector_error("DISABLED: ipv4.fragsout");
             do_ip_fragsin = 0;
-            error("DISABLED: ipv4.fragsin");
+            collector_error("DISABLED: ipv4.fragsin");
             do_ip_errors = 0;
-            error("DISABLED: ipv4.errors");
+            collector_error("DISABLED: ipv4.errors");
         } else {
             if (likely(do_ip_packets)) {
                 st = rrdset_find_active_localhost("ipv4.packets");
@@ -919,13 +919,13 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_ip6_packets || do_ip6_fragsout || do_ip6_fragsin || do_ip6_errors)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet6.ip6.stats", ip6stat))) {
             do_ip6_packets = 0;
-            error("DISABLED: ipv6.packets");
+            collector_error("DISABLED: ipv6.packets");
             do_ip6_fragsout = 0;
-            error("DISABLED: ipv6.fragsout");
+            collector_error("DISABLED: ipv6.fragsout");
             do_ip6_fragsin = 0;
-            error("DISABLED: ipv6.fragsin");
+            collector_error("DISABLED: ipv6.fragsin");
             do_ip6_errors = 0;
-            error("DISABLED: ipv6.errors");
+            collector_error("DISABLED: ipv6.errors");
         } else {
             if (do_ip6_packets == CONFIG_BOOLEAN_YES || (do_ip6_packets == CONFIG_BOOLEAN_AUTO &&
                                                          (ip6stat.ip6s_localout ||
@@ -1096,7 +1096,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_icmp6 || do_icmp6_redir || do_icmp6_errors || do_icmp6_echos || do_icmp6_router || do_icmp6_neighbor || do_icmp6_types)) {
         if (unlikely(GETSYSCTL_BY_NAME("net.inet6.icmp6.stats", icmp6stat))) {
             do_icmp6 = 0;
-            error("DISABLED: ipv6.icmp");
+            collector_error("DISABLED: ipv6.icmp");
         } else {
             for (i = 0; i <= ICMP6_MAXTYPE; i++) {
                 icmp6_total.msgs_in += icmp6stat.icp6s_inhist[i];
@@ -1392,7 +1392,7 @@ int do_macos_sysctl(int update_every, usec_t dt) {
     if (likely(do_uptime)) {
         if (unlikely(GETSYSCTL_BY_NAME("kern.boottime", boot_time))) {
             do_uptime = 0;
-            error("DISABLED: system.uptime");
+            collector_error("DISABLED: system.uptime");
         } else {
             clock_gettime(CLOCK_REALTIME, &cur_time);
             st = rrdset_find_active_localhost("system.uptime");

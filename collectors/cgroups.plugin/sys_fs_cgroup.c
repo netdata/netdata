@@ -174,9 +174,9 @@ static enum cgroups_systemd_setting cgroups_detect_systemd(const char *exec)
     }
 
     if (ret == -1) {
-        error("Failed to get the output of \"%s\"", exec);
+        collector_error("Failed to get the output of \"%s\"", exec);
     } else if (ret == 0) {
-        info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
+        collector_info("Cannot get the output of \"%s\" within %"PRId64" seconds", exec, (int64_t)timeout.tv_sec);
     } else {
         while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
             if ((begin = strstr(buf, SYSTEMD_HIERARCHY_STRING))) {
@@ -214,7 +214,7 @@ static enum cgroups_type cgroups_try_detect_version()
     FILE *fp_child_input;
     FILE *fp_child_output = netdata_popen("grep cgroup /proc/filesystems", &command_pid, &fp_child_input);
     if (!fp_child_output) {
-        error("popen failed");
+        collector_error("popen failed");
         return CGROUPS_AUTODETECT_FAIL;
     }
     while (fgets(buf, MAXSIZE_PROC_CMDLINE, fp_child_output) != NULL) {
@@ -258,12 +258,12 @@ static enum cgroups_type cgroups_try_detect_version()
     //    check kernel command line flag that can override that setting
     FILE *fp = fopen("/proc/cmdline", "r");
     if (!fp) {
-        error("Error reading kernel boot commandline parameters");
+        collector_error("Error reading kernel boot commandline parameters");
         return CGROUPS_AUTODETECT_FAIL;
     }
 
     if (!fgets(buf, MAXSIZE_PROC_CMDLINE, fp)) {
-        error("couldn't read all cmdline params into buffer");
+        collector_error("couldn't read all cmdline params into buffer");
         fclose(fp);
         return CGROUPS_AUTODETECT_FAIL;
     }
@@ -271,7 +271,7 @@ static enum cgroups_type cgroups_try_detect_version()
     fclose(fp);
 
     if (strstr(buf, "systemd.unified_cgroup_hierarchy=0")) {
-        info("cgroups v2 (unified cgroups) is available but are disabled on this system.");
+        collector_info("cgroups v2 (unified cgroups) is available but are disabled on this system.");
         return CGROUPS_V1;
     }
     return CGROUPS_V2;
@@ -311,7 +311,7 @@ void read_cgroup_plugin_configuration() {
     if(cgroup_use_unified_cgroups == CONFIG_BOOLEAN_AUTO)
         cgroup_use_unified_cgroups = (cgroups_try_detect_version() == CGROUPS_V2);
 
-    info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
+    collector_info("use unified cgroups %s", cgroup_use_unified_cgroups ? "true" : "false");
 
     cgroup_containers_chart_priority = (int)config_get_number("plugin:cgroups", "containers priority", cgroup_containers_chart_priority);
     if(cgroup_containers_chart_priority < 1)
@@ -361,7 +361,7 @@ void read_cgroup_plugin_configuration() {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuacct");
         if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuacct");
         if(!mi) {
-            error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
+            collector_error("CGROUP: cannot find cpuacct mountinfo. Assuming default: /sys/fs/cgroup/cpuacct");
             s = "/sys/fs/cgroup/cpuacct";
         }
         else s = mi->mount_point;
@@ -371,7 +371,7 @@ void read_cgroup_plugin_configuration() {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "cpuset");
         if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "cpuset");
         if(!mi) {
-            error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
+            collector_error("CGROUP: cannot find cpuset mountinfo. Assuming default: /sys/fs/cgroup/cpuset");
             s = "/sys/fs/cgroup/cpuset";
         }
         else s = mi->mount_point;
@@ -381,7 +381,7 @@ void read_cgroup_plugin_configuration() {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "blkio");
         if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "blkio");
         if(!mi) {
-            error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
+            collector_error("CGROUP: cannot find blkio mountinfo. Assuming default: /sys/fs/cgroup/blkio");
             s = "/sys/fs/cgroup/blkio";
         }
         else s = mi->mount_point;
@@ -391,7 +391,7 @@ void read_cgroup_plugin_configuration() {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "memory");
         if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "memory");
         if(!mi) {
-            error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
+            collector_error("CGROUP: cannot find memory mountinfo. Assuming default: /sys/fs/cgroup/memory");
             s = "/sys/fs/cgroup/memory";
         }
         else s = mi->mount_point;
@@ -401,7 +401,7 @@ void read_cgroup_plugin_configuration() {
         mi = mountinfo_find_by_filesystem_super_option(root, "cgroup", "devices");
         if(!mi) mi = mountinfo_find_by_filesystem_mount_source(root, "cgroup", "devices");
         if(!mi) {
-            error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
+            collector_error("CGROUP: cannot find devices mountinfo. Assuming default: /sys/fs/cgroup/devices");
             s = "/sys/fs/cgroup/devices";
         }
         else s = mi->mount_point;
@@ -433,7 +433,7 @@ void read_cgroup_plugin_configuration() {
             if(mi) debug(D_CGROUP, "found unified cgroup root using mountsource info, with path: '%s'", mi->mount_point);
         }
         if(!mi) {
-            error("CGROUP: cannot find cgroup2 mountinfo. Assuming default: /sys/fs/cgroup");
+            collector_error("CGROUP: cannot find cgroup2 mountinfo. Assuming default: /sys/fs/cgroup");
             s = "/sys/fs/cgroup";
         }
         else s = mi->mount_point;
@@ -575,13 +575,13 @@ void netdata_cgroup_ebpf_initialize_shm()
 {
     shm_fd_cgroup_ebpf = shm_open(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME, O_CREAT | O_RDWR, 0660);
     if (shm_fd_cgroup_ebpf < 0) {
-        error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
+        collector_error("Cannot initialize shared memory used by cgroup and eBPF, integration won't happen.");
         return;
     }
 
     size_t length = sizeof(netdata_ebpf_cgroup_shm_header_t) + cgroup_root_max * sizeof(netdata_ebpf_cgroup_shm_body_t);
     if (ftruncate(shm_fd_cgroup_ebpf, length)) {
-        error("Cannot set size for shared memory.");
+        collector_error("Cannot set size for shared memory.");
         goto end_init_shm;
     }
 
@@ -590,7 +590,7 @@ void netdata_cgroup_ebpf_initialize_shm()
                                                                        shm_fd_cgroup_ebpf, 0);
 
     if (!shm_cgroup_ebpf.header) {
-        error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
+        collector_error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
         goto end_init_shm;
     }
     shm_cgroup_ebpf.body = (netdata_ebpf_cgroup_shm_body_t *) ((char *)shm_cgroup_ebpf.header +
@@ -604,7 +604,7 @@ void netdata_cgroup_ebpf_initialize_shm()
         return;
     }
 
-    error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
+    collector_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
     munmap(shm_cgroup_ebpf.header, length);
 
 end_init_shm:
@@ -1077,7 +1077,7 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("CGROUP: file '%s' should have 1+ lines.", cp->filename);
+            collector_error("CGROUP: file '%s' should have 1+ lines.", cp->filename);
             cp->updated = 0;
             return;
         }
@@ -1123,7 +1123,7 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
 
     unsigned long lines = procfile_lines(ff);
     if (unlikely(lines < 3)) {
-        error("CGROUP: file '%s' should have 3 lines.", cp->filename);
+        collector_error("CGROUP: file '%s' should have 3 lines.", cp->filename);
         cp->updated = 0;
         return;
     }
@@ -1180,7 +1180,7 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
     unsigned long lines = procfile_lines(ff);
 
     if (unlikely(lines < 3)) {
-        error("CGROUP: file '%s' should have at least 3 lines.", cp->filename);
+        collector_error("CGROUP: file '%s' should have at least 3 lines.", cp->filename);
         cp->updated = 0;
         return;
     }
@@ -1261,7 +1261,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
         }
 
         if(unlikely(procfile_lines(ff) < 1)) {
-            error("CGROUP: file '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
+            collector_error("CGROUP: file '%s' should have 1+ lines but has %zu.", ca->filename, procfile_lines(ff));
             ca->updated = 0;
             return;
         }
@@ -1326,7 +1326,7 @@ static inline void cgroup_read_blkio(struct blkio *io) {
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("CGROUP: file '%s' should have 1+ lines.", io->filename);
+            collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
             io->updated = 0;
             return;
         }
@@ -1398,7 +1398,7 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
             unsigned long i, lines = procfile_lines(ff);
 
             if (unlikely(lines < 1)) {
-                error("CGROUP: file '%s' should have 1+ lines.", io->filename);
+                collector_error("CGROUP: file '%s' should have 1+ lines.", io->filename);
                 io->updated = 0;
                 return;
             }
@@ -1442,7 +1442,7 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
 
         size_t lines = procfile_lines(ff);
         if (lines < 1) {
-            error("CGROUP: file '%s' should have 1+ lines.", res->filename);
+            collector_error("CGROUP: file '%s' should have 1+ lines.", res->filename);
             res->updated = 0;
             return;
         }
@@ -1499,7 +1499,7 @@ static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unif
         unsigned long i, lines = procfile_lines(ff);
 
         if(unlikely(lines < 1)) {
-            error("CGROUP: file '%s' should have 1+ lines.", mem->filename_detailed);
+            collector_error("CGROUP: file '%s' should have 1+ lines.", mem->filename_detailed);
             mem->updated_detailed = 0;
             goto memory_next;
         }
@@ -1669,7 +1669,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
     FILE *fp_child_input, *fp_child_output;
     (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_network_interface_script, "--cgroup", cgroup_identifier);
     if(!fp_child_output) {
-        error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
+        collector_error("CGROUP: cannot popen(%s --cgroup \"%s\", \"r\").", cgroups_network_interface_script, cgroup_identifier);
         return;
     }
 
@@ -1687,12 +1687,12 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             }
 
             if(!*s) {
-                error("CGROUP: empty host interface returned by script");
+                collector_error("CGROUP: empty host interface returned by script");
                 continue;
             }
 
             if(!*t) {
-                error("CGROUP: empty guest interface returned by script");
+                collector_error("CGROUP: empty guest interface returned by script");
                 continue;
             }
 
@@ -1702,7 +1702,7 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
             i->next = cg->interfaces;
             cg->interfaces = i;
 
-            info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
+            collector_info("CGROUP: cgroup '%s' has network interface '%s' as '%s'", cg->id, i->host_device, i->container_device);
 
             // register a device rename to proc_net_dev.c
             netdev_rename_device_add(
@@ -1875,7 +1875,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     FILE *fp_child_input, *fp_child_output;
     (void)netdata_popen_raw_default_flags_and_environment(&cgroup_pid, &fp_child_input, &fp_child_output, cgroups_rename_script, cg->id, cg->intermediate_id);
     if (!fp_child_output) {
-        error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
+        collector_error("CGROUP: cannot popen(%s \"%s\", \"r\").", cgroups_rename_script, cg->intermediate_id);
         cg->pending_renames = 0;
         cg->processed = 1;
         return;
@@ -2034,14 +2034,14 @@ static inline void discovery_find_cgroup_in_dir_callback(const char *dir) {
     }
 
     if (cgroup_root_count >= cgroup_root_max) {
-        info("CGROUP: maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, dir);
+        collector_info("CGROUP: maximum number of cgroups reached (%d). Not adding cgroup '%s'", cgroup_root_count, dir);
         return;
     }
 
     if (cgroup_max_depth > 0) {
         int depth = calc_cgroup_depth(dir);
         if (depth > cgroup_max_depth) {
-            info("CGROUP: '%s' is too deep (%d, while max is %d)", dir, depth, cgroup_max_depth);
+            collector_info("CGROUP: '%s' is too deep (%d, while max is %d)", dir, depth, cgroup_max_depth);
             return;
         }
     }
@@ -2066,7 +2066,7 @@ static inline int discovery_find_dir_in_subdirs(const char *base, const char *th
 
     DIR *dir = opendir(this);
     if(!dir) {
-        error("CGROUP: cannot read directory '%s'", base);
+        collector_error("CGROUP: cannot read directory '%s'", base);
         return ret;
     }
     ret = 1;
@@ -2550,7 +2550,7 @@ static inline void discovery_find_all_cgroups_v1() {
     if (cgroup_enable_cpuacct_stat || cgroup_enable_cpuacct_usage) {
         if (discovery_find_dir_in_subdirs(cgroup_cpuacct_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
             cgroup_enable_cpuacct_stat = cgroup_enable_cpuacct_usage = CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled cpu statistics.");
+            collector_error("CGROUP: disabled cpu statistics.");
         }
     }
 
@@ -2560,7 +2560,7 @@ static inline void discovery_find_all_cgroups_v1() {
             cgroup_enable_blkio_io = cgroup_enable_blkio_ops = cgroup_enable_blkio_throttle_io =
                 cgroup_enable_blkio_throttle_ops = cgroup_enable_blkio_merged_ops = cgroup_enable_blkio_queued_ops =
                     CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled blkio statistics.");
+            collector_error("CGROUP: disabled blkio statistics.");
         }
     }
 
@@ -2568,14 +2568,14 @@ static inline void discovery_find_all_cgroups_v1() {
         if (discovery_find_dir_in_subdirs(cgroup_memory_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
             cgroup_enable_memory = cgroup_enable_detailed_memory = cgroup_enable_swap = cgroup_enable_memory_failcnt =
                 CONFIG_BOOLEAN_NO;
-            error("CGROUP: disabled memory statistics.");
+            collector_error("CGROUP: disabled memory statistics.");
         }
     }
 
     if (cgroup_search_in_devices) {
         if (discovery_find_dir_in_subdirs(cgroup_devices_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
             cgroup_search_in_devices = 0;
-            error("CGROUP: disabled devices statistics.");
+            collector_error("CGROUP: disabled devices statistics.");
         }
     }
 }
@@ -2583,7 +2583,7 @@ static inline void discovery_find_all_cgroups_v1() {
 static inline void discovery_find_all_cgroups_v2() {
     if (discovery_find_dir_in_subdirs(cgroup_unified_base, NULL, discovery_find_cgroup_in_dir_callback) == -1) {
         cgroup_unified_exist = CONFIG_BOOLEAN_NO;
-        error("CGROUP: disabled unified cgroups statistics.");
+        collector_error("CGROUP: disabled unified cgroups statistics.");
     }
 }
 
@@ -2651,7 +2651,7 @@ static int discovery_is_cgroup_duplicate(struct cgroup *cg) {
    struct cgroup *c;
    for (c = discovered_cgroup_root; c; c = c->discovered_next) {
        if (c != cg && c->enabled && c->hash_chart == cg->hash_chart && !strcmp(c->chart_id, cg->chart_id)) {
-           error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.", cg->chart_id, c->id, cg->id);
+           collector_error("CGROUP: chart id '%s' already exists with id '%s' and is enabled and available. Disabling cgroup with id '%s'.", cg->chart_id, c->id, cg->id);
            return 1;
        }
    }
@@ -2686,7 +2686,7 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     cg->processed = 1;
 
     if ((strlen(cg->chart_id) + strlen(cgroup_chart_id_prefix)) >= RRD_ID_LENGTH_MAX) {
-        info("cgroup '%s' (chart id '%s') disabled because chart_id exceeds the limit (RRD_ID_LENGTH_MAX)", cg->id, cg->chart_id);
+        collector_info("cgroup '%s' (chart id '%s') disabled because chart_id exceeds the limit (RRD_ID_LENGTH_MAX)", cg->id, cg->chart_id);
         return;
     }
 
@@ -3573,7 +3573,7 @@ static inline void update_cpu_limits(char **filename, unsigned long long *value,
         else ret = -1;
 
         if(ret) {
-            error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+            collector_error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
             freez(*filename);
             *filename = NULL;
         }
@@ -3597,7 +3597,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         unsigned long lines = procfile_lines(ff);
 
         if (unlikely(lines < 1)) {
-            error("CGROUP: file '%s' should have 1 lines.", cg->filename_cpu_cfs_quota);
+            collector_error("CGROUP: file '%s' should have 1 lines.", cg->filename_cpu_cfs_quota);
             return;
         }
 
@@ -3614,7 +3614,7 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
         return;
 
 cpu_limits2_err:
-        error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, cg->filename_cpu_cfs_quota);
+        collector_error("Cannot refresh cgroup %s cpu limit by reading '%s'. Will not update its limit anymore.", cg->id, cg->filename_cpu_cfs_quota);
         freez(cg->filename_cpu_cfs_quota);
         cg->filename_cpu_cfs_quota = NULL;
 
@@ -3626,7 +3626,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
         if(unlikely(!*chart_var)) {
             *chart_var = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_mem_usage, chart_var_name);
             if(!*chart_var) {
-                error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
+                collector_error("Cannot create cgroup %s chart variable '%s'. Will not update its limit anymore.", cg->id, chart_var_name);
                 freez(*filename);
                 *filename = NULL;
             }
@@ -3635,7 +3635,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
         if(*filename && *chart_var) {
             if(!(cg->options & CGROUP_OPTIONS_IS_UNIFIED)) {
                 if(read_single_number_file(*filename, value)) {
-                    error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+                    collector_error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
                     freez(*filename);
                     *filename = NULL;
                 }
@@ -3647,7 +3647,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
                 char buffer[30 + 1];
                 int ret = read_file(*filename, buffer, 30);
                 if(ret) {
-                    error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
+                    collector_error("Cannot refresh cgroup %s memory limit by reading '%s'. Will not update its limit anymore.", cg->id, *filename);
                     freez(*filename);
                     *filename = NULL;
                     return 0;
@@ -3756,7 +3756,7 @@ void update_cgroup_charts(int update_every) {
                 if(unlikely(!cg->chart_var_cpu_limit)) {
                     cg->chart_var_cpu_limit = rrdsetvar_custom_chart_variable_add_and_acquire(cg->st_cpu, "cpu_limit");
                     if(!cg->chart_var_cpu_limit) {
-                        error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
+                        collector_error("Cannot create cgroup %s chart variable 'cpu_limit'. Will not update its limit anymore.", cg->id);
                         if(cg->filename_cpuset_cpus) freez(cg->filename_cpuset_cpus);
                         cg->filename_cpuset_cpus = NULL;
                         if(cg->filename_cpu_cfs_period) freez(cg->filename_cpu_cfs_period);
@@ -4148,7 +4148,7 @@ void update_cgroup_charts(int update_every) {
                     if(likely(ff && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
                         ram_total = str2ull(procfile_word(ff, 1)) * 1024;
                     else {
-                        error("Cannot read file %s. Will not update cgroup %s RAM limit anymore.", filename, cg->id);
+                        collector_error("Cannot read file %s. Will not update cgroup %s RAM limit anymore.", filename, cg->id);
                         freez(cg->filename_memory_limit);
                         cg->filename_memory_limit = NULL;
                     }
@@ -4782,19 +4782,19 @@ static void cgroup_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     usec_t max = 2 * USEC_PER_SEC, step = 50000;
 
     if (!discovery_thread.exited) {
-        info("stopping discovery thread worker");
+        collector_info("stopping discovery thread worker");
         uv_mutex_lock(&discovery_thread.mutex);
         discovery_thread.start_discovery = 1;
         uv_cond_signal(&discovery_thread.cond_var);
         uv_mutex_unlock(&discovery_thread.mutex);
     }
 
-    info("waiting for discovery thread to finish...");
+    collector_info("waiting for discovery thread to finish...");
     
     while (!discovery_thread.exited && max > 0) {
         max -= step;
@@ -4833,7 +4833,7 @@ void *cgroups_main(void *ptr) {
     netdata_cgroup_ebpf_initialize_shm();
 
     if (uv_mutex_init(&cgroup_root_mutex)) {
-        error("CGROUP: cannot initialize mutex for the main cgroup list");
+        collector_error("CGROUP: cannot initialize mutex for the main cgroup list");
         goto exit;
     }
 
@@ -4842,17 +4842,17 @@ void *cgroups_main(void *ptr) {
     discovery_thread.exited = 0;
 
     if (uv_mutex_init(&discovery_thread.mutex)) {
-        error("CGROUP: cannot initialize mutex for discovery thread");
+        collector_error("CGROUP: cannot initialize mutex for discovery thread");
         goto exit;
     }
     if (uv_cond_init(&discovery_thread.cond_var)) {
-        error("CGROUP: cannot initialize conditional variable for discovery thread");
+        collector_error("CGROUP: cannot initialize conditional variable for discovery thread");
         goto exit;
     }
 
     int error = uv_thread_create(&discovery_thread.thread, cgroup_discovery_worker, NULL);
     if (error) {
-        error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
+        collector_error("CGROUP: cannot create thread worker. uv_thread_create(): %s", uv_strerror(error));
         goto exit;
     }
     uv_thread_set_name_np(discovery_thread.thread, "PLUGIN[cgroups]");

@@ -434,7 +434,7 @@ static inline NETDATA_DOUBLE statsd_parse_float(const char *v, NETDATA_DOUBLE de
         char *e = NULL;
         value = str2ndd(v, &e);
         if(unlikely(e && *e))
-            error("STATSD: excess data '%s' after value '%s'", e, v);
+            collector_error("STATSD: excess data '%s' after value '%s'", e, v);
     }
     else
         value = def;
@@ -456,7 +456,7 @@ static inline long long statsd_parse_int(const char *v, long long def) {
         char *e = NULL;
         value = str2ll(v, &e);
         if(unlikely(e && *e))
-            error("STATSD: excess data '%s' after value '%s'", e, v);
+            collector_error("STATSD: excess data '%s' after value '%s'", e, v);
     }
     else
         value = def;
@@ -484,7 +484,7 @@ static inline void statsd_process_gauge(STATSD_METRIC *m, const char *value, con
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
+        collector_error("STATSD: metric '%s' of type gauge, with empty value is ignored.", m->name);
         return;
     }
 
@@ -532,7 +532,7 @@ static inline void statsd_process_histogram_or_timer(STATSD_METRIC *m, const cha
     if(!is_metric_useful_for_collection(m)) return;
 
     if(unlikely(!value || !*value)) {
-        error("STATSD: metric of type %s, with empty value is ignored.", type);
+        collector_error("STATSD: metric of type %s, with empty value is ignored.", type);
         return;
     }
 
@@ -1100,7 +1100,7 @@ void statsd_collector_thread_cleanup(void *data) {
     d->status->running = false;
     netdata_spinlock_unlock(&d->status->spinlock);
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
 #ifdef HAVE_RECVMMSG
     size_t i;
@@ -1131,7 +1131,7 @@ void *statsd_collector_thread(void *ptr) {
     worker_register_job_name(WORKER_JOB_TYPE_RCV_DATA, "receive");
     worker_register_job_name(WORKER_JOB_TYPE_SND_DATA, "send");
 
-    info("STATSD collector thread started with taskid %d", gettid());
+    collector_info("STATSD collector thread started with taskid %d", gettid());
 
     struct statsd_udp *d = callocz(sizeof(struct statsd_udp), 1);
     d->status = status;
@@ -1942,7 +1942,7 @@ static inline void statsd_flush_dictionary(STATSD_METRIC *m) {
     if(m->dictionary.unique >= statsd.dictionary_max_unique) {
         if(!(m->options & STATSD_METRIC_OPTION_COLLECTION_FULL_LOGGED)) {
             m->options |= STATSD_METRIC_OPTION_COLLECTION_FULL_LOGGED;
-            info(
+            collector_info(
                 "STATSD dictionary '%s' reach max of %zu items - try increasing 'dictionaries max unique dimensions' in netdata.conf",
                 m->name,
                 m->dictionary.unique);
@@ -2315,7 +2315,7 @@ static inline void statsd_flush_index_metrics(STATSD_INDEX *index, void (*flush_
         if(unlikely(!(m->options & STATSD_METRIC_OPTION_PRIVATE_CHART_CHECKED))) {
             if(unlikely(statsd.private_charts >= statsd.max_private_charts_hard)) {
                 debug(D_STATSD, "STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts has been reached.", m->name);
-                info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts_hard);
+                collector_info("STATSD: metric '%s' will not be charted, because the hard limit of the maximum number of charts (%zu) has been reached. Increase the number of charts by editing netdata.conf, [statsd] section.", m->name, statsd.max_private_charts_hard);
                 m->options &= ~STATSD_METRIC_OPTION_PRIVATE_CHART_ENABLED;
             }
             else {
@@ -2361,24 +2361,24 @@ static int statsd_listen_sockets_setup(void) {
 static void statsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if (statsd.collection_threads_status) {
         int i;
         for (i = 0; i < statsd.threads; i++) {
             netdata_spinlock_lock(&statsd.collection_threads_status[i].spinlock);
             if(statsd.collection_threads_status[i].running) {
-                info("STATSD: stopping data collection thread %d...", i + 1);
+                collector_info("STATSD: stopping data collection thread %d...", i + 1);
                 netdata_thread_cancel(statsd.collection_threads_status[i].thread);
             }
             else {
-                info("STATSD: data collection thread %d found stopped.", i + 1);
+                collector_info("STATSD: data collection thread %d found stopped.", i + 1);
             }
             netdata_spinlock_unlock(&statsd.collection_threads_status[i].spinlock);
         }
     }
 
-    info("STATSD: closing sockets...");
+    collector_info("STATSD: closing sockets...");
     listen_sockets_close(&statsd.sockets);
 
     // destroy the dictionaries
@@ -2390,7 +2390,7 @@ static void statsd_main_cleanup(void *data) {
     dictionary_destroy(statsd.sets.dict);
     dictionary_destroy(statsd.timers.dict);
 
-    info("STATSD: cleanup completed.");
+    collector_info("STATSD: cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     worker_unregister();
@@ -2454,7 +2454,7 @@ void *statsd_main(void *ptr) {
     statsd.update_every = default_rrd_update_every;
     statsd.update_every = (int)config_get_number(CONFIG_SECTION_STATSD, "update every (flushInterval)", statsd.update_every);
     if(statsd.update_every < default_rrd_update_every) {
-        error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
+        collector_error("STATSD: minimum flush interval %d given, but the minimum is the update every of netdata. Using %d", statsd.update_every, default_rrd_update_every);
         statsd.update_every = default_rrd_update_every;
     }
 
@@ -2471,7 +2471,7 @@ void *statsd_main(void *ptr) {
 
     statsd.histogram_percentile = (double)config_get_float(CONFIG_SECTION_STATSD, "histograms and timers percentile (percentThreshold)", statsd.histogram_percentile);
     if(isless(statsd.histogram_percentile, 0) || isgreater(statsd.histogram_percentile, 100)) {
-        error("STATSD: invalid histograms and timers percentile %0.5f given", statsd.histogram_percentile);
+        collector_error("STATSD: invalid histograms and timers percentile %0.5f given", statsd.histogram_percentile);
         statsd.histogram_percentile = 95.0;
     }
     {
@@ -2518,7 +2518,7 @@ void *statsd_main(void *ptr) {
 #ifdef STATSD_MULTITHREADED
     statsd.threads = (int)config_get_number(CONFIG_SECTION_STATSD, "threads", processors);
     if(statsd.threads < 1) {
-        error("STATSD: Invalid number of threads %d, using %d", statsd.threads, processors);
+        collector_error("STATSD: Invalid number of threads %d, using %d", statsd.threads, processors);
         statsd.threads = processors;
         config_set_number(CONFIG_SECTION_STATSD, "collector threads", statsd.threads);
     }
@@ -2536,7 +2536,7 @@ void *statsd_main(void *ptr) {
 
     statsd_listen_sockets_setup();
     if(!statsd.sockets.opened) {
-        error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
+        collector_error("STATSD: No statsd sockets to listen to. statsd will be disabled.");
         goto cleanup;
     }
 
