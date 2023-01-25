@@ -1315,7 +1315,12 @@ void find_uuid_first_time(
             time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
             time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
 
-            uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
+            uuid_original_entry = bsearch(&uuid_list[index].uuid,
+                                          uuid_first_entry_list,
+                                          count,
+                                          sizeof(*uuid_first_entry_list),
+                                          journal_metric_uuid_compare);
+
             if (likely(uuid_original_entry)) {
                 uuid_original_entry->df_matched++;
 
@@ -1420,7 +1425,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
 
     size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct journal_metric_list));
+    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
 
     size_t added = 0;
     for (size_t index = 0; index < count; ++index) {
