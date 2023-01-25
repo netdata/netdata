@@ -1256,6 +1256,8 @@ struct uuid_first_time_s {
     time_t first_time_s;
     time_t last_time_s;
     METRIC *metric;
+    size_t df_matched;
+    size_t df_index_oldest;
 };
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
@@ -1295,7 +1297,9 @@ void find_uuid_first_time(
         return;
 
     unsigned journalfile_count = 0;
-    size_t index_match =0, binary_match = 0;
+    size_t binary_match = 0;
+    size_t not_matching_bsearches = 0;
+
     while (datafile) {
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
         if (!j2_header) {
@@ -1311,18 +1315,22 @@ void find_uuid_first_time(
             time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
             time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
 
-            if (index < count && uuid_first_entry_list[index].metric && uuid_compare(*uuid_first_entry_list[index].uuid, uuid_list[index].uuid) == 0) {
-                uuid_first_entry_list[index].first_time_s = MIN(uuid_first_entry_list[index].first_time_s, first_time_s);
-                uuid_first_entry_list[index].last_time_s = MIN(uuid_first_entry_list[index].last_time_s, last_time_s);
-                index_match++;
-            } else {
-                uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
-                if (likely(uuid_original_entry)) {
-                    uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
-                    uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
-                    binary_match++;
-                }
+            uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
+            if (likely(uuid_original_entry)) {
+                uuid_original_entry->df_matched++;
+
+                time_t old_first_time_s = uuid_original_entry->first_time_s;
+
+                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+                uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
+
+                if(uuid_original_entry->first_time_s != old_first_time_s)
+                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+
+                binary_match++;
             }
+            else
+                not_matching_bsearches++;
         }
 
         journalfile_count++;
@@ -1333,11 +1341,30 @@ void find_uuid_first_time(
     // Let's scan the open cache for almost exact match
     size_t open_cache_count = 0;
 
+    size_t df_index[10] = { 0 };
+    size_t without_metric = 0;
+    size_t open_cache_gave_first_time_s = 0;
+    size_t metric_count = 0;
+    size_t without_retention = 0;
+    size_t not_needed_bsearches = 0;
+
     for (size_t index = 0; index < count; ++index) {
         struct uuid_first_time_s *uuid_first_t_entry = &uuid_first_entry_list[index];
 
-        if (unlikely(!uuid_first_t_entry->metric))
+        metric_count++;
+
+        size_t idx = uuid_first_t_entry->df_index_oldest;
+        if(idx >= 10)
+            idx = 9;
+
+        df_index[idx]++;
+
+        not_needed_bsearches = uuid_first_t_entry->df_matched - uuid_first_t_entry->df_index_oldest;
+
+        if (unlikely(!uuid_first_t_entry->metric)) {
+            without_metric++;
             continue;
+        }
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
@@ -1345,16 +1372,40 @@ void find_uuid_first_time(
                 PGC_SEARCH_CLOSEST);
 
         if (page) {
+            time_t old_first_time_s = uuid_first_t_entry->first_time_s;
+
             time_t first_time_s = pgc_page_start_time_s(page);
             time_t last_time_s = pgc_page_end_time_s(page);
             uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s, first_time_s);
             uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s, last_time_s);
             pgc_page_release(open_cache, page);
             open_cache_count++;
+
+            if(uuid_first_t_entry->first_time_s != old_first_time_s) {
+                open_cache_gave_first_time_s++;
+            }
+        }
+        else {
+            if(!uuid_first_t_entry->df_index_oldest)
+                without_retention++;
         }
     }
-    info("DBENGINE: processed %u journalfiles and matched %zu metric pages (index matched %zu, binary matched %zu) in v2 files and %zu in open cache",
-         journalfile_count, binary_match + index_match, index_match, binary_match, open_cache_count);
+    info("DBENGINE: analyzed the retention of %zu rotated metrics, "
+         "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
+         "%zu in open cache searches, "
+         "metrics first time found per datafile index ([0]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
+         "open cache found first time %zu, "
+         "metrics without any remaining retention %zu ",
+         metric_count,
+         binary_match,
+         not_matching_bsearches,
+         not_needed_bsearches,
+         journalfile_count,
+         open_cache_count,
+         df_index[0], df_index[1], df_index[2], df_index[3], df_index[4], df_index[5], df_index[6], df_index[7], df_index[8], df_index[9],
+         open_cache_gave_first_time_s,
+         without_retention
+    );
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
