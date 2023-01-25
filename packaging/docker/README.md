@@ -520,47 +520,4 @@ Caddyfile.
 ## Publish a test image to your own repository
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
-You may either use the command line tools available or take advantage of our Travis CI infrastructure.
-
-### Inside Netdata organization, using Travis CI
-
-To enable Travis CI integration on your own repositories (Docker and GitHub), you need to be part of the Netdata
-organization.
-
-Once you have contacted the Netdata owners to setup you up on GitHub and Travis, execute the following steps
-
--   Preparation
-    -   Have Netdata forked on your personal GitHub account
-    -   Get a GitHub token: Go to **GitHub settings** -> **Developer Settings** -> **Personal access tokens**, and
-        generate a new token with full access to `repo_hook`, read-only access to `admin:org`, `public_repo`,
-        `repo_deployment`, `repo:status`, and `user:email` settings enabled. This will be your `GITHUB_TOKEN` that is
-        described later in the instructions, so keep it somewhere safe.
-    -   Contact the Netdata team and seek for permissions on `https://scan.coverity.com` should you require Travis to be
-        able to push your forked code to coverity for analysis and report. Once you are setup, you should have your
-        email you used in coverity and a token from them. These will be your `COVERITY_SCAN_SUBMIT_EMAIL` and
-        `COVERITY_SCAN_TOKEN` that we will refer to later.
-    -   Have a valid Docker hub account, the credentials from this account will be your `DOCKER_USERNAME` and
-        `DOCKER_PWD` mentioned later.
-
--   Setting up Travis CI for your own fork (Detailed instructions provided by Travis team [here](https://docs.travis-ci.com/user/tutorial/))
-    -   Login to travis with your own GITHUB credentials (There is Open Auth access)
-    -   Go to your profile settings, under [repositories](https://travis-ci.com/account/repositories) section and setup
-        your Netdata fork to be built by Travis CI.
-    -   Once the repository has been setup, go to repository settings within Travis CI (usually under
-        `https://travis-ci.com/NETDATA_DEVELOPER/netdata/settings`, where `NETDATA_DEVELOPER` is your GitHub handle),
-        and select your desired settings.
-
--   While in Travis settings, under Netdata repository settings in the Environment Variables section, you need to add
-    the following:
-    -   `DOCKER_USERNAME` and `DOCKER_PWD` variables so that Travis can log in to your Docker Hub account and publish
-        Docker images there. 
-    -   `REPOSITORY` variable to `NETDATA_DEVELOPER/netdata`, where `NETDATA_DEVELOPER` is your GitHub handle again.
-    -   `GITHUB_TOKEN` variable with the token generated on the preparation step, for Travis workflows to function
-        properly.
-    -   `COVERITY_SCAN_SUBMIT_EMAIL` and `COVERITY_SCAN_TOKEN` variables to enable Travis to submit your code for
-        analysis to Coverity.
-
-Having followed these instructions, your forked repository should be all set up for integration with Travis CI. Happy
-testing!
-
-
+You may either use the command line tools available or take advantage of our GitHub Acions infrastructure.

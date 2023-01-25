@@ -1,7 +1,0 @@
-deployments:
-  netdata:
-    auto_deploy_on_commits: true
-    filename: ./packaging/docker/Dockerfile
-    context_path: ./
-    port_forwarding: 80:19999
-    run_options: -v /proc:/host/proc:ro -v /sys:/host/sys:ro -v /var/run/docker.sock:/var/run/docker.sock:ro --cap-add SYS_PTRACE --security-opt apparmor=unconfined

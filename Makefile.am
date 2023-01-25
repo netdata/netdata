@@ -23,7 +23,6 @@ CLEANFILES = \
 
 EXTRA_DIST = \
     .gitignore \
-    .csslintrc \
     .eslintignore \
     .eslintrc \
     .github/CODEOWNERS \
