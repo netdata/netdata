@@ -1265,11 +1265,6 @@ static int journal_metric_compare(const void *key, const void *metric)
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
 
-//static int journal_metric_uuid_compare(const void *key, const void *metric)
-//{
-//    return uuid_compare(*(uuid_t *) key, *((struct uuid_first_time_s *) metric)->uuid);
-//}
-
 struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
 
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
@@ -1347,29 +1342,6 @@ void find_uuid_first_time(
             binary_match++;
         }
 
-//
-//        for (size_t index = 0; index < j2_header->metric_count; ++index) {
-//            time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
-//            time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
-//
-//            uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
-//            if (likely(uuid_original_entry)) {
-//                uuid_original_entry->df_matched++;
-//
-//                time_t old_first_time_s = uuid_original_entry->first_time_s;
-//
-//                uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
-//                uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
-//
-//                if(uuid_original_entry->first_time_s != old_first_time_s)
-//                    uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
-//
-//                binary_match++;
-//            }
-//            else
-//                not_matching_bsearches++;
-//        }
-
         journalfile_count++;
         journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
@@ -1425,7 +1397,8 @@ void find_uuid_first_time(
                 without_retention++;
         }
     }
-    info("DBENGINE: analyzed the retention of %zu rotated metrics, "
+    internal_error(true,
+         "DBENGINE: analyzed the retention of %zu rotated metrics, "
          "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
          "%zu metrics with entries in open cache, "
          "metrics first time found per datafile index ([not in jv2]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
