@@ -5,52 +5,52 @@
 * @Ferroin
 
 # Ownership by directory structure
-.travis/ @Ferroin
-.github/ @Ferroin
+.travis/ @Ferroin @tkatsoulas
+.github/ @Ferroin @tkatsoulas
 aclk/ @stelfrag @underhood
-build/ @Ferroin
-contrib/debian @Ferroin
+build/ @Ferroin @tkatsoulas
+contrib/debian @Ferroin @tkatsoulas
 collectors/ @thiagoftsm
 collectors/ebpf.plugin/ @thiagoftsm
 collectors/charts.d.plugin/ @ilyam8 @Ferroin
 collectors/freebsd.plugin/ @thiagoftsm
 collectors/macos.plugin/ @thiagoftsm
 collectors/python.d.plugin/ @ilyam8
-collectors/cups.plugin/ @simonnagl @thiagoftsm
+collectors/cups.plugin/ @thiagoftsm
 exporting/ @thiagoftsm
 daemon/ @thiagoftsm @vkalintiris
 database/ @thiagoftsm @vkalintiris
-docs/ @DShreve2 @tkatsoulas
+docs/ @tkatsoulas
 health/ @thiagoftsm @vkalintiris @MrZammler
 health/health.d/ @thiagoftsm @MrZammler
 health/notifications/ @Ferroin @thiagoftsm @MrZammler
 ml/ @andrewm4894 @vkalintiris
 libnetdata/ @thiagoftsm @vkalintiris
-packaging/ @Ferroin
+packaging/ @Ferroin @tkatsoulas
 registry/ @jacekkolasa
 streaming/ @thiagoftsm
-system/ @Ferroin
-tests/ @Ferroin @vkalintiris
+system/ @Ferroin @tkatsoulas
+tests/ @Ferroin @vkalintiris @tkatsoulas
 web/ @thiagoftsm @vkalintiris
 web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
-*.am @Ferroin
-*.md @DShreve2 @tkatsoulas
-Dockerfile* @Ferroin
+*.am @Ferroin @tkatsoulas
+*.md @tkatsoulas
+Dockerfile* @Ferroin @tkatsoulas
 
 # Ownership of specific files
-.gitignore @Ferroin @vkalintiris
-.travis.yml @Ferroin
-.eslintrc @Ferroin
-.eslintignore @Ferroin
-.csslintrc @Ferroin
-.codeclimate.yml @Ferroin
-.codacy.yml @Ferroin
-.yamllint.yml @Ferroin
-netdata.spec.in @Ferroin
-netdata-installer.sh @Ferroin
-packaging/version @netdatabot @Ferroin
+.gitignore @Ferroin @tkatsoulas @vkalintiris
+.travis.yml @Ferroin @tkatsoulas
+.eslintrc @Ferroin @tkatsoulas
+.eslintignore @Ferroin @tkatsoulas
+.csslintrc @Ferroin @tkatsoulas
+.codeclimate.yml @Ferroin @tkatsoulas
+.codacy.yml @Ferroin @tkatsoulas
+.yamllint.yml @Ferroin @tkatsoulas
+netdata.spec.in @Ferroin @tkatsoulas
+netdata-installer.sh @Ferroin @tkatsoulas
+packaging/version @netdatabot @Ferroin @tkatsoulas
 
-LICENSE.md @DShreve2 @Ferroin @vkalintiris
-CHANGELOG.md @netdatabot @Ferroin
+LICENSE.md @Ferroin @tkatsoulas @vkalintiris
+CHANGELOG.md @netdatabot @Ferroin @tkatsoulas
