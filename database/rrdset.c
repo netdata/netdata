@@ -615,16 +615,17 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     }
 
     if(unlikely(db_first_entry_s && db_last_entry_s && db_first_entry_s >= db_last_entry_s)) {
-        internal_error(true,
-                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is equal or bigger than latest db time %ld, adjusting it last updated time - update every",
+        internal_error(db_first_entry_s > db_last_entry_s,
+                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is bigger than latest db time %ld, adjusting it to (latest time %ld - update every %ld)",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_first_entry_s, db_last_entry_s);
+                       db_first_entry_s, db_last_entry_s,
+                       db_last_entry_s, (time_t)st->update_every);
         db_first_entry_s = db_last_entry_s - st->update_every;
     }
 
     if(unlikely(!db_first_entry_s && db_last_entry_s))
         // this can be the case on the first data collection of a chart
-        db_first_entry_s = db_last_entry_s;
+        db_first_entry_s = db_last_entry_s - st->update_every;
 
     *first_time_s = db_first_entry_s;
     *last_time_s = db_last_entry_s;

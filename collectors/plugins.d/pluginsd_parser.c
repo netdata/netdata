@@ -326,7 +326,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 {
     const char *first_entry_txt = get_word(words, num_words, 1);
     const char *last_entry_txt = get_word(words, num_words, 2);
-    const char *world_time_txt = get_word(words, num_words, 3);
+    const char *wall_clock_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
@@ -336,12 +336,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
     time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
     time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
-    time_t child_world_time = (world_time_txt && *world_time_txt) ? (time_t)str2ul(world_time_txt) : now_realtime_sec();
-
-    if((first_entry_child != 0 || last_entry_child != 0) && (first_entry_child == 0 || last_entry_child == 0))
-        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %ld, last time %ld, world time %ld).",
-              rrdhost_hostname(host), rrdset_id(st),
-              first_entry_child, last_entry_child, child_world_time);
+    time_t child_wall_clock_time = (wall_clock_time_txt && *wall_clock_time_txt) ? (time_t)str2ul(wall_clock_time_txt) : now_realtime_sec();
 
     bool ok = true;
     if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
@@ -358,7 +353,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
         PARSER *parser = ((PARSER_USER_OBJECT *)user)->parser;
         ok = replicate_chart_request(send_to_plugin, parser, host, st,
-                                     first_entry_child, last_entry_child, child_world_time,
+                                     first_entry_child, last_entry_child, child_wall_clock_time,
                                      0, 0);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
