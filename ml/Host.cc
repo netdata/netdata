@@ -303,7 +303,7 @@ void Host::detect() {
 
     while (service_running((SERVICE_TYPE)(SERVICE_ML_PREDICTION | SERVICE_COLLECTORS))) {
         worker_is_idle();
-        heartbeat_next(&HB, RH->rrd_update_every * USEC_PER_SEC);
+        heartbeat_next(&HB, (RH ? RH->rrd_update_every : default_rrd_update_every) * USEC_PER_SEC);
         detectOnce();
     }
 }
