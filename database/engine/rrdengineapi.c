@@ -1094,6 +1094,11 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
+bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return ctx->config.legacy;
+}
+
 void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
     __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
 }
@@ -1155,7 +1160,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
         finalize_rrd_files(ctx);
     }
 
-    if (!is_storage_engine_shared((STORAGE_INSTANCE *)ctx)) {
+    if (ctx->config.legacy) {
         freez(ctx);
         if (ctxp)
             *ctxp = NULL;
@@ -1185,14 +1190,16 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
         if(!logged) {
-            info("Waiting for collectors to finish on tier %d...", ctx->config.tier);
+            info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
     }
 
+    info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
+    info("DBENGINE: shutting down tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
@@ -1201,7 +1208,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     finalize_rrd_files(ctx);
 
-    if(!is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
+    if(ctx->config.legacy)
         freez(ctx);
 
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

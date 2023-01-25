@@ -33,10 +33,8 @@ time_t rrdhost_free_orphan_time_s = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
-            return true;
-    }
+    if(!rrdeng_is_legacy(engine))
+        return true;
 #endif
 
     return false;
