@@ -238,7 +238,8 @@ When a Netdata program cannot run at all, a `FATAL` line is logged.
 
 ### collector.log
 
-The `collector.log` is the `stderr` of all external plugins run by `netdata`.
+The `collector.log` is the `stderr` of all [colectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
+ run by `netdata`.
 
 So if any process, in the Netdata process tree, writes anything to its standard error,
 it will appear in `collector.log`.
