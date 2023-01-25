@@ -1353,8 +1353,8 @@ void find_uuid_first_time(
             open_cache_count++;
         }
     }
-    info("DBENGINE: processed %u journalfiles and matched %zu metric pages in v2 files and %zu in open cache",
-         journalfile_count, binary_match + index_match, open_cache_count);
+    info("DBENGINE: processed %u journalfiles and matched %zu metric pages (index matched %zu, binary matched %zu) in v2 files and %zu in open cache",
+         journalfile_count, binary_match + index_match, index_match, binary_match, open_cache_count);
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
