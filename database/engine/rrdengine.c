@@ -1260,7 +1260,7 @@ struct uuid_first_time_s {
 
 static int journal_metric_uuid_compare(const void *key, const void *metric)
 {
-    return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
+    return uuid_compare(*(uuid_t *) key, *((struct uuid_first_time_s *) metric)->uuid);
 }
 
 struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
@@ -1279,7 +1279,12 @@ struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struc
     return next_datafile;
 }
 
-void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t metric_first_time_JudyL) {
+void find_uuid_first_time(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_datafile *datafile,
+    struct uuid_first_time_s *uuid_first_entry_list,
+    size_t count)
+{
     // acquire the datafile to work with it
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     while(datafile && !datafile_acquire(datafile, DATAFILE_ACQUIRE_RETENTION))
@@ -1289,8 +1294,8 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     if (unlikely(!datafile))
         return;
 
-    unsigned v2_count = 0;
     unsigned journalfile_count = 0;
+    size_t index_match =0, binary_match = 0;
     while (datafile) {
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
         if (!j2_header) {
@@ -1299,38 +1304,40 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         }
 
         time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-        size_t journal_metric_count = (size_t)j2_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
-        Word_t index = 0;
-        bool first_then_next = true;
-        Pvoid_t *PValue;
-        while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-            struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+        struct uuid_first_time_s *uuid_original_entry;
+        for (size_t index = 0; index < j2_header->metric_count; ++index) {
+            time_t first_time_s = uuid_list[index].delta_start_s + journal_start_time_s;
+            time_t last_time_s = uuid_list[index].delta_end_s + journal_start_time_s;
 
-            struct journal_metric_list *uuid_entry = bsearch(uuid_first_t_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
-
-            if (unlikely(!uuid_entry))
-                continue;
-
-            time_t first_time_s = uuid_entry->delta_start_s + journal_start_time_s;
-            time_t last_time_s = uuid_entry->delta_end_s + journal_start_time_s;
-            uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s , first_time_s);
-            uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s , last_time_s);
-            v2_count++;
+            if (index < count && uuid_first_entry_list[index].metric && uuid_compare(*uuid_first_entry_list[index].uuid, uuid_list[index].uuid) == 0) {
+                uuid_first_entry_list[index].first_time_s = MIN(uuid_first_entry_list[index].first_time_s, first_time_s);
+                uuid_first_entry_list[index].last_time_s = MIN(uuid_first_entry_list[index].last_time_s, last_time_s);
+                index_match++;
+            } else {
+                uuid_original_entry = bsearch(&uuid_list[index].uuid,uuid_first_entry_list,count,sizeof(*uuid_first_entry_list), journal_metric_uuid_compare);
+                if (likely(uuid_original_entry)) {
+                    uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+                    uuid_original_entry->last_time_s = MIN(uuid_original_entry->last_time_s, last_time_s);
+                    binary_match++;
+                }
+            }
         }
+
         journalfile_count++;
         journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
     }
 
     // Let's scan the open cache for almost exact match
-    bool first_then_next = true;
-    Pvoid_t *PValue;
-    Word_t index = 0;
-    unsigned open_cache_count = 0;
-    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-        struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+    size_t open_cache_count = 0;
+
+    for (size_t index = 0; index < count; ++index) {
+        struct uuid_first_time_s *uuid_first_t_entry = &uuid_first_entry_list[index];
+
+        if (unlikely(!uuid_first_t_entry->metric))
+            continue;
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
@@ -1346,8 +1353,8 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
             open_cache_count++;
         }
     }
-    info("DBENGINE: processed %u journalfiles and matched %u metric pages in v2 files and %u in open cache", journalfile_count,
-        v2_count, open_cache_count);
+    info("DBENGINE: processed %u journalfiles and matched %zu metric pages in v2 files and %zu in open cache",
+         journalfile_count, binary_match + index_match, open_cache_count);
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
@@ -1360,59 +1367,48 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
     struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
-    Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
-    Pvoid_t *PValue;
-
-    unsigned count = 0;
+    size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    for (uint32_t index = 0; index < j2_header->metric_count; ++index) {
+    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct journal_metric_list));
+
+    size_t added = 0;
+    for (size_t index = 0; index < count; ++index) {
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
         if (!metric)
             continue;
 
-        PValue = JudyLIns(&metric_first_time_JudyL, (Word_t) index, PJE0);
-        fatal_assert(NULL != PValue);
-        if (!*PValue) {
-            uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
-            uuid_first_t_entry->metric = metric;
-            uuid_first_t_entry->first_time_s = LONG_MAX;
-            uuid_first_t_entry->last_time_s = 0;
-            uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
-            *PValue = uuid_first_t_entry;
-            count++;
-        }
+        uuid_first_entry_list[added].metric = metric;
+        uuid_first_entry_list[added].first_time_s = LONG_MAX;
+        uuid_first_entry_list[added].last_time_s = 0;
+        uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+        added++;
     }
-    journalfile_v2_data_release(journalfile);
 
-    info("DBENGINE: recalculating retention for %u metrics starting with datafile %u", count, first_datafile_remaining->fileno);
+    info("DBENGINE: recalculating retention for %zu metrics starting with datafile %u", count, first_datafile_remaining->fileno);
+
+    journalfile_v2_data_release(journalfile);
 
     // Update the first time / last time for all metrics we plan to delete
 
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
 
-    find_uuid_first_time(ctx, first_datafile_remaining, metric_first_time_JudyL);
+    find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
 
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    info("DBENGINE: updating metric registry retention for %u metrics", count);
+    info("DBENGINE: updating metric registry retention for %zu metrics", added);
 
-    Word_t index = 0;
-    bool first_then_next = true;
-    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-        uuid_first_t_entry = *PValue;
-
+    for (size_t index = 0; index < added; ++index) {
+        uuid_first_t_entry = &uuid_first_entry_list[index];
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX && uuid_first_t_entry->last_time_s))
             mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
         else
             mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, 0);
-
         mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
-        freez(uuid_first_t_entry);
     }
-
-    JudyLFreeArray(&metric_first_time_JudyL, PJE0);
+    freez(uuid_first_entry_list);
 
     if(worker)
         worker_is_idle();
