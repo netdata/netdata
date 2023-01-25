@@ -412,7 +412,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     check_and_fix_mrg_update_every(handle);
 }
 
-static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size) {
+static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
     size_t size;
 
@@ -421,28 +421,45 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
         size = tier_page_size[ctx->config.tier];
     }
     else {
+        size_t final_slots = 0;
+
         // the first page
         handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
         size_t max_size = tier_page_size[ctx->config.tier];
         size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
-        size_t min_slots = max_slots / 5;
-        size_t distribution = max_slots - min_slots;
-        size_t this_page_end_slot = indexing_partition((Word_t)handle->alignment, distribution);
 
-        size_t current_end_slot = (size_t)now_monotonic_sec() % distribution;
+        if(handle->alignment->initial_slots) {
+            final_slots = handle->alignment->initial_slots;
+        }
+        else {
+            max_slots -= 3;
 
-        if(current_end_slot < this_page_end_slot)
-            this_page_end_slot -= current_end_slot;
-        else if(current_end_slot > this_page_end_slot)
-            this_page_end_slot = (max_slots - current_end_slot) + this_page_end_slot;
+            size_t smaller_slot = indexing_partition((Word_t)handle->alignment, max_slots);
+            final_slots = smaller_slot;
 
-        size_t final_slots = min_slots + this_page_end_slot;
+            time_t now_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+            size_t current_pos = (now_s % max_slots);
 
-        if(final_slots > max_slots)
-            final_slots = max_slots;
+            if(current_pos > final_slots)
+                final_slots += max_slots - current_pos;
 
-        if(final_slots < min_slots)
-            final_slots = min_slots;
+            else if(current_pos < final_slots)
+                final_slots -= current_pos;
+
+            if(final_slots < 3) {
+                final_slots += 3;
+                smaller_slot += 3;
+
+                if(smaller_slot >= max_slots)
+                    smaller_slot -= max_slots;
+            }
+
+            max_slots += 3;
+            handle->alignment->initial_slots = smaller_slot + 3;
+
+            internal_fatal(handle->alignment->initial_slots < 3 || handle->alignment->initial_slots >= max_slots, "ooops! wrong distribution of metrics across time");
+            internal_fatal(final_slots < 3 || final_slots >= max_slots, "ooops! wrong distribution of metrics across time");
+        }
 
         size = final_slots * CTX_POINT_SIZE_BYTES(ctx);
     }
@@ -485,7 +502,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
             handle->page_flags |= RRDENG_PAGE_UNALIGNED;
             rrdeng_store_metric_flush_current_page(collection_handle);
 
-            data = rrdeng_alloc_new_metric_data(handle, &data_size);
+            data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
         }
         else {
             data = pgc_page_data(handle->page);
@@ -493,7 +510,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
         }
     }
     else
-        data = rrdeng_alloc_new_metric_data(handle, &data_size);
+        data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
 
     switch (ctx->config.page_type) {
         case PAGE_METRICS: {
@@ -682,8 +699,14 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 
+    time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, handle->metric);
+    time_t last_time_s = mrg_metric_get_latest_time_s(main_mrg, handle->metric);
+
     mrg_metric_release(main_mrg, handle->metric);
     freez(handle);
+
+    if(!first_time_s && !last_time_s)
+        return 1;
 
     return 0;
 }
@@ -1088,6 +1111,11 @@ void rrdeng_readiness_wait(struct rrdengine_instance *ctx) {
     info("DBENGINE: tier %d is ready for data collection and queries", ctx->config.tier);
 }
 
+bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)db_instance;
+    return ctx->config.legacy;
+}
+
 void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
     __atomic_store_n(&ctx->quiesce.exit_mode, true, __ATOMIC_RELAXED);
 }
@@ -1149,7 +1177,7 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
         finalize_rrd_files(ctx);
     }
 
-    if (!is_storage_engine_shared((STORAGE_INSTANCE *)ctx)) {
+    if (ctx->config.legacy) {
         freez(ctx);
         if (ctxp)
             *ctxp = NULL;
@@ -1179,14 +1207,16 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
     bool logged = false;
     while(__atomic_load_n(&ctx->atomic.collectors_running, __ATOMIC_RELAXED) && !unittest_running) {
         if(!logged) {
-            info("Waiting for collectors to finish on tier %d...", ctx->config.tier);
+            info("DBENGINE: waiting for collectors to finish on tier %d...", (ctx->config.legacy) ? -1 : ctx->config.tier);
             logged = true;
         }
         sleep_usec(100 * USEC_PER_MS);
     }
 
+    info("DBENGINE: flushing main cache for tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
 
+    info("DBENGINE: shutting down tier %d", (ctx->config.legacy) ? -1 : ctx->config.tier);
     struct completion completion = {};
     completion_init(&completion);
     rrdeng_enq_cmd(ctx, RRDENG_OPCODE_CTX_SHUTDOWN, NULL, &completion, STORAGE_PRIORITY_BEST_EFFORT, NULL, NULL);
@@ -1195,7 +1225,7 @@ int rrdeng_exit(struct rrdengine_instance *ctx) {
 
     finalize_rrd_files(ctx);
 
-    if(!is_storage_engine_shared((STORAGE_INSTANCE *)ctx))
+    if(ctx->config.legacy)
         freez(ctx);
 
     rrd_stat_atomic_add(&rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);

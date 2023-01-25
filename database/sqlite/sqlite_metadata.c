@@ -881,7 +881,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     freez(data);
 }
 
-static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
+static bool metadata_scan_host(RRDHOST *host, uint32_t max_count, size_t *query_counter) {
     RRDSET *st;
     int rc;
 
@@ -895,6 +895,8 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
             break;
         }
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
+            (*query_counter)++;
+
             rrdset_flag_clear(st, RRDSET_FLAG_METADATA_UPDATE);
             scan_count++;
 
@@ -924,6 +926,8 @@ static bool metadata_scan_host(RRDHOST *host, uint32_t max_count) {
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
             if(rrddim_flag_check(rd, RRDDIM_FLAG_METADATA_UPDATE)) {
+                (*query_counter)++;
+
                 rrddim_flag_clear(rd, RRDDIM_FLAG_METADATA_UPDATE);
 
                 if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN))
@@ -963,12 +967,18 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
+    usec_t all_started_ut = now_monotonic_usec(); (void)all_started_ut;
+    internal_error(true, "METADATA: checking all hosts...");
+
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
-        internal_error(true, "METADATA: Scanning host %s", rrdhost_hostname(host));
+
+        size_t query_counter = 0; (void)query_counter;
+        usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
@@ -981,37 +991,55 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 rrdlabels_walkthrough_read(host->rrdlabels, host_label_store_to_sql_callback, &tmp);
                 db_execute(buffer_tostring(work_buffer));
                 buffer_free(work_buffer);
+                query_counter++;
             }
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_CLAIMID))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_CLAIMID);
             uuid_t uuid;
+
             if (likely(host->aclk_state.claimed_id && !uuid_parse(host->aclk_state.claimed_id, uuid)))
                 store_claim_id(&host->host_uuid, &uuid);
             else
                 store_claim_id(&host->host_uuid, NULL);
+
+            query_counter++;
         }
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_INFO))) {
             rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_INFO);
 
             BUFFER *work_buffer = sql_store_host_system_info(host);
-            db_execute(buffer_tostring(work_buffer));
-            buffer_free(work_buffer);
+            if(work_buffer) {
+                db_execute(buffer_tostring(work_buffer));
+                buffer_free(work_buffer);
+                query_counter++;
+            }
 
             int rc = sql_store_host_info(host);
             if (unlikely(rc))
-                error_report("Failed to store host info in the database for %s", string2str(host->hostname));
+                error_report("METADATA: 'host:%s': failed to store host info", string2str(host->hostname));
+            else
+                query_counter++;
         }
 
-        if (unlikely(metadata_scan_host(host, data->max_count))) {
+        if (unlikely(metadata_scan_host(host, data->max_count, &query_counter))) {
             run_again = true;
             rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
-            internal_error(true,"METADATA: Rescheduling host %s to run; more charts to store", rrdhost_hostname(host));
+            internal_error(true,"METADATA: 'host:%s': scheduling another run, more charts to store", rrdhost_hostname(host));
         }
+
+        usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+        internal_error(true, "METADATA: 'host:%s': saved metadata with %zu SQL statements, in %0.2f ms",
+                       rrdhost_hostname(host), query_counter,
+                       (double)(ended_ut - started_ut) / USEC_PER_MS);
     }
     dfe_done(host);
+
+    usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
+    internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",
+                   (double)(all_ended_ut - all_started_ut) / USEC_PER_MS);
 
     if (unlikely(run_again))
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;

@@ -33,10 +33,8 @@ time_t rrdhost_free_orphan_time_s = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
-            return true;
-    }
+    if(!rrdeng_is_legacy(engine))
+        return true;
 #endif
 
     return false;
@@ -1223,6 +1221,15 @@ void rrdhost_free_all(void) {
     rrd_unlock();
 }
 
+void rrd_finalize_collection_for_all_hosts(void) {
+    RRDHOST *host;
+    rrd_wrlock();
+    rrdhost_foreach_read(host) {
+        rrdhost_finalize_collection(host);
+    }
+    rrd_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - save host files
 
@@ -1389,6 +1396,15 @@ void reload_host_labels(void) {
     health_label_log_save(localhost);
 
     rrdpush_send_host_labels(localhost);
+}
+
+void rrdhost_finalize_collection(RRDHOST *host) {
+    info("Stopping data collection for host '%s'...", rrdhost_hostname(host));
+
+    RRDSET *st;
+    rrdset_foreach_write(st, host)
+        rrdset_finalize_collection(st, true);
+    rrdset_foreach_done(st);
 }
 
 // ----------------------------------------------------------------------------

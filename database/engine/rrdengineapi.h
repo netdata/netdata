@@ -225,5 +225,6 @@ struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
+bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

@@ -571,6 +571,8 @@ typedef enum __attribute__ ((__packed__)) rrdset_flags {
     RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED    = (1 << 25), // the receiving side has completed replication
 
     RRDSET_FLAG_UPSTREAM_SEND_VARIABLES          = (1 << 26), // a custom variable has been updated and needs to be exposed to parent
+
+    RRDSET_FLAG_COLLECTION_FINISHED              = (1 << 27), // when set, data collection is not available for this chart
 } RRDSET_FLAGS;
 
 #define rrdset_flag_check(st, flag) (__atomic_load_n(&((st)->flags), __ATOMIC_SEQ_CST) & (flag))
@@ -1309,6 +1311,11 @@ void rrddim_isnot_obsolete(RRDSET *st, RRDDIM *rd);
 collected_number rrddim_timed_set_by_pointer(RRDSET *st, RRDDIM *rd, struct timeval collected_time, collected_number value);
 collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number value);
 collected_number rrddim_set(RRDSET *st, const char *id, collected_number value);
+
+bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd);
+void rrdset_finalize_collection(RRDSET *st, bool dimensions_too);
+void rrdhost_finalize_collection(RRDHOST *host);
+void rrd_finalize_collection_for_all_hosts(void);
 
 long align_entries_to_pagesize(RRD_MEMORY_MODE mode, long entries);
 

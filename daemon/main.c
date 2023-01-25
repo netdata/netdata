@@ -418,9 +418,10 @@ void netdata_cleanup_and_exit(int ret) {
 #endif
 
         // free the database
-        delta_shutdown_time("free rrdhost structures");
+        delta_shutdown_time("stop collection for all hosts");
 
-        rrdhost_free_all();
+        // rrdhost_free_all();
+        rrd_finalize_collection_for_all_hosts();
 
         delta_shutdown_time("stop metasync threads");
 
