@@ -412,7 +412,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     check_and_fix_mrg_update_every(handle);
 }
 
-static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size) {
+static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
     size_t size;
 
@@ -421,28 +421,45 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
         size = tier_page_size[ctx->config.tier];
     }
     else {
+        size_t final_slots = 0;
+
         // the first page
         handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
         size_t max_size = tier_page_size[ctx->config.tier];
         size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
-        size_t min_slots = max_slots / 5;
-        size_t distribution = max_slots - min_slots;
-        size_t this_page_end_slot = indexing_partition((Word_t)handle->alignment, distribution);
 
-        size_t current_end_slot = (size_t)now_monotonic_sec() % distribution;
+        if(handle->alignment->initial_slots) {
+            final_slots = handle->alignment->initial_slots;
+        }
+        else {
+            max_slots -= 3;
 
-        if(current_end_slot < this_page_end_slot)
-            this_page_end_slot -= current_end_slot;
-        else if(current_end_slot > this_page_end_slot)
-            this_page_end_slot = (max_slots - current_end_slot) + this_page_end_slot;
+            size_t smaller_slot = indexing_partition((Word_t)handle->alignment, max_slots);
+            final_slots = smaller_slot;
 
-        size_t final_slots = min_slots + this_page_end_slot;
+            time_t now_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
+            size_t current_pos = (now_s % max_slots);
 
-        if(final_slots > max_slots)
-            final_slots = max_slots;
+            if(current_pos > final_slots)
+                final_slots += max_slots - current_pos;
 
-        if(final_slots < min_slots)
-            final_slots = min_slots;
+            else if(current_pos < final_slots)
+                final_slots -= current_pos;
+
+            if(final_slots < 3) {
+                final_slots += 3;
+                smaller_slot += 3;
+
+                if(smaller_slot >= max_slots)
+                    smaller_slot -= max_slots;
+            }
+
+            max_slots += 3;
+            handle->alignment->initial_slots = smaller_slot + 3;
+
+            internal_fatal(handle->alignment->initial_slots < 3 || handle->alignment->initial_slots >= max_slots, "ooops! wrong distribution of metrics across time");
+            internal_fatal(final_slots < 3 || final_slots >= max_slots, "ooops! wrong distribution of metrics across time");
+        }
 
         size = final_slots * CTX_POINT_SIZE_BYTES(ctx);
     }
@@ -485,7 +502,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
             handle->page_flags |= RRDENG_PAGE_UNALIGNED;
             rrdeng_store_metric_flush_current_page(collection_handle);
 
-            data = rrdeng_alloc_new_metric_data(handle, &data_size);
+            data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
         }
         else {
             data = pgc_page_data(handle->page);
@@ -493,7 +510,7 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
         }
     }
     else
-        data = rrdeng_alloc_new_metric_data(handle, &data_size);
+        data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
 
     switch (ctx->config.page_type) {
         case PAGE_METRICS: {
