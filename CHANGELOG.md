@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
 - DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
 - Fix Exporiting compilaton error [\#14306](https://github.com/netdata/netdata/pull/14306) ([thiagoftsm](https://github.com/thiagoftsm))
 - bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
@@ -349,7 +350,6 @@
 - Additional sqlite statistics [\#13668](https://github.com/netdata/netdata/pull/13668) ([stelfrag](https://github.com/stelfrag))
 - Advance the buffer properly to scan the journal file [\#13666](https://github.com/netdata/netdata/pull/13666) ([stelfrag](https://github.com/stelfrag))
 - Add sqlite page cache hit and miss statistics [\#13665](https://github.com/netdata/netdata/pull/13665) ([stelfrag](https://github.com/stelfrag))
-- bump go.d.plugin to v0.39.0 [\#13662](https://github.com/netdata/netdata/pull/13662) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
