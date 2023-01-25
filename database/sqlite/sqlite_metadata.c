@@ -967,15 +967,18 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     struct scan_metadata_payload *data = req->data;
     struct metadata_wc *wc = data->wc;
 
+    usec_t all_started_ut = now_monotonic_usec(); (void)all_started_ut;
+    internal_error(true, "METADATA: checking all hosts...");
+
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
-        size_t query_counter = 0;
+        size_t query_counter = 0; (void)query_counter;
+        usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
-        internal_error(true, "METADATA: 'host:%s' check...", rrdhost_hostname(host));
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
         if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_LABELS))) {
@@ -1027,9 +1030,16 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
             internal_error(true,"METADATA: 'host:%s': scheduling another run, more charts to store", rrdhost_hostname(host));
         }
 
-        internal_error(true, "METADATA: 'host:%s': saved metadata with %zu SQL statements", rrdhost_hostname(host), query_counter);
+        usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+        internal_error(true, "METADATA: 'host:%s': saved metadata with %zu SQL statements, in %0.2f ms",
+                       rrdhost_hostname(host), query_counter,
+                       (double)(ended_ut - started_ut) / USEC_PER_MS);
     }
     dfe_done(host);
+
+    usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
+    internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",
+                   (double)(all_ended_ut - all_started_ut) / USEC_PER_MS);
 
     if (unlikely(run_again))
         wc->check_hosts_after = now_realtime_sec() + METADATA_HOST_CHECK_IMMEDIATE;
