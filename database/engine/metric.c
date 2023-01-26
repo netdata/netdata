@@ -327,33 +327,42 @@ bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metr
     return ret;
 }
 
-bool mrg_metric_set_first_time_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
-    bool ret = false;
-
-    netdata_spinlock_lock(&metric->spinlock);
-    if(!metric->first_time_s) {
-        metric->first_time_s = first_time_s;
-        ret = true;
-    }
-    netdata_spinlock_unlock(&metric->spinlock);
-
-    return ret;
-}
-
 time_t mrg_metric_get_first_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t first_time_s;
-    netdata_spinlock_lock(&metric->spinlock);
-    first_time_s = metric->first_time_s;
-    if(!first_time_s) {
-        if(metric->latest_time_s_clean)
-            first_time_s = metric->latest_time_s_clean;
 
-        if(!first_time_s || metric->latest_time_s_hot < metric->latest_time_s_clean)
-            first_time_s = metric->latest_time_s_hot;
+    netdata_spinlock_lock(&metric->spinlock);
+
+    if(unlikely(!metric->first_time_s)) {
+        if(metric->latest_time_s_clean)
+            metric->first_time_s = metric->latest_time_s_clean;
+
+        else if(metric->latest_time_s_hot)
+            metric->first_time_s = metric->latest_time_s_hot;
     }
+
+    first_time_s = metric->first_time_s;
+
     netdata_spinlock_unlock(&metric->spinlock);
 
     return first_time_s;
+}
+
+void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s) {
+    netdata_spinlock_lock(&metric->spinlock);
+
+    if(unlikely(!metric->first_time_s)) {
+        if(metric->latest_time_s_clean)
+            metric->first_time_s = metric->latest_time_s_clean;
+
+        else if(metric->latest_time_s_hot)
+            metric->first_time_s = metric->latest_time_s_hot;
+    }
+
+    *first_time_s = metric->first_time_s;
+    *last_time_s = MAX(metric->latest_time_s_clean, metric->latest_time_s_hot);
+    *update_every_s = metric->latest_update_every_s;
+
+    netdata_spinlock_unlock(&metric->spinlock);
 }
 
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
