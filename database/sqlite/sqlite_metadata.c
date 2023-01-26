@@ -52,7 +52,7 @@
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
 #define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
-#define METADATA_HOST_CHECK_IMMEDIATE (1)           // Repeat immediate run because we have more metadata to write
+#define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
 
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
@@ -1170,7 +1170,7 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
                     }
                     else
-                        data->max_count = 10000;
+                        data->max_count = 1000;
 
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
                     if (unlikely(
@@ -1268,6 +1268,9 @@ void metadata_sync_shutdown_prepare(void)
 
     struct completion compl;
     completion_init(&compl);
+
+    db_execute("PRAGMA journal_size_limit=-1;");
+    db_execute("PRAGMA synchronous=0;");
 
     info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
