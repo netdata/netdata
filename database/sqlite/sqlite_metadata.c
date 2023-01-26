@@ -1179,7 +1179,7 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
                     }
                     else
-                        data->max_count = 1000;
+                        data->max_count = 5000;
 
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
                     if (unlikely(
@@ -1277,9 +1277,6 @@ void metadata_sync_shutdown_prepare(void)
 
     struct completion compl;
     completion_init(&compl);
-
-//    db_execute("PRAGMA journal_size_limit=-1;");
-//    db_execute("PRAGMA synchronous=0;");
 
     info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
