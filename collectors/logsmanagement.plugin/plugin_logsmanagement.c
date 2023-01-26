@@ -67,6 +67,29 @@ static void logsmanagement_plugin_main_cleanup(void *ptr) {
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 }
 
+#define add_table_field(wb, key, name, visible, type, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range) do { \
+    if(fields_added) buffer_strcat(wb, ",");                                                                    \
+    buffer_sprintf(wb, "\n      \"%s\": {", key);                                                               \
+    buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                                               \
+    buffer_sprintf(wb, "\n         \"unique_key\":%s,", (unique_key)?"true":"false");                           \
+    buffer_sprintf(wb, "\n         \"name\":\"%s\",", name);                                                    \
+    buffer_sprintf(wb, "\n         \"visible\":%s,", (visible)?"true":"false");                                 \
+    buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                                                    \
+    if(units)                                                                                                   \
+       buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));                                      \
+    if(!isnan((NETDATA_DOUBLE)(max)))                                                                           \
+       buffer_sprintf(wb, "\n         \"max\":%f,", (NETDATA_DOUBLE)(max));                                     \
+    if(pointer_to)                                                                                              \
+        buffer_sprintf(wb, "\n         \"pointer_to\":\"%s\",", (char *)(pointer_to));                          \
+    buffer_sprintf(wb, "\n         \"sort\":\"%s\",", sort);                                                    \
+    buffer_sprintf(wb, "\n         \"sortable\":%s,", (sortable)?"true":"false");                               \
+    buffer_sprintf(wb, "\n         \"sticky\":%s,", (sticky)?"true":"false");                                   \
+    buffer_sprintf(wb, "\n         \"summary\":\"%s\",", summary);                                              \
+    buffer_sprintf(wb, "\n         \"filter\":\"%s\"", (range)?"range":"multiselect");                          \
+    buffer_sprintf(wb, "\n      }");                                                                            \
+    fields_added++;                                                                                             \
+} while(0)
+
 static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout, 
                                                 const char *function, void *collector_data, 
                                                 void (*callback)(BUFFER *wb, int code, void *callback_data), 
@@ -261,9 +284,14 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         if(query_params.results_buff->len - res_off > 0) buffer_strcat(dest_wb, ",\n");
     }
 
-    buffer_fast_strcat(dest_wb, "\n   ]\n", 6);
+    buffer_fast_strcat(dest_wb, "\n   ],\n   \"columns\": {", sizeof("\n   ],\n   \"columns\": {") - 1);
+    int fields_added = 0;
+    add_table_field(dest_wb, "Timestamp", "Timestamp in Milliseconds", true, "time", "milliseconds", NAN, "ascending", true, true, true, NULL, "max", false);
+    add_table_field(dest_wb, "Logs", "Logs collected in last interval", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
+    add_table_field(dest_wb, "LogsTxtSz", "Logs text length", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
+    add_table_field(dest_wb, "MatchNo", "Keyword matches", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "sum", false);
 
-    buffer_fast_strcat(dest_wb, "}", 1);
+    buffer_fast_strcat(dest_wb, "\n   }\n}", sizeof("\n   }\n}") - 1);
 
     buffer_free(query_params.results_buff);
 
