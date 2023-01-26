@@ -6,7 +6,13 @@
 
 **Merged pull requests:**
 
+- Revert "Misc SSL improvements" [\#14327](https://github.com/netdata/netdata/pull/14327) ([MrZammler](https://github.com/MrZammler))
+- DBENGINE v2 - improvements part 9 [\#14326](https://github.com/netdata/netdata/pull/14326) ([ktsaou](https://github.com/ktsaou))
+- fix\(proc.plugin\): add "cpu" label to per core util% charts [\#14322](https://github.com/netdata/netdata/pull/14322) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
+- Misc SSL improvements [\#14317](https://github.com/netdata/netdata/pull/14317) ([MrZammler](https://github.com/MrZammler))
+- minor - kaitai for netdata datafiles [\#14312](https://github.com/netdata/netdata/pull/14312) ([underhood](https://github.com/underhood))
+- Add Collector log [\#14309](https://github.com/netdata/netdata/pull/14309) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
 - Fix Exporiting compilaton error [\#14306](https://github.com/netdata/netdata/pull/14306) ([thiagoftsm](https://github.com/thiagoftsm))
 - bump go.d.plugin to v0.49.2 [\#14305](https://github.com/netdata/netdata/pull/14305) ([ilyam8](https://github.com/ilyam8))
@@ -130,6 +136,7 @@
 - add clickhouse third party collector and install instructions [\#14021](https://github.com/netdata/netdata/pull/14021) ([andrewm4894](https://github.com/andrewm4894))
 - Switch nightlies to GitHub releases. [\#14020](https://github.com/netdata/netdata/pull/14020) ([Ferroin](https://github.com/Ferroin))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
+- Introduce the new Structure of the documentation [\#13915](https://github.com/netdata/netdata/pull/13915) ([Ancairon](https://github.com/Ancairon))
 - Finish renaming the `--install` option to `--install-prefix`. [\#13881](https://github.com/netdata/netdata/pull/13881) ([Ferroin](https://github.com/Ferroin))
 - Support HTTP proxy Basic auth [\#13762](https://github.com/netdata/netdata/pull/13762) ([underhood](https://github.com/underhood))
 - Cleanly reimplement system/edit-config.in. [\#13702](https://github.com/netdata/netdata/pull/13702) ([Ferroin](https://github.com/Ferroin))
@@ -342,14 +349,6 @@
 - Fix warnings during compilation time on ARM \(32 bits\) [\#13681](https://github.com/netdata/netdata/pull/13681) ([thiagoftsm](https://github.com/thiagoftsm))
 - dictionary updated documentation and cosmetics [\#13679](https://github.com/netdata/netdata/pull/13679) ([ktsaou](https://github.com/ktsaou))
 - disable internal log [\#13678](https://github.com/netdata/netdata/pull/13678) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin v0.40.0 [\#13675](https://github.com/netdata/netdata/pull/13675) ([ilyam8](https://github.com/ilyam8))
-- remove \_instance\_family label [\#13674](https://github.com/netdata/netdata/pull/13674) ([ilyam8](https://github.com/ilyam8))
-- fix typo not deleting collected flag; force removing collected flag on child disconnect [\#13672](https://github.com/netdata/netdata/pull/13672) ([ktsaou](https://github.com/ktsaou))
-- feat\(health\): add Postgres alarms [\#13671](https://github.com/netdata/netdata/pull/13671) ([ilyam8](https://github.com/ilyam8))
-- add proxysql dashboard info [\#13669](https://github.com/netdata/netdata/pull/13669) ([ilyam8](https://github.com/ilyam8))
-- Additional sqlite statistics [\#13668](https://github.com/netdata/netdata/pull/13668) ([stelfrag](https://github.com/stelfrag))
-- Advance the buffer properly to scan the journal file [\#13666](https://github.com/netdata/netdata/pull/13666) ([stelfrag](https://github.com/stelfrag))
-- Add sqlite page cache hit and miss statistics [\#13665](https://github.com/netdata/netdata/pull/13665) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
