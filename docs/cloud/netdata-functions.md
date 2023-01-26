@@ -57,7 +57,7 @@ concern is addressed.
 
 ### **Related Concepts**
 
-- [ACLK](https://github.com/netdata/netdata/blob/master/docs/nightly/setup/agent-cloud-link-aclk)
+- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
 - [plugins.d]((https://github.com/netdata/netdata/blob/master/docs/nightly/references/collectors-references/plugins.d)
 
 ### Related Tasks
