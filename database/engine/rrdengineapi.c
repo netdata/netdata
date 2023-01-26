@@ -580,12 +580,8 @@ static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, us
         collect_page_flags_to_buffer(wb, handle->page_flags);
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    internal_error(true,
-#else
     error_limit_static_global_var(erl, 1, 0);
     error_limit(&erl,
-#endif
                 "DBENGINE: metric '%s' collected point at %ld, %s last collection at %ld, "
                 "update every %ld, %s page from %ld to %ld, position %u (of %u), flags: %s",
                 uuid,
