@@ -601,9 +601,11 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     if(unlikely(!db_last_entry_s)) {
         db_last_entry_s = rrdset_last_entry_s_of_tier(st, tier);
 
-        if (unlikely(!db_last_entry_s))
+        if (unlikely(!db_last_entry_s)) {
             // we assume this is a collected RRDSET
-            db_last_entry_s = now_s;
+            db_first_entry_s = 0;
+            db_last_entry_s = 0;
+        }
     }
 
     if(unlikely(db_last_entry_s > now_s)) {
