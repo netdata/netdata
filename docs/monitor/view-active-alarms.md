@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/monitor/vi
 sidebar_label: "View active health alarms"
 learn_status: "Published"
 learn_topic_type: "Concepts"
-learn_rel_path: "Operations"
+learn_rel_path: "Operations/Alerts"
 -->
 
 # View active health alarms
