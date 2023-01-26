@@ -396,7 +396,7 @@ get_os_key() {
   fi
 }
 
-group_exists(){
+get_group(){
   if command -v getent > /dev/null 2>&1; then
     getent group "${1:-""}"
   else
@@ -941,7 +941,7 @@ portable_add_group() {
   groupname="${1}"
 
   # Check if group exist
-  if group_exists "${groupname}" > /dev/null 2>&1; then
+  if get_group "${groupname}" > /dev/null 2>&1; then
     echo >&2 "Group '${groupname}' already exists."
     return 0
   fi
@@ -977,14 +977,14 @@ portable_add_user_to_group() {
   username="${2}"
 
   # Check if group exist
-  if ! group_exists "${groupname}" > /dev/null 2>&1; then
+  if ! get_group "${groupname}" > /dev/null 2>&1; then
     echo >&2 "Group '${groupname}' does not exist."
     # Don’t treat this as a failure, if the group does not exist we should not be trying to add the user to it.
     return 0
   fi
 
   # Check if user is in group
-  if group_exists "${groupname}" | cut -d ':' -f 4 | grep -wq "${username}"; then
+  if get_group "${groupname}" | cut -d ':' -f 4 | grep -wq "${username}"; then
     # username is already there
     echo >&2 "User '${username}' is already in group '${groupname}'."
     return 0
