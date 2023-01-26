@@ -957,10 +957,12 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
 
     for(size_t p = 0; p < qm->plan.used ; p++) {
-        time_t after = qm->plan.array[p].after;
-        time_t before = qm->plan.array[p].before;
-
         size_t tier = qm->plan.array[p].tier;
+        time_t update_every = qm->tiers[tier].db_update_every_s;
+
+        time_t after = qm->plan.array[p].after - (update_every * 2);
+        time_t before = qm->plan.array[p].before + (update_every * 2);
+
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
                 tier_ptr->db_metric_handle,
@@ -1179,11 +1181,6 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
         internal_fatal(qm->plan.array[p].before > before_wanted, "QUERY: too big plan last time");
     }
 #endif
-
-    for(size_t p = 0; p < qm->plan.used ;p++) {
-        size_t tier = qm->plan.array[p].tier;
-        qm->plan.array[p].before += qm->tiers[tier].db_update_every_s - 1;
-    }
 
     query_planer_initialize_plans(ops);
     query_planer_activate_plan(ops, 0, 0);

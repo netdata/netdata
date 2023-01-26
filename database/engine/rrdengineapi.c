@@ -827,10 +827,19 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
     unsigned position;
     if(likely(handle->now_s >= page_start_time_s && handle->now_s <= page_end_time_s)) {
 
-        if(unlikely(entries == 1 || page_start_time_s == page_end_time_s))
+        if(unlikely(entries == 1 || page_start_time_s == page_end_time_s || !page_update_every_s)) {
             position = 0;
-        else
+            handle->now_s = page_start_time_s;
+        }
+        else {
             position = (handle->now_s - page_start_time_s) * (entries - 1) / (page_end_time_s - page_start_time_s);
+            time_t point_end_time_s = page_start_time_s + position * page_update_every_s;
+            if(point_end_time_s < handle->now_s && position + 1 < entries) {
+                position++;
+                point_end_time_s = page_start_time_s + position * page_update_every_s;
+            }
+            handle->now_s = point_end_time_s;
+        }
 
         internal_fatal(position >= entries, "DBENGINE: wrong page position calculation");
     }
