@@ -314,7 +314,7 @@ typedef struct storage_collect_handle STORAGE_COLLECT_HANDLE;
 struct rrddim_tier {
     STORAGE_POINT virtual_point;
     size_t tier_grouping;
-    time_t next_point_time_s;
+    time_t next_point_end_time_s;
     STORAGE_METRIC_HANDLE *db_metric_handle;        // the metric handle inside the database
     STORAGE_COLLECT_HANDLE *db_collection_handle;   // the data collection handle
     struct storage_engine_collect_ops *collect_ops;
