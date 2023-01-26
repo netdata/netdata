@@ -609,7 +609,7 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     }
 
     if(unlikely(db_last_entry_s > now_s)) {
-        internal_error(true,
+        internal_error(db_last_entry_s > now_s + 1,
                        "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
                        db_last_entry_s, now_s);
