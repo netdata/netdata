@@ -52,7 +52,7 @@
 
 #define METADATA_HOST_CHECK_FIRST_CHECK (5)         // First check for pending metadata
 #define METADATA_HOST_CHECK_INTERVAL (30)           // Repeat check for pending metadata
-#define METADATA_HOST_CHECK_IMMEDIATE (5)           // Repeat immediate run because we have more metadata to write
+#define METADATA_HOST_CHECK_IMMEDIATE (1)           // Repeat immediate run because we have more metadata to write
 
 #define MAX_METADATA_CLEANUP (500)                  // Maximum metadata write operations (e.g  deletes before retrying)
 #define METADATA_MAX_BATCH_SIZE (512)               // Maximum commands to execute before running the event loop
@@ -1170,7 +1170,7 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = NULL;          // Do not complete after launching worker (worker will do)
                     }
                     else
-                        data->max_count = 1000;
+                        data->max_count = 10000;
 
                     metadata_flag_set(wc, METADATA_FLAG_SCANNING_HOSTS);
                     if (unlikely(
