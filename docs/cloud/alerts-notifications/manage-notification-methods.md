@@ -4,7 +4,7 @@ sidebar_label: "Manage notification methods"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Operations\Alert Notifications"
+learn_rel_path: "Operations/Alert Notifications"
 learn_docs_purpose: "Instructions on how to manage notification methods"
 -->
 
