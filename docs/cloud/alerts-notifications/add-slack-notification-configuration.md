@@ -37,7 +37,7 @@ To add discord notification configurations you need
 #### Settings on slack
 
 To enable the webhook integrations on slack you need:
-1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1)
+1. Create an app to receive webhook integrations. Check [Create an app](https://api.slack.com/apps?new_app=1) from slack documentation for further details
 1. Install the app on your workspace
 1. Configure Webhook URLs for your workspace
    - On your app go to **Incoming Webhooks** and click on **activate incoming webhooks**

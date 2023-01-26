@@ -30,7 +30,7 @@ To manage space notification settings, you will need the following:
 
 Notes:
 * For Netadata provided ones you can't delete the existing notification method configuration.
-* Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/centralized-alerts.md#service-classification))
+* Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx#service-classification))
 
 #### Steps
 
@@ -38,14 +38,16 @@ Notes:
 1. Click on the **Notification** tab
 1. You will be presented with a table of the configured notification methods for the space. You will be able to:
    1. **Add a new** notification method configuration.
-      - Choose the service from the available list of Community or Business options (if your plan allows it)
-      - Depending on the service different inputs will be present, please note that there are mandatory and optional inputs
+      - Choose the service from the list of the available ones, you'll may see a list of unavailable options if your plan doesn't allow some of them (you will see on the
+      card the plan level that allows a specific service)
       - You can optionally provide a name for the configuration so you can easily refer to what it
       - Define filtering criteria. To which Rooms will this apply? What notifications I want to receive? (All Alerts and unreachable, All Alerts, Critical only)
+      - Depending on the service different inputs will be present, please note that there are mandatory and optional inputs
+         - If you doubts on how to configure the service you can find a link at the top of the modal that takes you to the specific documentation page to help you
    1. **Edit an existing** notification method configuration. Personal level ones can't be edited here, see [Manage user notification settings](#manage-user-notification-settings). You will be able to change:
-      - Service specific inputs
       - The name provided for it
       - Filtering criteria
+      - Service specific inputs
    1. **Enable/Disable** a given notification method configuration.
       - Use the toggle to enable or disable the notification method configuration
    1. **Delete an existing** notification method configuartion. Netdata provided ones can't be deleted, e.g. Email
@@ -66,7 +68,7 @@ Note: If an Administrator has disabled a Personal [service level](https://github
 
 1. Click on the **User notification settings** shortcut on top of the help button
 1. You are presented with:
-   - The Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level)notification methods you can manage
+   - The Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification methods you can manage
    - The list spaces and rooms inside those where you have access to
    - If you're an Administrator, Manager or Troubleshooter you'll also see the Rooms from a space you don't have access to on **All Rooms** tab and you can activate notifications for them by joining the room
 1. On this modal you will be able to:
