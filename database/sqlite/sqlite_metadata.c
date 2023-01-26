@@ -1027,11 +1027,15 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                 query_counter++;
         }
 
+        if (data->max_count)
+            db_execute("BEGIN TRANSACTION;");
         if (unlikely(metadata_scan_host(host, data->max_count, &query_counter))) {
             run_again = true;
             rrdhost_flag_set(host,RRDHOST_FLAG_METADATA_UPDATE);
             internal_error(true,"METADATA: 'host:%s': scheduling another run, more charts to store", rrdhost_hostname(host));
         }
+        if (data->max_count)
+            db_execute("COMMIT TRANSACTION;");
 
         usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
         internal_error(true, "METADATA: 'host:%s': saved metadata with %zu SQL statements, in %0.2f ms",
@@ -1274,8 +1278,8 @@ void metadata_sync_shutdown_prepare(void)
     struct completion compl;
     completion_init(&compl);
 
-    db_execute("PRAGMA journal_size_limit=-1;");
-    db_execute("PRAGMA synchronous=0;");
+//    db_execute("PRAGMA journal_size_limit=-1;");
+//    db_execute("PRAGMA synchronous=0;");
 
     info("METADATA: Sending a scan host command");
     uint32_t max_wait_iterations = 2000;
