@@ -953,7 +953,7 @@ typedef struct query_engine_ops {
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
 
-#define POINTS_TO_EXPAND_QUERY 2
+#define POINTS_TO_EXPAND_QUERY 0
 
 static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
@@ -1409,7 +1409,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
                     // we only log if this is not point 1
                     internal_error(new_point.end_time < after_wanted &&
-                                   new_point.id > POINTS_TO_EXPAND_QUERY,
+                                   new_point.id > POINTS_TO_EXPAND_QUERY + 1,
                                    "QUERY: '%s', dimension '%s' next_metric() "
                                    "returned point %zu from %ld time %ld, "
                                    "which is entirely before our current timeframe %ld to %ld "

@@ -128,7 +128,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->cache_dir = rrdset_cache_dir(host, chart_full_id);
     st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
@@ -833,7 +832,8 @@ void rrdset_delete_files(RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    recursively_delete_dir(st->cache_dir, "left-over chart");
+    if(st->cache_dir)
+        recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -2077,6 +2077,13 @@ const char *rrdset_cache_filename(RRDSET *st) {
     return st_on_file->cache_filename;
 }
 
+const char *rrdset_cache_dir(RRDSET *st) {
+    if(!st->cache_dir)
+        st->cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
+
+    return st->cache_dir;
+}
+
 void rrdset_memory_file_free(RRDSET *st) {
     if(!st->st_on_file) return;
 
@@ -2107,7 +2114,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         return false;
 
     char fullfilename[FILENAME_MAX + 1];
-    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", st->cache_dir);
+    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", rrdset_cache_dir(st));
 
     unsigned long size = sizeof(struct rrdset_map_save_v019);
     struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(
