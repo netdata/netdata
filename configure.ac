@@ -54,6 +54,8 @@ else
   AC_CHECK_TOOL([AR], [ar])
 fi
 
+AX_PROG_CC_FOR_BUILD
+
 # -----------------------------------------------------------------------------
 # configurable options
 

@@ -524,12 +524,14 @@ libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYG
 noinst_PROGRAMS = judyltablesgen
 
 judyltablesgen_SOURCES = libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
-judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) $(BUILD_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough -Wno-format -Wno-format-security
+judyltablesgen_LDFLAGS = $(BUILD_LDFLAGS)
 
-$(builddir)/judyltablesgen$(EXEEXT) : CFLAGS += -Wno-format -Wno-format-security
+$(builddir)/judyltablesgen$(BUILD_EXEEXT) :
+	$(CC_FOR_BUILD) $(judyltablesgen_CFLAGS) $(judyltablesgen_LDFLAGS) $(judyltablesgen_SOURCES) -o judyltablesgen$(BUILD_EXEEXT)
 
-JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(EXEEXT)
-	$(builddir)/judyltablesgen$(EXEEXT)
+JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(BUILD_EXEEXT)
+	$(builddir)/judyltablesgen$(BUILD_EXEEXT)
 
 libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyL
 
