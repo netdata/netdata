@@ -953,6 +953,8 @@ typedef struct query_engine_ops {
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
 
+#define POINTS_TO_EXPAND_QUERY 2
+
 static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
 
@@ -960,8 +962,8 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         size_t tier = qm->plan.array[p].tier;
         time_t update_every = qm->tiers[tier].db_update_every_s;
 
-        time_t after = qm->plan.array[p].after - (update_every * 2);
-        time_t before = qm->plan.array[p].before + (update_every * 2);
+        time_t after = qm->plan.array[p].after - (update_every * POINTS_TO_EXPAND_QUERY);
+        time_t before = qm->plan.array[p].before + (update_every * POINTS_TO_EXPAND_QUERY);
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
@@ -1358,19 +1360,30 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             }
 
             // check if the db is giving us zero duration points
-            if(unlikely(db_points_read_since_plan_switch > 1 && new_point.start_time == new_point.end_time)) {
-                internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned point %zu start time %ld, end time %ld, that are both equal",
-                               qt->id, string2str(qm->dimension.id), new_point.id, new_point.start_time, new_point.end_time);
+            if(unlikely(db_points_read_since_plan_switch > 1 &&
+                        new_point.start_time == new_point.end_time)) {
+
+                internal_error(true, "QUERY: '%s', dimension '%s' next_metric() returned "
+                                     "point %zu from %ld to %ld, that are both equal",
+                                     qt->id, string2str(qm->dimension.id),
+                                     new_point.id, new_point.start_time, new_point.end_time);
 
                 new_point.start_time = new_point.end_time - ops->tier_ptr->db_update_every_s;
             }
 
             // check if the db is advancing the query
-            if(unlikely(db_points_read_since_plan_switch > 1 && new_point.end_time <= last1_point.end_time)) {
+            if(unlikely(db_points_read_since_plan_switch > 1 &&
+                        new_point.end_time <= last1_point.end_time)) {
+
                 internal_error(true,
-                               "QUERY: '%s', dimension '%s' next_metric() returned point %zu from %ld to %ld, before the last point %zu from %ld to %ld, now is %ld to %ld",
-                               qt->id, string2str(qm->dimension.id), new_point.id, new_point.start_time, new_point.end_time,
-                               last1_point.id, last1_point.start_time, last1_point.end_time, now_start_time, now_end_time);
+                               "QUERY: '%s', dimension '%s' next_metric() returned "
+                               "point %zu from %ld to %ld, before the "
+                               "last point %zu from %ld to %ld, "
+                               "now is %ld to %ld",
+                               qt->id, string2str(qm->dimension.id),
+                               new_point.id, new_point.start_time, new_point.end_time,
+                               last1_point.id, last1_point.start_time, last1_point.end_time,
+                               now_start_time, now_end_time);
 
                 count_same_end_time++;
                 continue;
@@ -1395,8 +1408,12 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     // at exactly the time we will want
 
                     // we only log if this is not point 1
-                    internal_error(new_point.end_time < after_wanted && new_point.id > 1,
-                                   "QUERY: '%s', dimension '%s' next_metric() returned point %zu from %ld time %ld, which is entirely before our current timeframe %ld to %ld (and before the entire query, after %ld, before %ld)",
+                    internal_error(new_point.end_time < after_wanted &&
+                                   new_point.id > POINTS_TO_EXPAND_QUERY,
+                                   "QUERY: '%s', dimension '%s' next_metric() "
+                                   "returned point %zu from %ld time %ld, "
+                                   "which is entirely before our current timeframe %ld to %ld "
+                                   "(and before the entire query, after %ld, before %ld)",
                                    qt->id, string2str(qm->dimension.id),
                                    new_point.id, new_point.start_time, new_point.end_time,
                                    now_start_time, now_end_time,
