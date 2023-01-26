@@ -50,7 +50,7 @@ concern is to ensure no sensitive
 information or disruptive actions are exposed through the Agent's API.
 
 With the communication between the Netdata Agent and Netdata Cloud being
-through [ACLK](https://github.com/netdata/netdata/blob/master/docs/nightly/setup/agent-cloud-link-aclk) this
+through [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) this
 concern is addressed.
 
 ## Related Topics
