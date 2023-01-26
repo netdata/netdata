@@ -17,6 +17,8 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
+#define POINTS_TO_EXPAND_QUERY 0
+
 // ----------------------------------------------------------------------------
 
 static struct {
@@ -952,8 +954,6 @@ typedef struct query_engine_ops {
 // query planer
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
-
-#define POINTS_TO_EXPAND_QUERY 0
 
 static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;

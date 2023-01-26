@@ -1858,7 +1858,7 @@ static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDI
         now_realtime_timeval(&now);
         rrdset_timed_done(st[i], now, false);
     }
-    // Fluh pages for subsequent real values
+    // Flush pages for subsequent real values
     for (i = 0 ; i < CHARTS ; ++i) {
         for (j = 0; j < DIMS; ++j) {
             rrdeng_store_metric_flush_current_page((rd[i][j])->tiers[0].db_collection_handle);
