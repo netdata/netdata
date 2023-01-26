@@ -972,6 +972,9 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
+
+    if (!data->max_count)
+        db_execute("BEGIN TRANSACTION;");
     dfe_start_reentrant(rrdhost_root_index, host) {
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
@@ -1036,6 +1039,8 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
                        (double)(ended_ut - started_ut) / USEC_PER_MS);
     }
     dfe_done(host);
+    if (!data->max_count)
+        db_execute("COMMIT TRANSACTION;");
 
     usec_t all_ended_ut = now_monotonic_usec(); (void)all_ended_ut;
     internal_error(true, "METADATA: checking all hosts completed in %0.2f ms",
