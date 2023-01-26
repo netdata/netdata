@@ -1518,12 +1518,31 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-static int replication_execute_next_pending_request(void) {
+static int replication_execute_next_pending_request(bool cancel) {
     static __thread int max_requests_ahead = 0;
     static __thread struct replication_request *rqs = NULL;
     static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
     static __thread size_t queue_rounds = 0; (void)queue_rounds;
     struct replication_request *rq;
+
+    if(unlikely(cancel)) {
+        if(rqs) {
+            do {
+                if (++rqs_last_executed >= max_requests_ahead)
+                    rqs_last_executed = 0;
+
+                rq = &rqs[rqs_last_executed];
+                rq->executed = true;
+
+                if (rq->found) {
+                    replication_response_cancel_and_finalize(rq->q);
+                    rq->found = false;
+                }
+
+            } while (rqs_last_executed != rqs_last_prepared);
+        }
+        return REQUEST_QUEUE_EMPTY;
+    }
 
     if(unlikely(!rqs)) {
         max_requests_ahead = get_system_cpus() / 2;
@@ -1616,6 +1635,7 @@ static int replication_execute_next_pending_request(void) {
 }
 
 static void replication_worker_cleanup(void *ptr __maybe_unused) {
+    replication_execute_next_pending_request(true);
     worker_unregister();
 }
 
@@ -1625,7 +1645,7 @@ static void *replication_worker_thread(void *ptr) {
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
     while(service_running(SERVICE_REPLICATION)) {
-        if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
             sender_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1640,6 +1660,8 @@ static void *replication_worker_thread(void *ptr) {
 static void replication_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    replication_execute_next_pending_request(true);
 
     int threads = (int)replication_globals.main_thread.threads;
     for(int i = 0; i < threads ;i++) {
@@ -1756,7 +1778,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_is_idle();
         }
 
-        if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
 
             worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();
