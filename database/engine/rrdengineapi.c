@@ -793,24 +793,38 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
 
     time_t db_first_time_s, db_last_time_s, db_update_every_s;
     mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
-    handle->start_time_s = start_time_s < db_first_time_s ? db_first_time_s : start_time_s;
-    handle->end_time_s = end_time_s > db_last_time_s ? db_last_time_s : end_time_s;
-    handle->now_s = handle->start_time_s;
 
-    handle->dt_s = db_update_every_s;
-    if(!handle->dt_s) {
-        handle->dt_s = default_rrd_update_every;
-        mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
+    if(is_page_in_time_range(start_time_s, end_time_s, db_first_time_s, db_last_time_s) == PAGE_IS_IN_RANGE) {
+        handle->start_time_s = MAX(start_time_s, db_first_time_s);
+        handle->end_time_s = MIN(end_time_s, db_last_time_s);
+        handle->now_s = handle->start_time_s;
+
+        handle->dt_s = db_update_every_s;
+        if (!handle->dt_s) {
+            handle->dt_s = default_rrd_update_every;
+            mrg_metric_set_update_every_s_if_zero(main_mrg, metric, default_rrd_update_every);
+        }
+
+        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
+        rrddim_handle->start_time_s = handle->start_time_s;
+        rrddim_handle->end_time_s = handle->end_time_s;
+        rrddim_handle->priority = priority;
+
+        pg_cache_preload(handle);
+
+        __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
     }
+    else {
+        handle->start_time_s = start_time_s;
+        handle->end_time_s = end_time_s;
+        handle->now_s = start_time_s;
+        handle->dt_s = db_update_every_s;
 
-    rrddim_handle->handle = (STORAGE_QUERY_HANDLE *)handle;
-    rrddim_handle->start_time_s = handle->start_time_s;
-    rrddim_handle->end_time_s = handle->end_time_s;
-    rrddim_handle->priority = priority;
-
-    pg_cache_preload(handle);
-
-    __atomic_add_fetch(&rrdeng_cache_efficiency_stats.query_time_init, now_monotonic_usec() - started_ut, __ATOMIC_RELAXED);
+        rrddim_handle->handle = (STORAGE_QUERY_HANDLE *) handle;
+        rrddim_handle->start_time_s = handle->start_time_s;
+        rrddim_handle->end_time_s = 0;
+        rrddim_handle->priority = priority;
+    }
 }
 
 static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_handle, bool debug_this __maybe_unused) {

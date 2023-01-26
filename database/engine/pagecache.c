@@ -356,16 +356,26 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
 }
 
 static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_t start_time_s, time_t end_time_s) {
+
+    time_t db_first_time_s, db_last_time_s, db_update_every_s;
+    mrg_metric_get_retention(main_mrg, metric, &db_first_time_s, &db_last_time_s, &db_update_every_s);
+
+    if(is_page_in_time_range(start_time_s, end_time_s, db_first_time_s, db_last_time_s) != PAGE_IS_IN_RANGE)
+        return;
+
     PGC_ENTRY page_entry = {
             .hot = false,
             .section = (Word_t)ctx,
             .metric_id = (Word_t)metric,
-            .start_time_s = start_time_s,
-            .end_time_s = end_time_s,
+            .start_time_s = MAX(start_time_s, db_first_time_s),
+            .end_time_s = MIN(end_time_s, db_last_time_s),
             .update_every_s = 0,
             .size = 0,
             .data = DBENGINE_EMPTY_PAGE,
     };
+
+    if(page_entry.start_time_s >= page_entry.end_time_s)
+        return;
 
     PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, NULL);
     pgc_page_release(main_cache, page);
