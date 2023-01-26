@@ -385,11 +385,12 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         error_limit(&erl,
 #endif
               "DBENGINE: metric '%s' new page from %ld to %ld, update every %ld, has a conflict in main cache "
-              "with existing %s page from %ld to %ld, update every %ld - "
+              "with existing %s%s page from %ld to %ld, update every %ld - "
               "is it collected more than once?",
               uuid,
               page_entry.start_time_s, page_entry.end_time_s, (time_t)page_entry.update_every_s,
               pgc_is_page_hot(page) ? "hot" : "not-hot",
+              pgc_page_data(page) == DBENGINE_EMPTY_PAGE ? " gap" : "",
               pgc_page_start_time_s(page), pgc_page_end_time_s(page), pgc_page_update_every_s(page)
               );
 
