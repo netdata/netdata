@@ -686,7 +686,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
     rrdset_strncpyz_name(filename, rrddim_id(rd), FILENAME_MAX);
-    snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
+    snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", rrdset_cache_dir(st), filename);
 
     rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(
         fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1, false, NULL);

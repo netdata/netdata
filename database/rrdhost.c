@@ -499,7 +499,6 @@ int is_legacy = 1;
                  ", health %s"
                  ", cache_dir '%s'"
                  ", varlib_dir '%s'"
-                 ", health_log '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
@@ -519,7 +518,6 @@ int is_legacy = 1;
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
          , host->varlib_dir
-         , host->health.health_log_filename
          , string2str(host->health.health_default_exec)
          , string2str(host->health.health_default_recipient)
     );
@@ -1085,7 +1083,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
     if (netdata_exit || force) {
-        info("Freeing all memory for host '%s'...", rrdhost_hostname(host));
+        info("RRD: 'host:%s' freeing memory...", rrdhost_hostname(host));
 
         // ------------------------------------------------------------------------
         // first remove it from the indexes, so that it will not be discoverable
@@ -1146,7 +1144,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 #endif
 
     if (!netdata_exit && !force) {
-        info("Setting archive mode for host '%s'...", rrdhost_hostname(host));
+        info("RRD: 'host:%s' is now in archive mode...", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
         return;
     }
@@ -1187,7 +1185,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdpush_destinations_free(host);
     string_freez(host->health.health_default_exec);
     string_freez(host->health.health_default_recipient);
-    freez(host->health.health_log_filename);
     string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
@@ -1236,7 +1233,7 @@ void rrd_finalize_collection_for_all_hosts(void) {
 void rrdhost_save_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Saving/Closing database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' saving / closing database...", rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1393,13 +1390,11 @@ void reload_host_labels(void) {
 
     rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
-    health_label_log_save(localhost);
-
     rrdpush_send_host_labels(localhost);
 }
 
 void rrdhost_finalize_collection(RRDHOST *host) {
-    info("Stopping data collection for host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
 
     RRDSET *st;
     rrdset_foreach_write(st, host)
@@ -1413,16 +1408,18 @@ void rrdhost_finalize_collection(RRDHOST *host) {
 void rrdhost_delete_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Deleting database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' deleting disk files...", rrdhost_hostname(host));
 
     RRDSET *st;
 
-    // we get a write lock
-    // to ensure only one thread is saving the database
-    rrdset_foreach_write(st, host) {
-            rrdset_delete_files(st);
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+        // we get a write lock
+        // to ensure only one thread is saving the database
+        rrdset_foreach_write(st, host){
+                    rrdset_delete_files(st);
+                }
+        rrdset_foreach_done(st);
     }
-    rrdset_foreach_done(st);
 
     recursively_delete_dir(host->cache_dir, "left over host");
 }
@@ -1433,7 +1430,7 @@ void rrdhost_delete_charts(RRDHOST *host) {
 void rrdhost_cleanup_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Cleaning up database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' cleaning up disk files...", rrdhost_hostname(host));
 
     RRDSET *st;
     uint32_t rrdhost_delete_obsolete_charts = rrdhost_option_check(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
@@ -1460,7 +1457,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 // RRDHOST - save all hosts to disk
 
 void rrdhost_save_all(void) {
-    info("Saving database [%zu hosts(s)]...", rrdhost_hosts_available());
+    info("RRD: saving databases [%zu hosts(s)]...", rrdhost_hosts_available());
 
     rrd_rdlock();
 
@@ -1475,7 +1472,7 @@ void rrdhost_save_all(void) {
 // RRDHOST - save or delete all hosts from disk
 
 void rrdhost_cleanup_all(void) {
-    info("Cleaning up database [%zu hosts(s)]...", rrdhost_hosts_available());
+    info("RRD: cleaning up database [%zu hosts(s)]...", rrdhost_hosts_available());
 
     rrd_rdlock();
 

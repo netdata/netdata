@@ -1620,9 +1620,17 @@ static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unuse
     completion_wait_for(&ctx->quiesce.completion);
     completion_destroy(&ctx->quiesce.completion);
 
+    bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED))
+            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
+        if(!logged) {
+            logged = true;
+            info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
+                 __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED),
+                 (ctx->config.legacy) ? -1 : ctx->config.tier);
+        }
         sleep_usec(1 * USEC_PER_MS);
+    }
 
     completion_mark_complete(completion);
 

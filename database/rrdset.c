@@ -128,7 +128,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->cache_dir = rrdset_cache_dir(host, chart_full_id);
     st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
@@ -601,13 +600,15 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     if(unlikely(!db_last_entry_s)) {
         db_last_entry_s = rrdset_last_entry_s_of_tier(st, tier);
 
-        if (unlikely(!db_last_entry_s))
+        if (unlikely(!db_last_entry_s)) {
             // we assume this is a collected RRDSET
-            db_last_entry_s = now_s;
+            db_first_entry_s = 0;
+            db_last_entry_s = 0;
+        }
     }
 
     if(unlikely(db_last_entry_s > now_s)) {
-        internal_error(true,
+        internal_error(db_last_entry_s > now_s + 1,
                        "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
                        db_last_entry_s, now_s);
@@ -831,7 +832,8 @@ void rrdset_delete_files(RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    recursively_delete_dir(st->cache_dir, "left-over chart");
+    if(st->cache_dir)
+        recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -1105,15 +1107,17 @@ static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, t
 }
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
-    if (unlikely(!t->next_point_time_s))
-        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+    if (unlikely(!t->next_point_end_time_s))
+        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
 
-    if(unlikely(sp.start_time_s > t->next_point_time_s)) {
+    if(unlikely(sp.start_time_s >= t->next_point_end_time_s)) {
+        // flush the virtual point, it is done
+
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time_s * USEC_PER_SEC,
+                t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
                 t->virtual_point.min,
                 t->virtual_point.max,
@@ -1124,7 +1128,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         else {
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time_s * USEC_PER_SEC,
+                t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
                 NAN,
                 NAN,
@@ -1134,7 +1138,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
-        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
     }
 
     // merge the dates into our virtual point
@@ -2073,6 +2077,13 @@ const char *rrdset_cache_filename(RRDSET *st) {
     return st_on_file->cache_filename;
 }
 
+const char *rrdset_cache_dir(RRDSET *st) {
+    if(!st->cache_dir)
+        st->cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
+
+    return st->cache_dir;
+}
+
 void rrdset_memory_file_free(RRDSET *st) {
     if(!st->st_on_file) return;
 
@@ -2103,7 +2114,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         return false;
 
     char fullfilename[FILENAME_MAX + 1];
-    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", st->cache_dir);
+    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", rrdset_cache_dir(st));
 
     unsigned long size = sizeof(struct rrdset_map_save_v019);
     struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(

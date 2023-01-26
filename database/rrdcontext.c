@@ -3446,6 +3446,8 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
     if(worker_jobs)
         worker_is_busy(WORKER_JOB_PP_CONTEXT);
 
+    size_t min_priority_collected = LONG_MAX;
+    size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
     size_t instances_active = 0, instances_deleted = 0;
@@ -3482,8 +3484,16 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
 
             instances_active++;
 
-            if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY && ri->priority < min_priority)
-                min_priority = ri->priority;
+            if (ri->priority >= RRDCONTEXT_MINIMUM_ALLOWED_PRIORITY) {
+                if(rrd_flag_check(ri, RRD_FLAG_COLLECTED)) {
+                    if(ri->priority < min_priority_collected)
+                        min_priority_collected = ri->priority;
+                }
+                else {
+                    if(ri->priority < min_priority_not_collected)
+                        min_priority_not_collected = ri->priority;
+                }
+            }
 
             if (ri->first_time_s && ri->first_time_s < min_first_time_t)
                 min_first_time_t = ri->first_time_s;
@@ -3492,6 +3502,13 @@ static void rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAG
                 max_last_time_t = ri->last_time_s;
         }
         dfe_done(ri);
+
+        if(min_priority_collected != LONG_MAX)
+            // use the collected priority
+            min_priority = min_priority_collected;
+        else
+            // use the non-collected priority
+            min_priority = min_priority_not_collected;
     }
 
     {

@@ -797,30 +797,15 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
         if(r != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
     }
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health.health_log_filename = strdupz(filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
 
-    if (!file_is_migrated(host->health.health_log_filename)) {
-        int rc = sql_create_health_log_table(host);
-        if (unlikely(rc)) {
-            log_health("[%s]: Failed to create health log table in the database", rrdhost_hostname(host));
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
-        }
-        else {
-            health_alarm_log_load(host);
-            add_migrated_file(host->health.health_log_filename, 0);
-        }
-    } else {
-        // TODO: This needs to go to the metadata thread
-        // Health should wait before accessing the table (needs to be created by the metadata thread)
-        sql_create_health_log_table(host);
-        sql_health_alarm_log_load(host);
-    }
+    // TODO: This needs to go to the metadata thread
+    // Health should wait before accessing the table (needs to be created by the metadata thread)
+    sql_create_health_log_table(host);
+    sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
     // load health configuration

@@ -606,6 +606,9 @@ void pdc_acquire(PDC *pdc) {
 }
 
 bool pdc_release_and_destroy_if_unreferenced(PDC *pdc, bool worker, bool router __maybe_unused) {
+    if(unlikely(!pdc))
+        return true;
+
     netdata_spinlock_lock(&pdc->refcount_spinlock);
 
     if(pdc->refcount <= 0)
