@@ -96,6 +96,16 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         if(!key || !*key) continue;
         if(!value || !*value) continue;
 
+        // Kludge to respect quotes with spaces in between
+        // Not proper fix
+        if(*value == '_'){
+            value++;
+            value[strlen(value)] = ' '; 
+            value = mystrsep(&value, "_");
+            function = strrchr(value, NULL);
+            function++;
+        }
+
         if(!strcmp(key, LOGS_QRY_KW_START_TIME)){
             query_params.start_timestamp = strtoll(value, NULL, 10);
         }
