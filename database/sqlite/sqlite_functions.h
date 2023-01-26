@@ -54,9 +54,7 @@ void sql_close_database(void);
 int bind_text_null(sqlite3_stmt *res, int position, const char *text, bool can_be_null);
 int prepare_statement(sqlite3 *database, const char *query, sqlite3_stmt **statement);
 int execute_insert(sqlite3_stmt *res);
-int file_is_migrated(char *path);
 int exec_statement_with_uuid(const char *sql, uuid_t *uuid);
-void add_migrated_file(char *path, uint64_t file_size);
 void db_execute(const char *cmd);
 
 // Look up functions
