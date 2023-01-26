@@ -24,7 +24,7 @@ function (i.e. code) to be run by a data collector when
 the function is invoked.
 
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes
-functions - [plugins.d](https://github.com/netdata/netdata/blob/master/docs/nightly/references/collectors-references/plugins.d/#function).
+functions - [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d#function).
 
 #### What are the current available functions?
 
