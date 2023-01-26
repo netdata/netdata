@@ -145,6 +145,21 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         }
     }
 
+    const uint64_t  req_start_timestamp = query_params.start_timestamp,
+                    req_end_timestamp = query_params.end_timestamp;
+    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp
+    int status;
+    switch(err_code){
+        case INVALID_REQUEST_ERROR:
+        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
+            status = HTTP_RESP_BAD_REQUEST;
+            break;
+        case GENERIC_ERROR:
+            status = HTTP_RESP_BACKEND_FETCH_FAILED;
+        default:
+            status = HTTP_RESP_OK;
+    }
+
     fn_off = cn_off = 0;
 
     buffer_sprintf( dest_wb,
@@ -156,14 +171,14 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                     "   \"requested from\": %" PRIu64 ",\n"
                     "   \"requested until\": %" PRIu64 ",\n"
                     "   \"requested keyword\": \"%s\",\n",
-                    HTTP_RESP_OK,
+                    status,
                     1,
                     QUERY_VERSION,
-                    query_params.start_timestamp,
-                    query_params.end_timestamp,
+                    req_start_timestamp,
+                    req_end_timestamp,
                     query_params.keyword ? query_params.keyword : ""
     );
-    LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
+     
     buffer_sprintf( dest_wb,
                     "   \"actual from\": %" PRIu64 ",\n"
                     "   \"actual until\": %" PRIu64 ",\n"
@@ -254,10 +269,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
     // buffer_no_cacheable(w->response.data);  
 
-    if( unlikely(   err_code == INVALID_REQUEST_ERROR || 
-                    err_code == NO_MATCHING_CHART_OR_FILENAME_ERROR)) return HTTP_RESP_BAD_REQUEST;
-    if( unlikely(err_code == GENERIC_ERROR)) return HTTP_RESP_BACKEND_FETCH_FAILED;
-    return HTTP_RESP_OK;
+    return status;
 }
 
 
