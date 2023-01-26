@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/aler
 sidebar_position: "1"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Operations/Alert Notifications"
+learn_rel_path: "Operations/Alerts"
 learn_docs_purpose: "Instructions on how to add notification configuration for discord"
 -->
 
@@ -57,5 +57,5 @@ For more details please check discord's article [Intro to Webhooks](https://supp
 
 - [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
 - [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Centralized Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-cloud/centralized-alerts.md)
+- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)

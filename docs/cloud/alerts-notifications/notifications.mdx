@@ -15,27 +15,27 @@ unreachable state. By enabling notifications, you ensure no alert, on any node i
 you or your team.
 
 Having this information centralized helps you:
-* Have a clear view of the health across your infrastructure, [seeing all a alerts in one place](/docs/nightly/operations/view-active-health-alarms)
-* Easily [setup your alert notification process](/docs/nightly/metric-correlations): 
+* Have a clear view of the health across your infrastructure, [seeing all a alerts in one place](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+* Easily [setup your alert notification process](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md): 
 methods to use and where to use them, filtering rules, etc.
-* Quickly troubleshoot using [Metric Correlations](https://learn.netdata.cloud/docs/nightly/concepts/guided-troubleshooting/metric-correlations) 
-or [Anomaly Advisor](/docs/cloud/insights/anomaly-advisor)
+* Quickly troubleshoot using [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metrics-correlations.md)
+or [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
 
 If a node is getting disconnected often or has many alerts, we protect you and your team from alert fatigue by sending
 you a flood protection notification. Getting one of these notifications is a good signal of health or performance issues
 on that node.
 
-Admins must enable alert notifications for their [Space(s)](#manage-alert-notifications-for-a-space). All users in a
+Admins must enable alert notifications for their [Space(s)](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings). All users in a
 Space can then personalize their notifications settings from within their [account
-menu](#manage-alert-notifications-per-user).
+menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
 
 <Callout type="notice">
 
 Centralized alert notifications from Netdata Cloud is a independent process from [notifications from
-Netdata](/docs/monitor/enable-notifications). You can enable one or the other, or both, based on your needs. However,
+Netdata](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can enable one or the other, or both, based on your needs. However,
 the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak
 or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must
-[configure](/docs/monitor/configure-alarms) each node's alert watchdog.
+[configure](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) each node's alert watchdog.
 
 </Callout>
 
@@ -133,22 +133,22 @@ Cloud](https://user-images.githubusercontent.com/1153921/87461878-e933c480-c5c3-
 
 Netdata Cloud's alarm notifications feature leverages the alarms configuration on each node in your infrastructure. If
 you'd like to tweak any of these alarms, or even add new ones based on your needs, read our [health
-quickstart](/docs/monitor/configure-alarms).
+quickstart](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
 
-You can also [view active alarms](/docs/cloud/alerts-notifications/view-active-alerts) in Netdata Cloud for an instant
+You can also [view active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx) in Netdata Cloud for an instant
 visualization of the health of your infrastructure.
 
 ### Related Topics
 
 #### **Related Concepts**
-- [Rooms](/docs/cloud/war-rooms.md)
-- [Metric Correlations](/docs/nightly/metric-correlations.md)
-- [Anomaly Advisor](/docs/cloud/insights/anomaly-advisor.mdx)
+- [Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+- [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metrics-correlations.md)
+- [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
 
 #### Related Tasks
-- [View Active health alarms](/docs/nightly/operations/view-active-health-alarms)
-- [Manage notification methods](/docs/cloud/alerts-notifications/manage-notification-methods)
-- [Add webhook notification configuration](/docs/cloud/alerts-notifications/add-webhook-notification-configuration)
-- [Add discord notification configuration](/docs/cloud/alerts-notifications/add-discord-notification-configuration)
-- [Add slack notification configuration](/docs/cloud/alerts-notifications/add-slack-notification-configuration)
-- [Add pagerduty notification configuration](/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration)
+- [View Active health alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)
+- [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-webhook-notification-configuration.md)
+- [Add discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification-configuration.md)
+- [Add slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md)
+- [Add pagerduty notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md)
