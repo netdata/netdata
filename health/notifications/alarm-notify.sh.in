@@ -484,53 +484,105 @@ msteams_migration
 # filter a recipient based on alarm event severity
 
 filter_recipient_by_criticality() {
-  local method="${1}" x="${2}" r s
-  shift
-
-  r="${x/|*/}" # the recipient
-  s="${x/*|/}" # the severity required for notifying this recipient
+  local method="${1}" recipient_arg="${2}"
+  local tracking_dir tracking_file modifier modifiers recipient="${recipient_arg/|*/}"
+  local mod_critical=0 mod_noclear=0 mod_nowarn=0
 
   # no severity filtering for this person
-  [ "${r}" = "${s}" ] && return 0
+  [ "${recipient}" = "${recipient_arg}" ] && return 0
 
-  # the severity is invalid
-  s="${s^^}"
-  if [ "${s}" != "CRITICAL" ]; then
-    error "SEVERITY FILTERING for ${x} VIA ${method}: invalid severity '${s,,}', only 'critical' is supported."
-    return 0
-  fi
+  # find out which modifiers are set
+  modifiers="${recipient_arg#*|}"
+  modifiers="${modifiers//|/ }" # replace pipes with spaces
+  modifiers="${modifiers,,}"    # lowercase
+  for modifier in ${modifiers}; do
+    case "${modifier}" in
+      critical) mod_critical=1 ;;
+      noclear) mod_noclear=1 ;;
+      nowarn) mod_nowarn=1 ;;
 
-  # create the status tracking directory for this user
-  [ ! -d "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}" ] &&
-    mkdir -p "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}"
+      *)
+        error "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: invalid modifier '${modifier}'."
+        # invalid modifier, always send notification
+        return 0
+      ;;
+    esac
+  done
+
+  # set status tracking directory/file var
+  tracking_dir="${NETDATA_CACHE_DIR}/alarm-notify/${method}/${recipient}"
+  tracking_file="${tracking_dir}/${alarm_id}"
+
+  # create the status tracking directory for this user if "critical" modifier is set
+  [ "${mod_critical}" == "1" ] && [ ! -d "${tracking_dir}" ] && mkdir -p "${tracking_dir}"
 
   case "${status}" in
-  CRITICAL)
-    # make sure he will get future notifications for this alarm too
-    touch "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
-    debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
-    return 0
-    ;;
+    CRITICAL)
+      # "critical" modifier set, create tracking file for future status changes
+      if [ "${mod_critical}" == "1" ]; then
+        touch "${tracking_file}"
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: the alarm is CRITICAL (will now receive next status change)"
+        return 0
+      fi
 
-  WARNING)
-    if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
-      # we do not remove the file, so that he will get future notifications of this alarm
-      debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
+      # always send CRITICAL notification
+      debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: the alarm is CRITICAL"
       return 0
-    fi
-    ;;
+      ;;
 
-  *)
-    if [ -f "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}" ]; then
-      # remove the file, so that he will only receive notifications for CRITICAL states for this alarm
-      rm "${NETDATA_CACHE_DIR}/alarm-notify/${method}/${r}/${alarm_id}"
-      debug "SEVERITY FILTERING for ${x} VIA ${method}: ALLOW: recipient has been notified for this alarm (will only receive CRITICAL notifications from now on)"
-      return 0
-    fi
-    ;;
+    WARNING)
+      # "nowarn" modifier set, block notification
+      if [ "${mod_nowarn}" == "1" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: BLOCK: recipient should not receive this notification (nowarn modifier set)"
+        return 1
+      fi
+
+      # "critical" modifier not set, send notification
+      if [ "${mod_critical}" == "0" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: the alarm is WARNING"
+        return 0
+      fi
+
+      # "critical" modifier set, send notification if tracking file exists
+      if [ "${mod_critical}" == "1" ] && [ -f "${tracking_file}" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
+        return 0
+      fi
+      ;;
+
+    CLEAR)
+      # remove tracking file
+      [ -f "${tracking_file}" ] && rm "${tracking_file}"
+
+      # "noclear" modifier set, block notification
+      if [ "${mod_noclear}" == "1" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: BLOCK: recipient should not receive this notification (noclear modifier set)"
+        return 1
+      fi
+
+      # "critical" modifier not set, send notification
+      if [ "${mod_critical}" == "0" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: the alarm is CLEAR"
+        return 0
+      fi
+
+      # "critical" modifier set, send notification if tracking file exists
+      if [ "${mod_critical}" == "1" ] && [ -f "${tracking_file}" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (no status change will be sent from now)"
+        return 0
+      fi
+      ;;
+
+    *)
+      # "critical" modifier set, send notification if tracking file exists
+      if [ "${mod_critical}" == "1" ] && [ -f "${tracking_file}" ]; then
+        debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: ALLOW: recipient has been notified for this alarm in the past (will still receive next status change)"
+        return 0
+      fi
+      ;;
   esac
 
-  debug "SEVERITY FILTERING for ${x} VIA ${method}: BLOCK: recipient should not receive this notification"
+  debug "SEVERITY FILTERING for ${recipient_arg} VIA ${method}: BLOCK: recipient should not receive this notification"
   return 1
 }
 
