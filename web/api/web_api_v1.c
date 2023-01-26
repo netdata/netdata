@@ -1738,8 +1738,17 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
             else {
-                buffer_need_bytes(w->response.data, 1);
-                w->response.data->buffer[w->response.data->len++] = *p;
+                if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
+                    while(*p != 'm'){
+                        buffer_need_bytes(w->response.data, 1);
+                        p++;
+                        remaining--;
+                    }
+                }
+                else{
+                    buffer_need_bytes(w->response.data, 1);
+                    w->response.data->buffer[w->response.data->len++] = *p;
+                }
             }
             p++;
         }

@@ -267,8 +267,17 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                 dest_wb->buffer[dest_wb->len++] = '"';
             }
             else {
-                buffer_need_bytes(dest_wb, 1);
-                dest_wb->buffer[dest_wb->len++] = *p;
+                if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
+                    while(*p != 'm'){
+                        buffer_need_bytes(dest_wb, 1);
+                        p++;
+                        remaining--;
+                    }
+                }
+                else{
+                    buffer_need_bytes(dest_wb, 1);
+                    dest_wb->buffer[dest_wb->len++] = *p;
+                }
             }
             p++;
         }
