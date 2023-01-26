@@ -1542,7 +1542,7 @@ static int replication_execute_next_pending_request(bool cancel) {
 
                 if (rq->q) {
                     internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
-                    internal_fatal(rq->found, "REPLAY FATAL: orphan q in rq");
+                    internal_fatal(!rq->found, "REPLAY FATAL: orphan q in rq");
 
                     replication_response_cancel_and_finalize(rq->q);
                     rq->q = NULL;
