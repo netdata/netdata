@@ -15,7 +15,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 
 To enable Discord notifications you need:
 
-- A Cloud account
+- A Netdata Cloud account
 - Access to the space as and Administrator
 - Have your discord server able to receive webhook integrations, for mode details check [how to configure this on discord](#settings-on-discord)
 
