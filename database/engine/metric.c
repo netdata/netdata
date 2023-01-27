@@ -577,7 +577,7 @@ time_t mrg_metric_get_update_every_s(MRG *mrg __maybe_unused, METRIC *metric) {
     return update_every_s;
 }
 
-bool mrg_metric_writer_acquire(MRG *mrg, METRIC *metric) {
+bool mrg_metric_set_writer(MRG *mrg, METRIC *metric) {
     bool done = false;
     netdata_spinlock_lock(&metric->spinlock);
     if(!metric->writer) {
@@ -591,7 +591,7 @@ bool mrg_metric_writer_acquire(MRG *mrg, METRIC *metric) {
     return done;
 }
 
-bool mrg_metric_writer_release(MRG *mrg, METRIC *metric) {
+bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
     bool done = false;
     netdata_spinlock_lock(&metric->spinlock);
     if(metric->writer) {
