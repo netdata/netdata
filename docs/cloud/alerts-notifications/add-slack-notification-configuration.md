@@ -15,8 +15,8 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 To add discord notification configurations you need
 
-- A Cloud account
-- Access to the space as and **administrator**
+- A Netdata Cloud account
+- Access to the space as an **administrator**
 - Space will needs to be on **Business** plan or higher
 - Have a Slack app on your workspace to receive the webhooks, for mode details check [how to configure this on Slack](#settings-on-slack)
 
