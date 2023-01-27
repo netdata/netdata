@@ -9,7 +9,7 @@ learn_rel_path: "Getting started"
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
-import { Install, InstallBox } from '@site/src/components/Install/'
+import { InstallRegexLink, InstallBoxRegexLink } from '@site/src/components/InstallRegexLink/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
@@ -63,32 +63,32 @@ troubleshooting with Netdata.
 
 ## Other installation options
 
-<Install>
-  <InstallBox
+<InstallRegexLink>
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)"
     os="Run with Docker" 
     svg="docker" />
-  <InstallBox
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)"
     os="Deploy on Kubernetes" 
     svg="kubernetes" />
-   <InstallBox
+   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)"
     os="Install on macOS" 
     svg="macos" />
-  <InstallBox
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)"
     os="Linux from Git" 
     svg="linux" />
-  <InstallBox
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)"
     os="Linux from source"
     svg="linux" />
-  <InstallBox
+  <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)" 
     os="Linux for offline nodes"
     svg="linux" />
-</Install>
+</InstallRegexLink>
 
 
 ## What's next?
