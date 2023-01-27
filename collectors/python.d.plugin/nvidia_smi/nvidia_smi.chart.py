@@ -58,6 +58,10 @@ ORDER = [
 # https://docs.nvidia.com/gameworks/content/gameworkslibrary/coresdk/nvapi/group__gpupstate.html
 POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
+# PCI Transfer data rate in gigabits per second (Gb/s) per generation
+PCI_SPEED = [2.5, 5, 8, 16, 32]
+# PCI encoding per generation
+PCI_ENCODING = [2/10, 2/10, 2/130, 2/130, 2/130]
 
 def gpu_charts(gpu):
     fam = gpu.full_name()
@@ -347,8 +351,10 @@ class GPU:
     def pci_bw_max(self):
         link_gen = int(self.pci_link_gen())
         link_width = int(self.pci_link_width())
-        # return max bandwidth in kB/s
-        return link_gen * 250 * 1024 * link_width
+        # Maximum PCIe Bandwidth = SPEED * WIDTH * (1 - ENCODING) - 1Gb/s.
+        # see details https://enterprise-support.nvidia.com/s/article/understanding-pcie-configuration-for-maximum-performance
+        # return max bandwidth in kilobytes per second (kB/s)
+        return (PCI_SPEED[link_gen] * link_width * (1- PCI_ENCODING[link_gen]) - 1) * 1000 * 1000 / 8
 
     @handle_attr_error
     def rx_util(self):
