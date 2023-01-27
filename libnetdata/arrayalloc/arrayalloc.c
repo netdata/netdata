@@ -15,11 +15,10 @@
 // max malloc size
 // optimal at current versions of libc is up to 256k
 // ideal to have the same overhead as libc is 4k
-#define ARAL_MAX_PAGE_SIZE_MALLOC (64*1024)
+#define ARAL_MAX_PAGE_SIZE_MALLOC (16*1024)
 
 typedef struct arrayalloc_free {
     size_t size;
-    struct arrayalloc_page *page;
     struct arrayalloc_free *next;
 } ARAL_FREE;
 
@@ -172,6 +171,17 @@ static void arrayalloc_init(ARAL *ar) {
         }
 
         ar->internal.initialized = true;
+
+        internal_error(true,
+                       "ARRAYALLOC: '%s' "
+                       "requested element size %zu bytes, actual %zu bytes, "
+                       "initial size %zu elements, "
+                       "max allocation size %zu bytes"
+                       , ar->name
+                       , ar->requested_element_size, ar->internal.element_size
+                       , ar->initial_elements
+                       , ar->internal.max_alloc_size
+                       );
     }
 
     netdata_mutex_unlock(&mutex);
@@ -270,7 +280,6 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
     // link the free space to its page
     ARAL_FREE *fr = (ARAL_FREE *)page->data;
     fr->size = page->size;
-    fr->page = page;
     fr->next = NULL;
     page->free_list = fr;
 
@@ -405,7 +414,6 @@ void *arrayalloc_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION
 
         uint8_t *data = (uint8_t *)found_fr;
         ARAL_FREE *fr = (ARAL_FREE *)&data[ar->internal.element_size];
-        fr->page = page;
         fr->size = found_fr->size - ar->internal.element_size;
 
         // link the free slot first in the page
@@ -479,7 +487,6 @@ void arrayalloc_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DE
 
     // make this element available
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
-    fr->page = page;
     fr->size = ar->internal.element_size;
     fr->next = page->free_list;
     page->free_list = fr;
