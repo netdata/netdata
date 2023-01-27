@@ -50,7 +50,7 @@ To enable the webhook integrations on Discord you need:
 
    ![image](https://user-images.githubusercontent.com/82235632/214092713-d16389e3-080f-4e1c-b150-c0fccbf4570e.png)
 
-For more details please check Discord's article [Intro to Webhooks](https://support.discord.com/hc/en-us/articles/228383668).
+For more details please read this article from Discord: [Intro to Webhooks](https://support.discord.com/hc/en-us/articles/228383668).
 
 
 #### Related topics
