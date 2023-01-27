@@ -33,6 +33,35 @@ typedef struct arrayalloc_page {
     struct arrayalloc_page *next; // the next page on the list
 } ARAL_PAGE;
 
+struct {
+    struct {
+        struct {
+            size_t allocations;
+            size_t allocated;
+        } structures;
+
+        struct {
+            size_t allocations;
+            size_t allocated;
+            size_t used;
+        } malloc;
+
+        struct {
+            size_t allocations;
+            size_t allocated;
+            size_t used;
+        } mmap;
+    } atomic;
+} aral_globals = {};
+
+void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used) {
+    *structures = __atomic_load_n(&aral_globals.atomic.structures.allocated, __ATOMIC_RELAXED);
+    *malloc_allocated = __atomic_load_n(&aral_globals.atomic.malloc.allocated, __ATOMIC_RELAXED);
+    *malloc_used = __atomic_load_n(&aral_globals.atomic.malloc.used, __ATOMIC_RELAXED);
+    *mmap_allocated = __atomic_load_n(&aral_globals.atomic.mmap.allocated, __ATOMIC_RELAXED);
+    *mmap_used = __atomic_load_n(&aral_globals.atomic.mmap.used, __ATOMIC_RELAXED);
+}
+
 #define ARAL_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
 static inline size_t natural_alignment(size_t size, size_t alignment) {
     if(unlikely(size % alignment))
@@ -204,7 +233,10 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
     else
         ar->internal.allocation_multiplier *= 2;
 
-    if(ar->internal.mmap) {
+    __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
+
+    if(unlikely(ar->internal.mmap)) {
         ar->internal.file_number++;
         char filename[FILENAME_MAX + 1];
         snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->cache_dir, ar->filename, ar->internal.file_number);
@@ -212,6 +244,8 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
         page->data = netdata_mmap(page->filename, page->size, MAP_SHARED, 0, false, NULL);
         if (unlikely(!page->data))
             fatal("Cannot allocate arrayalloc buffer of size %zu on filename '%s'", page->size, page->filename);
+        __atomic_add_fetch(&aral_globals.atomic.mmap.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&aral_globals.atomic.mmap.allocated, page->size, __ATOMIC_RELAXED);
     }
     else {
 #ifdef NETDATA_TRACE_ALLOCATIONS
@@ -219,6 +253,8 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
 #else
         page->data = mallocz(page->size);
 #endif
+        __atomic_add_fetch(&aral_globals.atomic.malloc.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&aral_globals.atomic.malloc.allocated, page->size, __ATOMIC_RELAXED);
     }
 
     // link the free space to its page
@@ -252,6 +288,9 @@ ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filena
     ar->cache_dir = cache_dir;
     ar->use_mmap = mmap;
     ar->internal.lockless = lockless;
+
+    __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL), __ATOMIC_RELAXED);
     return ar;
 }
 
@@ -267,6 +306,9 @@ void arrayalloc_del_page(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DE
             error("Cannot delete file '%s'", page->filename);
 
         freez((void *)page->filename);
+
+        __atomic_sub_fetch(&aral_globals.atomic.mmap.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&aral_globals.atomic.mmap.allocated, page->size, __ATOMIC_RELAXED);
     }
     else {
 #ifdef NETDATA_TRACE_ALLOCATIONS
@@ -274,9 +316,13 @@ void arrayalloc_del_page(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DE
 #else
         freez(page->data);
 #endif
+        __atomic_sub_fetch(&aral_globals.atomic.malloc.allocations, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&aral_globals.atomic.malloc.allocated, page->size, __ATOMIC_RELAXED);
     }
 
     freez(page);
+    __atomic_sub_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
 }
 
 void arrayalloc_destroy_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -314,6 +360,7 @@ void *arrayalloc_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION
                    "ARRAYALLOC: free item size %zu, cannot be smaller than %zu",
                    found_fr->size, ar->internal.element_size);
 
+    // check if the remaining size (after we use this slot) is not enough for another element
     if(unlikely(found_fr->size - ar->internal.element_size < ar->internal.element_size)) {
         // we can use the entire free space entry
 
@@ -341,6 +388,11 @@ void *arrayalloc_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION
 
         arrayalloc_free_validate_internal_check(ar, fr);
     }
+
+    if(unlikely(ar->internal.mmap))
+        __atomic_add_fetch(&aral_globals.atomic.mmap.used, ar->internal.element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_add_fetch(&aral_globals.atomic.malloc.used, ar->internal.element_size, __ATOMIC_RELAXED);
 
     page->used_elements++;
 
@@ -391,6 +443,11 @@ void arrayalloc_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DE
 
     if (unlikely(!page->used_elements))
         fatal("ARRAYALLOC: free of pointer %p is inside a page without any active allocations.", ptr);
+
+    if(unlikely(ar->internal.mmap))
+        __atomic_sub_fetch(&aral_globals.atomic.mmap.used, ar->internal.element_size, __ATOMIC_RELAXED);
+    else
+        __atomic_sub_fetch(&aral_globals.atomic.malloc.used, ar->internal.element_size, __ATOMIC_RELAXED);
 
     page->used_elements--;
 

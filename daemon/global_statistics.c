@@ -292,6 +292,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_replication = NULL;
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_workers = NULL;
+        static RRDDIM *rd_aral_overhead = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -322,6 +323,7 @@ static void global_statistics_charts(void) {
             rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_aral_overhead = rrddim_add(st_memory, "aral overhead", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -342,6 +344,11 @@ static void global_statistics_charts(void) {
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
 
+
+        size_t aral_structures, aral_malloc_allocated, aral_malloc_used, aral_mmap_allocated, aral_mmap_used;
+        aral_get_size_statistics(&aral_structures, &aral_malloc_allocated, &aral_malloc_used, &aral_mmap_allocated, &aral_mmap_used);
+        size_t aral_overhead = aral_structures + (aral_malloc_allocated - aral_malloc_used);
+
         rrddim_set_by_pointer(st_memory, rd_database, (collected_number)dbengine_total_memory + (collected_number)rrddim_db_memory_size);
         rrddim_set_by_pointer(st_memory, rd_collectors, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_collectors));
         rrddim_set_by_pointer(st_memory, rd_hosts, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_rrdhost) + (collected_number)netdata_buffers_statistics.rrdhost_allocations_size);
@@ -355,6 +362,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
         rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_aral_overhead, (collected_number) aral_overhead);
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);

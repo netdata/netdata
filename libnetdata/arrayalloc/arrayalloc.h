@@ -29,6 +29,7 @@ typedef struct arrayalloc {
 
 ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
 int aral_unittest(size_t elements);
+void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 
