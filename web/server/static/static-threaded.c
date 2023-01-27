@@ -349,7 +349,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
 
         if(unlikely(w->ofd == fd && web_client_has_wait_send(w)))
             *events |= POLLOUT;
-    } else if(unlikely(web_client_receive(w) < 0)) {
+    } else if(unlikely(bytes < 0)) {
         ret = -1;
         goto cleanup;
     } else if (unlikely(bytes == 0)) {
