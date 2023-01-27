@@ -16,8 +16,8 @@ From the Cloud interface, you can manage your space's notification settings as w
 
 To manage space notification settings, you will need the following:
 
-- A Cloud account
-- Access to the space as and Administrator
+- A Netdata Cloud account
+- Access to the space as an **administrator**
 
 #### Available actions per notification methods based on service level
 
@@ -62,7 +62,7 @@ To manage user specific notification settings, you will need the following:
 - A Cloud account
 - Have access to, at least, a space
 
-Note: If an Administrator has disabled a Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification method this will override any user specific setting.
+Note: If an administrator has disabled a Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification method this will override any user specific setting.
 
 #### Steps
 
@@ -70,7 +70,7 @@ Note: If an Administrator has disabled a Personal [service level](https://github
 1. You are presented with:
    - The Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification methods you can manage
    - The list spaces and rooms inside those where you have access to
-   - If you're an Administrator, Manager or Troubleshooter you'll also see the Rooms from a space you don't have access to on **All Rooms** tab and you can activate notifications for them by joining the room
+   - If you're an administrator, Manager or Troubleshooter you'll also see the Rooms from a space you don't have access to on **All Rooms** tab and you can activate notifications for them by joining the room
 1. On this modal you will be able to:
    1. **Enable/Disable** the notification method for you, this applies accross all spaces and rooms
       - Use the the toggle enable or disable the notification method

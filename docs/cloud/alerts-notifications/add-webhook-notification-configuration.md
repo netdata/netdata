@@ -16,7 +16,7 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add discord notification configurations you need
 
 - A Cloud account
-- Access to the space as and **Administrator**
+- Access to the space as and **administrator**
 - Space will needs to be on **Pro** plan or higher
 - Have an app that allows you to receive webhooks following a predefined schema, for mode details check [how to create the webhook service](#webhook-service)
 

@@ -16,7 +16,7 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add discord notification configurations you need
 
 - A Cloud account
-- Access to the space as and **Administrator**
+- Access to the space as and **administrator**
 - Space will needs to be on **Business** plan or higher
 - Have a Slack app on your workspace to receive the webhooks, for mode details check [how to configure this on Slack](#settings-on-slack)
 
@@ -31,7 +31,7 @@ To add discord notification configurations you need
       - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
       - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
+   1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Slack:
       - Webhook URL - URL provided on Slack for the channel you want to receive your notifications. For more details check [how to configure this on Slack](#settings-on-slack)
 
 #### Settings on Slack
