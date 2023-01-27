@@ -7,11 +7,11 @@ learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
 -->
+
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'
 import { Install, InstallBox } from '@site/src/components/Install/'
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
-
 
 ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_by_url_pattern&options=unaligned&dimensions=kickstart&group=sum&after=-3600&label=last+hour&units=kickstart%20downloads&value_color=orange&precision=0) ![](https://registry.my-netdata.io/api/v1/badge.svg?chart=web_log_nginx.requests_by_url_pattern&options=unaligned&dimensions=kickstart&group=sum&after=-86400&label=today&units=kickstart%20downloads&precision=0)
 
@@ -55,7 +55,7 @@ The `kickstart.sh` script does the following after being downloaded and ran usin
 - Attempts to install Netdata using our [official native binary packages](#native-packages).
 - If there are no official native binary packages for your system (or installing that way failed), tries to install
   using a [static build of Netdata](#static-builds) if one is available.
-- If no static build is available, installs required dependencies and then attempts to install by 
+- If no static build is available, installs required dependencies and then attempts to install by
   [building Netdata locally](#local-builds) (by downloading the sources and building them directly).
 - Installs `netdata-updater.sh` to `cron.daily`, so your Netdata installation will be updated with new nightly
   versions, unless you override that with an [optional parameter](#optional-parameters-to-alter-your-installation).
@@ -71,9 +71,9 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--dry-run`: Show what the installer would do, but don’t actually do any of it.
 - `--dont-start-it`: Don’t auto-start the daemon after installing. This parameter is not guaranteed to work.
 - `--release-channel`: Specify a particular release channel to install from. Currently supported release channels are:
-    - `nightly`: Installs a nightly build (this is currently the default).
-    - `stable`: Installs a stable release.
-    - `default`: Explicitly request whatever the current default is.
+  - `nightly`: Installs a nightly build (this is currently the default).
+  - `stable`: Installs a stable release.
+  - `default`: Explicitly request whatever the current default is.
 - `--nightly-channel`: Synonym for `--release-channel nightly`.
 - `--stable-channel`: Synonym for `--release-channel stable`.
 - `--auto-update`: Enable automatic updates (this is the default).
@@ -110,12 +110,14 @@ should not need to use special values for any of these):
 
 ### Connect node to Netdata Cloud during installation
 
-The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation. 
+The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation.
 
 :::note
-You either need to run the command with root privileges or run it with the user that is running the agent.  More details: [Connect an agent without root privileges](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-an-agent-without-root-privileges) section.
-To automatically claim nodes after installation: 
+You either need to run the command with root privileges or run it with the user that is running the agent.  
+More details: [Connect an agent without root privileges](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-an-agent-without-root-privileges) section.
 :::
+
+To automatically claim nodes after installation:
 
 1. Sign in to [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces)
 2. Go to the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#manage-spaces)
@@ -166,7 +168,6 @@ If you want to enforce the usage of a local build (perhaps because you require a
 which is not supported with native packages or static builds), you can do so by adding `--build-only` to the
 options you pass to the installer.
 
-
 ## Verify script integrity
 
 To use `md5sum` to verify the integrity of the `kickstart.sh` script you will download using the one-line command above,
@@ -188,5 +189,3 @@ Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/
 Read through Netdata's [documentation](https://learn.netdata.cloud/), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
-
-
