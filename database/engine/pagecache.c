@@ -23,6 +23,9 @@ static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused,
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
+    if(!entries)
+        return;
+
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
 
     size_t bytes_per_point =  CTX_POINT_SIZE_BYTES(ctx);
@@ -50,7 +53,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
             error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
-        memcpy(descr->page, pgc_page_data(pages_array[Index]), descr->page_length);
+        descr->page = pgc_page_data(pages_array[Index]);
         DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");

@@ -59,6 +59,7 @@ time_t mrg_metric_get_update_every_s(MRG *mrg, METRIC *metric);
 
 void mrg_metric_expand_retention(MRG *mrg, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s);
 void mrg_metric_get_retention(MRG *mrg, METRIC *metric, time_t *first_time_s, time_t *last_time_s, time_t *update_every_s);
+bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric);
 
 bool mrg_metric_writer_acquire(MRG *mrg, METRIC *metric);
 bool mrg_metric_writer_release(MRG *mrg, METRIC *metric);

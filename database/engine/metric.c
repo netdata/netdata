@@ -331,16 +331,6 @@ METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section) {
 }
 
 bool mrg_metric_release_and_delete(MRG *mrg, METRIC *metric) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    netdata_spinlock_lock(&metric->spinlock);
-
-    internal_fatal(metric->first_time_s || metric->latest_time_s_clean || metric->latest_time_s_hot,
-                   "METRIC: trying to delete a metric with retention from %ld to %ld (clean) and %ld (hot)",
-                   metric->first_time_s, metric->latest_time_s_clean, metric->latest_time_s_hot);
-
-    netdata_spinlock_unlock(&metric->spinlock);
-#endif
-
     return acquired_metric_del(mrg, metric);
 }
 
@@ -471,6 +461,56 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
     metric_has_retention_unsafe(mrg, metric);
     netdata_spinlock_unlock(&metric->spinlock);
     return true;
+}
+
+// returns true when metric still has retention
+bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
+    Word_t section = mrg_metric_section(mrg, metric);
+    bool do_again = false;
+    size_t countdown = 5;
+    bool ret = true;
+
+    do {
+        time_t min_first_time_s = LONG_MAX;
+        time_t max_end_time_s = 0;
+        PGC_PAGE *page;
+        PGC_SEARCH method = PGC_SEARCH_FIRST;
+        while ((page = pgc_page_get_and_acquire(main_cache, section, (Word_t) metric, 0, method))) {
+            method = PGC_SEARCH_NEXT;
+
+            bool is_hot = pgc_is_page_hot(page);
+            bool is_dirty = pgc_is_page_dirty(page);
+            time_t page_first_time_s = pgc_page_start_time_s(page);
+            time_t page_end_time_s = pgc_page_end_time_s(page);
+
+            if ((is_hot || is_dirty) && page_first_time_s < min_first_time_s)
+                min_first_time_s = page_first_time_s;
+
+            if (is_dirty && page_end_time_s > max_end_time_s)
+                max_end_time_s = page_end_time_s;
+
+            pgc_page_release(main_cache, page);
+        }
+
+        if (min_first_time_s == LONG_MAX)
+            min_first_time_s = 0;
+
+        netdata_spinlock_lock(&metric->spinlock);
+        if (--countdown && !min_first_time_s && metric->latest_time_s_hot)
+            do_again = true;
+        else {
+            internal_error(!countdown, "METRIC: giving up on updating the retention of metric without disk retention");
+
+            do_again = false;
+            metric->first_time_s = min_first_time_s;
+            metric->latest_time_s_clean = max_end_time_s;
+
+            ret = metric_has_retention_unsafe(mrg, metric);
+        }
+        netdata_spinlock_unlock(&metric->spinlock);
+    } while(do_again);
+
+    return ret;
 }
 
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {

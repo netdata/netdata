@@ -1446,7 +1446,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         added++;
     }
 
-    info("DBENGINE: recalculating retention for %zu metrics starting with datafile %u", count, first_datafile_remaining->fileno);
+    info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+         ctx->config.tier, count, first_datafile_remaining->fileno);
 
     journalfile_v2_data_release(journalfile);
 
@@ -1460,17 +1461,32 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    info("DBENGINE: updating metric registry retention for %zu metrics", added);
+    info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
+         ctx->config.tier, added);
 
+    size_t deleted_metrics = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
-        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX))
+        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
             mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
-        else
-            mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, 0);
-        mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+        }
+        else {
+            // there is no retention for this metric
+            bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
+            if (!has_retention) {
+                bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
+                if(deleted)
+                    deleted_metrics++;
+            }
+            else
+                mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+        }
     }
     freez(uuid_first_entry_list);
+
+    internal_error(deleted_metrics, "DBENGINE: deleted %zu tier %d metrics from metrics registry",
+                   deleted_metrics, ctx->config.tier);
 
     if(worker)
         worker_is_idle();
