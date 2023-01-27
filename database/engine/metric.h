@@ -18,23 +18,24 @@ typedef struct mrg_entry {
 
 struct mrg_statistics {
     size_t entries;
-    size_t size;                // memory without indexing
+    size_t entries_acquired;
+    size_t entries_with_retention;
+    size_t size;                // total memory used, with indexing
     size_t additions;
     size_t additions_duplicate;
     size_t deletions;
     size_t delete_misses;
     size_t search_hits;
     size_t search_misses;
-    size_t pointer_validation_hits;
-    size_t pointer_validation_misses;
     size_t writers;
+    size_t writers_conflicts;
 };
 
 MRG *mrg_create(void);
 void mrg_destroy(MRG *mrg);
 
 METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric);
-void mrg_metric_release(MRG *mrg, METRIC *metric);
+bool mrg_metric_release(MRG *mrg, METRIC *metric);
 
 METRIC *mrg_metric_add_and_acquire(MRG *mrg, MRG_ENTRY entry, bool *ret);
 METRIC *mrg_metric_get_and_acquire(MRG *mrg, uuid_t *uuid, Word_t section);
