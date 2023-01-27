@@ -82,6 +82,8 @@ struct pgc_linked_list {
 
 struct pgc {
     struct {
+        char name[PGC_NAME_MAX + 1];
+
         size_t partitions;
         size_t clean_size;
         size_t max_dirty_pages_per_call;
@@ -416,6 +418,7 @@ struct section_pages {
 };
 
 static ARAL section_pages_aral = {
+        .name = "pgc_sections",
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
@@ -1713,7 +1716,8 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // ----------------------------------------------------------------------------
 // public API
 
-PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
+PGC *pgc_create(const char *name,
+                size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_flush,
                 save_dirty_init_callback pgc_save_init_cb,
                 save_dirty_page_callback pgc_save_dirty_cb,
@@ -1732,6 +1736,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
         max_flushes_inline = 2;
 
     PGC *cache = callocz(1, sizeof(PGC));
+    strncpyz(cache->config.name, name, PGC_NAME_MAX);
     cache->config.options = options;
     cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
@@ -1772,7 +1777,9 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = arrayalloc_create(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page, 65536 / sizeof(PGC_PAGE),
+    cache->aral = arrayalloc_create(name,
+                                    sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
+                                    65536 / sizeof(PGC_PAGE),
                                     NULL, NULL, false, false);
 #endif
 
@@ -2602,7 +2609,8 @@ void unittest_stress_test(void) {
 #endif
 
 int pgc_unittest(void) {
-    PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
+    PGC *cache = pgc_create("test",
+                            32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,
                             10, 10, 1000, 10,
                             PGC_OPTIONS_DEFAULT, 1, 11);

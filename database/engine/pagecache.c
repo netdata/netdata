@@ -1077,6 +1077,7 @@ void init_page_cache(void)
         }
 
         main_cache = pgc_create(
+                "main_cache",
                 main_cache_size,
                 main_cache_free_clean_page_callback,
                 (size_t) rrdeng_pages_per_extent,
@@ -1092,6 +1093,7 @@ void init_page_cache(void)
         );
 
         open_cache = pgc_create(
+                "open_cache",
                 open_cache_size,                             // the default is 1MB
                 open_cache_free_clean_page_callback,
                 1,
@@ -1108,6 +1110,7 @@ void init_page_cache(void)
         pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
 
         extent_cache = pgc_create(
+                "extent_cache",
                 extent_cache_size,
                 extent_cache_free_clean_page_callback,
                 1,

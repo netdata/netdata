@@ -4,12 +4,15 @@
 
 #include "../libnetdata.h"
 
+#define ARAL_MAX_NAME 23
+
 typedef struct arrayalloc {
     size_t requested_element_size;
     size_t initial_elements;
     const char *filename;
     char **cache_dir;
     bool use_mmap;
+    char name[ARAL_MAX_NAME + 1];
 
     // private members - do not touch
     struct {
@@ -28,7 +31,7 @@ typedef struct arrayalloc {
     } internal;
 } ARAL;
 
-ARAL *arrayalloc_create(size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
+ARAL *arrayalloc_create(const char *name, size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
 int aral_unittest(size_t elements);
 void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used);
 void aral_enable_check_free_space(void);

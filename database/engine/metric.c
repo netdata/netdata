@@ -307,8 +307,10 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 MRG *mrg_create(void) {
     MRG *mrg = callocz(1, sizeof(MRG));
     for(size_t i = 0; i < MRG_PARTITIONS ; i++) {
+        char buf[ARAL_MAX_NAME + 1];
+        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
-        mrg->index[i].aral = arrayalloc_create(sizeof(METRIC), 32768 / sizeof(METRIC), NULL, NULL, false, true);
+        mrg->index[i].aral = arrayalloc_create(buf, sizeof(METRIC), 32768 / sizeof(METRIC), NULL, NULL, false, true);
     }
     mrg->stats.size = sizeof(MRG);
     return mrg;

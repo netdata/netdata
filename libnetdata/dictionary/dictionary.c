@@ -1235,6 +1235,7 @@ static inline size_t item_get_name_len(const DICTIONARY_ITEM *item) {
 }
 
 static ARAL dict_items_aral = {
+        .name = "dict-items",
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
@@ -1243,6 +1244,7 @@ static ARAL dict_items_aral = {
 };
 
 static ARAL dict_shared_items_aral = {
+        .name = "dict-shared-items",
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
