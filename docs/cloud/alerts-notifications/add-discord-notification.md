@@ -13,7 +13,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 
 #### Prerequisites
 
-To add discord notification configurations you need
+To enable Discord notifications you need:
 
 - A Cloud account
 - Access to the space as and Administrator
