@@ -17,7 +17,7 @@ These routines can be used to retrieve additional information to help you troubl
 
 The following is required to be able to run Functions from Netdata Cloud.
 * At least one of the nodes claimed to your Space should be on a Netdata agent version higher than `v1.37.1`
-* Ensure that the node has the collector that exposes the function you want enabled ([see current available functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md#what-are-the-current-available-functions)
+* Ensure that the node has the collector that exposes the function you want enabled ([see current available functions](https://github.com/netdata/netdata/blob/master/docs/cloud/netdata-functions.md#what-functions-are-currently-available)
 
 ### Execute a function (from functions view)
 
