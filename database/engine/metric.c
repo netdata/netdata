@@ -205,6 +205,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->latest_update_every_s = entry->latest_update_every_s;
     metric->writer = 0;
     metric->refcount = 0;
+    metric->flags = 0;
     netdata_spinlock_init(&metric->spinlock);
     metric_acquire(mrg, metric, true); // no spinlock use required here
     *PValue = metric;
@@ -349,7 +350,7 @@ METRIC *mrg_metric_dup(MRG *mrg, METRIC *metric) {
 }
 
 bool mrg_metric_release(MRG *mrg, METRIC *metric) {
-    metric_release_and_can_be_deleted(mrg, metric);
+    return metric_release_and_can_be_deleted(mrg, metric);
 }
 
 Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
