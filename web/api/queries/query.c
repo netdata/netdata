@@ -1320,6 +1320,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     query_planer_next_plan(ops, now_end_time, new_point.end_time))) {
                     db_points_read_since_plan_switch = 1;
                     sp = ops->next_metric(ops->handle);
+                    if(last1_point.end_time > sp.start_time_s)
+                        last1_point.end_time = sp.start_time_s;
                 }
 
                 ops->db_points_read_per_tier[ops->tier]++;
