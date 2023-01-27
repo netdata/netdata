@@ -33,7 +33,7 @@ typedef struct arrayalloc_page {
     struct arrayalloc_page *next; // the next page on the list
 } ARAL_PAGE;
 
-struct {
+struct aral_statistics {
     struct {
         struct {
             size_t allocations;
@@ -51,8 +51,14 @@ struct {
             size_t allocated;
             size_t used;
         } mmap;
+
+        usec_t check_free_space_ut;
     } atomic;
 } aral_globals = {};
+
+void aral_enable_check_free_space(void) {
+    __atomic_store_n(&aral_globals.atomic.check_free_space_ut, now_realtime_usec(), __ATOMIC_RELAXED);
+}
 
 void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used) {
     *structures = __atomic_load_n(&aral_globals.atomic.structures.allocated, __ATOMIC_RELAXED);
@@ -203,7 +209,6 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 // ----------------------------------------------------------------------------
 // find a page with a free slot (there shouldn't be any)
 
-#ifdef NETDATA_ARRAYALLOC_INTERNAL_CHECKS
 static inline ARAL_PAGE *find_page_with_free_slots_internal_check(ARAL *ar) {
     ARAL_PAGE *page;
 
@@ -220,7 +225,6 @@ static inline ARAL_PAGE *find_page_with_free_slots_internal_check(ARAL *ar) {
 
     return page;
 }
-#endif
 
 static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     if(unlikely(!ar->internal.initialized))
@@ -343,11 +347,22 @@ void *arrayalloc_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION
     arrayalloc_lock(ar);
 
     if(unlikely(!ar->internal.pages || !ar->internal.pages->free_list)) {
-#ifdef NETDATA_ARRAYALLOC_INTERNAL_CHECKS
-            internal_fatal(find_page_with_free_slots_internal_check(ar) != NULL,
-                           "ARRAYALLOC: first page does not have any free slots, but there is another that has!");
-#endif
-        arrayalloc_add_page(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+        usec_t check_ut = __atomic_load_n(&aral_globals.atomic.check_free_space_ut, __ATOMIC_RELAXED);
+        if(check_ut > ar->internal.last_full_check_time_ut) {
+            ARAL_PAGE *page = find_page_with_free_slots_internal_check(ar);
+            if (page) {
+                internal_error(true, "ARRAYALLOC: first page does not have any free slots, but there is another that has - moved it first!");
+                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->internal.pages, page, prev, next);
+                DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->internal.pages, page, prev, next);
+            }
+            else {
+                ar->internal.last_full_check_time_ut = check_ut;
+                internal_error(true, "ARRAYALLOC: page check done - all pages full");
+                arrayalloc_add_page(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+            }
+        }
+        else
+            arrayalloc_add_page(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
     }
 
     ARAL_PAGE *page = ar->internal.pages;

@@ -1326,7 +1326,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_host = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
+    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0, hash_aral_full_check = 0;
 #endif
 
     if(unlikely(!hash_api)) {
@@ -1337,6 +1337,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
         hash_mirror = simple_hash("mirror");
+        hash_aral_full_check = simple_hash("aral-full-check");
 #endif
     }
 
@@ -1378,6 +1379,19 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
             error("web request to exit received.");
             netdata_cleanup_and_exit(0);
+            return HTTP_RESP_OK;
+        }
+        else if(unlikely(hash == hash_aral_full_check && strcmp(tok, "aral-full-check") == 0)) {
+            if(unlikely(!web_client_can_access_netdataconf(w)))
+                return web_client_permission_denied(w);
+
+            w->response.data->contenttype = CT_TEXT_PLAIN;
+            buffer_flush(w->response.data);
+
+            buffer_strcat(w->response.data, "ok, done.");
+
+            error("ARRAYALLOC: full check command received.");
+            aral_enable_check_free_space();
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
