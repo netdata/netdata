@@ -1259,7 +1259,7 @@ static bool epdl_populate_pages_from_extent_data(
     return true;
 }
 
-static void *read_datafile_extent(uv_file file, unsigned pos, unsigned size_bytes)
+static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, unsigned pos, unsigned size_bytes)
 {
     void *buffer;
     uv_fs_t request;
@@ -1267,17 +1267,25 @@ static void *read_datafile_extent(uv_file file, unsigned pos, unsigned size_byte
     unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     int ret = posix_memalign(&buffer, RRDFILE_ALIGNMENT, real_io_size);
     if (unlikely(ret))
-        fatal("posix_memalign:%s", strerror(ret));
+        fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
 
     uv_buf_t iov = uv_buf_init(buffer, real_io_size);
     ret = uv_fs_read(NULL, &request, file, &iov, 1, pos, NULL);
     if (unlikely(-1 == ret)) {
+        ctx_io_error(ctx);
         posix_memfree(buffer);
         buffer = NULL;
     }
+    else
+        ctx_io_read_op_bytes(ctx, real_io_size);
+
     uv_fs_req_cleanup(&request);
-    // This needs to be released with posix_memfree(buffer);
+
     return buffer;
+}
+
+static inline void datafile_extent_read_free(void *buffer) {
+    posix_memfree(buffer);
 }
 
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
@@ -1327,12 +1335,12 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
 
-        void *extent_data = read_datafile_extent(epdl->file, epdl->extent_offset, epdl->extent_size);
+        void *extent_data = datafile_extent_read(ctx, epdl->file, epdl->extent_offset, epdl->extent_size);
         if(extent_data != NULL) {
 
             void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
             memcpy(copied_extent_compressed_data, extent_data, epdl->extent_size);
-            posix_memfree((void *)extent_data);
+            datafile_extent_read_free(extent_data);
 
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);

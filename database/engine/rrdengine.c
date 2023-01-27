@@ -968,10 +968,6 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
     struct rrdengine_datafile *datafile;
     unsigned i;
 
-    if (uv_fs_request->result < 0) {
-        ctx_io_error(ctx);
-        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)uv_fs_request->result));
-    }
     datafile = xt_io_descr->datafile;
 
     bool still_running = ctx_is_available_for_queries(ctx);
@@ -1013,6 +1009,11 @@ static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
     struct rrdengine_instance *ctx = datafile->ctx;
+
+    if (uv_fs_request->result < 0) {
+        ctx_io_error(ctx);
+        error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
+    }
 
     journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
 
