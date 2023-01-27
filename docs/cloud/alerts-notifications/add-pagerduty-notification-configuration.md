@@ -16,7 +16,7 @@ From the Cloud interface, you can manage your space's notification settings and 
 To add PagerDuty notification configurations you need
 
 - A Cloud account
-- Access to the space as and **Administrator**
+- Access to the space as and **administrator**
 - Space will needs to be on **Business** plan or higher
 - Have a PagerDuty service to receive events, for mode details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
@@ -31,7 +31,7 @@ To add PagerDuty notification configurations you need
       - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
       - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
+   1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For PagerDuty:
       - Integration Key -  is a 32 character key provided by PagerDuty to receive events on your service. For more details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
 #### Settings on PagerDuty

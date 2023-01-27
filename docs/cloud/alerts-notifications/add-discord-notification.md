@@ -16,7 +16,7 @@ From the Netdata Cloud UI, you can manage your space's notification settings and
 To enable Discord notifications you need:
 
 - A Netdata Cloud account
-- Access to the space as an administrator
+- Access to the space as an **administrator**
 - Have a Discord server able to receive webhook integrations. For mode details check [how to configure this on Discord](#settings-on-discord)
 
 #### Steps
@@ -30,7 +30,7 @@ To enable Discord notifications you need:
       - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
       - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Discord:
+   1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For Discord:
       - Define the type channel you want to send notifications to: **Text channel** or **Forum channel**
       - Webhook URL - URL provided on Discord for the channel you want to receive your notifications. For more details check [how to configure this on Discord](#settings-on-discord)
       - Thread name - if the Discord channel is a **Forum channel** you will need to provide the thread name as well
