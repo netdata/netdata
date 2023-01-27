@@ -58,7 +58,7 @@ concern is addressed.
 ### **Related Concepts**
 
 - [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
-- [plugins.d]((https://github.com/netdata/netdata/blob/master/docs/nightly/references/collectors-references/plugins.d)
+- [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d)
 
 ### Related Tasks
 
