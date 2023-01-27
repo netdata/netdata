@@ -26,7 +26,7 @@ the function is invoked.
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes
 functions - [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d#function).
 
-#### What are the current available functions?
+#### What functions are currently available?
 
 | Function | Description | plugin - module |
 | :-- | :-- | :-- |
