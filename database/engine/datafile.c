@@ -257,7 +257,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
+    fd = open_file_buffered_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -340,7 +340,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_RDWR, &file);
+    fd = open_file_buffered_io(path, O_RDWR, &file);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
