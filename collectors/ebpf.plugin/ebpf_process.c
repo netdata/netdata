@@ -57,17 +57,6 @@ struct config process_config = { .first_section = NULL,
 static char *threads_stat[NETDATA_EBPF_THREAD_STAT_END] = {"total", "running"};
 static char *load_event_stat[NETDATA_EBPF_LOAD_STAT_END] = {"legacy", "co-re"};
 
-static struct netdata_static_thread cgroup_thread = {
-    .name = "EBPF CGROUP",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-
 /*****************************************************************
  *
  *  PROCESS DATA AND SEND TO NETDATA
@@ -324,55 +313,6 @@ static void ebpf_process_update_apps_data()
 
         pids = pids->next;
     }
-}
-
-/**
- * Cgroup Exit
- *
- * Function used with netdata_thread_clean_push
- *
- * @param ptr unused argument
- */
-static void ebpf_cgroup_exit(void *ptr)
-{
-    UNUSED(ptr);
-}
-
-/**
- * Cgroup update shm
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data from shared memory.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_cgroup_update_shm(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_cgroup_exit, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    usec_t step = 3 * USEC_PER_SEC;
-    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
-    //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        // We are using a small heartbeat time to wake up thread,
-        // but we should not update so frequently the shared memory data
-        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
-            counter = 0;
-            if (!shm_ebpf_cgroup.header)
-                ebpf_map_cgroup_shared_memory();
-
-            ebpf_parse_cgroup_shm_data();
-        }
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -745,8 +685,6 @@ static void ebpf_process_exit(void *ptr)
     pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
-    if (cgroup_thread.thread)
-        pthread_cancel(*cgroup_thread.thread);
 }
 
 /*****************************************************************
@@ -1105,13 +1043,6 @@ void ebpf_send_statistic_data()
  */
 static void process_collector(ebpf_module_t *em)
 {
-    // Start cgroup integration before other threads
-    cgroup_thread.thread = mallocz(sizeof(netdata_thread_t));
-    cgroup_thread.start_routine = ebpf_cgroup_update_shm;
-
-    netdata_thread_create(cgroup_thread.thread, cgroup_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_cgroup_update_shm, NULL);
-
     heartbeat_t hb;
     heartbeat_init(&hb);
     int publish_global = em->global_charts;
@@ -1153,7 +1084,7 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_process_update_apps_data();
                 }
 
-                if (cgroups) {
+                if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_update_process_cgroup();
                 }
             }
@@ -1170,7 +1101,7 @@ static void process_collector(ebpf_module_t *em)
                     ebpf_process_send_apps_data(apps_groups_root_target, em);
                 }
 
-                if (cgroups) {
+                if (cgroups && shm_ebpf_cgroup.header) {
                     ebpf_process_send_cgroup_data(em);
                 }
             }

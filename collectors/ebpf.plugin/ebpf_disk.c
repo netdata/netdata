@@ -33,16 +33,6 @@ static netdata_syscall_stat_t disk_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
 static netdata_idx_t *disk_hash_values = NULL;
-static struct netdata_static_thread disk_threads = {
-                                        .name = "DISK KERNEL",
-                                        .config_section = NULL,
-                                        .config_name = NULL,
-                                        .env_name = NULL,
-                                        .enabled = 1,
-                                        .thread = NULL,
-                                        .init_routine = NULL,
-                                        .start_routine = NULL
-};
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -439,11 +429,7 @@ static void ebpf_cleanup_disk_list()
 static void ebpf_disk_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_disk_disable_tracepoints();
@@ -452,7 +438,6 @@ static void ebpf_disk_free(ebpf_module_t *em)
         ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
 
     freez(disk_hash_values);
-    freez(disk_threads.thread);
     pthread_mutex_destroy(&plot_mutex);
 
     ebpf_cleanup_plot_disks();
@@ -471,21 +456,6 @@ static void ebpf_disk_free(ebpf_module_t *em)
  * @param ptr thread data.
  */
 static void ebpf_disk_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (disk_threads.thread)
-        netdata_thread_cancel(*disk_threads.thread);
-    ebpf_disk_free(em);
-}
-
-/**
- * Disk Cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_disk_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_disk_free(em);
@@ -590,35 +560,6 @@ static void read_hard_disk_tables(int table)
 
         key = next_key;
     }
-}
-
-/**
- * Disk read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_disk_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -744,11 +685,6 @@ static void ebpf_latency_send_hd_data(int update_every)
 static void disk_collector(ebpf_module_t *em)
 {
     disk_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-    disk_threads.thread = mallocz(sizeof(netdata_thread_t));
-    disk_threads.start_routine = ebpf_disk_read_hash;
-
-    netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_disk_read_hash, em);
 
     int update_every = em->update_every;
     heartbeat_t hb;
@@ -759,6 +695,7 @@ static void disk_collector(ebpf_module_t *em)
         if (ebpf_exit_plugin)
             break;
 
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data(update_every);

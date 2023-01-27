@@ -34,17 +34,6 @@ struct config vfs_config = { .first_section = NULL,
     .index = { .avl_tree = { .root = NULL, .compar = appconfig_section_compare },
     .rwlock = AVL_LOCK_INITIALIZER } };
 
-struct netdata_static_thread vfs_threads = {
-    .name = "VFS KERNEL",
-    .config_section = NULL,
-    .config_name = NULL,
-    .env_name = NULL,
-    .enabled = 1,
-    .thread = NULL,
-    .init_routine = NULL,
-    .start_routine = NULL
-};
-
 netdata_ebpf_targets_t vfs_targets[] = { {.name = "vfs_write", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "vfs_writev", .mode = EBPF_LOAD_TRAMPOLINE},
                                          {.name = "vfs_read", .mode = EBPF_LOAD_TRAMPOLINE},
@@ -409,16 +398,11 @@ static inline int ebpf_vfs_load_and_attach(struct vfs_bpf *obj, ebpf_module_t *e
 static void ebpf_vfs_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     freez(vfs_hash_values);
     freez(vfs_vector);
-    freez(vfs_threads.thread);
 
 #ifdef LIBBPF_MAJOR_VERSION
     if (bpf_obj)
@@ -438,19 +422,6 @@ static void ebpf_vfs_free(ebpf_module_t *em)
  * @param ptr thread data.
 **/
 static void ebpf_vfs_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (vfs_threads.thread)
-        netdata_thread_cancel(*vfs_threads.thread);
-    ebpf_vfs_free(em);
-}
-
-/**
-* Clean up the main thread.
-*
-* @param ptr thread data.
-**/
-static void ebpf_vfs_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_vfs_free(em);
@@ -519,7 +490,7 @@ static void ebpf_vfs_send_data(ebpf_module_t *em)
 /**
  * Read the hash table and store data to allocated vectors.
  */
-static void read_global_table()
+static void ebpf_vfs_read_global_table()
 {
     uint64_t idx;
     netdata_idx_t res[NETDATA_VFS_COUNTER];
@@ -872,36 +843,6 @@ static void read_update_vfs_cgroup()
         }
     }
     pthread_mutex_unlock(&mutex_cgroup_shm);
-}
-
-/**
- * VFS read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_vfs_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_vfs_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_VFS_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_global_table();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -1526,12 +1467,6 @@ static void ebpf_vfs_send_cgroup_data(ebpf_module_t *em)
  */
 static void vfs_collector(ebpf_module_t *em)
 {
-    vfs_threads.thread = mallocz(sizeof(netdata_thread_t));
-    vfs_threads.start_routine = ebpf_vfs_read_hash;
-
-    netdata_thread_create(vfs_threads.thread, vfs_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_vfs_read_hash, em);
-
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -1542,6 +1477,7 @@ static void vfs_collector(ebpf_module_t *em)
             break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
+        ebpf_vfs_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             ebpf_vfs_read_apps();
