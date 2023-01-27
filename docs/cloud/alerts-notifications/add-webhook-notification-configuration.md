@@ -15,8 +15,8 @@ From the Cloud interface, you can manage your space's notification settings and 
 
 To add discord notification configurations you need
 
-- A Cloud account
-- Access to the space as and **administrator**
+- A Netdata Cloud account
+- Access to the space as an **administrator**
 - Space will needs to be on **Pro** plan or higher
 - Have an app that allows you to receive webhooks following a predefined schema, for mode details check [how to create the webhook service](#webhook-service)
 
@@ -31,7 +31,7 @@ To add discord notification configurations you need
       - Configuration name - you can optionally provide a name for your configuration  you can easily refer to it
       - Rooms - by specifying a list of Rooms you are select to which nodes or areas of your infrastructure you want to be notified using this configuration
       - Notification - you specify which notifications you want to be notified using this configuration: All Alerts and unreachable, All Alerts, Critical only
-1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For webhook:
+   1. **Integration configuration** are the specific notification integration required settings, which vary by notification method. For webhook:
       - Webhook URL - webhook URL is the url of the service that Netdata will send notifications to. In order to keep the communication secured, we only accept HTTPS urls. Check [how to create the webhook service](#webhook-service).
       - Extra headers - these are optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL. For mode details check [Extra headers](#extra-headers)
       - Authorization Mechanism - Netdata webhook integration supports 3 different authorization mechanisms. For mode details check [Authorization mechanism](#authorization-mechanism):
