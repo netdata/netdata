@@ -62,4 +62,4 @@ concern is addressed.
 
 ### Related Tasks
 
-- [Run-time troubleshooting with Functions](https://github.com/netdata/netdata/blob/master/docs/nightly/operations/run-time-troubleshooting-with-functions)
+- [Run-time troubleshooting with Functions](https://github.com/netdata/netdata/blob/master/docs/nightly/operations/run-time-troubleshooting-with-functions.md)
