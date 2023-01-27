@@ -605,7 +605,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                 false);
 
         if(!vd.is_valid) {
-            mrg_metric_release(main_mrg, metric);
+            if(metric)
+                mrg_metric_release(main_mrg, metric);
+
             continue;
         }
 
