@@ -24,7 +24,7 @@ function (i.e. code) to be run by a data collector when
 the function is invoked.
 
 For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes
-functions - [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d#function).
+functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#function).
 
 #### What functions are currently available?
 
@@ -58,7 +58,7 @@ concern is addressed.
 ### **Related Concepts**
 
 - [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
-- [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d)
+- [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md)
 
 ### Related Tasks
 
