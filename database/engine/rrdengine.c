@@ -1398,7 +1398,7 @@ void find_uuid_first_time(
         }
     }
     internal_error(true,
-         "DBENGINE: analyzed the retention of %zu rotated metrics, "
+         "DBENGINE: analyzed the retention of %zu rotated metrics of tier %d, "
          "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
          "%zu metrics with entries in open cache, "
          "metrics first time found per datafile index ([not in jv2]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
@@ -1406,6 +1406,7 @@ void find_uuid_first_time(
          "metrics without any remaining retention %zu, "
          "metrics not in MRG %zu",
          metric_count,
+         ctx->config.tier,
          binary_match,
          not_matching_bsearches,
          not_needed_bsearches,
