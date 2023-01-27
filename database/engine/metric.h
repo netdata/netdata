@@ -18,15 +18,23 @@ typedef struct mrg_entry {
 
 struct mrg_statistics {
     size_t entries;
-    size_t entries_acquired;
+    size_t entries_referenced;
     size_t entries_with_retention;
+
     size_t size;                // total memory used, with indexing
+
+    size_t current_references;
+
     size_t additions;
     size_t additions_duplicate;
+
     size_t deletions;
+    size_t delete_having_retention_or_referenced;
     size_t delete_misses;
+
     size_t search_hits;
     size_t search_misses;
+
     size_t writers;
     size_t writers_conflicts;
 };

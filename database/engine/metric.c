@@ -134,7 +134,9 @@ static inline REFCOUNT metric_acquire(MRG *mrg __maybe_unused, METRIC *metric, b
         netdata_spinlock_unlock(&metric->spinlock);
 
     if(refcount == 1)
-        __atomic_add_fetch(&mrg->stats.entries_acquired, 1, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&mrg->stats.entries_referenced, 1, __ATOMIC_RELAXED);
+
+    __atomic_add_fetch(&mrg->stats.current_references, 1, __ATOMIC_RELAXED);
 
     return refcount;
 }
@@ -156,7 +158,9 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
     netdata_spinlock_unlock(&metric->spinlock);
 
     if(unlikely(!refcount))
-        __atomic_sub_fetch(&mrg->stats.entries_acquired, 1, __ATOMIC_RELAXED);
+        __atomic_sub_fetch(&mrg->stats.entries_referenced, 1, __ATOMIC_RELAXED);
+
+    __atomic_sub_fetch(&mrg->stats.current_references, 1, __ATOMIC_RELAXED);
 
     return ret;
 }
@@ -258,6 +262,7 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 
     if(!metric_release_and_can_be_deleted(mrg, metric)) {
         mrg_index_write_unlock(mrg, partition);
+        __atomic_add_fetch(&mrg->stats.delete_having_retention_or_referenced, 1, __ATOMIC_RELAXED);
         return false;
     }
 
@@ -714,72 +719,79 @@ static void *mrg_stress_test_thread3(void *ptr) {
 
 int mrg_unittest(void) {
     MRG *mrg = mrg_create();
-    METRIC *metric1, *metric2;
+    METRIC *m1_t0, *m2_t0, *m3_t0, *m4_t0;
+    METRIC *m1_t1, *m2_t1, *m3_t1, *m4_t1;
     bool ret;
 
     MRG_ENTRY entry = {
-            .section = 1,
+            .section = 0,
             .first_time_s = 2,
             .last_time_s = 3,
             .latest_update_every_s = 4,
     };
     uuid_generate(entry.uuid);
-    metric1 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    m1_t0 = mrg_metric_add_and_acquire(mrg, entry, &ret);
     if(!ret)
         fatal("DBENGINE METRIC: failed to add metric");
 
     // add the same metric again
-    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric1)
+    m2_t0 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    if(m2_t0 != m1_t0)
         fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
-    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric1)
+    m3_t0 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    if(m3_t0 != m1_t0)
         fatal("DBENGINE METRIC: cannot find the metric added");
 
     // add the same metric again
-    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric1)
+    m4_t0 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    if(m4_t0 != m1_t0)
         fatal("DBENGINE METRIC: adding the same metric twice, does not return the same pointer");
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice");
 
     // add the same metric in another section
-    entry.section = 0;
-    metric2 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    entry.section = 1;
+    m1_t1 = mrg_metric_add_and_acquire(mrg, entry, &ret);
     if(!ret)
-        fatal("DBENGINE METRIC: failed to add metric in different section");
+        fatal("DBENGINE METRIC: failed to add metric in section %zu", (size_t)entry.section);
 
     // add the same metric again
-    if(mrg_metric_add_and_acquire(mrg, entry, &ret) != metric2)
-        fatal("DBENGINE METRIC: adding the same metric twice (section 0), does not return the same pointer");
+    m2_t1 = mrg_metric_add_and_acquire(mrg, entry, &ret);
+    if(m2_t1 != m1_t1)
+        fatal("DBENGINE METRIC: adding the same metric twice (section %zu), does not return the same pointer", (size_t)entry.section);
     if(ret)
         fatal("DBENGINE METRIC: managed to add the same metric twice in (section 0)");
 
-    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
-        fatal("DBENGINE METRIC: cannot find the metric added (section 0)");
+    m3_t1 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    if(m3_t1 != m1_t1)
+        fatal("DBENGINE METRIC: cannot find the metric added (section %zu)", (size_t)entry.section);
 
     // delete the first metric
-    if(!mrg_metric_release_and_delete(mrg, metric1))
+    mrg_metric_release(mrg, m2_t0);
+    mrg_metric_release(mrg, m3_t0);
+    mrg_metric_release(mrg, m4_t0);
+    mrg_metric_set_first_time_s(mrg, m1_t0, 0);
+    mrg_metric_set_clean_latest_time_s(mrg, m1_t0, 0);
+    mrg_metric_set_hot_latest_time_s(mrg, m1_t0, 0);
+    if(!mrg_metric_release_and_delete(mrg, m1_t0))
         fatal("DBENGINE METRIC: cannot delete the first metric");
 
-    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
-        fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one");
-
-    // delete the first metric again - metric1 pointer is invalid now
-    if(mrg_metric_release_and_delete(mrg, metric1))
-        fatal("DBENGINE METRIC: deleted again an already deleted metric");
-
-    // find the section 0 metric again
-    if(mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section) != metric2)
-        fatal("DBENGINE METRIC: cannot find the metric added (section 0), after deleting the first one twice");
+    m4_t1 = mrg_metric_get_and_acquire(mrg, &entry.uuid, entry.section);
+    if(m4_t1 != m1_t1)
+        fatal("DBENGINE METRIC: cannot find the metric added (section %zu), after deleting the first one", (size_t)entry.section);
 
     // delete the second metric
-    if(!mrg_metric_release_and_delete(mrg, metric2))
+    mrg_metric_release(mrg, m2_t1);
+    mrg_metric_release(mrg, m3_t1);
+    mrg_metric_release(mrg, m4_t1);
+    mrg_metric_set_first_time_s(mrg, m1_t1, 0);
+    mrg_metric_set_clean_latest_time_s(mrg, m1_t1, 0);
+    mrg_metric_set_hot_latest_time_s(mrg, m1_t1, 0);
+    if(!mrg_metric_release_and_delete(mrg, m1_t1))
         fatal("DBENGINE METRIC: cannot delete the second metric");
-
-    // delete the second metric again
-    if(mrg_metric_release_and_delete(mrg, metric2))
-        fatal("DBENGINE METRIC: managed to delete an already deleted metric");
 
     if(mrg->stats.entries != 0)
         fatal("DBENGINE METRIC: invalid entries counter");

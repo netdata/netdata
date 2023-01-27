@@ -1465,7 +1465,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
          ctx->config.tier, added);
 
-    size_t deleted_metrics = 0;
+    size_t deleted_metrics = 0, still_having_retention_or_referenced = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
@@ -1479,6 +1479,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
                 bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
                 if(deleted)
                     deleted_metrics++;
+                else
+                    still_having_retention_or_referenced++;
             }
             else
                 mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
@@ -1486,8 +1488,9 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     }
     freez(uuid_first_entry_list);
 
-    internal_error(deleted_metrics, "DBENGINE: deleted %zu tier %d metrics from metrics registry",
-                   deleted_metrics, ctx->config.tier);
+    internal_error(deleted_metrics + still_having_retention_or_referenced,
+                   "DBENGINE: deleted %zu (out of %zu) zero on-disk retention tier %d metrics from metrics registry",
+                   deleted_metrics, deleted_metrics + still_having_retention_or_referenced, ctx->config.tier);
 
     if(worker)
         worker_is_idle();

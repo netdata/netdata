@@ -1891,6 +1891,7 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_mrg_acquired = NULL;
         static RRDDIM *rd_mrg_collected = NULL;
         static RRDDIM *rd_mrg_with_retention = NULL;
+        static RRDDIM *rd_mrg_without_retention = NULL;
         static RRDDIM *rd_mrg_multiple_writers = NULL;
 
         if (unlikely(!st_mrg_metrics)) {
@@ -1900,7 +1901,7 @@ static void dbengine2_statistics_charts(void) {
                     NULL,
                     "dbengine metrics",
                     NULL,
-                    "Netdata Metrics",
+                    "Netdata Metrics in Metrics Registry",
                     "metrics",
                     "netdata",
                     "stats",
@@ -1912,17 +1913,81 @@ static void dbengine2_statistics_charts(void) {
             rd_mrg_acquired = rrddim_add(st_mrg_metrics, "acquired", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_collected = rrddim_add(st_mrg_metrics, "collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_with_retention = rrddim_add(st_mrg_metrics, "with retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_without_retention = rrddim_add(st_mrg_metrics, "without retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_mrg_multiple_writers = rrddim_add(st_mrg_metrics, "multi-collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
         priority++;
 
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_metrics, (collected_number)mrg_stats.entries);
-        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_acquired, (collected_number)mrg_stats.entries_acquired);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_acquired, (collected_number)mrg_stats.entries_referenced);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_collected, (collected_number)mrg_stats.writers);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_with_retention, (collected_number)mrg_stats.entries_with_retention);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_without_retention, (collected_number)mrg_stats.entries - (collected_number)mrg_stats.entries_with_retention);
         rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_multiple_writers, (collected_number)mrg_stats.writers_conflicts);
 
         rrdset_done(st_mrg_metrics);
+    }
+
+    {
+        static RRDSET *st_mrg_ops = NULL;
+        static RRDDIM *rd_mrg_add = NULL;
+        static RRDDIM *rd_mrg_del = NULL;
+        static RRDDIM *rd_mrg_search = NULL;
+
+        if (unlikely(!st_mrg_ops)) {
+            st_mrg_ops = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_metrics_registry_operations",
+                    NULL,
+                    "dbengine metrics",
+                    NULL,
+                    "Netdata Metrics Registry Operations",
+                    "metrics",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_mrg_add = rrddim_add(st_mrg_ops, "add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mrg_del = rrddim_add(st_mrg_ops, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mrg_search = rrddim_add(st_mrg_ops, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_add, (collected_number)mrg_stats.additions);
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_del, (collected_number)mrg_stats.deletions);
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_search, (collected_number)mrg_stats.search_hits + (collected_number)mrg_stats.search_misses);
+
+        rrdset_done(st_mrg_ops);
+    }
+
+    {
+        static RRDSET *st_mrg_references = NULL;
+        static RRDDIM *rd_mrg_references = NULL;
+
+        if (unlikely(!st_mrg_references)) {
+            st_mrg_references = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_metrics_registry_references",
+                    NULL,
+                    "dbengine metrics",
+                    NULL,
+                    "Netdata Metrics Registry References",
+                    "references",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_mrg_references = rrddim_add(st_mrg_references, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_mrg_references, rd_mrg_references, (collected_number)mrg_stats.current_references);
+
+        rrdset_done(st_mrg_references);
     }
 
     {
