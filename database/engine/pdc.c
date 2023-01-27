@@ -1259,6 +1259,28 @@ static bool epdl_populate_pages_from_extent_data(
     return true;
 }
 
+static void *read_datafile_extent(uv_file file, unsigned pos, unsigned size_bytes)
+{
+    void *buffer;
+    uv_fs_t request;
+    uv_buf_t iov;
+
+    unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    int ret = posix_memalign(&buffer, RRDFILE_ALIGNMENT, real_io_size);
+    if (unlikely(ret))
+        fatal("posix_memalign:%s", strerror(ret));
+
+    iov = uv_buf_init(buffer, real_io_size);
+    ret = uv_fs_read(NULL, &request, file, &iov, 1, pos, NULL);
+    if (unlikely(-1 == ret)) {
+        posix_memfree(buffer);
+        buffer = NULL;
+    }
+    uv_fs_req_cleanup(&request);
+    // This needs to be released with posix_memfree(buffer);
+    return buffer;
+}
+
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
     size_t *statistics_counter = NULL;
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
@@ -1306,18 +1328,25 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
 
-        off_t map_start =  ALIGN_BYTES_FLOOR(epdl->extent_offset);
-        size_t length = ALIGN_BYTES_CEILING(epdl->extent_offset + epdl->extent_size) - map_start;
+//        off_t map_start =  ALIGN_BYTES_FLOOR(epdl->extent_offset);
+//        size_t length = ALIGN_BYTES_CEILING(epdl->extent_offset + epdl->extent_size) - map_start;
 
-        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, epdl->file, map_start);
-        if(mmap_data != MAP_FAILED) {
-            extent_compressed_data = mmap_data + (epdl->extent_offset - map_start);
+        void *extent_data = read_datafile_extent(epdl->file, epdl->extent_offset, epdl->extent_size);
+//        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, epdl->file, map_start);
+        if(extent_data != NULL) {
+//            extent_compressed_data = mmap_data + (epdl->extent_offset - map_start);
 
             void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
-            memcpy(copied_extent_compressed_data, extent_compressed_data, epdl->extent_size);
+//            memcpy(copied_extent_compressed_data, extent_compressed_data, epdl->extent_size);
+            memcpy(copied_extent_compressed_data, extent_data, epdl->extent_size);
 
-            int ret = munmap(mmap_data, length);
-            fatal_assert(0 == ret);
+//            if (memcmp(copied_extent_compressed_data, extent_data, epdl->extent_size) == 0)
+//                info("EXTENT: MATCH ON %p vs %p with size %u", copied_extent_compressed_data, extent_data, epdl->extent_size);
+
+            posix_memfree((void *)extent_data);
+
+//            int ret = munmap(mmap_data, length);
+//            fatal_assert(0 == ret);
 
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);
