@@ -17,7 +17,8 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
-#define POINTS_TO_EXPAND_QUERY 0
+#define POINTS_TO_EXPAND_QUERY_AFTER 0
+#define POINTS_TO_EXPAND_QUERY_BEFORE 5
 
 // ----------------------------------------------------------------------------
 
@@ -962,8 +963,8 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         size_t tier = qm->plan.array[p].tier;
         time_t update_every = qm->tiers[tier].db_update_every_s;
 
-        time_t after = qm->plan.array[p].after - (update_every * POINTS_TO_EXPAND_QUERY);
-        time_t before = qm->plan.array[p].before + (update_every * POINTS_TO_EXPAND_QUERY);
+        time_t after = qm->plan.array[p].after - (update_every * POINTS_TO_EXPAND_QUERY_AFTER);
+        time_t before = qm->plan.array[p].before + (update_every * POINTS_TO_EXPAND_QUERY_BEFORE);
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
@@ -1029,7 +1030,7 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
         ops->current_plan_expire_time = qm->plan.array[plan_id].before;
 }
 
-static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
+static bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
     QUERY_METRIC *qm = ops->qm;
 
     size_t old_plan = ops->current_plan;
@@ -1043,7 +1044,7 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
             ops->current_plan_expire_time = ops->r->internal.qt->window.before;
             // let the query run with current plan
             // we will not switch it
-            return;
+            return false;
         }
 
         next_plan_before_time = qm->plan.array[ops->current_plan].before;
@@ -1052,11 +1053,12 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
     if(!query_metric_is_valid_tier(qm, qm->plan.array[ops->current_plan].tier)) {
         ops->current_plan = old_plan;
         ops->current_plan_expire_time = ops->r->internal.qt->window.before;
-        return;
+        return false;
     }
 
     query_planer_finalize_plan(ops, old_plan);
     query_planer_activate_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
+    return true;
 }
 
 static int compare_query_plan_entries_on_start_time(const void *a, const void *b) {
@@ -1314,6 +1316,12 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                 db_points_read_since_plan_switch++;
                 STORAGE_POINT sp = ops->next_metric(ops->handle);
 
+                if(unlikely(query_plan_should_switch_plan(ops, sp.start_time_s) &&
+                    query_planer_next_plan(ops, now_end_time, new_point.end_time))) {
+                    db_points_read_since_plan_switch = 1;
+                    sp = ops->next_metric(ops->handle);
+                }
+
                 ops->db_points_read_per_tier[ops->tier]++;
                 ops->db_total_points_read++;
 
@@ -1409,7 +1417,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
                     // we only log if this is not point 1
                     internal_error(new_point.end_time < after_wanted &&
-                                   new_point.id > POINTS_TO_EXPAND_QUERY + 1,
+                                   new_point.id > POINTS_TO_EXPAND_QUERY_AFTER + 1,
                                    "QUERY: '%s', dimension '%s' next_metric() "
                                    "returned point %zu from %ld time %ld, "
                                    "which is entirely before our current timeframe %ld to %ld "
