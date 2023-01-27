@@ -123,12 +123,6 @@ Netdata comes with hundreds of preconfigured alarms, designed by our monitoring 
 community, but you may want to [edit alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or 
 [enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to customize your Netdata experience.
 
-### Need to monitor multiple nodes in one place?
+### Make your deployment production ready
 
-For robust multi-node monitoring from a single interface, consider [Netdata Cloud](https://app.netdata.cloud/), which streams, aggregates, and visualizes metrics from any number of
-nodes. It's all the same out-of-the-box, zero-configuration functionality of the open-source monitoring agent, but for
-any number of distributed nodes, _entirely for free_.
-
-There is an alternative for those who aren't interested in using Netdata Cloud, albeit with some required configuration.
-Each node can [stream](https://github.com/netdata/netdata/blob/master/streaming/README.md) its metrics to any other node, and the default
-[registry](https://github.com/netdata/netdata/blob/master/registry/README.md) is configurable to create a private "network" of Netdata dashboards.
+Both [securing](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) and [replication](https://github.com/netdata/netdata/blob/master/streaming/README.md) are strongly recommended.
