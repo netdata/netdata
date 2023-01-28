@@ -54,4 +54,4 @@ All users will be able to see events from the Topology and Alerts domain but Aud
 
 ### Related Tasks
 
-- [How to use the Events feed?](TO-DO)
+- [How to use the Events feed?](https://github.com/netdata/netdata/blob/master/docs/cloud/view-evetns-feed.md)
