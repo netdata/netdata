@@ -1239,8 +1239,9 @@ static ARAL dict_items_aral = {
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
-        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM),
         .requested_element_size = sizeof(DICTIONARY_ITEM),
+        .initial_page_elements = 16,
+        .max_page_elements = 128,
 };
 
 static ARAL dict_shared_items_aral = {
@@ -1248,8 +1249,9 @@ static ARAL dict_shared_items_aral = {
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
-        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM_SHARED),
         .requested_element_size = sizeof(DICTIONARY_ITEM_SHARED),
+        .initial_page_elements = 16,
+        .max_page_elements = 128,
 };
 
 static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {

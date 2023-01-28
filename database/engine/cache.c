@@ -422,8 +422,9 @@ static ARAL section_pages_aral = {
         .filename = NULL,
         .cache_dir = NULL,
         .use_mmap = false,
-        .initial_elements = 16384 / sizeof(struct section_pages),
         .requested_element_size = sizeof(struct section_pages),
+        .initial_page_elements = 16,
+        .max_page_elements = 64,
 };
 
 static inline void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
@@ -1779,7 +1780,8 @@ PGC *pgc_create(const char *name,
 #ifdef PGC_WITH_ARAL
     cache->aral = arrayalloc_create(name,
                                     sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
-                                    65536 / sizeof(PGC_PAGE),
+                                    16,
+                                    128,
                                     NULL, NULL, false, false);
 #endif
 

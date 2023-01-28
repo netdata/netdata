@@ -15,7 +15,7 @@
 // max malloc size
 // optimal at current versions of libc is up to 256k
 // ideal to have the same overhead as libc is 4k
-#define ARAL_MAX_PAGE_SIZE_MALLOC (16*1024)
+#define ARAL_MAX_PAGE_SIZE_MALLOC (65*1024)
 
 typedef struct arrayalloc_free {
     size_t size;
@@ -142,11 +142,16 @@ static void arrayalloc_init(ARAL *ar) {
         //info("ARRAYALLOC: element size %zu, sizeof(uintptr_t) %zu, natural alignment %zu, final element size %zu, page_ptr_offset %zu",
         //      ar->element_size, sizeof(uintptr_t), ARAL_NATURAL_ALIGNMENT, ar->internal.element_size, ar->internal.page_ptr_offset);
 
-        if (ar->initial_elements < 10)
-            ar->initial_elements = 10;
+
+        if (ar->initial_page_elements < 10)
+            ar->initial_page_elements = 10;
 
         ar->internal.mmap = (ar->use_mmap && ar->cache_dir && *ar->cache_dir) ? true : false;
-        ar->internal.max_alloc_size = ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
+
+        if(!ar->max_page_elements)
+            ar->internal.max_alloc_size = ar->internal.mmap ? ARAL_MAX_PAGE_SIZE_MMAP : ARAL_MAX_PAGE_SIZE_MALLOC;
+        else
+            ar->internal.max_alloc_size = ar->max_page_elements * ar->internal.element_size;
 
         if(ar->internal.max_alloc_size % ar->internal.natural_page_size)
             ar->internal.max_alloc_size += ar->internal.natural_page_size - (ar->internal.max_alloc_size % ar->internal.natural_page_size) ;
@@ -175,11 +180,12 @@ static void arrayalloc_init(ARAL *ar) {
         internal_error(true,
                        "ARRAYALLOC: '%s' "
                        "requested element size %zu bytes, actual %zu bytes, "
-                       "initial size %zu elements, "
-                       "max allocation size %zu bytes"
+                       "initial elements per page %zu, "
+                       "max elements per page %zu, "
+                       "max allocation size %zu bytes, "
                        , ar->name
                        , ar->requested_element_size, ar->internal.element_size
-                       , ar->initial_elements
+                       , ar->initial_page_elements, ar->internal.max_alloc_size / ar->internal.element_size
                        , ar->internal.max_alloc_size
                        );
     }
@@ -246,7 +252,7 @@ static void arrayalloc_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_P
         arrayalloc_init(ar);
 
     ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
-    page->size = ar->initial_elements * ar->internal.element_size * ar->internal.allocation_multiplier;
+    page->size = ar->initial_page_elements * ar->internal.element_size * ar->internal.allocation_multiplier;
     if(page->size > ar->internal.max_alloc_size)
         page->size = ar->internal.max_alloc_size;
     else
@@ -299,15 +305,18 @@ static inline void arrayalloc_unlock(ARAL *ar) {
         netdata_spinlock_unlock(&ar->internal.spinlock);
 }
 
-ARAL *arrayalloc_create(const char *name, size_t element_size, size_t elements, const char *filename, char **cache_dir, bool mmap, bool lockless) {
+ARAL *arrayalloc_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_elements, const char *filename, char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
     ar->requested_element_size = element_size;
-    ar->initial_elements = elements;
+    ar->initial_page_elements = initial_page_elements;
+    ar->max_page_elements = max_page_elements;
     ar->filename = filename;
     ar->cache_dir = cache_dir;
     ar->use_mmap = mmap;
     ar->internal.lockless = lockless;
     strncpyz(ar->name, name, ARAL_MAX_NAME);
+
+    arrayalloc_init(ar);
 
     __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL), __ATOMIC_RELAXED);
@@ -507,7 +516,7 @@ void arrayalloc_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DE
 
 int aral_unittest(size_t elements) {
     char *cache_dir = "/tmp/";
-    ARAL *ar = arrayalloc_create("aral-test", 20, 10, "test-aral", &cache_dir, false, false);
+    ARAL *ar = arrayalloc_create("aral-test", 20, 10, 1024, "test-aral", &cache_dir, false, false);
 
     void *pointers[elements];
 

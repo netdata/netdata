@@ -310,7 +310,11 @@ MRG *mrg_create(void) {
         char buf[ARAL_MAX_NAME + 1];
         snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
-        mrg->index[i].aral = arrayalloc_create(buf, sizeof(METRIC), 32768 / sizeof(METRIC), NULL, NULL, false, true);
+        mrg->index[i].aral = arrayalloc_create(buf,sizeof(METRIC),
+                                               16,
+                                               64,
+                                               NULL, NULL, false,
+                                               true);
     }
     mrg->stats.size = sizeof(MRG);
     return mrg;
