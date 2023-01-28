@@ -200,7 +200,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         return metric;
     }
 
-    METRIC *metric = arrayalloc_mallocz(mrg->index[partition].aral);
+    METRIC *metric = aral_mallocz(mrg->index[partition].aral);
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
     metric->first_time_s = entry->first_time_s;
@@ -291,8 +291,8 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
         mrg_stats_size_judyhs_removed_uuid(mrg);
     }
 
-    // arrayalloc is running lockless here
-    arrayalloc_freez(mrg->index[partition].aral, metric);
+    // ARAL is running lockless here
+    aral_freez(mrg->index[partition].aral, metric);
 
     mrg_index_write_unlock(mrg, partition);
 
@@ -310,11 +310,11 @@ MRG *mrg_create(void) {
         char buf[ARAL_MAX_NAME + 1];
         snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
-        mrg->index[i].aral = arrayalloc_create(buf,sizeof(METRIC),
-                                               16,
-                                               64,
-                                               NULL, NULL, false,
-                                               true);
+        mrg->index[i].aral = aral_create(buf, sizeof(METRIC),
+                                         0,
+                                         8192,
+                                         NULL, NULL, false,
+                                         true);
     }
     mrg->stats.size = sizeof(MRG);
     return mrg;

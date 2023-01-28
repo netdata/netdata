@@ -16,7 +16,7 @@
 typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
-// to use arrayalloc uncomment the following line:
+// to use ARAL uncomment the following line:
 #define PGC_WITH_ARAL 1
 
 typedef enum __attribute__ ((__packed__)) {
@@ -417,15 +417,25 @@ struct section_pages {
     PGC_PAGE *base;
 };
 
-static ARAL section_pages_aral = {
-        .name = "pgc_sections",
-        .filename = NULL,
-        .cache_dir = NULL,
-        .use_mmap = false,
-        .requested_element_size = sizeof(struct section_pages),
-        .initial_page_elements = 16,
-        .max_page_elements = 64,
-};
+static ARAL *pgc_section_pages_aral = NULL;
+static void pgc_section_pages_static_aral_init(void) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    if(unlikely(!pgc_section_pages_aral)) {
+        netdata_spinlock_lock(&spinlock);
+
+        // we have to check again
+        if(!pgc_section_pages_aral)
+            pgc_section_pages_aral = aral_create(
+                    "pgc_section",
+                    sizeof(struct section_pages),
+                    0,
+                    65536,
+                    NULL, NULL, false, false);
+
+        netdata_spinlock_unlock(&spinlock);
+    }
+}
 
 static inline void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
     if(mem_after_judyl > mem_before_judyl) {
@@ -466,7 +476,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         struct section_pages *sp = *section_pages_pptr;
         if(!sp) {
             // sp = callocz(1, sizeof(struct section_pages));
-            sp = arrayalloc_mallocz(&section_pages_aral);
+            sp = aral_mallocz(pgc_section_pages_aral);
             memset(sp, 0, sizeof(struct section_pages));
 
             *section_pages_pptr = sp;
@@ -547,7 +557,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
             // freez(sp);
-            arrayalloc_freez(&section_pages_aral, sp);
+            aral_freez(pgc_section_pages_aral, sp);
             mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
         }
@@ -864,7 +874,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page) {
 
     // free our memory
 #ifdef PGC_WITH_ARAL
-    arrayalloc_freez(cache->aral, page);
+    aral_freez(cache->aral, page);
 #else
     freez(page);
 #endif
@@ -1182,7 +1192,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
 #ifdef PGC_WITH_ARAL
-    PGC_PAGE *allocation = arrayalloc_mallocz(cache->aral);
+    PGC_PAGE *allocation = aral_mallocz(cache->aral);
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
@@ -1289,7 +1299,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
 #ifdef PGC_WITH_ARAL
     if(allocation)
-        arrayalloc_freez(cache->aral, allocation);
+        aral_freez(cache->aral, allocation);
 #endif
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
@@ -1778,13 +1788,14 @@ PGC *pgc_create(const char *name,
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = arrayalloc_create(name,
-                                    sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
-                                    16,
-                                    128,
-                                    NULL, NULL, false, false);
+    cache->aral = aral_create(name,
+                              sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
+                              0,
+                              65536,
+                              NULL, NULL, false, false);
 #endif
 
+    pgc_section_pages_static_aral_init();
     pointer_index_init(cache);
 
     return cache;
@@ -1812,7 +1823,7 @@ void pgc_destroy(PGC *cache) {
     else {
         pointer_destroy_index(cache);
 #ifdef PGC_WITH_ARAL
-        arrayalloc_destroy(cache->aral);
+        aral_destroy(cache->aral);
 #endif
         freez(cache);
     }
