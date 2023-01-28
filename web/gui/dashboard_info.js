@@ -4406,6 +4406,45 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (MSSQL)
+
+    'mssql.instance_accessmethods_page_splits': {
+        info : 'Page split happens when the page does not have more space. When this happens SQL Server transfers data from a page to another data page.'
+    },
+
+    'mssql.instance_bufman_checkpoint_pages': {
+        info : 'Indicates the number of pages flushed to disk per second by a checkpoint or other operation that require all dirty pages to be flushed.'
+    },
+
+    'mssql.instance_bufman_page_life_expectancy': {
+        info : 'Indicates the number of seconds a page will stay in the buffer pool without references.'
+    },
+
+    'mssql.instance_memmgr_external_benefit_of_memory': {
+        info : 'It is used by the engine to balance memory usage between cache and is useful to support when troubleshooting cases with unexpected cache growth. The value is presented as an integer based on an internal calculation.'
+    },
+
+    'mssql_instance_sql_errors_total': {
+        info: 'Errors in Microsoft SQL Server.</p><p><b>Db_offline</b> - Tracks severe errors that cause SQL Server to take the current database offline. <b>Info</b> - Information related to error messages that provide information to users but do not cause errors. <b>Kill_connection</b> - Tracks severe errors that cause SQL Server to kill the current connection. <b>User</b> - User errors.</p>'
+    },
+
+    'mssql.instance_sqlstats_auto_parameterization_attempts': {
+        info: 'Auto-parameterization occurs when an instance of SQL Server tries to parameterize a Transact-SQL request by replacing some literals with parameters so that reuse of the resulting cached execution plan across multiple similar-looking requests is possible. Note that auto-parameterizations are also known as simple parameterizations in newer versions of SQL Server. This counter does not include forced parameterizations.'
+    },
+
+    'mssql.instance_sqlstats_batch_requests': {
+        info: 'This statistic is affected by all constraints (such as I/O, number of users, cache size, complexity of requests, and so on). High batch requests mean good throughput.'
+    },
+
+    'mssql.instance_sqlstats_safe_auto_parameterization_attempts': {
+        info: 'Note that auto-parameterizations are also known as simple parameterizations in later versions of SQL Server.'
+    },
+
+    'mssql.instance_sqlstats_sql_compilations': {
+        info: 'Indicates the number of times the compile code path is entered. Includes compiles caused by statement-level recompilations in SQL Server. After SQL Server user activity is stable, this value reaches a steady state.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
