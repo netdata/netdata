@@ -4445,6 +4445,21 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (AD)
+
+    'ad.dra_replication_objects_filtered': {
+        info: 'Shows the number of objects received from inbound replication partners that contained no updates that needed to be applied.'
+    },
+
+    'ad.dra_replication_pending_syncs': {
+        info: 'Shows the number of directory synchronizations that are queued for this server but not yet processed.'
+    },
+
+    'ad.dra_replication_sync_requests': {
+        info: 'Shows the number of directory synchronizations that are queued for this server but not yet processed.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
