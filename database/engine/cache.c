@@ -430,7 +430,7 @@ static void pgc_section_pages_static_aral_init(void) {
                     "pgc_section",
                     sizeof(struct section_pages),
                     0,
-                    65536,
+                    4096,
                     NULL, NULL, false, false);
 
         netdata_spinlock_unlock(&spinlock);
@@ -487,7 +487,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
         sp->entries++;
         sp->size += page->assumed_size;
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(sp->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sp->base, page, link.prev, link.next);
 
         if((sp->entries % cache->config.max_dirty_pages_per_call) == 0)
             ll->version++;
@@ -498,11 +498,11 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
         if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
         }
         else
-            DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
 
         ll->version++;
     }
@@ -544,7 +544,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         struct section_pages *sp = *section_pages_pptr;
         sp->entries--;
         sp->size -= page->assumed_size;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sp->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sp->base, page, link.prev, link.next);
 
         if(!sp->base) {
             size_t mem_before_judyl, mem_after_judyl;
@@ -563,7 +563,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         }
     }
     else {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ll->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
         ll->version++;
     }
 
@@ -579,8 +579,8 @@ static inline void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
 
         if (flags & PGC_PAGE_CLEAN) {
             if(pgc_ll_trylock(cache, &cache->clean)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 pgc_ll_unlock(cache, &cache->clean);
                 page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
             }
@@ -1052,8 +1052,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 break;
 
             if(unlikely(page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
                 continue;
             }
@@ -1070,7 +1070,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
 
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
                 pages_to_evict_size += page->assumed_size;
 
@@ -1087,8 +1087,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 if(!first_page_we_relocated)
                     first_page_we_relocated = page;
 
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
                 // check if we have to stop
                 if(unlikely(++total_pages_skipped >= max_skip && !all_of_them)) {
@@ -1113,8 +1113,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     next = page->link.next;
 
                     size_t partition = pgc_indexing_partition(cache, page->metric_id);
-                    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pages_to_evict, page, link.prev, link.next);
-                    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
                 }
 
                 // remove them from the index
@@ -1791,7 +1791,7 @@ PGC *pgc_create(const char *name,
     cache->aral = aral_create(name,
                               sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
                               0,
-                              65536,
+                              4096,
                               NULL, NULL, false, false);
 #endif
 

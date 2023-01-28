@@ -54,7 +54,7 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
         }
 
         descr->page = pgc_page_data(pages_array[Index]);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, descr, link.prev, link.next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
     }

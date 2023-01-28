@@ -498,8 +498,8 @@ int connect_to_one_of_destinations(
             // move the current item to the end of the list
             // without this, this destination will break the loop again and again
             // not advancing the destinations to find one that may work
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, d, prev, next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->destinations, d, prev, next);
 
             break;
         }
@@ -522,7 +522,7 @@ bool destinations_init_add_one(char *entry, void *data) {
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(t->list, d, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
     info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
@@ -549,7 +549,7 @@ void rrdpush_destinations_init(RRDHOST *host) {
 void rrdpush_destinations_free(RRDHOST *host) {
     while (host->destinations) {
         struct rrdpush_destinations *tmp = host->destinations;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
         __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);

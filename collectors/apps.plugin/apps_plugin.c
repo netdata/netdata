@@ -975,7 +975,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid) {
     init_pid_fds(p, 0, p->fds_size);
     p->pid = pid;
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(root_of_pids, p, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(root_of_pids, p, prev, next);
 
     all_pids[pid] = p;
     all_pids_count++;
@@ -993,7 +993,7 @@ static inline void del_pid_entry(pid_t pid) {
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(root_of_pids, p, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(root_of_pids, p, prev, next);
 
     // free the filename
 #ifndef __FreeBSD__

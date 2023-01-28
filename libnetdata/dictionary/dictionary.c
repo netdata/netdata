@@ -789,7 +789,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
             // we didn't get a reference
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
                 dict_item_free_with_hooks(dict, item);
                 deleted++;
 
@@ -1167,9 +1167,9 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
     if(dict->options & DICT_OPTION_ADD_IN_FRONT)
-        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(dict->items.list, item, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
     else
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_adder_pid = gettid();
@@ -1186,7 +1186,7 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_remover_pid = gettid();
@@ -1249,7 +1249,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-items",
                     sizeof(DICTIONARY_ITEM),
                     0,
-                    16384,
+                    4096,
                     NULL, NULL, false, false);
 
         // we have to check again
@@ -1258,7 +1258,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-shared-items",
                     sizeof(DICTIONARY_ITEM_SHARED),
                     0,
-                    16384,
+                    4096,
                     NULL, NULL, false, false);
 
         netdata_spinlock_unlock(&spinlock);

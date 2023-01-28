@@ -477,9 +477,9 @@ int is_legacy = 1;
     rrdhost_index_add_hostname(host);
 
     if(is_localhost)
-        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(localhost, host, prev, next);
     else
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
 
     rrd_unlock();
 
@@ -1092,7 +1092,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         rrdhost_index_del_by_guid(host);
 
         if (host->prev)
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(localhost, host, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
     }
 
     // ------------------------------------------------------------------------

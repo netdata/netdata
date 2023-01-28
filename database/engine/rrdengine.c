@@ -124,7 +124,7 @@ static void work_request_cleanup1(void) {
 
     if(work_request_globals.protected.available_items && work_request_globals.protected.available > (size_t)libuv_worker_threads) {
         item = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
         work_request_globals.protected.available--;
     }
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
@@ -137,7 +137,7 @@ static void work_request_cleanup1(void) {
 
 static inline void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
     work_request_globals.protected.available++;
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
 }
@@ -183,7 +183,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     if(likely(work_request_globals.protected.available_items)) {
         work_request = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
         work_request_globals.protected.available--;
     }
 
@@ -246,7 +246,7 @@ static void page_descriptor_cleanup1(void) {
 
     if(page_descriptor_globals.protected.available_items && page_descriptor_globals.protected.available > MAX_PAGES_PER_EXTENT) {
         item = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
         page_descriptor_globals.protected.available--;
     }
 
@@ -265,7 +265,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 
     if(likely(page_descriptor_globals.protected.available_items)) {
         descr = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
         page_descriptor_globals.protected.available--;
     }
 
@@ -284,7 +284,7 @@ static inline void page_descriptor_release(struct page_descr_with_data *descr) {
     if(unlikely(!descr)) return;
 
     netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
     page_descriptor_globals.protected.available++;
     netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
 }
@@ -322,7 +322,7 @@ static void extent_io_descriptor_cleanup1(void) {
 
     if(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > (size_t)libuv_worker_threads) {
         item = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
         extent_io_descriptor_globals.protected.available--;
     }
     netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
@@ -340,7 +340,7 @@ static struct extent_io_descriptor *extent_io_descriptor_get(void) {
 
     if(likely(extent_io_descriptor_globals.protected.available_items)) {
         xt_io_descr = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
         extent_io_descriptor_globals.protected.available--;
     }
 
@@ -359,7 +359,7 @@ static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_
     if(unlikely(!xt_io_descr)) return;
 
     netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
     extent_io_descriptor_globals.protected.available++;
     netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
 }
@@ -396,7 +396,7 @@ static void rrdeng_query_handle_cleanup1(void) {
 
     if(rrdeng_query_handle_globals.protected.available_items && rrdeng_query_handle_globals.protected.available > 10) {
         item = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
         rrdeng_query_handle_globals.protected.available--;
     }
 
@@ -415,7 +415,7 @@ struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
 
     if(likely(rrdeng_query_handle_globals.protected.available_items)) {
         handle = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
         rrdeng_query_handle_globals.protected.available--;
     }
 
@@ -434,7 +434,7 @@ void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
     if(unlikely(!handle)) return;
 
     netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
     rrdeng_query_handle_globals.protected.available++;
     netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
 }
@@ -471,7 +471,7 @@ static void wal_cleanup1(void) {
 
     if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -494,7 +494,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 
     if(likely(wal_globals.protected.available_items)) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -532,7 +532,7 @@ void wal_release(WAL *wal) {
     if(unlikely(!wal)) return;
 
     netdata_spinlock_lock(&wal_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
     wal_globals.protected.available++;
     netdata_spinlock_unlock(&wal_globals.protected.spinlock);
 }
@@ -596,7 +596,7 @@ static void rrdeng_cmd_cleanup1(void) {
 
     if(rrdeng_cmd_globals.cache.available_items && rrdeng_cmd_globals.cache.available > 100) {
         item = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available--;
     }
     netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
@@ -639,8 +639,8 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
         priority = rrdeng_enq_cmd_map_opcode_to_priority(cmd->opcode, priority);
 
         if (cmd->priority > priority) {
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             cmd->priority = priority;
         }
     }
@@ -657,7 +657,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
     if(likely(rrdeng_cmd_globals.cache.available_items)) {
         cmd = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available--;
     }
     netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
@@ -676,7 +676,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->dequeue_cb = dequeue_cb;
 
     netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
     rrdeng_cmd_globals.queue.waiting++;
     if(enqueue_cb)
         enqueue_cb(cmd);
@@ -715,7 +715,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
             }
 
             // remove it from the queue
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             rrdeng_cmd_globals.queue.waiting--;
             break;
         }
@@ -735,7 +735,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
         // put it in the cache
         netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available++;
         netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
     }

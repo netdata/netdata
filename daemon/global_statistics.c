@@ -3931,7 +3931,7 @@ static void workers_threads_cleanup(struct worker_utilization *wu) {
 
         if(!t->enabled) {
             JudyLDel(&workers_by_pid_JudyL_array, t->pid, PJE0);
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wu->threads, t, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wu->threads, t, prev, next);
             freez(t);
         }
         t = next;
@@ -3958,7 +3958,7 @@ static struct worker_thread *worker_thread_create(struct worker_utilization *wu,
     *PValue = wt;
 
     // link it
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wu->threads, wt, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wu->threads, wt, prev, next);
 
     return wt;
 }

@@ -100,7 +100,7 @@ void worker_register(const char *name) {
     }
 
     netdata_spinlock_lock(&workname->spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(workname->base, worker, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(workname->base, worker, prev, next);
     netdata_spinlock_unlock(&workname->spinlock);
 
     netdata_spinlock_unlock(&workers_globals.spinlock);
@@ -141,7 +141,7 @@ void worker_unregister(void) {
     if(PValue) {
         struct workers_workname *workname = *PValue;
         netdata_spinlock_lock(&workname->spinlock);
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(workname->base, worker, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(workname->base, worker, prev, next);
         netdata_spinlock_unlock(&workname->spinlock);
 
         if(!workname->base) {

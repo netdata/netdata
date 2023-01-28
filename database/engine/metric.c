@@ -25,8 +25,9 @@ struct metric {
 };
 
 struct mrg {
+    ARAL *aral;
+
     struct pgc_index {
-        ARAL *aral;
         netdata_rwlock_t rwlock;
         Pvoid_t uuid_judy;          // each UUID has a JudyL of sections (tiers)
     } index[MRG_PARTITIONS];
@@ -166,8 +167,9 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
 }
 
 static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
-    size_t partition = uuid_partition(mrg, &entry->uuid);
+    METRIC *allocation = aral_mallocz(mrg->aral);
 
+    size_t partition = uuid_partition(mrg, &entry->uuid);
     mrg_index_write_lock(mrg, partition);
 
     size_t mem_before_judyl, mem_after_judyl;
@@ -187,7 +189,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     if(unlikely(!PValue || PValue == PJERR))
         fatal("DBENGINE METRIC: corrupted section JudyL array");
 
-    if(*PValue != NULL) {
+    if(unlikely(*PValue != NULL)) {
         METRIC *metric = *PValue;
 
         metric_acquire(mrg, metric, false);
@@ -196,11 +198,13 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         if(ret)
             *ret = false;
 
+        aral_freez(mrg->aral, allocation);
+
         MRG_STATS_DUPLICATE_ADD(mrg);
         return metric;
     }
 
-    METRIC *metric = aral_mallocz(mrg->index[partition].aral);
+    METRIC *metric = allocation;
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
     metric->first_time_s = entry->first_time_s;
@@ -291,10 +295,10 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
         mrg_stats_size_judyhs_removed_uuid(mrg);
     }
 
-    // ARAL is running lockless here
-    aral_freez(mrg->index[partition].aral, metric);
-
     mrg_index_write_unlock(mrg, partition);
+
+    // ARAL is running lockless here
+    aral_freez(mrg->aral, metric);
 
     MRG_STATS_DELETED_METRIC(mrg, partition);
 
@@ -306,17 +310,22 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 
 MRG *mrg_create(void) {
     MRG *mrg = callocz(1, sizeof(MRG));
+
     for(size_t i = 0; i < MRG_PARTITIONS ; i++) {
         char buf[ARAL_MAX_NAME + 1];
         snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
-        mrg->index[i].aral = aral_create(buf, sizeof(METRIC),
-                                         0,
-                                         8192,
-                                         NULL, NULL, false,
-                                         true);
     }
+
+    mrg->aral = aral_create("mrg",
+                            sizeof(METRIC),
+                            0,
+                            4096,
+                            NULL, NULL, false,
+                            false);
+
     mrg->stats.size = sizeof(MRG);
+
     return mrg;
 }
 

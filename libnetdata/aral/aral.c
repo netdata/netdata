@@ -23,10 +23,12 @@ typedef struct aral_free {
 } ARAL_FREE;
 
 typedef struct aral_page {
-    const char *filename;
     size_t size;                  // the total size of the page
-    size_t used_elements;         // the total number of used elements on this page
+    const char *filename;
     uint8_t *data;
+    uint32_t max_elements;
+    uint32_t used_elements;         // the total number of used elements on this page
+    uint32_t free_elements;
     ARAL_FREE *free_list;
     struct aral_page *prev; // the prev page on the list
     struct aral_page *next; // the next page on the list
@@ -37,6 +39,7 @@ struct aral {
         char name[ARAL_MAX_NAME + 1];
 
         bool lockless;
+        bool defragment;
 
         size_t element_size;            // calculated to take into account ARAL overheads
         size_t max_allocation_size;          // calculated in bytes
@@ -215,6 +218,8 @@ static void aral_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS)
     else
         ar->unsafe.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->unsafe.allocation_size * 4 / 3);
 
+    page->max_elements = page->free_elements = page->size / ar->config.element_size;
+
     __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
 
@@ -247,14 +252,14 @@ static void aral_add_page(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS)
     page->free_list = fr;
 
     // link the new page at the front of the list of pages
-    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->unsafe.pages, page, prev, next);
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
 
     aral_free_validate_internal_check(ar, fr);
 }
 
 void aral_del_page(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->unsafe.pages, page, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
 
     // free it
     if (ar->config.mmap.enabled) {
@@ -295,8 +300,8 @@ static inline ARAL_PAGE *aral_get_a_page_with_free_item(ARAL *ar TRACE_ALLOCATIO
                                      "but there is another that has - moved it first!",
                                ar->config.name);
 
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->unsafe.pages, page, prev, next);
-                DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->unsafe.pages, page, prev, next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+                DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
             }
             else {
                 ar->atomic.last_full_check_time_ut = check_ut;
@@ -318,6 +323,17 @@ static inline ARAL_PAGE *aral_get_a_page_with_free_item(ARAL *ar TRACE_ALLOCATIO
                    "ARAL: '%s' free item size %zu, cannot be smaller than %zu",
                    ar->config.name, page->free_list->size, ar->config.element_size);
 
+    internal_fatal(page->max_elements != page->used_elements + page->free_elements,
+                   "ARAL: '%s' page element counters do not match, "
+                   "page says it can handle %zu elements, "
+                   "but there are %zu used and %zu free items, "
+                   "total %zu items",
+                   ar->config.name,
+                   (size_t)page->max_elements,
+                   (size_t)page->used_elements, (size_t)page->free_elements,
+                   (size_t)page->used_elements + (size_t)page->free_elements
+    );
+
     return page;
 }
 
@@ -338,8 +354,8 @@ void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
             // we are done with this page
             // move the full page last
             // so that pages with free items remain first in the list
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->unsafe.pages, page, prev, next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(ar->unsafe.pages, page, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
         }
     }
     else {
@@ -362,6 +378,7 @@ void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
         __atomic_add_fetch(&aral_globals.atomic.malloc.used, ar->config.element_size, __ATOMIC_RELAXED);
 
     page->used_elements++;
+    page->free_elements--;
 
     // put the page pointer after the element
     uint8_t *data = (uint8_t *)found_fr;
@@ -393,20 +410,88 @@ static inline ARAL_PAGE *aral_ptr_to_page(ARAL *ar, void *ptr) {
         ARAL_PAGE *page2 = find_page_with_allocation_internal_check(ar, ptr);
 
         if(unlikely(page != page2))
-            fatal("ARAL: '%s' page pointers do not match!", ar->name);
+            fatal("ARAL: '%s' page pointers do not match!",
+                  ar->name);
 
         if (unlikely(!page2))
-            fatal("ARAL: '%s' free of pointer %p is not in ARAL address space.", ar->name, ptr);
+            fatal("ARAL: '%s' free of pointer %p is not in ARAL address space.",
+                  ar->name, ptr);
     }
 #endif
 
     internal_fatal(!page,
-                   "ARAL: '%s' possible corruption or double free of pointer %p", ar->config.name, ptr);
+                   "ARAL: '%s' possible corruption or double free of pointer %p",
+                   ar->config.name, ptr);
 
     internal_fatal(!page->used_elements,
-                   "ARAL: '%s' pointer %p is inside a page without any active allocations.", ar->config.name, ptr);
+                   "ARAL: '%s' pointer %p is inside a page without any active allocations.",
+                   ar->config.name, ptr);
 
+    internal_fatal(page->max_elements != page->used_elements + page->free_elements,
+                   "ARAL: '%s' page element counters do not match, "
+                   "page says it can handle %zu elements, "
+                   "but there are %zu used and %zu free items, "
+                   "total %zu items",
+                   ar->config.name,
+                   (size_t)page->max_elements,
+                   (size_t)page->used_elements, (size_t)page->free_elements,
+                   (size_t)page->used_elements + (size_t)page->free_elements
+                   );
     return page;
+}
+
+static inline void aral_move_page_with_free_list(ARAL *ar, ARAL_PAGE *page) {
+
+    if(page->free_elements == 1 || !ar->config.defragment) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+        return;
+    }
+
+    ARAL_PAGE *tmp;
+
+    int action = 0; (void)action;
+    size_t move_later = 0, move_earlier = 0;
+    (void)move_later; (void)move_earlier;
+
+    for(tmp = page->next ;
+        tmp && tmp->free_elements && tmp->free_elements < page->free_elements ;
+        tmp = tmp->next)
+        move_later++;
+
+    if(!tmp && page->next) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+        action = 1;
+    }
+    else if(tmp != page->next) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+        DOUBLE_LINKED_LIST_INSERT_ITEM_BEFORE_UNSAFE(ar->unsafe.pages, tmp, page, prev, next);
+        action = 2;
+    }
+    else {
+        for(tmp = (page == ar->unsafe.pages) ? NULL : page->prev ;
+            tmp && (!tmp->free_elements || tmp->free_elements > page->free_elements);
+            tmp = (tmp == ar->unsafe.pages) ? NULL : tmp->prev)
+            move_earlier++;
+
+        if(!tmp) {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+            action = 3;
+        }
+        else if(tmp != page->prev){
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+            DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(ar->unsafe.pages, tmp, page, prev, next);
+            action = 4;
+        }
+    }
+
+    internal_fatal(page->next && page->next->free_elements && page->next->free_elements < page->free_elements,
+                   "ARAL: '%s' item should be later in the list", ar->config.name);
+
+    internal_fatal(page != ar->unsafe.pages && (!page->prev->free_elements || page->prev->free_elements > page->free_elements),
+                   "ARAL: '%s' item should be earlier in the list", ar->config.name);
 }
 
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
@@ -423,6 +508,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
         __atomic_sub_fetch(&aral_globals.atomic.malloc.used, ar->config.element_size, __ATOMIC_RELAXED);
 
     page->used_elements--;
+    page->free_elements++;
 
     // make this element available
     ARAL_FREE *fr = (ARAL_FREE *)ptr;
@@ -435,10 +521,12 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
         aral_del_page(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
 
     else if(likely(page != ar->unsafe.pages)) {
-        // move the page with free item first
-        // so that the next allocation will use this page
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ar->unsafe.pages, page, prev, next);
-        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ar->unsafe.pages, page, prev, next);
+        aral_move_page_with_free_list(ar, page);
+
+//        // move the page with free item first
+//        // so that the next allocation will use this page
+//        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
+//        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->unsafe.pages, page, prev, next);
     }
 
     aral_unlock(ar);
@@ -463,6 +551,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     ar->config.mmap.cache_dir = cache_dir;
     ar->config.mmap.enabled = mmap;
     ar->config.lockless = lockless;
+    ar->config.defragment = true;
     strncpyz(ar->config.name, name, ARAL_MAX_NAME);
     netdata_spinlock_init(&ar->unsafe.spinlock);
 
