@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
 - DBENGINE v2 - improvements part 10 [\#14332](https://github.com/netdata/netdata/pull/14332) ([ktsaou](https://github.com/ktsaou))
 - Add |nowarn and |noclear notification modifiers [\#14330](https://github.com/netdata/netdata/pull/14330) ([vobruba-martin](https://github.com/vobruba-martin))
 - Revert "Misc SSL improvements" [\#14327](https://github.com/netdata/netdata/pull/14327) ([MrZammler](https://github.com/MrZammler))
@@ -13,6 +14,7 @@
 - fix\(proc.plugin\): add "cpu" label to per core util% charts [\#14322](https://github.com/netdata/netdata/pull/14322) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
 - Misc SSL improvements [\#14317](https://github.com/netdata/netdata/pull/14317) ([MrZammler](https://github.com/MrZammler))
+- Use "getent group" instead of reading "/etc/group" to get group information [\#14316](https://github.com/netdata/netdata/pull/14316) ([Dim-P](https://github.com/Dim-P))
 - minor - kaitai for netdata datafiles [\#14312](https://github.com/netdata/netdata/pull/14312) ([underhood](https://github.com/underhood))
 - Add Collector log [\#14309](https://github.com/netdata/netdata/pull/14309) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
@@ -36,6 +38,7 @@
 - Check session variable before resuming it [\#14279](https://github.com/netdata/netdata/pull/14279) ([MrZammler](https://github.com/MrZammler))
 - Update infographic image on main README [\#14276](https://github.com/netdata/netdata/pull/14276) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin to v0.49.1 [\#14275](https://github.com/netdata/netdata/pull/14275) ([ilyam8](https://github.com/ilyam8))
+- Improve ebpf exit [\#14270](https://github.com/netdata/netdata/pull/14270) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 3 [\#14269](https://github.com/netdata/netdata/pull/14269) ([ktsaou](https://github.com/ktsaou))
 - minor - add kaitaistruct for journal v2 files [\#14267](https://github.com/netdata/netdata/pull/14267) ([underhood](https://github.com/underhood))
 - fix\(health\): don't assume 2 cores if the number is unknown [\#14265](https://github.com/netdata/netdata/pull/14265) ([ilyam8](https://github.com/ilyam8))
@@ -347,9 +350,6 @@
 - Use CMake generated config.h also in out of tree CMake build [\#13692](https://github.com/netdata/netdata/pull/13692) ([underhood](https://github.com/underhood))
 - Add info for Docker containers about using hostname from host. [\#13685](https://github.com/netdata/netdata/pull/13685) ([Ferroin](https://github.com/Ferroin))
 - add node level AR based example [\#13684](https://github.com/netdata/netdata/pull/13684) ([andrewm4894](https://github.com/andrewm4894))
-- Store nulls instead of empty strings in health tables [\#13683](https://github.com/netdata/netdata/pull/13683) ([MrZammler](https://github.com/MrZammler))
-- Fix warnings during compilation time on ARM \(32 bits\) [\#13681](https://github.com/netdata/netdata/pull/13681) ([thiagoftsm](https://github.com/thiagoftsm))
-- dictionary updated documentation and cosmetics [\#13679](https://github.com/netdata/netdata/pull/13679) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
