@@ -70,6 +70,11 @@ struct aral {
         SPINLOCK spinlock;
         size_t file_number;             // for mmap
         struct aral_page *pages;        // linked list of pages
+
+        size_t user_malloc_operations;
+        size_t user_free_operations;
+        size_t defragment_operations;
+        size_t defragment_linked_list_traversals;
     } aral_lock;
 
     struct {
@@ -335,6 +340,8 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
                    (size_t)page->aral_lock.used_elements + (size_t)page->aral_lock.free_elements
     );
 
+    ar->aral_lock.user_malloc_operations++;
+
     // acquire a slot for the caller
     page->aral_lock.used_elements++;
     if(--page->aral_lock.free_elements == 0) {
@@ -400,7 +407,7 @@ void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAM
     return (void *)found_fr;
 }
 
-static inline ARAL_PAGE *aral_ptr_to_page___no_lock_needed(ARAL *ar, void *ptr) {
+static inline ARAL_PAGE *aral_ptr_to_page___must_NOT_have_aral_lock(ARAL *ar, void *ptr) {
     // given a data pointer we returned before,
     // find the ARAL_PAGE it belongs to
 
@@ -438,8 +445,14 @@ static inline ARAL_PAGE *aral_ptr_to_page___no_lock_needed(ARAL *ar, void *ptr) 
 }
 
 static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
+    if(likely(page != ar->aral_lock.pages))
+        // we are the first already
+        return;
 
-    if(page->aral_lock.free_elements == 1 || !ar->config.defragment) {
+    if (!ar->config.defragment ||
+        page->aral_lock.free_elements == 1 ||
+        page->aral_lock.free_elements <= ar->aral_lock.pages->aral_lock.free_elements) {
+        // speed-up: move this page first
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
         DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
         return;
@@ -449,7 +462,6 @@ static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, AR
 
     int action = 0; (void)action;
     size_t move_later = 0, move_earlier = 0;
-    (void)move_later; (void)move_earlier;
 
     for(tmp = page->next ;
         tmp && tmp->aral_lock.free_elements && tmp->aral_lock.free_elements < page->aral_lock.free_elements ;
@@ -484,6 +496,9 @@ static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, AR
         }
     }
 
+    ar->aral_lock.defragment_operations++;
+    ar->aral_lock.defragment_linked_list_traversals += move_earlier + move_later;
+
     internal_fatal(page->next && page->next->aral_lock.free_elements && page->next->aral_lock.free_elements < page->aral_lock.free_elements,
                    "ARAL: '%s' item should be later in the list", ar->config.name);
 
@@ -495,7 +510,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     if(unlikely(!ptr)) return;
 
     // get the page pointer
-    ARAL_PAGE *page = aral_ptr_to_page___no_lock_needed(ar, ptr);
+    ARAL_PAGE *page = aral_ptr_to_page___must_NOT_have_aral_lock(ar, ptr);
 
     if(unlikely(ar->config.mmap.enabled))
         __atomic_sub_fetch(&aral_globals.atomic.mmap.used, ar->config.element_size, __ATOMIC_RELAXED);
@@ -531,6 +546,8 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     page->aral_lock.used_elements--;
     page->aral_lock.free_elements++;
 
+    ar->aral_lock.user_free_operations++;
+
     // if the page is empty, release it
     if(unlikely(!page->aral_lock.used_elements)) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
@@ -538,9 +555,7 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
         aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
     }
     else {
-        if(likely(page != ar->aral_lock.pages))
-            aral_move_page_with_free_list___aral_lock_needed(ar, page);
-
+        aral_move_page_with_free_list___aral_lock_needed(ar, page);
         aral_unlock(ar);
     }
 }
