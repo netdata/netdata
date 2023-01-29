@@ -486,6 +486,7 @@ static void ebpf_exit()
 #ifdef NETDATA_INTERNAL_CHECKS
     error("Good bye world! I was PID %d", main_thread_id);
 #endif
+    printf("DISABLE\n");
     exit(0);
 }
 
