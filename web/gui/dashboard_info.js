@@ -4439,7 +4439,11 @@ netdataDashboard.context = {
     // WMI (MSSQL)
 
     'mssql.instance_accessmethods_page_splits': {
-        info : 'Page split happens when the page does not have more space. When this happens SQL Server transfers data from a page to another data page.'
+        info : 'Page split happens when the page does not have more space. This chart shows the number of page splits per second that occur as the result of overflowing index pages.'
+    },
+
+    'mssql.instance_cache_hit_ratio': {
+        info : 'Indicates the percentage of pages found in the buffer cache without having to read from disk. The ratio is the total number of cache hits divided by the total number of cache lookups over the last few thousand page accesses. After a long period of time, the ratio moves very little. Because reading from the cache is much less expensive than reading from disk, you want this ratio to be high.'
     },
 
     'mssql.instance_bufman_checkpoint_pages': {
@@ -4476,6 +4480,18 @@ netdataDashboard.context = {
 
     // ------------------------------------------------------------------------
     // WMI (AD)
+
+    'ad.dra_replication_intersite_compressed_traffic': {
+        info: 'Shows the compressed size, in bytes, of inbound and outbound compressed replication data (size after compression, from DSAs in other sites).'
+    },
+
+    'ad.dra_replication_intrasite_compressed_traffic': {
+        info: 'Shows the number of bytes replicated that were not compressed (that is., from DSAs in the same site).'
+    },
+
+    'ad.dra_replication_properties_updated': {
+        info: 'Shows the number of properties that are updated due to incoming property winning the reconciliation logic that determines the final value to be replicated.'
+    },
 
     'ad.dra_replication_objects_filtered': {
         info: 'Shows the number of objects received from inbound replication partners that contained no updates that needed to be applied.'
