@@ -211,22 +211,24 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 // ----------------------------------------------------------------------------
 // find a page with a free slot (there shouldn't be any)
 
-//static inline ARAL_PAGE *find_page_with_free_slots_internal_check(ARAL *ar) {
-//    ARAL_PAGE *page;
-//
-//    for(page = ar->unsafe.pages; page ; page = page->next) {
-//        if(page->free_list)
-//            break;
-//
-//        internal_fatal(page->size - page->used_elements * ar->config.element_size >= ar->config.element_size,
-//                       "ARAL: '%s' a page is marked full, but it is not!", ar->config.name);
-//
-//        internal_fatal(page->size < page->used_elements * ar->config.element_size,
-//                       "ARAL: '%s' a page has been overflown!", ar->config.name);
-//    }
-//
-//    return page;
-//}
+#ifdef NETDATA_ARAL_INTERNAL_CHECKS
+static inline ARAL_PAGE *find_page_with_free_slots_internal_check___with_aral_lock(ARAL *ar) {
+    ARAL_PAGE *page;
+
+    for(page = ar->aral_lock.pages; page ; page = page->next) {
+        if(page->aral_lock.free_elements)
+            break;
+
+        internal_fatal(page->size - page->aral_lock.used_elements * ar->config.element_size >= ar->config.element_size,
+                       "ARAL: '%s' a page is marked full, but it is not!", ar->config.name);
+
+        internal_fatal(page->size < page->aral_lock.used_elements * ar->config.element_size,
+                       "ARAL: '%s' a page has been overflown!", ar->config.name);
+    }
+
+    return page;
+}
+#endif
 
 static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
@@ -339,6 +341,9 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
     ARAL_PAGE *page = ar->aral_lock.pages;
 
     while(!page || !page->aral_lock.free_elements) {
+#ifdef NETDATA_ARAL_INTERNAL_CHECKS
+        internal_fatal(find_page_with_free_slots_internal_check___with_aral_lock(ar), "ARAL: '%s' found page with free slot!", ar->config.name);
+#endif
         aral_unlock(ar);
 
         if(netdata_spinlock_trylock(&ar->adders.spinlock)) {
