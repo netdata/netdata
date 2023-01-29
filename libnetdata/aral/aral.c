@@ -9,6 +9,8 @@
 #define TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS
 #endif
 
+#define ARAL_FREE_PAGES_DELTA_TO_REARRANGE_LIST 5
+
 // max file size
 #define ARAL_MAX_PAGE_SIZE_MMAP (1*1024*1024*1024)
 
@@ -27,6 +29,7 @@ typedef struct aral_page {
     const char *filename;
     uint8_t *data;
 
+    uint32_t free_elements_to_move_first;
     uint32_t max_elements;          // the number of elements that can fit on this page
 
     struct {
@@ -69,8 +72,6 @@ struct aral {
     struct {
         SPINLOCK spinlock;
         size_t file_number;             // for mmap
-        size_t pages_version;
-        size_t pages_version_last_checked;
         struct aral_page *pages;        // linked list of pages
 
         size_t user_malloc_operations;
@@ -227,7 +228,7 @@ static inline ARAL_PAGE *find_page_with_allocation_internal_check(ARAL *ar, void
 //    return page;
 //}
 
-static ARAL_PAGE *aral_add_page___adders_lock_needed(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
     netdata_spinlock_init(&page->free.spinlock);
     page->size = ar->adders.allocation_size;
@@ -238,6 +239,9 @@ static ARAL_PAGE *aral_add_page___adders_lock_needed(ARAL *ar TRACE_ALLOCATIONS_
         ar->adders.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->adders.allocation_size * 4 / 3);
 
     page->max_elements = page->aral_lock.free_elements = page->size / ar->config.element_size;
+    page->free_elements_to_move_first = page->max_elements / 4;
+    if(unlikely(page->free_elements_to_move_first < 1))
+        page->free_elements_to_move_first = 1;
 
     __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
@@ -305,6 +309,30 @@ void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOCATIONS_
     __atomic_sub_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL_PAGE), __ATOMIC_RELAXED);
 }
 
+static inline void aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
+    ARAL_PAGE *first = ar->aral_lock.pages;
+
+    if (page->aral_lock.free_elements <= page->free_elements_to_move_first ||
+        !first ||
+        !first->aral_lock.free_elements ||
+        page->aral_lock.free_elements <= first->aral_lock.free_elements + ARAL_FREE_PAGES_DELTA_TO_REARRANGE_LIST) {
+        // first position
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
+    }
+    else {
+        ARAL_PAGE *second = first->next;
+
+        if (!second ||
+            !second->aral_lock.free_elements ||
+            page->aral_lock.free_elements <= second->aral_lock.free_elements)
+            // second position
+            DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(ar->aral_lock.pages, first, page, prev, next);
+        else
+            // third position
+            DOUBLE_LINKED_LIST_INSERT_ITEM_AFTER_UNSAFE(ar->aral_lock.pages, second, page, prev, next);
+    }
+}
+
 static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     aral_lock(ar);
 
@@ -314,12 +342,10 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
         aral_unlock(ar);
 
         if(netdata_spinlock_trylock(&ar->adders.spinlock)) {
-            page = aral_add_page___adders_lock_needed(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+            page = aral_create_page___no_lock_needed(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
 
             aral_lock(ar);
-            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
-            ar->aral_lock.pages_version++;
-
+            aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
             netdata_spinlock_unlock(&ar->adders.spinlock);
             break;
         }
@@ -332,28 +358,24 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
     // we have a page
     // and aral locked
 
-    if (page->aral_lock.free_elements > 1 &&
-        ar->aral_lock.pages_version_last_checked != ar->aral_lock.pages_version) {
+    {
+        ARAL_PAGE *first = ar->aral_lock.pages;
+        ARAL_PAGE *second = first->next;
 
-        ARAL_PAGE *selected = page;
-        ARAL_PAGE *next = page->next;
-        size_t countdown = 3;
-
-        while (next && next->aral_lock.free_elements && countdown-- > 0) {
-            if (next->aral_lock.free_elements < page->aral_lock.free_elements)
-                selected = next;
-
-            next = next->next;
+        if (!second ||
+            !second->aral_lock.free_elements ||
+            first->aral_lock.free_elements <= second->aral_lock.free_elements + ARAL_FREE_PAGES_DELTA_TO_REARRANGE_LIST)
+            page = first;
+        else {
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, second, prev, next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, second, prev, next);
+            page = second;
         }
-
-        if(selected != page) {
-            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, selected, prev, next);
-            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, selected, prev, next);
-            page = selected;
-        }
-
-        ar->aral_lock.pages_version_last_checked = ar->aral_lock.pages_version;
     }
+
+    internal_fatal(!page || !page->aral_lock.free_elements,
+                   "ARAL: '%s' selected page does not have a free slot in it",
+                   ar->config.name);
 
     internal_fatal(page->max_elements != page->aral_lock.used_elements + page->aral_lock.free_elements,
                    "ARAL: '%s' page element counters do not match, "
@@ -376,7 +398,6 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
         // so that pages with free items remain first in the list
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
         DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
-        ar->aral_lock.pages_version++;
     }
 
     aral_unlock(ar);
@@ -471,24 +492,7 @@ static inline ARAL_PAGE *aral_ptr_to_page___must_NOT_have_aral_lock(ARAL *ar, vo
     return page;
 }
 
-static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
-    if(unlikely(page == ar->aral_lock.pages))
-        // we are the first already
-        return;
-
-    ar->aral_lock.pages_version++;
-
-    if (!ar->config.defragment ||
-        page->aral_lock.free_elements == 1 ||
-        page->aral_lock.free_elements <= ar->aral_lock.pages->aral_lock.free_elements) {
-        // speed-up: move this page first
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
-        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
-        return;
-    }
-
-    ar->aral_lock.pages_version_last_checked = ar->aral_lock.pages_version;
-
+static void aral_defrag_sorted_page_position___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
     ARAL_PAGE *tmp;
 
     int action = 0; (void)action;
@@ -537,6 +541,19 @@ static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, AR
                    "ARAL: '%s' item should be earlier in the list", ar->config.name);
 }
 
+static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, ARAL_PAGE *page) {
+    if(unlikely(page == ar->aral_lock.pages))
+        // we are the first already
+        return;
+
+    if(likely(!ar->config.defragment)) {
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
+        aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
+    }
+    else
+        aral_defrag_sorted_page_position___aral_lock_needed(ar, page);
+}
+
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     if(unlikely(!ptr)) return;
 
@@ -582,7 +599,6 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
     // if the page is empty, release it
     if(unlikely(!page->aral_lock.used_elements)) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, prev, next);
-        ar->aral_lock.pages_version++;
         aral_unlock(ar);
         aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
     }
@@ -705,87 +721,180 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
 // ----------------------------------------------------------------------------
 // unittest
 
+struct aral_unittest_config {
+    bool single_threaded;
+    bool stop;
+    ARAL *ar;
+    size_t elements;
+    size_t threads;
+    int errors;
+};
+
+static void *aral_test_thread(void *ptr) {
+    struct aral_unittest_config *auc = ptr;
+    ARAL *ar = auc->ar;
+    size_t elements = auc->elements;
+
+    void **pointers = callocz(elements, sizeof(void *));
+
+    do {
+        for (size_t i = 0; i < elements; i++) {
+            pointers[i] = aral_mallocz(ar);
+        }
+
+        for (size_t div = 5; div >= 2; div--) {
+            for (size_t i = 0; i < elements / div; i++) {
+                aral_freez(ar, pointers[i]);
+                pointers[i] = NULL;
+            }
+
+            for (size_t i = 0; i < elements / div; i++) {
+                pointers[i] = aral_mallocz(ar);
+            }
+        }
+
+        for (size_t step = 50; step >= 10; step -= 10) {
+            for (size_t i = 0; i < elements; i += step) {
+                aral_freez(ar, pointers[i]);
+                pointers[i] = NULL;
+            }
+
+            for (size_t i = 0; i < elements; i += step) {
+                pointers[i] = aral_mallocz(ar);
+            }
+        }
+
+        for (size_t i = 0; i < elements; i++) {
+            aral_freez(ar, pointers[i]);
+            pointers[i] = NULL;
+        }
+
+        if (auc->single_threaded && ar->aral_lock.pages) {
+            fprintf(stderr, "\n\nARAL leftovers detected (1)\n\n");
+            __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
+        }
+
+        if(!auc->single_threaded && __atomic_load_n(&auc->stop, __ATOMIC_RELAXED))
+            break;
+
+        for (size_t i = 0; i < elements; i++) {
+            pointers[i] = aral_mallocz(ar);
+        }
+
+        size_t increment = elements / ar->config.max_page_elements;
+        for (size_t all = increment; all <= elements / 2; all += increment) {
+
+            size_t to_free = all % ar->config.max_page_elements;
+            size_t step = elements / to_free;
+            if(!step) step = 1;
+
+            // fprintf(stderr, "all %zu, to free %zu, step %zu\n", all, to_free, step);
+
+            size_t free_list[to_free];
+            for (size_t i = 0; i < to_free; i++) {
+                size_t pos = step * i;
+                aral_freez(ar, pointers[pos]);
+                pointers[pos] = NULL;
+                free_list[i] = pos;
+            }
+
+            for (size_t i = 0; i < to_free; i++) {
+                size_t pos = free_list[i];
+                pointers[pos] = aral_mallocz(ar);
+            }
+        }
+
+        for (size_t i = 0; i < elements; i++) {
+            aral_freez(ar, pointers[i]);
+            pointers[i] = NULL;
+        }
+
+        if (auc->single_threaded && ar->aral_lock.pages) {
+            fprintf(stderr, "\n\nARAL leftovers detected (2)\n\n");
+            __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
+        }
+
+    } while(!auc->single_threaded && !__atomic_load_n(&auc->stop, __ATOMIC_RELAXED));
+
+    freez(pointers);
+
+    return ptr;
+}
+
+int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
+    fprintf(stderr, "Running stress test of %zu threads, with %zu elements each, for %zu seconds...\n",
+            threads, elements, seconds);
+
+    memset(&aral_globals, 0, sizeof(aral_globals));
+
+    struct aral_unittest_config auc = {
+            .single_threaded = false,
+            .threads = threads,
+            .ar = aral_create("aral-test", 20, 10, 1024, "test-aral", NULL, false, false),
+            .elements = elements,
+            .errors = 0,
+    };
+
+    usec_t started_ut = now_monotonic_usec();
+    netdata_thread_t thread_ptrs[threads];
+
+    for(size_t i = 0; i < threads ; i++) {
+        char tag[NETDATA_THREAD_NAME_MAX + 1];
+        snprintfz(tag, NETDATA_THREAD_NAME_MAX, "TH[%zu]", i);
+        netdata_thread_create(&thread_ptrs[i], tag,
+                              NETDATA_THREAD_OPTION_JOINABLE | NETDATA_THREAD_OPTION_DONT_LOG,
+                              aral_test_thread, &auc);
+    }
+
+    sleep_usec(seconds * USEC_PER_SEC);
+
+    __atomic_store_n(&auc.stop, true, __ATOMIC_RELAXED);
+
+//    fprintf(stderr, "Cancelling the threads...\n");
+//    for(size_t i = 0; i < threads ; i++) {
+//        netdata_thread_cancel(thread_ptrs[i]);
+//    }
+
+    fprintf(stderr, "Waiting the threads to finish...\n");
+    for(size_t i = 0; i < threads ; i++) {
+        netdata_thread_join(thread_ptrs[i], NULL);
+    }
+
+    usec_t ended_ut = now_monotonic_usec();
+
+    if (auc.ar->aral_lock.pages) {
+        fprintf(stderr, "\n\nARAL leftovers detected (3)\n\n");
+        __atomic_add_fetch(&auc.errors, 1, __ATOMIC_RELAXED);
+    }
+
+    info("ARAL: did %zu malloc, %zu free, "
+         "using %zu threads, in %llu usecs",
+         auc.ar->aral_lock.user_malloc_operations,
+         auc.ar->aral_lock.user_free_operations,
+         threads,
+         ended_ut - started_ut);
+
+    aral_destroy(auc.ar);
+
+    return auc.errors;
+}
+
 int aral_unittest(size_t elements) {
     char *cache_dir = "/tmp/";
-    ARAL *ar = aral_create("aral-test", 20, 10, 1024, "test-aral", &cache_dir, false, false);
 
-    void *pointers[elements];
+    struct aral_unittest_config auc = {
+            .single_threaded = true,
+            .threads = 1,
+            .ar = aral_create("aral-test", 20, 10, 1024, "test-aral", &cache_dir, false, false),
+            .elements = elements,
+            .errors = 0,
+    };
 
-    for(size_t i = 0; i < elements ;i++) {
-        pointers[i] = aral_mallocz(ar);
-    }
+    aral_test_thread(&auc);
 
-    for(size_t div = 5; div >= 2 ;div--) {
-        for (size_t i = 0; i < elements / div; i++) {
-            aral_freez(ar, pointers[i]);
-        }
+    aral_destroy(auc.ar);
 
-        for (size_t i = 0; i < elements / div; i++) {
-            pointers[i] = aral_mallocz(ar);
-        }
-    }
+    int errors = aral_stress_test(2, elements, 5);
 
-    for(size_t step = 50; step >= 10 ;step -= 10) {
-        for (size_t i = 0; i < elements; i += step) {
-            aral_freez(ar, pointers[i]);
-        }
-
-        for (size_t i = 0; i < elements; i += step) {
-            pointers[i] = aral_mallocz(ar);
-        }
-    }
-
-    for(size_t i = 0; i < elements ;i++) {
-        aral_freez(ar, pointers[i]);
-    }
-
-    if(ar->aral_lock.pages) {
-        fprintf(stderr, "ARAL leftovers detected (1)");
-        return 1;
-    }
-
-    size_t ops = 0; (void)ops;
-    size_t increment = elements / 10;
-    size_t allocated = 0;
-    for(size_t all = increment; all <= elements ; all += increment) {
-
-        for(; allocated < all ; allocated++) {
-            pointers[allocated] = aral_mallocz(ar);
-            ops++;
-        }
-
-        size_t to_free = now_realtime_usec() % all;
-        size_t free_list[to_free];
-        for(size_t i = 0; i < to_free ;i++) {
-            size_t pos;
-            do {
-                pos = now_realtime_usec() % all;
-            } while(!pointers[pos]);
-
-            aral_freez(ar, pointers[pos]);
-            pointers[pos] = NULL;
-            free_list[i] = pos;
-            ops++;
-        }
-
-        for(size_t i = 0; i < to_free ;i++) {
-            size_t pos = free_list[i];
-            pointers[pos] = aral_mallocz(ar);
-            ops++;
-        }
-    }
-
-    for(size_t i = 0; i < allocated - 1 ;i++) {
-        aral_freez(ar, pointers[i]);
-        ops++;
-    }
-
-    aral_freez(ar, pointers[allocated - 1]);
-
-    if(ar->aral_lock.pages) {
-        fprintf(stderr, "ARAL leftovers detected (2)");
-        return 1;
-    }
-
-    return 0;
+    return auc.errors + errors;
 }
