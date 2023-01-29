@@ -495,13 +495,15 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
         time_t max_end_time_s = 0;
         PGC_PAGE *page;
         PGC_SEARCH method = PGC_SEARCH_FIRST;
-        while ((page = pgc_page_get_and_acquire(main_cache, section, (Word_t) metric, 0, method))) {
+        time_t page_first_time_s = 0;
+        time_t page_end_time_s = 0;
+        while ((page = pgc_page_get_and_acquire(main_cache, section, (Word_t)metric, page_first_time_s, method))) {
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
             bool is_dirty = pgc_is_page_dirty(page);
-            time_t page_first_time_s = pgc_page_start_time_s(page);
-            time_t page_end_time_s = pgc_page_end_time_s(page);
+            page_first_time_s = pgc_page_start_time_s(page);
+            page_end_time_s = pgc_page_end_time_s(page);
 
             if ((is_hot || is_dirty) && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
