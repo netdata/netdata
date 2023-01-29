@@ -846,7 +846,20 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
                               aral_test_thread, &auc);
     }
 
-    sleep_usec(seconds * USEC_PER_SEC);
+    size_t malloc_done = 0;
+    size_t free_done = 0;
+    size_t countdown = seconds;
+    while(countdown-- > 0) {
+        sleep_usec(1 * USEC_PER_SEC);
+        aral_lock(auc.ar);
+        size_t m = auc.ar->aral_lock.user_malloc_operations;
+        size_t f = auc.ar->aral_lock.user_free_operations;
+        aral_unlock(auc.ar);
+        fprintf(stderr, "ARAL executes %0.2f M malloc and %0.2f M free operations/s\n",
+                (double)(m - malloc_done) / 1000000.0, (double)(f - free_done) / 1000000.0);
+        malloc_done = m;
+        free_done = f;
+    }
 
     __atomic_store_n(&auc.stop, true, __ATOMIC_RELAXED);
 
