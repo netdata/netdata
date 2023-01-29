@@ -582,7 +582,7 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     ar->config.mmap.cache_dir = cache_dir;
     ar->config.mmap.enabled = mmap;
     ar->config.lockless = lockless;
-    ar->config.defragment = true;
+    ar->config.defragment = false;
     strncpyz(ar->config.name, name, ARAL_MAX_NAME);
     netdata_spinlock_init(&ar->aral_lock.spinlock);
 
