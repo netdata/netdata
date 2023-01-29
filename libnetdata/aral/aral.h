@@ -11,7 +11,6 @@ typedef struct aral ARAL;
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
 int aral_unittest(size_t elements);
 void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used);
-void aral_enable_check_free_space(void);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 

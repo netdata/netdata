@@ -129,10 +129,10 @@ void web_client_request_done(struct web_client *w) {
                    , mode
                    , sent
                    , size
-                   , -((size > 0) ? ((size - sent) / (double) size * 100.0) : 0.0)
-                   , dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
-                   , dt_usec(&tv, &w->tv_ready) / 1000.0
-                   , dt_usec(&tv, &w->tv_in) / 1000.0
+                   , -((size > 0) ? ((double)(size - sent) / (double) size * 100.0) : 0.0)
+                   , (double)dt_usec(&w->tv_ready, &w->tv_in) / 1000.0
+                   , (double)dt_usec(&tv, &w->tv_ready) / 1000.0
+                   , (double)dt_usec(&tv, &w->tv_in) / 1000.0
                    , w->response.code
                    , strip_control_characters(w->last_url)
         );
@@ -302,7 +302,7 @@ int mysendfile(struct web_client *w, char *filename) {
         }
     }
 
-    // if the filename contains a .. refuse to serve it
+    // if the filename contains a double dot refuse to serve it
     if(strstr(filename, "..") != 0) {
         debug(D_WEB_CLIENT_ACCESS, "%llu: File '%s' is not acceptable.", w->id, filename);
         w->response.data->contenttype = CT_TEXT_HTML;
@@ -831,9 +831,8 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
  * @param s is the first address of the string.
  * @param ptr is the address of the separator.
  */
-static void web_client_set_path_query(struct web_client *w, char *s, char *ptr) {
+static void web_client_set_path_query(struct web_client *w, const char *s, char *ptr) {
     w->url_path_length = (size_t)(ptr -s);
-
     w->url_search_path = ptr;
 }
 
@@ -1326,7 +1325,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_host = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0, hash_aral_full_check = 0;
+    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
 #endif
 
     if(unlikely(!hash_api)) {
@@ -1337,7 +1336,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
         hash_mirror = simple_hash("mirror");
-        hash_aral_full_check = simple_hash("aral-full-check");
 #endif
     }
 
@@ -1379,19 +1377,6 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
 
             error("web request to exit received.");
             netdata_cleanup_and_exit(0);
-            return HTTP_RESP_OK;
-        }
-        else if(unlikely(hash == hash_aral_full_check && strcmp(tok, "aral-full-check") == 0)) {
-            if(unlikely(!web_client_can_access_netdataconf(w)))
-                return web_client_permission_denied(w);
-
-            w->response.data->contenttype = CT_TEXT_PLAIN;
-            buffer_flush(w->response.data);
-
-            buffer_strcat(w->response.data, "ok, done.");
-
-            error("ARRAYALLOC: full check command received.");
-            aral_enable_check_free_space();
             return HTTP_RESP_OK;
         }
         else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
@@ -1443,7 +1428,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             // replace the zero bytes with spaces
             buffer_char_replace(w->response.data, '\0', ' ');
 
-            // just leave the buffer as is
+            // just leave the buffer as-is
             // it will be copied back to the client
 
             return HTTP_RESP_OK;
@@ -1560,7 +1545,7 @@ void web_client_process_request(struct web_client *w) {
             break;
     }
 
-    // keep track of the time we done processing
+    // keep track of the processing time
     now_realtime_timeval(&w->tv_ready);
 
     w->response.sent = 0;
@@ -1861,7 +1846,7 @@ ssize_t web_client_read_file(struct web_client *w)
     if(unlikely(w->response.rlen <= w->response.data->len))
         return 0;
 
-    ssize_t left = w->response.rlen - w->response.data->len;
+    ssize_t left = (ssize_t)(w->response.rlen - w->response.data->len);
     ssize_t bytes = read(w->ifd, &w->response.data->buffer[w->response.data->len], (size_t)left);
     if(likely(bytes > 0)) {
         size_t old = w->response.data->len;
@@ -1911,7 +1896,7 @@ ssize_t web_client_receive(struct web_client *w)
         return web_client_read_file(w);
 
     ssize_t bytes;
-    ssize_t left = w->response.data->size - w->response.data->len;
+    ssize_t left = (ssize_t)(w->response.data->size - w->response.data->len);
 
     // do we have any space for more data?
     buffer_need_bytes(w->response.data, NETDATA_WEB_REQUEST_RECEIVE_SIZE);
