@@ -579,6 +579,36 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'iis': {
+        title: 'IIS',
+        icon: '<i class="fas fa-eye"></i>',
+        info: undefined
+    },
+
+    'mssql': {
+        title: 'MS SQL',
+        icon: '<i class="fas fa-database"></i>',
+        info: undefined
+    },
+
+    'ad': {
+        title: 'Active Directory (AD)',
+        icon: '<i class="fas fa-windows"></i>',
+        info: undefined
+    },
+
+    'adcs': {
+        title: 'AD Certification Service',
+        icon: '<i class="fas fa-windows"></i>',
+        info: undefined
+    },
+
+    'adfs': {
+        title: 'AD Federation Service',
+        icon: '<i class="fas fa-windows"></i>',
+        info: undefined
+    },
+
     'perf': {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
