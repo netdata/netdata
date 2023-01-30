@@ -58,7 +58,6 @@ For more details please check Slacks's article [Incoming webhooks for Slack](htt
 
 #### Related topics
 
-- [Alerts](https://github.com/netdata/netdata/blob/master/docs/concepts/health-monitoring/alerts.md)
 - [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
+- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
 - [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)
