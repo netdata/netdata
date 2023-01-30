@@ -495,7 +495,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     char path[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -1411,7 +1411,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
     // If it is not the last file, open read only
-    fd = open_file_direct_io(path, O_RDWR, &file);
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;

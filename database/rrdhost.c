@@ -7,6 +7,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 size_t storage_tiers = 3;
+bool use_direct_io = true;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
@@ -783,6 +784,8 @@ void *dbengine_tier_init(void *ptr) {
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
+    use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
+
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
