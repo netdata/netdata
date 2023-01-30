@@ -1,6 +1,10 @@
 <!--
 title: "Netdata ini config files"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/config/README.md
+sidebar_label: "Netdata ini config files"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Developers"
 -->
 
 # Netdata ini config files
