@@ -1671,7 +1671,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
             query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
         }
         else if(!strcmp(name, LOGS_QRY_KW_SANITIZE_KW)) {
-            query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
+            query_params.sanitize_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
         else if(unlikely(!strcmp(name, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
             query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;

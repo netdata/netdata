@@ -74,8 +74,12 @@
 /*                                  Queries                                   */
 /* -------------------------------------------------------------------------- */
 
-#define LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES 10    /**< Maximum allowed number of log sources that can be searched in a single query **/
-#define LOGS_MANAG_QUERY_QUOTA_DEFAULT 524288       /**< Default logs management query quota **/
+#define LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES 10U       /**< Maximum allowed number of log sources that can be searched in a single query **/
+#define LOGS_MANAG_QUERY_START_DEFAULT 1000U            /**< Default start timestamp for logs management queries (in ms) **/
+#define LOGS_MANAG_QUERY_END_DEFAULT 99999999999999UL   /**< Default end timestamp for logs management queries (in ms) **/
+#define LOGS_MANAG_QUERY_QUOTA_DEFAULT 524288U          /**< Default logs management query quota **/
+#define LOGS_MANAG_QUERY_IGNORE_CASE_DEFAULT 0          /**< Boolean to indicate whether to ignore case for keyword or not **/
+#define LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT 0     /**< Boolean to indicate whether to sanitize keyword or not **/
 
 /* -------------------------------------------------------------------------- */
 

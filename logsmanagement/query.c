@@ -114,7 +114,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     if(unlikely(!p_file_infos[0])) return NO_MATCHING_CHART_OR_FILENAME_ERROR;
 
     
-    if( p_query_params->sanitise_keyword && p_query_params->keyword && 
+    if( p_query_params->sanitize_keyword && p_query_params->keyword && 
         *p_query_params->keyword && strcmp(p_query_params->keyword, " ")){
         p_query_params->keyword = sanitise_string(p_query_params->keyword); // freez(p_query_params->keyword) in this case
     }
@@ -162,7 +162,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
 #endif // MEASURE_QUERY_TIME
 
     /* If keyword has been sanitised, it needs to be freed - otherwise it's just a pointer to a substring */
-    if(p_query_params->sanitise_keyword && p_query_params->keyword){
+    if(p_query_params->sanitize_keyword && p_query_params->keyword){
         freez(p_query_params->keyword);
     }
 

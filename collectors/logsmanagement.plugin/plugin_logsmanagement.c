@@ -16,7 +16,40 @@
 #define WORKER_JOB_COLLECT                      0
 #define WORKER_JOB_UPDATE                       1
 
-#define FUNCTION_LOGSMANAGEMENT_HELP            "Help text for logsmanagement"
+#define LOGS_MANAG_STR_HELPER(x) #x
+#define LOGS_MANAG_STR(x) LOGS_MANAG_STR_HELPER(x)
+#define FUNCTION_LOGSMANAGEMENT_HELP_SHORT      "Query of logs management engine running on this node"
+#define FUNCTION_LOGSMANAGEMENT_HELP_LONG       \
+    "logsmanagement\n\n" \
+    "Function 'logsmanagement' enables querying of the logs management engine and retrieval of logs stored on this node. \n\n" \
+    "Arguments:\n\n" \
+    "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \ 
+    "      start timestamp in ms to search from, default: " \ 
+            LOGS_MANAG_STR(LOGS_MANAG_QUERY_START_DEFAULT) "\n\n" \
+    "   "LOGS_QRY_KW_END_TIME":NUMBER\n" \
+    "      end timestamp in ms to search until, default: " \ 
+            LOGS_MANAG_STR(LOGS_MANAG_QUERY_END_DEFAULT) "\n\n" \
+    "   "LOGS_QRY_KW_QUOTA":NUMBER\n" \
+    "      max size of logs to return (in MiB), default: " \
+            LOGS_MANAG_STR(LOGS_MANAG_QUERY_QUOTA_DEFAULT) "\n\n" \
+    "   "LOGS_QRY_KW_CHARTNAME":STRING\n" \
+    "      Chart name (or names if provided multiple times) to be queried for logs, max No. of sources: " \ 
+            LOGS_MANAG_STR(LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) "\n\n" \
+    "   "LOGS_QRY_KW_FILENAME":STRING\n" \
+    "      If no 'chart_name' is provided, file name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
+            LOGS_MANAG_STR(LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) "\n\n" \
+    "   "LOGS_QRY_KW_KEYWORD":STRING\n" \
+    "      Keyword to be searched in the queried logs\n\n" \
+    "   "LOGS_QRY_KW_IGNORE_CASE":BOOL\n" \
+    "      Case-sensitive keyword search if set to 0, default: " \
+            LOGS_MANAG_STR(LOGS_MANAG_QUERY_IGNORE_CASE_DEFAULT) "\n\n" \
+    "   "LOGS_QRY_KW_SANITIZE_KW":BOOL\n" \
+    "      If non-zero, the keyword will be sanitized before used by the regex engine (it will *not* be interpreted as a regex), default: " \
+            LOGS_MANAG_STR(LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT) "\n\n" \
+    "   "LOGS_QRY_KW_DATA_FORMAT":STRING\n" \
+    "      Grouping of results per collection interval, options: '"LOGS_QRY_KW_JSON_ARRAY"' (default), '"LOGS_QRY_KW_NEWLINE"'\n\n" \
+    "All arguments except for either '"LOGS_QRY_KW_CHARTNAME"' or '"LOGS_QRY_KW_FILENAME"' are optional."
+
 
 static struct Chart_meta chart_types[] = {
     {.type = GENERIC,       .init = generic_chart_init,   .collect = generic_chart_collect,   .update = generic_chart_update},
@@ -96,24 +129,29 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                                                 void *callback_data) {
 
     logs_query_params_t query_params = {  
-        .start_timestamp = 1,
-        .end_timestamp = UINT64_MAX, /* default from / until to return all timestamps */
+        .start_timestamp = LOGS_MANAG_QUERY_START_DEFAULT,
+        .end_timestamp = LOGS_MANAG_QUERY_END_DEFAULT, /* default from / until to return all timestamps */
         .quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT,
         .chart_name = {0},
         .filename = {0},
         .keyword = NULL,
         .ignore_case = 0,
-        .sanitise_keyword = 0,
+        .sanitize_keyword = 0,
         .data_format = LOGS_QUERY_DATA_FORMAT_JSON_ARRAY,
         .results_buff = buffer_create(query_params.quota),
         .keyword_matches = 0
     };
 
-    int fn_off = 0, cn_off = 0;
+    unsigned int fn_off = 0, cn_off = 0;
 
     while(function){
-        char *value = mystrsep(&function, " ");
+        char *value = mystrsep((char **) &function, " ");
         if (!value || !*value) continue;
+        else if(!strcmp(value, "help")){
+            buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
+            dest_wb->contenttype = CT_TEXT_PLAIN;
+            return HTTP_RESP_OK;
+        }
 
         char *key = mystrsep(&value, ":");
         if(!key || !*key) continue;
@@ -125,7 +163,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             value++;
             value[strlen(value)] = ' '; 
             value = mystrsep(&value, "_");
-            function = strrchr(value, NULL);
+            function = strrchr(value, 0);
             function++;
         }
 
@@ -153,18 +191,14 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             query_params.ignore_case = strtol(value, NULL, 10) ? 1 : 0;
         }
         else if(!strcmp(key, LOGS_QRY_KW_SANITIZE_KW)){
-            query_params.sanitise_keyword = strtol(value, NULL, 10) ? 1 : 0;
+            query_params.sanitize_keyword = strtol(value, NULL, 10) ? 1 : 0;
         }
         else if(unlikely(!strcmp(key, LOGS_QRY_KW_DATA_FORMAT) && !strcmp(value, LOGS_QRY_KW_NEWLINE))) {
             query_params.data_format = LOGS_QUERY_DATA_FORMAT_NEW_LINE;
         }
-        else if(strcmp(key, "help") == 0) {
-            buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP);
-            return;
-        }
         else {
             error("functions: logsmanagement invalid parameter");
-            return;
+            return HTTP_RESP_BAD_REQUEST;
         }
     }
 
@@ -495,7 +529,7 @@ void *logsmanagement_plugin_main(void *ptr){
     heartbeat_t hb;
     heartbeat_init(&hb);
 
-    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, FUNCTION_LOGSMANAGEMENT_HELP, true, 
+    rrd_collector_add_function( localhost, NULL, "logsmanagement", 10, FUNCTION_LOGSMANAGEMENT_HELP_SHORT, true, 
                                 logsmanagement_function_execute_cb, NULL);
 
 	while(!netdata_exit){
