@@ -1466,7 +1466,7 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
          ctx->config.tier, added);
 
-    size_t deleted_metrics = 0, still_having_retention_or_referenced = 0;
+    size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
         if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
@@ -1474,6 +1474,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
             mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
         }
         else {
+            zero_disk_retention++;
+
             // there is no retention for this metric
             bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
             if (!has_retention) {
@@ -1481,17 +1483,19 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
                 if(deleted)
                     deleted_metrics++;
                 else
-                    still_having_retention_or_referenced++;
+                    zero_retention_referenced++;
             }
-            else
+            else {
+                zero_disk_but_live++;
                 mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            }
         }
     }
     freez(uuid_first_entry_list);
 
-    internal_error(deleted_metrics + still_having_retention_or_referenced,
-                   "DBENGINE: deleted %zu (out of %zu) zero on-disk retention tier %d metrics from metrics registry",
-                   deleted_metrics, deleted_metrics + still_having_retention_or_referenced, ctx->config.tier);
+    internal_error(zero_disk_retention,
+                   "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
+                   deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live, ctx->config.tier);
 
     if(worker)
         worker_is_idle();
