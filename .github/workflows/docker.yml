@@ -183,6 +183,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Quay.io Login
+        id: quay-login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
         uses: docker/build-push-action@v3
@@ -209,6 +217,7 @@ jobs:
               Setup buildx: ${{ steps.buildx.outcome }}
               Login to DockerHub: ${{ steps.docker-hub-login.outcome }}
               Login to GHCR: ${{ steps.ghcr-login.outcome }}
+              Login to Quay: ${{ steps.quay-login.outcome }}
               Build and publish images: ${{ steps.build.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
