@@ -783,6 +783,8 @@ void *dbengine_tier_init(void *ptr) {
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
+    bool parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", true);
+
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
@@ -819,6 +821,7 @@ void dbengine_init(char *hostname) {
 
     struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
+    size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
     int divisor = 1;
@@ -881,13 +884,18 @@ void dbengine_init(char *hostname) {
         tiers_init[tier].path = dbenginepath;
         tiers_init[tier].ret = 0;
 
-        netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
+        if(parallel_initialization)
+            netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE,
+                                  dbengine_tier_init, &tiers_init[tier]);
+        else
+            dbengine_tier_init(&tiers_init[tier]);
     }
 
-    size_t created_tiers = 0;
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         void *ptr;
-        netdata_thread_join(tiers_init[tier].thread, &ptr);
+
+        if(parallel_initialization)
+            netdata_thread_join(tiers_init[tier].thread, &ptr);
 
         if(tiers_init[tier].ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
