@@ -1,10 +1,6 @@
 <!--
-title: "Circular Buffer"
+title: "circular_buffer"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/circular_buffer/README.md
-sidebar_label: "Circular Buffer"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers"
 -->
 
 # Circular Buffer
