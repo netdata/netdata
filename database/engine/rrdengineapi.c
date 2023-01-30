@@ -243,7 +243,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     bool is_1st_metric_writer = true;
-    if(!mrg_metric_writer_acquire(main_mrg, metric)) {
+    if(!mrg_metric_set_writer(main_mrg, metric)) {
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
@@ -696,7 +696,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     if(!(handle->options & RRDENG_1ST_METRIC_WRITER))
         __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
-    if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
+    if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 
     time_t first_time_s, last_time_s, update_every_s;
@@ -738,12 +738,12 @@ static void register_query_handle(struct rrdeng_query_handle *handle) {
     handle->started_time_s = now_realtime_sec();
 
     netdata_spinlock_lock(&global_query_handle_spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(global_query_handle_ll, handle, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     netdata_spinlock_unlock(&global_query_handle_spinlock);
 }
 static void unregister_query_handle(struct rrdeng_query_handle *handle) {
     netdata_spinlock_lock(&global_query_handle_spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(global_query_handle_ll, handle, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     netdata_spinlock_unlock(&global_query_handle_spinlock);
 }
 #else

@@ -436,8 +436,10 @@ void rrddim_memory_file_save(RRDDIM *rd);
     (x).end_time_s = end_s;                             \
     } while(0)
 
+#define STORAGE_POINT_UNSET { .min = NAN, .max = NAN, .sum = NAN, .count = 0, .anomaly_count = 0, .flags = SN_FLAG_NONE, .start_time_s = 0, .end_time_s = 0 }
+
 #define storage_point_is_unset(x) (!(x).count)
-#define storage_point_is_empty(x) (!netdata_double_isnumber((x).sum))
+#define storage_point_is_gap(x) (!netdata_double_isnumber((x).sum))
 
 // ------------------------------------------------------------------------
 // function pointers that handle data collection

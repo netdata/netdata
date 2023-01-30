@@ -392,7 +392,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 if (likely( d->sp.start_time_s <= min_end_time &&
                             d->sp.end_time_s >= min_end_time &&
                             !storage_point_is_unset(d->sp) &&
-                            !storage_point_is_empty(d->sp))) {
+                            !storage_point_is_gap(d->sp))) {
 
                     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                    rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");

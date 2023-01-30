@@ -23,6 +23,9 @@ static void main_cache_flush_dirty_page_init_callback(PGC *cache __maybe_unused,
 
 static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_ENTRY *entries_array __maybe_unused, PGC_PAGE **pages_array __maybe_unused, size_t entries __maybe_unused)
 {
+    if(!entries)
+        return;
+
      struct rrdengine_instance *ctx = (struct rrdengine_instance *) entries_array[0].section;
 
     size_t bytes_per_point =  CTX_POINT_SIZE_BYTES(ctx);
@@ -50,8 +53,8 @@ static void main_cache_flush_dirty_page_callback(PGC *cache __maybe_unused, PGC_
             error_limit(&erl, "DBENGINE: page exceeds the maximum size, adjusting it to max.");
         }
 
-        memcpy(descr->page, pgc_page_data(pages_array[Index]), descr->page_length);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, descr, link.prev, link.next);
+        descr->page = pgc_page_data(pages_array[Index]);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, descr, link.prev, link.next);
 
         internal_fatal(descr->page_length > RRDENG_BLOCK_SIZE, "DBENGINE: faulty page length calculation");
     }
@@ -1074,6 +1077,7 @@ void init_page_cache(void)
         }
 
         main_cache = pgc_create(
+                "main_cache",
                 main_cache_size,
                 main_cache_free_clean_page_callback,
                 (size_t) rrdeng_pages_per_extent,
@@ -1089,6 +1093,7 @@ void init_page_cache(void)
         );
 
         open_cache = pgc_create(
+                "open_cache",
                 open_cache_size,                             // the default is 1MB
                 open_cache_free_clean_page_callback,
                 1,
@@ -1105,6 +1110,7 @@ void init_page_cache(void)
         pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
 
         extent_cache = pgc_create(
+                "extent_cache",
                 extent_cache_size,
                 extent_cache_free_clean_page_callback,
                 1,

@@ -16,7 +16,7 @@
 typedef int32_t REFCOUNT;
 #define REFCOUNT_DELETING (-100)
 
-// to use arrayalloc uncomment the following line:
+// to use ARAL uncomment the following line:
 #define PGC_WITH_ARAL 1
 
 typedef enum __attribute__ ((__packed__)) {
@@ -82,6 +82,8 @@ struct pgc_linked_list {
 
 struct pgc {
     struct {
+        char name[PGC_NAME_MAX + 1];
+
         size_t partitions;
         size_t clean_size;
         size_t max_dirty_pages_per_call;
@@ -415,13 +417,25 @@ struct section_pages {
     PGC_PAGE *base;
 };
 
-static ARAL section_pages_aral = {
-        .filename = NULL,
-        .cache_dir = NULL,
-        .use_mmap = false,
-        .initial_elements = 16384 / sizeof(struct section_pages),
-        .requested_element_size = sizeof(struct section_pages),
-};
+static ARAL *pgc_section_pages_aral = NULL;
+static void pgc_section_pages_static_aral_init(void) {
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    if(unlikely(!pgc_section_pages_aral)) {
+        netdata_spinlock_lock(&spinlock);
+
+        // we have to check again
+        if(!pgc_section_pages_aral)
+            pgc_section_pages_aral = aral_create(
+                    "pgc_section",
+                    sizeof(struct section_pages),
+                    0,
+                    4096,
+                    NULL, NULL, false, false);
+
+        netdata_spinlock_unlock(&spinlock);
+    }
+}
 
 static inline void pgc_stats_ll_judy_change(PGC *cache, struct pgc_linked_list *ll, size_t mem_before_judyl, size_t mem_after_judyl) {
     if(mem_after_judyl > mem_before_judyl) {
@@ -462,7 +476,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         struct section_pages *sp = *section_pages_pptr;
         if(!sp) {
             // sp = callocz(1, sizeof(struct section_pages));
-            sp = arrayalloc_mallocz(&section_pages_aral);
+            sp = aral_mallocz(pgc_section_pages_aral);
             memset(sp, 0, sizeof(struct section_pages));
 
             *section_pages_pptr = sp;
@@ -473,7 +487,7 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
 
         sp->entries++;
         sp->size += page->assumed_size;
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(sp->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(sp->base, page, link.prev, link.next);
 
         if((sp->entries % cache->config.max_dirty_pages_per_call) == 0)
             ll->version++;
@@ -484,11 +498,11 @@ static void pgc_ll_add(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         // - DIRTY pages made CLEAN, depending on their accesses may be appended (accesses > 0) or prepended (accesses = 0).
 
         if(page->accesses || page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED) {
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(ll->base, page, link.prev, link.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
             page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
         }
         else
-            DOUBLE_LINKED_LIST_PREPEND_UNSAFE(ll->base, page, link.prev, link.next);
+            DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
 
         ll->version++;
     }
@@ -530,7 +544,7 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
         struct section_pages *sp = *section_pages_pptr;
         sp->entries--;
         sp->size -= page->assumed_size;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(sp->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(sp->base, page, link.prev, link.next);
 
         if(!sp->base) {
             size_t mem_before_judyl, mem_after_judyl;
@@ -543,13 +557,13 @@ static void pgc_ll_del(PGC *cache __maybe_unused, struct pgc_linked_list *ll, PG
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
             // freez(sp);
-            arrayalloc_freez(&section_pages_aral, sp);
+            aral_freez(pgc_section_pages_aral, sp);
             mem_after_judyl -= sizeof(struct section_pages);
             pgc_stats_ll_judy_change(cache, ll, mem_before_judyl, mem_after_judyl);
         }
     }
     else {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(ll->base, page, link.prev, link.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ll->base, page, link.prev, link.next);
         ll->version++;
     }
 
@@ -565,8 +579,8 @@ static inline void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
 
         if (flags & PGC_PAGE_CLEAN) {
             if(pgc_ll_trylock(cache, &cache->clean)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 pgc_ll_unlock(cache, &cache->clean);
                 page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
             }
@@ -860,7 +874,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page) {
 
     // free our memory
 #ifdef PGC_WITH_ARAL
-    arrayalloc_freez(cache->aral, page);
+    aral_freez(cache->aral, page);
 #else
     freez(page);
 #endif
@@ -1038,8 +1052,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 break;
 
             if(unlikely(page_flag_check(page, PGC_PAGE_HAS_BEEN_ACCESSED | PGC_PAGE_HAS_NO_DATA_IGNORE_ACCESSES) == PGC_PAGE_HAS_BEEN_ACCESSED)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
                 page_flag_clear(page, PGC_PAGE_HAS_BEEN_ACCESSED);
                 continue;
             }
@@ -1056,7 +1070,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 __atomic_add_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                 __atomic_add_fetch(&cache->stats.evicting_size, page->assumed_size, __ATOMIC_RELAXED);
 
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_to_evict, page, link.prev, link.next);
 
                 pages_to_evict_size += page->assumed_size;
 
@@ -1073,8 +1087,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 if(!first_page_we_relocated)
                     first_page_we_relocated = page;
 
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(cache->clean.base, page, link.prev, link.next);
-                DOUBLE_LINKED_LIST_APPEND_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
+                DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(cache->clean.base, page, link.prev, link.next);
 
                 // check if we have to stop
                 if(unlikely(++total_pages_skipped >= max_skip && !all_of_them)) {
@@ -1099,8 +1113,8 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                     next = page->link.next;
 
                     size_t partition = pgc_indexing_partition(cache, page->metric_id);
-                    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pages_to_evict, page, link.prev, link.next);
-                    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pages_to_evict, page, link.prev, link.next);
+                    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pages_per_partition[partition], page, link.prev, link.next);
                 }
 
                 // remove them from the index
@@ -1178,7 +1192,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
 #ifdef PGC_WITH_ARAL
-    PGC_PAGE *allocation = arrayalloc_mallocz(cache->aral);
+    PGC_PAGE *allocation = aral_mallocz(cache->aral);
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
@@ -1285,7 +1299,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
 #ifdef PGC_WITH_ARAL
     if(allocation)
-        arrayalloc_freez(cache->aral, allocation);
+        aral_freez(cache->aral, allocation);
 #endif
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
@@ -1713,7 +1727,8 @@ void free_all_unreferenced_clean_pages(PGC *cache) {
 // ----------------------------------------------------------------------------
 // public API
 
-PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
+PGC *pgc_create(const char *name,
+                size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
                 size_t max_dirty_pages_per_flush,
                 save_dirty_init_callback pgc_save_init_cb,
                 save_dirty_page_callback pgc_save_dirty_cb,
@@ -1732,6 +1747,7 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
         max_flushes_inline = 2;
 
     PGC *cache = callocz(1, sizeof(PGC));
+    strncpyz(cache->config.name, name, PGC_NAME_MAX);
     cache->config.options = options;
     cache->config.clean_size = (clean_size_bytes < 1 * 1024 * 1024) ? 1 * 1024 * 1024 : clean_size_bytes;
     cache->config.pgc_free_clean_cb = pgc_free_cb;
@@ -1772,10 +1788,14 @@ PGC *pgc_create(size_t clean_size_bytes, free_clean_page_callback pgc_free_cb,
     cache->clean.stats = &cache->stats.queues.clean;
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = arrayalloc_create(sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page, 65536 / sizeof(PGC_PAGE),
-                                    NULL, NULL, false, false);
+    cache->aral = aral_create(name,
+                              sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
+                              0,
+                              4096,
+                              NULL, NULL, false, false);
 #endif
 
+    pgc_section_pages_static_aral_init();
     pointer_index_init(cache);
 
     return cache;
@@ -1803,7 +1823,7 @@ void pgc_destroy(PGC *cache) {
     else {
         pointer_destroy_index(cache);
 #ifdef PGC_WITH_ARAL
-        arrayalloc_destroy(cache->aral);
+        aral_destroy(cache->aral);
 #endif
         freez(cache);
     }
@@ -2602,7 +2622,8 @@ void unittest_stress_test(void) {
 #endif
 
 int pgc_unittest(void) {
-    PGC *cache = pgc_create(32 * 1024 * 1024, unittest_free_clean_page_callback,
+    PGC *cache = pgc_create("test",
+                            32 * 1024 * 1024, unittest_free_clean_page_callback,
                             64, NULL, unittest_save_dirty_page_callback,
                             10, 10, 1000, 10,
                             PGC_OPTIONS_DEFAULT, 1, 11);

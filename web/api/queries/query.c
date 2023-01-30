@@ -17,7 +17,7 @@
 #include "percentile/percentile.h"
 #include "trimmed_mean/trimmed_mean.h"
 
-#define POINTS_TO_EXPAND_QUERY 0
+#define POINTS_TO_EXPAND_QUERY 5
 
 // ----------------------------------------------------------------------------
 
@@ -927,6 +927,8 @@ typedef struct query_engine_ops {
     // query planer
     size_t current_plan;
     time_t current_plan_expire_time;
+    time_t plan_expanded_after;
+    time_t plan_expanded_before;
 
     // storage queries
     size_t tier;
@@ -955,6 +957,20 @@ typedef struct query_engine_ops {
 
 #define query_plan_should_switch_plan(ops, now) ((now) >= (ops)->current_plan_expire_time)
 
+static size_t query_planer_expand_duration_in_points(time_t this_update_every, time_t next_update_every) {
+
+    time_t delta = this_update_every - next_update_every;
+    if(delta < 0) delta = -delta;
+
+    size_t points;
+    if(delta < this_update_every * POINTS_TO_EXPAND_QUERY)
+        points = POINTS_TO_EXPAND_QUERY;
+    else
+        points = (delta + this_update_every - 1) / this_update_every;
+
+    return points;
+}
+
 static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
     QUERY_METRIC *qm = ops->qm;
 
@@ -962,8 +978,35 @@ static void query_planer_initialize_plans(QUERY_ENGINE_OPS *ops) {
         size_t tier = qm->plan.array[p].tier;
         time_t update_every = qm->tiers[tier].db_update_every_s;
 
-        time_t after = qm->plan.array[p].after - (update_every * POINTS_TO_EXPAND_QUERY);
-        time_t before = qm->plan.array[p].before + (update_every * POINTS_TO_EXPAND_QUERY);
+        size_t points_to_add_to_after;
+        if(p > 0) {
+            // there is another plan before to this
+
+            size_t tier0 = qm->plan.array[p - 1].tier;
+            time_t update_every0 = qm->tiers[tier0].db_update_every_s;
+
+            points_to_add_to_after = query_planer_expand_duration_in_points(update_every, update_every0);
+        }
+        else
+            points_to_add_to_after = (tier == 0) ? 0 : POINTS_TO_EXPAND_QUERY;
+
+        size_t points_to_add_to_before;
+        if(p + 1 < qm->plan.used) {
+            // there is another plan after to this
+
+            size_t tier1 = qm->plan.array[p+1].tier;
+            time_t update_every1 = qm->tiers[tier1].db_update_every_s;
+
+            points_to_add_to_before = query_planer_expand_duration_in_points(update_every, update_every1);
+        }
+        else
+            points_to_add_to_before = POINTS_TO_EXPAND_QUERY;
+
+        time_t after = qm->plan.array[p].after - (time_t)(update_every * points_to_add_to_after);
+        time_t before = qm->plan.array[p].before + (time_t)(update_every * points_to_add_to_before);
+
+        qm->plan.array[p].expanded_after = after;
+        qm->plan.array[p].expanded_before = before;
 
         struct query_metric_tier *tier_ptr = &qm->tiers[tier];
         tier_ptr->eng->api.query_ops.init(
@@ -1027,9 +1070,12 @@ static void query_planer_activate_plan(QUERY_ENGINE_OPS *ops, size_t plan_id, ti
         ops->current_plan_expire_time = qm->plan.array[plan_id + 1].after;
     else
         ops->current_plan_expire_time = qm->plan.array[plan_id].before;
+
+    ops->plan_expanded_after = qm->plan.array[plan_id].expanded_after;
+    ops->plan_expanded_before = qm->plan.array[plan_id].expanded_before;
 }
 
-static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
+static bool query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t last_point_end_time) {
     QUERY_METRIC *qm = ops->qm;
 
     size_t old_plan = ops->current_plan;
@@ -1043,7 +1089,7 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
             ops->current_plan_expire_time = ops->r->internal.qt->window.before;
             // let the query run with current plan
             // we will not switch it
-            return;
+            return false;
         }
 
         next_plan_before_time = qm->plan.array[ops->current_plan].before;
@@ -1052,11 +1098,12 @@ static void query_planer_next_plan(QUERY_ENGINE_OPS *ops, time_t now, time_t las
     if(!query_metric_is_valid_tier(qm, qm->plan.array[ops->current_plan].tier)) {
         ops->current_plan = old_plan;
         ops->current_plan_expire_time = ops->r->internal.qt->window.before;
-        return;
+        return false;
     }
 
     query_planer_finalize_plan(ops, old_plan);
     query_planer_activate_plan(ops, ops->current_plan, MIN(now, last_point_end_time));
+    return true;
 }
 
 static int compare_query_plan_entries_on_start_time(const void *a, const void *b) {
@@ -1273,6 +1320,11 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     QUERY_POINT last1_point = QUERY_POINT_EMPTY;
     QUERY_POINT new_point   = QUERY_POINT_EMPTY;
 
+    // ONE POINT READ-AHEAD
+    // when we switch plans, we read-ahead a point from the next plan
+    // to join them smoothly at the exact time the next plan begins
+    STORAGE_POINT next1_point = STORAGE_POINT_UNSET;
+
     time_t now_start_time = after_wanted - ops->query_granularity;
     time_t now_end_time   = after_wanted + ops->view_update_every - ops->query_granularity;
 
@@ -1311,8 +1363,41 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
             // fetch the new point
             {
-                db_points_read_since_plan_switch++;
-                STORAGE_POINT sp = ops->next_metric(ops->handle);
+                STORAGE_POINT sp;
+                if(likely(storage_point_is_unset(next1_point))) {
+                    db_points_read_since_plan_switch++;
+                    sp = ops->next_metric(ops->handle);
+                }
+                else {
+                    // ONE POINT READ-AHEAD
+                    sp = next1_point;
+                    storage_point_unset(next1_point);
+                    db_points_read_since_plan_switch = 1;
+                }
+
+                // ONE POINT READ-AHEAD
+                if(unlikely(query_plan_should_switch_plan(ops, sp.end_time_s) &&
+                    query_planer_next_plan(ops, now_end_time, new_point.end_time))) {
+
+                    // The end time of the current point, crosses our plans (tiers)
+                    // so, we switched plan (tier)
+                    //
+                    // There are 2 cases now:
+                    //
+                    // A. the entire point of the previous plan is to the future of point from the next plan
+                    // B. part of the point of the previous plan overlaps with the point from the next plan
+
+                    STORAGE_POINT sp2 = ops->next_metric(ops->handle);
+
+                    if(sp.start_time_s > sp2.start_time_s)
+                        // the point from the previous plan is useless
+                        sp = sp2;
+                    else
+                        // let the query run from the previous plan
+                        // but setting this will also cut off the interpolation
+                        // of the point from the previous plan
+                        next1_point = sp2;
+                }
 
                 ops->db_points_read_per_tier[ops->tier]++;
                 ops->db_total_points_read++;
@@ -1326,8 +1411,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 //                    info("QUERY: got point %zu, from time %ld to %ld   //   now from %ld to %ld   //   query from %ld to %ld",
 //                         new_point.id, new_point.start_time, new_point.end_time, now_start_time, now_end_time, after_wanted, before_wanted);
 //
-                // set the right value to the point we got
-                if(likely(!storage_point_is_unset(sp) && !storage_point_is_empty(sp))) {
+                // get the right value from the point we got
+                if(likely(!storage_point_is_unset(sp) && !storage_point_is_gap(sp))) {
 
                     if(unlikely(use_anomaly_bit_as_value))
                         new_point.value =  new_point.anomaly;
@@ -1391,7 +1476,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             count_same_end_time = 0;
 
             // decide how to use this point
-            if(likely(new_point.end_time < now_end_time)) { // likely to favor tier0
+            if(likely(new_point.end_time <= now_end_time)) { // likely to favor tier0
                 // this db point ends before our now_end_time
 
                 if(likely(new_point.end_time >= now_start_time)) { // likely to favor tier0
@@ -1408,8 +1493,8 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                     // at exactly the time we will want
 
                     // we only log if this is not point 1
-                    internal_error(new_point.end_time < after_wanted &&
-                                   new_point.id > POINTS_TO_EXPAND_QUERY + 1,
+                    internal_error(new_point.end_time < ops->plan_expanded_after &&
+                                   db_points_read_since_plan_switch > 1,
                                    "QUERY: '%s', dimension '%s' next_metric() "
                                    "returned point %zu from %ld time %ld, "
                                    "which is entirely before our current timeframe %ld to %ld "
@@ -1417,7 +1502,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
                                    qt->id, string2str(qm->dimension.id),
                                    new_point.id, new_point.start_time, new_point.end_time,
                                    now_start_time, now_end_time,
-                                   after_wanted, before_wanted);
+                                   ops->plan_expanded_after, ops->plan_expanded_before);
                 }
 
             }
@@ -1430,11 +1515,22 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
 
         if(unlikely(count_same_end_time)) {
             internal_error(true,
-                           "QUERY: '%s', dimension '%s', the database does not advance the query, it returned an end time less or equal to the end time of the last point we got %ld, %zu times",
-                           qt->id, string2str(qm->dimension.id), last1_point.end_time, count_same_end_time);
+                           "QUERY: '%s', dimension '%s', the database does not advance the query,"
+                           " it returned an end time less or equal to the end time of the last "
+                           "point we got %ld, %zu times",
+                           qt->id, string2str(qm->dimension.id),
+                           last1_point.end_time, count_same_end_time);
 
             if(unlikely(new_point.end_time <= last1_point.end_time))
                 new_point.end_time = now_end_time;
+        }
+
+        time_t stop_time = new_point.end_time;
+        if(unlikely(!storage_point_is_unset(next1_point))) {
+            // ONE POINT READ-AHEAD
+            // the point crosses the start time of the
+            // read ahead storage point we have read
+            stop_time = next1_point.start_time_s;
         }
 
         // the inner loop
@@ -1442,7 +1538,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
         // we select the one to use based on their timestamps
 
         size_t iterations = 0;
-        for ( ; now_end_time <= new_point.end_time && points_added < points_wanted ;
+        for ( ; now_end_time <= stop_time && points_added < points_wanted ;
                 now_end_time += ops->view_update_every, iterations++) {
 
             // now_start_time is wrong in this loop

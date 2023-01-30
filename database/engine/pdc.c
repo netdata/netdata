@@ -68,7 +68,7 @@ void pdc_cleanup1(void) {
 
     if(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
         item = pdc_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
         pdc_globals.protected.available--;
     }
 
@@ -87,7 +87,7 @@ PDC *pdc_get(void) {
 
     if(likely(pdc_globals.protected.available_items)) {
         pdc = pdc_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
         pdc_globals.protected.available--;
     }
 
@@ -106,7 +106,7 @@ static void pdc_release(PDC *pdc) {
     if(unlikely(!pdc)) return;
 
     netdata_spinlock_lock(&pdc_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
     pdc_globals.protected.available++;
     netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
 }
@@ -147,7 +147,7 @@ void page_details_cleanup1(void) {
 
     if(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
         item = page_details_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
         page_details_globals.protected.available--;
     }
 
@@ -166,7 +166,7 @@ struct page_details *page_details_get(void) {
 
     if(likely(page_details_globals.protected.available_items)) {
         pd = page_details_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
         page_details_globals.protected.available--;
     }
 
@@ -185,7 +185,7 @@ static void page_details_release(struct page_details *pd) {
     if(unlikely(!pd)) return;
 
     netdata_spinlock_lock(&page_details_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
     page_details_globals.protected.available++;
     netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
 }
@@ -226,7 +226,7 @@ void epdl_cleanup1(void) {
 
     if(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
         item = epdl_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
         epdl_globals.protected.available--;
     }
 
@@ -245,7 +245,7 @@ static EPDL *epdl_get(void) {
 
     if(likely(epdl_globals.protected.available_items)) {
         epdl = epdl_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
         epdl_globals.protected.available--;
     }
 
@@ -264,7 +264,7 @@ static void epdl_release(EPDL *epdl) {
     if(unlikely(!epdl)) return;
 
     netdata_spinlock_lock(&epdl_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
     epdl_globals.protected.available++;
     netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
 }
@@ -305,7 +305,7 @@ void deol_cleanup1(void) {
 
     if(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
         item = deol_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
         deol_globals.protected.available--;
     }
 
@@ -324,7 +324,7 @@ static DEOL *deol_get(void) {
 
     if(likely(deol_globals.protected.available_items)) {
         deol = deol_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
         deol_globals.protected.available--;
     }
 
@@ -343,7 +343,7 @@ static void deol_release(DEOL *deol) {
     if(unlikely(!deol)) return;
 
     netdata_spinlock_lock(&deol_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
     deol_globals.protected.available++;
     netdata_spinlock_unlock(&deol_globals.protected.spinlock);
 }
@@ -399,7 +399,7 @@ void extent_buffer_cleanup1(void) {
 
     if(extent_buffer_globals.protected.available_items && extent_buffer_globals.protected.available > 1) {
         item = extent_buffer_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, item, cache.prev, cache.next);
         extent_buffer_globals.protected.available--;
     }
 
@@ -424,7 +424,7 @@ struct extent_buffer *extent_buffer_get(size_t size) {
     netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
     if(likely(extent_buffer_globals.protected.available_items)) {
         eb = extent_buffer_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
         extent_buffer_globals.protected.available--;
     }
     netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
@@ -452,7 +452,7 @@ void extent_buffer_release(struct extent_buffer *eb) {
     if(unlikely(!eb)) return;
 
     netdata_spinlock_lock(&extent_buffer_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_buffer_globals.protected.available_items, eb, cache.prev, cache.next);
     extent_buffer_globals.protected.available++;
     netdata_spinlock_unlock(&extent_buffer_globals.protected.spinlock);
 }
@@ -671,7 +671,7 @@ static bool epdl_pending_add(EPDL *epdl) {
             rrdeng_req_cmd(epdl_get_cmd, base, epdl->pdc->priority);
     }
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(base, epdl, query.prev, query.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(base, epdl, query.prev, query.next);
     *PValue = base;
 
     netdata_spinlock_unlock(&epdl->datafile->extent_queries.spinlock);
@@ -1009,7 +1009,7 @@ static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_
                     if (unlikely(__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)))
                         pdc_page_status_set(pd, PDC_PAGE_FAILED | PDC_PAGE_CANCELLED);
                     else
-                        DOUBLE_LINKED_LIST_APPEND_UNSAFE(pd_list, pd, load.prev, load.next);
+                        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pd_list, pd, load.prev, load.next);
                 }
             }
         }
@@ -1259,6 +1259,35 @@ static bool epdl_populate_pages_from_extent_data(
     return true;
 }
 
+static inline void *datafile_extent_read(struct rrdengine_instance *ctx, uv_file file, unsigned pos, unsigned size_bytes)
+{
+    void *buffer;
+    uv_fs_t request;
+
+    unsigned real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+    int ret = posix_memalign(&buffer, RRDFILE_ALIGNMENT, real_io_size);
+    if (unlikely(ret))
+        fatal("DBENGINE: posix_memalign(): %s", strerror(ret));
+
+    uv_buf_t iov = uv_buf_init(buffer, real_io_size);
+    ret = uv_fs_read(NULL, &request, file, &iov, 1, pos, NULL);
+    if (unlikely(-1 == ret)) {
+        ctx_io_error(ctx);
+        posix_memfree(buffer);
+        buffer = NULL;
+    }
+    else
+        ctx_io_read_op_bytes(ctx, real_io_size);
+
+    uv_fs_req_cleanup(&request);
+
+    return buffer;
+}
+
+static inline void datafile_extent_read_free(void *buffer) {
+    posix_memfree(buffer);
+}
+
 void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *epdl, bool worker) {
     size_t *statistics_counter = NULL;
     PDC_PAGE_STATUS not_loaded_pages_tag = 0, loaded_pages_tag = 0;
@@ -1306,18 +1335,12 @@ void epdl_find_extent_and_populate_pages(struct rrdengine_instance *ctx, EPDL *e
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_EXTENT_MMAP);
 
-        off_t map_start =  ALIGN_BYTES_FLOOR(epdl->extent_offset);
-        size_t length = ALIGN_BYTES_CEILING(epdl->extent_offset + epdl->extent_size) - map_start;
-
-        void *mmap_data = mmap(NULL, length, PROT_READ, MAP_SHARED, epdl->file, map_start);
-        if(mmap_data != MAP_FAILED) {
-            extent_compressed_data = mmap_data + (epdl->extent_offset - map_start);
+        void *extent_data = datafile_extent_read(ctx, epdl->file, epdl->extent_offset, epdl->extent_size);
+        if(extent_data != NULL) {
 
             void *copied_extent_compressed_data = dbengine_extent_alloc(epdl->extent_size);
-            memcpy(copied_extent_compressed_data, extent_compressed_data, epdl->extent_size);
-
-            int ret = munmap(mmap_data, length);
-            fatal_assert(0 == ret);
+            memcpy(copied_extent_compressed_data, extent_data, epdl->extent_size);
+            datafile_extent_read_free(extent_data);
 
             if(worker)
                 worker_is_busy(UV_EVENT_DBENGINE_EXTENT_CACHE_LOOKUP);

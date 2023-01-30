@@ -243,6 +243,9 @@ static void global_statistics_charts(void) {
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
     getrusage(RUSAGE_SELF, &me);
 
+    size_t aral_structures, aral_malloc_allocated, aral_malloc_used, aral_mmap_allocated, aral_mmap_used;
+    aral_get_size_statistics(&aral_structures, &aral_malloc_allocated, &aral_malloc_used, &aral_mmap_allocated, &aral_mmap_used);
+
     // ----------------------------------------------------------------
 
     {
@@ -292,6 +295,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_replication = NULL;
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_workers = NULL;
+        static RRDDIM *rd_aral = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -322,6 +326,7 @@ static void global_statistics_charts(void) {
             rd_replication = rrddim_add(st_memory, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -355,6 +360,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
         rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
+        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_structures);
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
@@ -374,6 +380,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_cbuffers_streaming = NULL;
         static RRDDIM *rd_buffers_replication = NULL;
         static RRDDIM *rd_buffers_web = NULL;
+        static RRDDIM *rd_buffers_aral = NULL;
 
         if (unlikely(!st_memory_buffers)) {
             st_memory_buffers = rrdset_create_localhost(
@@ -402,6 +409,7 @@ static void global_statistics_charts(void) {
             rd_cbuffers_streaming = rrddim_add(st_memory_buffers, "streaming cbuf", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_aral = rrddim_add(st_memory_buffers, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
@@ -416,6 +424,7 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)(aral_malloc_allocated + aral_mmap_allocated) - (collected_number)(aral_malloc_used + aral_mmap_used));
 
         rrdset_done(st_memory_buffers);
     }
@@ -1884,6 +1893,111 @@ static void dbengine2_statistics_charts(void) {
         rrdset_done(st_julyl_moved);
     }
 #endif
+
+    {
+        static RRDSET *st_mrg_metrics = NULL;
+        static RRDDIM *rd_mrg_metrics = NULL;
+        static RRDDIM *rd_mrg_acquired = NULL;
+        static RRDDIM *rd_mrg_collected = NULL;
+        static RRDDIM *rd_mrg_with_retention = NULL;
+        static RRDDIM *rd_mrg_without_retention = NULL;
+        static RRDDIM *rd_mrg_multiple_writers = NULL;
+
+        if (unlikely(!st_mrg_metrics)) {
+            st_mrg_metrics = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_metrics",
+                    NULL,
+                    "dbengine metrics",
+                    NULL,
+                    "Netdata Metrics in Metrics Registry",
+                    "metrics",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_mrg_metrics = rrddim_add(st_mrg_metrics, "all", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_acquired = rrddim_add(st_mrg_metrics, "acquired", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_collected = rrddim_add(st_mrg_metrics, "collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_with_retention = rrddim_add(st_mrg_metrics, "with retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_without_retention = rrddim_add(st_mrg_metrics, "without retention", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_mrg_multiple_writers = rrddim_add(st_mrg_metrics, "multi-collected", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_metrics, (collected_number)mrg_stats.entries);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_acquired, (collected_number)mrg_stats.entries_referenced);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_collected, (collected_number)mrg_stats.writers);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_with_retention, (collected_number)mrg_stats.entries_with_retention);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_without_retention, (collected_number)mrg_stats.entries - (collected_number)mrg_stats.entries_with_retention);
+        rrddim_set_by_pointer(st_mrg_metrics, rd_mrg_multiple_writers, (collected_number)mrg_stats.writers_conflicts);
+
+        rrdset_done(st_mrg_metrics);
+    }
+
+    {
+        static RRDSET *st_mrg_ops = NULL;
+        static RRDDIM *rd_mrg_add = NULL;
+        static RRDDIM *rd_mrg_del = NULL;
+        static RRDDIM *rd_mrg_search = NULL;
+
+        if (unlikely(!st_mrg_ops)) {
+            st_mrg_ops = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_metrics_registry_operations",
+                    NULL,
+                    "dbengine metrics",
+                    NULL,
+                    "Netdata Metrics Registry Operations",
+                    "metrics",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_mrg_add = rrddim_add(st_mrg_ops, "add", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mrg_del = rrddim_add(st_mrg_ops, "delete", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+            rd_mrg_search = rrddim_add(st_mrg_ops, "search", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_add, (collected_number)mrg_stats.additions);
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_del, (collected_number)mrg_stats.deletions);
+        rrddim_set_by_pointer(st_mrg_ops, rd_mrg_search, (collected_number)mrg_stats.search_hits + (collected_number)mrg_stats.search_misses);
+
+        rrdset_done(st_mrg_ops);
+    }
+
+    {
+        static RRDSET *st_mrg_references = NULL;
+        static RRDDIM *rd_mrg_references = NULL;
+
+        if (unlikely(!st_mrg_references)) {
+            st_mrg_references = rrdset_create_localhost(
+                    "netdata",
+                    "dbengine_metrics_registry_references",
+                    NULL,
+                    "dbengine metrics",
+                    NULL,
+                    "Netdata Metrics Registry References",
+                    "references",
+                    "netdata",
+                    "stats",
+                    priority,
+                    localhost->rrd_update_every,
+                    RRDSET_TYPE_LINE);
+
+            rd_mrg_references = rrddim_add(st_mrg_references, "references", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        }
+        priority++;
+
+        rrddim_set_by_pointer(st_mrg_references, rd_mrg_references, (collected_number)mrg_stats.current_references);
+
+        rrdset_done(st_mrg_references);
+    }
 
     {
         static RRDSET *st_cache_hit_ratio = NULL;
@@ -3817,7 +3931,7 @@ static void workers_threads_cleanup(struct worker_utilization *wu) {
 
         if(!t->enabled) {
             JudyLDel(&workers_by_pid_JudyL_array, t->pid, PJE0);
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wu->threads, t, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wu->threads, t, prev, next);
             freez(t);
         }
         t = next;
@@ -3844,7 +3958,7 @@ static struct worker_thread *worker_thread_create(struct worker_utilization *wu,
     *PValue = wt;
 
     // link it
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wu->threads, wt, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wu->threads, wt, prev, next);
 
     return wt;
 }

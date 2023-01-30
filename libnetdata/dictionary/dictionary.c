@@ -789,7 +789,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
             // we didn't get a reference
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
-                DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+                DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
                 dict_item_free_with_hooks(dict, item);
                 deleted++;
 
@@ -1167,9 +1167,9 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
     if(dict->options & DICT_OPTION_ADD_IN_FRONT)
-        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(dict->items.list, item, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
     else
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(dict->items.list, item, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_adder_pid = gettid();
@@ -1186,7 +1186,7 @@ static inline void item_linked_list_add(DICTIONARY *dict, DICTIONARY_ITEM *item)
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(dict->items.list, item, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     item->ll_remover_pid = gettid();
@@ -1234,28 +1234,43 @@ static inline size_t item_get_name_len(const DICTIONARY_ITEM *item) {
         return strlen(item->caller_name);
 }
 
-static ARAL dict_items_aral = {
-        .filename = NULL,
-        .cache_dir = NULL,
-        .use_mmap = false,
-        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM),
-        .requested_element_size = sizeof(DICTIONARY_ITEM),
-};
+static ARAL *dict_items_aral =  NULL;
+static ARAL *dict_shared_items_aral = NULL;
 
-static ARAL dict_shared_items_aral = {
-        .filename = NULL,
-        .cache_dir = NULL,
-        .use_mmap = false,
-        .initial_elements = 65536 / sizeof(DICTIONARY_ITEM_SHARED),
-        .requested_element_size = sizeof(DICTIONARY_ITEM_SHARED),
-};
+void dictionary_static_items_aral_init(void) {
+    static SPINLOCK spinlock;
+
+    if(unlikely(!dict_items_aral || !dict_shared_items_aral)) {
+        netdata_spinlock_lock(&spinlock);
+
+        // we have to check again
+        if(!dict_items_aral)
+            dict_items_aral = aral_create(
+                    "dict-items",
+                    sizeof(DICTIONARY_ITEM),
+                    0,
+                    4096,
+                    NULL, NULL, false, false);
+
+        // we have to check again
+        if(!dict_shared_items_aral)
+            dict_shared_items_aral = aral_create(
+                    "dict-shared-items",
+                    sizeof(DICTIONARY_ITEM_SHARED),
+                    0,
+                    4096,
+                    NULL, NULL, false, false);
+
+        netdata_spinlock_unlock(&spinlock);
+    }
+}
 
 static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t *allocated_bytes, DICTIONARY_ITEM *master_item) {
     DICTIONARY_ITEM *item;
 
     size_t size = sizeof(DICTIONARY_ITEM);
 //    item = callocz(1, size);
-    item = arrayalloc_mallocz(&dict_items_aral);
+    item = aral_mallocz(dict_items_aral);
     memset(item, 0, sizeof(DICTIONARY_ITEM));
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -1276,7 +1291,7 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     else {
         size = sizeof(DICTIONARY_ITEM_SHARED);
         // item->shared = callocz(1, size);
-        item->shared = arrayalloc_mallocz(&dict_shared_items_aral);
+        item->shared = aral_mallocz(dict_shared_items_aral);
         memset(item->shared, 0, sizeof(DICTIONARY_ITEM_SHARED));
 
         item->shared->links = 1;
@@ -1418,13 +1433,13 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
         value_size += item->shared->value_len;
 
         // freez(item->shared);
-        arrayalloc_freez(&dict_shared_items_aral, item->shared);
+        aral_freez(dict_shared_items_aral, item->shared);
         item->shared = NULL;
         item_size += sizeof(DICTIONARY_ITEM_SHARED);
     }
 
     // freez(item);
-    arrayalloc_freez(&dict_items_aral, item);
+    aral_freez(dict_items_aral, item);
 
     item_size += sizeof(DICTIONARY_ITEM);
 
@@ -1971,6 +1986,7 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
     dict_size += reference_counter_init(dict);
     dict_size += hashtable_init_unsafe(dict);
 
+    dictionary_static_items_aral_init();
     pointer_index_init(dict);
 
     DICTIONARY_STATS_PLUS_MEMORY(dict, 0, dict_size, 0);

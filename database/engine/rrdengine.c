@@ -124,7 +124,7 @@ static void work_request_cleanup1(void) {
 
     if(work_request_globals.protected.available_items && work_request_globals.protected.available > (size_t)libuv_worker_threads) {
         item = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
         work_request_globals.protected.available--;
     }
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
@@ -137,7 +137,7 @@ static void work_request_cleanup1(void) {
 
 static inline void work_done(struct rrdeng_work *work_request) {
     netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
     work_request_globals.protected.available++;
     netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
 }
@@ -183,7 +183,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     if(likely(work_request_globals.protected.available_items)) {
         work_request = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
         work_request_globals.protected.available--;
     }
 
@@ -246,7 +246,7 @@ static void page_descriptor_cleanup1(void) {
 
     if(page_descriptor_globals.protected.available_items && page_descriptor_globals.protected.available > MAX_PAGES_PER_EXTENT) {
         item = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
         page_descriptor_globals.protected.available--;
     }
 
@@ -265,7 +265,7 @@ struct page_descr_with_data *page_descriptor_get(void) {
 
     if(likely(page_descriptor_globals.protected.available_items)) {
         descr = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
         page_descriptor_globals.protected.available--;
     }
 
@@ -284,7 +284,7 @@ static inline void page_descriptor_release(struct page_descr_with_data *descr) {
     if(unlikely(!descr)) return;
 
     netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
     page_descriptor_globals.protected.available++;
     netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
 }
@@ -322,7 +322,7 @@ static void extent_io_descriptor_cleanup1(void) {
 
     if(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > (size_t)libuv_worker_threads) {
         item = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
         extent_io_descriptor_globals.protected.available--;
     }
     netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
@@ -340,7 +340,7 @@ static struct extent_io_descriptor *extent_io_descriptor_get(void) {
 
     if(likely(extent_io_descriptor_globals.protected.available_items)) {
         xt_io_descr = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
         extent_io_descriptor_globals.protected.available--;
     }
 
@@ -359,7 +359,7 @@ static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_
     if(unlikely(!xt_io_descr)) return;
 
     netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
     extent_io_descriptor_globals.protected.available++;
     netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
 }
@@ -396,7 +396,7 @@ static void rrdeng_query_handle_cleanup1(void) {
 
     if(rrdeng_query_handle_globals.protected.available_items && rrdeng_query_handle_globals.protected.available > 10) {
         item = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
         rrdeng_query_handle_globals.protected.available--;
     }
 
@@ -415,7 +415,7 @@ struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
 
     if(likely(rrdeng_query_handle_globals.protected.available_items)) {
         handle = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
         rrdeng_query_handle_globals.protected.available--;
     }
 
@@ -434,7 +434,7 @@ void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
     if(unlikely(!handle)) return;
 
     netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
     rrdeng_query_handle_globals.protected.available++;
     netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
 }
@@ -471,7 +471,7 @@ static void wal_cleanup1(void) {
 
     if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -494,7 +494,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 
     if(likely(wal_globals.protected.available_items)) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -532,7 +532,7 @@ void wal_release(WAL *wal) {
     if(unlikely(!wal)) return;
 
     netdata_spinlock_lock(&wal_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
     wal_globals.protected.available++;
     netdata_spinlock_unlock(&wal_globals.protected.spinlock);
 }
@@ -596,7 +596,7 @@ static void rrdeng_cmd_cleanup1(void) {
 
     if(rrdeng_cmd_globals.cache.available_items && rrdeng_cmd_globals.cache.available > 100) {
         item = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available--;
     }
     netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
@@ -639,8 +639,8 @@ void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY 
         priority = rrdeng_enq_cmd_map_opcode_to_priority(cmd->opcode, priority);
 
         if (cmd->priority > priority) {
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             cmd->priority = priority;
         }
     }
@@ -657,7 +657,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
     if(likely(rrdeng_cmd_globals.cache.available_items)) {
         cmd = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available--;
     }
     netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
@@ -676,7 +676,7 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->dequeue_cb = dequeue_cb;
 
     netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
     rrdeng_cmd_globals.queue.waiting++;
     if(enqueue_cb)
         enqueue_cb(cmd);
@@ -715,7 +715,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
             }
 
             // remove it from the queue
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
             rrdeng_cmd_globals.queue.waiting--;
             break;
         }
@@ -735,7 +735,7 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
         // put it in the cache
         netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
         rrdeng_cmd_globals.cache.available++;
         netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
     }
@@ -968,10 +968,6 @@ static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __m
     struct rrdengine_datafile *datafile;
     unsigned i;
 
-    if (uv_fs_request->result < 0) {
-        ctx_io_error(ctx);
-        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)uv_fs_request->result));
-    }
     datafile = xt_io_descr->datafile;
 
     bool still_running = ctx_is_available_for_queries(ctx);
@@ -1013,6 +1009,11 @@ static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
     struct rrdengine_instance *ctx = datafile->ctx;
+
+    if (uv_fs_request->result < 0) {
+        ctx_io_error(ctx);
+        error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
+    }
 
     journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
 
@@ -1398,7 +1399,7 @@ void find_uuid_first_time(
         }
     }
     internal_error(true,
-         "DBENGINE: analyzed the retention of %zu rotated metrics, "
+         "DBENGINE: analyzed the retention of %zu rotated metrics of tier %d, "
          "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
          "%zu metrics with entries in open cache, "
          "metrics first time found per datafile index ([not in jv2]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
@@ -1406,6 +1407,7 @@ void find_uuid_first_time(
          "metrics without any remaining retention %zu, "
          "metrics not in MRG %zu",
          metric_count,
+         ctx->config.tier,
          binary_match,
          not_matching_bsearches,
          not_needed_bsearches,
@@ -1446,7 +1448,8 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         added++;
     }
 
-    info("DBENGINE: recalculating retention for %zu metrics starting with datafile %u", count, first_datafile_remaining->fileno);
+    info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+         ctx->config.tier, count, first_datafile_remaining->fileno);
 
     journalfile_v2_data_release(journalfile);
 
@@ -1460,17 +1463,39 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    info("DBENGINE: updating metric registry retention for %zu metrics", added);
+    info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
+         ctx->config.tier, added);
 
+    size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
     for (size_t index = 0; index < added; ++index) {
         uuid_first_t_entry = &uuid_first_entry_list[index];
-        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX))
+        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
             mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
-        else
-            mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, 0);
-        mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+        }
+        else {
+            zero_disk_retention++;
+
+            // there is no retention for this metric
+            bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
+            if (!has_retention) {
+                bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
+                if(deleted)
+                    deleted_metrics++;
+                else
+                    zero_retention_referenced++;
+            }
+            else {
+                zero_disk_but_live++;
+                mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            }
+        }
     }
     freez(uuid_first_entry_list);
+
+    internal_error(zero_disk_retention,
+                   "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
+                   deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live, ctx->config.tier);
 
     if(worker)
         worker_is_idle();

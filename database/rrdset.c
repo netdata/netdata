@@ -1149,7 +1149,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         t->virtual_point.end_time_s = sp.end_time_s;
 
     // merge the values into our virtual point
-    if (likely(!storage_point_is_empty(sp))) {
+    if (likely(!storage_point_is_gap(sp))) {
         // we aggregate only non NULLs into higher tiers
 
         if (likely(!storage_point_is_unset(t->virtual_point))) {
