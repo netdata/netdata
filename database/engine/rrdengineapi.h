@@ -61,7 +61,7 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *r
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
-int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
                        unsigned disk_space_mb, size_t tier);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);

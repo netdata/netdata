@@ -390,7 +390,6 @@ int is_legacy = 1;
             ret = rrdeng_init(
                 (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
-                default_rrdeng_page_cache_mb,
                 default_rrdeng_disk_quota_mb,
                 0); // may fail here for legacy dbengine initialization
 
@@ -768,6 +767,20 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
+struct dbengine_initialization {
+    netdata_thread_t thread;
+    const char *path;
+    int disk_space_mb;
+    size_t tier;
+    int ret;
+};
+
+void *dbengine_tier_init(void *ptr) {
+    struct dbengine_initialization *dbi = ptr;
+    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
+    return ptr;
+}
+
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
@@ -804,7 +817,8 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
     }
 
-    size_t created_tiers = 0;
+    struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
+
     char dbenginepath[FILENAME_MAX + 1];
     char dbengineconfig[200 + 1];
     int divisor = 1;
@@ -823,15 +837,11 @@ void dbengine_init(char *hostname) {
         if(tier > 0)
             divisor *= 2;
 
-        int page_cache_mb = default_rrdeng_page_cache_mb / divisor;
         int disk_space_mb = default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu page cache size MB", tier);
-            page_cache_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, page_cache_mb);
-
             snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
@@ -865,17 +875,26 @@ void dbengine_init(char *hostname) {
         }
 
         internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
-        ret = rrdeng_init(NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
-        if(ret != 0) {
+
+        tiers_init[tier].disk_space_mb = disk_space_mb;
+        tiers_init[tier].tier = tier;
+        tiers_init[tier].path = dbenginepath;
+        tiers_init[tier].ret = 0;
+
+        netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE, dbengine_tier_init, &tiers_init[tier]);
+    }
+
+    size_t created_tiers = 0;
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        void *ptr;
+        netdata_thread_join(tiers_init[tier].thread, &ptr);
+
+        if(tiers_init[tier].ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                  hostname, tier, dbenginepath);
-            break;
+                  hostname, tiers_init[tier].tier, tiers_init[tier].path);
         }
-        else {
-            if (rrdeng_ctx_exceeded_disk_quota(multidb_ctx[created_tiers]))
-                rrdeng_enq_cmd(multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        else if(created_tiers == tier)
             created_tiers++;
-        }
     }
 
     if(created_tiers && created_tiers < storage_tiers) {

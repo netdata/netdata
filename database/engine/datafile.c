@@ -392,7 +392,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 {
     int ret;
     unsigned tier, no, matched_files, i,failed_to_load;
-    static uv_fs_t req;
+    uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;
