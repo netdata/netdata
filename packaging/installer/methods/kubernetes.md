@@ -8,7 +8,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
 -->
 
-# Deploy Kubernetes monitoring with Netdata
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following these directions, you
 will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to create a Kubernetes monitoring deployment on
@@ -19,94 +20,118 @@ The Helm chart installs one `parent` pod for storing metrics and managing alarm 
 pods/containers, and [supported application-specific
 metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
 
+### Prerequisites
+
 To deploy Kubernetes monitoring with Netdata, you need:
 
--   A working cluster running Kubernetes v1.9 or newer.
--   The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
+- A working cluster running Kubernetes v1.9 or newer.
+- The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
     difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
     administrative system.
--   The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
+- The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
+- A Netdata Cloud account with a Space to claim the cluster to.
 
-## Install the Netdata Helm chart
+## Deploy Netdata on your Kubernetes Cluster
 
-We recommend you install the Helm chart using our Helm repository. In the `helm install` command, replace `netdata` with
-the release name of your choice.
-
-```bash
-helm repo add netdata https://netdata.github.io/helmchart/
-helm install netdata netdata/netdata
-```
-
-Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one
-parent pod, and multiple child pods.
-
-You've now installed Netdata on your Kubernetes cluster. Next, it's time to opt-in and enable the powerful Kubernetes
-dashboards available in Netdata Cloud.
-
-## Connect your Kubernetes cluster to Netdata Cloud
-
-To start [Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md), you must first
-[connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
-connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
+To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/), you must first install Netdata, and then
+[connect](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
 like the health map and time-series composite charts.
 
-### New installations
+<Tabs groupId="installation_type">
+<TabItem value="new_installations" label="New Installations">
 
-First, find the script to run an `helm install` command. You can get it by clicking on your Space's dropdown, then **Manage your Space**.
-Click the **Nodes** tab and select the environment your node is running, in this case **kubernetes**, to reveal the script for your Space in Netdata Cloud. You need the `TOKEN`
-and `ROOM` values.
+#### Steps
 
-The script should be similar to:
+1. Add the Netdata Helm chart repository by running:
 
-```bash
-helm install netdata netdata/netdata --set parent.claiming.enabled="true" --set parent.claiming.token="TOKEN" --set parent.claiming.rooms="ROOM" --set child.claiming.enabled=true --set child.claiming.token="TOKEN" --set child.claiming.rooms="ROOM"
-```
+  ```bash
+  helm repo add netdata https://netdata.github.io/helmchart/
+  ```
 
-### Existing installations
+2. To install Netdata using the `helm install` command, run:
 
-On an existing installation, you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override. You can start with creating a file called `override.yml`.
+  ```bash
+  helm install netdata netdata/netdata 
+  --set parent.claiming.enabled="true" 
+  --set parent.claiming.token=YOUR_CLAIM_TOKEN 
+  --set parent.claiming.rooms=YOUR_ROOM_ID_A,YOUR_ROOM_ID_B 
+  --set child.claiming.enabled=true 
+  --set child.claiming.token=YOUR_CLAIM_TOKEN 
+  --set child.claiming.rooms=YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
+  ```
 
-```bash
-touch override.yml
-```
+  :::note
+  If you plan to also Claim the node to Netdata Cloud,
+  make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+  and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
+  :::
 
-Paste the following into your `override.yml` file, replacing instances of `ROOM` and `TOKEN` with those from the script from Netdata Cloud. These settings connect your `parent`/`child` nodes to Netdata Cloud and store more
-metrics in the nodes' time-series databases.
+#### Expected Result
 
-```yaml
-parent:
-  claiming:
-    enabled: true
-    token: "TOKEN"
-    rooms: "ROOM"
+Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one parent pod, and multiple child pods.
 
-child:
-  claiming:
-    enabled: true
-    token: "TOKEN"
-    rooms: "ROOM"
-  configs:
-    netdata:
-      data: |
-        [global]
-          memory mode = ram
-          history = 3600
-        [health]
-          enabled = no
-```
+You've now installed Netdata on your Kubernetes cluster and claimed it to your Netdata Space.
 
-> ❗ These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`history =
-> 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on
-> your cluster, you may want to increase the `history` setting.
+</TabItem>
+<TabItem value="existing_installations" label="Existing Installations">
 
-Apply these new settings:
+On an existing installation, in order to Claim it to Netdata Cloud you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override.
 
-```bash
-helm upgrade -f override.yml netdata netdata/netdata
-```
+#### Steps
 
-The cluster terminates the old pods and creates new ones with the proper persistence and connection configuration. You'll
-see your nodes, containers, and pods appear in Netdata Cloud in a few seconds.
+1. You can start with creating a file called `override.yml`
+
+  ```bash
+  touch override.yml
+  ```
+  
+2. Paste the following into your `override.yml` file.
+
+  ```yaml
+  parent:
+    claiming:
+      enabled: true
+      token: YOUR_CLAIM_TOKEN
+      rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
+
+  child:
+    claiming:
+      enabled: true
+      token: YOUR_CLAIM_TOKEN
+      rooms: YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
+    configs:
+      netdata:
+        data: |
+          [global]
+            memory mode = ram
+            history = 3600
+          [health]
+            enabled = no
+  ```
+
+   These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
+
+  :::note
+  Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+  and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
+  :::
+
+  :::info
+  These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`history = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+  :::
+
+3. To apply these new settings, run:
+
+  ```bash
+  helm upgrade -f override.yml netdata netdata/netdata
+  ```
+
+#### Expected Result
+
+The cluster terminates the old pods and creates new ones with the proper persistence and connection configuration. You'll see your nodes, containers, and pods appear in Netdata Cloud in a few seconds.
+
+</TabItem>
+</Tabs>
 
 ![Netdata's Kubernetes monitoring
 visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
