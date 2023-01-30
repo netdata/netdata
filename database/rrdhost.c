@@ -783,8 +783,6 @@ void *dbengine_tier_init(void *ptr) {
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
-    bool parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", true);
-
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
@@ -804,6 +802,9 @@ void dbengine_init(char *hostname) {
         storage_tiers = RRD_STORAGE_TIERS;
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
+
+    bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
+    parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", parallel_initialization);
 
     default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
     if (default_rrdeng_page_fetch_timeout < 1) {
