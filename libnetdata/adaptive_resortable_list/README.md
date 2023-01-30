@@ -1,6 +1,10 @@
 <!--
 title: "Adaptive Re-sortable List (ARL)"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/adaptive_resortable_list/README.md
+sidebar_label: "Adaptive Re-sortable List (ARL)"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Developers"
 -->
 
 # Adaptive Re-sortable List (ARL)
