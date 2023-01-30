@@ -483,7 +483,7 @@ static void ebpf_exit()
     if (unlink(filename))
         error("Cannot remove PID file %s", filename);
 
-    exit(0);
+    ebpf_exit_plugin = 2;
 }
 
 /**
@@ -534,7 +534,7 @@ static void ebpf_stop_threads(int sig)
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit_plugin = 1;
-    usec_t max = 3 * USEC_PER_SEC, step = 100000;
+    usec_t max = USEC_PER_SEC, step = 100000;
     while (i && max) {
         max -= step;
         sleep_usec(step);
@@ -548,32 +548,35 @@ static void ebpf_stop_threads(int sig)
         pthread_mutex_unlock(&ebpf_exit_cleanup);
     }
 
-    //Unload threads(except sync and filesystem)
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    for (i = 0; ebpf_threads[i].name != NULL; i++) {
-        if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
-            i != EBPF_MODULE_SYNC_IDX)
-            ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
-    //Unload filesystem
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-        for (i = 0; localfs[i].filesystem != NULL; i++) {
-            ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+    if (!i)  {
+        //Unload threads(except sync and filesystem)
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        for (i = 0; ebpf_threads[i].name != NULL; i++) {
+            if (ebpf_threads[i].enabled == NETDATA_THREAD_EBPF_STOPPED && i != EBPF_MODULE_FILESYSTEM_IDX &&
+                i != EBPF_MODULE_SYNC_IDX)
+                ebpf_unload_legacy_code(ebpf_modules[i].objects, ebpf_modules[i].probe_links);
         }
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    //Unload Sync
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
-        for (i = 0; local_syscalls[i].syscall != NULL; i++) {
-            ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+        //Unload filesystem
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (ebpf_threads[EBPF_MODULE_FILESYSTEM_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
+            for (i = 0; localfs[i].filesystem != NULL; i++) {
+                ebpf_unload_legacy_code(localfs[i].objects, localfs[i].probe_links);
+            }
         }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+        //Unload Sync
+        pthread_mutex_lock(&ebpf_exit_cleanup);
+        if (ebpf_threads[EBPF_MODULE_SYNC_IDX].enabled  == NETDATA_THREAD_EBPF_STOPPED) {
+            for (i = 0; local_syscalls[i].syscall != NULL; i++) {
+                ebpf_unload_legacy_code(local_syscalls[i].objects, local_syscalls[i].probe_links);
+            }
+        }
+        pthread_mutex_unlock(&ebpf_exit_cleanup);
+
     }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_exit();
 }
@@ -2245,12 +2248,25 @@ int main(int argc, char **argv)
         }
     }
 
-    usec_t step = EBPF_DEFAULT_UPDATE_EVERY * USEC_PER_SEC;
+    usec_t step = USEC_PER_SEC;
+    int counter = NETDATA_EBPF_CGROUP_UPDATE - 1;
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    while (!ebpf_exit_plugin) {
+    while (ebpf_exit_plugin != 2) {
         (void)heartbeat_next(&hb, step);
+        if (ebpf_exit_plugin == 2)
+            break;
+
+        // We are using a small heartbeat time to wake up thread,
+        // but we should not update so frequently the shared memory data
+        if (++counter >=  NETDATA_EBPF_CGROUP_UPDATE) {
+            counter = 0;
+            if (!shm_ebpf_cgroup.header)
+                ebpf_map_cgroup_shared_memory();
+
+            ebpf_parse_cgroup_shm_data();
+        }
     }
 
     return 0;
