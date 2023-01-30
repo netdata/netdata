@@ -1,5 +1,10 @@
 <!--
+title: "String"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/string/README.md
+sidebar_label: "String"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Developers/libnetdata libraries"
 -->
 
 # STRING
