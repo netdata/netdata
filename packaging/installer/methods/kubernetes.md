@@ -33,9 +33,9 @@ To deploy Kubernetes monitoring with Netdata, you need:
 
 ## Deploy Netdata on your Kubernetes Cluster
 
-To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/), you must first install Netdata, and then
-[connect](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
-like the health map and time-series composite charts.
+To start [Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md), you must first install Netdata, and then
+[connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
+connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations like the health map and time-series composite charts.
 
 <Tabs groupId="installation_type">
 <TabItem value="new_installations" label="New Installations">
@@ -144,8 +144,7 @@ in Netdata, in addition to more guides and resources.
 Read up on the various configuration options in the [Helm chart
 documentation](https://github.com/netdata/helmchart#configuration) if you need to tweak your Kubernetes monitoring.
 
-Your first option is to create an `override.yml` file, if you haven't created one already for
-[connect](#connect-your-kubernetes-cluster-to-netdata-cloud), then apply the new configuration to your cluster with `helm
+Your first option is to create an `override.yml` file, if you haven't created one already upon [deploying](#deploy-netdata-on-your-kubernetes-cluster), then apply the new configuration to your cluster with `helm
 upgrade`.
 
 ```bash
@@ -165,8 +164,7 @@ Netdata's [service discovery](https://github.com/netdata/agent-service-discovery
 of the Helm chart installation, finds what services are running in a cluster's containers and automatically collects
 service-level metrics from them.
 
-Service discovery supports [popular applications](https://github.com/netdata/helmchart#applications) and [Prometheus
-endpoints](https://github.com/netdata/helmchart#prometheus-endpoints).
+Service discovery supports [popular applications](https://github.com/netdata/helmchart#applications) and [Prometheus endpoints](https://github.com/netdata/helmchart#prometheus-endpoints).
 
 If your cluster runs services on non-default ports or uses non-default names, you may need to configure service
 discovery to start collecting metrics from your services. You have to edit the default ConfigMap that is shipped with
@@ -178,8 +176,7 @@ First, copy the default file to your administrative system.
 curl https://raw.githubusercontent.com/netdata/helmchart/master/charts/netdata/sdconfig/child.yml -o child.yml
 ```
 
-Edit the new `child.yml` file according to your needs. See the [Helm chart
-configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details.
+Edit the new `child.yml` file according to your needs. See the [Helm chart configuration](https://github.com/netdata/helmchart#configuration) and the file itself for details.
 
 You can then run `helm upgrade` with the `--set-file` argument to use your configured `child.yml` file instead of the
 default, changing the path if you copied it elsewhere.
@@ -209,18 +206,10 @@ helm upgrade netdata netdata/netdata
 
 ## What's next?
 
-[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) in Netdata Cloud, which
-comes with meaningful visualizations out of the box. 
-
-Read our guide, [_Kubernetes monitoring with Netdata: Overview and
-visualizations_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md), for a complete walkthrough of Netdata's Kubernetes
-monitoring capabilities, including a health map of every container in your infrastructure, aggregated resource
-utilization metrics, and application metrics.
+[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) in Netdata Cloud, which comes with meaningful visualizations out of the box.
 
 ### Related reference documentation
 
 - [Netdata Cloud · Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
 - [Netdata Helm chart](https://github.com/netdata/helmchart)
 - [Netdata service discovery](https://github.com/netdata/agent-service-discovery/)
-
-
