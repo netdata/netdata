@@ -107,6 +107,5 @@ extern int netdata_ready;
 extern int netdata_cloud_setting;
 
 long get_netdata_cpus(void);
-unsigned long read_cpuset_cpus(const char *filename, long system_cpus);
 
 #endif /* NETDATA_COMMON_H */

@@ -51,6 +51,7 @@ extern const char *os_type;
 #define get_system_cpus() get_system_cpus_with_cache(true, false)
 #define get_system_cpus_uncached() get_system_cpus_with_cache(false, false)
 long get_system_cpus_with_cache(bool cache, bool for_netdata);
+unsigned long read_cpuset_cpus(const char *filename, long system_cpus);
 
 extern pid_t pid_max;
 pid_t get_system_pid_max(void);

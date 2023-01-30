@@ -19,56 +19,6 @@ int32_t netdata_configured_utc_offset        = 0;
 int netdata_ready;
 int netdata_cloud_setting;
 
-static inline unsigned long cpuset_str2ul(char **s) {
-    unsigned long n = 0;
-    char c;
-    for(c = **s; c >= '0' && c <= '9' ; c = *(++*s)) {
-        n *= 10;
-        n += c - '0';
-    }
-    return n;
-}
-
-unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
-    static char *buf = NULL;
-    static size_t buf_size = 0;
-
-    if(!buf) {
-        buf_size = 100U + 6 * system_cpus; // taken from kernel/cgroup/cpuset.c
-        buf = mallocz(buf_size + 1);
-    }
-
-    int ret = read_file(filename, buf, buf_size);
-
-    if(!ret) {
-        char *s = buf;
-        unsigned long ncpus = 0;
-
-        // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
-        while(*s) {
-            unsigned long n = cpuset_str2ul(&s);
-            ncpus++;
-            if(*s == ',') {
-                s++;
-                continue;
-            }
-            if(*s == '-') {
-                s++;
-                unsigned long m = cpuset_str2ul(&s);
-                ncpus += m - n; // calculate the number of cpus in the region
-            }
-            s++;
-        }
-
-        if(!ncpus)
-            return 0;
-
-        return ncpus;
-    }
-
-    return 0;
-}
-
 long get_netdata_cpus(void) {
     static long processors = 0;
 
