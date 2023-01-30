@@ -11,9 +11,11 @@ learn_rel_path: "Installation"
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster. By following these directions, you
-will use Netdata's [Helm chart](https://github.com/netdata/helmchart) to create a Kubernetes monitoring deployment on
-your cluster.
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and claim it to Netdata Cloud.  
+
+To see what our Netdata Cloud Kubernetes visualizations have to offer, read the[Kubernetes visualizations Concept](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+
+By following these directions, you will use Netdata's [Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) to create a Kubernetes monitoring deployment on your cluster.
 
 The Helm chart installs one `parent` pod for storing metrics and managing alarm notifications, plus an additional
 `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
@@ -33,9 +35,15 @@ To deploy Kubernetes monitoring with Netdata, you need:
 
 ## Deploy Netdata on your Kubernetes Cluster
 
+<<<<<<< HEAD
 To start [Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md), you must first install Netdata, and then
 [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
 connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations like the health map and time-series composite charts.
+=======
+First, you need to install Netdata, and then connect your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
+connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
+like the health map and time-series composite charts.
+>>>>>>> 7824ceadb (Suggestions from code review)
 
 <Tabs groupId="installation_type">
 <TabItem value="new_installations" label="New Installations">
@@ -52,25 +60,17 @@ connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabli
 
   ```bash
   helm install netdata netdata/netdata 
-  --set parent.claiming.enabled="true" 
-  --set parent.claiming.token=YOUR_CLAIM_TOKEN 
-  --set parent.claiming.rooms=YOUR_ROOM_ID_A,YOUR_ROOM_ID_B 
-  --set child.claiming.enabled=true 
-  --set child.claiming.token=YOUR_CLAIM_TOKEN 
-  --set child.claiming.rooms=YOUR_ROOM_ID_A,YOUR_ROOM_ID_B
   ```
 
   :::note
-  If you plan to also Claim the node to Netdata Cloud,
-  make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-  and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
+  If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
   :::
+
+  For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 
 #### Expected Result
 
 Run `kubectl get services` and `kubectl get pods` to confirm that your cluster now runs a `netdata` service, one parent pod, and multiple child pods.
-
-You've now installed Netdata on your Kubernetes cluster and claimed it to your Netdata Space.
 
 </TabItem>
 <TabItem value="existing_installations" label="Existing Installations">
