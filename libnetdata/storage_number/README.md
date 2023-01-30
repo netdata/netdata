@@ -1,10 +1,6 @@
 <!--
 title: "Netdata storage number"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/storage_number/README.md
-sidebar_label: "Storage number"
-learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Developers"
 -->
 
 # Netdata storage number
