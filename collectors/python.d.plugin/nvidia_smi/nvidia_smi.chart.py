@@ -57,10 +57,21 @@ ORDER = [
 POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 # PCI Transfer data rate in gigabits per second (Gb/s) per generation
-PCI_SPEED = [2.5, 5, 8, 16, 32]
+PCI_SPEED = {
+  "1": 2.5, 
+  "2": 5, 
+  "3": 8, 
+  "4": 16,
+  "5": 32
+}
 # PCI encoding per generation
-PCI_ENCODING = [2/10, 2/10, 2/130, 2/130, 2/130]
-
+PCI_ENCODING = {
+  "1": 2/10, 
+  "2": 2/10, 
+  "3": 2/130, 
+  "4": 2/130,
+  "5": 2/130
+}
 def gpu_charts(gpu):
     fam = gpu.full_name()
 
@@ -341,7 +352,7 @@ class GPU:
         return self.root.find('pci').find('pci_gpu_link_info').find('link_widths').find('max_link_width').text.split('x')[0]
 
     def pci_bw_max(self):
-        link_gen = int(self.pci_link_gen())
+        link_gen = self.pci_link_gen()
         link_width = int(self.pci_link_width())
         # Maximum PCIe Bandwidth = SPEED * WIDTH * (1 - ENCODING) - 1Gb/s.
         # see details https://enterprise-support.nvidia.com/s/article/understanding-pcie-configuration-for-maximum-performance
