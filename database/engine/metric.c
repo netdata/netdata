@@ -319,7 +319,7 @@ MRG *mrg_create(void) {
         mrg->aral[i] = aral_create("mrg",
                                 sizeof(METRIC),
                                 0,
-                                4096,
+                                512,
                                 NULL, NULL, false,
                                 false);
     }
