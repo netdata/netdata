@@ -1891,6 +1891,9 @@ void timer_cb(uv_timer_t* handle) {
 
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    netdata_spinlock_lock(&spinlock);
 
     if(!spawned) {
         int ret;
@@ -1923,6 +1926,7 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         spawned = true;
     }
 
+    netdata_spinlock_unlock(&spinlock);
     return true;
 }
 
