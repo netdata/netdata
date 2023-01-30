@@ -48,7 +48,7 @@ and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
 
 ## What does `kickstart.sh` do?
 
-The `kickstart.sh` script does the following after being downloaded and ran using `sh`:
+The `kickstart.sh` script does the following after being downloaded and run using `sh`:
 
 - Determines what platform you are running on.
 - Checks for an existing installation, and if found updates that instead of creating a new install.
