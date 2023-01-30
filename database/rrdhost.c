@@ -769,7 +769,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 
 struct dbengine_initialization {
     netdata_thread_t thread;
-    char *path;
+    char path[FILENAME_MAX + 1];
     int disk_space_mb;
     size_t tier;
     int ret;
@@ -882,7 +882,7 @@ void dbengine_init(char *hostname) {
 
         tiers_init[tier].disk_space_mb = disk_space_mb;
         tiers_init[tier].tier = tier;
-        tiers_init[tier].path = strdupz(dbenginepath);
+        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
         tiers_init[tier].ret = 0;
 
         if(parallel_initialization)
@@ -894,8 +894,6 @@ void dbengine_init(char *hostname) {
 
     for(size_t tier = 0; tier < storage_tiers ;tier++) {
         void *ptr;
-
-        freez(tiers_init[tier].path);
 
         if(parallel_initialization)
             netdata_thread_join(tiers_init[tier].thread, &ptr);
