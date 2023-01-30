@@ -19,3 +19,13 @@ int32_t netdata_configured_utc_offset        = 0;
 int netdata_ready;
 int netdata_cloud_setting;
 
+long get_netdata_cpus(void) {
+    static long processors = 0;
+
+    if(processors)
+        return processors;
+
+    processors = config_get_number(CONFIG_SECTION_GLOBAL, "cpu cores", get_system_cpus_with_cache(false, true));
+
+    return processors;
+}

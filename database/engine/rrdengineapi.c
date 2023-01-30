@@ -1090,7 +1090,7 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    size_t cpus = get_system_cpus() / storage_tiers;
+    size_t cpus = get_netdata_cpus() / storage_tiers;
     if(cpus > datafiles)
         cpus = datafiles;
 

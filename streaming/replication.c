@@ -1560,7 +1560,7 @@ static int replication_execute_next_pending_request(bool cancel) {
     }
 
     if(unlikely(!rqs)) {
-        max_requests_ahead = get_system_cpus() / 2;
+        max_requests_ahead = get_netdata_cpus() / 2;
 
         if(max_requests_ahead > libuv_worker_threads * 2)
             max_requests_ahead = libuv_worker_threads * 2;

@@ -310,7 +310,7 @@ static void puback_callback(uint16_t packet_id)
 
 static int read_query_thread_count()
 {
-    int threads = MIN(get_system_cpus()/2, 6);
+    int threads = MIN(get_netdata_cpus()/2, 6);
     threads = MAX(threads, 2);
     threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
     if(threads < 1) {
