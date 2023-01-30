@@ -20,6 +20,7 @@ from external processes, thus allowing Netdata to use **external plugins**.
 |[charts.d.plugin](/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
 |[cups.plugin](/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
 |[ebpf.plugin](/collectors/ebpf.plugin/README.md)|`C`|linux|monitors different metrics on environments using kernel internal functions.|
+|[go.d.plugin](https://github.com/netdata/go.d.plugin/)|`C`|all|monitors different services running on host.|
 |[ioping.plugin](/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
 |[freeipmi.plugin](/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
 |[nfacct.plugin](/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
