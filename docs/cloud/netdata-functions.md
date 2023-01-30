@@ -23,9 +23,18 @@ A function is a  `key`  -  `value`  pair. The  `key`  uniquely identifies the fu
 function (i.e. code) to be run by a data collector when
 the function is invoked.
 
-For more details please check out documentation on our first collector that exposes
-functions - [plugins.d](/docs/nightly/references/collectors-references/plugins.d/#function)
+For more details please check out documentation on how we use our internal collector to get this from the first collector that exposes
+functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#function).
 
+#### What functions are currently available?
+
+| Function | Description | plugin - module |
+| :-- | :-- | :-- |
+| processes | Detailed information on the currently running processes on the node. | [apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) |
+
+If you have ideas or requests for other functions:
+* open a [Feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
+* engage with out community on [Netdata discord server](https://discord.com/invite/mPZ6WZKKG2).
 #### How do functions work with streaming?
 
 Via streaming, the definitions of functions are transmitted to a parent node so it knows all the functions available on
@@ -41,16 +50,16 @@ concern is to ensure no sensitive
 information or disruptive actions are exposed through the Agent's API.
 
 With the communication between the Netdata Agent and Netdata Cloud being
-through [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md#ACLK) this
+through [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md) this
 concern is addressed.
 
 ## Related Topics
 
 ### **Related Concepts**
 
-- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
-- [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d)
+- [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md)
+- [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md)
 
 ### Related Tasks
 
-- [Run-time troubleshooting with Functions](docs/nightly/tasks/operations/runtime-troubleshootting-with-function)
+- [Run-time troubleshooting with Functions](https://github.com/netdata/netdata/blob/master/docs/cloud/runtime-troubleshooting-with-functions.md)
