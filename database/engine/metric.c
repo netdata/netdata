@@ -25,7 +25,7 @@ struct metric {
 };
 
 struct mrg {
-    ARAL *aral;
+    ARAL *aral[MRG_PARTITIONS];
 
     struct pgc_index {
         netdata_rwlock_t rwlock;
@@ -167,9 +167,10 @@ static inline bool metric_release_and_can_be_deleted(MRG *mrg __maybe_unused, ME
 }
 
 static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
-    METRIC *allocation = aral_mallocz(mrg->aral);
-
     size_t partition = uuid_partition(mrg, &entry->uuid);
+
+    METRIC *allocation = aral_mallocz(mrg->aral[partition]);
+
     mrg_index_write_lock(mrg, partition);
 
     size_t mem_before_judyl, mem_after_judyl;
@@ -198,7 +199,7 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         if(ret)
             *ret = false;
 
-        aral_freez(mrg->aral, allocation);
+        aral_freez(mrg->aral[partition], allocation);
 
         MRG_STATS_DUPLICATE_ADD(mrg);
         return metric;
@@ -297,8 +298,7 @@ static bool acquired_metric_del(MRG *mrg, METRIC *metric) {
 
     mrg_index_write_unlock(mrg, partition);
 
-    // ARAL is running lockless here
-    aral_freez(mrg->aral, metric);
+    aral_freez(mrg->aral[partition], metric);
 
     MRG_STATS_DELETED_METRIC(mrg, partition);
 
@@ -315,14 +315,14 @@ MRG *mrg_create(void) {
         char buf[ARAL_MAX_NAME + 1];
         snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
-    }
 
-    mrg->aral = aral_create("mrg",
-                            sizeof(METRIC),
-                            0,
-                            4096,
-                            NULL, NULL, false,
-                            false);
+        mrg->aral[i] = aral_create("mrg",
+                                sizeof(METRIC),
+                                0,
+                                4096,
+                                NULL, NULL, false,
+                                false);
+    }
 
     mrg->stats.size = sizeof(MRG);
 
