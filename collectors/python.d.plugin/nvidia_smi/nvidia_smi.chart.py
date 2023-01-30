@@ -22,6 +22,7 @@ EMPTY_ROW_LIMIT = 500
 POLLER_BREAK_ROW = '</nvidia_smi_log>'
 
 PCI_BANDWIDTH = 'pci_bandwidth'
+PCI_BANDWIDTH_PERCENT = 'pci_bandwidth_percent'
 FAN_SPEED = 'fan_speed'
 GPU_UTIL = 'gpu_utilization'
 MEM_UTIL = 'mem_utilization'
@@ -38,6 +39,7 @@ USER_NUM = 'user_num'
 
 ORDER = [
     PCI_BANDWIDTH,
+    PCI_BANDWIDTH_PERCENT,
     FAN_SPEED,
     GPU_UTIL,
     MEM_UTIL,
@@ -58,17 +60,17 @@ POWER_STATES = ['P' + str(i) for i in range(0, 16)]
 
 # PCI Transfer data rate in gigabits per second (Gb/s) per generation
 PCI_SPEED = {
-  "1": 2.5, 
-  "2": 5, 
-  "3": 8, 
+  "1": 2.5,
+  "2": 5,
+  "3": 8,
   "4": 16,
   "5": 32
 }
 # PCI encoding per generation
 PCI_ENCODING = {
-  "1": 2/10, 
-  "2": 2/10, 
-  "3": 2/130, 
+  "1": 2/10,
+  "2": 2/10,
+  "3": 2/130,
   "4": 2/130,
   "5": 2/130
 }
@@ -81,6 +83,11 @@ def gpu_charts(gpu):
             'lines': [
                 ['rx_util', 'rx', 'absolute', 1, 1],
                 ['tx_util', 'tx', 'absolute', 1, -1],
+            ]
+        },
+        PCI_BANDWIDTH_PERCENT: {
+            'options': [None, 'PCI Express Bandwidth Percent', 'percentage', fam, 'nvidia_smi.pci_bandwidth_percent', 'area'],
+            'lines': [
                 ['rx_util_percent', 'rx_percent'],
                 ['tx_util_percent', 'tx_percent'],
             ]
@@ -354,6 +361,8 @@ class GPU:
     def pci_bw_max(self):
         link_gen = self.pci_link_gen()
         link_width = int(self.pci_link_width())
+        if link_gen not in PCI_SPEED or link_gen not in PCI_ENCODING or not link_width:
+            return None
         # Maximum PCIe Bandwidth = SPEED * WIDTH * (1 - ENCODING) - 1Gb/s.
         # see details https://enterprise-support.nvidia.com/s/article/understanding-pcie-configuration-for-maximum-performance
         # return max bandwidth in kilobytes per second (kB/s)
@@ -455,8 +464,6 @@ class GPU:
         data = {
             'rx_util': self.rx_util(),
             'tx_util': self.tx_util(),
-            'rx_util_percent': str(int(int(self.rx_util())*100/self.pci_bw_max())),
-            'tx_util_percent': str(int(int(self.tx_util())*100/self.pci_bw_max())),
             'fan_speed': self.fan_speed(),
             'gpu_util': self.gpu_util(),
             'memory_util': self.memory_util(),
@@ -473,6 +480,14 @@ class GPU:
             'mem_clock': self.mem_clock(),
             'power_draw': self.power_draw(),
         }
+
+        if self.pci_bw_max() is None or self.pci_bw_max() == 0:
+            data['rx_util_percent'] = 0
+            data['tx_util_percent'] = 0
+        else :
+            data['rx_util_percent'] = str(int(int(self.rx_util())*100/self.pci_bw_max()))
+            data['tx_util_percent'] = str(int(int(self.tx_util())*100/self.pci_bw_max()))
+
 
         for v in POWER_STATES:
             data['power_state_' + v.lower()] = 0
