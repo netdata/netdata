@@ -15,7 +15,7 @@ This is achieved through the set of pre-defined roles that are available and hav
 
 #### What roles are available?
 
-Depending on the plan associated to your space you will have different roles available:
+Depending on the plan associated with your space you will have different roles available:
 
 | **Role** | **Community** | **Pro** | **Business** |
 | :-- | :--: | :--: | :--: |
