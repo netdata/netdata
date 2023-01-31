@@ -302,12 +302,21 @@ EOF
   if command -v curl > /dev/null 2>&1; then
     curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
   elif command -v wget > /dev/null 2>&1; then
-    wget -q -O - --no-check-certificate \
-    --method POST \
-    --timeout=1 \
-    --header 'Content-Type: application/json' \
-    --body-data "${REQ_BODY}" \
-     "${TELEMETRY_URL}" > /dev/null
+    if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+      # BusyBox-compatible version of wget, there is no --no-check-certificate option
+      wget -q -O - \
+      -T 1 \
+      --header 'Content-Type: application/json' \
+      --post-data "${REQ_BODY}" \
+      "${TELEMETRY_URL}" > /dev/null
+    else
+      wget -q -O - --no-check-certificate \
+      --method POST \
+      --timeout=1 \
+      --header 'Content-Type: application/json' \
+      --body-data "${REQ_BODY}" \
+      "${TELEMETRY_URL}" > /dev/null
+    fi
   fi
 }
 
