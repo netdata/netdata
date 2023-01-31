@@ -119,3 +119,11 @@ ENTRYPOINT ["/usr/sbin/run.sh"]
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
 
 ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
+
+LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
+LABEL org.opencontainers.image.url="https://netdata.cloud"
+LABEL org.opencontainers.image.documentation="https://learn.netdata.cloud"
+LABEL org.opencontainers.image.source="https://github.com/netdata/netdata"
+LABEL org.opencontainers.image.title="Netdata Agent"
+LABEL org.opencontainers.image.description="Official Netdata Agent Docker Image"
+LABEL org.opencontainers.image.vendor="Netdata Inc."
