@@ -768,6 +768,7 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
+#ifdef ENABLE_DBENGINE
 struct dbengine_initialization {
     netdata_thread_t thread;
     char path[FILENAME_MAX + 1];
@@ -781,6 +782,7 @@ void *dbengine_tier_init(void *ptr) {
     dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
     return ptr;
 }
+#endif
 
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
