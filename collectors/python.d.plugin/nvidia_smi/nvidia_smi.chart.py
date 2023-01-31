@@ -481,7 +481,9 @@ class GPU:
             'power_draw': self.power_draw(),
         }
 
-        if self.pci_bw_max() is None or self.pci_bw_max() == 0:
+        pci_bw_max = self.pci_bw_max()
+        if not pci_bw_max:
+            ...
             data['rx_util_percent'] = 0
             data['tx_util_percent'] = 0
         else :
