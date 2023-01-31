@@ -52,10 +52,6 @@ To enable the webhook integrations on Discord you need:
 
 For more details please read this article from Discord: [Intro to Webhooks](https://support.discord.com/hc/en-us/articles/228383668).
 
-<<<<<<< HEAD
-
-=======
->>>>>>> dce9d7414dc46bc903d456e4726d040a57cafb1a
 #### Related topics
 
 - [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
