@@ -21,6 +21,70 @@ int enable_ksm = 0;
 volatile sig_atomic_t netdata_exit = 0;
 const char *program_version = VERSION;
 
+#define MAX_JUDY_SIZE_TO_ARAL 24
+static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
+        [3] = true,
+        [4] = true,
+        [5] = true,
+        [6] = true,
+        [7] = true,
+        [8] = true,
+        [10] = true,
+        [11] = true,
+        [15] = true,
+        [23] = true,
+};
+static ARAL *judy_sizes_aral[MAX_JUDY_SIZE_TO_ARAL + 1] = {};
+
+void aral_judy_init(void) {
+    for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
+        if(judy_sizes_config[Words]) {
+            char buf[30+1];
+            snprintfz(buf, 30, "judy-%zu", Words * sizeof(Word_t));
+            judy_sizes_aral[Words] = aral_create(
+                    buf,
+                    Words * sizeof(Word_t),
+                    0,
+                    65536 / (Words * sizeof(Word_t)),
+                    NULL, NULL, false, false);
+        }
+}
+
+static ARAL *judy_size_aral(Word_t Words) {
+    if(Words <= MAX_JUDY_SIZE_TO_ARAL && judy_sizes_aral[Words])
+        return judy_sizes_aral[Words];
+
+    return NULL;
+}
+
+inline Word_t JudyMalloc(Word_t Words) {
+    Word_t Addr;
+
+    ARAL *ar = judy_size_aral(Words);
+    if(ar)
+        Addr = (Word_t) aral_mallocz(ar);
+    else
+        Addr = (Word_t) mallocz(Words * sizeof(Word_t));
+
+    return(Addr);
+}
+
+inline void JudyFree(void * PWord, Word_t Words) {
+    ARAL *ar = judy_size_aral(Words);
+    if(ar)
+        aral_freez(ar, PWord);
+    else
+        freez(PWord);
+}
+
+Word_t JudyMallocVirtual(Word_t Words) {
+    return JudyMalloc(Words);
+}
+
+void JudyFreeVirtual(void * PWord, Word_t Words) {
+    JudyFree(PWord, Words);
+}
+
 // ----------------------------------------------------------------------------
 // memory allocation functions that handle failures
 
@@ -148,32 +212,6 @@ static size_t (*libc_malloc_usable_size)(void *) = NULL;
 
 void posix_memfree(void *ptr) {
     libc_free(ptr);
-}
-
-#define MAX_JUDY_SIZE_TO_TRACK 64
-size_t judy_sizes[MAX_JUDY_SIZE_TO_TRACK + 1] = {};
-
-Word_t JudyMalloc(Word_t Words) {
-    Word_t Addr;
-
-    __atomic_add_fetch(&judy_sizes[Words > MAX_JUDY_SIZE_TO_TRACK ? 0 : Words], 1, __ATOMIC_RELAXED);
-    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
-    return(Addr);
-}
-void JudyFree(void * PWord, Word_t Words) {
-    (void)Words;
-    freez(PWord);
-}
-Word_t JudyMallocVirtual(Word_t Words) {
-    Word_t Addr;
-
-    __atomic_add_fetch(&judy_sizes[Words > MAX_JUDY_SIZE_TO_TRACK ? 0 : Words], 1, __ATOMIC_RELAXED);
-    Addr = (Word_t) mallocz(Words * sizeof(Word_t));
-    return(Addr);
-}
-void JudyFreeVirtual(void * PWord, Word_t Words) {
-    (void)Words;
-    freez(PWord);
 }
 
 #define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)

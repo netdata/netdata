@@ -1866,6 +1866,8 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
+        aral_judy_init();
+
         get_system_timezone();
 
         // --------------------------------------------------------------------
