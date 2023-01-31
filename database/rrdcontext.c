@@ -611,7 +611,9 @@ static void rrdmetrics_create_in_rrdinstance(RRDINSTANCE *ri) {
     if(unlikely(!ri)) return;
     if(likely(ri->rrdmetrics)) return;
 
-    ri->rrdmetrics = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
+    ri->rrdmetrics = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                &dictionary_stats_category_rrdcontext, sizeof(RRDMETRIC));
+
     dictionary_register_insert_callback(ri->rrdmetrics, rrdmetric_insert_callback, ri);
     dictionary_register_delete_callback(ri->rrdmetrics, rrdmetric_delete_callback, ri);
     dictionary_register_conflict_callback(ri->rrdmetrics, rrdmetric_conflict_callback, ri);
@@ -914,7 +916,9 @@ static void rrdinstance_react_callback(const DICTIONARY_ITEM *item __maybe_unuse
 void rrdinstances_create_in_rrdcontext(RRDCONTEXT *rc) {
     if(unlikely(!rc || rc->rrdinstances)) return;
 
-    rc->rrdinstances = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
+    rc->rrdinstances = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                  &dictionary_stats_category_rrdcontext, sizeof(RRDINSTANCE));
+
     dictionary_register_insert_callback(rc->rrdinstances, rrdinstance_insert_callback, rc);
     dictionary_register_delete_callback(rc->rrdinstances, rrdinstance_delete_callback, rc);
     dictionary_register_conflict_callback(rc->rrdinstances, rrdinstance_conflict_callback, rc);
@@ -1392,18 +1396,20 @@ void rrdhost_create_rrdcontexts(RRDHOST *host) {
     if(unlikely(!host)) return;
     if(likely(host->rrdctx)) return;
 
-    host->rrdctx = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
+    host->rrdctx = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                             &dictionary_stats_category_rrdcontext, sizeof(RRDCONTEXT));
+
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx, rrdcontext_insert_callback, host);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx, rrdcontext_delete_callback, host);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx, rrdcontext_conflict_callback, host);
     dictionary_register_react_callback((DICTIONARY *)host->rrdctx, rrdcontext_react_callback, host);
 
-    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext);
+    host->rrdctx_hub_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_delete_callback, NULL);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_hub_queue, rrdcontext_hub_queue_conflict_callback, NULL);
 
-    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext);
+    host->rrdctx_post_processing_queue = (RRDCONTEXTS *)dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_VALUE_LINK_DONT_CLONE, &dictionary_stats_category_rrdcontext, 0);
     dictionary_register_insert_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_insert_callback, NULL);
     dictionary_register_delete_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_delete_callback, NULL);
     dictionary_register_conflict_callback((DICTIONARY *)host->rrdctx_post_processing_queue, rrdcontext_post_processing_queue_conflict_callback, NULL);
@@ -2211,7 +2217,7 @@ DICTIONARY *rrdcontext_all_metrics_to_dict(RRDHOST *host, SIMPLE_PATTERN *contex
     if(!host || !host->rrdctx)
         return NULL;
 
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdcontext, 0);
     dictionary_register_insert_callback(dict, metric_entry_insert_callback, NULL);
     dictionary_register_delete_callback(dict, metric_entry_delete_callback, NULL);
     dictionary_register_conflict_callback(dict, metric_entry_conflict_callback, NULL);

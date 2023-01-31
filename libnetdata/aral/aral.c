@@ -54,7 +54,7 @@ struct aral {
         bool defragment;
 
         size_t element_size;            // calculated to take into account ARAL overheads
-        size_t max_allocation_size;          // calculated in bytes
+        size_t max_allocation_size;     // calculated in bytes
         size_t page_ptr_offset;         // calculated
         size_t natural_page_size;       // calculated
 
@@ -626,6 +626,10 @@ void aral_destroy_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS
     freez(ar);
 }
 
+size_t aral_element_size(ARAL *ar) {
+    return ar->config.requested_element_size;
+}
+
 ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_elements, const char *filename, char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
     ar->config.requested_element_size = element_size;
@@ -721,6 +725,78 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
     __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
     __atomic_add_fetch(&aral_globals.atomic.structures.allocated, sizeof(ARAL), __ATOMIC_RELAXED);
     return ar;
+}
+
+// ----------------------------------------------------------------------------
+// global aral caching
+
+#define ARAL_BY_SIZE_MAX_SIZE 1024
+
+struct aral_by_size {
+    ARAL *ar;
+    int32_t refcount;
+};
+
+struct {
+    SPINLOCK spinlock;
+    struct aral_by_size array[ARAL_BY_SIZE_MAX_SIZE + 1];
+} aral_by_size_globals = {};
+
+ARAL *aral_by_size_acquire(size_t size) {
+    netdata_spinlock_lock(&aral_by_size_globals.spinlock);
+
+    ARAL *ar = NULL;
+
+    if(size <= ARAL_BY_SIZE_MAX_SIZE && aral_by_size_globals.array[size].ar) {
+        ar = aral_by_size_globals.array[size].ar;
+        aral_by_size_globals.array[size].refcount++;
+
+        internal_fatal(aral_element_size(ar) != size, "DICTIONARY: aral has size %zu but we want %zu",
+                       aral_element_size(ar), size);
+    }
+
+    if(!ar) {
+        char buf[30 + 1];
+        snprintf(buf, 30, "size-%zu", size);
+        ar = aral_create(buf,
+                         size,
+                         0,
+                         65536 / size,
+                         NULL, NULL, false, false);
+
+        if(size <= ARAL_BY_SIZE_MAX_SIZE) {
+            aral_by_size_globals.array[size].ar = ar;
+            aral_by_size_globals.array[size].refcount = 1;
+        }
+    }
+
+    netdata_spinlock_unlock(&aral_by_size_globals.spinlock);
+
+    return ar;
+}
+
+void aral_by_size_release(ARAL *ar) {
+    size_t size = aral_element_size(ar);
+
+    if(size <= ARAL_BY_SIZE_MAX_SIZE) {
+        netdata_spinlock_lock(&aral_by_size_globals.spinlock);
+
+        internal_fatal(aral_by_size_globals.array[size].ar != ar,
+                       "ARAL BY SIZE: aral pointers do not match");
+
+        if(aral_by_size_globals.array[size].refcount <= 0)
+            fatal("ARAL BY SIZE: double release detected");
+
+        aral_by_size_globals.array[size].refcount--;
+        if(!aral_by_size_globals.array[size].refcount) {
+            aral_destroy(aral_by_size_globals.array[size].ar);
+            aral_by_size_globals.array[size].ar = NULL;
+        }
+
+        netdata_spinlock_unlock(&aral_by_size_globals.spinlock);
+    }
+    else
+        aral_destroy(ar);
 }
 
 // ----------------------------------------------------------------------------
