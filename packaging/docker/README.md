@@ -8,7 +8,8 @@ learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
 -->
 
-# Install the Netdata Agent with Docker
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
 you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
@@ -41,9 +42,10 @@ and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
-> **Notice**: all `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit. This is
-> required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved. Failure to do so
-> may cause a task running in a container to hang and consume 100% of the CPU core.
+:::note
+All `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit.
+This is required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved.
+Failure to do so may cause a task running in a container to hang and consume 100% of the CPU core.
 
 <details>
 <summary>What are these "some distros"?</summary>
@@ -55,6 +57,7 @@ If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
 Max open files            1073741816           1073741816           files
 ```
 </details>
+:::
 
 You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
@@ -64,7 +67,10 @@ _within the container_ at `/etc/netdata`. See the [configuration section](#confi
 you want to access the configuration files from your _host_ machine, see [host-editable
 configuration](#host-editable-configuration).
 
-**`docker run`**: Use the `docker run` command, along with the following options, to start a new container.
+<Tabs>
+<TabItem value="docker_run" label=<code>docker run</code>>
+
+Use the `docker run` command, along with the following options, to start a new container.
 
 ```bash
 docker run -d --name=netdata \
@@ -84,41 +90,56 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-**Docker Compose**: Copy the following code and paste into a new file called `docker-compose.yml`, then run
-`docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
+:::note
+If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::
 
-```yaml
-version: '3'
-services:
-  netdata:
-    image: netdata/netdata
-    container_name: netdata
-    hostname: example.com # set to fqdn of host
-    ports:
-      - 19999:19999
-    restart: unless-stopped
-    cap_add:
-      - SYS_PTRACE
-    security_opt:
-      - apparmor:unconfined
-    ulimits:
-      nofile:
-        soft: 4096
-    volumes:
-      - netdataconfig:/etc/netdata
-      - netdatalib:/var/lib/netdata
-      - netdatacache:/var/cache/netdata
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/os-release:/host/etc/os-release:ro
+</TabItem>
+<TabItem value="docker compose" label=<code>docker-compose</code>>
 
-volumes:
-  netdataconfig:
-  netdatalib:
-  netdatacache:
-```
+1. Copy the following code and paste into a new file called `docker-compose.yml`
+
+  ```yaml
+  version: '3'
+  services:
+    netdata:
+      image: netdata/netdata
+      container_name: netdata
+      hostname: example.com # set to fqdn of host
+      ports:
+        - 19999:19999
+      restart: unless-stopped
+      cap_add:
+        - SYS_PTRACE
+      security_opt:
+        - apparmor:unconfined
+      ulimits:
+        nofile:
+          soft: 4096
+      volumes:
+        - netdataconfig:/etc/netdata
+        - netdatalib:/var/lib/netdata
+        - netdatacache:/var/cache/netdata
+        - /etc/passwd:/host/etc/passwd:ro
+        - /etc/group:/host/etc/group:ro
+        - /proc:/host/proc:ro
+        - /sys:/host/sys:ro
+        - /etc/os-release:/host/etc/os-release:ro
+
+  volumes:
+    netdataconfig:
+    netdatalib:
+    netdatacache:
+  ```
+
+2. Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
+
+:::note
+If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::
+
+</TabItem>
+</Tabs>
 
 ## Docker tags
 
