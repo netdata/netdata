@@ -601,7 +601,7 @@ get_redirect() {
   if command -v curl > /dev/null 2>&1; then
     run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep Location | head -n 1 | sed 's/^[ \t]*//;s/[ \t]*$//' | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
+    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -o '[^/]*$'" || return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi

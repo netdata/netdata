@@ -378,7 +378,7 @@ get_netdata_latest_tag() {
   if command -v curl >/dev/null 2>&1; then
     tag=$(curl "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
   elif command -v wget >/dev/null 2>&1; then
-    tag=$(wget --max-redirect=0 "${url}" 2>&1 | grep Location | cut -d ' ' -f2 | grep -m 1 -o '[^/]*$')
+    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -o '[^/]*$')
   else
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
