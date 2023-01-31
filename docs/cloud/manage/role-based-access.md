@@ -9,8 +9,9 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Explanation of Netdata roles and permissions linked to them"
 -->
 
-Netdata Cloud provides out-of-the-box a role-based-access mechanism that allows you to control what functionalities in the app users can access.
-This is achieved through the availability of a set of pre-defined roles that have associated permissions depending on the purpose of each one of them.
+Netdata Cloud provides an out-of-the-box role-based-access mechanism that allows you to control what functionalities in the app users can access.
+
+This is achieved through the set of pre-defined roles that are available and have associated permissions, depending on the purpose of each one of them.
 
 #### What roles are available?
 
