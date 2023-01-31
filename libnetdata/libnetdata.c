@@ -150,9 +150,13 @@ void posix_memfree(void *ptr) {
     libc_free(ptr);
 }
 
+#define MAX_JUDY_SIZE_TO_TRACK 64
+size_t judy_sizes[MAX_JUDY_SIZE_TO_TRACK + 1] = {};
+
 Word_t JudyMalloc(Word_t Words) {
     Word_t Addr;
 
+    __atomic_add_fetch(&judy_sizes[Words > MAX_JUDY_SIZE_TO_TRACK ? 0 : Words], 1, __ATOMIC_RELAXED);
     Addr = (Word_t) mallocz(Words * sizeof(Word_t));
     return(Addr);
 }
@@ -163,6 +167,7 @@ void JudyFree(void * PWord, Word_t Words) {
 Word_t JudyMallocVirtual(Word_t Words) {
     Word_t Addr;
 
+    __atomic_add_fetch(&judy_sizes[Words > MAX_JUDY_SIZE_TO_TRACK ? 0 : Words], 1, __ATOMIC_RELAXED);
     Addr = (Word_t) mallocz(Words * sizeof(Word_t));
     return(Addr);
 }
