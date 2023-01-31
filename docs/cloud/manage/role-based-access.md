@@ -32,10 +32,11 @@ In more detail, you can find on the following table which functionalities are av
 
 | **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** |
 | :-- | :--: | :--: | :--: | :--: | :--: |
-| See space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| See Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | Delete Space | :heavy_check_mark: | - | - | - | - |
-| Change Name | :heavy_check_mark: | - | - | - | - |
-| Change Description | :heavy_check_mark: | - | - | - | - |
+| Change name | :heavy_check_mark: | - | - | - | - |
+| Change description | :heavy_check_mark: | - | - | - | - |
+| Leave Space  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 
 ##### Node Management
 
@@ -59,16 +60,79 @@ In more detail, you can find on the following table which functionalities are av
 | Appoint Observer | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
 | See all Users in a Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | |
 | Invite existing user to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
-| Remove user from to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Remove user from Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
 
+##### Room Management
 
-## Related Topics
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | Notes |
+| :-- | :--: | :--: | :--: | :--: | :--: | :-- |
+| See all Rooms in a Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | |
+| Join any Room in a Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - | This will enable you to get notifications from nodes on the room you joined |
+| Create a new Room in a Space | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Delete Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Change Room name | :heavy_check_mark: | :heavy_check_mark: | - | - | - | If not the _All Nodes_ room |
+| Change Room description | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Add existing Nodes to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Remove Nodes from Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | |
+| Leave Room  | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | |
 
-### **Related Concepts**
+##### Notifications Management
 
-- [ACLK](https://github.com/netdata/netdata/blob/master/docs/concepts/netdata-agent/aclk.md)
-- [plugins.d](https://github.com/netdata/netdata/tree/master/collectors/plugins.d)
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | Notes |
+| :-- | :--: | :--: | :--: | :--: | :--: | :-- |
+| See all configured notifications on a Space  | :heavy_check_mark: | - | - | - | - | |
+| Add new configuration | :heavy_check_mark: | - | - | - | - | |
+| Enable/Disable configuration | :heavy_check_mark: | - | - | - | - |  |
+| Edit configuration | :heavy_check_mark: | - | - | - | - | Some exceptions apply depending on [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#available-actions-per-notification-methods-based-on-service-level)) |
+| Delete configuration | :heavy_check_mark: | - | - | - | - | |
+| Edit personal level notification settings | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | [Manage user notification settings](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-user-notification-settings) |
 
-### Related Tasks
+Notes:
+* Enable, Edit and Add actions over specific notification methods will only be allowed if your plan has access to those ([service classification](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx#service-classification))
 
-- [Run-time troubleshooting with Functions](docs/nightly/tasks/operations/runtime-troubleshootting-with-function)
+##### Dashboards
+
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** |
+| :-- | :--: | :--: | :--: | :--: | :--: |
+| See all dashboards in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Add new dashboards to Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Edit any dashboards in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - |
+| Edit own dashboards in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Delete any dashboards in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - |
+| Delete own dashboards in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+
+##### Functions
+
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | Notes |
+| :-- | :--: | :--: | :--: | :--: | :--: | :-- |
+| See all functions in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Run any function in Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - |
+| Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | There isn't any function on this category, subject to change. |
+| Run sensitive function in Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | There isn't any function on this category, subject to change. |
+
+##### Events feed
+
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | Notes |
+| :-- | :--: | :--: | :--: | :--: | :--: | :-- |
+| See Alert or Topology events | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | |
+| See Auditing events | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | These are coming soon, not currently available  |
+
+##### Billing
+
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** | Notes |
+| :-- | :--: | :--: | :--: | :--: | :--: | :-- |
+| See Plan & Billing details | :heavy_check_mark: | - | - | - | :heavy_check_mark: | Current plan and usage figures |
+| Update plans | :heavy_check_mark: | - | - | - | - | This includes cancelling |
+| See invoices | :heavy_check_mark: | - | - | - | :heavy_check_mark: | |
+| Manage payment methods | :heavy_check_mark: | - | - | - | :heavy_check_mark: | |
+| Update billing email | :heavy_check_mark: | - | - | - | :heavy_check_mark: | |
+
+##### Other permissions
+
+| **Functionality** | **Administrator** | **Manager** | **Troubleshooter** | **Observer** | **Billing** |
+| :-- | :--: | :--: | :--: | :--: | :--: |
+| See Bookmarks in Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Add Bookmark to Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - |
+| Delete Bookmark from Space | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | - |
+| See Visited Nodes | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
+| Update Visited Nodes | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
