@@ -11,7 +11,7 @@ learn_rel_path: "Installation"
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and claim it to Netdata Cloud.  
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud.  
 
 To see what our Netdata Cloud Kubernetes visualizations have to offer, read the[Kubernetes visualizations Concept](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
 
@@ -31,7 +31,7 @@ To deploy Kubernetes monitoring with Netdata, you need:
     difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
     administrative system.
 - The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
-- A Netdata Cloud account with a Space to claim the cluster to.
+- A Netdata Cloud account with a Space to connect the cluster to.
 
 ## Deploy Netdata on your Kubernetes Cluster
 
@@ -63,7 +63,7 @@ like the health map and time-series composite charts.
   ```
 
   :::note
-  If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+  If you plan to Connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
   :::
 
   For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
@@ -75,7 +75,7 @@ Run `kubectl get services` and `kubectl get pods` to confirm that your cluster n
 </TabItem>
 <TabItem value="existing_installations" label="Existing Installations">
 
-On an existing installation, in order to Claim it to Netdata Cloud you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override.
+On an existing installation, in order to Connect it to Netdata Cloud you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override.
 
 #### Steps
 
@@ -113,7 +113,7 @@ On an existing installation, in order to Claim it to Netdata Cloud you will need
 
   :::note
   Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-  and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
+  and `YOUR_ROOM_ID` with the ID of the room you are willing to connect to.
   :::
 
   :::info
