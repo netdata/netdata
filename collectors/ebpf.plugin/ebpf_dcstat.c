@@ -985,12 +985,14 @@ static void dcstat_collector(ebpf_module_t *em)
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        counter = 0;
         netdata_apps_integration_flags_t apps = em->apps_charts;
         ebpf_dc_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
