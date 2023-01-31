@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifica
 sidebar_label: "Notifications Reference"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
+learn_rel_path: "Operations/Alerts"
 -->
 
 # Alarm notifications

@@ -4,7 +4,7 @@ sidebar_label: "Health"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/REFERENCE.md"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
+learn_rel_path: "Operations/Alerts"
 -->
 
 # Health configuration reference

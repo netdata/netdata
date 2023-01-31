@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/aler
 sidebar_label: "Alert notifications"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Operations"
+learn_rel_path: "Operations/Alerts"
 ---
 
 import Callout from '@site/src/components/Callout'
@@ -14,61 +14,88 @@ Netdata Cloud can send centralized alert notifications to your team whenever a n
 unreachable state. By enabling notifications, you ensure no alert, on any node in your infrastructure, goes unnoticed by
 you or your team.
 
+Having this information centralized helps you:
+* Have a clear view of the health across your infrastructure, [seeing all a alerts in one place](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+* Easily [setup your alert notification process](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md): 
+methods to use and where to use them, filtering rules, etc.
+* Quickly troubleshoot using [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metrics-correlations.md)
+or [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
+
 If a node is getting disconnected often or has many alerts, we protect you and your team from alert fatigue by sending
 you a flood protection notification. Getting one of these notifications is a good signal of health or performance issues
 on that node.
 
-Netdata Cloud currently supports email notifications. We're working on additional endpoints and functionality.
-
-Admins must enable alert notifications for their [Space(s)](#manage-alert-notifications-for-a-space). All users in a
+Admins must enable alert notifications for their [Space(s)](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md#manage-space-notification-settings). All users in a
 Space can then personalize their notifications settings from within their [account
-menu](#manage-alert-notifications-per-user).
+menu](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/#manage-user-notification-settings).
 
 <Callout type="notice">
 
 Centralized alert notifications from Netdata Cloud is a independent process from [notifications from
-Netdata](/docs/monitor/enable-notifications). You can enable one or the other, or both, based on your needs. However,
+Netdata](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md). You can enable one or the other, or both, based on your needs. However,
 the alerts you see in Netdata Cloud are based on those streamed from your Netdata-monitoring nodes. If you want to tweak
 or add new alert that you see in Netdata Cloud, and receive via centralized alert notifications, you must
-[configure](/docs/monitor/configure-alarms) each node's alert watchdog.
+[configure](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) each node's alert watchdog.
 
 </Callout>
 
-## Manage alert notifications for a Space
+### Alert notifications
 
-To enable notifications for a Space, click **Manage Space** in the [Space](/docs/cloud/spaces) management area.
+Netdata Cloud can send centralized alert notifications to your team whenever a node enters a warning, critical, or unreachable state. By enabling notifications, 
+you ensure no alert, on any node in your infrastructure, goes unnoticed by you or your team.
 
-![The Manage Space
-button](https://user-images.githubusercontent.com/1153921/108530321-b6a52500-7292-11eb-9599-a5ba77a25094.png)
+If a node is getting disconnected often or has many alerts, we protect you and your team from alert fatigue by sending you a flood protection notification. 
+Getting one of these notifications is a good signal of health or performance issues on that node.
 
-In the modal, click on the **Notifications** tab. This menu option is visible only to administrators.
+Alert notifications can be delivered through different methods, these can go from an Email sent from Netdata to the use of a 3rd party tool like PagerDuty.
 
-![The Space-level management panel for alert
-notifications](https://user-images.githubusercontent.com/1153921/99722010-3f7eab80-2a6d-11eb-8836-547a6d243d51.png)
+Notification methods are classified on two main attributes:
+* Service level: Personal or System
+* Service classification: Community or Business
 
-Click on the toggle to enable or disable a notification method.
+Only administrators are able to manage the space's alert notification settings.
+All users in a Space can personalize their notifications settings, for Personal service level notification methods, from within their profile menu.
 
-## Manage alert notifications per user
+> ⚠️ Netdata Cloud supports different notification methods and their availability will depend on the plan you are at.
+> For more details check [Service classification](#service-classification) or [netdata.cloud/pricing](https://www.netdata.cloud/pricing).
 
-You, and other individual users in your Space, can also enable and disable notification methods.
+#### Service level
 
-Click on your profile icon at the top-right of the Cloud UI to open your account menu, then **Profile** in the dropdown. 
-Click on the **Notifications** tab in the panel that appears.
+##### Personal
 
-![The user-level management panel for alert
-notifications](https://user-images.githubusercontent.com/1153921/99722015-40174200-2a6d-11eb-837e-3de761127ca7.png)
+The notifications methods classified as **Personal** are what we consider generic, meaning that these can't have specific rules for them set by the administrators.
 
-Enable or disable notification methods with the toggle buttons.
+These notifications are sent to the destination of the channel which is a user-specific attribute, e.g. user's e-mail, and the users are the ones that will then be able to
+manage what specific configurations they want for the Space / Room(s) and the desired Notification level, they can achieve this from their User Profile page under 
+**Notifications**.
 
-Select which the notifications you want to receive from each War Room:
+One example of such a notification method is the E-mail.
 
--   **All alerts and unreachable**: Receive notifications for all changes in alert status: critical, warning, and
-    cleared. In addition, receive notifications for any node that enters an unreachable state.
--   **All alerts**: Receive notifications for all changes in alert status: critical, warning, and cleared.
--   **Critical only**: Receive notifications only for critical alerts.
--   **No notifications**: Receive no notifications for nodes in this War Room.
+##### System
 
-If a Space's administrator has disabled notifications, you will see a mesage similar to, "E-mail notifications for this space has been disabled by admin," and your settings have no effect.
+For **System** notification methods, the destination of the channel will be a target that usually isn't specific to a single user, e.g. slack channel.
+
+These notification methods allow for fine-grain rule settings to be done by administrators and more than one configuration can exist for them since. You can specify 
+different targets depending on Rooms or Notification level settings.
+
+Some examples of such notification methods are: Webhook, PagerDuty, slack.
+
+#### Service classification
+
+##### Community
+
+Notification methods classified as Community can be used by everyone independent on the plan your space is at.
+These are: Email and discord
+
+##### Pro
+
+Notification methods classified as Pro are only available for **Pro** and **Business** plans
+These are: webhook
+
+##### Business
+
+Notification methods classified as Business are only available for **Business** plans
+These are: PagerDuty, slack
 
 ## Flood protection
 
@@ -106,7 +133,22 @@ Cloud](https://user-images.githubusercontent.com/1153921/87461878-e933c480-c5c3-
 
 Netdata Cloud's alarm notifications feature leverages the alarms configuration on each node in your infrastructure. If
 you'd like to tweak any of these alarms, or even add new ones based on your needs, read our [health
-quickstart](/docs/monitor/configure-alarms).
+quickstart](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
 
-You can also [view active alarms](/docs/cloud/alerts-notifications/view-active-alerts) in Netdata Cloud for an instant
+You can also [view active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx) in Netdata Cloud for an instant
 visualization of the health of your infrastructure.
+
+### Related Topics
+
+#### **Related Concepts**
+- [Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+- [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metrics-correlations.md)
+- [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
+
+#### Related Tasks
+- [View Active alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/manage-notification-methods.md)
+- [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-webhook-notification-configuration.md)
+- [Add Discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification-configuration.md)
+- [Add Slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md)
+- [Add PagerDuty notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md)
