@@ -78,6 +78,7 @@ dist_noinst_DATA = \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
+    database/engine/journalfile_v2.ksy.in \
     $(NULL)
 
 # until integrated within build
@@ -562,7 +563,7 @@ if ENABLE_DBENGINE
         $(NULL)
 
     BUILT_SOURCES += $(RRD_PLUGIN_KSY_BUILTFILES)
-	CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
+    CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
 
 database/engine/journalfile_v2.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
 	m4 $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
