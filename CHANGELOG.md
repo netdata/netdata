@@ -6,9 +6,11 @@
 
 **Merged pull requests:**
 
+- bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
 - Patch master [\#14377](https://github.com/netdata/netdata/pull/14377) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "Delete libnetdata readme" [\#14374](https://github.com/netdata/netdata/pull/14374) ([cakrit](https://github.com/cakrit))
 - Revert "Add libnetdata readmes to learn, delete empty" [\#14373](https://github.com/netdata/netdata/pull/14373) ([cakrit](https://github.com/cakrit))
+- Publish Docker images to GHCR.io and Quay.io [\#14372](https://github.com/netdata/netdata/pull/14372) ([Ferroin](https://github.com/Ferroin))
 - Add libnetdata readmes to learn, delete empty [\#14371](https://github.com/netdata/netdata/pull/14371) ([cakrit](https://github.com/cakrit))
 - Add collectors main readme to learn [\#14370](https://github.com/netdata/netdata/pull/14370) ([cakrit](https://github.com/cakrit))
 - Add collectors list to learn temporarily [\#14369](https://github.com/netdata/netdata/pull/14369) ([cakrit](https://github.com/cakrit))
@@ -25,6 +27,7 @@
 - Delete data structures readme [\#14354](https://github.com/netdata/netdata/pull/14354) ([cakrit](https://github.com/cakrit))
 - Delete BREAKING\_CHANGES.md [\#14353](https://github.com/netdata/netdata/pull/14353) ([cakrit](https://github.com/cakrit))
 - Add redistributed to learn [\#14352](https://github.com/netdata/netdata/pull/14352) ([cakrit](https://github.com/cakrit))
+- Add missing entries in README.md [\#14351](https://github.com/netdata/netdata/pull/14351) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add ansible.md to learn [\#14350](https://github.com/netdata/netdata/pull/14350) ([cakrit](https://github.com/cakrit))
 - Delete BUILD.md [\#14348](https://github.com/netdata/netdata/pull/14348) ([cakrit](https://github.com/cakrit))
 - minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -355,8 +358,6 @@
 - Dont send NodeInfo during first database cleanup [\#13740](https://github.com/netdata/netdata/pull/13740) ([MrZammler](https://github.com/MrZammler))
 - CMake - add possibility to build without ACLK [\#13736](https://github.com/netdata/netdata/pull/13736) ([underhood](https://github.com/underhood))
 - Change cast to remove coverity warnings [\#13735](https://github.com/netdata/netdata/pull/13735) ([thiagoftsm](https://github.com/thiagoftsm))
-- Do not try to start an archived host in dbengine if dbengine is not compiled [\#13724](https://github.com/netdata/netdata/pull/13724) ([stelfrag](https://github.com/stelfrag))
-- Allow netdata plugins to expose functions for querying more information about specific charts [\#13720](https://github.com/netdata/netdata/pull/13720) ([ktsaou](https://github.com/ktsaou))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
