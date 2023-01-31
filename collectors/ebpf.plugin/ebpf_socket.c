@@ -2882,12 +2882,12 @@ static void socket_collector(ebpf_module_t *em)
 
         counter = 0;
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
-        pthread_mutex_lock(&collect_data_mutex);
         if (socket_global_enabled) {
             read_listen_table();
             read_hash_global_tables();
         }
 
+        pthread_mutex_lock(&collect_data_mutex);
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
