@@ -17,7 +17,7 @@ We also provide paid subscriptions that designed to provide additional features 
 
 The plan is an attribute that is directly attached to your space(s) and that dictates what capabilities and customizations you have on your space. If you have different spaces you can have different Netdata plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your spaces.
 
-Our plans, with the exception of Community, work as subscriptions and overall consist of:
+Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of:
 * A flat fee component, that is a price per space, and
 * An on-demand metered component, that is related to your usage of Netdata which directly links to the [number of nodes you have running](#running-nodes-and-billing)
 
@@ -34,8 +34,8 @@ The only dynamic variable we consider for billing is the number of concurrently 
 * stale nodes, nodes that are available to query through a Netdata parent agent but are not actively connecting metrics at the moment
 
 To ensure we don't overcharge you due to sporadic spikes throughout a month or even at a certain point in a day we are:
-* Calculating a daily P90 figure for your running nodes. To achieve that, we take a daily snapshot of your running nodes and using the node state change events (live, offline) we guarantee that a daily P90 figure is calculated to remove any daily spikes
-* On top of the above, we do a running P90 calculation from the start to the end of your billing cycle. Even if you have an yearly billing frequency we keep a monthly subscription linked to that to identify any potential overage over you [committed nodes](#committed-nodes).
+* Calculate a daily P90 figure for your running nodes. To achieve that, we take a daily snapshot of your running nodes, and using the node state change events (live, offline) we guarantee that a daily P90 figure is calculated to remove any daily spikes
+* On top of the above, we do a running P90 calculation from the start to the end of your billing cycle. Even if you have an yearly billing frequency we keep a monthly subscription linked to that to identify any potential overage over your [committed nodes](#committed-nodes).
 
 #### Committed nodes
 
@@ -45,7 +45,7 @@ When you subscribe to an Yearly plan you will need to specify the number of node
 Node plan discounted price x committed nodes x 12 months
 ```
 
-If, for a given month, your usage is over this committed nodes we will charge the original cost per node for the nodes above the committed number.
+If, for a given month, your usage is over these committed nodes we will charge the original cost per node for the nodes above the committed number.
 
 #### Plan changes and credit balance
 
