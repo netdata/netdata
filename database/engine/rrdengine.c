@@ -754,152 +754,49 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
-#define MAX_PAGE_SIZES_TO_KEEP 3
-#define MIN_PAGES_PER_SIZE_TO_KEEP 100
-
-struct dbengine_page_size {
-    SPINLOCK spinlock;
-    size_t page_size; // read-only, no lock required to read it
-
-    size_t demand;
-    size_t supply;
-
-    size_t hit;
-    size_t miss;
-
-    size_t used;
-    size_t array_size;
-    void **array;
-};
-
 struct {
-    struct {
-        size_t hit;
-        size_t miss_wrong_size;
-        size_t miss_short_supply;
-        size_t cached_size;
-        size_t struct_size;
-    } atomic;
+    ARAL *aral[RRD_STORAGE_TIERS];
+} dbengine_page_alloc_globals = {};
 
-    struct dbengine_page_size slots[MAX_PAGE_SIZES_TO_KEEP];
-} dbengine_page_alloc_globals = {
-        .atomic = {
-                .struct_size = sizeof(dbengine_page_alloc_globals),
-        }
-};
+static inline ARAL *page_size_lookup(size_t size) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        if(size == tier_page_size[tier])
+            return dbengine_page_alloc_globals.aral[tier];
 
-__attribute__((constructor)) void initialize_sizes_to_slots(void) {
-    uint8_t found[RRDENG_BLOCK_SIZE + 1];
-    memset(found, 0, RRDENG_BLOCK_SIZE + 1);
-
-    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
-        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
-        memset(dps, 0, sizeof(struct dbengine_page_size));
-        netdata_spinlock_init(&dps->spinlock);
-    }
-
-    for(int tier = 0; tier < MAX_PAGE_SIZES_TO_KEEP && tier < RRD_STORAGE_TIERS ; tier++) {
-        size_t size = tier_page_size[tier];
-
-        if(size <= RRDENG_BLOCK_SIZE && !found[size]) {
-            struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[tier];
-            dps->page_size = size;
-            found[size] = 1;
-        }
-    }
-}
-
-static inline struct dbengine_page_size *page_size_lookup(size_t size) {
-    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
-        if(size == dbengine_page_alloc_globals.slots[i].page_size)
-            return &dbengine_page_alloc_globals.slots[i];
-    }
     return NULL;
 }
 
-static void dbengine_page_alloc_cleanup1(void) {
-    for(int i = 0; i < MAX_PAGE_SIZES_TO_KEEP ; i++) {
-        void *page = NULL;
+static void dbengine_page_alloc_init(void) {
+    for(size_t i = storage_tiers; i > 0 ;i--) {
+        size_t tier = storage_tiers - i;
 
-        struct dbengine_page_size *dps = &dbengine_page_alloc_globals.slots[i];
-        netdata_spinlock_lock(&dps->spinlock);
-        if(dps->used > MIN_PAGES_PER_SIZE_TO_KEEP) {
-            dps->used--;
-            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
-            page = dps->array[dps->used];
-            dps->array[dps->used] = NULL;
-            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
-        }
-        netdata_spinlock_unlock(&dps->spinlock);
+        char buf[20 + 1];
+        snprintfz(buf, 20, "tier%zu-pages", tier);
 
-        if(page)
-            freez(page);
+        dbengine_page_alloc_globals.aral[tier] = aral_create(
+                buf,
+                tier_page_size[tier],
+                64,
+                512,
+                NULL, NULL, false, false);
     }
 }
 
 void *dbengine_page_alloc(size_t size) {
-    void *page = NULL;
+    ARAL *ar = page_size_lookup(size);
+    if(ar) return aral_mallocz(ar);
 
-    struct dbengine_page_size *dps = page_size_lookup(size);
-    if(dps) {
-        netdata_spinlock_lock(&dps->spinlock);
-        dps->demand++;
-
-        if(dps->used > 0) {
-            dps->hit++;
-            dps->used--;
-            internal_fatal(!dps->array[dps->used], "DBENGINE: slot should have a page but is empty");
-            page = dps->array[dps->used];
-            dps->array[dps->used] = NULL;
-            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.hit, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
-        }
-        else {
-            dps->miss++;
-            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_short_supply, 1, __ATOMIC_RELAXED);
-        }
-
-        netdata_spinlock_unlock(&dps->spinlock);
-    }
-    else
-        __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.miss_wrong_size, 1, __ATOMIC_RELAXED);
-
-    if(!page)
-        page = mallocz(size);
-
-    return page;
+    return mallocz(size);
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
     if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
         return;
 
-    struct dbengine_page_size *dps = page_size_lookup(size);
-    if(dps) {
-        netdata_spinlock_lock(&dps->spinlock);
-        dps->supply++;
-
-        if(dps->used == dps->array_size) {
-            size_t new_array_size = dps->array_size ? dps->array_size * 2 : MIN_PAGES_PER_SIZE_TO_KEEP;
-            dps->array = reallocz(dps->array, new_array_size * sizeof(void *));
-
-            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.struct_size,
-                               (new_array_size - dps->array_size) * sizeof(void *), __ATOMIC_RELAXED);
-
-            dps->array_size = new_array_size;
-        }
-
-        if(dps->used < dps->array_size) {
-            dps->array[dps->used] = page;
-            dps->used++;
-            page = NULL;
-            __atomic_add_fetch(&dbengine_page_alloc_globals.atomic.cached_size, dps->page_size, __ATOMIC_RELAXED);
-        }
-
-        netdata_spinlock_unlock(&dps->spinlock);
-    }
-
-    if(page)
+    ARAL *ar = page_size_lookup(size);
+    if(ar)
+        aral_freez(ar, page);
+    else
         freez(page);
 }
 
@@ -1828,8 +1725,6 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
-            .pages       = __atomic_load_n(&dbengine_page_alloc_globals.atomic.cached_size, __ATOMIC_RELAXED) +
-                            __atomic_load_n(&dbengine_page_alloc_globals.atomic.struct_size, __ATOMIC_RELAXED),
 
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
@@ -1855,7 +1750,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     extent_buffer_cleanup1();
     epdl_cleanup1();
     deol_cleanup1();
-    dbengine_page_alloc_cleanup1();
 
     {
         static time_t last_run_s = 0;
@@ -1973,6 +1867,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
 
     extent_buffer_init();
+    dbengine_page_alloc_init();
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
