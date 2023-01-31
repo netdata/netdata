@@ -1253,7 +1253,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-items",
                     sizeof(DICTIONARY_ITEM),
                     0,
-                    4096,
+                    65536,
                     NULL, NULL, false, false);
 
         // we have to check again
@@ -1262,7 +1262,7 @@ void dictionary_static_items_aral_init(void) {
                     "dict-shared-items",
                     sizeof(DICTIONARY_ITEM_SHARED),
                     0,
-                    4096,
+                    65536,
                     NULL, NULL, false, false);
 
         netdata_spinlock_unlock(&spinlock);

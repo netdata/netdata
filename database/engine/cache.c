@@ -430,7 +430,7 @@ static void pgc_section_pages_static_aral_init(void) {
                     "pgc_section",
                     sizeof(struct section_pages),
                     0,
-                    4096,
+                    65536,
                     NULL, NULL, false, false);
 
         netdata_spinlock_unlock(&spinlock);
@@ -1791,7 +1791,7 @@ PGC *pgc_create(const char *name,
     cache->aral = aral_create(name,
                               sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
                               0,
-                              4096,
+                              512 * 1024,
                               NULL, NULL, false, false);
 #endif
 

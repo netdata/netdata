@@ -26,6 +26,18 @@ struct rrdeng_main {
     size_t flushes_running;
     size_t evictions_running;
     size_t cleanup_running;
+
+    struct {
+        ARAL *ar;
+
+        struct {
+            size_t allocated;
+            size_t dispatched;
+            size_t executing;
+            size_t pending_cb;
+        } atomics;
+    } work_cmd;
+
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -79,71 +91,28 @@ struct rrdeng_work {
     work_cb work_cb;
     after_work_cb after_work_cb;
     enum rrdeng_opcode opcode;
-
-    struct {
-        struct rrdeng_work *prev;
-        struct rrdeng_work *next;
-    } cache;
 };
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct rrdeng_work *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-        size_t dispatched;
-        size_t executing;
-        size_t pending_cb;
-    } atomics;
-} work_request_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-                .dispatched = 0,
-                .executing = 0,
-        },
-};
-
-static inline bool work_request_full(void) {
-    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
+static void work_request_init(void) {
+    rrdeng_main.work_cmd.ar = aral_create(
+            "dbengine-work-cmd",
+            sizeof(struct rrdeng_work),
+            0,
+            65536,
+            NULL, NULL, false, false
+            );
 }
 
-static void work_request_cleanup1(void) {
-    struct rrdeng_work *item = NULL;
-
-    if(!netdata_spinlock_trylock(&work_request_globals.protected.spinlock))
-        return;
-
-    if(work_request_globals.protected.available_items && work_request_globals.protected.available > (size_t)libuv_worker_threads) {
-        item = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
-        work_request_globals.protected.available--;
-    }
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+static inline bool work_request_full(void) {
+    return __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
 }
 
 static inline void work_done(struct rrdeng_work *work_request) {
-    netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
-    work_request_globals.protected.available++;
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
+    aral_freez(rrdeng_main.work_cmd.ar, work_request);
 }
 
 static void work_standard_worker(uv_work_t *req) {
-    __atomic_add_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
     register_libuv_worker_jobs();
     worker_is_busy(UV_EVENT_WORKER_INIT);
@@ -152,9 +121,9 @@ static void work_standard_worker(uv_work_t *req) {
     work_request->data = work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
 
-    __atomic_sub_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
@@ -169,7 +138,7 @@ static void after_work_standard_callback(uv_work_t* req, int status) {
         work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
 
     work_done(work_request);
-    __atomic_sub_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -179,21 +148,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
 
-    netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-
-    if(likely(work_request_globals.protected.available_items)) {
-        work_request = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
-        work_request_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
-
-    if(unlikely(!work_request)) {
-        work_request = mallocz(sizeof(struct rrdeng_work));
-        __atomic_add_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    work_request = aral_mallocz(rrdeng_main.work_cmd.ar);
     memset(work_request, 0, sizeof(struct rrdeng_work));
     work_request->req.data = work_request;
     work_request->ctx = ctx;
@@ -209,7 +164,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
         return false;
     }
 
-    __atomic_add_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
 
     return true;
 }
@@ -777,7 +732,7 @@ static void dbengine_page_alloc_init(void) {
                 buf,
                 tier_page_size[tier],
                 64,
-                512,
+                512 * tier_page_size[tier],
                 NULL, NULL, false, false);
     }
 }
@@ -1718,7 +1673,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
-            .workers     = __atomic_load_n(&work_request_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
+            .workers     = __atomic_load_n(&rrdeng_main.work_cmd.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
             .pdc         = pdc_cache_size(),
             .xt_io       = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
             .xt_buf      = extent_buffer_cache_size(),
@@ -1740,7 +1695,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
     rrdeng_cmd_cleanup1();
-    work_request_cleanup1();
     page_descriptor_cleanup1();
     extent_io_descriptor_cleanup1();
     pdc_cleanup1();
@@ -1773,8 +1727,8 @@ void timer_cb(uv_timer_t* handle) {
     uv_update_time(handle->loop);
 
     worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.queue.waiting);
-    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
-    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
+    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
+    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
 
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
@@ -1866,6 +1820,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
 
+    work_request_init();
     extent_buffer_init();
     dbengine_page_alloc_init();
 

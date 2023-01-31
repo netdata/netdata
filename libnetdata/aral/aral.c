@@ -61,6 +61,7 @@ struct aral {
         size_t requested_element_size;
         size_t initial_page_elements;
         size_t max_page_elements;
+        size_t max_page_size;
 
         struct {
             bool enabled;
@@ -630,11 +631,11 @@ size_t aral_element_size(ARAL *ar) {
     return ar->config.requested_element_size;
 }
 
-ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_elements, const char *filename, char **cache_dir, bool mmap, bool lockless) {
+ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size, const char *filename, char **cache_dir, bool mmap, bool lockless) {
     ARAL *ar = callocz(1, sizeof(ARAL));
     ar->config.requested_element_size = element_size;
     ar->config.initial_page_elements = initial_page_elements;
-    ar->config.max_page_elements = max_page_elements;
+    ar->config.max_page_size = max_page_size;
     ar->config.mmap.filename = filename;
     ar->config.mmap.cache_dir = cache_dir;
     ar->config.mmap.enabled = mmap;
@@ -662,6 +663,8 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
 
     // and finally align it to the natural alignment
     ar->config.element_size = natural_alignment(ar->config.element_size, ARAL_NATURAL_ALIGNMENT);
+
+    ar->config.max_page_elements = ar->config.max_page_size / ar->config.element_size;
 
     // we write the page pointer just after each element
     ar->config.page_ptr_offset = ar->config.element_size - sizeof(uintptr_t);
@@ -713,13 +716,13 @@ ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_ele
                    "ARAL: '%s' "
                    "element size %zu (requested %zu bytes), "
                    "min elements per page %zu (requested %zu), "
-                   "max elements per page %zu (requested %zu), "
-                   "max page size %zu bytes, "
+                   "max elements per page %zu, "
+                   "max page size %zu bytes (requested %zu) "
                    , ar->config.name
                    , ar->config.element_size, ar->config.requested_element_size
                    , ar->adders.allocation_size / ar->config.element_size, ar->config.initial_page_elements
-                   , ar->config.max_allocation_size / ar->config.element_size, ar->config.max_page_elements
-                   , ar->config.max_allocation_size
+                   , ar->config.max_allocation_size / ar->config.element_size
+                   , ar->config.max_allocation_size,  ar->config.max_page_size
     );
 
     __atomic_add_fetch(&aral_globals.atomic.structures.allocations, 1, __ATOMIC_RELAXED);
@@ -761,7 +764,7 @@ ARAL *aral_by_size_acquire(size_t size) {
         ar = aral_create(buf,
                          size,
                          0,
-                         65536 / size,
+                         65536 * ((size / 150) + 1),
                          NULL, NULL, false, false);
 
         if(size <= ARAL_BY_SIZE_MAX_SIZE) {
@@ -911,7 +914,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     struct aral_unittest_config auc = {
             .single_threaded = false,
             .threads = threads,
-            .ar = aral_create("aral-test", 20, 10, 1024, "test-aral", NULL, false, false),
+            .ar = aral_create("aral-test", 20, 10, 8192, "test-aral", NULL, false, false),
             .elements = elements,
             .errors = 0,
     };
@@ -979,7 +982,7 @@ int aral_unittest(size_t elements) {
     struct aral_unittest_config auc = {
             .single_threaded = true,
             .threads = 1,
-            .ar = aral_create("aral-test", 20, 10, 1024, "test-aral", &cache_dir, false, false),
+            .ar = aral_create("aral-test", 20, 10, 8192, "test-aral", &cache_dir, false, false),
             .elements = elements,
             .errors = 0,
     };
