@@ -189,7 +189,8 @@ static void rrdsetvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrdsetvar_index_init(RRDSET *st) {
     if(!st->rrdsetvar_root_index) {
-        st->rrdsetvar_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdhealth);
+        st->rrdsetvar_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              &dictionary_stats_category_rrdhealth, sizeof(RRDSETVAR));
 
         dictionary_register_insert_callback(st->rrdsetvar_root_index, rrdsetvar_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrdsetvar_root_index, rrdsetvar_conflict_callback, NULL);

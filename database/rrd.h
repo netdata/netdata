@@ -134,6 +134,7 @@ typedef struct storage_point {
 extern bool unittest_running;
 extern bool dbengine_enabled;
 extern size_t storage_tiers;
+extern bool use_direct_io;
 extern size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS];
 
 typedef enum __attribute__ ((__packed__)) {

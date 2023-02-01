@@ -84,7 +84,8 @@ static void rrdvar_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 }
 
 DICTIONARY *rrdvariables_create(void) {
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdhealth);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                  &dictionary_stats_category_rrdhealth, sizeof(RRDVAR));
 
     dictionary_register_insert_callback(dict, rrdvar_insert_callback, NULL);
     dictionary_register_delete_callback(dict, rrdvar_delete_callback, NULL);

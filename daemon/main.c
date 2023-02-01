@@ -1801,7 +1801,7 @@ int main(int argc, char **argv) {
 #endif
 
         // set libuv worker threads
-        libuv_worker_threads = get_system_cpus() * 2;
+        libuv_worker_threads = (int)get_netdata_cpus() * 2;
 
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
@@ -1865,6 +1865,8 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+
+        aral_judy_init();
 
         get_system_timezone();
 

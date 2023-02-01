@@ -53,6 +53,7 @@ typedef enum dictionary_options {
     DICT_OPTION_NAME_LINK_DONT_CLONE    = (1 << 2), // don't copy the name, just point to the one provided (default: copy)
     DICT_OPTION_DONT_OVERWRITE_VALUE    = (1 << 3), // don't overwrite values of dictionary items (default: overwrite)
     DICT_OPTION_ADD_IN_FRONT            = (1 << 4), // add dictionary items at the front of the linked list (default: at the end)
+    DICT_OPTION_FIXED_SIZE              = (1 << 5), // the items of the dictionary have a fixed size
 } DICT_OPTIONS;
 
 struct dictionary_stats {
@@ -107,12 +108,12 @@ struct dictionary_stats {
 
 // Create a dictionary
 #ifdef NETDATA_INTERNAL_CHECKS
-#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, __FUNCTION__, __LINE__, __FILE__)
-#define dictionary_create_advanced(options, stats) dictionary_create_advanced_with_trace(options, stats, __FUNCTION__, __LINE__, __FILE__)
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file);
+#define dictionary_create(options) dictionary_create_advanced_with_trace(options, NULL, 0, __FUNCTION__, __LINE__, __FILE__)
+#define dictionary_create_advanced(options, stats, fixed_size) dictionary_create_advanced_with_trace(options, stats, fixed_size, __FUNCTION__, __LINE__, __FILE__)
+DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file);
 #else
-#define dictionary_create(options) dictionary_create_advanced(options, NULL);
-DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats);
+#define dictionary_create(options) dictionary_create_advanced(options, NULL, 0);
+DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size);
 #endif
 
 // Create a view on a dictionary

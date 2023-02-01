@@ -1090,12 +1090,12 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    size_t cpus = get_system_cpus() / 2;
+    size_t cpus = get_netdata_cpus() / storage_tiers;
     if(cpus > datafiles)
         cpus = datafiles;
 
-    if(cpus < 2)
-        cpus = 2;
+    if(cpus < 1)
+        cpus = 1;
 
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
@@ -1158,7 +1158,7 @@ void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
                 unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
@@ -1191,8 +1191,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
     ctx->config.global_compress_alg = RRD_LZ4;
-    if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
-        page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
@@ -1202,15 +1200,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
 
-    init_page_cache();
-    if (!init_rrd_files(ctx)) {
-        if(rrdeng_dbengine_spawn(ctx)) {
-            // success - we run this ctx too
-            rrdeng_populate_mrg(ctx);
-            return 0;
-        }
-
-        finalize_rrd_files(ctx);
+    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
+        // success - we run this ctx too
+        rrdeng_populate_mrg(ctx);
+        return 0;
     }
 
     if (ctx->config.legacy) {

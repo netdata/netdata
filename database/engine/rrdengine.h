@@ -55,11 +55,6 @@ typedef struct page_details_control {
     STORAGE_PRIORITY priority;
 
     time_t optimal_end_time_s;
-
-    struct {
-        struct page_details_control *prev;
-        struct page_details_control *next;
-    } cache;
 } PDC;
 
 PDC *pdc_get(void);
@@ -128,11 +123,6 @@ struct page_details {
         struct page_details *prev;
         struct page_details *next;
     } load;
-
-    struct {
-        struct page_details *prev;
-        struct page_details *next;
-    } cache;
 };
 
 struct page_details *page_details_get(void);
@@ -225,11 +215,6 @@ struct rrdeng_query_handle {
     unsigned position;
     unsigned entries;
 
-    struct {
-        struct rrdeng_query_handle *prev;
-        struct rrdeng_query_handle *next;
-    } cache;
-
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t started_time_s;
     pid_t query_pid;
@@ -292,11 +277,6 @@ struct extent_io_descriptor {
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
-
-    struct {
-        struct extent_io_descriptor *prev;
-        struct extent_io_descriptor *next;
-    } cache;
 };
 
 struct generic_io_descriptor {
@@ -463,6 +443,7 @@ int init_rrd_files(struct rrdengine_instance *ctx);
 void finalize_rrd_files(struct rrdengine_instance *ctx);
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx);
 void dbengine_event_loop(void *arg);
+
 typedef void (*enqueue_callback_t)(struct rrdeng_cmd *cmd);
 typedef void (*dequeue_callback_t)(struct rrdeng_cmd *cmd);
 

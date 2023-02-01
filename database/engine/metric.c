@@ -24,6 +24,8 @@ struct metric {
     // YOU HAVE TO INITIALIZE IT YOURSELF !
 };
 
+static struct aral_statistics mrg_aral_statistics;
+
 struct mrg {
     ARAL *aral[MRG_PARTITIONS];
 
@@ -312,21 +314,31 @@ MRG *mrg_create(void) {
     MRG *mrg = callocz(1, sizeof(MRG));
 
     for(size_t i = 0; i < MRG_PARTITIONS ; i++) {
-        char buf[ARAL_MAX_NAME + 1];
-        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
 
-        mrg->aral[i] = aral_create("mrg",
-                                sizeof(METRIC),
-                                0,
-                                512,
-                                NULL, NULL, false,
-                                false);
+        char buf[ARAL_MAX_NAME + 1];
+        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
+
+        mrg->aral[i] = aral_create(buf,
+                                   sizeof(METRIC),
+                                   0,
+                                   16384,
+                                   &mrg_aral_statistics,
+                                   NULL, NULL, false,
+                                   false);
     }
 
     mrg->stats.size = sizeof(MRG);
 
     return mrg;
+}
+
+size_t mrg_aral_structures(void) {
+    return aral_structures_from_stats(&mrg_aral_statistics);
+}
+
+size_t mrg_aral_overhead(void) {
+    return aral_overhead_from_stats(&mrg_aral_statistics);
 }
 
 void mrg_destroy(MRG *mrg __maybe_unused) {

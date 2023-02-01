@@ -243,9 +243,6 @@ static void global_statistics_charts(void) {
     global_statistics_copy(&gs, GLOBAL_STATS_RESET_WEB_USEC_MAX);
     getrusage(RUSAGE_SELF, &me);
 
-    size_t aral_structures, aral_malloc_allocated, aral_malloc_used, aral_mmap_allocated, aral_mmap_used;
-    aral_get_size_statistics(&aral_structures, &aral_malloc_allocated, &aral_malloc_used, &aral_mmap_allocated, &aral_mmap_used);
-
     // ----------------------------------------------------------------
 
     {
@@ -296,6 +293,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_buffers = NULL;
         static RRDDIM *rd_workers = NULL;
         static RRDDIM *rd_aral = NULL;
+        static RRDDIM *rd_judy = NULL;
         static RRDDIM *rd_other = NULL;
 
         if (unlikely(!st_memory)) {
@@ -327,6 +325,7 @@ static void global_statistics_charts(void) {
             rd_buffers = rrddim_add(st_memory, "buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_workers = rrddim_add(st_memory, "workers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_aral = rrddim_add(st_memory, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_judy = rrddim_add(st_memory, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_other = rrddim_add(st_memory, "other", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
@@ -342,7 +341,9 @@ static void global_statistics_charts(void) {
             netdata_buffers_statistics.buffers_streaming +
             netdata_buffers_statistics.cbuffers_streaming +
             netdata_buffers_statistics.buffers_web +
-            replication_allocated_buffers();
+            replication_allocated_buffers() +
+            aral_by_size_overhead() +
+            judy_aral_overhead();
 
         size_t strings = 0;
         string_statistics(NULL, NULL, NULL, NULL, NULL, &strings, NULL, NULL);
@@ -360,7 +361,8 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory, rd_replication, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_replication) + (collected_number)replication_allocated_memory());
         rrddim_set_by_pointer(st_memory, rd_buffers, (collected_number)buffers);
         rrddim_set_by_pointer(st_memory, rd_workers, (collected_number) workers_allocated_memory());
-        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_structures);
+        rrddim_set_by_pointer(st_memory, rd_aral, (collected_number) aral_by_size_structures());
+        rrddim_set_by_pointer(st_memory, rd_judy, (collected_number) judy_aral_structures());
         rrddim_set_by_pointer(st_memory, rd_other, (collected_number)dictionary_stats_memory_total(dictionary_stats_category_other));
 
         rrdset_done(st_memory);
@@ -381,6 +383,7 @@ static void global_statistics_charts(void) {
         static RRDDIM *rd_buffers_replication = NULL;
         static RRDDIM *rd_buffers_web = NULL;
         static RRDDIM *rd_buffers_aral = NULL;
+        static RRDDIM *rd_buffers_judy = NULL;
 
         if (unlikely(!st_memory_buffers)) {
             st_memory_buffers = rrdset_create_localhost(
@@ -410,6 +413,7 @@ static void global_statistics_charts(void) {
             rd_buffers_replication = rrddim_add(st_memory_buffers, "replication", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_web = rrddim_add(st_memory_buffers, "web", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_buffers_aral = rrddim_add(st_memory_buffers, "aral", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_buffers_judy = rrddim_add(st_memory_buffers, "judy", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
 
         rrddim_set_by_pointer(st_memory_buffers, rd_queries, (collected_number)netdata_buffers_statistics.query_targets_size + (collected_number) onewayalloc_allocated_memory());
@@ -424,7 +428,8 @@ static void global_statistics_charts(void) {
         rrddim_set_by_pointer(st_memory_buffers, rd_cbuffers_streaming, (collected_number)netdata_buffers_statistics.cbuffers_streaming);
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_replication, (collected_number)replication_allocated_buffers());
         rrddim_set_by_pointer(st_memory_buffers, rd_buffers_web, (collected_number)netdata_buffers_statistics.buffers_web);
-        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)(aral_malloc_allocated + aral_mmap_allocated) - (collected_number)(aral_malloc_used + aral_mmap_used));
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_aral, (collected_number)aral_by_size_overhead());
+        rrddim_set_by_pointer(st_memory_buffers, rd_buffers_judy, (collected_number)judy_aral_overhead());
 
         rrdset_done(st_memory_buffers);
     }
@@ -1743,7 +1748,7 @@ static void dbengine2_statistics_charts(void) {
 
     struct rrdeng_buffer_sizes buffers = rrdeng_get_buffer_sizes();
     size_t buffers_total_size = buffers.handles + buffers.xt_buf + buffers.xt_io + buffers.pdc + buffers.descriptors +
-            buffers.opcodes + buffers.wal + buffers.workers + buffers.epdl + buffers.deol + buffers.pd + buffers.pages;
+            buffers.opcodes + buffers.wal + buffers.workers + buffers.epdl + buffers.deol + buffers.pd + buffers.pgc + buffers.mrg;
 
 #ifdef PDC_USE_JULYL
     buffers_total_size += buffers.julyl;
@@ -1796,6 +1801,8 @@ static void dbengine2_statistics_charts(void) {
 
     {
         static RRDSET *st_pgc_buffers = NULL;
+        static RRDDIM *rd_pgc_buffers_pgc = NULL;
+        static RRDDIM *rd_pgc_buffers_mrg = NULL;
         static RRDDIM *rd_pgc_buffers_opcodes = NULL;
         static RRDDIM *rd_pgc_buffers_handles = NULL;
         static RRDDIM *rd_pgc_buffers_descriptors = NULL;
@@ -1807,7 +1814,6 @@ static void dbengine2_statistics_charts(void) {
         static RRDDIM *rd_pgc_buffers_epdl = NULL;
         static RRDDIM *rd_pgc_buffers_deol = NULL;
         static RRDDIM *rd_pgc_buffers_pd = NULL;
-        static RRDDIM *rd_pgc_buffers_pages = NULL;
 #ifdef PDC_USE_JULYL
         static RRDDIM *rd_pgc_buffers_julyl = NULL;
 #endif
@@ -1827,6 +1833,8 @@ static void dbengine2_statistics_charts(void) {
                     localhost->rrd_update_every,
                     RRDSET_TYPE_STACKED);
 
+            rd_pgc_buffers_pgc         = rrddim_add(st_pgc_buffers, "pgc", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rd_pgc_buffers_mrg         = rrddim_add(st_pgc_buffers, "mrg", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_opcodes     = rrddim_add(st_pgc_buffers, "opcodes",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_handles     = rrddim_add(st_pgc_buffers, "query handles",  NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_descriptors = rrddim_add(st_pgc_buffers, "descriptors",    NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1834,7 +1842,6 @@ static void dbengine2_statistics_charts(void) {
             rd_pgc_buffers_workers     = rrddim_add(st_pgc_buffers, "workers",        NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_pdc         = rrddim_add(st_pgc_buffers, "pdc",            NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_pd          = rrddim_add(st_pgc_buffers, "pd",             NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-            rd_pgc_buffers_pages       = rrddim_add(st_pgc_buffers, "pages",          NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_xt_io       = rrddim_add(st_pgc_buffers, "extent io",      NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_xt_buf      = rrddim_add(st_pgc_buffers, "extent buffers", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_pgc_buffers_epdl        = rrddim_add(st_pgc_buffers, "epdl",           NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
@@ -1845,6 +1852,8 @@ static void dbengine2_statistics_charts(void) {
         }
         priority++;
 
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pgc, (collected_number)buffers.pgc);
+        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_mrg, (collected_number)buffers.mrg);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_opcodes, (collected_number)buffers.opcodes);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_handles, (collected_number)buffers.handles);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_descriptors, (collected_number)buffers.descriptors);
@@ -1852,7 +1861,6 @@ static void dbengine2_statistics_charts(void) {
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_workers, (collected_number)buffers.workers);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pdc, (collected_number)buffers.pdc);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pd, (collected_number)buffers.pd);
-        rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_pages, (collected_number)buffers.pages);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_io, (collected_number)buffers.xt_io);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_xt_buf, (collected_number)buffers.xt_buf);
         rrddim_set_by_pointer(st_pgc_buffers, rd_pgc_buffers_epdl, (collected_number)buffers.epdl);

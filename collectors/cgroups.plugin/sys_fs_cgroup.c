@@ -3516,52 +3516,15 @@ static inline char *cgroup_chart_type(char *buffer, const char *id, size_t len) 
     return buffer;
 }
 
-static inline unsigned long long cpuset_str2ull(char **s) {
-    unsigned long long n = 0;
-    char c;
-    for(c = **s; c >= '0' && c <= '9' ; c = *(++*s)) {
-        n *= 10;
-        n += c - '0';
-    }
-    return n;
-}
-
 static inline void update_cpu_limits(char **filename, unsigned long long *value, struct cgroup *cg) {
     if(*filename) {
         int ret = -1;
 
         if(value == &cg->cpuset_cpus) {
-            static char *buf = NULL;
-            static size_t buf_size = 0;
-
-            if(!buf) {
-                buf_size = 100U + 6 * get_system_cpus(); // taken from kernel/cgroup/cpuset.c
-                buf = mallocz(buf_size + 1);
-            }
-
-            ret = read_file(*filename, buf, buf_size);
-
-            if(!ret) {
-                char *s = buf;
-                unsigned long long ncpus = 0;
-
-                // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
-                while(*s) {
-                    unsigned long long n = cpuset_str2ull(&s);
-                    ncpus++;
-                    if(*s == ',') {
-                        s++;
-                        continue;
-                    }
-                    if(*s == '-') {
-                        s++;
-                        unsigned long long m = cpuset_str2ull(&s);
-                        ncpus += m - n; // calculate the number of cpus in the region
-                    }
-                    s++;
-                }
-
-                if(likely(ncpus)) *value = ncpus;
+            unsigned long ncpus = read_cpuset_cpus(*filename, get_system_cpus());
+            if(ncpus) {
+                *value = ncpus;
+                ret = 0;
             }
         }
         else if(value == &cg->cpu_cfs_period) {

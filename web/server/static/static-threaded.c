@@ -507,7 +507,7 @@ void *socket_listen_main_static_threaded(void *ptr) {
     // 6 threads is the optimal value
     // since 6 are the parallel connections browsers will do
     // so, if the machine has more CPUs, avoid using resources unnecessarily
-    int def_thread_count = (get_system_cpus() > 6) ? 6 : (int)get_system_cpus();
+    int def_thread_count = MIN(get_netdata_cpus(), 6);
 
     if (!strcmp(config_get(CONFIG_SECTION_WEB, "mode", ""),"single-threaded")) {
                 info("Running web server with one thread, because mode is single-threaded");

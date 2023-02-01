@@ -322,7 +322,7 @@ int do_proc_spl_kstat_zfs_pool_state(int update_every, usec_t dt)
         snprintfz(filename, FILENAME_MAX, "%s%s", netdata_configured_host_prefix, "/proc/spl/kstat/zfs");
         dirname = config_get("plugin:proc:" ZFS_PROC_POOLS, "directory to monitor", filename);
 
-        zfs_pools = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors);
+        zfs_pools = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
 
         do_zfs_pool_state = 1;
     }

@@ -8,9 +8,41 @@
 
 typedef struct aral ARAL;
 
-ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_elements, const char *filename, char **cache_dir, bool mmap, bool lockless);
+struct aral_statistics {
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+    } structures;
+
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+        size_t used_bytes;
+    } malloc;
+
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+        size_t used_bytes;
+    } mmap;
+};
+
+ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
+                  struct aral_statistics *stats, const char *filename, char **cache_dir, bool mmap, bool lockless);
+size_t aral_element_size(ARAL *ar);
+size_t aral_overhead(ARAL *ar);
+size_t aral_structures(ARAL *ar);
+struct aral_statistics *aral_statistics(ARAL *ar);
+size_t aral_structures_from_stats(struct aral_statistics *stats);
+size_t aral_overhead_from_stats(struct aral_statistics *stats);
+
+ARAL *aral_by_size_acquire(size_t size);
+void aral_by_size_release(ARAL *ar);
+size_t aral_by_size_structures(void);
+size_t aral_by_size_overhead(void);
+struct aral_statistics *aral_by_size_statistics(void);
+
 int aral_unittest(size_t elements);
-void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used);
 
 #ifdef NETDATA_TRACE_ALLOCATIONS
 

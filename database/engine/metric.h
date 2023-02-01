@@ -73,5 +73,7 @@ bool mrg_metric_set_writer(MRG *mrg, METRIC *metric);
 bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric);
 
 struct mrg_statistics mrg_get_statistics(MRG *mrg);
+size_t mrg_aral_structures(void);
+size_t mrg_aral_overhead(void);
 
 #endif // DBENGINE_METRIC_H
