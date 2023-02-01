@@ -49,6 +49,10 @@ struct rrdeng_main {
         } atomics;
     } work_cmd;
 
+    struct {
+        ARAL *ar;
+    } handles;
+
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -339,76 +343,24 @@ static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_
 // ----------------------------------------------------------------------------
 // query handle cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct rrdeng_query_handle *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} rrdeng_query_handle_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void rrdeng_query_handle_cleanup1(void) {
-    struct rrdeng_query_handle *item = NULL;
-
-    if(!netdata_spinlock_trylock(&rrdeng_query_handle_globals.protected.spinlock))
-        return;
-
-    if(rrdeng_query_handle_globals.protected.available_items && rrdeng_query_handle_globals.protected.available > 10) {
-        item = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
-        rrdeng_query_handle_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void rrdeng_query_handle_init(void) {
+    rrdeng_main.handles.ar = aral_create(
+            "dbengine-query-handles",
+            sizeof(struct rrdeng_query_handle),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false);
 }
 
 struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
-    struct rrdeng_query_handle *handle = NULL;
-
-    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(likely(rrdeng_query_handle_globals.protected.available_items)) {
-        handle = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
-        rrdeng_query_handle_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(unlikely(!handle)) {
-        handle = mallocz(sizeof(struct rrdeng_query_handle));
-        __atomic_add_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct rrdeng_query_handle *handle = aral_mallocz(rrdeng_main.handles.ar);
     memset(handle, 0, sizeof(struct rrdeng_query_handle));
     return handle;
 }
 
 void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
-    if(unlikely(!handle)) return;
-
-    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
-    rrdeng_query_handle_globals.protected.available++;
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
+    aral_freez(rrdeng_main.handles.ar, handle);
 }
 
 // ----------------------------------------------------------------------------
@@ -1629,7 +1581,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .pgc         = pgc_aral_overhead() + pgc_aral_structures(),
             .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
             .opcodes     = aral_overhead(rrdeng_main.cmd_queue.ar) + aral_structures(rrdeng_main.cmd_queue.ar),
-            .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
+            .handles     = aral_overhead(rrdeng_main.handles.ar) + aral_structures(rrdeng_main.handles.ar),
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
             .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
@@ -1657,7 +1609,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
     extent_io_descriptor_cleanup1();
     pdc_cleanup1();
     page_details_cleanup1();
-    rrdeng_query_handle_cleanup1();
     wal_cleanup1();
     extent_buffer_cleanup1();
     epdl_cleanup1();
@@ -1780,6 +1731,7 @@ void dbengine_event_loop(void* arg) {
 
     rrdeng_cmd_queue_init();
     work_request_init();
+    rrdeng_query_handle_init();
     extent_buffer_init();
     dbengine_page_alloc_init();
 

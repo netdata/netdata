@@ -225,11 +225,6 @@ struct rrdeng_query_handle {
     unsigned position;
     unsigned entries;
 
-    struct {
-        struct rrdeng_query_handle *prev;
-        struct rrdeng_query_handle *next;
-    } cache;
-
 #ifdef NETDATA_INTERNAL_CHECKS
     usec_t started_time_s;
     pid_t query_pid;
