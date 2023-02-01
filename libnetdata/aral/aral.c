@@ -92,6 +92,8 @@ struct aral {
 
     struct {
         SPINLOCK spinlock;
+        size_t count;
+        size_t allocating_items;
         size_t allocation_size;         // current allocation size
     } adders;
 
@@ -241,17 +243,23 @@ static inline ARAL_PAGE *find_page_with_free_slots_internal_check___with_aral_lo
 }
 #endif
 
-static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
-    ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
-    netdata_spinlock_init(&page->free.spinlock);
-    page->size = ar->adders.allocation_size;
+size_t aral_next_allocation_size___with_adders_lock(ARAL *ar) {
+    size_t size = ar->adders.allocation_size;
 
-    if(page->size > ar->config.max_allocation_size)
-        page->size = ar->config.max_allocation_size;
+    if(size > ar->config.max_allocation_size)
+        size = ar->config.max_allocation_size;
     else
         ar->adders.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->adders.allocation_size * 2);
 
-    page->max_elements = page->aral_lock.free_elements = page->size / ar->config.element_size;
+    return size;
+}
+
+static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+    ARAL_PAGE *page = callocz(1, sizeof(ARAL_PAGE));
+    netdata_spinlock_init(&page->free.spinlock);
+    page->size = size;
+    page->max_elements = page->size / ar->config.element_size;
+    page->aral_lock.free_elements = page->max_elements;
     page->free_elements_to_move_first = page->max_elements / 4;
     if(unlikely(page->free_elements_to_move_first < 1))
         page->free_elements_to_move_first = 1;
@@ -352,7 +360,9 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
 
     if(unlikely(ar->aral_lock.allocators > ar->aral_lock.allocators_max)) {
         ar->aral_lock.allocators_max = ar->aral_lock.allocators;
-        internal_error(true, "ARAL: '%s' max allocators is now %zu", ar->config.name, ar->aral_lock.allocators_max);
+        internal_error(ar->aral_lock.allocators_max > 5,
+                       "ARAL: '%s' max allocators is now %zu",
+                       ar->config.name, ar->aral_lock.allocators_max);
     }
 
     ARAL_PAGE *page = ar->aral_lock.pages;
@@ -364,12 +374,31 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
         aral_unlock(ar);
 
         if(netdata_spinlock_trylock(&ar->adders.spinlock)) {
-            page = aral_create_page___no_lock_needed(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+            if(ar->adders.allocating_items < ar->aral_lock.allocators) {
 
-            aral_lock(ar);
-            aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
-            netdata_spinlock_unlock(&ar->adders.spinlock);
-            break;
+                internal_error(ar->adders.allocating_items,
+                               "ARAL: '%s' allocation another page in parallel",
+                               ar->config.name);
+
+                size_t size = aral_next_allocation_size___with_adders_lock(ar);
+                ar->adders.allocating_items += size / ar->config.element_size;
+                netdata_spinlock_unlock(&ar->adders.spinlock);
+
+                page = aral_create_page___no_lock_needed(ar, size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+
+                aral_lock(ar);
+                aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
+
+                netdata_spinlock_lock(&ar->adders.spinlock);
+                ar->adders.allocating_items -= size / ar->config.element_size;
+                netdata_spinlock_unlock(&ar->adders.spinlock);
+
+                break;
+            }
+            else {
+                netdata_spinlock_unlock(&ar->adders.spinlock);
+                aral_lock(ar);
+            }
         }
         else {
             aral_lock(ar);
