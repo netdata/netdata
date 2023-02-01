@@ -36,6 +36,8 @@ static bool judy_sizes_config[MAX_JUDY_SIZE_TO_ARAL + 1] = {
 };
 static ARAL *judy_sizes_aral[MAX_JUDY_SIZE_TO_ARAL + 1] = {};
 
+struct aral_statistics judy_sizes_aral_statistics = {};
+
 void aral_judy_init(void) {
     for(size_t Words = 0; Words <= MAX_JUDY_SIZE_TO_ARAL; Words++)
         if(judy_sizes_config[Words]) {
@@ -45,9 +47,18 @@ void aral_judy_init(void) {
                     buf,
                     Words * sizeof(Word_t),
                     0,
-                    65536, NULL,
+                    65536,
+                    &judy_sizes_aral_statistics,
                     NULL, NULL, false, false);
         }
+}
+
+size_t judy_aral_overhead(void) {
+    return aral_overhead_from_stats(&judy_sizes_aral_statistics);
+}
+
+size_t judy_aral_structures(void) {
+    return aral_structures_from_stats(&judy_sizes_aral_statistics);
 }
 
 static ARAL *judy_size_aral(Word_t Words) {
