@@ -1512,8 +1512,6 @@ static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, vo
 
     wal_cleanup1();
     extent_buffer_cleanup1();
-    epdl_cleanup1();
-    deol_cleanup1();
 
     {
         static time_t last_run_s = 0;
@@ -1548,8 +1546,12 @@ void timer_cb(uv_timer_t* handle) {
 }
 
 static void dbengine_initialize_structures(void) {
+    pgc_and_mrg_initialize();
+
     pdc_init();
     page_details_init();
+    epdl_init();
+    deol_init();
     rrdeng_cmd_queue_init();
     work_request_init();
     rrdeng_query_handle_init();

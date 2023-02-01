@@ -1200,15 +1200,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
 
-    init_page_cache();
-    if (!init_rrd_files(ctx)) {
-        if(rrdeng_dbengine_spawn(ctx)) {
-            // success - we run this ctx too
-            rrdeng_populate_mrg(ctx);
-            return 0;
-        }
-
-        finalize_rrd_files(ctx);
+    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
+        // success - we run this ctx too
+        rrdeng_populate_mrg(ctx);
+        return 0;
     }
 
     if (ctx->config.legacy) {

@@ -47,6 +47,14 @@ static struct {
     struct {
         ARAL *ar;
     } pd;
+
+    struct {
+        ARAL *ar;
+    } epdl;
+
+    struct {
+        ARAL *ar;
+    } deol;
 } pdc_globals = {};
 
 void pdc_init(void) {
@@ -105,159 +113,57 @@ size_t pd_cache_size(void) {
 // ----------------------------------------------------------------------------
 // epdl cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        EPDL *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} epdl_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-void epdl_cleanup1(void) {
-    EPDL *item = NULL;
-
-    if(!netdata_spinlock_trylock(&epdl_globals.protected.spinlock))
-        return;
-
-    if(epdl_globals.protected.available_items && epdl_globals.protected.available > 100) {
-        item = epdl_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(epdl_globals.protected.available_items, item, cache.prev, cache.next);
-        epdl_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void epdl_init(void) {
+    pdc_globals.epdl.ar = aral_create(
+            "dbengine-epdl",
+            sizeof(EPDL),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+    );
 }
 
 static EPDL *epdl_get(void) {
-    EPDL *epdl = NULL;
-
-    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
-
-    if(likely(epdl_globals.protected.available_items)) {
-        epdl = epdl_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
-        epdl_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
-
-    if(unlikely(!epdl)) {
-        epdl = mallocz(sizeof(EPDL));
-        __atomic_add_fetch(&epdl_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    EPDL *epdl = aral_mallocz(pdc_globals.epdl.ar);
     memset(epdl, 0, sizeof(EPDL));
     return epdl;
 }
 
 static void epdl_release(EPDL *epdl) {
-    if(unlikely(!epdl)) return;
-
-    netdata_spinlock_lock(&epdl_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(epdl_globals.protected.available_items, epdl, cache.prev, cache.next);
-    epdl_globals.protected.available++;
-    netdata_spinlock_unlock(&epdl_globals.protected.spinlock);
+    aral_freez(pdc_globals.epdl.ar, epdl);
 }
 
 size_t epdl_cache_size(void) {
-    return __atomic_load_n(&epdl_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(EPDL);
+    return aral_overhead(pdc_globals.epdl.ar) + aral_structures(pdc_globals.epdl.ar);
 }
 
 // ----------------------------------------------------------------------------
 // deol cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        DEOL *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} deol_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-void deol_cleanup1(void) {
-    DEOL *item = NULL;
-
-    if(!netdata_spinlock_trylock(&deol_globals.protected.spinlock))
-        return;
-
-    if(deol_globals.protected.available_items && deol_globals.protected.available > 100) {
-        item = deol_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(deol_globals.protected.available_items, item, cache.prev, cache.next);
-        deol_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void deol_init(void) {
+    pdc_globals.deol.ar = aral_create(
+            "dbengine-deol",
+            sizeof(DEOL),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+    );
 }
 
 static DEOL *deol_get(void) {
-    DEOL *deol = NULL;
-
-    netdata_spinlock_lock(&deol_globals.protected.spinlock);
-
-    if(likely(deol_globals.protected.available_items)) {
-        deol = deol_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
-        deol_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
-
-    if(unlikely(!deol)) {
-        deol = mallocz(sizeof(DEOL));
-        __atomic_add_fetch(&deol_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    DEOL *deol = aral_mallocz(pdc_globals.deol.ar);
     memset(deol, 0, sizeof(DEOL));
     return deol;
 }
 
 static void deol_release(DEOL *deol) {
-    if(unlikely(!deol)) return;
-
-    netdata_spinlock_lock(&deol_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(deol_globals.protected.available_items, deol, cache.prev, cache.next);
-    deol_globals.protected.available++;
-    netdata_spinlock_unlock(&deol_globals.protected.spinlock);
+    aral_freez(pdc_globals.deol.ar, deol);
 }
 
 size_t deol_cache_size(void) {
-    return __atomic_load_n(&deol_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(DEOL);
+    return aral_overhead(pdc_globals.deol.ar) + aral_structures(pdc_globals.deol.ar);
 }
 
 // ----------------------------------------------------------------------------
