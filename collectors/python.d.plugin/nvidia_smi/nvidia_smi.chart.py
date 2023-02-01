@@ -483,7 +483,6 @@ class GPU:
 
         pci_bw_max = self.pci_bw_max()
         if not pci_bw_max:
-            ...
             data['rx_util_percent'] = 0
             data['tx_util_percent'] = 0
         else :
