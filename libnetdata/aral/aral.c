@@ -781,7 +781,7 @@ size_t aral_by_size_structures(void) {
 }
 
 size_t aral_by_size_overhead(void) {
-    aral_overhead_from_stats(&aral_by_size_globals.shared_statistics);
+    return aral_overhead_from_stats(&aral_by_size_globals.shared_statistics);
 }
 
 ARAL *aral_by_size_acquire(size_t size) {
