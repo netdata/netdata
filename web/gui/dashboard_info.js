@@ -593,19 +593,19 @@ netdataDashboard.menu = {
 
     'ad': {
         title: 'Active Directory (AD)',
-        icon: '<i class="fas fa-windows"></i>',
+        icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
     'adcs': {
         title: 'AD Certification Service',
-        icon: '<i class="fas fa-windows"></i>',
+        icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
     'adfs': {
         title: 'AD Federation Service',
-        icon: '<i class="fas fa-windows"></i>',
+        icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
 
