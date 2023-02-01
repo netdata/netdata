@@ -41,9 +41,9 @@ To install Netdata, run the following as your normal user:
 </Tabs>
 
 :::note
-If you plan to also Claim the node to Netdata Cloud,
+If you plan to also connect the node to Netdata Cloud,
 make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-and `YOUR_ROOM_ID` with the ID of the room you are willing to claim to.
+and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
 :::
 
 ## What does `kickstart.sh` do?
@@ -96,6 +96,12 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
 - `--local-build-options`: Specify additional options to pass to the installer code when building locally. Only valid if `--build-only` is also specified.
 - `--static-install-options`: Specify additional options to pass to the static installer code. Only valid if --static-only is also specified.
 - `--prepare-offline-install-source`: Instead of installing the agent, prepare a directory that can be used to install on another system without needing to download anything. See our [offline installation documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md) for more info.
+- `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
+  after the install.
+- `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
+- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
+  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
+- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
 
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
@@ -107,35 +113,6 @@ should not need to use special values for any of these):
   we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
-
-### Connect node to Netdata Cloud during installation
-
-The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation.
-
-:::note
-You either need to run the command with root privileges or run it with the user that is running the agent.  
-More details: [Connect an agent without root privileges](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-an-agent-without-root-privileges) section.
-:::
-
-To automatically claim nodes after installation:
-
-1. Sign in to [Netdata Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces)
-2. Go to the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#manage-spaces)
-3. Click on **Connect Nodes**
-4. Find the `token` and `rooms` strings and specify your nodes:
-
-- `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
-  after the install.
-- `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
-- `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
-  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
-- `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
-
-For example:
-
-```bash
-wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token TOKEN --claim-rooms ROOM1,ROOM2
-```
 
 ### Native packages
 
