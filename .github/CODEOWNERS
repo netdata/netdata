@@ -35,7 +35,8 @@ web/gui/ @jacekkolasa
 
 # Ownership by filetype (overwrites ownership by directory)
 *.am @Ferroin @tkatsoulas
-*.m?(d|dx) @tkatsoulas @andrewm4894
+*.md @tkatsoulas @andrewm4894
+*.mdx @tkatsoulas @andrewm4894
 Dockerfile* @Ferroin @tkatsoulas
 
 # Ownership of specific files
