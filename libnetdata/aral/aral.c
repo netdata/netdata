@@ -86,15 +86,13 @@ struct aral {
         size_t defragment_operations;
         size_t defragment_linked_list_traversals;
 
-        size_t allocators;
-        size_t allocators_max;
+        size_t allocators;              // the number of threads currently trying to allocate memory
     } aral_lock;
 
     struct {
         SPINLOCK spinlock;
-        size_t count;
-        size_t allocating_items;
-        size_t allocation_size;         // current allocation size
+        size_t allocating_elements;     // currently allocating elements
+        size_t allocation_size;         // current / next allocation size
     } adders;
 
     struct aral_statistics *stats;
@@ -358,13 +356,6 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
     aral_lock(ar);
     ar->aral_lock.allocators++;
 
-    if(unlikely(ar->aral_lock.allocators > ar->aral_lock.allocators_max)) {
-        ar->aral_lock.allocators_max = ar->aral_lock.allocators;
-        internal_error(ar->aral_lock.allocators_max > 5,
-                       "ARAL: '%s' max allocators is now %zu",
-                       ar->config.name, ar->aral_lock.allocators_max);
-    }
-
     ARAL_PAGE *page = ar->aral_lock.pages;
 
     while(!page || !page->aral_lock.free_elements) {
@@ -374,14 +365,10 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
         aral_unlock(ar);
 
         if(netdata_spinlock_trylock(&ar->adders.spinlock)) {
-            if(ar->adders.allocating_items < ar->aral_lock.allocators) {
-
-                internal_error(ar->adders.allocating_items,
-                               "ARAL: '%s' allocation another page in parallel",
-                               ar->config.name);
+            if(ar->adders.allocating_elements < ar->aral_lock.allocators) {
 
                 size_t size = aral_next_allocation_size___with_adders_lock(ar);
-                ar->adders.allocating_items += size / ar->config.element_size;
+                ar->adders.allocating_elements += size / ar->config.element_size;
                 netdata_spinlock_unlock(&ar->adders.spinlock);
 
                 page = aral_create_page___no_lock_needed(ar, size TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
@@ -390,7 +377,7 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
                 aral_insert_not_linked_page_with_free_items_to_proper_position___aral_lock_needed(ar, page);
 
                 netdata_spinlock_lock(&ar->adders.spinlock);
-                ar->adders.allocating_items -= size / ar->config.element_size;
+                ar->adders.allocating_elements -= size / ar->config.element_size;
                 netdata_spinlock_unlock(&ar->adders.spinlock);
 
                 break;
@@ -398,6 +385,7 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
             else {
                 netdata_spinlock_unlock(&ar->adders.spinlock);
                 aral_lock(ar);
+                page = ar->aral_lock.pages;
             }
         }
         else {
@@ -933,7 +921,7 @@ static void *aral_test_thread(void *ptr) {
             pointers[i] = NULL;
         }
 
-        if (auc->single_threaded && ar->aral_lock.pages) {
+        if (auc->single_threaded && ar->aral_lock.pages && ar->aral_lock.pages->aral_lock.used_elements) {
             fprintf(stderr, "\n\nARAL leftovers detected (1)\n\n");
             __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
         }
@@ -948,7 +936,7 @@ static void *aral_test_thread(void *ptr) {
         size_t increment = elements / ar->config.max_page_elements;
         for (size_t all = increment; all <= elements / 2; all += increment) {
 
-            size_t to_free = all % ar->config.max_page_elements;
+            size_t to_free = (all % ar->config.max_page_elements) + 1;
             size_t step = elements / to_free;
             if(!step) step = 1;
 
@@ -973,7 +961,7 @@ static void *aral_test_thread(void *ptr) {
             pointers[i] = NULL;
         }
 
-        if (auc->single_threaded && ar->aral_lock.pages) {
+        if (auc->single_threaded && ar->aral_lock.pages && ar->aral_lock.pages->aral_lock.used_elements) {
             fprintf(stderr, "\n\nARAL leftovers detected (2)\n\n");
             __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
         }
@@ -992,7 +980,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     struct aral_unittest_config auc = {
             .single_threaded = false,
             .threads = threads,
-            .ar = aral_create("aral-test", 20, 10, 8192, NULL, "test-aral", NULL, false, false),
+            .ar = aral_create("aral-stress-test", 16, 0, 8192, NULL, "aral-stress-test", NULL, false, false),
             .elements = elements,
             .errors = 0,
     };
@@ -1037,7 +1025,7 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
 
     usec_t ended_ut = now_monotonic_usec();
 
-    if (auc.ar->aral_lock.pages) {
+    if (auc.ar->aral_lock.pages && auc.ar->aral_lock.pages->aral_lock.used_elements) {
         fprintf(stderr, "\n\nARAL leftovers detected (3)\n\n");
         __atomic_add_fetch(&auc.errors, 1, __ATOMIC_RELAXED);
     }
@@ -1060,7 +1048,7 @@ int aral_unittest(size_t elements) {
     struct aral_unittest_config auc = {
             .single_threaded = true,
             .threads = 1,
-            .ar = aral_create("aral-test", 20, 10, 8192, NULL, "test-aral", &cache_dir, false, false),
+            .ar = aral_create("aral-test", 16, 0, 8192, NULL, "aral-test", &cache_dir, false, false),
             .elements = elements,
             .errors = 0,
     };
