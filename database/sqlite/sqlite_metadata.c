@@ -64,6 +64,7 @@ enum metadata_opcode {
     METADATA_STORE_CLAIM_ID,
     METADATA_ADD_HOST_INFO,
     METADATA_SCAN_HOSTS,
+    METADATA_LOAD_HOST_CONTEXT,
     METADATA_MAINTENANCE,
     METADATA_SYNC_SHUTDOWN,
     METADATA_UNITTEST,
@@ -849,9 +850,44 @@ struct scan_metadata_payload {
     uv_work_t request;
     struct metadata_wc *wc;
     struct completion *completion;
-    BUFFER *work_buffer;
+    union {
+       BUFFER *work_buffer;
+       RRDHOST *host;
+    };
     uint32_t max_count;
 };
+
+// Callback after scan of hosts is done
+static void after_start_host_load_context(uv_work_t *req, int status __maybe_unused)
+{
+    struct scan_metadata_payload *data = req->data;
+    freez(data);
+}
+
+// Worker thread to load a host context
+static void start_host_load_context(uv_work_t *req __maybe_unused)
+{
+    register_libuv_worker_jobs();
+
+    struct scan_metadata_payload *data = req->data;
+
+    worker_is_busy(UV_EVENT_METADATA_STORE);
+
+    RRDHOST *host = data->host;
+    internal_error(true, "METADATA: 'host:%s' loading context load", rrdhost_hostname(host));
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+
+    rrdhost_load_rrdcontext_data(host);
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+
+    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+    internal_error(true, "METADATA: 'host:%s' context load in %0.2f ms",
+                   rrdhost_hostname(host),
+                   (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    worker_is_idle();
+}
 
 // Callback after scan of hosts is done
 static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
@@ -962,18 +998,26 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
     BUFFER *work_buffer = data->work_buffer;
     usec_t all_started_ut = now_monotonic_usec(); (void)all_started_ut;
     internal_error(true, "METADATA: checking all hosts...");
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
     bool run_again = false;
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
     if (!data->max_count)
         transaction_started = !db_execute("BEGIN TRANSACTION;");
+
     dfe_start_reentrant(rrdhost_root_index, host) {
+
+        if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+            rrdhost_load_rrdcontext_data(host);
+            rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+            continue;
+        }
+
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
         size_t query_counter = 0; (void)query_counter;
-        usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
         rrdhost_flag_clear(host,RRDHOST_FLAG_METADATA_UPDATE);
 
@@ -1122,6 +1166,7 @@ static void metadata_event_loop(void *arg)
     wc->row_id = 0;
     completion_mark_complete(&wc->init_complete);
     BUFFER *work_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    struct scan_metadata_payload *data;
 
     while (shutdown == 0 || (wc->flags & METADATA_WORKER_BUSY)) {
         uuid_t  *uuid;
@@ -1184,7 +1229,7 @@ static void metadata_event_loop(void *arg)
                     if (unittest_running)
                         break;
 
-                    struct scan_metadata_payload *data = mallocz(sizeof(*data));
+                    data = mallocz(sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
                     data->completion = cmd.completion;  // Completion by the worker
@@ -1206,6 +1251,29 @@ static void metadata_event_loop(void *arg)
                         cmd.completion = data->completion;
                         freez(data);
                         metadata_flag_clear(wc, METADATA_FLAG_SCANNING_HOSTS);
+                    }
+                    break;
+                case METADATA_LOAD_HOST_CONTEXT:;
+                    if (unittest_running)
+                        break;
+
+                    host = (RRDHOST *) cmd.param[0];
+                    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS)))
+                        break;
+
+                    data = mallocz(sizeof(*data));
+                    data->request.data = data;
+                    data->wc = wc;
+                    data->max_count = 0;
+                    data->completion = NULL;  // Completion by the worker
+                    data->host = host;
+                    rrdhost_flag_set(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+                    if (unlikely(
+                            uv_queue_work(loop,&data->request,
+                                          start_host_load_context,
+                                          after_start_host_load_context))) {
+                        rrdhost_flag_clear(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+                        freez(data);
                     }
                     break;
                 case METADATA_MAINTENANCE:
@@ -1236,17 +1304,9 @@ static void metadata_event_loop(void *arg)
     if (!uv_timer_stop(&wc->timer_req))
         uv_close((uv_handle_t *)&wc->timer_req, NULL);
 
-    /*
-     * uv_async_send after uv_close does not seem to crash in linux at the moment,
-     * it is however undocumented behaviour we need to be aware if this becomes
-     * an issue in the future.
-     */
     uv_close((uv_handle_t *)&wc->async, NULL);
-    uv_run(loop, UV_RUN_DEFAULT);
-
     uv_cond_destroy(&wc->cmd_cond);
     int rc;
-
     do {
         rc = uv_loop_close(loop);
     } while (rc != UV_EBUSY);
@@ -1380,6 +1440,13 @@ void metaqueue_host_update_info(RRDHOST *host)
     if (unlikely(!metasync_worker.loop))
         return;
     queue_metadata_cmd(METADATA_ADD_HOST_INFO, host, NULL);
+}
+
+void metadata_queue_load_host_context(RRDHOST *host)
+{
+    if (unlikely(!metasync_worker.loop))
+        return;
+    queue_metadata_cmd(METADATA_LOAD_HOST_CONTEXT, host, NULL);
 }
 
 //

@@ -769,12 +769,16 @@ struct node_instance_list *get_node_list(void)
             uuid_copy(node_list[row].node_id, *((uuid_t *)sqlite3_column_blob(res, 0)));
         if (sqlite3_column_bytes(res, 1) == sizeof(uuid_t)) {
             uuid_t *host_id = (uuid_t *)sqlite3_column_blob(res, 1);
-            uuid_copy(node_list[row].host_id, *host_id);
-            node_list[row].queryable = 1;
             uuid_unparse_lower(*host_id, host_guid);
             RRDHOST *host = rrdhost_find_by_guid(host_guid);
+            if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
+                info("ACLK: 'host:%s' skipping get node list because context is initializing", rrdhost_hostname(host));
+                continue;
+            }
+            uuid_copy(node_list[row].host_id, *host_id);
+            node_list[row].queryable = 1;
             node_list[row].live = (host && (host == localhost || host->receiver
-                                    || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)))) ? 1 : 0;
+                                            || !(rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)))) ? 1 : 0;
             node_list[row].hops = (host && host->system_info) ? host->system_info->hops :
                                   uuid_compare(*host_id, localhost->host_uuid) ? 1 : 0;
             node_list[row].hostname =

@@ -147,8 +147,13 @@ void aclk_check_node_info_and_collectors(void)
         return;
 
     dfe_start_reentrant(rrdhost_root_index, host) {
+
+        if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))) {
+            info("ACLK: 'host:%s' not sending node info, context load is pending", rrdhost_hostname(host));
+            continue;
+        }
+
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-//        internal_error(true, "ACLK SYNC: Scanning host got node info and collectors %s", rrdhost_hostname(host));
 
         if (wc->node_info_send) {
             build_node_info(strdupz(wc->node_id));

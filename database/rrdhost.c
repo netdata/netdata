@@ -519,15 +519,16 @@ int is_legacy = 1;
          , string2str(host->health.health_default_recipient)
     );
 
-    if(!archived)
+    if(!archived) {
         metaqueue_host_update_info(host);
-
-    rrdhost_load_rrdcontext_data(host);
-    if (!archived) {
+        rrdhost_load_rrdcontext_data(host);
+//        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
         ml_host_start_training_thread(host);
-    } else
-        rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+    } else {
+        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
+        metadata_queue_load_host_context(host);
+    }
 
     return host;
 }
@@ -719,31 +720,30 @@ RRDHOST *rrdhost_find_or_create(
         );
     }
     else {
-
-        rrdhost_update(host
-           , hostname
-           , registry_hostname
-           , guid
-           , os
-           , timezone
-           , abbrev_timezone
-           , utc_offset
-           , tags
-           , program_name
-           , program_version
-           , update_every
-           , history
-           , mode
-           , health_enabled
-           , rrdpush_enabled
-           , rrdpush_destination
-           , rrdpush_api_key
-           , rrdpush_send_charts_matching
-           , rrdpush_enable_replication
-           , rrdpush_seconds_to_replicate
-           , rrdpush_replication_step
-           , system_info);
-
+        if (likely(!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)))
+            rrdhost_update(host
+               , hostname
+               , registry_hostname
+               , guid
+               , os
+               , timezone
+               , abbrev_timezone
+               , utc_offset
+               , tags
+               , program_name
+               , program_version
+               , update_every
+               , history
+               , mode
+               , health_enabled
+               , rrdpush_enabled
+               , rrdpush_destination
+               , rrdpush_api_key
+               , rrdpush_send_charts_matching
+               , rrdpush_enable_replication
+               , rrdpush_seconds_to_replicate
+               , rrdpush_replication_step
+               , system_info);
     }
 
     return host;
