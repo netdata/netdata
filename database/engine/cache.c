@@ -106,7 +106,7 @@ struct pgc {
     } config;
 
 #ifdef PGC_WITH_ARAL
-    ARAL *aral;
+    ARAL **aral;
 #endif
 
     PGC_CACHE_LINE_PADDING(0);
@@ -851,7 +851,7 @@ static inline bool acquired_page_get_for_deletion_or_release_it(PGC *cache __may
 // ----------------------------------------------------------------------------
 // Indexing
 
-static inline void free_this_page(PGC *cache, PGC_PAGE *page) {
+static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition __maybe_unused) {
     // call the callback to free the user supplied memory
     cache->config.pgc_free_clean_cb(cache, (PGC_ENTRY){
             .section = page->section,
@@ -874,7 +874,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page) {
 
     // free our memory
 #ifdef PGC_WITH_ARAL
-    aral_freez(cache->aral, page);
+    aral_freez(cache->aral[partition], page);
 #else
     freez(page);
 #endif
@@ -942,7 +942,7 @@ static inline void remove_and_free_page_not_in_any_queue_and_acquired_for_deleti
     pgc_index_write_lock(cache, partition);
     remove_this_page_from_index_unsafe(cache, page, partition);
     pgc_index_write_unlock(cache, partition);
-    free_this_page(cache, page);
+    free_this_page(cache, page, partition);
 }
 
 static inline bool make_acquired_page_clean_and_evict_or_page_release(PGC *cache, PGC_PAGE *page) {
@@ -1137,7 +1137,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                         next = page->link.next;
 
                         size_t page_size = page->assumed_size;
-                        free_this_page(cache, page);
+                        free_this_page(cache, page, partition);
 
                         __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                         __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
@@ -1156,7 +1156,7 @@ static bool evict_pages_with_filter(PGC *cache, size_t max_skip, size_t max_evic
                 pgc_index_write_lock(cache, partition);
                 remove_this_page_from_index_unsafe(cache, page, partition);
                 pgc_index_write_unlock(cache, partition);
-                free_this_page(cache, page);
+                free_this_page(cache, page, partition);
 
                 __atomic_sub_fetch(&cache->stats.evicting_entries, 1, __ATOMIC_RELAXED);
                 __atomic_sub_fetch(&cache->stats.evicting_size, page_size, __ATOMIC_RELAXED);
@@ -1191,8 +1191,10 @@ premature_exit:
 static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
+    size_t partition = pgc_indexing_partition(cache, entry->metric_id);
+
 #ifdef PGC_WITH_ARAL
-    PGC_PAGE *allocation = aral_mallocz(cache->aral);
+    PGC_PAGE *allocation = aral_mallocz(cache->aral[partition]);
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
@@ -1201,7 +1203,6 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
         if(++spins > 1)
             __atomic_add_fetch(&cache->stats.insert_spins, 1, __ATOMIC_RELAXED);
 
-        size_t partition = pgc_indexing_partition(cache, entry->metric_id);
         pgc_index_write_lock(cache, partition);
 
         size_t mem_before_judyl = 0, mem_after_judyl = 0;
@@ -1299,7 +1300,7 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 
 #ifdef PGC_WITH_ARAL
     if(allocation)
-        aral_freez(cache->aral, allocation);
+        aral_freez(cache->aral[partition], allocation);
 #endif
 
     __atomic_sub_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
@@ -1790,12 +1791,18 @@ PGC *pgc_create(const char *name,
     pgc_section_pages_static_aral_init();
 
 #ifdef PGC_WITH_ARAL
-    cache->aral = aral_create(name,
-                              sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
-                              0,
-                              512 * 1024,
-                              aral_statistics(pgc_section_pages_aral),
-                              NULL, NULL, false, false);
+    cache->aral = callocz(cache->config.partitions, sizeof(ARAL *));
+    for(size_t part = 0; part < cache->config.partitions ; part++) {
+        char buf[100 +1];
+        snprintfz(buf, 100, "%s[%zu]", name, part);
+        cache->aral[part] = aral_create(
+                buf,
+                sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
+                0,
+                16384,
+                aral_statistics(pgc_section_pages_aral),
+                NULL, NULL, false, false);
+    }
 #endif
 
     pointer_index_init(cache);
@@ -1836,9 +1843,17 @@ void pgc_destroy(PGC *cache) {
         error("DBENGINE CACHE: there are %zu referenced cache pages - leaving the cache allocated", PGC_REFERENCED_PAGES(cache));
     else {
         pointer_destroy_index(cache);
+
+        for(size_t part = 0; part < cache->config.partitions ; part++)
+            netdata_rwlock_destroy(&cache->index[part].rwlock);
+
 #ifdef PGC_WITH_ARAL
-        aral_destroy(cache->aral);
+        for(size_t part = 0; part < cache->config.partitions ; part++)
+            aral_destroy(cache->aral[part]);
+
+        freez(cache->aral);
 #endif
+
         freez(cache);
     }
 }

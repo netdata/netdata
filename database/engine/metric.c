@@ -314,14 +314,15 @@ MRG *mrg_create(void) {
     MRG *mrg = callocz(1, sizeof(MRG));
 
     for(size_t i = 0; i < MRG_PARTITIONS ; i++) {
-        char buf[ARAL_MAX_NAME + 1];
-        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
         netdata_rwlock_init(&mrg->index[i].rwlock);
 
-        mrg->aral[i] = aral_create("mrg",
+        char buf[ARAL_MAX_NAME + 1];
+        snprintfz(buf, ARAL_MAX_NAME, "mrg[%zu]", i);
+
+        mrg->aral[i] = aral_create(buf,
                                    sizeof(METRIC),
                                    0,
-                                   32768,
+                                   16384,
                                    &mrg_aral_statistics,
                                    NULL, NULL, false,
                                    false);
