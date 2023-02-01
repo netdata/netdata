@@ -18,22 +18,12 @@ struct extent_page_details_list {
         struct extent_page_details_list *prev;
         struct extent_page_details_list *next;
     } query;
-
-    struct {
-        struct extent_page_details_list *prev;
-        struct extent_page_details_list *next;
-    } cache;
 };
 
 typedef struct datafile_extent_offset_list {
     uv_file file;
     unsigned fileno;
     Pvoid_t extent_pd_list_by_extent_offset_JudyL;
-
-    struct {
-        struct datafile_extent_offset_list *prev;
-        struct datafile_extent_offset_list *next;
-    } cache;
 } DEOL;
 
 // ----------------------------------------------------------------------------
