@@ -611,9 +611,15 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     // if the page is empty, release it
     if(unlikely(!page->aral_lock.used_elements)) {
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+        bool is_this_page_the_last_one = ar->aral_lock.pages == page && !page->aral_lock.next;
+
+        if(!is_this_page_the_last_one)
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ar->aral_lock.pages, page, aral_lock.prev, aral_lock.next);
+
         aral_unlock(ar);
-        aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
+
+        if(!is_this_page_the_last_one)
+            aral_del_page___no_lock_needed(ar, page TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
     }
     else {
         aral_move_page_with_free_list___aral_lock_needed(ar, page);
