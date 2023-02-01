@@ -181,15 +181,15 @@ BEGIN {
 /^ups.temperature: .*/			{ temp = \$2 * 100 };
 /^ups.connected_clients: .*/	{ clients = \$2 };
 END {
-  { load_usage = nompower * load / 100 };
+	{ load_usage = nompower * load / 100 };
 
 	print \"BEGIN nut_$x.charge $1\";
 	print \"SET battery_charge = \" battery_charge;
 	print \"END\"
 
-  print \"BEGIN nut_$x.runtime $1\";
-  print \"SET battery_runtime = \" battery_runtime;
-  print \"END\"
+	print \"BEGIN nut_$x.runtime $1\";
+	print \"SET battery_runtime = \" battery_runtime;
+	print \"END\"
 
 	print \"BEGIN nut_$x.battery_voltage $1\";
 	print \"SET battery_voltage = \" battery_voltage;
