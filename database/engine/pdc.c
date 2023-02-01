@@ -40,79 +40,32 @@ typedef struct datafile_extent_offset_list {
 // PDC cache
 
 static struct {
-    struct {
-        SPINLOCK spinlock;
-        PDC *available_items;
-        size_t available;
-    } protected;
+    ARAL *ar;
+} pdc_globals = {};
 
-    struct {
-        size_t allocated;
-    } atomics;
-} pdc_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-void pdc_cleanup1(void) {
-    PDC *item = NULL;
-
-    if(!netdata_spinlock_trylock(&pdc_globals.protected.spinlock))
-        return;
-
-    if(pdc_globals.protected.available_items && pdc_globals.protected.available > (size_t)libuv_worker_threads) {
-        item = pdc_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pdc_globals.protected.available_items, item, cache.prev, cache.next);
-        pdc_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void pdc_init(void) {
+    pdc_globals.ar = aral_create(
+            "dbengine-pdc",
+            sizeof(PDC),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+            );
 }
 
 PDC *pdc_get(void) {
-    PDC *pdc = NULL;
-
-    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
-
-    if(likely(pdc_globals.protected.available_items)) {
-        pdc = pdc_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
-        pdc_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
-
-    if(unlikely(!pdc)) {
-        pdc = mallocz(sizeof(PDC));
-        __atomic_add_fetch(&pdc_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    PDC *pdc = aral_mallocz(pdc_globals.ar);
     memset(pdc, 0, sizeof(PDC));
     return pdc;
 }
 
 static void pdc_release(PDC *pdc) {
-    if(unlikely(!pdc)) return;
-
-    netdata_spinlock_lock(&pdc_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pdc_globals.protected.available_items, pdc, cache.prev, cache.next);
-    pdc_globals.protected.available++;
-    netdata_spinlock_unlock(&pdc_globals.protected.spinlock);
+    aral_freez(pdc_globals.ar, pdc);
 }
 
 size_t pdc_cache_size(void) {
-    return __atomic_load_n(&pdc_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(PDC);
+    return aral_overhead(pdc_globals.ar) + aral_structures(pdc_globals.ar);
 }
 
 // ----------------------------------------------------------------------------

@@ -1510,7 +1510,6 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
-    pdc_cleanup1();
     page_details_cleanup1();
     wal_cleanup1();
     extent_buffer_cleanup1();
@@ -1549,6 +1548,17 @@ void timer_cb(uv_timer_t* handle) {
     worker_is_idle();
 }
 
+static void dbengine_initialize_structures(void) {
+    pdc_init();
+    rrdeng_cmd_queue_init();
+    work_request_init();
+    rrdeng_query_handle_init();
+    page_descriptors_init();
+    extent_buffer_init();
+    dbengine_page_alloc_init();
+    extent_io_descriptor_init();
+}
+
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
     static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
@@ -1581,6 +1591,8 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
             return false;
         }
         rrdeng_main.timer.data = &rrdeng_main;
+
+        dbengine_initialize_structures();
 
         fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
         spawned = true;
@@ -1631,14 +1643,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_OPCODES_WAITING,  "opcodes waiting",  "opcodes", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
-
-    rrdeng_cmd_queue_init();
-    work_request_init();
-    rrdeng_query_handle_init();
-    page_descriptors_init();
-    extent_buffer_init();
-    dbengine_page_alloc_init();
-    extent_io_descriptor_init();
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
