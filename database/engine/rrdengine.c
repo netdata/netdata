@@ -53,6 +53,10 @@ struct rrdeng_main {
         ARAL *ar;
     } handles;
 
+    struct {
+        ARAL *ar;
+    } descriptors;
+
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -193,76 +197,24 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 // ----------------------------------------------------------------------------
 // page descriptor cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct page_descr_with_data *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} page_descriptor_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void page_descriptor_cleanup1(void) {
-    struct page_descr_with_data *item = NULL;
-
-    if(!netdata_spinlock_trylock(&page_descriptor_globals.protected.spinlock))
-        return;
-
-    if(page_descriptor_globals.protected.available_items && page_descriptor_globals.protected.available > MAX_PAGES_PER_EXTENT) {
-        item = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
-        page_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&page_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void page_descriptors_init(void) {
+    rrdeng_main.descriptors.ar = aral_create(
+            "dbengine-descriptors",
+            sizeof(struct page_descr_with_data),
+            0,
+            65536 * 4,
+            NULL,
+            NULL, NULL, false, false);
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
-    struct page_descr_with_data *descr = NULL;
-
-    netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-
-    if(likely(page_descriptor_globals.protected.available_items)) {
-        descr = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
-        page_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
-
-    if(unlikely(!descr)) {
-        descr = mallocz(sizeof(struct page_descr_with_data));
-        __atomic_add_fetch(&page_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct page_descr_with_data *descr = aral_mallocz(rrdeng_main.descriptors.ar);
     memset(descr, 0, sizeof(struct page_descr_with_data));
     return descr;
 }
 
 static inline void page_descriptor_release(struct page_descr_with_data *descr) {
-    if(unlikely(!descr)) return;
-
-    netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
-    page_descriptor_globals.protected.available++;
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
+    aral_freez(rrdeng_main.descriptors.ar, descr);
 }
 
 // ----------------------------------------------------------------------------
@@ -1582,7 +1534,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
             .opcodes     = aral_overhead(rrdeng_main.cmd_queue.ar) + aral_structures(rrdeng_main.cmd_queue.ar),
             .handles     = aral_overhead(rrdeng_main.handles.ar) + aral_structures(rrdeng_main.handles.ar),
-            .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
+            .descriptors = aral_overhead(rrdeng_main.descriptors.ar) + aral_structures(rrdeng_main.descriptors.ar),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
             .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
             .pdc         = pdc_cache_size(),
@@ -1605,7 +1557,6 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
-    page_descriptor_cleanup1();
     extent_io_descriptor_cleanup1();
     pdc_cleanup1();
     page_details_cleanup1();
@@ -1732,6 +1683,7 @@ void dbengine_event_loop(void* arg) {
     rrdeng_cmd_queue_init();
     work_request_init();
     rrdeng_query_handle_init();
+    page_descriptors_init();
     extent_buffer_init();
     dbengine_page_alloc_init();
 
