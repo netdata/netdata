@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README
 
 Each Netdata node is able to replicate/mirror its database to another Netdata node, by streaming the collected
 metrics in real-time. This is quite different to [data archiving to third party time-series
-databases](/exporting/README.md).
+databases](https://github.com/netdata/netdata/blob/master/exporting/README.md).
 The nodes that send metrics are called **child** nodes, and the nodes that receive metrics are called **parent** nodes.
 
 There are also **proxy** nodes, which collect metrics from a child and sends it to a parent.
@@ -38,7 +38,7 @@ In a headless setup, the child acts as a plain data collector. It spawns all ext
 local database and accepting dashboard requests, it streams all metrics to the parent. 
 
 This setup works great to reduce the memory footprint. Depending on the enabled plugins, memory usage is between 6 MiB and 40 MiB. To reduce the memory usage as much as
-possible, refer to the [performance optimization guide](/docs/guides/configure/performance.md).
+possible, refer to the [performance optimization guide](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md).
 
 
 ### Database Replication
@@ -107,7 +107,7 @@ This also disables the registry (there cannot be a registry without an API).
 requests from its child nodes. 0 sets no limit, 1 means maximum once every second. If this is set, you may see error log
 entries "... too busy to accept new streaming request. Will be allowed in X secs".
 
-You can [use](/exporting/README.md#configuration) the exporting engine to configure data archiving to an external database (it archives all databases maintained on
+You can [use](https://github.com/netdata/netdata/blob/master/exporting/README.md#configuration) the exporting engine to configure data archiving to an external database (it archives all databases maintained on
 this host).
 
 ### Streaming configuration
@@ -198,7 +198,7 @@ You can also use `default memory mode = dbengine` for an API key or `memory mode
 
 ##### Allow from
 
-`allow from` settings are [Netdata simple patterns](/libnetdata/simple_pattern/README.md): string matches
+`allow from` settings are [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md): string matches
 that use `*` as wildcard (any number of times) and a `!` prefix for a negative match.
 So: `allow from = !10.1.2.3 10.*` will allow all IPs in `10.*` except `10.1.2.3`. The order is
 important: left to right, the first positive or negative match is used.
@@ -233,7 +233,7 @@ For Netdata v1.9+, streaming can also be monitored via `access.log`.
 ### Securing streaming communications
 
 Netdata does not activate TLS encryption by default. To encrypt streaming connections:
-1. On the parent node (receiving node), [enable TLS support](/web/server/README.md#enabling-tls-support). 
+1. On the parent node (receiving node), [enable TLS support](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support). 
 2. On the child's `stream.conf`, configure the destination as follows:
 
 ```
@@ -602,7 +602,7 @@ this writing, Netdata supports:
 -   json document DBs
 -   all the compatibles to the above (e.g. kairosdb, influxdb, etc)
 
-Check the Netdata [exporting documentation](/docs/export/external-databases.md) for configuring this.
+Check the Netdata [exporting documentation](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for configuring this.
 
 This is how such a solution will work:
 
@@ -696,7 +696,7 @@ ERROR : STREAM_SENDER[CHILD HOSTNAME] : STREAM child HOSTNAME [send to PARENT HO
 Chart data needs to be consistent between child and parent nodes. If there are differences between chart data on
 a parent and a child, such as gaps in metrics collection, it most often means your child's `memory mode`
 does not match the parent's. To learn more about the different ways Netdata can store metrics, and thus keep chart
-data consistent, read our [memory mode documentation](/database/README.md).
+data consistent, read our [memory mode documentation](https://github.com/netdata/netdata/blob/master/database/README.md).
 
 ### Forbidding access
 

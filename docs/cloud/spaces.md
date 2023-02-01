@@ -1,6 +1,8 @@
 ---
 title: "Spaces"
-description: " Organize your infrastructure monitoring on Netdata Cloud by creating Spaces, then groupingyour Agent-monitored nodes. "
+description: >-
+      "Organize your infrastructure monitoring on Netdata Cloud by creating Spaces, then groupingyour
+      Agent-monitored nodes."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md"
 sidebar_label: "Spaces"
 learn_status: "Published"
@@ -27,8 +29,9 @@ The other consideration for the number of Spaces you use to organize your Netdat
 complexity of your organization.
 
 For small team and infrastructures we recommend sticking to a single Space so that you can keep all your nodes and their
-respective metrics in one place. You can then use multiple [War Rooms](/docs/cloud/war-rooms) to further organize your
-infrastructure monitoring.
+respective metrics in one place. You can then use
+multiple [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+to further organize your infrastructure monitoring.
 
 Enterprises may want to create multiple Spaces for each of their larger teams, particularly if those teams have
 different responsibilities or parts of the overall infrastructure to monitor. For example, you might have one SRE team
@@ -57,9 +60,10 @@ will open a side tab in which you can:
 2. _Edit the War Rooms*_, click on the **War rooms** tab to add or remove War Rooms.
 
 3. _Connect nodes*_, click on **Nodes** tab. Copy the claiming script to your node and run it. See the
-   [connect to Cloud doc](/docs/agent/claim) for details.
+   [connect to Cloud doc](https://github.com/netdata/netdata/blob/master/claim/README.md) for details.
 
-4. _Manage the users*_, click on **Users**. The [invitation doc](/docs/cloud/manage/invite-your-team)
+4. _Manage the users*_, click on **Users**.
+   The [invitation doc](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
    details the invitation process.
 
 5. _Manage notification setting*_, click on **Notifications** tab to turn off/on notification methods.
@@ -83,4 +87,5 @@ Netdata admin users now have the ability to remove obsolete nodes from a space.
 
 ## What's next?
 
-Once you configured your Spaces, it's time to set up your [War Rooms](/docs/cloud/war-rooms).
+Once you configured your Spaces, it's time to set up
+your [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md).

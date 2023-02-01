@@ -11,7 +11,7 @@ learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 
 # Export metrics to JSON document databases
 
-You can use the JSON connector for the [exporting engine](/exporting/README.md) to archive your agent's metrics to JSON
+You can use the JSON connector for the [exporting engine](https://github.com/netdata/netdata/blob/master/exporting/README.md) to archive your agent's metrics to JSON
 document databases for long-term storage, further analysis, or correlation with data from other sources.
 
 ## Configuration
@@ -33,7 +33,7 @@ Add `:http` or `:https` modifiers to the connector type if you need to use other
     password = my_password
 ```
 
-The JSON connector is further configurable using additional settings. See the [exporting reference
-doc](/exporting/README.md#options) for details.
+The JSON connector is further configurable using additional settings. See 
+the [exporting reference doc](https://github.com/netdata/netdata/blob/master/exporting/README.md#options) for details.
 
 

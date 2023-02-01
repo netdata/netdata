@@ -114,7 +114,7 @@ To enable or disable anomaly detection:
 2. In the `[ml]` section, set `enabled = yes` to enable or `enabled = no` to disable.
 3. Restart netdata (typically `sudo systemctl restart netdata`).
 
-**Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://learn.netdata.cloud/guides/step-by-step/step-04).
+**Note**: If you would like to learn more about configuring Netdata please see [the configuration guide](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-04.md).
 
 Below is a list of all the available configuration params and their default values.
 
@@ -143,7 +143,7 @@ Below is a list of all the available configuration params and their default valu
 
 If you would like to run ML on a parent instead of at the edge, some configuration options are illustrated below.
 
-This example assumes 3 child nodes [streaming](https://learn.netdata.cloud/docs/agent/streaming) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
+This example assumes 3 child nodes [streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) to 1 parent node and illustrates the main ways you might want to configure running ML for the children on the parent, running ML on the children themselves, or even a mix of approaches.
 
 ![parent_child_options](https://user-images.githubusercontent.com/2178292/164439761-8fb7dddd-c4d8-4329-9f44-9a794937a086.png)
 
@@ -265,4 +265,4 @@ The anomaly rate across all dimensions of a node.
 - Netdata uses [dlib](https://github.com/davisking/dlib) under the hood for its core ML features.
 - You should benchmark Netdata resource usage before and after enabling ML. Typical overhead ranges from 1-2% additional CPU at most.
 - The "anomaly bit" has been implemented to be a building block to underpin many more ML based use cases that we plan to deliver soon.
-- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deep dive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.
+- At its core Netdata uses an approach and problem formulation very similar to the Netdata python [anomalies collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md), just implemented in a much much more efficient and scalable way in the agent in c++. So if you would like to learn more about the approach and are familiar with Python that is a useful resource to explore, as is the corresponding [deep dive tutorial](https://nbviewer.org/github/netdata/community/blob/main/netdata-agent-api/netdata-pandas/anomalies_collector_deepdive.ipynb) where the default model used is PCA instead of K-Means but the overall approach and formulation is similar.

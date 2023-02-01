@@ -78,7 +78,7 @@ currently unsupported when using unified cgroups.
 ### enabled cgroups
 
 To provide a sane default, Netdata uses the
-following [pattern list](https://learn.netdata.cloud/docs/agent/libnetdata/simple_pattern):
+following [pattern list](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md):
 
 - checks the pattern against the path of the cgroup
 
@@ -309,4 +309,4 @@ cannot find, but immediately:
 - I/O full pressure
 
 Network interfaces are monitored by means of
-the [proc plugin](/collectors/proc.plugin/README.md#monitored-network-interface-metrics).
+the [proc plugin](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md#monitored-network-interface-metrics).

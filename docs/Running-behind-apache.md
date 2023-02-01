@@ -353,7 +353,7 @@ If your apache server is not on localhost, you can set:
 
 *note: Netdata v1.9+ support `allow connections from`*
 
-`allow connections from` accepts [Netdata simple patterns](/libnetdata/simple_pattern/README.md) to match against the connection IP address.
+`allow connections from` accepts [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) to match against the connection IP address.
 
 ## prevent the double access.log
 

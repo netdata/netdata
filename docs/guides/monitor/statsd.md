@@ -22,7 +22,7 @@ In general, the process for creating a StatsD collector can be summarized in 2 s
 
 - Run an experiment by sending StatsD metrics to Netdata, without any prior configuration. This will create a chart per metric (called private charts) and will help you verify that everything works as expected from the application side of things.
     - Make sure to reload the dashboard tab **after** you start sending data to Netdata.
-- Create a configuration file for your app using [edit-config](/docs/configure/nodes.md): `sudo ./edit-config
+- Create a configuration file for your app using [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md): `sudo ./edit-config
   statsd.d/myapp.conf`
     - Each app will have it's own section in the right-hand menu.
 
@@ -30,7 +30,7 @@ Now, let's see the above process in detail.
 
 ## Prerequisites
 
-- A node with the [Netdata](/docs/get-started.mdx) installed.
+- A node with the [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) installed.
 - An application to instrument. For this guide, that will be [k6](https://k6.io/docs/getting-started/installation).
 
 ## Understanding the metrics
@@ -63,7 +63,7 @@ Here are some examples of default private charts. You can see that the histogram
 
 ## Create a new StatsD configuration file
 
-Start by creating a new configuration file under the `statsd.d/` folder in the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory). Use [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to create a new file called `k6.conf`.
+Start by creating a new configuration file under the `statsd.d/` folder in the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory). Use [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to create a new file called `k6.conf`.
 
 ```bash=
 sudo ./edit-config statsd.d/k6.conf
@@ -104,7 +104,7 @@ Families and context are additional ways to group metrics. Families control the 
 
 Context is a second way to group metrics, when the metrics are of the same nature but different origin. In our case, if we ran several different load testing experiments side-by-side, we could define the same app, but different context (e.g `http_requests.experiment1`, `http_requests.experiment2`).
 
-Find more details about family and context in our [documentation](/web/README.md#families).
+Find more details about family and context in our [documentation](https://github.com/netdata/netdata/blob/master/web/README.md#families).
 
 ### Dimension 
 
@@ -115,7 +115,7 @@ Now, having decided on how we are going to group the charts, we need to define h
 
 The dimension option has this syntax: `dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS`
 
-- **pattern**: A keyword that tells the StatsD server the `METRIC` string is actually a [simple pattern].(/libnetdata/simple_pattern/README.md). We don't simple patterns in the example, but if we wanted to visualize all the `http_req` metrics, we could have a single dimension: `dimension = pattern 'k6.http_req*' last 1 1`. Find detailed examples with patterns in our [documentation](/collectors/statsd.plugin/README.md#dimension-patterns).
+- **pattern**: A keyword that tells the StatsD server the `METRIC` string is actually a [simple pattern].(/libnetdata/simple_pattern/README.md). We don't simple patterns in the example, but if we wanted to visualize all the `http_req` metrics, we could have a single dimension: `dimension = pattern 'k6.http_req*' last 1 1`. Find detailed examples with patterns in our [documentation](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md#dimension-patterns).
 - **METRIC** The id of the metric as it comes from the client. You can easily find this in the private charts above, for example: `k6.http_req_connecting`.
 - **NAME**: The name of the dimension. You can use the dictionary to expand this to something more human-readable. 
 - **TYPE**: 
@@ -212,7 +212,7 @@ Following the above steps, we append to the `k6.conf` that we defined above, the
 
 > Take note that Netdata will report the rate for metrics and counters, even if k6 or another application sends an _absolute_ number. For example, k6 sends absolute HTTP requests with `http_reqs`, but Netdat visualizes that in `requests/second`.
 
-To enable this StatsD configuration, [restart Netdata](/docs/configure/start-stop-restart.md).
+To enable this StatsD configuration, [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 ## Final touches
 
@@ -293,6 +293,6 @@ Netdata allows you easily visualize any StatsD metric without any configuration,
 
 ### Related reference documentation
 
-- [Netdata Agent · StatsD](/collectors/statsd.plugin/README.md)
+- [Netdata Agent · StatsD](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md)
 
 

@@ -54,7 +54,8 @@ Set AWS credentials and stream name:
     stream name = your_stream_name
 ```
 
-Alternatively, you can set AWS credentials for the `netdata` user using AWS SDK for C++ [standard methods](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html).
+Alternatively, you can set AWS credentials for the `netdata` user using AWS SDK for
+C++ [standard methods](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html).
 
 Netdata automatically computes a partition key for every record with the purpose to distribute records across
 available shards evenly.

@@ -51,7 +51,7 @@ and you must do it manually, using the following steps:
 :::note
 
 In some cases a simple restart of the Agent can fix the issue.  
-Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/start-stop-restart.md).
+Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 :::
 
@@ -59,7 +59,7 @@ Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/st
 
 Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
 
-With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update) to the latest stable version.
+With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to the latest stable version.
 
 ## Network issues while connecting to the Cloud
 

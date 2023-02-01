@@ -5,7 +5,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatte
 
 # JSON formatter
 
-The CSV formatter presents [results of database queries](/web/api/queries/README.md) in the following formats:
+The CSV formatter presents [results of database queries](https://github.com/netdata/netdata/blob/master/web/api/queries/README.md) in the following formats:
 
 | format       | content type     | description|
 |:----:|:----------:|:----------|

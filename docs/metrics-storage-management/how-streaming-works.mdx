@@ -1,8 +1,11 @@
 ---
 title: "How metrics streaming works"
-description: "Netdata's real-time streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB)."
+description: >- 
+    "Netdata's real-time streaming allows you to replicate metrics data 
+    across multiple nodes, or centralize all your metrics data into a single 
+    time-series database (TSDB)."
 type: "explanation"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/metrics-storage-management/how-streaming-works.mdx"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.mdx"
 sidebar_label: "How metrics streaming works"
 learn_status: "Published"
 learn_topic_type: "Concepts"
@@ -16,13 +19,13 @@ replicate metrics data across multiple nodes, or centralize all your metrics dat
 (TSDB).
 
 When one node streams metrics to another, the node receiving metrics can visualize them on the
-[dashboard](/docs/visualize/interact-dashboards-charts.md), run health checks to [trigger
-alarms](/docs/monitor/view-active-alarms.md) and [send notifications](/docs/monitor/enable-notifications.md), and
-[export](/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
+[dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md), run health checks to [trigger
+alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/view-active-alarms.md) and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md), and
+[export](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) all metrics to an external TSDB. When Netdata streams metrics to another
 Netdata, the receiving one is able to perform everything a Netdata instance is capable of.
 
 Streaming lets you decide exactly how you want to store and maintain metrics data. While we believe Netdata's
-[distributed architecture](/docs/store/distributed-data-architecture.md) is ideal for speed and scale, streaming
+[distributed architecture](https://github.com/netdata/netdata/blob/master/docs/store/distributed-data-architecture.md) is ideal for speed and scale, streaming
 provides centralization options for those who want to maintain only a single TSDB instance.
 
 ## Streaming basics
@@ -72,7 +75,7 @@ Here are a few example streaming configurations:
 Parent nodes feature a **Replicated Nodes** section in the left-hand panel, which opens with the hamburger icon
 ![Hamburger icon](https://raw.githubusercontent.com/netdata/netdata-ui/master/src/components/icon/assets/hamburger.svg)
 in the top navigation. The parent node, plus any child nodes, appear here. Click on any of the hostnames to switch
-between parent and child dashboards, all served by the parent's [web server](/web/server/README.md).
+between parent and child dashboards, all served by the parent's [web server](https://github.com/netdata/netdata/blob/master/web/server/README.md).
 
 ![Switching between
 ](https://user-images.githubusercontent.com/1153921/110043346-761ec000-7d04-11eb-8e58-77670ba39161.gif)
@@ -83,14 +86,14 @@ Each child dashboard is also available directly at the following URL pattern:
 ## What's next?
 
 Now that you understand the fundamentals of streaming metrics between nodes, go ahead and [enable
-streaming](/docs/metrics-storage-management/enable-streaming.mdx) using a simple `parent-child` relationship. For all
-the details, see the [streaming reference](/docs/metrics-storage-management/reference-streaming.mdx) doc.
+streaming](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.mdx) using a simple `parent-child` relationship. For all
+the details, see the [streaming reference](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.mdx) doc.
 
-Take your streaming setup even further by [exporting metrics](/docs/export/external-databases.md) to an external TSDB.
+Take your streaming setup even further by [exporting metrics](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) to an external TSDB.
 
 ### Related information & further reading
 
 - Streaming
-  - **[How Netdata streams metrics](/docs/metrics-storage-management/how-streaming-works.mdx)**
-  - [Enable streaming between nodes](/docs/metrics-storage-management/enable-streaming.mdx)
-  - [Streaming reference](/docs/metrics-storage-management/reference-streaming.mdx)
+  - **[How Netdata streams metrics](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.mdx)**
+  - [Enable streaming between nodes](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.mdx)
+  - [Streaming reference](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.mdx)
