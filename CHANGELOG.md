@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
 - bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
 - Patch master [\#14377](https://github.com/netdata/netdata/pull/14377) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "Delete libnetdata readme" [\#14374](https://github.com/netdata/netdata/pull/14374) ([cakrit](https://github.com/cakrit))
@@ -33,6 +34,7 @@
 - minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
 - DBENGINE v2 - improvements part 11 [\#14337](https://github.com/netdata/netdata/pull/14337) ([ktsaou](https://github.com/ktsaou))
 - Update the Get started doc [\#14336](https://github.com/netdata/netdata/pull/14336) ([Ancairon](https://github.com/Ancairon))
+- Notifications integration docs [\#14335](https://github.com/netdata/netdata/pull/14335) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - DBENGINE v2 - improvements part 10 [\#14332](https://github.com/netdata/netdata/pull/14332) ([ktsaou](https://github.com/ktsaou))
 - reviewed the docs functions to fix broken links and other additions [\#14331](https://github.com/netdata/netdata/pull/14331) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Add |nowarn and |noclear notification modifiers [\#14330](https://github.com/netdata/netdata/pull/14330) ([vobruba-martin](https://github.com/vobruba-martin))
