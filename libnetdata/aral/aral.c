@@ -95,18 +95,25 @@ struct aral {
     struct aral_statistics *stats;
 };
 
-void aral_get_size_statistics(size_t *structures, size_t *malloc_allocated, size_t *malloc_used, size_t *mmap_allocated, size_t *mmap_used) {
-    *structures = 0;
-    *malloc_allocated = 0;
-    *malloc_used = 0;
-    *mmap_allocated = 0;
-    *mmap_used = 0;
+size_t aral_structures_from_stats(struct aral_statistics *stats) {
+    return __atomic_load_n(&stats->structures.allocated_bytes, __ATOMIC_RELAXED);
+}
+
+size_t aral_overhead_from_stats(struct aral_statistics *stats) {
+    return __atomic_load_n(&stats->malloc.allocated_bytes, __ATOMIC_RELAXED) -
+           __atomic_load_n(&stats->malloc.used_bytes, __ATOMIC_RELAXED);
 }
 
 size_t aral_overhead(ARAL *ar) {
-    return __atomic_load_n(&ar->stats->structures.allocated_bytes, __ATOMIC_RELAXED) +
-            __atomic_load_n(&ar->stats->malloc.allocated_bytes, __ATOMIC_RELAXED) -
-            __atomic_load_n(&ar->stats->malloc.used_bytes, __ATOMIC_RELAXED);
+    return aral_overhead_from_stats(ar->stats);
+}
+
+size_t aral_structures(ARAL *ar) {
+    return aral_structures_from_stats(ar->stats);
+}
+
+struct aral_statistics *aral_statistics(ARAL *ar) {
+    return ar->stats;
 }
 
 #define ARAL_NATURAL_ALIGNMENT  (sizeof(uintptr_t) * 2)
@@ -754,9 +761,22 @@ struct aral_by_size {
 };
 
 struct {
+    struct aral_statistics shared_statistics;
     SPINLOCK spinlock;
     struct aral_by_size array[ARAL_BY_SIZE_MAX_SIZE + 1];
 } aral_by_size_globals = {};
+
+struct aral_statistics *aral_by_size_statistics(void) {
+    return &aral_by_size_globals.shared_statistics;
+}
+
+size_t aral_by_size_structures(void) {
+    return aral_structures_from_stats(&aral_by_size_globals.shared_statistics);
+}
+
+size_t aral_by_size_overhead(void) {
+    aral_overhead_from_stats(&aral_by_size_globals.shared_statistics);
+}
 
 ARAL *aral_by_size_acquire(size_t size) {
     netdata_spinlock_lock(&aral_by_size_globals.spinlock);
@@ -777,7 +797,8 @@ ARAL *aral_by_size_acquire(size_t size) {
         ar = aral_create(buf,
                          size,
                          0,
-                         65536 * ((size / 150) + 1), NULL,
+                         65536 * ((size / 150) + 1),
+                         &aral_by_size_globals.shared_statistics,
                          NULL, NULL, false, false);
 
         if(size <= ARAL_BY_SIZE_MAX_SIZE) {

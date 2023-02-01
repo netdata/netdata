@@ -311,7 +311,7 @@ static inline size_t cache_usage_per1000(PGC *cache, size_t *size_to_evict) {
     if(unlikely(wanted_cache_size < referenced_size * 2 / 3))
         wanted_cache_size = referenced_size * 2 / 3;
 
-    current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED);
+    current_cache_size = __atomic_load_n(&cache->stats.size, __ATOMIC_RELAXED); // + pgc_aral_overhead();
 
     per1000 = (size_t)((unsigned long long)current_cache_size * 1000ULL / (unsigned long long)wanted_cache_size);
 
@@ -1787,18 +1787,32 @@ PGC *pgc_create(const char *name,
     cache->clean.linked_list_in_sections_judy = false;
     cache->clean.stats = &cache->stats.queues.clean;
 
+    pgc_section_pages_static_aral_init();
+
 #ifdef PGC_WITH_ARAL
     cache->aral = aral_create(name,
                               sizeof(PGC_PAGE) + cache->config.additional_bytes_per_page,
                               0,
-                              512 * 1024, NULL,
+                              512 * 1024,
+                              aral_statistics(pgc_section_pages_aral),
                               NULL, NULL, false, false);
 #endif
 
-    pgc_section_pages_static_aral_init();
     pointer_index_init(cache);
 
     return cache;
+}
+
+struct aral_statistics *pgc_aral_statistics(void) {
+    return aral_statistics(pgc_section_pages_aral);
+}
+
+size_t pgc_aral_structures(void) {
+    return aral_structures(pgc_section_pages_aral);
+}
+
+size_t pgc_aral_overhead(void) {
+    return aral_overhead(pgc_section_pages_aral);
 }
 
 void pgc_flush_all_hot_and_dirty_pages(PGC *cache, Word_t section) {

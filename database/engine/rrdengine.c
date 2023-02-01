@@ -731,7 +731,8 @@ static void dbengine_page_alloc_init(void) {
                 buf,
                 tier_page_size[tier],
                 64,
-                512 * tier_page_size[tier], NULL,
+                512 * tier_page_size[tier],
+                pgc_aral_statistics(),
                 NULL, NULL, false, false);
     }
 }
@@ -1668,6 +1669,8 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
+            .pgc         = pgc_aral_overhead() + pgc_aral_structures(),
+            .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
             .opcodes     = __atomic_load_n(&rrdeng_cmd_globals.cache.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_cmd),
             .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),

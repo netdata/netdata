@@ -24,6 +24,8 @@ struct metric {
     // YOU HAVE TO INITIALIZE IT YOURSELF !
 };
 
+static struct aral_statistics mrg_aral_statistics;
+
 struct mrg {
     ARAL *aral[MRG_PARTITIONS];
 
@@ -319,7 +321,8 @@ MRG *mrg_create(void) {
         mrg->aral[i] = aral_create("mrg",
                                    sizeof(METRIC),
                                    0,
-                                   32768, NULL,
+                                   32768,
+                                   &mrg_aral_statistics,
                                    NULL, NULL, false,
                                    false);
     }
@@ -327,6 +330,14 @@ MRG *mrg_create(void) {
     mrg->stats.size = sizeof(MRG);
 
     return mrg;
+}
+
+size_t mrg_aral_structures(void) {
+    return aral_structures_from_stats(&mrg_aral_statistics);
+}
+
+size_t mrg_aral_overhead(void) {
+    return aral_overhead_from_stats(&mrg_aral_statistics);
 }
 
 void mrg_destroy(MRG *mrg __maybe_unused) {

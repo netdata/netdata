@@ -242,4 +242,8 @@ bool pgc_flush_pages(PGC *cache, size_t max_flushes);
 struct pgc_statistics pgc_get_statistics(PGC *cache);
 size_t pgc_hot_and_dirty_entries(PGC *cache);
 
+struct aral_statistics *pgc_aral_statistics(void);
+size_t pgc_aral_structures(void);
+size_t pgc_aral_overhead(void);
+
 #endif // DBENGINE_CACHE_H
