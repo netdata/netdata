@@ -317,11 +317,11 @@ MRG *mrg_create(void) {
         netdata_rwlock_init(&mrg->index[i].rwlock);
 
         mrg->aral[i] = aral_create("mrg",
-                                sizeof(METRIC),
-                                0,
-                                32768,
-                                NULL, NULL, false,
-                                false);
+                                   sizeof(METRIC),
+                                   0,
+                                   32768, NULL,
+                                   NULL, NULL, false,
+                                   false);
     }
 
     mrg->stats.size = sizeof(MRG);

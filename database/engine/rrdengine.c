@@ -31,7 +31,6 @@ struct rrdeng_main {
         ARAL *ar;
 
         struct {
-            size_t allocated;
             size_t dispatched;
             size_t executing;
             size_t pending_cb;
@@ -98,9 +97,9 @@ static void work_request_init(void) {
             "dbengine-work-cmd",
             sizeof(struct rrdeng_work),
             0,
-            65536,
+            65536, NULL,
             NULL, NULL, false, false
-            );
+    );
 }
 
 static inline bool work_request_full(void) {
@@ -732,7 +731,7 @@ static void dbengine_page_alloc_init(void) {
                 buf,
                 tier_page_size[tier],
                 64,
-                512 * tier_page_size[tier],
+                512 * tier_page_size[tier], NULL,
                 NULL, NULL, false, false);
     }
 }
@@ -1673,7 +1672,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
             .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
-            .workers     = __atomic_load_n(&rrdeng_main.work_cmd.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
+            .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
             .pdc         = pdc_cache_size(),
             .xt_io       = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
             .xt_buf      = extent_buffer_cache_size(),

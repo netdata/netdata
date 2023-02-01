@@ -45,7 +45,7 @@ void aral_judy_init(void) {
                     buf,
                     Words * sizeof(Word_t),
                     0,
-                    65536,
+                    65536, NULL,
                     NULL, NULL, false, false);
         }
 }

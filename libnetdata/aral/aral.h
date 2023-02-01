@@ -8,9 +8,29 @@
 
 typedef struct aral ARAL;
 
-ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size, const char *filename, char **cache_dir, bool mmap, bool lockless);
-size_t aral_element_size(ARAL *ar);
+struct aral_statistics {
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+    } structures;
 
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+        size_t used_bytes;
+    } malloc;
+
+    struct {
+        size_t allocations;
+        size_t allocated_bytes;
+        size_t used_bytes;
+    } mmap;
+};
+
+ARAL *aral_create(const char *name, size_t element_size, size_t initial_page_elements, size_t max_page_size,
+                  struct aral_statistics *stats, const char *filename, char **cache_dir, bool mmap, bool lockless);
+size_t aral_element_size(ARAL *ar);
+size_t aral_overhead(ARAL *ar);
 ARAL *aral_by_size_acquire(size_t size);
 void aral_by_size_release(ARAL *ar);
 
