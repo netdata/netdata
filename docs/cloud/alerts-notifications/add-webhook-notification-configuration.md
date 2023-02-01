@@ -17,7 +17,7 @@ To add discord notification configurations you need
 
 - A Netdata Cloud account
 - Access to the space as an **administrator**
-- Space will needs to be on **Pro** plan or higher
+- Space needs to be on **Pro** plan or higher
 - Have an app that allows you to receive webhooks following a predefined schema, for mode details check [how to create the webhook service](#webhook-service)
 
 #### Steps
