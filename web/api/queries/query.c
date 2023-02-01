@@ -1476,7 +1476,7 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
             count_same_end_time = 0;
 
             // decide how to use this point
-            if(likely(new_point.end_time <= now_end_time)) { // likely to favor tier0
+            if(likely(new_point.end_time < now_end_time)) { // likely to favor tier0
                 // this db point ends before our now_end_time
 
                 if(likely(new_point.end_time >= now_start_time)) { // likely to favor tier0
