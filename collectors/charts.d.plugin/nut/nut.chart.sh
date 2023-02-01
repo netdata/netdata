@@ -112,7 +112,7 @@ CHART nut_$x.load '' "UPS Load" "percentage" ups nut.load area $((nut_priority))
 DIMENSION load load absolute 1 100
 
 CHART nut_$x.load_usage '' "UPS Load Usage" "Watts" ups nut.load_usage area $((nut_priority + 1)) $nut_update_every
-DIMENSION load_usage load_usage absolute 1 1
+DIMENSION load_usage load_usage absolute 1 100
 
 CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 9)) $nut_update_every
 DIMENSION temp temp absolute 1 100
