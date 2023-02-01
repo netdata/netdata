@@ -40,11 +40,17 @@ typedef struct datafile_extent_offset_list {
 // PDC cache
 
 static struct {
-    ARAL *ar;
+    struct {
+        ARAL *ar;
+    } pdc;
+
+    struct {
+        ARAL *ar;
+    } pd;
 } pdc_globals = {};
 
 void pdc_init(void) {
-    pdc_globals.ar = aral_create(
+    pdc_globals.pdc.ar = aral_create(
             "dbengine-pdc",
             sizeof(PDC),
             0,
@@ -55,96 +61,45 @@ void pdc_init(void) {
 }
 
 PDC *pdc_get(void) {
-    PDC *pdc = aral_mallocz(pdc_globals.ar);
+    PDC *pdc = aral_mallocz(pdc_globals.pdc.ar);
     memset(pdc, 0, sizeof(PDC));
     return pdc;
 }
 
 static void pdc_release(PDC *pdc) {
-    aral_freez(pdc_globals.ar, pdc);
+    aral_freez(pdc_globals.pdc.ar, pdc);
 }
 
 size_t pdc_cache_size(void) {
-    return aral_overhead(pdc_globals.ar) + aral_structures(pdc_globals.ar);
+    return aral_overhead(pdc_globals.pdc.ar) + aral_structures(pdc_globals.pdc.ar);
 }
 
 // ----------------------------------------------------------------------------
 // PD cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct page_details *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} page_details_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-void page_details_cleanup1(void) {
-    struct page_details *item = NULL;
-
-    if(!netdata_spinlock_trylock(&page_details_globals.protected.spinlock))
-        return;
-
-    if(page_details_globals.protected.available_items && page_details_globals.protected.available > (size_t)libuv_worker_threads * 2) {
-        item = page_details_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_details_globals.protected.available_items, item, cache.prev, cache.next);
-        page_details_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void page_details_init(void) {
+    pdc_globals.pd.ar = aral_create(
+            "dbengine-pd",
+            sizeof(struct page_details),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+    );
 }
 
 struct page_details *page_details_get(void) {
-    struct page_details *pd = NULL;
-
-    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
-
-    if(likely(page_details_globals.protected.available_items)) {
-        pd = page_details_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
-        page_details_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
-
-    if(unlikely(!pd)) {
-        pd = mallocz(sizeof(struct page_details));
-        __atomic_add_fetch(&page_details_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct page_details *pd = aral_mallocz(pdc_globals.pd.ar);
     memset(pd, 0, sizeof(struct page_details));
     return pd;
 }
 
 static void page_details_release(struct page_details *pd) {
-    if(unlikely(!pd)) return;
-
-    netdata_spinlock_lock(&page_details_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(page_details_globals.protected.available_items, pd, cache.prev, cache.next);
-    page_details_globals.protected.available++;
-    netdata_spinlock_unlock(&page_details_globals.protected.spinlock);
+    aral_freez(pdc_globals.pd.ar, pd);
 }
 
 size_t pd_cache_size(void) {
-    return __atomic_load_n(&page_details_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_details);
+    return aral_overhead(pdc_globals.pd.ar) + aral_structures(pdc_globals.pd.ar);
 }
 
 // ----------------------------------------------------------------------------

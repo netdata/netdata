@@ -1510,7 +1510,6 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
-    page_details_cleanup1();
     wal_cleanup1();
     extent_buffer_cleanup1();
     epdl_cleanup1();
@@ -1550,6 +1549,7 @@ void timer_cb(uv_timer_t* handle) {
 
 static void dbengine_initialize_structures(void) {
     pdc_init();
+    page_details_init();
     rrdeng_cmd_queue_init();
     work_request_init();
     rrdeng_query_handle_init();

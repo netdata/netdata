@@ -55,11 +55,6 @@ typedef struct page_details_control {
     STORAGE_PRIORITY priority;
 
     time_t optimal_end_time_s;
-
-    struct {
-        struct page_details_control *prev;
-        struct page_details_control *next;
-    } cache;
 } PDC;
 
 PDC *pdc_get(void);
@@ -128,11 +123,6 @@ struct page_details {
         struct page_details *prev;
         struct page_details *next;
     } load;
-
-    struct {
-        struct page_details *prev;
-        struct page_details *next;
-    } cache;
 };
 
 struct page_details *page_details_get(void);
