@@ -4458,7 +4458,7 @@ netdataDashboard.context = {
         info : 'It is used by the engine to balance memory usage between cache and is useful to support when troubleshooting cases with unexpected cache growth. The value is presented as an integer based on an internal calculation.'
     },
 
-    'mssql_instance_sql_errors_total': {
+    'mssql.instance_sql_errors_total': {
         info: 'Errors in Microsoft SQL Server.</p><p><b>Db_offline</b> - Tracks severe errors that cause SQL Server to take the current database offline. <b>Info</b> - Information related to error messages that provide information to users but do not cause errors. <b>Kill_connection</b> - Tracks severe errors that cause SQL Server to kill the current connection. <b>User</b> - User errors.</p>'
     },
 
