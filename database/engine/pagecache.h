@@ -33,11 +33,6 @@ struct page_descr_with_data {
         struct page_descr_with_data *prev;
         struct page_descr_with_data *next;
     } link;
-
-    struct {
-        struct page_descr_with_data *prev;
-        struct page_descr_with_data *next;
-    } cache;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)
