@@ -158,7 +158,7 @@ BEGIN {
 	output_voltage = 0;
 	load = 0;
 	load_usage = 0;
-  nompower = 0;
+	nompower = 0;
 	temp = 0;
 	client = 0;
 	do_clients = ${nut_clients_chart};
