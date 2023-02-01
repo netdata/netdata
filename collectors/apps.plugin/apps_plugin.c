@@ -10,8 +10,10 @@
 #include "libnetdata/libnetdata.h"
 #include "libnetdata/required_dummies.h"
 
+#define APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION "Detailed information on the currently running processes."
+
 #define APPS_PLUGIN_FUNCTIONS() do { \
-        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"Detailed information on the currently running processes on this node\"\n"); \
+        fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " \"processes\" 10 \"%s\"\n", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION); \
     } while(0)
 
 
@@ -4402,10 +4404,12 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                    "\n   \"status\":%d"
                    ",\n   \"type\":\"table\""
                    ",\n   \"update_every\":%d"
+                   ",\n   \"help\":\"%s\""
                    ",\n   \"data\":["
                    "\n"
             , HTTP_RESP_OK
             , update_every
+            , APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION
     );
 
     NETDATA_DOUBLE
