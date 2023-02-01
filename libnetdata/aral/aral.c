@@ -246,7 +246,7 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar TRACE_ALLOCATIONS_F
     if(page->size > ar->config.max_allocation_size)
         page->size = ar->config.max_allocation_size;
     else
-        ar->adders.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->adders.allocation_size * 4 / 3);
+        ar->adders.allocation_size = aral_align_alloc_size(ar, (uint64_t)ar->adders.allocation_size * 2);
 
     page->max_elements = page->aral_lock.free_elements = page->size / ar->config.element_size;
     page->free_elements_to_move_first = page->max_elements / 4;

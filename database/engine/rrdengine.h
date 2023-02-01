@@ -287,11 +287,6 @@ struct extent_io_descriptor {
     struct page_descr_with_data *descr_array[MAX_PAGES_PER_EXTENT];
     struct rrdengine_datafile *datafile;
     struct extent_io_descriptor *next; /* multiple requests to be served by the same cached extent */
-
-    struct {
-        struct extent_io_descriptor *prev;
-        struct extent_io_descriptor *next;
-    } cache;
 };
 
 struct generic_io_descriptor {

@@ -57,6 +57,10 @@ struct rrdeng_main {
         ARAL *ar;
     } descriptors;
 
+    struct {
+        ARAL *ar;
+    } xt_io_descr;
+
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -220,76 +224,25 @@ static inline void page_descriptor_release(struct page_descr_with_data *descr) {
 // ----------------------------------------------------------------------------
 // extent io descriptor cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct extent_io_descriptor *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-
-} extent_io_descriptor_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void extent_io_descriptor_cleanup1(void) {
-    struct extent_io_descriptor *item = NULL;
-
-    if(!netdata_spinlock_trylock(&extent_io_descriptor_globals.protected.spinlock))
-        return;
-
-    if(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > (size_t)libuv_worker_threads) {
-        item = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
-        extent_io_descriptor_globals.protected.available--;
-    }
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&extent_io_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+static void extent_io_descriptor_init(void) {
+    rrdeng_main.xt_io_descr.ar = aral_create(
+            "dbengine-extent-io",
+            sizeof(struct extent_io_descriptor),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+            );
 }
 
 static struct extent_io_descriptor *extent_io_descriptor_get(void) {
-    struct extent_io_descriptor *xt_io_descr = NULL;
-
-    netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(likely(extent_io_descriptor_globals.protected.available_items)) {
-        xt_io_descr = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
-        extent_io_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(unlikely(!xt_io_descr)) {
-        xt_io_descr = mallocz(sizeof(struct extent_io_descriptor));
-        __atomic_add_fetch(&extent_io_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct extent_io_descriptor *xt_io_descr = aral_mallocz(rrdeng_main.xt_io_descr.ar);
     memset(xt_io_descr, 0, sizeof(struct extent_io_descriptor));
     return xt_io_descr;
 }
 
 static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
-    if(unlikely(!xt_io_descr)) return;
-
-    netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
-    extent_io_descriptor_globals.protected.available++;
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
+    aral_freez(rrdeng_main.xt_io_descr.ar, xt_io_descr);
 }
 
 // ----------------------------------------------------------------------------
@@ -1538,7 +1491,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
             .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
             .pdc         = pdc_cache_size(),
-            .xt_io       = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
+            .xt_io       = aral_overhead(rrdeng_main.xt_io_descr.ar) + aral_structures(rrdeng_main.xt_io_descr.ar),
             .xt_buf      = extent_buffer_cache_size(),
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
@@ -1557,7 +1510,6 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
-    extent_io_descriptor_cleanup1();
     pdc_cleanup1();
     page_details_cleanup1();
     wal_cleanup1();
@@ -1686,6 +1638,7 @@ void dbengine_event_loop(void* arg) {
     page_descriptors_init();
     extent_buffer_init();
     dbengine_page_alloc_init();
+    extent_io_descriptor_init();
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
