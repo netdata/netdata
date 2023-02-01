@@ -964,7 +964,7 @@ static bool epdl_populate_pages_from_extent_data(
                 have_read_error);
 
         if(worker)
-            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION);
+            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION);
 
         void *page_data;
 
@@ -995,6 +995,9 @@ static bool epdl_populate_pages_from_extent_data(
                 }
             }
         }
+
+        if(worker)
+            worker_is_busy(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION);
 
         PGC_ENTRY page_entry = {
                 .hot = false,
