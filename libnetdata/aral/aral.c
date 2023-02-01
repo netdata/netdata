@@ -85,6 +85,9 @@ struct aral {
         size_t user_free_operations;
         size_t defragment_operations;
         size_t defragment_linked_list_traversals;
+
+        size_t allocators;
+        size_t allocators_max;
     } aral_lock;
 
     struct {
@@ -345,6 +348,12 @@ static inline void aral_insert_not_linked_page_with_free_items_to_proper_positio
 
 static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
     aral_lock(ar);
+    ar->aral_lock.allocators++;
+
+    if(unlikely(ar->aral_lock.allocators > ar->aral_lock.allocators_max)) {
+        ar->aral_lock.allocators_max = ar->aral_lock.allocators;
+        internal_error(true, "ARAL: '%s' max allocators is now %zu", ar->config.name, ar->aral_lock.allocators_max);
+    }
 
     ARAL_PAGE *page = ar->aral_lock.pages;
 
@@ -367,6 +376,8 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
             page = ar->aral_lock.pages;
         }
     }
+
+    ar->aral_lock.allocators--;
 
     // we have a page
     // and aral locked
