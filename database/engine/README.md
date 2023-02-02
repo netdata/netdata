@@ -305,7 +305,7 @@ Agent.
 ##### Information
 
 For more information about setting `[db].mode` on your nodes, in addition to other streaming configurations, see
-[streaming](/streaming/README.md).
+[streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md).
 
 ## Requirements & limitations
 
@@ -331,7 +331,7 @@ An important observation is that RAM usage depends on both the `page cache size`
 options.
 
 You can use
-our [database engine calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
+our [database engine calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics)
 to validate the memory requirements for your particular system(s) and configuration (**out-of-date**).
 
 ### Disk space
@@ -403,7 +403,7 @@ location is `/var/cache/netdata/dbengine/*`). The higher numbered filenames cont
 can safely delete some pairs of files when Netdata is stopped to manually free up some space.
 
 _Users should_ **back up** _their `./dbengine` folders if they consider this data to be important._ You can also set up
-one or more [exporting connectors](/exporting/README.md) to send your Netdata metrics to other databases for long-term
+one or more [exporting connectors](https://github.com/netdata/netdata/blob/master/exporting/README.md) to send your Netdata metrics to other databases for long-term
 storage at lower granularity.
 
 ## Operation

@@ -10,8 +10,8 @@ learn_rel_path: "Installation"
 # Install Netdata on macOS
 
 Netdata works on macOS, albeit with some limitations. 
-The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/collectors/plugins.d/README.md) to monitor any services you might have installed on your macOS system. 
-You could also use a macOS system as the parent node in a [streaming configuration](/streaming/README.md).
+The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) to monitor any services you might have installed on your macOS system. 
+You could also use a macOS system as the parent node in a [streaming configuration](https://github.com/netdata/netdata/blob/master/streaming/README.md).
 
 You can install Netdata in one of the three following ways: 
 
@@ -22,12 +22,12 @@ You can install Netdata in one of the three following ways:
 Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies. 
 
 > The Netdata Homebrew package is community-created and -maintained.
-> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/packaging/PLATFORM_SUPPORT.md).
+> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md).
 
 ## Install Netdata with our automatic one-line installation script
 
 **Local Netdata Agent installation**
-To install Netdata using our automatic [kickstart](/packaging/installer/README.md#automatic-one-line-installation-script) open a new terminal and run:
+To install Netdata using our automatic [kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-one-line-installation-script) open a new terminal and run:
 
 ```bash
 curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/netdata-kickstart.sh
@@ -38,16 +38,16 @@ The Netdata Agent is installed under `/usr/local/netdata`. Dependencies are hand
 <!-- Potential reuse: https://learn.netdata.cloud/docs/agent/claim#connect-an-agent-running-in-macos-->
 <!--Potential reuse https://learn.netdata.cloud/docs/agent/packaging/installer/methods/kickstart#connect-node-to-netdata-cloud-during-installation The following information is copied from this link.-->
 
-The `kickstart.sh` script accepts additional parameters to automatically [connect](/claim/README.md) your node to Netdata
+The `kickstart.sh` script accepts additional parameters to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata
 Cloud immediately after installation. Find the `token` and `rooms` strings by [signing in to Netdata
 Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on **Connect Nodes** in the [Spaces management
-area](https://learn.netdata.cloud/docs/cloud/spaces#manage-spaces).
+area](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx#manage-spaces).
 
 - `--claim-token`: Specify a unique claiming token associated with your Space in Netdata Cloud to be used to connect to the node
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each War Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
-  See [connecting through a proxy](/claim/README.md#connect-through-a-proxy) for details.
+  See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
 
 For example: 
@@ -56,7 +56,7 @@ curl https://my-netdata.io/kickstart.sh > /tmp/netdata-kickstart.sh && sh /tmp/n
 ```
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
-If you experience issues while claiming your node, follow the steps in our [Troubleshooting](/claim/README.md#troubleshooting) documentation.
+If you experience issues while claiming your node, follow the steps in our [Troubleshooting](https://github.com/netdata/netdata/blob/master/claim/README.md#troubleshooting) documentation.
 ## Install Netdata via Homebrew
 
 To install Netdata and all its dependencies, run Homebrew using the following command: 
@@ -81,7 +81,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    ```
 
 2. Click **Install** on the Software Update popup window that appears. 
-3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/), you can omit `cmake`.
+3. Use the same terminal session to install some of Netdata's prerequisites using Homebrew. If you don't want to use [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx), you can omit `cmake`.
 
    ```bash
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
@@ -106,10 +106,10 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 
 

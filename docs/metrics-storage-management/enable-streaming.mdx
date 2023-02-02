@@ -1,8 +1,11 @@
 ---
 title: "Enable streaming between nodes"
-description: "With metrics streaming enabled, you can not only replicate metrics data into a second database, but also view dashboards and trigger alarm notifications for multiple nodes in parallel."
+description: >-
+    "With metrics streaming enabled, you can not only replicate metrics data 
+    into a second database, but also view dashboards and trigger alarm notifications 
+    for multiple nodes in parallel."
 type: "how-to"
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/metrics-storage-management/enable-streaming.mdx"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.mdx"
 sidebar_label: "Enable streaming between nodes"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -17,7 +20,7 @@ parent node, and both nodes retain metrics in their own databases.
 To configure replication, you need two nodes, each running Netdata. First you'll first enable streaming on your parent
 node, then enable streaming on your child node. When you're finished, you'll be able to see the child node's metrics in
 the parent node's dashboard, quickly switch between the two dashboards, and be able to serve [alarm
-notifications](/docs/monitor/enable-notifications.md) from either or both nodes.
+notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) from either or both nodes.
 
 ## Enable streaming on the parent node
 
@@ -28,8 +31,8 @@ itself while initiating a streaming connection. Copy that into a separate text f
 
 > Find out how to [install `uuidgen`](https://command-not-found.com/uuidgen) on your node if you don't already have it.
 
-Next, open `stream.conf` using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
-from within the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+Next, open `stream.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
+from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
 
 ```bash
 cd /etc/netdata
@@ -53,7 +56,7 @@ simplified version of the configuration, minus the commented lines, looks like t
 ```
 
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 ## Enable streaming on the child node
 
@@ -74,7 +77,7 @@ looks like the following:
 ```
 
 Save the file and close it, then restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 ## Enable TLS/SSL on streaming (optional)
 
@@ -94,7 +97,7 @@ sudo chown netdata:netdata /etc/netdata/ssl/cert.pem /etc/netdata/ssl/key.pem
 
 Next, enforce TLS/SSL on the web server. Open `netdata.conf`, scroll down to the `[web]` section, and look for the `bind
 to` setting. Add `^SSL=force` to turn on TLS/SSL. See the [web server
-reference](/web/server/README.md#enabling-tls-support) for other TLS/SSL options.
+reference](https://github.com/netdata/netdata/blob/master/web/server/README.md#enabling-tls-support) for other TLS/SSL options.
 
 ```conf
 [web]
@@ -114,7 +117,7 @@ self-signed certificates.
 ```
 
 Restart both the parent and child nodes with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system, to stream encrypted metrics using TLS/SSL.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to stream encrypted metrics using TLS/SSL.
 
 ## View streamed metrics in Netdata's dashboard
 
@@ -139,17 +142,17 @@ Now that you have a basic streaming setup with replication, you may want to twea
 child database, disable the child dashboard, or enable SSL on the streaming connection between the parent and child.
 
 See the [streaming reference
-doc](/docs/metrics-storage-management/reference-streaming.mdx#examples) for details about
+doc](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.mdx#examples) for details about
 other possible configurations.
 
 When using Netdata's default TSDB (`dbengine`), the parent node maintains separate, parallel databases for itself and
 every child node streaming to it. Each instance is sized identically based on the `dbengine multihost disk space`
-setting in `netdata.conf`. See our doc on [changing metrics retention](/docs/store/change-metrics-storage.md) for
+setting in `netdata.conf`. See our doc on [changing metrics retention](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) for
 details.
 
 ### Related information & further reading
 
 - Streaming
-  - [How Netdata streams metrics](/docs/metrics-storage-management/how-streaming-works.mdx)
-  - **[Enable streaming between nodes](/docs/metrics-storage-management/enable-streaming.mdx)**
-  - [Streaming reference](/docs/metrics-storage-management/reference-streaming.mdx)
+  - [How Netdata streams metrics](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/how-streaming-works.mdx)
+  - **[Enable streaming between nodes](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/enable-streaming.mdx)**
+  - [Streaming reference](https://github.com/netdata/netdata/blob/master/docs/metrics-storage-management/reference-streaming.mdx)

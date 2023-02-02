@@ -53,7 +53,7 @@ Behind the scenes, Netdata will aggregate the raw data as needed such that arbit
 
 Netdata is different from typical observability agents since, in addition to just collecting raw metric values, it will by default also assign an "[Anomaly Bit](/docs/agent/ml#anomaly-bit)" related to each collected metric each second. This bit will be 0 for "normal" and 1 for "anomalous". This means that each metric also natively has an "[Anomaly Rate](/docs/agent/ml#anomaly-rate)" associated with it and, as such, MC can be run against the raw metric values or their corresponding anomaly rates.
 
-**Note**: Read more [here](https://learn.netdata.cloud/guides/monitor/anomaly-detection) to learn more about the native anomaly detection features within netdata.
+**Note**: Read more [here](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md) to learn more about the native anomaly detection features within netdata.
 
 - `Metrics` - Run MC on the raw metric values.
 - `Anomaly Rate` - Run MC on the corresponding anomaly rate for each metric.
@@ -84,4 +84,4 @@ Should you still want to, disabling nodes for Metric Correlation on the agent is
 
 ## What's next?
 
-You can read more about all the ML powered capabilities of Netdata [here](https://learn.netdata.cloud/guides/monitor/anomaly-detection). If you aren't yet familiar with the power of Netdata Cloud's visualization features, check out the [Nodes view](/docs/cloud/visualize/nodes) and learn how to [build new dashboards](/docs/cloud/visualize/dashboards).
+You can read more about all the ML powered capabilities of Netdata [here](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md). If you aren't yet familiar with the power of Netdata Cloud's visualization features, check out the [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) and learn how to [build new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).

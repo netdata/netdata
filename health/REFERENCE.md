@@ -15,7 +15,7 @@ This guide contains information about editing health configuration files to twea
 entities that are customized to the needs of your infrastructure.
 
 To learn the basics of locating and editing health configuration files, see the [health
-quickstart](/health/QUICKSTART.md).
+quickstart](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md).
 
 ## Health configuration files
 
@@ -23,7 +23,7 @@ You can configure the Agent's health watchdog service by editing files in two lo
 
 -   The `[health]` section in `netdata.conf`. By editing the daemon's behavior, you can disable health monitoring
     altogether, run health checks more or less often, and more. See [daemon
-    configuration](/daemon/config/README.md#health-section-options) for a table of all the available settings, their
+    configuration](https://github.com/netdata/netdata/blob/master/daemon/config/README.md#health-section-options) for a table of all the available settings, their
     default values, and what they control.
 -   The individual `.conf` files in `health.d/`. These health entity files are organized by the type of metric they are
     performing calculations on or their associated collector. You should edit these files using the `edit-config`
@@ -56,7 +56,7 @@ Netdata parses the following lines. Beneath the table is an in-depth explanation
 -   The `every` line is **required** if not using `lookup`.
 -   Each entity **must** have at least one of the following lines: `lookup`, `calc`, `warn`, or `crit`.
 -   A few lines use space-separated lists to define how the entity behaves. You can use `*` as a wildcard or prefix with
-    `!` for a negative match. Order is important, too! See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
+    `!` for a negative match. Order is important, too! See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
     more examples.
 -   Lines terminated by a `\` are spliced together with the next line. The backslash is removed and the following line is
     joined with the current one. No space is inserted, so you may split a line anywhere, even in the middle of a word.
@@ -240,7 +240,7 @@ hosts: server1 server2 database* !redis3 redis*
 #### Alarm line `plugin`
 
 The `plugin` line filters which plugin within the context this alarm should apply to. The value is a space-separated
-list of [simple patterns](/libnetdata/simple_pattern/README.md). For example,
+list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For example,
 you can create a filter for an alarm that applies specifically to `python.d.plugin`:
 
 ```yaml
@@ -254,7 +254,7 @@ comprehensive example using both.
 #### Alarm line `module`
 
 The `module` line filters which module within the context this alarm should apply to. The value is a space-separated
-list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
 example, you can create an alarm that applies only on the `isc_dhcpd` module started by `python.d.plugin`:
 
 ```yaml
@@ -266,7 +266,7 @@ module: isc_dhcpd
 
 The `charts` line filters which chart this alarm should apply to. It is only available on entities using the 
 [`template`](#alarm-line-alarm-or-template) line.
-The value is a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). For
+The value is a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). For
 example, a template that applies to `disk.svctm` (Average Service Time) context, but excludes the disk `sdb` from alarms:
 
 ```yaml
@@ -280,7 +280,7 @@ template: disk_svctm_alarm
 The `families` line, used only alongside templates, filters which families within the context this alarm should apply
 to. The value is a space-separated list.
 
-The value is a space-separate list of simple patterns. See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for
+The value is a space-separate list of simple patterns. See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for
 some examples.
 
 For example, you can create a template on the `disk.io` context, but filter it to only the `sda` and `sdb` families:
@@ -299,7 +299,7 @@ The format is:
 lookup: METHOD AFTER [at BEFORE] [every DURATION] [OPTIONS] [of DIMENSIONS] [foreach DIMENSIONS]
 ```
 
-Everything is the same with [badges](/web/api/badges/README.md). In short:
+Everything is the same with [badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md). In short:
 
 -   `METHOD` is one of `average`, `min`, `max`, `sum`, `incremental-sum`.
      This is required.
@@ -316,7 +316,7 @@ Everything is the same with [badges](/web/api/badges/README.md). In short:
      above too).
 
 -   `OPTIONS` is a space separated list of `percentage`, `absolute`, `min2max`, `unaligned`,
-     `match-ids`, `match-names`. Check the [badges](/web/api/badges/README.md) documentation for more info.
+     `match-ids`, `match-names`. Check the [badges](https://github.com/netdata/netdata/blob/master/web/api/badges/README.md) documentation for more info.
 
 -   `of DIMENSIONS` is optional and has to be the last parameter. Dimensions have to be separated
      by `,` or `|`. The space characters found in dimensions will be kept as-is (a few dimensions
@@ -503,7 +503,7 @@ good idea to tell Netdata to not clear the notification, by using the `no-clear-
 
 #### Alarm line `host labels`
 
-Defines the list of labels present on a host. See our [host labels guide](/docs/guides/using-host-labels.md) for
+Defines the list of labels present on a host. See our [host labels guide](https://github.com/netdata/netdata/blob/master/docs/guides/using-host-labels.md) for
 an explanation of host labels and how to implement them.
 
 For example, let's suppose that `netdata.conf` is configured with the following labels:
@@ -536,7 +536,7 @@ that will be applied to all hosts installed in the last decade with the followin
 host labels: installed = 201*
 ```
 
-See our [simple patterns docs](/libnetdata/simple_pattern/README.md) for more examples.
+See our [simple patterns docs](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) for more examples.
 
 #### Alarm line `info`
 
@@ -651,15 +651,15 @@ You can find all the variables that can be used for a given chart, using
 Agent dashboard. For example, [variables for the `system.cpu` chart of the
 registry](https://registry.my-netdata.io/api/v1/alarm_variables?chart=system.cpu).
 
-> If you don't know how to find the CHART_NAME, you can read about it [here](/web/README.md#charts).
+> If you don't know how to find the CHART_NAME, you can read about it [here](https://github.com/netdata/netdata/blob/master/web/README.md#charts).
 
 Netdata supports 3 internal indexes for variables that will be used in health monitoring.
 
 <details markdown="1"><summary>The variables below can be used in both chart alarms and context templates.</summary>
 
 Although the `alarm_variables` link shows you variables for a particular chart, the same variables can also be used in
-templates for charts belonging to a given [context](/web/README.md#contexts). The reason is that all charts of a given
-context are essentially identical, with the only difference being the [family](/web/README.md#families) that
+templates for charts belonging to a given [context](https://github.com/netdata/netdata/blob/master/web/README.md#contexts). The reason is that all charts of a given
+context are essentially identical, with the only difference being the [family](https://github.com/netdata/netdata/blob/master/web/README.md#families) that
 identifies a particular hardware or software instance. Charts and templates do not apply to specific families anyway,
 unless if you explicitly limit an alarm with the [alarm line `families`](#alarm-line-families).
 
@@ -999,7 +999,7 @@ The `lookup` line will use the `anomaly_rate` dimension of the `anomaly_detectio
 
 ## Troubleshooting
 
-You can compile Netdata with [debugging](/daemon/README.md#debugging) and then set in `netdata.conf`:
+You can compile Netdata with [debugging](https://github.com/netdata/netdata/blob/master/daemon/README.md#debugging) and then set in `netdata.conf`:
 
 ```yaml
 [global]
@@ -1022,6 +1022,6 @@ expression.
 It's currently not possible to schedule notifications from within the alarm template. For those scenarios where you need
 to temporary disable notifications (for instance when running backups triggers a disk alert) you can disable or silence
 notifications are runtime. The health checks can be controlled at runtime via the [health management
-api](/web/api/health/README.md).
+api](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
 
 

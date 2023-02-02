@@ -18,7 +18,7 @@ The Netdata team aggregates and publishes all documentation at [learn.netdata.cl
 ## Before you get started
 
 Anyone interested in contributing to documentation should first read the [Netdata style
-guide](/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+guide](https://github.com/netdata/netdata/blob/master/docs/contributing/style-guide.md) and the [Netdata Community Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read the [Mastering
 Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on creating
@@ -40,7 +40,7 @@ Netdata's documentation is separated into four sections.
   - Published under the **Reference** section in the Netdata Learn sidebar.
 - **Netdata Cloud reference**: Reference documentation for the closed-source Netdata Cloud web application.
   - Stored in a private GitHub repository and not editable by the community.
-  - Published at [`https://learn.netdata.cloud/docs/cloud`](https://learn.netdata.cloud/docs/cloud).
+  - Published at [`https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx`](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx).
 - **Guides**: Solutions-based articles for users who want instructions on completing a specific complex task using the
   Netdata Agent and/or Netdata Cloud.
   - Stored in the [`/docs/guides` folder](https://github.com/netdata/netdata/tree/master/docs/guides) within the
@@ -59,7 +59,7 @@ fixes to a single document, such as fixing a typo or clarifying a confusing sent
 
 Click on the **Edit this page** button on any published document on [Netdata Learn](https://learn.netdata.cloud). Each
 page has two of these buttons: One beneath the table of contents, and another at the end of the document, which take you
-to GitHub's code editor. Make your suggested changes, keeping [Netdata style guide](/docs/contributing/style-guide.md)
+to GitHub's code editor. Make your suggested changes, keeping [Netdata style guide](https://github.com/netdata/netdata/blob/master/docs/contributing/style-guide.md)
 in mind, and use *Preview changes** button to ensure your Markdown syntax works as expected.
 
 Under the **Commit changes**  header, write descriptive title for your requested change. Click the **Commit changes**
@@ -86,7 +86,7 @@ git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
 ```
 
 Create a new branch using `git checkout -b BRANCH-NAME`. Use your favorite text editor to make your changes, keeping the
-[Netdata style guide](/docs/contributing/style-guide.md) in mind. Add, commit, and push changes to your fork. When
+[Netdata style guide](https://github.com/netdata/netdata/blob/master/docs/contributing/style-guide.md) in mind. Add, commit, and push changes to your fork. When
 you're finished, visit the [Netdata Agent Pull requests](https://github.com/netdata/netdata/pulls) to create a new pull
 request based on the changes you made in the new branch of your fork.
 

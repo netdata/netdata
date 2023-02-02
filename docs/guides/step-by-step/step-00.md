@@ -18,7 +18,7 @@ completely new to Netdata, or have never tried health monitoring/performance tro
 guide is perfect for you.
 
 If you have monitoring experience, or would rather get straight into configuring Netdata to your needs, you can jump
-straight into code and configurations with our [getting started guide](/docs/get-started.mdx).
+straight into code and configurations with our [getting started guide](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
 
 > This guide contains instructions for Netdata installed on a Linux system. Many of the instructions will work on
 > other supported operating systems, like FreeBSD and macOS, but we can't make any guarantees.
@@ -44,7 +44,7 @@ The easiest way to install Netdata on a Linux system is our `kickstart.sh` one-l
 and let it take care of the rest. 
 
 This script will install Netdata from source, keep it up to date with nightly releases, connects to the Netdata
-[registry](/registry/README.md), and sends [_anonymous statistics_](/docs/anonymous-statistics.md) about how you use
+[registry](https://github.com/netdata/netdata/blob/master/registry/README.md), and sends [_anonymous statistics_](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md) about how you use
 Netdata. We use this information to better understand how we can improve the Netdata experience for all our users.
 
 To install Netdata, run the following as your normal user:
@@ -60,7 +60,7 @@ Once finished, you'll have Netdata installed, and you'll be set up to get _night
 improvements, and bugfixes.
 
 If this method doesn't work for you, or you want to use a different process, visit our [installation
-documentation](/packaging/installer/README.md) for details.
+documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) for details.
 
 ## Netdata fundamentals
 

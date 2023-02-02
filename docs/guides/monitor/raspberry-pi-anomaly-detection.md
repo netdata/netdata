@@ -12,7 +12,7 @@ We love IoT and edge at Netdata, we also love machine learning. Even better if w
 of monitoring increasingly complex systems.
 
 We recently explored what might be involved in enabling our Python-based [anomalies
-collector](/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
+collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md) on a Raspberry Pi. To our delight, it's actually quite
 straightforward! 
 
 Read on to learn all the steps and enable unsupervised anomaly detection on your on Raspberry Pi(s).
@@ -23,14 +23,14 @@ Read on to learn all the steps and enable unsupervised anomaly detection on your
 
 - A Raspberry Pi running Raspbian, which we'll call a _node_.
 - The [open-source Netdata](https://github.com/netdata/netdata) monitoring agent. If you don't have it installed on your
-  node yet, [get started now](/docs/get-started.mdx).
+  node yet, [get started now](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
 
 ## Install dependencies
 
 First make sure Netdata is using Python 3 when it runs Python-based data collectors. 
 
-Next, open `netdata.conf` using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
-from within the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory). Scroll down to the
+Next, open `netdata.conf` using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files)
+from within the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory). Scroll down to the
 `[plugin:python.d]` section to pass in the `-ppython3` command option. 
 
 ```conf
@@ -59,7 +59,7 @@ LLVM_CONFIG=llvm-config-9 pip3 install --user llvmlite numpy==1.20.1 netdata-pan
 
 ## Enable the anomalies collector
 
-Now you're ready to enable the collector and [restart Netdata](/docs/configure/start-stop-restart.md).
+Now you're ready to enable the collector and [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 ```bash
 sudo ./edit-config python.d.conf
@@ -82,7 +82,7 @@ centralized cloud somewhere) is the resource utilization impact of running a mon
 
 With the default configuration, the anomalies collector uses about 6.5% of CPU at each run. During the retraining step,
 CPU utilization jumps to between 20-30% for a few seconds, but you can [configure
-retraining](/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
+retraining](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md#configuration) to happen less often if you wish.
 
 ![CPU utilization of anomaly detection on the Raspberry
 Pi](https://user-images.githubusercontent.com/1153921/110149718-9d749c00-7d9b-11eb-9af8-46e2032cd1d0.png)
@@ -108,18 +108,18 @@ looks like a potentially useful addition to enable unsupervised anomaly detectio
 See our two-part guide series for a more complete picture of configuring the anomalies collector, plus some best
 practices on using the charts it automatically generates:
 
-- [_Detect anomalies in systems and applications_](/docs/guides/monitor/anomaly-detection-python.md)
-- [_Monitor and visualize anomalies with Netdata_](/docs/guides/monitor/visualize-monitor-anomalies.md)
+- [_Detect anomalies in systems and applications_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection-python.md)
+- [_Monitor and visualize anomalies with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/visualize-monitor-anomalies.md)
 
 If you're using your Raspberry Pi for other purposes, like blocking ads/trackers with Pi-hole, check out our companions
-Pi guide: [_Monitor Pi-hole (and a Raspberry Pi) with Netdata_](/docs/guides/monitor/pi-hole-raspberry-pi.md).
+Pi guide: [_Monitor Pi-hole (and a Raspberry Pi) with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/pi-hole-raspberry-pi.md).
 
 Once you've had a chance to give unsupervised anomaly detection a go, share your use cases and let us know of any
 feedback on our [community forum](https://community.netdata.cloud/t/anomalies-collector-feedback-megathread/767).  
 
 ### Related reference documentation
 
-- [Netdata Agent · Get Netdata](/docs/get-started.mdx)
-- [Netdata Agent · Anomalies collector](/collectors/python.d.plugin/anomalies/README.md)
+- [Netdata Agent · Get Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx)
+- [Netdata Agent · Anomalies collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md)
 
 

@@ -6,30 +6,30 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/i
 
 # Interact with dashboards and charts
 
-> ⚠️ There is a new version of charts that is currently **only** available on [Netdata Cloud](https://learn.netdata.cloud/docs/cloud/visualize/interact-new-charts). We didn't
+> ⚠️ There is a new version of charts that is currently **only** available on [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md). We didn't
 > want to keep this valuable feature from you, so after we get this into your hands on the Cloud, we will collect and implement your feedback to make sure we are providing the best possible version of the feature on the Netdata Agent dashboard as quickly as possible.
 
 You can find Netdata's dashboards in two places: locally served at `http://NODE:19999` by the Netdata Agent, and in
 Netdata Cloud. While you access these dashboards differently, they have similar interfaces, identical charts and
 metrics, and you interact with both of them the same way.
 
-> If you're not sure which option is best for you, see our [single-node](/docs/quickstart/single-node.md) and
-> [infrastructure](/docs/quickstart/infrastructure.md) quickstart guides.
+> If you're not sure which option is best for you, see our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) and
+> [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) quickstart guides.
 
 Netdata dashboards are single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
 
 The dashboard is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, which are
-automatically generated based on which [collectors](/docs/collect/how-collectors-work.md) begin collecting metrics when
+automatically generated based on which [collectors](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) begin collecting metrics when
 Netdata starts up. Sections also appear in the right-hand **menu**, along with submenus based on the contexts and
 families Netdata creates for your node.
 
 ## Choose timeframes to visualize
 
 Both the local Agent dashboard and Netdata Cloud feature time & date pickers to help you visualize specific points in
-time. In Netdata Cloud, the picker appears in the [Overview](/docs/visualize/overview-infrastructure.md), [Nodes
-view](https://learn.netdata.cloud/docs/cloud/visualize/nodes), [new
-dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards), and any single-node dashboards you visit.
+time. In Netdata Cloud, the picker appears in the [Overview](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md), [Nodes
+view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md), [new
+dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md), and any single-node dashboards you visit.
 
 Local Agent dashboard:
 
@@ -45,8 +45,8 @@ Their behavior is identical. Use the Quick Selector to visualize generic timefra
 select days, hours, minutes or seconds. Click **Apply** to re-render all visualizations with new metrics data, or
 **Clear** to restore the default timeframe.
 
-See reference documentation for the [local Agent dashboard](/web/gui/README.md#time--date-picker) and [Netdata
-Cloud](https://learn.netdata.cloud/docs/cloud/war-rooms#time--date-picker) for additional context about how the time &
+See reference documentation for the [local Agent dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md#time--date-picker) and [Netdata
+Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#time--date-picker) for additional context about how the time &
 date picker behaves in each environment.
 
 ## Charts, dimensions, families, and contexts
@@ -68,7 +68,7 @@ A **context** groups several charts based on the types of metrics being collecte
 this context to create individual charts and then groups them by family. You can always see the context of any chart by
 looking at its name or hovering over the chart's date.
 
-See our [dashboard docs](/web/README.md#charts-contexts-families) for more information about the above distinctions
+See our [dashboard docs](https://github.com/netdata/netdata/blob/master/web/README.md#charts-contexts-families) for more information about the above distinctions
 and how they're used across Netdata to meaningfully organize and present metrics.
 
 ## Interact with charts
@@ -107,25 +107,25 @@ height](https://user-images.githubusercontent.com/1153921/102652691-24b25c00-412
 Netdata Cloud now supports composite charts in the Overview interface. Composite charts come with a few additional UI
 elements and varied interactions, such as the location of dimensions and a utility bar for configuring the state of
 individual composite charts. All of these details are covered in the [Overview
-reference](https://learn.netdata.cloud/docs/cloud/visualize/overview) doc.
+reference](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) doc.
 
 ## What's next?
 
-Netdata Cloud users can [build new dashboards](/docs/visualize/create-dashboards.md) in just a few clicks. By
+Netdata Cloud users can [build new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) in just a few clicks. By
 aggregating relevant metrics from any number of nodes onto a single interface, you can respond faster to anomalies,
 perform more targeted troubleshooting, or keep tabs on a bird's eye view of your infrastructure.
 
 If you're finished with dashboards for now, skip to Netdata's health watchdog for information on [creating or
-configuring](/docs/monitor/configure-alarms.md) alarms, and [send notifications](/docs/monitor/enable-notifications.md)
+configuring](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) alarms, and [send notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md)
 to get informed when something goes wrong in your infrastructure.
 
 ### Related reference documentation
 
--   [Netdata Agent · Web dashboards overview](/web/README.md)
--   [Netdata Cloud · Interact with new charts](https://learn.netdata.cloud/docs/cloud/visualize/interact-new-charts)
--   [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
--   [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
--   [Netdata Cloud · Nodes](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
--   [Netdata Cloud · Build new dashboards](https://learn.netdata.cloud/docs/cloud/visualize/dashboards)
+-   [Netdata Agent · Web dashboards overview](https://github.com/netdata/netdata/blob/master/web/README.md)
+-   [Netdata Cloud · Interact with new charts](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/interact-new-charts.md)
+-   [Netdata Cloud · War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+-   [Netdata Cloud · Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
+-   [Netdata Cloud · Nodes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
+-   [Netdata Cloud · Build new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
 
 

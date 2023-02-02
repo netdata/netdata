@@ -71,8 +71,8 @@ in the Netdata registry regardless of whether you sign in or not.
 
 ## Who talks to the registry?
 
-Your web browser **only**! If sending this information is against your policies, you can [run your own
-registry](#run-your-own-registry)
+Your web browser **only**! If sending this information is against your policies, you 
+can [run your own registry](#run-your-own-registry)
 
 Your Netdata servers do not talk to the registry. This is a UML diagram of its operation:
 
@@ -137,7 +137,7 @@ Netdata v1.9+ support limiting access to the registry from given IPs, like this:
     allow from = *
 ```
 
-`allow from` settings are [Netdata simple patterns](/libnetdata/simple_pattern/README.md): string matches that use `*`
+`allow from` settings are [Netdata simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md): string matches that use `*`
 as wildcard (any number of times) and a `!` prefix for a negative match. So: `allow from = !10.1.2.3 10.*` will allow
 all IPs in `10.*` except `10.1.2.3`. The order is important: left to right, the first positive or negative match is
 used.
@@ -184,7 +184,7 @@ Both files are machine readable text files.
 
 Beginning with `v1.30.0`, when the Netdata Agent's web server processes a request, it delivers the `SameSite=none`
 and `Secure` cookies. If you have problems accessing the local Agent dashboard or Netdata Cloud, disable these
-cookies by [editing `netdata.conf`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files):
+cookies by [editing `netdata.conf`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files):
 
 ```conf
 [registry]

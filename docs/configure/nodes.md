@@ -23,7 +23,7 @@ anomaly, or change in infrastructure affects how their Agents should perform.
 ## The Netdata config directory
 
 On most Linux systems, using our [recommended one-line
-installation](/docs/get-started.mdx#install-on-linux-with-one-line-installer), the **Netdata config
+installation](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx#install-on-linux-with-one-line-installer), the **Netdata config
 directory** is `/etc/netdata/`. The config directory contains several configuration files with the `.conf` extension, a
 few directories, and a shell script named `edit-config`.
 
@@ -41,23 +41,23 @@ these files in your own Netdata config directory, as the next section describes 
 exist.
 
 - `netdata.conf` is the main configuration file. This is where you'll find most configuration options. Read descriptions
-  for each in the [daemon config](/daemon/config/README.md) doc.
+  for each in the [daemon config](https://github.com/netdata/netdata/blob/master/daemon/config/README.md) doc.
 - `edit-config` is a shell script used for [editing configuration files](#use-edit-config-to-edit-configuration-files).
 - Various configuration files ending in `.conf` for [configuring plugins or
-  collectors](/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
+  collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md#enable-a-collector-or-its-orchestrator) behave. Examples: `go.d.conf`,
   `python.d.conf`, and `ebpf.d.conf`.
 - Various directories ending in `.d`, which contain other configuration files, each ending in `.conf`, for [configuring
-  specific collectors](/docs/collect/enable-configure.md#configure-a-collector).
+  specific collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md#configure-a-collector).
 - `apps_groups.conf` is a configuration file for changing how applications/processes are grouped when viewing the
-  **Application** charts from [`apps.plugin`](/collectors/apps.plugin/README.md) or
-  [`ebpf.plugin`](/collectors/ebpf.plugin/README.md).
-- `health.d/` is a directory that contains [health configuration files](/docs/monitor/configure-alarms.md).
-- `health_alarm_notify.conf` enables and configures [alarm notifications](/docs/monitor/enable-notifications.md).
-- `statsd.d/` is a directory for configuring Netdata's [statsd collector](/collectors/statsd.plugin/README.md).
-- `stream.conf` configures [parent-child streaming](/streaming/README.md) between separate nodes running the Agent.
+  **Application** charts from [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) or
+  [`ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md).
+- `health.d/` is a directory that contains [health configuration files](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md).
+- `health_alarm_notify.conf` enables and configures [alarm notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md).
+- `statsd.d/` is a directory for configuring Netdata's [statsd collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
+- `stream.conf` configures [parent-child streaming](https://github.com/netdata/netdata/blob/master/streaming/README.md) between separate nodes running the Agent.
 - `.environment` is a hidden file that describes the environment in which the Netdata Agent is installed, including the
-  `PATH` and any installation options. Useful for [reinstalling](/packaging/installer/REINSTALL.md) or
-  [uninstalling](/packaging/installer/UNINSTALL.md) the Agent.
+  `PATH` and any installation options. Useful for [reinstalling](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) or
+  [uninstalling](https://github.com/netdata/netdata/blob/master/packaging/installer/UNINSTALL.md) the Agent.
 
 The Netdata config directory also contains one symlink:
 
@@ -67,7 +67,7 @@ The Netdata config directory also contains one symlink:
 
 ## Configure a Netdata docker container
 
-See [configure agent containers](/packaging/docker/README.md#configure-agent-containers).
+See [configure agent containers](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#configure-agent-containers).
 
 ## Use `edit-config` to edit configuration files
 
@@ -107,7 +107,7 @@ method for `edit-config` to write into the config directory. Use your `$EDITOR`,
 > defaulted to `vim` or `nano`. Use `export EDITOR=` to change this temporarily, or edit your shell configuration file
 > to change to permanently.
 
-After you make your changes, you need to [restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl
+After you make your changes, you need to [restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl
 restart netdata` or the appropriate method for your system.
 
 Here's an example of editing the node's hostname, which appears in both the local dashboard and in Netdata Cloud.
@@ -149,26 +149,26 @@ curl -o /etc/netdata/netdata.conf http://NODE:19999/netdata.conf
 
 ## What's next?
 
-Learn more about [starting, stopping, or restarting](/docs/configure/start-stop-restart.md) the Netdata daemon to apply
+Learn more about [starting, stopping, or restarting](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) the Netdata daemon to apply
 configuration changes.
 
-Apply some [common configuration changes](/docs/configure/common-changes.md) to quickly tweak the Agent's behavior.
+Apply some [common configuration changes](https://github.com/netdata/netdata/blob/master/docs/configure/common-changes.md) to quickly tweak the Agent's behavior.
 
-[Add security to your node](/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
+[Add security to your node](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md) with what you've learned about the Netdata config directory
 and `edit-config`. We put together a few security best practices based on how you use the Netdata.
 
 You can also take what you've learned about node configuration to enable or enhance features:
 
--   [Enable new collectors](/docs/collect/enable-configure.md) or tweak their behavior.
--   [Configure existing health alarms](/docs/monitor/configure-alarms.md) or create new ones.
--   [Enable notifications](/docs/monitor/enable-notifications.md) to receive updates about the health of your
+-   [Enable new collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) or tweak their behavior.
+-   [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
+-   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
     infrastructure.
--   Change [the long-term metrics retention period](/docs/store/change-metrics-storage.md) using the database engine.
+-   Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.
 
 ### Related reference documentation
 
-- [Netdata Agent · Daemon](/daemon/README.md)
-- [Netdata Agent · Health monitoring](/health/README.md)
-- [Netdata Agent · Notifications](/health/notifications/README.md)
+- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
+- [Netdata Agent · Health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md)
+- [Netdata Agent · Notifications](https://github.com/netdata/netdata/blob/master/health/notifications/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fnodes&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

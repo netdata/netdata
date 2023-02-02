@@ -18,7 +18,7 @@ threads. Despite collecting 100,000 metrics every second, the Agent still only u
 single core.
 
 But not everyone has such powerful systems at their disposal. For example, you might run the Agent on a cloud VM with
-only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](/docs/guides/monitor/pi-hole-raspberry-pi.md). In these
+only 512 MiB of RAM, or an IoT device like a [Raspberry Pi](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/pi-hole-raspberry-pi.md). In these
 cases, reducing Netdata's footprint beyond its already diminutive size can pay big dividends, giving your services more
 horsepower while still monitoring the health and the performance of the node, OS, hardware, and applications.
 
@@ -33,7 +33,7 @@ enabled, since we want you to experience the full thing.
 -   Familiarity with configuring the Netdata Agent with `edit-config`.
 
 If you're not familiar with how to configure the Netdata Agent, read our [node configuration
-doc](/docs/configure/nodes.md) before continuing with this guide. This guide assumes familiarity with the Netdata config
+doc](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) before continuing with this guide. This guide assumes familiarity with the Netdata config
 directory, using `edit-config`, and the process of uncommenting/editing various settings in `netdata.conf` and other
 configuration files.
 
@@ -43,11 +43,11 @@ Netdata's performance is primarily affected by **data collection/retention** and
 
 You can configure almost all aspects of data collection/retention, and certain aspects of clients accessing data. For
 example, you can't control how many users might be viewing a local Agent dashboard, [viewing an
-infrastructure](/docs/visualize/overview-infrastructure.md) in real-time with Netdata Cloud, or running [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations).
+infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) in real-time with Netdata Cloud, or running [Metric
+Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md).
 
 The Netdata Agent runs with the lowest possible [process scheduling
-policy](/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
+policy](https://github.com/netdata/netdata/blob/master/daemon/README.md#netdata-process-scheduling-policy), which is `nice 19`, and uses the `idle` process scheduler.
 Together, these settings ensure that the Agent only gets CPU resources when the node has CPU resources to space. If the
 node reaches 100% CPU utilization, the Agent is stopped first to ensure your applications get any available resources.
 In addition, under heavy load, collectors that require disk I/O may stop and show gaps in charts.
@@ -80,10 +80,10 @@ seconds, respectively.
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
 `python.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
 every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
-or configure a collector](/docs/collect/enable-configure.md) doc for details.
+or configure a collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) doc for details.
 
 To reduce the frequency of an [internal
-plugin/collector](/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and
+plugin/collector](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and
 find the appropriate section. For example, to reduce the frequency of the `apps` plugin, which collects and visualizes
 metrics on application resource utilization:
 
@@ -92,7 +92,7 @@ metrics on application resource utilization:
     update every = 5
 ```
 
-To [configure an individual collector](/docs/collect/enable-configure.md), open its specific configuration file with
+To [configure an individual collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md), open its specific configuration file with
 `edit-config` and look for the `update_every` setting. For example, to reduce the frequency of the `nginx` collector,
 run `sudo ./edit-config go.d/nginx.conf`:
 
@@ -104,7 +104,7 @@ update_every: 10
 ## Disable unneeded plugins or collectors
 
 If you know that you don't need an [entire plugin or a specific
-collector](/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), you can disable any of them.
+collector](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), you can disable any of them.
 Keep in mind that if a plugin/collector has nothing to do, it simply shuts down and does not consume system resources.
 You will only improve the Agent's performance by disabling plugins/collectors that are actively collecting metrics.
 
@@ -139,7 +139,7 @@ modules:
 
 ## Lower memory usage for metrics retention
 
-Reduce the disk space that the [database engine](/database/engine/README.md) uses to retain metrics by editing
+Reduce the disk space that the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) uses to retain metrics by editing
 the `dbengine multihost disk space` option in `netdata.conf`. The default value is `256`, but can be set to a minimum of
 `64`. By reducing the disk space allocation, Netdata also needs to store less metadata in the node's memory.
 
@@ -147,7 +147,7 @@ The `page cache size` option also directly impacts Netdata's memory usage, but h
 
 Reducing the value of `dbengine multihost disk space` does slim down Netdata's resource usage, but it also reduces how
 long Netdata retains metrics. Find the right balance of performance and metrics retention by using the [dbengine
-calculator](/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics).
+calculator](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md#calculate-the-system-resources-ram-disk-space-needed-to-store-metrics).
 
 All the settings are found in the `[global]` section of `netdata.conf`:
 
@@ -187,11 +187,11 @@ with the following:
    
 ## Run Netdata behind Nginx
 
-A dedicated web server like Nginx provides far more robustness than the Agent's internal [web server](/web/README.md).
+A dedicated web server like Nginx provides far more robustness than the Agent's internal [web server](https://github.com/netdata/netdata/blob/master/web/README.md).
 Nginx can handle more concurrent connections, reuse idle connections, and use fast gzip compression to reduce payloads.
 
 For details on installing Nginx as a proxy for the local Agent dashboard, see our [Nginx
-doc](/docs/Running-behind-nginx.md).
+doc](https://github.com/netdata/netdata/blob/master/docs/Running-behind-nginx.md).
 
 After you complete Nginx setup according to the doc linked above, we recommend setting `keepalive` to `1024`, and using
 gzip compression with the following options in the `location /` block:
@@ -264,14 +264,14 @@ On the child nodes you should add to `netdata.conf` the following:
 
 We hope this guide helped you better understand how to optimize the performance of the Netdata Agent.
 
-Now that your Agent is running smoothly, we recommend you [secure your nodes](/docs/configure/nodes.md) if you haven't
+Now that your Agent is running smoothly, we recommend you [secure your nodes](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) if you haven't
 already.
 
 Next, dive into some of Netdata's more complex features, such as configuring its health watchdog or exporting metrics to
 an external time-series database.
 
--   [Interact with dashboards and charts](/docs/visualize/interact-dashboards-charts.md)
--   [Configure health alarms](/docs/monitor/configure-alarms.md)
--   [Export metrics to external time-series databases](/docs/export/external-databases.md)
+-   [Interact with dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)
+-   [Configure health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md)
+-   [Export metrics to external time-series databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fguides%2Fconfigure%2Fperformance.md&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

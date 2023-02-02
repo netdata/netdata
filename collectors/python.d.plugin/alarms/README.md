@@ -26,7 +26,7 @@ Below is an example of the chart produced when running `stress-ng --all 2` for a
 
 ## Configuration
 
-Enable the collector and [restart Netdata](/docs/configure/start-stop-restart.md).
+Enable the collector and [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 ```bash
 cd /etc/netdata/
@@ -36,7 +36,7 @@ sudo systemctl restart netdata
 ```
 
 If needed, edit the `python.d/alarms.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

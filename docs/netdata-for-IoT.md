@@ -10,22 +10,23 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for
 > New to Netdata? Check its demo: **<https://my-netdata.io/>**
 >
 >[![User
->Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
->[![Monitored
->Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
->[![Sessions
->Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
+> Base](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&label=user%20base&units=null&value_color=blue&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
+> [![Monitored
+> Servers](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&label=servers%20monitored&units=null&value_color=orange&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
+> [![Sessions
+> Served](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&label=sessions%20served&units=null&value_color=yellowgreen&precision=0&v41)](https://registry.my-netdata.io/#netdata_registry)
 >
 >[![New Users
->Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
->[![New Machines
->Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
->[![Sessions
->Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
+> Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=persons&after=-86400&options=unaligned&group=incremental-sum&label=new%20users%20today&units=null&value_color=blue&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
+> [![New Machines
+> Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_entries&dimensions=machines&group=incremental-sum&after=-86400&options=unaligned&label=servers%20added%20today&units=null&value_color=orange&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
+> [![Sessions
+> Today](https://registry.my-netdata.io/api/v1/badge.svg?chart=netdata.registry_sessions&after=-86400&group=incremental-sum&options=unaligned&label=sessions%20served%20today&units=null&value_color=yellowgreen&precision=0&v40)](https://registry.my-netdata.io/#netdata_registry)
 
 ---
 
-Netdata is a [very efficient](/docs/guides/configure/performance.md) server performance monitoring solution. When running in server hardware, it can collect
+Netdata is a [very efficient](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md)
+server performance monitoring solution. When running in server hardware, it can collect
 thousands of system and application metrics **per second** with just 1% CPU utilization of a single core. Its web server
 responds to most data requests in about **half a millisecond** making its web dashboards spontaneous, amazingly fast!
 
@@ -43,8 +44,8 @@ provider so it can directly be used by google sheets, google charts, google widg
 ![sensors](https://cloud.githubusercontent.com/assets/2662304/15339745/8be84540-1c8e-11e6-9e9a-106dea7539b6.gif)
 
 Although Netdata has been significantly optimized to lower the CPU and RAM resources it consumes, the plethora of data
-collection plugins may be inappropriate for weak IoT devices. Please follow the [Netdata Agent performance
-guide](/docs/guides/configure/performance.md)
+collection plugins may be inappropriate for weak IoT devices. Please follow
+the [Netdata Agent performance guide](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md)
 
 ## Monitoring RPi temperature
 
