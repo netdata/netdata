@@ -23,7 +23,7 @@ library](https://github.com/yzhao062/pyod/tree/master), which periodically runs 
 quantify how anomalous certain charts are.
 
 All these metrics and alarms are available for centralized monitoring in [Netdata Cloud](https://app.netdata.cloud). If
-you choose to sign up for Netdata Cloud and [connect your nodes](/claim/README.md), you will have the ability to run
+you choose to sign up for Netdata Cloud and [connect your nodes](https://github.com/netdata/netdata/blob/master/claim/README.md), you will have the ability to run
 tailored anomaly detection on every node in your infrastructure, regardless of its purpose or workload.
 
 In this guide, you'll learn how to set up the anomalies collector to instantly detect anomalies in an Nginx web server
@@ -35,9 +35,9 @@ server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea
 
 ## Prerequisites
 
-- A node running the Netdata Agent. If you don't yet have that, [get Netdata](/docs/get-started.mdx).
+- A node running the Netdata Agent. If you don't yet have that, [get Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
 - A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
-- Familiarity with configuring the Netdata Agent with [`edit-config`](/docs/configure/nodes.md).
+- Familiarity with configuring the Netdata Agent with [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 - _Optional_: An Nginx web server running on the same node to follow the example configuration steps.
 
 ## Install required Python packages
@@ -65,7 +65,7 @@ Use `exit` to become your normal user again.
 
 ## Enable the anomalies collector
 
-Navigate to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config`
+Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) and use `edit-config`
 to open the `python.d.conf` file.
 
 ```bash
@@ -79,8 +79,8 @@ yourself if it doesn't already exist. Either way, the final result should look l
 anomalies: yes
 ```
 
-[Restart the Agent](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system, to start up the anomalies collector. By default, the
+[Restart the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata`, or the [appropriate
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, to start up the anomalies collector. By default, the
 model training process runs every 30 minutes, and uses the previous 4 hours of metrics to establish a baseline for
 health and performance across the default included charts.
 
@@ -105,7 +105,7 @@ involve tweaking the behavior of the ML training itself.
 - `train_every_n`: How often to train the ML models.
 - `train_n_secs`: The number of historical observations to train each model on. The default is 4 hours, but if your node
   doesn't have historical metrics going back that far, consider [changing the metrics retention
-  policy](/docs/store/change-metrics-storage.md) or reducing this window.
+  policy](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) or reducing this window.
 - `custom_models`: A way to define custom models that you want anomaly probabilities for, including multi-node or
   streaming setups.
 
@@ -119,8 +119,8 @@ involve tweaking the behavior of the ML training itself.
 
 As mentioned above, this guide uses an Nginx web server to demonstrate how the anomalies collector works. You must
 configure the collector to monitor charts from the
-[Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) and [web
-log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog) collectors.
+[Nginx](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md) and [web
+log](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md) collectors.
 
 `charts_regex` allows for some basic regex, such as wildcards (`*`) to match all contexts with a certain pattern. For
 example, `system\..*` matches with any chart with a context that begins with `system.`, and ends in any number of other
@@ -163,27 +163,27 @@ volume of requests/responses, not, for example, which type of 4xx response a use
 dimensions](https://user-images.githubusercontent.com/1153921/102820642-d69f9180-4392-11eb-91c5-d3d166d40105.png)
 
 Apply the ideas behind the collector's regex and exclude settings to any other
-[system](/docs/collect/system-metrics.md), [container](/docs/collect/container-metrics.md), or
-[application](/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
+[system](https://github.com/netdata/netdata/blob/master/docs/collect/system-metrics.md), [container](https://github.com/netdata/netdata/blob/master/docs/collect/container-metrics.md), or
+[application](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md) metrics you want to detect anomalies for.
 
 ## What's next?
 
 Now that you know how to set up unsupervised anomaly detection in the Netdata Agent, using an Nginx web server as an
 example, it's time to apply that knowledge to other mission-critical parts of your infrastructure. If you're not sure
-what to monitor next, check out our list of [collectors](/collectors/COLLECTORS.md) to see what kind of metrics Netdata
+what to monitor next, check out our list of [collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) to see what kind of metrics Netdata
 can collect from your systems, containers, and applications.
 
-Keep on moving to [part 2](/docs/guides/monitor/visualize-monitor-anomalies.md), which covers the charts and alarms
+Keep on moving to [part 2](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/visualize-monitor-anomalies.md), which covers the charts and alarms
 Netdata creates for unsupervised anomaly detection.
 
 For a different troubleshooting experience, try out the [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) feature in Netdata Cloud. Metric
+Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) feature in Netdata Cloud. Metric
 Correlations helps you perform faster root cause analysis by narrowing a dashboard to only the charts most likely to be
 related to an anomaly.
 
 ### Related reference documentation
 
-- [Netdata Agent · Anomalies collector](/collectors/python.d.plugin/anomalies/README.md)
-- [Netdata Agent · Nginx collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx)
-- [Netdata Agent · web log collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog)
-- [Netdata Cloud · Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations)
+- [Netdata Agent · Anomalies collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md)
+- [Netdata Agent · Nginx collector](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md)
+- [Netdata Agent · web log collector](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md)
+- [Netdata Cloud · Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)

@@ -7,7 +7,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/o
 # See an overview of your infrastructure
 
 In Netdata Cloud, your nodes are organized into War Rooms. One of the two available views for a War Room is the
-[**Overview**](https://learn.netdata.cloud/docs/cloud/visualize/overview), which uses composite charts to display
+[**Overview**](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md), which uses composite charts to display
 real-time, aggregated metrics from all the nodes (or a filtered selection) in a given War Room.
 
 With Overview's composite charts, you can see your infrastructure from a single pane of glass, discover trends or
@@ -15,7 +15,7 @@ anomalies, then drill down with filtering or single-node dashboards to see more.
 each chart visualizes average or sum metrics values from across 5 distributed nodes.
 
 Netdata also supports robust Kubernetes monitoring using the Overview. Read our [deployment
-doc](/packaging/installer/methods/kubernetes.md) for details on visualizing Kubernetes metrics in Netdata Cloud.
+doc](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md) for details on visualizing Kubernetes metrics in Netdata Cloud.
 
 ![The War Room
 Overview](https://user-images.githubusercontent.com/1153921/108732681-09791980-74eb-11eb-9ba2-98cb1b6608de.png)
@@ -32,8 +32,8 @@ Let's walk through some examples of using the Overview to monitor and troublesho
 ### Filter nodes and pick relevant times
 
 While not exclusive to Overview, you can use two important features, [node
-filtering](https://learn.netdata.cloud/docs/cloud/war-rooms#node-filter) and the [time &amp; date
-picker](https://learn.netdata.cloud/docs/cloud/war-rooms#time--date-picker), to widen or narrow your infrastructure
+filtering](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#node-filter) and the [time &amp; date
+picker](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#time--date-picker), to widen or narrow your infrastructure
 monitoring focus.
 
 By default, the Overview shows composite charts aggregated from every node in the War Room, but you can change that
@@ -48,7 +48,7 @@ establishing a baseline of infrastructure performance or targeted root cause ana
 For example, use the **Quick Selector** options to pick the 12-hour option first thing in the morning to check your
 infrastructure for any odd behavior overnight. Use the 7-day option to observe trends between various days of the week.
 
-See the [War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms) docs for more details on both features.
+See the [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md) docs for more details on both features.
 
 ### Configure composite charts to identify problems
 
@@ -60,7 +60,7 @@ affects a single node, a subset of nodes, or an entire infrastructure.
 ![Composite charts showing available and committed RAM across an
 infrastructure](https://user-images.githubusercontent.com/1153921/99314892-0bae4680-281f-11eb-823e-071a1da25dc7.png)
 
-Use [_group by node_](https://learn.netdata.cloud/docs/cloud/visualize/overview#group-by-dimension-or-node) to visualize
+Use [_group by node_](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#group-by-dimension-or-node) to visualize
 a single metric across all contributing nodes. If the composite chart has 5 contributing nodes, there will be 5
 lines/areas, one for the most relevant dimension from each node.
 
@@ -80,32 +80,32 @@ given node to quickly _jump to the same chart in that node's single-node dashboa
 
 You can use single-node dashboards in Netdata Cloud to drill down on specific issues, scrub backward in time to
 investigate historical data, and see like metrics presented meaningfully to help you troubleshoot performance problems.
-All of the familiar [interactions](/docs/visualize/interact-dashboards-charts.md) are available, as is adding any chart
-to a [new dashboard](/docs/visualize/create-dashboards.md).
+All of the familiar [interactions](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) are available, as is adding any chart
+to a [new dashboard](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md).
 
 ## Nodes view
 
 You can also use the **Nodes view** to monitor the health status and user-configurable key metrics from multiple nodes
-in a War Room. Read the [Nodes view doc](https://learn.netdata.cloud/docs/cloud/visualize/nodes) for details.
+in a War Room. Read the [Nodes view doc](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md) for details.
 
 ![The Nodes view](https://user-images.githubusercontent.com/1153921/108733066-5fe65800-74eb-11eb-98e0-abaccd36deaf.png)
 
 ## What's next?
 
 To troubleshoot complex performance issues using Netdata, you need to understand how to interact with its meaningful
-visualizations. Learn more about [interaction](/docs/visualize/interact-dashboards-charts.md) to see historical metrics,
+visualizations. Learn more about [interaction](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) to see historical metrics,
 highlight timeframes for targeted analysis, and more.
 
 If you're a Kubernetes user, read about Netdata's [Kubernetes
-visualizations](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes) for details about the health map and
+visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) for details about the health map and
 time-series k8s charts, and our tutorial, [_Kubernetes monitoring with Netdata: Overview and
-visualizations_](/docs/guides/monitor/kubernetes-k8s-netdata.md), for a full walkthrough.
+visualizations_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md), for a full walkthrough.
 
 ### Related reference documentation
 
-- [Netdata Cloud · War Rooms](https://learn.netdata.cloud/docs/cloud/war-rooms)
-- [Netdata Cloud · Overview](https://learn.netdata.cloud/docs/cloud/visualize/overview)
-- [Netdata Cloud · Nodes view](https://learn.netdata.cloud/docs/cloud/visualize/nodes)
-- [Netdata Cloud · Kubernetes visualizations](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes)
+- [Netdata Cloud · War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+- [Netdata Cloud · Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
+- [Netdata Cloud · Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
+- [Netdata Cloud · Kubernetes visualizations](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
 
 

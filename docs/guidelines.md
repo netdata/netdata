@@ -281,7 +281,7 @@ Here you can see how the metadata are parsed and create a markdown file in learn
 ### Before you get started
 
 Anyone interested in contributing to documentation should first read the [Netdata style guide](#styling-guide) further
-down below and the [Netdata Community Code of Conduct](/contribute/code-of-conduct).
+down below and the [Netdata Community Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Netdata's documentation uses Markdown syntax. If you're not familiar with Markdown, read
 the [Mastering Markdown](https://guides.github.com/features/mastering-markdown/) guide from GitHub for the basics on
@@ -324,7 +324,7 @@ git clone https://github.com/YOUR-GITHUB-USERNAME/netdata.git
 ```
 
 Create a new branch using `git checkout -b BRANCH-NAME`. Use your favorite text editor to make your changes, keeping
-the [Netdata style guide](/contribute/style-guide) in mind. Add, commit, and push changes to your fork. When you're
+the [Netdata style guide](https://github.com/netdata/netdata/blob/master/docs/contributing/style-guide.md) in mind. Add, commit, and push changes to your fork. When you're
 finished, visit the [Netdata Agent Pull requests](https://github.com/netdata/netdata/pulls) to create a new pull request
 based on the changes you made in the new branch of your fork.
 
@@ -680,8 +680,8 @@ reader.
 
 |                 |                                                                                            |
 | --------------- | ------------------------------------------------------------------------------------------ |
-| Not recommended | To install Netdata, click [here](/docs/agent/packaging/installer).                         |
-| **Recommended** | To install Netdata, read the [installation instructions](/docs/agent/packaging/installer). |
+| Not recommended | To install Netdata, click [here](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).                         |
+| **Recommended** | To install Netdata, read the [installation instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). |
 
 Use links as often as required to provide necessary context. Blog posts and guides require less hyperlinks than
 documentation. See the section on [linking between documentation](#linking-between-documentation) for guidance on the
@@ -732,7 +732,7 @@ Netdata Agent installation will have commands under the same paths. When applica
 path, providing a recommendation or instructions on how to view the running configuration, which includes the correct
 paths.
 
-For example, the [configuration](/docs/configure/nodes) doc first teaches users how to find the Netdata config directory
+For example, the [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) doc first teaches users how to find the Netdata config directory
 and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more universal.
 
 Don't include full paths, beginning from the system's root (`/`), as these might not work on certain systems.
@@ -741,7 +741,7 @@ Don't include full paths, beginning from the system's root (`/`), as these might
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`.                                                                                                                                                  |
 | **
-Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/configure/nodes#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
 
 #### `sudo`
 

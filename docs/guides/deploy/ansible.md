@@ -11,7 +11,7 @@ learn_rel_path: "Installation"
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](/docs/get-started.mdx) is zero-configuration, highly adaptable, and compatible with tons
+Netdata's [one-line kickstart](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) is zero-configuration, highly adaptable, and compatible with tons
 of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
 in-between.
 
@@ -105,8 +105,8 @@ two different SSH keys supplied by AWS.
 ### Edit the `vars/main.yml` file
 
 In order to connect your node(s) to your Space in Netdata Cloud, and see all their metrics in real-time in [composite
-charts](/docs/visualize/overview-infrastructure.md) or perform [Metric
-Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), you need to set the `claim_token`
+charts](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) or perform [Metric
+Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), you need to set the `claim_token`
 and `claim_room` variables.
 
 To find your `claim_token` and `claim_room`, go to Netdata Cloud, then click on your Space's name in the top navigation,
@@ -131,7 +131,7 @@ hostname of the node, the playbook disables that local dashboard by setting `web
 security boost by not allowing any unwanted access to the local dashboard.
 
 You can read more about this decision, or other ways you might lock down the local dashboard, in our [node security
-doc](https://learn.netdata.cloud/docs/configure/secure-nodes).
+doc](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
 
 > Curious about why Netdata's dashboard is open by default? Read our [blog
 > post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
@@ -166,11 +166,11 @@ want to do with Netdata, so use those categories to dive in.
 
 Some of the best places to start:
 
--   [Enable or configure a collector](/docs/collect/enable-configure.md)
--   [Supported collectors list](/collectors/COLLECTORS.md)
--   [See an overview of your infrastructure](/docs/visualize/overview-infrastructure.md)
--   [Interact with dashboards and charts](/docs/visualize/interact-dashboards-charts.md)
--   [Change how long Netdata stores metrics](/docs/store/change-metrics-storage.md)
+-   [Enable or configure a collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md)
+-   [Supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
+-   [See an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md)
+-   [Interact with dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)
+-   [Change how long Netdata stores metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
 
 We're looking for more deployment and configuration management strategies, whether via Ansible or other
 provisioning/infrastructure as code software, such as Chef or Puppet, in our [community

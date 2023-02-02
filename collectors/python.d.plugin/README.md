@@ -90,7 +90,7 @@ plugin](https://raw.githubusercontent.com/netdata/netdata/master/collectors/pyth
 Netdata (as opposed to having to install Netdata from source again with your new changes) to can copy over the relevant
 file to where Netdata expects it and then either `sudo systemctl restart netdata` to have it be picked up and used by
 Netdata or you can just run the updated collector in debug mode by following a process like below (this assumes you have
-[installed Netdata from a GitHub fork](https://learn.netdata.cloud/docs/agent/packaging/installer/methods/manual) you
+[installed Netdata from a GitHub fork](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md) you
 have made to do your development on).
 
 ```bash
@@ -129,7 +129,7 @@ CHART = {
         ]}
 ```
 
-All names are better explained in the [External Plugins](/collectors/plugins.d/README.md) section.
+All names are better explained in the [External Plugins](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md) section.
 Parameters like `priority` and `update_every` are handled by `python.d.plugin`.
 
 ### `Service` class
@@ -231,7 +231,7 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 _Examples: `apache`, `nginx`, `tomcat`_
 
-_Multiple Endpoints (urls) Examples: [`rabbitmq`](/collectors/python.d.plugin/rabbitmq/README.md) (simpler).
+_Multiple Endpoints (urls) Examples: [`rabbitmq`](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rabbitmq/README.md) (simpler).
 
 
 _Variables from config file_: `url`, `user`, `pass`.

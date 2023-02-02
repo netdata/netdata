@@ -14,16 +14,19 @@ Netdata uses collectors to help you gather metrics from your favorite applicatio
 real-time, interactive charts. The following list includes collectors for both external services/applications and
 internal system metrics.
 
-Learn more about [how collectors work](/docs/collect/how-collectors-work.md), and then learn how to [enable or
-configure](/docs/collect/enable-configure.md) any of the below collectors using the same process.
+Learn more
+about [how collectors work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md), and
+then learn how to [enable or
+configure](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) any of the below collectors using the same process.
 
 Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these
 cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best
 experience.
 
-If you want to use a Python version of a collector, you need to explicitly [disable the Go
-version](/docs/collect/enable-configure.md), and enable the Python version. Netdata then skips the Go version and
-attempts to load the Python version and its accompanying configuration file.
+If you want to use a Python version of a collector, you need to
+explicitly [disable the Go version](https://github.com/netdata/netdata/blob/masterhttps://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
+and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
+accompanying configuration file.
 
 If you don't see the app/service you'd like to monitor in this list:
 
@@ -33,7 +36,7 @@ If you don't see the app/service you'd like to monitor in this list:
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
 - If you have basic software development skills, you can add your own plugin
   in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
-  or [Python](https://learn.netdata.cloud/guides/python-collector)
+  or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
 Supported Collectors List:
 
@@ -76,256 +79,300 @@ configure any of these collectors according to your setup and infrastructure.
 
 ### Generic
 
-- [Prometheus endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus): Gathers
+- [Prometheus endpoints](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md): Gathers
   metrics from any number of Prometheus endpoints, with support to autodetect more than 600 services and applications.
-- [Pandas](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/pandas): A Python collector that gathers
-  metrics from a [pandas](https://pandas.pydata.org/) dataframe. Pandas is a high level data processing library in 
-  Python that can read various formats of data from local files or web endpoints. Custom processing and transformation 
+- [Pandas](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md): A Python
+  collector that gathers
+  metrics from a [pandas](https://pandas.pydata.org/) dataframe. Pandas is a high level data processing library in
+  Python that can read various formats of data from local files or web endpoints. Custom processing and transformation
   logic can also be expressed as part of the collector configuration.
 
 ### APM (application performance monitoring)
 
-- [Go applications](/collectors/python.d.plugin/go_expvar/README.md): Monitor any Go application that exposes its
+- [Go applications](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/go_expvar/README.md):
+  Monitor any Go application that exposes its
   metrics with the  `expvar` package from the Go standard library.
-- [Java Spring Boot 2
-  applications](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/springboot2/):
+- [Java Spring Boot 2 applications](https://github.com/netdata/go.d.plugin/blob/master/modules/springboot2/README.md):
   Monitor running Java Spring Boot 2 applications that expose their metrics with the use of the Spring Boot Actuator.
-- [statsd](/collectors/statsd.plugin/README.md): Implement a high performance `statsd` server for Netdata.
-- [phpDaemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpdaemon/): Collect worker
+- [statsd](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md): Implement a high
+  performance `statsd` server for Netdata.
+- [phpDaemon](https://github.com/netdata/go.d.plugin/blob/master/modules/phpdaemon/README.md): Collect worker
   statistics (total, active, idle), and uptime for web and network applications.
-- [uWSGI](/collectors/python.d.plugin/uwsgi/README.md): Monitor performance metrics exposed by the uWSGI Stats
+- [uWSGI](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/uwsgi/README.md): Monitor
+  performance metrics exposed by the uWSGI Stats
   Server.
 
 ### Containers and VMs
 
-- [Docker containers](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual Docker
-  containers using the cgroups collector plugin.
-- [DockerD](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker/): Collect container health statistics.
-- [Docker Engine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/docker_engine/): Collect
+- [Docker containers](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the
+  health and performance of individual Docker containers using the cgroups collector plugin.
+- [DockerD](https://github.com/netdata/go.d.plugin/blob/master/modules/docker/README.md): Collect container health
+  statistics.
+- [Docker Engine](https://github.com/netdata/go.d.plugin/blob/master/modules/docker_engine/README.md): Collect
   runtime statistics from the `docker` daemon using the `metrics-address` feature.
-- [Docker Hub](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dockerhub/): Collect statistics
+- [Docker Hub](https://github.com/netdata/go.d.plugin/blob/master/modules/dockerhub/README.md): Collect statistics
   about Docker repositories, such as pulls, starts, status, time since last update, and more.
-- [Libvirt](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual Libvirt containers
+- [Libvirt](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the health and
+  performance of individual Libvirt containers
   using the cgroups collector plugin.
-- [LXC](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual LXC containers using
+- [LXC](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the health and
+  performance of individual LXC containers using
   the cgroups collector plugin.
-- [LXD](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual LXD containers using
+- [LXD](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the health and
+  performance of individual LXD containers using
   the cgroups collector plugin.
-- [systemd-nspawn](/collectors/cgroups.plugin/README.md): Monitor the health and performance of individual
+- [systemd-nspawn](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the
+  health and performance of individual
   systemd-nspawn containers using the cgroups collector plugin.
-- [vCenter Server Appliance](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vcsa/): Monitor
+- [vCenter Server Appliance](https://github.com/netdata/go.d.plugin/blob/master/modules/vcsa/README.md): Monitor
   appliance system, components, and software update health statuses via the Health API.
-- [vSphere](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vsphere/): Collect host and virtual
+- [vSphere](https://github.com/netdata/go.d.plugin/blob/master/modules/vsphere/README.md): Collect host and virtual
   machine performance metrics.
-- [Xen/XCP-ng](/collectors/xenstat.plugin/README.md): Collect XenServer and XCP-ng metrics using `libxenstat`.
+- [Xen/XCP-ng](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/README.md): Collect XenServer
+  and XCP-ng metrics using `libxenstat`.
 
 ### Data stores
 
-- [CockroachDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/cockroachdb/): Monitor various
+- [CockroachDB](https://github.com/netdata/go.d.plugin/blob/master/modules/cockroachdb/README.md): Monitor various
   database components using `_status/vars` endpoint.
-- [Consul](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/consul/): Capture service and unbound
+- [Consul](https://github.com/netdata/go.d.plugin/blob/master/modules/consul/README.md): Capture service and unbound
   checks status (passing, warning, critical, maintenance).
-- [Couchbase](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchbase/): Gather per-bucket
+- [Couchbase](https://github.com/netdata/go.d.plugin/blob/master/modules/couchbase/README.md): Gather per-bucket
   metrics from any number of instances of the distributed JSON document database.
-- [CouchDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/couchdb): Monitor database health and
+- [CouchDB](https://github.com/netdata/go.d.plugin/blob/master/modules/couchdb/README.md): Monitor database health and
   performance metrics
   (reads/writes, HTTP traffic, replication status, etc).
-- [MongoDB](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mongodb): Collect server, database,
+- [MongoDB](https://github.com/netdata/go.d.plugin/blob/master/modules/mongodb/README.md): Collect server, database,
   replication and sharding performance and health metrics.
-- [MySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/mysql/): Collect database global,
+- [MySQL](https://github.com/netdata/go.d.plugin/blob/master/modules/mysql/README.md): Collect database global,
   replication and per user statistics.
-- [OracleDB](/collectors/python.d.plugin/oracledb/README.md): Monitor database performance and health metrics.
-- [Pika](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pika/): Gather metric, such as clients,
+- [OracleDB](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/oracledb/README.md): Monitor
+  database performance and health metrics.
+- [Pika](https://github.com/netdata/go.d.plugin/blob/master/modules/pika/README.md): Gather metric, such as clients,
   memory usage, queries, and more from the Redis interface-compatible database.
-- [Postgres](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/postgres): Collect database health
+- [Postgres](https://github.com/netdata/go.d.plugin/blob/master/modules/postgres/README.md): Collect database health
   and performance metrics.
-- [ProxySQL](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/proxysql): Monitor database backend
+- [ProxySQL](https://github.com/netdata/go.d.plugin/blob/master/modules/proxysql/README.md): Monitor database backend
   and frontend performance metrics.
-- [Redis](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/redis/): Monitor status from any
+- [Redis](https://github.com/netdata/go.d.plugin/blob/master/modules/redis/README.md): Monitor status from any
   number of database instances by reading the server's response to the `INFO ALL` command.
-- [RethinkDB](/collectors/python.d.plugin/rethinkdbs/README.md): Collect database server and cluster statistics.
-- [Riak KV](/collectors/python.d.plugin/riakkv/README.md): Collect database stats from the `/stats` endpoint.
-- [Zookeeper](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/zookeeper/): Monitor application
+- [RethinkDB](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rethinkdbs/README.md): Collect
+  database server and cluster statistics.
+- [Riak KV](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/riakkv/README.md): Collect
+  database stats from the `/stats` endpoint.
+- [Zookeeper](https://github.com/netdata/go.d.plugin/blob/master/modules/zookeeper/README.md): Monitor application
   health metrics reading the server's response to the `mntr` command.
-- [Memcached](/collectors/python.d.plugin/memcached/README.md): Collect memory-caching system performance metrics.
+- [Memcached](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/memcached/README.md): Collect
+  memory-caching system performance metrics.
 
 ### Distributed computing
 
-- [BOINC](/collectors/python.d.plugin/boinc/README.md): Monitor the total number of tasks, open tasks, and task
+- [BOINC](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/boinc/README.md): Monitor the total
+  number of tasks, open tasks, and task
   states for the distributed computing client.
-- [Gearman](/collectors/python.d.plugin/gearman/README.md): Collect application summary (queued, running) and per-job
+- [Gearman](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/gearman/README.md): Collect
+  application summary (queued, running) and per-job
   worker statistics (queued, idle, running).
 
 ### Email
 
-- [Dovecot](/collectors/python.d.plugin/dovecot/README.md): Collect email server performance metrics by reading the
+- [Dovecot](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/dovecot/README.md): Collect email
+  server performance metrics by reading the
   server's response to the `EXPORT global` command.
-- [EXIM](/collectors/python.d.plugin/exim/README.md): Uses the `exim` tool to monitor the queue length of a
+- [EXIM](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/exim/README.md): Uses the `exim` tool
+  to monitor the queue length of a
   mail/message transfer agent (MTA).
-- [Postfix](/collectors/python.d.plugin/postfix/README.md): Uses the `postqueue` tool to monitor the queue length of a
+- [Postfix](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/postfix/README.md): Uses
+  the `postqueue` tool to monitor the queue length of a
   mail/message transfer agent (MTA).
 
 ### Kubernetes
 
-- [Kubelet](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubelet/): Monitor one or more
+- [Kubelet](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubelet/README.md): Monitor one or more
   instances of the Kubelet agent and collects metrics on number of pods/containers running, volume of Docker
   operations, and more.
-- [kube-proxy](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/k8s_kubeproxy/): Collect
+- [kube-proxy](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubeproxy/README.md): Collect
   metrics, such as syncing proxy rules and REST client requests, from one or more instances of `kube-proxy`.
-- [Service discovery](https://github.com/netdata/agent-service-discovery/): Find what services are running on a
+- [Service discovery](https://github.com/netdata/agent-service-discovery/README.md): Find what services are running on a
   cluster's pods, converts that into configuration files, and exports them so they can be monitored by Netdata.
 
 ### Logs
 
-- [Fluentd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/fluentd/): Gather application
+- [Fluentd](https://github.com/netdata/go.d.plugin/blob/master/modules/fluentd/README.md): Gather application
   plugins metrics from an endpoint provided by `in_monitor plugin`.
-- [Logstash](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logstash/): Monitor JVM threads,
+- [Logstash](https://github.com/netdata/go.d.plugin/blob/master/modules/logstash/README.md): Monitor JVM threads,
   memory usage, garbage collection statistics, and more.
-- [OpenVPN status logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn_status_log): Parse
+- [OpenVPN status logs](https://github.com/netdata/go.d.plugin/blob/master/modules/openvpn_status_log/README.md): Parse
   server log files and provide summary (client, traffic) metrics.
-- [Squid web server logs](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/squidlog/): Tail Squid
+- [Squid web server logs](https://github.com/netdata/go.d.plugin/blob/master/modules/squidlog/README.md): Tail Squid
   access logs to return the volume of requests, types of requests, bandwidth, and much more.
 - [Web server logs (Go version for Apache,
-  NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/): Tail access logs and provide
+  NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md/): Tail access logs and provide
   very detailed web server performance statistics. This module is able to parse 200k+ rows in less than half a second.
-- [Web server logs (Apache, NGINX)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog): Tail
+- [Web server logs (Apache, NGINX)](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md): Tail
   access log
   file and collect web server/caching proxy metrics.
 
 ### Messaging
 
-- [ActiveMQ](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/activemq/): Collect message broker
+- [ActiveMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/activemq/README.md): Collect message broker
   queues and topics statistics using the ActiveMQ Console API.
-- [Beanstalk](/collectors/python.d.plugin/beanstalk/README.md): Collect server and tube-level statistics, such as CPU
+- [Beanstalk](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/beanstalk/README.md): Collect
+  server and tube-level statistics, such as CPU
   usage, jobs rates, commands, and more.
-- [Pulsar](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pulsar/): Collect summary,
+- [Pulsar](https://github.com/netdata/go.d.plugin/blob/master/modules/pulsar/README.md): Collect summary,
   namespaces, and topics performance statistics.
-- [RabbitMQ (Go)](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/rabbitmq/): Collect message
+- [RabbitMQ (Go)](https://github.com/netdata/go.d.plugin/blob/master/modules/rabbitmq/README.md): Collect message
   broker overview, system and per virtual host metrics.
-- [RabbitMQ (Python)](/collectors/python.d.plugin/rabbitmq/README.md): Collect message broker global and per virtual
+- [RabbitMQ (Python)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rabbitmq/README.md):
+  Collect message broker global and per virtual
   host metrics.
-- [VerneMQ](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/vernemq/): Monitor MQTT broker
+- [VerneMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/vernemq/README.md): Monitor MQTT broker
   health and performance metrics. It collects all available info for both MQTTv3 and v5 communication
 
 ### Network
 
-- [Bind 9](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/bind/): Collect nameserver summary
+- [Bind 9](https://github.com/netdata/go.d.plugin/blob/master/modules/bind/README.md): Collect nameserver summary
   performance statistics via a web interface (`statistics-channels` feature).
-- [Chrony](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/chrony): Monitor the precision and
+- [Chrony](https://github.com/netdata/go.d.plugin/blob/master/modules/chrony/README.md): Monitor the precision and
   statistics of a local `chronyd` server.
-- [CoreDNS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/coredns/): Measure DNS query round
+- [CoreDNS](https://github.com/netdata/go.d.plugin/blob/master/modules/coredns/README.md): Measure DNS query round
   trip time.
-- [Dnsmasq](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq_dhcp/): Automatically
+- [Dnsmasq](https://github.com/netdata/go.d.plugin/blob/master/modules/dnsmasq_dhcp/README.md): Automatically
   detects all configured `Dnsmasq` DHCP ranges and Monitor their utilization.
-- [DNSdist](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsdist/): Collect
+- [DNSdist](https://github.com/netdata/go.d.plugin/blob/master/modules/dnsdist/README.md): Collect
   load-balancer performance and health metrics.
-- [Dnsmasq DNS Forwarder](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsmasq/): Gather
+- [Dnsmasq DNS Forwarder](https://github.com/netdata/go.d.plugin/blob/master/modules/dnsmasq/README.md): Gather
   queries, entries, operations, and events for the lightweight DNS forwarder.
-- [DNS Query Time](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/dnsquery/): Monitor the round
+- [DNS Query Time](https://github.com/netdata/go.d.plugin/blob/master/modules/dnsquery/README.md): Monitor the round
   trip time for DNS queries in milliseconds.
-- [Freeradius](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/freeradius/): Collect
+- [Freeradius](https://github.com/netdata/go.d.plugin/blob/master/modules/freeradius/README.md): Collect
   server authentication and accounting statistics from the `status server`.
-- [Libreswan](/collectors/charts.d.plugin/libreswan/README.md): Collect bytes-in, bytes-out, and uptime metrics.
-- [Icecast](/collectors/python.d.plugin/icecast/README.md): Monitor the number of listeners for active sources.
-- [ISC Bind (RDNC)](/collectors/python.d.plugin/bind_rndc/README.md): Collect nameserver summary performance
+- [Libreswan](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/libreswan/README.md): Collect
+  bytes-in, bytes-out, and uptime metrics.
+- [Icecast](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/icecast/README.md): Monitor the
+  number of listeners for active sources.
+- [ISC Bind (RDNC)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/bind_rndc/README.md):
+  Collect nameserver summary performance
   statistics using the `rndc` tool.
-- [ISC DHCP](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/isc_dhcpd): Reads a
+- [ISC DHCP](https://github.com/netdata/go.d.plugin/blob/master/modules/isc_dhcpd/README.md): Reads a
   `dhcpd.leases` file and collects metrics on total active leases, pool active leases, and pool utilization.
-- [OpenLDAP](/collectors/python.d.plugin/openldap/README.md): Provides statistics information from the OpenLDAP
+- [OpenLDAP](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/openldap/README.md): Provides
+  statistics information from the OpenLDAP
   (`slapd`) server.
-- [NSD](/collectors/python.d.plugin/nsd/README.md): Monitor nameserver performance metrics using the `nsd-control`
+- [NSD](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nsd/README.md): Monitor nameserver
+  performance metrics using the `nsd-control`
   tool.
 - [NTP daemon](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ntpd): Monitor the system variables
   of the local `ntpd` daemon (optionally including variables of the polled peers) using the NTP Control Message Protocol
   via a UDP socket.
-- [OpenSIPS](/collectors/charts.d.plugin/opensips/README.md): Collect server health and performance metrics using the
+- [OpenSIPS](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/opensips/README.md): Collect
+  server health and performance metrics using the
   `opensipsctl` tool.
-- [OpenVPN](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/openvpn/): Gather server summary
+- [OpenVPN](https://github.com/netdata/go.d.plugin/blob/master/modules/openvpn/README.md): Gather server summary
   (client, traffic) and per user metrics (traffic, connection time) stats using `management-interface`.
-- [Pi-hole](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/pihole/): Monitor basic (DNS
+- [Pi-hole](https://github.com/netdata/go.d.plugin/blob/master/modules/pihole/README.md): Monitor basic (DNS
   queries, clients, blocklist) and extended (top clients, top permitted, and blocked domains) statistics using the PHP
   API.
-- [PowerDNS Authoritative Server](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns):
+- [PowerDNS Authoritative Server](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md):
   Monitor one or more instances of the nameserver software to collect questions, events, and latency metrics.
-- [PowerDNS Recursor](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/powerdns_recursor):
+- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md_recursor):
   Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
-- [RetroShare](/collectors/python.d.plugin/retroshare/README.md): Monitor application bandwidth, peers, and DHT
+- [RetroShare](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/retroshare/README.md): Monitor
+  application bandwidth, peers, and DHT
   metrics.
-- [Tor](/collectors/python.d.plugin/tor/README.md): Capture traffic usage statistics using the Tor control port.
-- [Unbound](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/unbound/): Collect DNS resolver
+- [Tor](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/tor/README.md): Capture traffic usage
+  statistics using the Tor control port.
+- [Unbound](https://github.com/netdata/go.d.plugin/blob/master/modules/unbound/README.md): Collect DNS resolver
   summary and extended system and per thread metrics via the `remote-control` interface.
 
 ### Provisioning
 
-- [Puppet](/collectors/python.d.plugin/puppet/README.md): Monitor the status of Puppet Server and Puppet DB.
+- [Puppet](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/puppet/README.md): Monitor the
+  status of Puppet Server and Puppet DB.
 
 ### Remote devices
 
-- [AM2320](/collectors/python.d.plugin/am2320/README.md): Monitor sensor temperature and humidity.
-- [Access point](/collectors/charts.d.plugin/ap/README.md): Monitor client, traffic and signal metrics using the `aw`
+- [AM2320](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/am2320/README.md): Monitor sensor
+  temperature and humidity.
+- [Access point](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/ap/README.md): Monitor
+  client, traffic and signal metrics using the `aw`
   tool.
-- [APC UPS](/collectors/charts.d.plugin/apcupsd/README.md): Capture status information using the `apcaccess` tool.
-- [Energi Core](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/energid): Monitor
+- [APC UPS](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/apcupsd/README.md): Capture status
+  information using the `apcaccess` tool.
+- [Energi Core](https://github.com/netdata/go.d.plugin/blob/master/modules/energid/README.md): Monitor
   blockchain indexes, memory usage, network usage, and transactions of wallet instances.
-- [UPS/PDU](/collectors/charts.d.plugin/nut/README.md): Read the status of UPS/PDU devices using the `upsc` tool.
-- [SNMP devices](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/snmp): Gather data using the SNMP
+- [UPS/PDU](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/nut/README.md): Read the status of
+  UPS/PDU devices using the `upsc` tool.
+- [SNMP devices](https://github.com/netdata/go.d.plugin/blob/master/modules/snmp/README.md): Gather data using the SNMP
   protocol.
-- [1-Wire sensors](/collectors/python.d.plugin/w1sensor/README.md): Monitor sensor temperature.
+- [1-Wire sensors](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/w1sensor/README.md):
+  Monitor sensor temperature.
 
 ### Search
 
-- [Elasticsearch](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/elasticsearch): Collect
+- [Elasticsearch](https://github.com/netdata/go.d.plugin/blob/master/modules/elasticsearch/README.md): Collect
   dozens of metrics on search engine performance from local nodes and local indices. Includes cluster health and
   statistics.
-- [Solr](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/solr/): Collect application search
+- [Solr](https://github.com/netdata/go.d.plugin/blob/master/modules/solr/README.md): Collect application search
   requests, search errors, update requests, and update errors statistics.
 
 ### Storage
 
-- [Ceph](/collectors/python.d.plugin/ceph/README.md): Monitor the Ceph cluster usage and server data consumption.
-- [HDFS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/hdfs/): Monitor health and performance
+- [Ceph](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/ceph/README.md): Monitor the Ceph
+  cluster usage and server data consumption.
+- [HDFS](https://github.com/netdata/go.d.plugin/blob/master/modules/hdfs/README.md): Monitor health and performance
   metrics for filesystem datanodes and namenodes.
-- [IPFS](/collectors/python.d.plugin/ipfs/README.md): Collect file system bandwidth, peers, and repo metrics.
-- [Scaleio](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/scaleio/): Monitor storage system,
+- [IPFS](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/ipfs/README.md): Collect file system
+  bandwidth, peers, and repo metrics.
+- [Scaleio](https://github.com/netdata/go.d.plugin/blob/master/modules/scaleio/README.md): Monitor storage system,
   storage pools, and SDCS health and performance metrics via VxFlex OS Gateway API.
-- [Samba](/collectors/python.d.plugin/samba/README.md): Collect file sharing metrics using the `smbstatus` tool.
+- [Samba](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/samba/README.md): Collect file
+  sharing metrics using the `smbstatus` tool.
 
 ### Web
 
-- [Apache](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/apache/): Collect Apache web
+- [Apache](https://github.com/netdata/go.d.plugin/blob/master/modules/apache/README.md): Collect Apache web
   server performance metrics via the `server-status?auto` endpoint.
-- [HAProxy](/collectors/python.d.plugin/haproxy/README.md): Collect frontend, backend, and health metrics.
-- [HTTP endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/httpcheck/): Monitor
+- [HAProxy](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/haproxy/README.md): Collect
+  frontend, backend, and health metrics.
+- [HTTP endpoints](https://github.com/netdata/go.d.plugin/blob/master/modules/httpcheck/README.md): Monitor
   any HTTP endpoint's availability and response time.
-- [Lighttpd](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd/): Collect web server
+- [Lighttpd](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd/README.md): Collect web server
   performance metrics using the `server-status?auto` endpoint.
-- [Lighttpd2](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/lighttpd2/): Collect web server
+- [Lighttpd2](https://github.com/netdata/go.d.plugin/blob/master/modules/lighttpd2/README.md): Collect web server
   performance metrics using the `server-status?format=plain` endpoint.
-- [Litespeed](/collectors/python.d.plugin/litespeed/README.md): Collect web server data (network, connection,
+- [Litespeed](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/litespeed/README.md): Collect
+  web server data (network, connection,
   requests, cache) by reading `.rtreport*` files.
-- [Nginx](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx/): Monitor web server
+- [Nginx](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md): Monitor web server
   status information by gathering metrics via `ngx_http_stub_status_module`.
-- [Nginx VTS](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginxvts/): Gathers metrics from
+- [Nginx VTS](https://github.com/netdata/go.d.plugin/blob/master/modules/nginxvts/README.md): Gathers metrics from
   any Nginx deployment with the _virtual host traffic status module_ enabled, including metrics on uptime, memory
   usage, and cache, and more.
-- [PHP-FPM](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/phpfpm/): Collect application
+- [PHP-FPM](https://github.com/netdata/go.d.plugin/blob/master/modules/phpfpm/README.md): Collect application
   summary and processes health metrics by scraping the status page (`/status?full`).
-- [TCP endpoints](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/portcheck/): Monitor any
+- [TCP endpoints](https://github.com/netdata/go.d.plugin/blob/master/modules/portcheck/README.md): Monitor any
   TCP endpoint's availability and response time.
-- [Spigot Minecraft servers](/collectors/python.d.plugin/spigotmc/README.md): Monitor average ticket rate and number
+- [Spigot Minecraft servers](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/spigotmc/README.md):
+  Monitor average ticket rate and number
   of users.
-- [Squid](/collectors/python.d.plugin/squid/README.md): Monitor client and server bandwidth/requests by gathering
+- [Squid](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/squid/README.md): Monitor client and
+  server bandwidth/requests by gathering
   data from the Cache Manager component.
-- [Tengine](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/tengine/): Monitor web server
+- [Tengine](https://github.com/netdata/go.d.plugin/blob/master/modules/tengine/README.md): Monitor web server
   statistics using information provided by `ngx_http_reqstat_module`.
-- [Tomcat](/collectors/python.d.plugin/tomcat/README.md): Collect web server performance metrics from the Manager App
+- [Tomcat](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/tomcat/README.md): Collect web
+  server performance metrics from the Manager App
   (`/manager/status?XML=true`).
-- [Traefik](/collectors/python.d.plugin/traefik/README.md): Uses Traefik's Health API to provide statistics.
-- [Varnish](/collectors/python.d.plugin/varnish/README.md): Provides HTTP accelerator global, backends (VBE), and
+- [Traefik](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/traefik/README.md): Uses Traefik's
+  Health API to provide statistics.
+- [Varnish](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/varnish/README.md): Provides HTTP
+  accelerator global, backends (VBE), and
   disks (SMF) statistics using the `varnishstat` tool.
-- [x509 check](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/x509check/): Monitor certificate
+- [x509 check](https://github.com/netdata/go.d.plugin/blob/master/modules/x509check/README.md): Monitor certificate
   expiration time.
-- [Whois domain expiry](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/whoisquery/): Checks the
+- [Whois domain expiry](https://github.com/netdata/go.d.plugin/blob/master/modules/whoisquery/README.md): Checks the
   remaining time until a given domain is expired.
 
 ## System collectors
@@ -335,139 +382,198 @@ The Netdata Agent can collect these system- and hardware-level metrics using a v
 
 ### Applications
 
-- [Fail2ban](/collectors/python.d.plugin/fail2ban/README.md): Parses configuration files to detect all jails, then
+- [Fail2ban](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/fail2ban/README.md): Parses
+  configuration files to detect all jails, then
   uses log files to report ban rates and volume of banned IPs.
-- [Monit](/collectors/python.d.plugin/monit/README.md): Monitor statuses of targets (service-checks) using the XML
+- [Monit](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/monit/README.md): Monitor statuses
+  of targets (service-checks) using the XML
   stats interface.
 - [WMI (Windows Management Instrumentation)
-  exporter](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/wmi/): Collect CPU, memory,
+  exporter](https://github.com/netdata/go.d.plugin/blob/master/modules/wmi/README.md): Collect CPU, memory,
   network, disk, OS, system, and log-in metrics scraping `wmi_exporter`.
 
 ### Disks and filesystems
 
-- [BCACHE](/collectors/proc.plugin/README.md): Monitor BCACHE statistics with the the `proc.plugin` collector.
-- [Block devices](/collectors/proc.plugin/README.md): Gather metrics about the health and performance of block
+- [BCACHE](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor BCACHE statistics
+  with the the `proc.plugin` collector.
+- [Block devices](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
+  the health and performance of block
   devices using the the `proc.plugin` collector.
-- [Btrfs](/collectors/proc.plugin/README.md): Monitors Btrfs filesystems with the the `proc.plugin` collector.
-- [Device mapper](/collectors/proc.plugin/README.md): Gather metrics about the Linux device mapper with the proc
+- [Btrfs](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitors Btrfs filesystems
+  with the the `proc.plugin` collector.
+- [Device mapper](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
+  the Linux device mapper with the proc
   collector.
-- [Disk space](/collectors/diskspace.plugin/README.md): Collect disk space usage metrics on Linux mount points.
-- [Clock synchronization](/collectors/timex.plugin/README.md): Collect the system clock synchronization status on Linux.
-- [Files and directories](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/filecheck): Gather
+- [Disk space](https://github.com/netdata/netdata/blob/master/collectors/diskspace.plugin/README.md): Collect disk space
+  usage metrics on Linux mount points.
+- [Clock synchronization](https://github.com/netdata/netdata/blob/master/collectors/timex.plugin/README.md): Collect the
+  system clock synchronization status on Linux.
+- [Files and directories](https://github.com/netdata/go.d.plugin/blob/master/modules/filecheck/README.md): Gather
   metrics about the existence, modification time, and size of files or directories.
-- [ioping.plugin](/collectors/ioping.plugin/README.md): Measure disk read/write latency.
-- [NFS file servers and clients](/collectors/proc.plugin/README.md): Gather operations, utilization, and space usage
+- [ioping.plugin](https://github.com/netdata/netdata/blob/master/collectors/ioping.plugin/README.md): Measure disk
+  read/write latency.
+- [NFS file servers and clients](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md):
+  Gather operations, utilization, and space usage
   using the the `proc.plugin` collector.
-- [RAID arrays](/collectors/proc.plugin/README.md): Collect health, disk status, operation status, and more with the
+- [RAID arrays](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect health, disk
+  status, operation status, and more with the
   the `proc.plugin` collector.
-- [Veritas Volume Manager](/collectors/proc.plugin/README.md): Gather metrics about the Veritas Volume Manager (VVM).
-- [ZFS](/collectors/proc.plugin/README.md): Monitor bandwidth and utilization of ZFS disks/partitions using the proc
+- [Veritas Volume Manager](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather
+  metrics about the Veritas Volume Manager (VVM).
+- [ZFS](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor bandwidth and
+  utilization of ZFS disks/partitions using the proc
   collector.
 
 ### eBPF
 
-- [Files](/collectors/ebpf.plugin/README.md): Provides information about how often a system calls kernel
+- [Files](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md): Provides information about
+  how often a system calls kernel
   functions related to file descriptors using the eBPF collector.
-- [Virtual file system (VFS)](/collectors/ebpf.plugin/README.md): Monitor IO, errors, deleted objects, and
+- [Virtual file system (VFS)](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md): Monitor
+  IO, errors, deleted objects, and
   more for kernel virtual file systems (VFS) using the eBPF collector.
-- [Processes](/collectors/ebpf.plugin/README.md): Monitor threads, task exits, and errors using the eBPF collector.
+- [Processes](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md): Monitor threads, task
+  exits, and errors using the eBPF collector.
 
 ### Hardware
 
-- [Adaptec RAID](/collectors/python.d.plugin/adaptec_raid/README.md): Monitor logical and physical devices health
+- [Adaptec RAID](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/adaptec_raid/README.md):
+  Monitor logical and physical devices health
   metrics using the `arcconf` tool.
-- [CUPS](/collectors/cups.plugin/README.md): Monitor CUPS.
-- [FreeIPMI](/collectors/freeipmi.plugin/README.md): Uses `libipmimonitoring-dev` or `libipmimonitoring-devel` to
+- [CUPS](https://github.com/netdata/netdata/blob/master/collectors/cups.plugin/README.md): Monitor CUPS.
+- [FreeIPMI](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/README.md):
+  Uses `libipmimonitoring-dev` or `libipmimonitoring-devel` to
   monitor the number of sensors, temperatures, voltages, currents, and more.
-- [Hard drive temperature](/collectors/python.d.plugin/hddtemp/README.md): Monitor the temperature of storage
+- [Hard drive temperature](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/hddtemp/README.md):
+  Monitor the temperature of storage
   devices.
-- [HP Smart Storage Arrays](/collectors/python.d.plugin/hpssa/README.md): Monitor controller, cache module, logical
+- [HP Smart Storage Arrays](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/hpssa/README.md):
+  Monitor controller, cache module, logical
   and physical drive state, and temperature using the `ssacli` tool.
-- [MegaRAID controllers](/collectors/python.d.plugin/megacli/README.md): Collect adapter, physical drives, and
+- [MegaRAID controllers](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/megacli/README.md):
+  Collect adapter, physical drives, and
   battery stats using the `megacli` tool.
-- [NVIDIA GPU](/collectors/python.d.plugin/nvidia_smi/README.md): Monitor performance metrics (memory usage, fan
+- [NVIDIA GPU](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/nvidia_smi/README.md): Monitor
+  performance metrics (memory usage, fan
   speed, pcie bandwidth utilization, temperature, and more) using the `nvidia-smi` tool.
-- [Sensors](/collectors/python.d.plugin/sensors/README.md): Reads system sensors information (temperature, voltage,
+- [Sensors](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/sensors/README.md): Reads system
+  sensors information (temperature, voltage,
   electric current, power, and more) from `/sys/devices/`.
-- [S.M.A.R.T](/collectors/python.d.plugin/smartd_log/README.md): Reads SMART Disk Monitoring daemon logs.
+- [S.M.A.R.T](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/smartd_log/README.md): Reads
+  SMART Disk Monitoring daemon logs.
 
 ### Memory
 
-- [Available memory](/collectors/proc.plugin/README.md): Tracks changes in available RAM using the the `proc.plugin`
+- [Available memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Tracks changes in
+  available RAM using the the `proc.plugin`
   collector.
-- [Committed memory](/collectors/proc.plugin/README.md): Monitor committed memory using the `proc.plugin` collector.
-- [Huge pages](/collectors/proc.plugin/README.md): Gather metrics about huge pages in Linux and FreeBSD with the
+- [Committed memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor committed
+  memory using the `proc.plugin` collector.
+- [Huge pages](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics about
+  huge pages in Linux and FreeBSD with the
   `proc.plugin` collector.
-- [KSM](/collectors/proc.plugin/README.md): Measure the amount of merging, savings, and effectiveness using the
+- [KSM](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Measure the amount of merging,
+  savings, and effectiveness using the
   `proc.plugin` collector.
-- [Numa](/collectors/proc.plugin/README.md): Gather metrics on the number of non-uniform memory access (NUMA) events
+- [Numa](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics on the number
+  of non-uniform memory access (NUMA) events
   every second using the `proc.plugin` collector.
-- [Page faults](/collectors/proc.plugin/README.md): Collect the number of memory page faults per second using the
+- [Page faults](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect the number of
+  memory page faults per second using the
   `proc.plugin` collector.
-- [RAM](/collectors/proc.plugin/README.md): Collect metrics on system RAM, available RAM, and more using the
+- [RAM](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect metrics on system RAM,
+  available RAM, and more using the
   `proc.plugin` collector.
-- [SLAB](/collectors/slabinfo.plugin/README.md): Collect kernel SLAB details on Linux systems.
-- [swap](/collectors/proc.plugin/README.md): Monitor the amount of free and used swap at every second using the
+- [SLAB](https://github.com/netdata/netdata/blob/master/collectors/slabinfo.plugin/README.md): Collect kernel SLAB
+  details on Linux systems.
+- [swap](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor the amount of free
+  and used swap at every second using the
   `proc.plugin` collector.
-- [Writeback memory](/collectors/proc.plugin/README.md): Collect how much memory is actively being written to disk at
+- [Writeback memory](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect how much
+  memory is actively being written to disk at
   every second using the `proc.plugin` collector.
 
 ### Networks
 
-- [Access points](/collectors/charts.d.plugin/ap/README.md): Visualizes data related to access points.
-- [Ping](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/ping/): Measure network latency, jitter and packet loss between the monitored node
+- [Access points](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/ap/README.md): Visualizes
+  data related to access points.
+- [Ping](https://github.com/netdata/go.d.plugin/blob/master/modules/ping/README.md): Measure network latency, jitter and
+  packet loss between the monitored node
   and any number of remote network end points.
-- [Netfilter](/collectors/nfacct.plugin/README.md): Collect netfilter firewall, connection tracker, and accounting
+- [Netfilter](https://github.com/netdata/netdata/blob/master/collectors/nfacct.plugin/README.md): Collect netfilter
+  firewall, connection tracker, and accounting
   metrics using `libmnl` and `libnetfilter_acct`.
-- [Network stack](/collectors/proc.plugin/README.md): Monitor the networking stack for errors, TCP connection aborts,
+- [Network stack](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor the
+  networking stack for errors, TCP connection aborts,
   bandwidth, and more.
-- [Network QoS](/collectors/tc.plugin/README.md): Collect traffic QoS metrics (`tc`) of Linux network interfaces.
-- [SYNPROXY](/collectors/proc.plugin/README.md): Monitor entries uses, SYN packets received, TCP cookies, and more.
+- [Network QoS](https://github.com/netdata/netdata/blob/master/collectors/tc.plugin/README.md): Collect traffic QoS
+  metrics (`tc`) of Linux network interfaces.
+- [SYNPROXY](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor entries uses, SYN
+  packets received, TCP cookies, and more.
 
 ### Operating systems
 
-- [freebsd.plugin](freebsd.plugin/README.md): Collect resource usage and performance data on FreeBSD systems.
-- [macOS](/collectors/macos.plugin/README.md): Collect resource usage and performance data on macOS systems.
+- [freebsd.plugin](https://github.com/netdata/netdata/blob/master/collectors/freebsd.plugin/README.md): Collect resource
+  usage and performance data on FreeBSD systems.
+- [macOS](https://github.com/netdata/netdata/blob/master/collectors/macos.plugin/README.md): Collect resource usage and
+  performance data on macOS systems.
 
 ### Processes
 
-- [Applications](/collectors/apps.plugin/README.md): Gather CPU, disk, memory, network, eBPF, and other metrics per
+- [Applications](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md): Gather CPU, disk,
+  memory, network, eBPF, and other metrics per
   application using the `apps.plugin` collector.
-- [systemd](/collectors/cgroups.plugin/README.md): Monitor the CPU and memory usage of systemd services using the
+- [systemd](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md): Monitor the CPU and
+  memory usage of systemd services using the
   `cgroups.plugin` collector.
-- [systemd unit states](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/systemdunits): See the
+- [systemd unit states](https://github.com/netdata/go.d.plugin/blob/master/modules/systemdunits/README.md): See the
   state (active, inactive, activating, deactivating, failed) of various systemd unit types.
-- [System processes](/collectors/proc.plugin/README.md): Collect metrics on system load and total processes running
+- [System processes](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect metrics
+  on system load and total processes running
   using `/proc/loadavg` and the `proc.plugin` collector.
-- [Uptime](/collectors/proc.plugin/README.md): Monitor the uptime of a system using the `proc.plugin` collector.
+- [Uptime](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor the uptime of a
+  system using the `proc.plugin` collector.
 
 ### Resources
 
-- [CPU frequency](/collectors/proc.plugin/README.md): Monitor CPU frequency, as set by the `cpufreq` kernel module,
+- [CPU frequency](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor CPU
+  frequency, as set by the `cpufreq` kernel module,
   using the `proc.plugin` collector.
-- [CPU idle](/collectors/proc.plugin/README.md): Measure CPU idle every second using the `proc.plugin` collector.
-- [CPU performance](/collectors/perf.plugin/README.md): Collect CPU performance metrics using performance monitoring
+- [CPU idle](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Measure CPU idle every
+  second using the `proc.plugin` collector.
+- [CPU performance](https://github.com/netdata/netdata/blob/master/collectors/perf.plugin/README.md): Collect CPU
+  performance metrics using performance monitoring
   units (PMU).
-- [CPU throttling](/collectors/proc.plugin/README.md): Gather metrics about thermal throttling using the `/proc/stat`
+- [CPU throttling](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Gather metrics
+  about thermal throttling using the `/proc/stat`
   module and the `proc.plugin` collector.
-- [CPU utilization](/collectors/proc.plugin/README.md): Capture CPU utilization, both system-wide and per-core, using
+- [CPU utilization](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Capture CPU
+  utilization, both system-wide and per-core, using
   the `/proc/stat` module and the `proc.plugin` collector.
-- [Entropy](/collectors/proc.plugin/README.md): Monitor the available entropy on a system using the `proc.plugin`
+- [Entropy](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor the available
+  entropy on a system using the `proc.plugin`
   collector.
-- [Interprocess Communication (IPC)](/collectors/proc.plugin/README.md): Monitor IPC semaphores and shared memory
+- [Interprocess Communication (IPC)](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md):
+  Monitor IPC semaphores and shared memory
   using the `proc.plugin` collector.
-- [Interrupts](/collectors/proc.plugin/README.md): Monitor interrupts per second using the `proc.plugin` collector.
-- [IdleJitter](/collectors/idlejitter.plugin/README.md): Measure CPU latency and jitter on all operating systems.
-- [SoftIRQs](/collectors/proc.plugin/README.md): Collect metrics on SoftIRQs, both system-wide and per-core, using the
+- [Interrupts](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Monitor interrupts per
+  second using the `proc.plugin` collector.
+- [IdleJitter](https://github.com/netdata/netdata/blob/master/collectors/idlejitter.plugin/README.md): Measure CPU
+  latency and jitter on all operating systems.
+- [SoftIRQs](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Collect metrics on
+  SoftIRQs, both system-wide and per-core, using the
   `proc.plugin` collector.
-- [SoftNet](/collectors/proc.plugin/README.md): Capture SoftNet events per second, both system-wide and per-core,
+- [SoftNet](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md): Capture SoftNet events per
+  second, both system-wide and per-core,
   using the `proc.plugin` collector.
 
 ### Users
 
-- [systemd-logind](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/logind/): Monitor active sessions, users, and seats tracked
+- [systemd-logind](https://github.com/netdata/go.d.plugin/blob/master/modules/logind/README.md): Monitor active
+  sessions, users, and seats tracked
   by `systemd-logind` or `elogind`.
-- [User/group usage](/collectors/apps.plugin/README.md): Gather CPU, disk, memory, network, and other metrics per user
+- [User/group usage](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md): Gather CPU, disk,
+  memory, network, and other metrics per user
   and user group using the `apps.plugin` collector.
 
 ## Netdata collectors
@@ -476,13 +582,18 @@ These collectors are recursive in nature, in that they monitor some function of 
 collectors are described only in code and associated charts in Netdata dashboards.
 
 - [ACLK (code only)](https://github.com/netdata/netdata/blob/master/aclk/legacy/aclk_stats.c): View whether a Netdata
-  Agent is connected to Netdata Cloud via the [ACLK](/aclk/README.md), the volume of queries, process times, and more.
-- [Alarms](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/alarms): This collector creates an
+  Agent is connected to Netdata Cloud via the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md), the
+  volume of queries, process times, and more.
+- [Alarms](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/alarms/README.md): This collector
+  creates an
   **Alarms** menu with one line plot showing the alarm states of a Netdata Agent over time.
-- [Anomalies](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin/anomalies): This collector uses the
+- [Anomalies](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md): This
+  collector uses the
   Python PyOD library to perform unsupervised anomaly detection on your Netdata charts and/or dimensions.
 - [Exporting (code only)](https://github.com/netdata/netdata/blob/master/exporting/send_internal_metrics.c): Gather
-  metrics on CPU utilization for the [exporting engine](/exporting/README.md), and specific metrics for each enabled
+  metrics on CPU utilization for
+  the [exporting engine](https://github.com/netdata/netdata/blob/master/exporting/README.md), and specific metrics for
+  each enabled
   exporting connector.
 - [Global statistics (code only)](https://github.com/netdata/netdata/blob/master/daemon/global_statistics.c): See
   metrics on the CPU utilization, network traffic, volume of web clients, API responses, database engine usage, and
@@ -496,8 +607,10 @@ If you're interested in developing a new collector that you'd like to contribute
 the `go.d.plugin`.
 
 - [go.d.plugin](https://github.com/netdata/go.d.plugin): An orchestrator for data collection modules written in `go`.
-- [python.d.plugin](python.d.plugin/README.md): An orchestrator for data collection modules written in `python` v2/v3.
-- [charts.d.plugin](charts.d.plugin/README.md): An orchestrator for data collection modules written in `bash` v4+.
+- [python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md): An
+  orchestrator for data collection modules written in `python` v2/v3.
+- [charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md): An
+  orchestrator for data collection modules written in `bash` v4+.
 
 ## Third-party collectors
 
@@ -509,13 +622,17 @@ default. To use a third-party collector, visit their GitHub/documentation page a
 
 In general the below steps should be sufficient to use a third party collector.
 
-1. Download collector code file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
-2. Download default collector configuration file into [folder expected by Netdata](https://learn.netdata.cloud/docs/agent/collectors/plugins.d#environment-variables).
-3. [Edit configuration file](/docs/collect/enable-configure#configure-a-collector) from step 2 if required.
-4. [Enable collector](/docs/collect/enable-configure#enable-a-collector-or-its-orchestrator).
-5. [Restart Netdata](/docs/configure/start-stop-restart.md) 
+1. Download collector code file
+   into [folder expected by Netdata](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#environment-variables).
+2. Download default collector configuration file
+   into [folder expected by Netdata](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#environment-variables).
+3. [Edit configuration file](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure#configure-a-collector)
+   from step 2 if required.
+4. [Enable collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure#enable-a-collector-or-its-orchestrator).
+5. [Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md)
 
-For example below are the steps to enable the [Python ClickHouse collector](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse).
+For example below are the steps to enable
+the [Python ClickHouse collector](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse).
 
 ```bash
 # download python collector script to /usr/libexec/netdata/python.d/
@@ -538,7 +655,6 @@ $ sudo systemctl restart netdata
 
 </details>
 
-
 - [CyberPower UPS](https://github.com/HawtDogFlvrWtr/netdata_cyberpwrups_plugin): Polls CyberPower UPS data using
   PowerPanel® Personal Linux.
 - [Logged-in users](https://github.com/veksh/netdata-numsessions): Collect the number of currently logged-on users.
@@ -549,9 +665,12 @@ $ sudo systemctl restart netdata
 - [Teamspeak 3](https://github.com/coraxx/netdata_ts3_plugin): Pulls active users and bandwidth from TeamSpeak 3
   servers.
 - [SSH](https://github.com/Yaser-Amiri/netdata-ssh-module): Monitor failed authentication requests of an SSH server.
-- [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse): Monitor [ClickHouse](https://clickhouse.com/) database.
+- [ClickHouse](https://github.com/netdata/community/tree/main/collectors/python.d.plugin/clickhouse):
+  Monitor [ClickHouse](https://clickhouse.com/) database.
 
 ## Etc
 
-- [charts.d example](charts.d.plugin/example/README.md): An example `charts.d` collector.
-- [python.d example](python.d.plugin/example/README.md): An example `python.d` collector.
+- [charts.d example](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/example/README.md): An
+  example `charts.d` collector.
+- [python.d example](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/README.md): An
+  example `python.d` collector.

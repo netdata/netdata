@@ -12,7 +12,7 @@ learn_rel_path: "References/Collectors references/Uncategorized"
 
 Smoothed, rolling [Z-Scores](https://en.wikipedia.org/wiki/Standard_score) for selected metrics or charts.
 
-This collector uses the [Netdata rest api](https://learn.netdata.cloud/docs/agent/web/api) to get the `mean` and `stddev`
+This collector uses the [Netdata rest api](https://github.com/netdata/netdata/blob/master/web/api/README.md) to get the `mean` and `stddev`
 for each dimension on specified charts over a time range (defined by `train_secs` and `offset_secs`). For each dimension
 it will calculate a Z-Score as `z = (x - mean) / stddev` (clipped at `z_clip`). Scores are then smoothed over
 time (`z_smooth_n`) and, if `mode: 'per_chart'`, aggregated across dimensions to a smoothed, rolling chart level Z-Score

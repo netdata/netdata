@@ -13,7 +13,7 @@ relevant if you run Netdata on your laptop or a small virtual server. If they're
 to real issues with health and performance.
 
 Silencing individual alarms is an excellent solution for situations where you're not interested in seeing a specific
-alarm but don't want to disable a [notification system](/health/notifications/README.md) entirely. 
+alarm but don't want to disable a [notification system](https://github.com/netdata/netdata/blob/master/health/notifications/README.md) entirely. 
 
 ## Find the alarm configuration file
 
@@ -34,7 +34,7 @@ In the `source` row, you see that this chart is getting its configuration from
 the file you need to edit if you want to silence this alarm.
 
 For more information about editing or referencing health configuration files on your system, see the [health
-quickstart](/health/QUICKSTART.md#edit-health-configuration-files).
+quickstart](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#edit-health-configuration-files).
 
 ## Edit the file to enable silencing
 
@@ -70,7 +70,7 @@ To silence this alarm, change `sysadmin` to `silent`.
  to: silent
 ```
 
-Use one of the available [methods](/health/QUICKSTART.md#reload-health-configuration) to reload your health configuration 
+Use one of the available [methods](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#reload-health-configuration) to reload your health configuration 
  and ensure you get no more notifications about that alarm**.
 
 You can add `to: silent` to any alarm you'd rather not bother you with notifications.
@@ -80,12 +80,12 @@ You can add `to: silent` to any alarm you'd rather not bother you with notificat
 You should now know the fundamentals behind silencing any individual alarm in Netdata.
 
 To learn about _all_ of Netdata's health configuration possibilities, visit the [health reference
-guide](/health/REFERENCE.md), or check out other [tutorials on health monitoring](/health/README.md#guides).
+guide](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md), or check out other [tutorials on health monitoring](https://github.com/netdata/netdata/blob/master/health/README.md#guides).
 
 Or, take better control over how you get notified about alarms via the [notification
-system](/health/notifications/README.md).
+system](https://github.com/netdata/netdata/blob/master/health/notifications/README.md).
 
-You can also use Netdata's [Health Management API](/web/api/health/README.md#health-management-api) to control health
+You can also use Netdata's [Health Management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md#health-management-api) to control health
 checks and notifications while Netdata runs. With this API, you can disable health checks during a maintenance window or
 backup process, for example.
 

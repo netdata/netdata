@@ -11,8 +11,9 @@ learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 
 # Export metrics to OpenTSDB
 
-You can use the OpenTSDB connector for the [exporting engine](/exporting/README.md) to archive your agent's metrics to OpenTSDB
-databases for long-term storage, further analysis, or correlation with data from other sources.
+You can use the OpenTSDB connector for
+the [exporting engine](https://github.com/netdata/netdata/blob/master/exporting/README.md) to archive your agent's
+metrics to OpenTSDB databases for long-term storage, further analysis, or correlation with data from other sources.
 
 ## Configuration
 
@@ -25,7 +26,8 @@ directory and set the following options:
     destination = localhost:4242
 ```
 
-Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol. For example: `opentsdb:http:my_opentsdb_instance`,
+Add `:http` or `:https` modifiers to the connector type if you need to use other than a plaintext protocol. For
+example: `opentsdb:http:my_opentsdb_instance`,
 `opentsdb:https:my_opentsdb_instance`. You can set basic HTTP authentication credentials using
 
 ```conf
@@ -33,7 +35,7 @@ Add `:http` or `:https` modifiers to the connector type if you need to use other
     password = my_password
 ```
 
-The OpenTSDB connector is further configurable using additional settings. See the [exporting reference
-doc](/exporting/README.md#options) for details.
+The OpenTSDB connector is further configurable using additional settings. See
+the [exporting reference doc](https://github.com/netdata/netdata/blob/master/exporting/README.md#options) for details.
 
 

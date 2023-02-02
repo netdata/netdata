@@ -29,8 +29,8 @@ this is not an option in your case always verify the current domain resolution (
 :::
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
-started with Cloud](https://learn.netdata.cloud/docs/cloud/get-started) guide or the full [connect to Cloud
-documentation](/claim/README.md).
+started with Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.mdx) guide or the full [connect to Cloud
+documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
 
 ## Data privacy
 [Data privacy](https://netdata.cloud/privacy/) is very important to us. We firmly believe that your data belongs to
@@ -41,7 +41,7 @@ The data passes through our systems, but it isn't stored.
 
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-Read more about [Data privacy in the Netdata Cloud](https://learn.netdata.cloud/docs/cloud/data-privacy) in the documentation.
+Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy.mdx) in the documentation.
 
 
 ## Enable and configure the ACLK
@@ -57,7 +57,7 @@ configuration uses two settings:
 ```
 
 If your Agent needs to use a proxy to access the internet, you must [set up a proxy for
-connecting to cloud](/claim/README.md#connect-through-a-proxy).
+connecting to cloud](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy).
 
 You can configure following keys in the `netdata.conf` section `[cloud]`:
 ```
@@ -76,8 +76,8 @@ You have two options if you prefer to disable the ACLK and not use Netdata Cloud
 ### Disable at installation
 
 You can pass the `--disable-cloud` parameter to the Agent installation when using a kickstart script
-([kickstart.sh](/packaging/installer/methods/kickstart.md), or a [manual installation from
-Git](/packaging/installer/methods/manual.md).
+([kickstart.sh](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), or a [manual installation from
+Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md).
 
 When you pass this parameter, the installer does not download or compile any extra libraries. Once running, the Agent
 kills the thread responsible for the ACLK and connecting behavior, and behaves as though the ACLK, and thus Netdata Cloud,
@@ -131,12 +131,12 @@ Restart your Agent to disable the ACLK.
 ### Re-enable the ACLK
 
 If you first disable the ACLK and any Cloud functionality and then decide you would like to use Cloud, you must either
-[reinstall Netdata](/packaging/installer/REINSTALL.md) with Cloud enabled or change the runtime setting in your
+[reinstall Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) with Cloud enabled or change the runtime setting in your
 `cloud.conf` file.
 
 If you passed `--disable-cloud` to `netdata-installer.sh` during installation, you must
-[reinstall](/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
-the installer. When installation finishes you can [connect your node](/claim/README.md#how-to-connect-a-node).
+[reinstall](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) your Agent. Use the same method as before, but pass `--require-cloud` to
+the installer. When installation finishes you can [connect your node](https://github.com/netdata/netdata/blob/master/claim/README.md#how-to-connect-a-node).
 
 If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` file, edit the file again and change
 `enabled` to `yes`:
@@ -146,6 +146,6 @@ If you changed the runtime setting in your `var/lib/netdata/cloud.d/cloud.conf` 
     enabled = yes
 ```
 
-Restart your Agent and [connect your node](/claim/README.md#how-to-connect-a-node).
+Restart your Agent and [connect your node](https://github.com/netdata/netdata/blob/master/claim/README.md#how-to-connect-a-node).
 
 

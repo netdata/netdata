@@ -16,7 +16,7 @@ You can use the [LTSV log format](http://ltsv.org/), track TLS and cipher usage,
 ever. In one test on a system with SSD storage, the collector consistently parsed the logs for 200,000 requests in
 200ms, using ~30% of a single core.
 
-The [web_log](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) collector is currently compatible
+The [web_log](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md) collector is currently compatible
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
@@ -90,7 +90,7 @@ jobs:
 ```
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and
 begin showing real-time charts!
 
 ### Custom log formats and fields
@@ -99,7 +99,7 @@ The web log collector is capable of parsing custom Nginx and Apache log formats 
 leave that topic for a separate guide.
 
 We do have [extensive
-documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/#custom-log-format) on how
+documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md#custom-log-format) on how
 to build custom parsing for Nginx and Apache logs.
 
 ## Tweak web log collector alarms
@@ -117,11 +117,11 @@ You can also edit this file directly with `edit-config`:
 ```
 
 For more information about editing the defaults or writing new alarm entities, see our [health monitoring
-documentation](/health/README.md).
+documentation](https://github.com/netdata/netdata/blob/master/health/README.md).
 
 ## What's next?
 
-Now that you have web log collection up and running, we recommend you take a look at the collector's [documentation](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/weblog/) for some ideas of how you can turn these rather "boring" logs into powerful real-time tools for keeping your servers happy.
+Now that you have web log collection up and running, we recommend you take a look at the collector's [documentation](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md) for some ideas of how you can turn these rather "boring" logs into powerful real-time tools for keeping your servers happy.
 
 Don't forget to give GitHub user [Wing924](https://github.com/Wing924) a big 👍 for his hard work in starting up the Go
 refactoring effort.

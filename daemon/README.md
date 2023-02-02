@@ -15,7 +15,7 @@ learn_rel_path: "References/Configuration"
 -   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
 -   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. When
-    exiting, the [database engine](/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
+    exiting, the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
     it can continue when started again.
 
 Access to the web site, for all graphs, is by default on port `19999`, so go to:
@@ -206,7 +206,7 @@ The command line options of the Netdata 1.10.0 version are the following:
   - USR2                   Reload health configuration.
 ```
 
-You can send commands during runtime via [netdatacli](/cli/README.md).
+You can send commands during runtime via [netdatacli](https://github.com/netdata/netdata/blob/master/cli/README.md).
 
 ## Log files
 
@@ -372,7 +372,7 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to [restart Netdata](/docs/configure/start-stop-restart.md):
+then execute this to [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md):
 
 ```sh
 sudo systemctl restart netdata

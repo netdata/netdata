@@ -11,8 +11,9 @@ learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 
 # Export metrics to MongoDB
 
-You can use the MongoDB connector for the [exporting engine](/exporting/README.md) to archive your agent's metrics to a
-MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
+You can use the MongoDB connector for
+the [exporting engine](https://github.com/netdata/netdata/blob/master/exporting/README.md) to archive your agent's
+metrics to a MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
 
 ## Prerequisites
 

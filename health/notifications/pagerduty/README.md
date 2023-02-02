@@ -18,7 +18,7 @@ resolution times.
 
 ## What you need to get started
 
-- An installation of the open-source [Netdata](/docs/get-started.mdx) monitoring agent.
+- An installation of the open-source [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) monitoring agent.
 - An installation of the [PagerDuty agent](https://www.pagerduty.com/docs/guides/agent-install-guide/) on the node
   running Netdata.
 - A PagerDuty `Generic API` service using either the `Events API v2` or `Events API v1`.
@@ -29,8 +29,8 @@ resolution times.
 to PagerDuty. Click **Use our API directly** and select either `Events API v2` or `Events API v1`. Once you finish
 creating the service, click on the **Integrations** tab to find your **Integration Key**.
 
-Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) and use
-[`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
+Navigate to the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) and use
+[`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) to open
 `health_alarm_notify.conf`.
 
 ```bash
@@ -63,5 +63,5 @@ sudo su -s /bin/bash netdata
 Aside from the three values set in `health_alarm_notify.conf`, there is no further configuration required to send alert
 notifications to PagerDuty.
 
-To configure individual alarms, read our [alert configuration](/docs/monitor/configure-alarms.md) doc or
-the [health entity reference](/health/REFERENCE.md) doc.
+To configure individual alarms, read our [alert configuration](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) doc or
+the [health entity reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) doc.

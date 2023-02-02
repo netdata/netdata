@@ -67,8 +67,8 @@ Netdata is a global company in every sense, with employees, contributors, and us
 communicate in a way that is clear and easily understood by everyone.
 
 Here are some guidelines, pointers, and questions to be aware of as you write to ensure your writing is universal. Some
-of these are expanded into individual sections in the [language, grammar, and
-mechanics](#language-grammar-and-mechanics) section below.
+of these are expanded into individual sections in
+the [language, grammar, and mechanics](#language-grammar-and-mechanics) section below.
 
 - Would this language make sense to someone who doesn't work here?
 - Could someone quickly scan this document and understand the material?
@@ -97,8 +97,8 @@ mechanics](#language-grammar-and-mechanics) section below.
 
 To ensure Netdata's writing is clear, concise, and universal, we have established standards for language, grammar, and
 certain writing mechanics. However, if you're writing about Netdata for an external publication, such as a guest blog
-post, follow that publication's style guide or standards, while keeping the [preferred spelling of Netdata
-terms](#netdata-specific-terms) in mind.
+post, follow that publication's style guide or standards, while keeping
+the [preferred spelling of Netdata terms](#netdata-specific-terms) in mind.
 
 ### Active voice
 
@@ -106,31 +106,32 @@ Active voice is more concise and easier to understand compared to passive voice.
 the sentence is action. In passive voice, the subject is acted upon. A famous example of passive voice is the phrase
 "mistakes were made."
 
-|                 |                                                                                             |
-|-----------------|---------------------------------------------------------------------------------------------|
-| Not recommended | When an alarm is triggered by a metric, a notification is sent by Netdata.                  |
-| **Recommended** | When a metric triggers an alarm, Netdata sends a notification to your preferred endpoint.   |
+|                 |                                                                                           |
+|-----------------|-------------------------------------------------------------------------------------------|
+| Not recommended | When an alarm is triggered by a metric, a notification is sent by Netdata.                |
+| **Recommended** | When a metric triggers an alarm, Netdata sends a notification to your preferred endpoint. |
 
 ### Second person
 
-Use the second person ("you") to give instructions or "talk" directly to users. 
+Use the second person ("you") to give instructions or "talk" directly to users.
 
 In these situations, avoid "we," "I," "let's," and "us," particularly in documentation. The "you" pronoun can also be
-implied, depending on your sentence structure. 
+implied, depending on your sentence structure.
 
 One valid exception is when a member of the Netdata team or community wants to write about said team or community.
 
-|                                |                                                                                           |
-|--------------------------------|-------------------------------------------------------------------------------------------|
-| Not recommended                | To install Netdata, we should try the one-line installer...                               |
-| **Recommended**                | To install Netdata, you should try the one-line installer...                              |
-| **Recommended**, implied "you" | To install Netdata, try the one-line installer...                                         |
+|                                |                                                              |
+|--------------------------------|--------------------------------------------------------------|
+| Not recommended                | To install Netdata, we should try the one-line installer...  |
+| **Recommended**                | To install Netdata, you should try the one-line installer... |
+| **Recommended**, implied "you" | To install Netdata, try the one-line installer...            |
 
 ### "Easy" or "simple"
 
-Using words that imply the complexity of a task or feature goes against our policy of [universal
-communication](#universal-communication). If you claim that a task is easy and the reader struggles to complete it, you
-may inadvertently discourage them. 
+Using words that imply the complexity of a task or feature goes against our policy
+of [universal communication](#universal-communication). If you claim that a task is easy and the reader struggles to
+complete it, you
+may inadvertently discourage them.
 
 However, if you give users two options and want to relay that one option is genuinely less complex than another, be
 specific about how and why.
@@ -163,11 +164,11 @@ See the [word list](#word-list) for spellings of specific words.
 Follow the general [English standards](https://owl.purdue.edu/owl/general_writing/mechanics/help_with_capitals.html) for
 capitalization. In summary:
 
--   Capitalize the first word of every new sentence.
--   Don't use uppercase for emphasis. (Netdata is the BEST!)
--   Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata,
-    Docker, Apache, NGINX)
--   Avoid camel case (NetData) or all caps (NETDATA).
+- Capitalize the first word of every new sentence.
+- Don't use uppercase for emphasis. (Netdata is the BEST!)
+- Capitalize the names of brands, software, products, and companies according to their official guidelines. (Netdata,
+  Docker, Apache, NGINX)
+- Avoid camel case (NetData) or all caps (NETDATA).
 
 Whenever you refer to the company Netdata, Inc., or the open-source monitoring agent the company develops, capitalize
 **Netdata**.
@@ -244,10 +245,10 @@ must reflect the _current state of [production](https://app.netdata.cloud).
 Every link should clearly state its destination. Don't use words like "here" to describe where a link will take your
 reader.
 
-|                 |                                                                                           |
-|-----------------|-------------------------------------------------------------------------------------------|
-| Not recommended | To install Netdata, click [here](/packaging/installer/README.md).                         |
-| **Recommended** | To install Netdata, read the [installation instructions](/packaging/installer/README.md). |
+|                 |                                                                                                                                         |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| Not recommended | To install Netdata, click [here](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).                         |
+| **Recommended** | To install Netdata, read the [installation instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). |
 
 Use links as often as required to provide necessary context. Blog posts and guides require less hyperlinks than
 documentation. See the section on [linking between documentation](#linking-between-documentation) for guidance on the
@@ -268,7 +269,7 @@ and desired audience.
 ## Technical/Linux standards
 
 Configuration or maintenance of the Netdata Agent requires some system administration skills, such as navigating
-directories, editing files, or starting/stopping/restarting services. Certain processes 
+directories, editing files, or starting/stopping/restarting services. Certain processes
 
 ### Switching Linux users
 
@@ -302,16 +303,17 @@ Netdata Agent installation will have commands under the same paths. When applica
 path, providing a recommendation or instructions on how to view the running configuration, which includes the correct
 paths.
 
-For example, the [configuration](/docs/configure/nodes.md) doc first teaches users how to find the Netdata config
+For example, the [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) doc first
+teaches users how to find the Netdata config
 directory and navigate to it, then runs commands from the `/etc/netdata` path so that the instructions are more
 universal.
 
 Don't include full paths, beginning from the system's root (`/`), as these might not work on certain systems.
 
-|                 |                                                                                                                                                                             |
-|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`. |
-| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
+|                 |                                                                                                                                                                                                                                                                                                    |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Not recommended | Use `edit-config` to edit Netdata's configuration: `sudo /etc/netdata/edit-config netdata.conf`.                                                                                                                                                                                                   |
+| **Recommended** | Use `edit-config` to edit Netdata's configuration by first navigating to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`, then running `sudo edit-config netdata.conf`. |
 
 ### `sudo`
 
@@ -371,8 +373,8 @@ Some documents, like the Ansible guide and others in the `/docs/guides` folder, 
 this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of the path to the document in question. End
 the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
 
-For example, here is the frontmatter for the guide about [deploying the Netdata Agent with
-Ansible](https://learn.netdata.cloud/guides/deploy/ansible).
+For example, here is the frontmatter for the guide
+about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/docs/guides/deploy/ansible.md).
 
 ```markdown
 <!--
@@ -387,8 +389,8 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/depl
 ...
 ```
 
-Questions about frontmatter in documentation? [Ask on our community
-forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
+Questions about frontmatter in
+documentation? [Ask on our community forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
 
 ### Linking between documentation
 
@@ -397,7 +399,8 @@ Documentation should link to relevant pages whenever it's relevant and provides 
 Links should always reference the full path to the document, beginning at the root of the Netdata Agent repository
 (`/`), and ending with the `.md` file extension. Avoid relative links or traversing up directories using `../`.
 
-For example, if you want to link to our node configuration document, link to `/docs/configure/nodes.md`. To reference
+For example, if you want to link to our node configuration document, link
+to `https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md`. To reference
 the guide for deploying the Netdata Agent with Ansible, link to `/docs/guides/deploy/ansible.md`.
 
 ### References to UI elements
@@ -421,7 +424,7 @@ In Markdown, use the standard image syntax, `![]()`, and place the alt text betw
 using our logo:
 
 ```markdown
-![The Netdata logo](/web/gui/static/img/netdata-logomark.svg)
+![The Netdata logo](https://github.com/netdata/netdata/blob/master/web/gui/static/img/netdata-logomark.svg)
 ```
 
 Reference in-product text, code samples, and terminal output with actual text content, not screen captures or other
@@ -458,8 +461,8 @@ inline char *health_stock_config_dir(void) {
 }
 ```
 
-Prism also supports titles and line highlighting. See the [Docusaurus
-documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
+Prism also supports titles and line highlighting. See
+the [Docusaurus documentation](https://v2.docusaurus.io/docs/markdown-features#code-blocks) for more information.
 
 ## Word list
 
@@ -469,24 +472,24 @@ The following tables describe the standard spelling, capitalization, and usage o
 
 | Term                        | Definition                                                                                                                                                                                                                                                                                                                                                                                                            |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **claimed node**            | A node that you've proved ownership of by completing the [connecting to Cloud process](/claim/README.md). The claimed node will then appear in your Space and any War Rooms you added it to.                                                                                                                                                                                                                                     |
+| **claimed node**            | A node that you've proved ownership of by completing the [connecting to Cloud process](https://github.com/netdata/netdata/blob/master/claim/README.md). The claimed node will then appear in your Space and any War Rooms you added it to.                                                                                                                                                                            |
 | **Netdata**                 | The company behind the open-source Netdata Agent and the Netdata Cloud web application. Never use _netdata_ or _NetData_. <br /><br />In general, focus on the user's goals, actions, and solutions rather than what the company provides. For example, write _Learn more about enabling alarm notifications on your preferred platforms_ instead of _Netdata sends alarm notifications to your preferred platforms_. |
 | **Netdata Agent**           | The free and open source [monitoring agent](https://github.com/netdata/netdata) that you can install on all of your distributed systems, whether they're physical, virtual, containerized, ephemeral, and more. The Agent monitors systems running Linux, Docker, Kubernetes, macOS, FreeBSD, and more, and collects metrics from hundreds of popular services and applications.                                      |
 | **Netdata Cloud**           | The web application hosted at [https://app.netdata.cloud](https://app.netdata.cloud) that helps you monitor an entire infrastructure of distributed systems in real time. <br /><br />Never use _Cloud_ without the preceding _Netdata_ to avoid ambiguity.                                                                                                                                                           |
-| **Netdata community**       | Contributors to any of Netdata's [open-source projects](https://learn.netdata.cloud/contribute/projects), members of the [community forum](https://community.netdata.cloud/).                                                                                                                                                                                                                                         |
+| **Netdata community**       | Contributors to any of Netdata's [open-source projects](https://github.com/netdata/learn/blob/master/contribute/projects.mdx), members of the [community forum](https://community.netdata.cloud/).                                                                                                                                                                                                                                         |
 | **Netdata community forum** | The Discourse-powered forum for feature requests, Netdata Cloud technical support, and conversations about Netdata's monitoring and troubleshooting products.                                                                                                                                                                                                                                                         |
 | **node**                    | A system on which the Netdata Agent is installed. The system can be physical, virtual, in a Docker container, and more. Depending on your infrastructure, you may have one, dozens, or hundreds of nodes. Some nodes are _ephemeral_, in that they're created/destroyed automatically by an orchestrator service.                                                                                                     |
 | **Space**                   | The highest level container within Netdata Cloud for a user to organize their team members and nodes within their infrastructure. A Space likely represents an entire organization or a large team. <br /><br />_Space_ is always capitalized.                                                                                                                                                                        |
-| **unreachable node**        | A connected node with a disrupted [Agent-Cloud link](/aclk/README.md). Unreachable could mean the node no longer exists or is experiencing network connectivity issues with Cloud.                                                                                                                                                                                                                                      |
+| **unreachable node**        | A connected node with a disrupted [Agent-Cloud link](https://github.com/netdata/netdata/blob/master/aclk/README.md). Unreachable could mean the node no longer exists or is experiencing network connectivity issues with Cloud.                                                                                                                                                                                      |
 | **visited node**            | A node which has had its Agent dashboard directly visited by a user. A list of these is maintained on a per-user basis.                                                                                                                                                                                                                                                                                               |
 | **War Room**                | A smaller grouping of nodes where users can view key metrics in real-time and monitor the health of many nodes with their alarm status. War Rooms can be used to organize nodes in any way that makes sense for your infrastructure, such as by a service, purpose, physical location, and more.  <br /><br />_War Room_ is always capitalized.                                                                       |
 
 ### Other technical terms
 
-| Term                        | Definition                                                                                                                                                                                                                  |
-|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **filesystem**              | Use instead of _file system_.                                                                                                                                                                                               |
-| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find [immediate value](/docs/overview/why-netdata.md#simple-to-deploy).                                           |
-| **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services. |
+| Term                        | Definition                                                                                                                                                                                                                      |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **filesystem**              | Use instead of _file system_.                                                                                                                                                                                                   |
+| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find [immediate value](https://github.com/netdata/netdata/blob/master/docs/overview/why-netdata.md#simple-to-deploy). |
+| **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services.     |
 
 

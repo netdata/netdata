@@ -61,7 +61,7 @@ To persist the changes after rotating the log file, add `create 640 root netdata
 ## Configuration
 
 Edit the `python.d/fail2ban.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

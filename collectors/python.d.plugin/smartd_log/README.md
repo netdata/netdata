@@ -109,7 +109,7 @@ Otherwise, all the smartd `.csv` files may get written to `/var/lib/smartmontool
 ## Configuration
 
 Edit the `python.d/smartd_log.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

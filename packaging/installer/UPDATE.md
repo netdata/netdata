@@ -15,7 +15,7 @@ you installed. If you opted out of automatic updates, you need to update your Ne
 or stable version. You can also [enable or disable automatic updates on an existing install](#control-automatic-updates).
 
 > 💡 Looking to reinstall the Netdata Agent to enable a feature, update an Agent that cannot update automatically, or
-> troubleshoot an error during the installation process? See our [reinstallation doc](/packaging/installer/REINSTALL.md)
+> troubleshoot an error during the installation process? See our [reinstallation doc](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md)
 > for reinstallation steps.
 
 Before you update the Netdata Agent, check to see if your Netdata Agent is already up-to-date by clicking on the update
@@ -84,8 +84,8 @@ On such installs, you can update Netdata using your distribution package manager
 ### If the kickstart script does not work
 
 If the above command fails, you can [reinstall
-Netdata](/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This
-also preserves your [configuration](/docs/configure/nodes.md) in `netdata.conf` or other files just like updating
+Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md#one-line-installer-script-kickstartsh) to get the latest version. This
+also preserves your [configuration](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) in `netdata.conf` or other files just like updating
 normally would, though you will need to specify any installation options you used originally again.
 
 ## Docker
@@ -109,7 +109,7 @@ docker rm netdata
 ```
 
 You can now re-create your Netdata container using the `docker` command or a `docker-compose.yml` file. See our [Docker
-installation instructions](/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
+installation instructions](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#create-a-new-netdata-agent-container) for details.
 
 ## macOS
 
@@ -128,7 +128,7 @@ instructions](#updates-for-most-systems) to update Netdata.
 
 ## Manual installation from Git
 
-If you installed [Netdata manually from Git](/packaging/installer/methods/manual.md), you can run that installer again
+If you installed [Netdata manually from Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md), you can run that installer again
 to update your agent. First, run our automatic requirements installer, which works on many Linux distributions, to
 ensure your system has the dependencies necessary for new features.
 

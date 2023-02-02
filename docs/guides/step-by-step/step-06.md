@@ -8,13 +8,13 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step
 When Netdata _starts_, it auto-detects dozens of **data sources**, such as database servers, web servers, and more.
 
 To auto-detect and collect metrics from a source you just installed, you need to restart Netdata using `sudo systemctl
-restart netdata`, or the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
+restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 However, auto-detection only works if you installed the source using its standard installation
 procedure. If Netdata isn't collecting metrics after a restart, your source probably isn't configured
 correctly.
 
-Check out the [collectors that come pre-installed with Netdata](/collectors/COLLECTORS.md) to find the module for the
+Check out the [collectors that come pre-installed with Netdata](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) to find the module for the
 source you want to monitor.
 
 ## What you'll learn in this step
@@ -37,8 +37,8 @@ are organized and manged by plugins. **Internal** plugins collect system metrics
 non-system metrics, and **orchestrator** plugins group individual collectors together based on the programming language
 they were built in.
 
-These modules are primarily written in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/) (`go.d`) and
-[Python](/collectors/python.d.plugin/README.md), although some use [Bash](/collectors/charts.d.plugin/README.md)
+These modules are primarily written in [Go](https://github.com/netdata/go.d.plugin/blob/master/README.md) (`go.d`) and
+[Python](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md), although some use [Bash](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)
 (`charts.d`).
 
 ## Enable and disable plugins
@@ -100,7 +100,7 @@ Next, edit your `/etc/nginx/sites-enabled/default` file to include a `location` 
 ```
 
 Restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system, and Netdata will auto-detect metrics from your Nginx web
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system, and Netdata will auto-detect metrics from your Nginx web
 server!
 
 While not necessary for most auto-detection and collection purposes, you can also configure the Nginx collector itself

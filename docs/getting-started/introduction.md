@@ -71,12 +71,12 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 -   **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
     immediately visualize them into meaningful charts designed for troubleshooting. See [everything we
-    support](https://learn.netdata.cloud/docs/agent/collectors/collectors).
+    support](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
 -   **20+ notification platforms**: Netdata's health watchdog sends warning and critical alarms to your [favorite
-    platform](https://learn.netdata.cloud/docs/monitor/enable-notifications) to inform you of anomalies just seconds
+    platform](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to inform you of anomalies just seconds
     after they affect your node.
 -   **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
-    Cloud-based databases](https://learn.netdata.cloud/docs/export/external-databases) for best-in-class
+    Cloud-based databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for best-in-class
     interoperability.
 
 
@@ -113,7 +113,7 @@ While Netdata Cloud offers a centralized method of monitoring your Agents, your 
 
 ## Community
 
-Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
 ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
@@ -133,18 +133,18 @@ You can also find Netdata on:
 
 Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
-- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
+- Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
 - Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
-Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
+Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from source and preparing a package.
 
 ## License
 
-The Netdata Agent is an open source project distributed under [GPLv3+](/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
-[third party licenses](/REDISTRIBUTED.md).
+The Netdata Agent is an open source project distributed under [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
+[third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
 
 ## Is it any good?
 

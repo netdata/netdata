@@ -42,6 +42,6 @@ Charts can be enabled/disabled for every mount separately:
     # inodes usage = auto
 ```
 
-> for disks performance monitoring, see the `proc` plugin, [here](/collectors/proc.plugin/README.md#monitoring-disks)
+> for disks performance monitoring, see the `proc` plugin, [here](https://github.com/netdata/netdata/blob/master/collectors/proc.plugin/README.md#monitoring-disks)
 
 

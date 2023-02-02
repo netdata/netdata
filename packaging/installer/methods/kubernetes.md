@@ -45,8 +45,8 @@ dashboards available in Netdata Cloud.
 
 ## Connect your Kubernetes cluster to Netdata Cloud
 
-To start [Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/), you must first
-[connect](/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
+To start [Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md), you must first
+[connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
 connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
 like the health map and time-series composite charts.
 
@@ -184,17 +184,17 @@ helm upgrade netdata netdata/netdata
 
 ## What's next?
 
-[Start Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/) in Netdata Cloud, which
+[Start Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md) in Netdata Cloud, which
 comes with meaningful visualizations out of the box. 
 
 Read our guide, [_Kubernetes monitoring with Netdata: Overview and
-visualizations_](/docs/guides/monitor/kubernetes-k8s-netdata.md), for a complete walkthrough of Netdata's Kubernetes
+visualizations_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md), for a complete walkthrough of Netdata's Kubernetes
 monitoring capabilities, including a health map of every container in your infrastructure, aggregated resource
 utilization metrics, and application metrics.
 
 ### Related reference documentation
 
-- [Netdata Cloud · Kubernetes monitoring](https://learn.netdata.cloud/docs/cloud/visualize/kubernetes/)
+- [Netdata Cloud · Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
 - [Netdata Helm chart](https://github.com/netdata/helmchart)
 - [Netdata service discovery](https://github.com/netdata/agent-service-discovery/)
 
