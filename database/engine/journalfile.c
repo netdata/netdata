@@ -1023,6 +1023,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     // Initialize the journal file to be able to access the data
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
+    ctx_current_disk_space_increase(ctx, journal_v2_file_size);
+
     // File is OK load it
     return 0;
 }
@@ -1378,7 +1380,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         error("DBENGINE: failed to resize file '%s'", path);
     }
     else
-        ctx_current_disk_space_increase(ctx, sizeof(struct journal_v2_header));
+        ctx_current_disk_space_increase(ctx, resize_file_to);
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
@@ -1389,35 +1391,47 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     int ret, fd, error;
     uint64_t file_size, max_id;
     char path[RRDENG_PATH_MAX];
+    bool loaded_v2 = false;
 
-    // Do not try to load the latest file
-    if (datafile->fileno != ctx_last_fileno_get(ctx)) {
-        if (likely(!journalfile_v2_load(ctx, journalfile, datafile)))
-            return 0;
-    }
+    // Do not try to load jv2 of the latest file
+    if (datafile->fileno != ctx_last_fileno_get(ctx))
+        loaded_v2 = journalfile_v2_load(ctx, journalfile, datafile) == 0;
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
     fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
+
+        if(loaded_v2)
+            return 0;
+
         return fd;
     }
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
-    if (ret)
-        goto error;
+    if (ret) {
+        error = ret;
+        goto cleanup;
+    }
+
+    if(loaded_v2) {
+        journalfile->unsafe.pos = file_size;
+        error = 0;
+        goto cleanup;
+    }
+
     file_size = ALIGN_BYTES_FLOOR(file_size);
+    journalfile->unsafe.pos = file_size;
+    journalfile->file = file;
 
     ret = journalfile_check_superblock(file);
     if (ret) {
         info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
-        goto error;
+        error = ret;
+        goto cleanup;
     }
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
-
-    journalfile->file = file;
-    journalfile->unsafe.pos = file_size;
 
     info("DBENGINE: loading journal file '%s'", path);
 
@@ -1441,8 +1455,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     return 0;
 
-error:
-    error = ret;
+cleanup:
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
