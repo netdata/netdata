@@ -33,7 +33,8 @@ static void rrdfamily_delete_callback(const DICTIONARY_ITEM *item __maybe_unused
 
 void rrdfamily_index_init(RRDHOST *host) {
     if(!host->rrdfamily_root_index) {
-        host->rrdfamily_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdhealth);
+        host->rrdfamily_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                                &dictionary_stats_category_rrdhealth, sizeof(RRDFAMILY));
 
         dictionary_register_insert_callback(host->rrdfamily_root_index, rrdfamily_insert_callback, NULL);
         dictionary_register_delete_callback(host->rrdfamily_root_index, rrdfamily_delete_callback, host);

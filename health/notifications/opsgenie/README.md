@@ -17,9 +17,9 @@ incidents.
 
 The first step is to create a [Netdata integration](https://docs.opsgenie.com/docs/api-integration) in the
 [Opsgenie](https://www.atlassian.com/software/opsgenie) dashboard. After this, you need to edit
-`health_alarm_notify.conf` on your system, by running the following from your [config
-directory](/docs/configure/nodes.md):
- 
+`health_alarm_notify.conf` on your system, by running the following from
+your [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md):
+
 ```bash
 ./edit-config health_alarm_notify.conf
 ```
@@ -60,7 +60,7 @@ message:
 2020-09-03 23:07:00: alarm-notify.sh: ERROR: failed to send opsgenie notification for: hades test.chart.test_alarm is CRITICAL, with HTTP error code 401.
 ```
 
-You can find more details about the Opsgenie error codes in their [response
-docs](https://docs.opsgenie.com/docs/response).
+You can find more details about the Opsgenie error codes in
+their [response docs](https://docs.opsgenie.com/docs/response).
 
 

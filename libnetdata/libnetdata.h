@@ -225,6 +225,10 @@ extern "C" {
 #define WARNUNUSED
 #endif
 
+void aral_judy_init(void);
+size_t judy_aral_overhead(void);
+size_t judy_aral_structures(void);
+
 #define ABS(x) (((x) < 0)? (-(x)) : (x))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))

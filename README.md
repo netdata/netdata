@@ -22,7 +22,7 @@ It gives you the ability to automatically identify processes, collect and store 
 
 [Netdata Cloud](https://www.netdata.cloud) is a hosted web interface that gives you **Free**, real-time visibility into your **Entire Infrastructure** with secure access to your Netdata Agents. It provides an ability to automatically route your requests to the most relevant agents to display your metrics, based on the stored metadata (Agents topology, what metrics are collected on specific Agents as well as the retention information for each metric).
 
-It gives you some extra features, like [Metric Correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations), [Anomaly Advisor](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
+It gives you some extra features, like [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md), [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx), [anomaly rates on every chart](https://blog.netdata.cloud/anomaly-rate-in-every-chart/) and much more. 
 
 Try it for yourself right now by checking out the Netdata Cloud [demo space](https://app.netdata.cloud/spaces/netdata-demo/rooms/all-nodes/overview) (No sign up or login needed).
 
@@ -77,7 +77,7 @@ Here's what you can expect from Netdata:
     synchronize charts as you pan through time, zoom in on anomalies, and more.
 -   **Visual anomaly detection**: Our UI/UX emphasizes the relationships between charts to help you detect the root
     cause of anomalies.
--   **Machine learning (ML) features out of the box**: Unsupervised ML-based [anomaly detection](https://learn.netdata.cloud/docs/cloud/insights/anomaly-advisor), every second, every metric, zero-config! [Metric correlations](https://learn.netdata.cloud/docs/cloud/insights/metric-correlations) to help with short-term change detection. And other [additional](https://learn.netdata.cloud/guides/monitor/anomaly-detection) ML-based features to help make your life easier.
+-   **Machine learning (ML) features out of the box**: Unsupervised ML-based [anomaly detection](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx), every second, every metric, zero-config! [Metric correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md) to help with short-term change detection. And other [additional](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection.md) ML-based features to help make your life easier.
 -   **Scales to infinity**: You can install it on all your servers, containers, VMs, and IoT devices. Metrics are not
     centralized by default, so there is no limit.
 -   **Several operating modes**: Autonomous host monitoring (the default), headless data collector, forwarding proxy,
@@ -88,17 +88,17 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 -   **300+ system, container, and application endpoints**: Collectors autodetect metrics from default endpoints and
     immediately visualize them into meaningful charts designed for troubleshooting. See [everything we
-    support](https://learn.netdata.cloud/docs/agent/collectors/collectors).
+    support](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
 -   **20+ notification platforms**: Netdata's health watchdog sends warning and critical alarms to your [favorite
-    platform](https://learn.netdata.cloud/docs/monitor/enable-notifications) to inform you of anomalies just seconds
+    platform](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to inform you of anomalies just seconds
     after they affect your node.
 -   **30+ external time-series databases**: Export resampled metrics as they're collected to other [local- and
-    Cloud-based databases](https://learn.netdata.cloud/docs/export/external-databases) for best-in-class
+    Cloud-based databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) for best-in-class
     interoperability.
 
 > 💡 **Want to leverage the monitoring power of Netdata across entire infrastructure**? View metrics from
 > any number of distributed nodes in a single interface and unlock even more
-> [features](https://learn.netdata.cloud/docs/overview/why-netdata) with [Netdata
+> [features](https://github.com/netdata/netdata/blob/master/docs/overview/why-netdata.md) with [Netdata
 > Cloud](https://learn.netdata.cloud/docs/overview/what-is-netdata#netdata-cloud).
 
 ## Get Netdata
@@ -117,7 +117,7 @@ Netdata works with tons of applications, notifications platforms, and other time
 
 ### Infrastructure view
 
-Due to the distributed nature of the Netdata ecosystem, it is recommended to setup not only one Netdata Agent on your production system, but also an additional Netdata Agent acting as a [Parent](https://learn.netdata.cloud/docs/agent/streaming). A local Netdata Agent (child), without any database or alarms, collects metrics and sends them to another Netdata Agent (parent). The same parent can collect data for any number of child nodes and serves as a centralized health check engine for each child by triggering alerts on their behalf.
+Due to the distributed nature of the Netdata ecosystem, it is recommended to setup not only one Netdata Agent on your production system, but also an additional Netdata Agent acting as a [Parent](https://github.com/netdata/netdata/blob/master/streaming/README.md). A local Netdata Agent (child), without any database or alarms, collects metrics and sends them to another Netdata Agent (parent). The same parent can collect data for any number of child nodes and serves as a centralized health check engine for each child by triggering alerts on their behalf.
 
 ![Netdata Cloud](https://user-images.githubusercontent.com/423236/205926887-43024984-6d38-46ad-96cb-d0c388117c6d.png)
 
@@ -127,7 +127,7 @@ Community version is free to use forever. No restriction on number of nodes, clu
 
 #### Claiming existing Agents
 
-You can easily [connect (claim)](https://learn.netdata.cloud/docs/agent/claim) your existing Agents to the Cloud to unlock features for free and to find weaknesses before they turn into outages. 
+You can easily [connect (claim)](https://github.com/netdata/netdata/blob/master/claim/README.md) your existing Agents to the Cloud to unlock features for free and to find weaknesses before they turn into outages. 
 
 ### Single Node view
 
@@ -138,7 +138,7 @@ installation script](https://learn.netdata.cloud/docs/agent/packaging/installer/
 and builds all dependencies, including those required to connect to [Netdata Cloud](https://netdata.cloud/cloud) if you
 choose, and enables [automatic nightly
 updates](https://learn.netdata.cloud/docs/agent/packaging/installer#nightly-vs-stable-releases) and [anonymous
-statistics](https://learn.netdata.cloud/docs/agent/anonymous-statistics).
+statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
 <!-- candidate for reuse -->
 ```bash
 wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/netdata-kickstart.sh
@@ -149,7 +149,7 @@ To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://
 ### Docker
 
 You can also try out Netdata's capabilities in a [Docker
-container](https://learn.netdata.cloud/docs/agent/packaging/docker/):
+container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md):
 
 ```bash
 docker run -d --name=netdata \
@@ -173,16 +173,16 @@ To view the Netdata dashboard, navigate to `http://localhost:19999`, or `http://
 ### Other operating systems
 
 See our documentation for [additional operating
-systems](/packaging/installer/README.md#have-a-different-operating-system-or-want-to-try-another-method), including
-[Kubernetes](/packaging/installer/methods/kubernetes.md), [`.deb`/`.rpm`
-packages](/packaging/installer/methods/kickstart.md#native-packages), and more.
+systems](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#have-a-different-operating-system-or-want-to-try-another-method), including
+[Kubernetes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md), [`.deb`/`.rpm`
+packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#native-packages), and more.
 
 ### Post-installation
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
@@ -215,7 +215,7 @@ to collect metrics, troubleshoot via charts, export to external databases, and m
 
 ## Community
 
-Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://learn.netdata.cloud/contribute/code-of-conduct).
+Netdata is an inclusive open-source project and community. Please read our [Code of Conduct](https://github.com/netdata/.github/blob/main/CODE_OF_CONDUCT.md).
 
 Find most of the Netdata team in our [community forums](https://community.netdata.cloud). It's the best place to
 ask questions, find resources, and engage with passionate professionals. The team is also available and active in our [Discord](https://discord.com/invite/mPZ6WZKKG2) too.
@@ -235,18 +235,18 @@ You can also find Netdata on:
 
 Contributions are the lifeblood of open-source projects. While we continue to invest in and improve Netdata, we need help to democratize monitoring!
 
-- Read our [Contributing Guide](https://learn.netdata.cloud/contribute/handbook), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
+- Read our [Contributing Guide](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md), which contains all the information you need to contribute to Netdata, such as improving our documentation, engaging in the community, and developing new features. We've made it as frictionless as possible, but if you need help, just ping us on our community forums!
 - We have a whole category dedicated to contributing and extending Netdata on our [community forums](https://community.netdata.cloud/c/agent-development/9)
 - Found a bug? Open a [GitHub issue](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml&title=%5BBug%5D%3A+).
 - View our [Security Policy](https://github.com/netdata/netdata/security/policy).
 
-Package maintainers should read the guide on [building Netdata from source](/packaging/installer/methods/source.md) for
+Package maintainers should read the guide on [building Netdata from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md) for
 instructions on building each Netdata component from source and preparing a package.
 
 ## License
 
-The Netdata Agent is [GPLv3+](/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
-[third party licenses](/REDISTRIBUTED.md).
+The Netdata Agent is [GPLv3+](https://github.com/netdata/netdata/blob/master/LICENSE). Netdata re-distributes other open-source tools and libraries. Please check the
+[third party licenses](https://github.com/netdata/netdata/blob/master/REDISTRIBUTED.md).
 
 ## Is it any good?
 

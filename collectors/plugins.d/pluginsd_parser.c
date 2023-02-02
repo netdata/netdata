@@ -525,7 +525,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
 }
 
 void inflight_functions_init(PARSER *parser) {
-    parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions);
+    parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions, 0);
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
     dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
     dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);

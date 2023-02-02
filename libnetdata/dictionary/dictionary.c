@@ -143,6 +143,8 @@ struct dictionary {
     DICT_OPTIONS options;               // the configuration flags of the dictionary (they never change - no atomics)
     DICT_FLAGS flags;                   // run time flags for the dictionary (they change all the time - atomics needed)
 
+    ARAL *value_aral;
+
     struct {                            // support for multiple indexing engines
         Pvoid_t JudyHSArray;            // the hash table
         netdata_rwlock_t rwlock;        // protect the index
@@ -179,7 +181,9 @@ struct dictionary {
 #endif
 };
 
+// ----------------------------------------------------------------------------
 // forward definitions of functions used in reverse order in the code
+
 static void garbage_collect_pending_deletes(DICTIONARY *dict);
 static inline void item_linked_list_remove(DICTIONARY *dict, DICTIONARY_ITEM *item);
 static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item);
@@ -1249,7 +1253,8 @@ void dictionary_static_items_aral_init(void) {
                     "dict-items",
                     sizeof(DICTIONARY_ITEM),
                     0,
-                    4096,
+                    65536,
+                    aral_by_size_statistics(),
                     NULL, NULL, false, false);
 
         // we have to check again
@@ -1258,7 +1263,8 @@ void dictionary_static_items_aral_init(void) {
                     "dict-shared-items",
                     sizeof(DICTIONARY_ITEM_SHARED),
                     0,
-                    4096,
+                    65536,
+                    aral_by_size_statistics(),
                     NULL, NULL, false, false);
 
         netdata_spinlock_unlock(&spinlock);
@@ -1269,7 +1275,6 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     DICTIONARY_ITEM *item;
 
     size_t size = sizeof(DICTIONARY_ITEM);
-//    item = callocz(1, size);
     item = aral_mallocz(dict_items_aral);
     memset(item, 0, sizeof(DICTIONARY_ITEM));
 
@@ -1290,7 +1295,6 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     }
     else {
         size = sizeof(DICTIONARY_ITEM_SHARED);
-        // item->shared = callocz(1, size);
         item->shared = aral_mallocz(dict_shared_items_aral);
         memset(item->shared, 0, sizeof(DICTIONARY_ITEM_SHARED));
 
@@ -1304,20 +1308,39 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     return item;
 }
 
-static void *dict_item_value_create(void *value, size_t value_len) {
+static inline void *dict_item_value_mallocz(DICTIONARY *dict, size_t value_len) {
+    if(dict->value_aral) {
+        internal_fatal(aral_element_size(dict->value_aral) != value_len,
+                       "DICTIONARY: item value size %zu does not match the configured fixed one %zu",
+                       value_len, aral_element_size(dict->value_aral));
+        return aral_mallocz(dict->value_aral);
+    }
+    else
+        return mallocz(value_len);
+}
+
+static inline void dict_item_value_freez(DICTIONARY *dict, void *ptr) {
+    if(dict->value_aral)
+        aral_freez(dict->value_aral, ptr);
+    else
+        freez(ptr);
+}
+
+static void *dict_item_value_create(DICTIONARY *dict, void *value, size_t value_len) {
     void *ptr = NULL;
 
     if(likely(value_len)) {
         if (likely(value)) {
             // a value has been supplied
             // copy it
-            ptr =  mallocz(value_len);
+            ptr =  dict_item_value_mallocz(dict, value_len);
             memcpy(ptr, value, value_len);
         }
         else {
             // no value has been supplied
             // allocate a clear memory block
-            ptr = callocz(1, value_len);
+            ptr = dict_item_value_mallocz(dict, value_len);
+            memset(ptr, 0, value_len);
         }
     }
     // else
@@ -1356,7 +1379,7 @@ static DICTIONARY_ITEM *dict_item_create_with_hooks(DICTIONARY *dict, const char
         if(unlikely(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))
             item->shared->value = value;
         else
-            item->shared->value = dict_item_value_create(value, value_len);
+            item->shared->value = dict_item_value_create(dict, value, value_len);
 
         item->shared->value_len = value_len;
         value_size += value_len;
@@ -1396,7 +1419,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
         void *old_value = item->shared->value;
         void *new_value = NULL;
         if(value_len) {
-            new_value = mallocz(value_len);
+            new_value = dict_item_value_mallocz(dict, value_len);
             if(value) memcpy(new_value, value, value_len);
             else memset(new_value, 0, value_len);
         }
@@ -1404,7 +1427,7 @@ static void dict_item_reset_value_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *
         item->shared->value_len = value_len;
 
         debug(D_DICTIONARY, "Dictionary: freeing old value of '%s'", item_get_name(item));
-        freez(old_value);
+        dict_item_value_freez(dict, old_value);
     }
 
     dictionary_execute_insert_callback(dict, item, constructor_data);
@@ -1427,18 +1450,16 @@ static size_t dict_item_free_with_hooks(DICTIONARY *dict, DICTIONARY_ITEM *item)
 
         if(unlikely(!(dict->options & DICT_OPTION_VALUE_LINK_DONT_CLONE))) {
             debug(D_DICTIONARY, "Dictionary freeing value of '%s'", item_get_name(item));
-            freez(item->shared->value);
+            dict_item_value_freez(dict, item->shared->value);
             item->shared->value = NULL;
         }
         value_size += item->shared->value_len;
 
-        // freez(item->shared);
         aral_freez(dict_shared_items_aral, item->shared);
         item->shared = NULL;
         item_size += sizeof(DICTIONARY_ITEM_SHARED);
     }
 
-    // freez(item);
     aral_freez(dict_items_aral, item);
 
     item_size += sizeof(DICTIONARY_ITEM);
@@ -1788,6 +1809,9 @@ static bool dictionary_free_all_resources(DICTIONARY *dict, size_t *mem, bool fo
     dict_size += sizeof(DICTIONARY);
     DICTIONARY_STATS_MINUS_MEMORY(dict, 0, sizeof(DICTIONARY), 0);
 
+    if(dict->value_aral)
+        aral_by_size_release(dict->value_aral);
+
     freez(dict);
 
     internal_error(
@@ -1973,12 +1997,26 @@ static bool api_is_name_good_with_trace(DICTIONARY *dict __maybe_unused, const c
 // ----------------------------------------------------------------------------
 // API - dictionary management
 
-static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats) {
+static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
     cleanup_destroyed_dictionaries();
 
     DICTIONARY *dict = callocz(1, sizeof(DICTIONARY));
     dict->options = options;
     dict->stats = stats;
+
+    if((dict->options & DICT_OPTION_FIXED_SIZE) && !fixed_size) {
+        dict->options &= ~DICT_OPTION_FIXED_SIZE;
+        internal_fatal(true, "DICTIONARY: requested fixed size dictionary, without setting the size");
+    }
+    if(!(dict->options & DICT_OPTION_FIXED_SIZE) && fixed_size) {
+        dict->options |= DICT_OPTION_FIXED_SIZE;
+        internal_fatal(true, "DICTIONARY: set a fixed size for the items, without setting DICT_OPTION_FIXED_SIZE flag");
+    }
+
+    if(dict->options & DICT_OPTION_FIXED_SIZE)
+        dict->value_aral = aral_by_size_acquire(fixed_size);
+    else
+        dict->value_aral = NULL;
 
     size_t dict_size = 0;
     dict_size += sizeof(DICTIONARY);
@@ -1995,12 +2033,12 @@ static DICTIONARY *dictionary_create_internal(DICT_OPTIONS options, struct dicti
 }
 
 #ifdef NETDATA_INTERNAL_CHECKS
-DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, const char *function, size_t line, const char *file) {
+DICTIONARY *dictionary_create_advanced_with_trace(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size, const char *function, size_t line, const char *file) {
 #else
-DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats) {
+DICTIONARY *dictionary_create_advanced(DICT_OPTIONS options, struct dictionary_stats *stats, size_t fixed_size) {
 #endif
 
-    DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other);
+    DICTIONARY *dict = dictionary_create_internal(options, stats?stats:&dictionary_stats_category_other, fixed_size);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     dict->creation_function = function;
@@ -2018,7 +2056,9 @@ DICTIONARY *dictionary_create_view_with_trace(DICTIONARY *master, const char *fu
 DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 #endif
 
-    DICTIONARY *dict = dictionary_create_internal(master->options, master->stats);
+    DICTIONARY *dict = dictionary_create_internal(master->options, master->stats,
+                                                  master->value_aral ? aral_element_size(master->value_aral) : 0);
+
     dict->master = master;
 
     dictionary_hooks_allocate(master);
@@ -3335,7 +3375,7 @@ static int dictionary_unittest_view_threads() {
     // threads testing of dictionary
     struct dictionary_stats stats_master = {};
     struct dictionary_stats stats_view = {};
-    tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats_master);
+    tv.master = dictionary_create_advanced(DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE, &stats_master, 0);
     tv.view = dictionary_create_view(tv.master);
     tv.view->stats = &stats_view;
 
@@ -3428,7 +3468,7 @@ static int dictionary_unittest_view_threads() {
 size_t dictionary_unittest_views(void) {
     size_t errors = 0;
     struct dictionary_stats stats = {};
-    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats);
+    DICTIONARY *master = dictionary_create_advanced(DICT_OPTION_NONE, &stats, 0);
     DICTIONARY *view = dictionary_create_view(master);
 
     fprintf(stderr, "\n\nChecking dictionary views...\n");

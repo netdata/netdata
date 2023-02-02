@@ -14,19 +14,19 @@ Netdata's health watchdog is highly configurable, with support for dynamic thres
 more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
 create new entities.
 
-You can use health alarms in conjunction with any of Netdata's [collectors](/docs/collect/how-collectors-work.md) (see
-the [supported collector list](/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
+You can use health alarms in conjunction with any of Netdata's [collectors](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) (see
+the [supported collector list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)) to monitor the health of your systems, containers, and
 applications in real time.
 
 While you can see active alarms both on the local dashboard and Netdata Cloud, all health alarms are configured _per
 node_ via individual Netdata Agents. If you want to deploy a new alarm across your
-[infrastructure](/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), you must configure each node with the same health configuration
 files.
 
 ## Edit health configuration files
 
-All of Netdata's [health configuration files](/health/REFERENCE.md#health-configuration-files) are in Netdata's config
-directory, inside the `health.d/` directory. Navigate to your [Netdata config directory](/docs/configure/nodes.md) and
+All of Netdata's [health configuration files](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#health-configuration-files) are in Netdata's config
+directory, inside the `health.d/` directory. Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
 use `edit-config` to make changes to any of these files.
 
 For example, to edit the `cpu.conf` health configuration file, run:
@@ -77,10 +77,10 @@ one line in a given health entity. To silence any single alarm, change the `to:`
 While tuning existing alarms may work in some cases, you may need to write entirely new health entities based on how
 your systems, containers, and applications work.
 
-Read Netdata's [health reference](/health/REFERENCE.md#health-entity-reference) for a full listing of the format,
+Read Netdata's [health reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#health-entity-reference) for a full listing of the format,
 syntax, and functionality of health entities.
 
-To write a new health entity into a new file, navigate to your [Netdata config directory](/docs/configure/nodes.md),
+To write a new health entity into a new file, navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md),
 then use `touch` to create a new file in the `health.d/` directory. Use `edit-config` to start editing the file.
 
 As an example, let's create a `ram-usage.conf` file.
@@ -121,7 +121,7 @@ Let's look into each of the lines to see how they create a working health entity
 -   `every`: How often to perform the `lookup` calculation to decide whether or not to trigger this alarm.
 -   `warn`/`crit`: The value at which Netdata should trigger a warning or critical alarm. This example uses simple
     syntax, but most pre-configured health entities use
-    [hysteresis](/health/REFERENCE.md#special-use-of-the-conditional-operator) to avoid superfluous notifications.
+    [hysteresis](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#special-use-of-the-conditional-operator) to avoid superfluous notifications.
 -   `info`: A description of the alarm, which will appear in the dashboard and notifications.
 
 In human-readable format: 
@@ -144,9 +144,9 @@ without restarting all of Netdata, run `netdatacli reload-health` or `killall -U
 ## What's next?
 
 With your health entities configured properly, it's time to [enable
-notifications](/docs/monitor/enable-notifications.md) to get notified whenever a node reaches a warning or critical
+notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to get notified whenever a node reaches a warning or critical
 state.
 
-To build complex, dynamic alarms, read our guide on [dimension templates](/docs/guides/monitor/dimension-templates.md).
+To build complex, dynamic alarms, read our guide on [dimension templates](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/dimension-templates.md).
 
 

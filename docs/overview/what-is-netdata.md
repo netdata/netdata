@@ -18,7 +18,8 @@ Netdata's distributed monitoring Agent collects thousands of metrics from system
 configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT
 devices.
 
-You can [install](/docs/get-started.mdx) Netdata on most Linux distributions (Ubuntu, Debian, CentOS, and more),
+You can [install](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) Netdata on most Linux
+distributions (Ubuntu, Debian, CentOS, and more),
 container/microservice platforms (Kubernetes clusters, Docker), and many other operating systems (FreeBSD, macOS), with
 no `sudo` required.
 
@@ -46,29 +47,30 @@ you're viewing the Netdata Cloud interface.
 Netdata is designed to be both simple to use and flexible for every monitoring, visualization, and troubleshooting use
 case:
 
--   **Collect**: Netdata collects all available metrics from your system and applications with 300+ collectors,
-    Kubernetes service discovery, and in-depth container monitoring, all while using only 1% CPU and a few MB of RAM. It
-    even collects metrics from Windows machines.
--   **Visualize**: The dashboard meaningfully presents charts to help you understand the relationships between your
-    hardware, operating system, running apps/services, and the rest of your infrastructure. Add nodes to Netdata Cloud
-    for a complete view of your infrastructure from a single pane of glass.
--   **Monitor**: Netdata's health watchdog uses hundreds of preconfigured alarms to notify you via Slack, email,
-    PagerDuty and more when an anomaly strikes. Customize with dynamic thresholds, hysteresis, alarm templates, and
-    role-based notifications.
--   **Troubleshoot**: 1s granularity helps you detect and analyze anomalies other monitoring platforms might have
-    missed. Interactive visualizations reduce your reliance on the console, and historical metrics help you trace issues
-    back to their root cause.
--   **Store**: Netdata's efficient database engine efficiently stores per-second metrics for days, weeks, or even
-    months. Every distributed node stores metrics locally, simplifying deployment, slashing costs, and enriching
-    Netdata's interactive dashboards.
--   **Export**: Integrate per-second metrics with other time-series databases like Graphite, Prometheus, InfluxDB,
-    TimescaleDB, and more with Netdata's interoperable and extensible core.
--   **Stream**: Aggregate metrics from any number of distributed nodes in one place for in-depth analysis, including
-    ephemeral nodes in a Kubernetes cluster.
+- **Collect**: Netdata collects all available metrics from your system and applications with 300+ collectors,
+  Kubernetes service discovery, and in-depth container monitoring, all while using only 1% CPU and a few MB of RAM. It
+  even collects metrics from Windows machines.
+- **Visualize**: The dashboard meaningfully presents charts to help you understand the relationships between your
+  hardware, operating system, running apps/services, and the rest of your infrastructure. Add nodes to Netdata Cloud
+  for a complete view of your infrastructure from a single pane of glass.
+- **Monitor**: Netdata's health watchdog uses hundreds of preconfigured alarms to notify you via Slack, email,
+  PagerDuty and more when an anomaly strikes. Customize with dynamic thresholds, hysteresis, alarm templates, and
+  role-based notifications.
+- **Troubleshoot**: 1s granularity helps you detect and analyze anomalies other monitoring platforms might have
+  missed. Interactive visualizations reduce your reliance on the console, and historical metrics help you trace issues
+  back to their root cause.
+- **Store**: Netdata's efficient database engine efficiently stores per-second metrics for days, weeks, or even
+  months. Every distributed node stores metrics locally, simplifying deployment, slashing costs, and enriching
+  Netdata's interactive dashboards.
+- **Export**: Integrate per-second metrics with other time-series databases like Graphite, Prometheus, InfluxDB,
+  TimescaleDB, and more with Netdata's interoperable and extensible core.
+- **Stream**: Aggregate metrics from any number of distributed nodes in one place for in-depth analysis, including
+  ephemeral nodes in a Kubernetes cluster.
 
 ## What's next?
 
-Learn more about [why you should use Netdata](/docs/overview/why-netdata.md), or [how Netdata works with your existing
-monitoring stack](/docs/overview/netdata-monitoring-stack.md).
+Learn more
+about [why you should use Netdata](https://github.com/netdata/netdata/blob/master/docs/overview/why-netdata.md),
+or [how Netdata works with your existing monitoring stack](https://github.com/netdata/netdata/blob/master/docs/overview/netdata-monitoring-stack.md).
 
 

@@ -25,7 +25,7 @@ You can generate a new token in the Gotify Web UI.
 To set up Gotify in Netdata: 
 
 1. Switch to your [config
-directory](/docs/configure/nodes.md) and edit the file `health_alarm_notify.conf` using the edit config script.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and edit the file `health_alarm_notify.conf` using the edit config script.
  
    ```bash
    ./edit-config health_alarm_notify.conf

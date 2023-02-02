@@ -8,24 +8,27 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/moni
 Your ability to monitor the health of your systems and applications relies on your ability to create and maintain
 the best set of alarms for your particular needs.
 
-In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of writing [alarm
-entities](/health/REFERENCE.md#health-entity-reference) for charts with many dimensions.
+In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of 
+writing [alarm entities](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#health-entity-reference) for 
+charts with many dimensions.
 
 Dimension templates can condense many individual entities into one—no more copy-pasting one entity and changing the
 `alarm`/`template` and `lookup` lines for each dimension you'd like to monitor.
 
 They are, however, an advanced health monitoring feature. For more basic instructions on creating your first alarm,
-check out our [health monitoring documentation](/health/README.md), which also includes
-[examples](/health/REFERENCE.md#example-alarms).
+check out our [health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md), which also includes
+[examples](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#example-alarms).
 
 ## The fundamentals of `foreach`
 
-Our dimension templates update creates a new `foreach` parameter to the existing [`lookup`
-line](/health/REFERENCE.md#alarm-line-lookup). This is where the magic happens.
+Our dimension templates update creates a new `foreach` parameter to the 
+existing [`lookup` line](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-lookup). This 
+is where the magic happens.
 
 You use the `foreach` parameter to specify which dimensions you want to monitor with this single alarm. You can separate
-them with a comma (`,`) or a pipe (`|`). You can also use a [Netdata simple pattern](/libnetdata/simple_pattern/README.md)
-to create many alarms with a regex-like syntax.
+them with a comma (`,`) or a pipe (`|`). You can also use 
+a [Netdata simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) to create 
+many alarms with a regex-like syntax.
 
 The `foreach` parameter _has_ to be the last parameter in your `lookup` line, and if you have both `of` and `foreach` in
 the same `lookup` line, Netdata will ignore the `of` parameter and use `foreach` instead.
@@ -95,7 +98,7 @@ Let's look at some other examples of how `foreach` works so you can best apply i
 In the last example, we used `foreach system,user,nice` to create three distinct alarms using dimension templates. But
 what if you want to quickly create alarms for _all_ the dimensions of a given chart? 
 
-Use a [simple pattern](/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
+Use a [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md)! One example of a simple pattern is a single wildcard
 (`*`).
 
 Instead of monitoring system CPU usage, let's monitor per-application CPU usage using the `apps.cpu` chart. Passing a
@@ -113,14 +116,15 @@ lookup: average -10m percentage foreach *
 This entity will now create alarms for every dimension in the `apps.cpu` chart. Given that most `apps.cpu` charts have
 10 or more dimensions, using the wildcard ensures you catch every CPU-hogging process.
 
-To learn more about how to use simple patterns with dimension templates, see our [simple patterns
-documentation](/libnetdata/simple_pattern/README.md).
+To learn more about how to use simple patterns with dimension templates, see 
+our [simple patterns documentation](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md).
 
 ## Using `foreach` with alarm templates
 
-Dimension templates also work with [alarm templates](/health/REFERENCE.md#alarm-line-alarm-or-template). Alarm
-templates help you create alarms for all the charts with a given context—for example, all the cores of your system's
-CPU.
+Dimension templates also work 
+with [alarm templates](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md#alarm-line-alarm-or-template). 
+Alarm templates help you create alarms for all the charts with a given context—for example, all the cores of your 
+system's CPU.
 
 By combining the two, you can create dozens of individual alarms with a single template entity. Here's how you would
 create alarms for the `system`, `user`, and `nice` dimensions for every chart in the `cpu.cpu` context—or, in other
@@ -170,7 +174,8 @@ alarms that will help you better monitor the health of your systems.
 
 Or, at the very least, simplify your configuration files.
 
-For information about other advanced features in Netdata's health monitoring toolkit, check out our [health
-documentation](/health/README.md). And if you have some cool alarms you built using dimension templates, 
+For information about other advanced features in Netdata's health monitoring toolkit, check out 
+our [health documentation](https://github.com/netdata/netdata/blob/master/health/README.md). And if you have some cool 
+alarms you built using dimension templates, 
 
 

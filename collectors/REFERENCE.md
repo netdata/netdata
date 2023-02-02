@@ -23,7 +23,7 @@ independent processes in a variety of programming languages based on their purpo
 MySQL database, among many others.
 
 For most users, enabling individual collectors for the application/service you're interested in is far more important
-than knowing which plugin it uses. See our [collectors list](/collectors/COLLECTORS.md) to see whether your favorite app/service has
+than knowing which plugin it uses. See our [collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) to see whether your favorite app/service has
 a collector, and then read the documentation for that specific collector to figure out how to enable it.
 
 There are three types of plugins:
@@ -35,7 +35,7 @@ There are three types of plugins:
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
     type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
-    but focus most of our efforts on the [Go plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/).
+    but focus most of our efforts on the [Go plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md).
 
 ## Enable, configure, and disable modules
 
@@ -169,5 +169,5 @@ through this, is to examine what other similar plugins do.
 
 ## Write a custom collector
 
-You can add custom collectors by following the [external plugins documentation](/collectors/plugins.d/README.md).
+You can add custom collectors by following the [external plugins documentation](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
 

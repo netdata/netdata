@@ -212,8 +212,8 @@ See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-28449
 
 Please see these two links to the official Netdata documentation for more information about the values:
 
--   [External plugins - charts](/collectors/plugins.d/README.md#chart)
--   [Chart variables](/collectors/python.d.plugin/README.md#global-variables-order-and-chart)
+-   [External plugins - charts](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#chart)
+-   [Chart variables](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#global-variables-order-and-chart)
 
 **Line definitions**
 
@@ -236,7 +236,7 @@ hidden: False
 ```
 
 Please see the following link for more information about the options and their default values:
-[External plugins - dimensions](/collectors/plugins.d/README.md#dimension)
+[External plugins - dimensions](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md#dimension)
 
 Apart from top-level expvars, this plugin can also parse expvars stored in a multi-level map;
 All dicts in the resulting JSON document are then flattened to one level.
@@ -258,7 +258,7 @@ the first defined key wins and all subsequent keys with the same name are ignore
 ## Enable the collector
 
 The `go_expvar` collector is disabled by default. To enable it, use `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf` file.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -271,7 +271,7 @@ restart netdata`, or the appropriate method for your system, to finish enabling 
 ## Configuration
 
 Edit the `python.d/go_expvar.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

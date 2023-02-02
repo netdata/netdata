@@ -1,6 +1,8 @@
 ---
 title: "Alert notifications"
-description: "Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure triggers a pre-configured or custom alert threshold."
+description: >-
+    "Configure Netdata Cloud to send notifications to your team whenever any node on your infrastructure
+    triggers a pre-configured or custom alert threshold."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx"
 sidebar_label: "Alert notifications"
 learn_status: "Published"
@@ -108,26 +110,25 @@ the local Agent dashboard at `http://NODE:19999`.
 
 Email alarm notifications show the following information:
 
--   The Space's name
--   The node's name
--   Alarm status: critical, warning, cleared
--   Previous alarm status
--   Time at which the alarm triggered
--   Chart context that triggered the alarm
--   Name and information about the triggered alarm
--   Alarm value
--   Total number of warning and critical alerts on that node
--   Threshold for triggering the given alarm state
--   Calculation or database lookups that Netdata uses to compute the value
--   Source of the alarm, including which file you can edit to configure this alarm on an individual node
+- The Space's name
+- The node's name
+- Alarm status: critical, warning, cleared
+- Previous alarm status
+- Time at which the alarm triggered
+- Chart context that triggered the alarm
+- Name and information about the triggered alarm
+- Alarm value
+- Total number of warning and critical alerts on that node
+- Threshold for triggering the given alarm state
+- Calculation or database lookups that Netdata uses to compute the value
+- Source of the alarm, including which file you can edit to configure this alarm on an individual node
 
 Email notifications also feature a **Go to Node** button, which takes you directly to the offending chart for that node
 within Cloud's embedded dashboards.
 
 Here's an example email notification for the `ram_available` chart, which is in a critical state:
 
-![Screenshot of an alarm notification email from Netdata
-Cloud](https://user-images.githubusercontent.com/1153921/87461878-e933c480-c5c3-11ea-870b-affdb0801854.png)
+![Screenshot of an alarm notification email from Netdata Cloud](https://user-images.githubusercontent.com/1153921/87461878-e933c480-c5c3-11ea-870b-affdb0801854.png)
 
 ## What's next?
 

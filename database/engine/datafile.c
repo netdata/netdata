@@ -257,7 +257,7 @@ int create_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -340,7 +340,7 @@ static int load_data_file(struct rrdengine_datafile *datafile)
     char path[RRDENG_PATH_MAX];
 
     generate_datafilepath(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_RDWR, &file);
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -392,7 +392,7 @@ static int scan_data_files(struct rrdengine_instance *ctx)
 {
     int ret;
     unsigned tier, no, matched_files, i,failed_to_load;
-    static uv_fs_t req;
+    uv_fs_t req;
     uv_dirent_t dent;
     struct rrdengine_datafile **datafiles, *datafile;
     struct rrdengine_journalfile *journalfile;

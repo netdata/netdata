@@ -1055,77 +1055,67 @@ size_t dynamic_extent_cache_size(void) {
     return target_size;
 }
 
-void init_page_cache(void)
+void pgc_and_mrg_initialize(void)
 {
-    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
-    static bool initialized = false;
+    main_mrg = mrg_create();
 
-    netdata_spinlock_lock(&spinlock);
-    if (!initialized) {
-        initialized = true;
+    size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
+    size_t main_cache_size = (target_cache_size / 100) * 95;
+    size_t open_cache_size = 0;
+    size_t extent_cache_size = (target_cache_size / 100) * 5;
 
-        main_mrg = mrg_create();
-
-        size_t target_cache_size = (size_t)default_rrdeng_page_cache_mb * 1024ULL * 1024ULL;
-        size_t main_cache_size = (target_cache_size / 100) * 95;
-        size_t open_cache_size = 0;
-        size_t extent_cache_size = (target_cache_size / 100) * 5;
-
-        if(extent_cache_size < 3 * 1024 * 1024) {
-            extent_cache_size = 3 * 1024 * 1024;
-            main_cache_size = target_cache_size - extent_cache_size;
-        }
-
-        main_cache = pgc_create(
-                "main_cache",
-                main_cache_size,
-                main_cache_free_clean_page_callback,
-                (size_t) rrdeng_pages_per_extent,
-                main_cache_flush_dirty_page_init_callback,
-                main_cache_flush_dirty_page_callback,
-                10,
-                10240,                                      // if there are that many threads, evict so many at once!
-                1000,                           //
-                5,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
-                0,                                                 // 0 = as many as the system cpus
-                0
-        );
-
-        open_cache = pgc_create(
-                "open_cache",
-                open_cache_size,                             // the default is 1MB
-                open_cache_free_clean_page_callback,
-                1,
-                NULL,
-                open_cache_flush_dirty_page_callback,
-                10,
-                10240,                                      // if there are that many threads, evict that many at once!
-                1000,                           //
-                3,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
-                0,                                                 // 0 = as many as the system cpus
-                sizeof(struct extent_io_data)
-        );
-        pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
-
-        extent_cache = pgc_create(
-                "extent_cache",
-                extent_cache_size,
-                extent_cache_free_clean_page_callback,
-                1,
-                NULL,
-                extent_cache_flush_dirty_page_callback,
-                5,
-                10,                                         // it will lose up to that extents at once!
-                100,                            //
-                2,                                          // don't delay too much other threads
-                PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
-                0,                                                 // 0 = as many as the system cpus
-                0
-        );
-        pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
+    if(extent_cache_size < 3 * 1024 * 1024) {
+        extent_cache_size = 3 * 1024 * 1024;
+        main_cache_size = target_cache_size - extent_cache_size;
     }
 
-    netdata_spinlock_unlock(&spinlock);
+    main_cache = pgc_create(
+            "main_cache",
+            main_cache_size,
+            main_cache_free_clean_page_callback,
+            (size_t) rrdeng_pages_per_extent,
+            main_cache_flush_dirty_page_init_callback,
+            main_cache_flush_dirty_page_callback,
+            10,
+            10240,                                      // if there are that many threads, evict so many at once!
+            1000,                           //
+            5,                                          // don't delay too much other threads
+            PGC_OPTIONS_AUTOSCALE,                               // AUTOSCALE = 2x max hot pages
+            0,                                                 // 0 = as many as the system cpus
+            0
+    );
+
+    open_cache = pgc_create(
+            "open_cache",
+            open_cache_size,                             // the default is 1MB
+            open_cache_free_clean_page_callback,
+            1,
+            NULL,
+            open_cache_flush_dirty_page_callback,
+            10,
+            10240,                                      // if there are that many threads, evict that many at once!
+            1000,                           //
+            3,                                          // don't delay too much other threads
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
+            0,                                                 // 0 = as many as the system cpus
+            sizeof(struct extent_io_data)
+    );
+    pgc_set_dynamic_target_cache_size_callback(open_cache, dynamic_open_cache_size);
+
+    extent_cache = pgc_create(
+            "extent_cache",
+            extent_cache_size,
+            extent_cache_free_clean_page_callback,
+            1,
+            NULL,
+            extent_cache_flush_dirty_page_callback,
+            5,
+            10,                                         // it will lose up to that extents at once!
+            100,                            //
+            2,                                          // don't delay too much other threads
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_INLINE | PGC_OPTIONS_FLUSH_PAGES_INLINE,
+            0,                                                 // 0 = as many as the system cpus
+            0
+    );
+    pgc_set_dynamic_target_cache_size_callback(extent_cache, dynamic_extent_cache_size);
 }

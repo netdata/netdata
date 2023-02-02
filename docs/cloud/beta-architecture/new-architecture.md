@@ -19,7 +19,7 @@ that you have specifically requested. Features that will be developed on the new
 ## Enabling the new architecture
 
 To enable the new architecture, first ensure that you have installed the latest Netdata version following 
-[our guide](https://learn.netdata.cloud/docs/get-started/). Then, you or your administrator will need to retrieve the Space IDs 
+[our guide](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx). Then, you or your administrator will need to retrieve the Space IDs 
 within Netdata Cloud by clicking `Manage Space` in the left pane, selecting the `Space` tab, and copying the value in the `Space Id` field.
 You can then send an email to [beta@Netdata.cloud](mailto:beta@netdata.cloud) requesting to be included in our beta testers, and include 
 in the body of the email a list of Space IDs for any space you would like to have whitelisted for the update. If you received an email

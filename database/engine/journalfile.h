@@ -47,7 +47,6 @@ struct rrdengine_journalfile {
     } unsafe;
 
     uv_file file;
-    void *data;
     struct rrdengine_datafile *datafile;
 };
 

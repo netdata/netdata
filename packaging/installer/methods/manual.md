@@ -202,7 +202,7 @@ cd netdata
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
@@ -214,10 +214,10 @@ cd netdata
 
 ### Connect node to Netdata Cloud during installation
 
-Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
-not allow you to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation.
+Unlike the [`kickstart.sh`](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
+not allow you to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
+See the [connect to cloud](https://github.com/netdata/netdata/blob/master/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 
@@ -229,10 +229,10 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to

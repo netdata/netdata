@@ -1,6 +1,8 @@
 ---
 title: "Build new dashboards"
-description: "Design new dashboards that target your infrastructure's unique needs and share them with your team for targeted visual anomaly detection or incident response."
+description: >-
+    "Design new dashboards that target your infrastructure's unique needs and share them with your team for
+    targeted visual anomaly detection or incident response."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md"
 sidebar_label: "Build new dashboards"
 learn_status: "Published"
@@ -24,7 +26,7 @@ In the modal, give your new dashboard a name, and click **+ Add**.
 
 Click the **Add Chart** button to add your first chart card. From the dropdown, select either *All Nodes** or a specific
 node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/visualize/overview#composite-charts) to
-your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it. 
+your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The **Add Text** button creates a new card with user-defined text, which you can use to describe or document a
 particular dashboard's meaning and purpose.
@@ -46,8 +48,8 @@ node. If you select **All Nodes**, you will add a [composite chart](/docs/cloud/
 your new dashboard. Next, select the context. You'll see a preview of the chart before you finish adding it.
 
 The charts you add to any dashboard are fully interactive, just like the charts in an Agent dashboard or a single node's
-dashboard in Cloud. Zoom in and out, highlight timeframes, and more. See our [Agent dashboard
-docs](https://learn.netdata.cloud/docs/agent/web#using-charts) for all the shortcuts.
+dashboard in Cloud. Zoom in and out, highlight timeframes, and more. See our 
+[Agent dashboard docs](https://learn.netdata.cloud/docs/agent/web#using-charts) for all the shortcuts.
 
 Charts also synchronize as you interact with them, even across contexts _or_ nodes.
 
@@ -114,6 +116,7 @@ Because of the visual complexity of individual charts, dashboards require a mini
 
 ## What's next?
 
-Once you've designed a dashboard or two, make sure to [invite your team](/docs/cloud/manage/invite-your-team) if
+Once you've designed a dashboard or two, make sure
+to [invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md) if
 you haven't already. You can add these new users to the same War Room to let them see the same dashboards without any
 effort.

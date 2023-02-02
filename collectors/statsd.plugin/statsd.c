@@ -595,7 +595,7 @@ static inline void statsd_process_set(STATSD_METRIC *m, const char *value) {
     }
 
     if (unlikely(!m->set.dict)) {
-        m->set.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
+        m->set.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
         dictionary_register_insert_callback(m->set.dict, dictionary_metric_set_value_insert_callback, m);
         m->set.unique = 0;
     }
@@ -635,7 +635,7 @@ static inline void statsd_process_dictionary(STATSD_METRIC *m, const char *value
         statsd_reset_metric(m);
 
     if (unlikely(!m->dictionary.dict)) {
-        m->dictionary.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
+        m->dictionary.dict   = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
         dictionary_register_insert_callback(m->dictionary.dict, dictionary_metric_dict_value_insert_callback, m);
         m->dictionary.unique = 0;
     }
@@ -1337,7 +1337,7 @@ static int statsd_readfile(const char *filename, STATSD_APP *app, STATSD_APP_CHA
             else if(app) {
                 if(!strcmp(s, "dictionary")) {
                     if(!app->dict)
-                        app->dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors);
+                        app->dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_collectors, 0);
 
                     dict = app->dict;
                 }
@@ -2422,13 +2422,13 @@ void *statsd_main(void *ptr) {
 
     netdata_thread_cleanup_push(statsd_main_cleanup, ptr);
 
-    statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.counters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.histograms.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.dictionaries.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.sets.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
-    statsd.timers.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors);
+    statsd.gauges.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.meters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.counters.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.histograms.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.dictionaries.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.sets.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
+    statsd.timers.dict = dictionary_create_advanced(STATSD_DICTIONARY_OPTIONS, &dictionary_stats_category_collectors, 0);
 
     dictionary_register_insert_callback(statsd.gauges.dict, dictionary_metric_insert_callback, &statsd.gauges);
     dictionary_register_insert_callback(statsd.meters.dict, dictionary_metric_insert_callback, &statsd.meters);

@@ -10,7 +10,7 @@ learn_rel_path: "Operations"
 
 # Start, stop, or restart the Netdata Agent
 
-When you install the Netdata Agent, the [daemon](/daemon/README.md) is configured to start at boot and stop and
+When you install the Netdata Agent, the [daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md) is configured to start at boot and stop and
 restart/shutdown.
 
 You will most often need to _restart_ the Agent to load new or editing configuration files. [Health
@@ -44,7 +44,7 @@ If you start the daemon this way, close it with `sudo killall netdata`.
 
 ## Using `netdatacli`
 
-The Netdata Agent also comes with a [CLI tool](/cli/README.md) capable of performing shutdowns. Start the Agent back up
+The Netdata Agent also comes with a [CLI tool](https://github.com/netdata/netdata/blob/master/cli/README.md) capable of performing shutdowns. Start the Agent back up
 using your preferred method listed above.
 
 ```bash
@@ -84,19 +84,19 @@ again with `service netdata start`, or the appropriate method for your system.
 
 ## What's next?
 
-Learn more about [securing the Netdata Agent](/docs/configure/secure-nodes.md).
+Learn more about [securing the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/secure-nodes.md).
 
 You can also use the restart/reload methods described above to enable new features:
 
-- [Enable new collectors](/docs/collect/enable-configure.md) or tweak their behavior.
-- [Configure existing health alarms](/docs/monitor/configure-alarms.md) or create new ones.
-- [Enable notifications](/docs/monitor/enable-notifications.md) to receive updates about the health of your
+- [Enable new collectors](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) or tweak their behavior.
+- [Configure existing health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) or create new ones.
+- [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to receive updates about the health of your
   infrastructure.
-- Change [the long-term metrics retention period](/docs/store/change-metrics-storage.md) using the database engine.
+- Change [the long-term metrics retention period](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) using the database engine.
 
 ### Related reference documentation
 
-- [Netdata Agent · Daemon](/daemon/README.md)
-- [Netdata Agent · Netdata CLI](/cli/README.md)
+- [Netdata Agent · Daemon](https://github.com/netdata/netdata/blob/master/daemon/README.md)
+- [Netdata Agent · Netdata CLI](https://github.com/netdata/netdata/blob/master/cli/README.md)
 
 [![analytics](https://www.google-analytics.com/collect?v=1&aip=1&t=pageview&_s=1&ds=github&dr=https%3A%2F%2Fgithub.com%2Fnetdata%2Fnetdata&dl=https%3A%2F%2Fmy-netdata.io%2Fgithub%2Fdocs%2Fconfigure%2Fstart-stop-restart&_u=MAC~&cid=5792dfd7-8dc4-476b-af31-da2fdb9f93d2&tid=UA-64295674-3)](<>)

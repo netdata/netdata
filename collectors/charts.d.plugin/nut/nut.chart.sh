@@ -81,43 +81,46 @@ nut_create() {
 
   for x in "${nut_ids[@]}"; do
     cat << EOF
-CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 1)) $nut_update_every
+CHART nut_$x.charge '' "UPS Charge" "percentage" ups nut.charge area $((nut_priority + 2)) $nut_update_every
 DIMENSION battery_charge charge absolute 1 100
 
-CHART nut_$x.runtime '' "UPS Runtime" "seconds" ups nut.runtime area $((nut_priority + 2)) $nut_update_every
+CHART nut_$x.runtime '' "UPS Runtime" "seconds" ups nut.runtime area $((nut_priority + 3)) $nut_update_every
 DIMENSION battery_runtime runtime absolute 1 100
 
-CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $((nut_priority + 3)) $nut_update_every
+CHART nut_$x.battery_voltage '' "UPS Battery Voltage" "Volts" ups nut.battery.voltage line $((nut_priority + 4)) $nut_update_every
 DIMENSION battery_voltage voltage absolute 1 100
 DIMENSION battery_voltage_high high absolute 1 100
 DIMENSION battery_voltage_low low absolute 1 100
 DIMENSION battery_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $((nut_priority + 4)) $nut_update_every
+CHART nut_$x.input_voltage '' "UPS Input Voltage" "Volts" input nut.input.voltage line $((nut_priority + 5)) $nut_update_every
 DIMENSION input_voltage voltage absolute 1 100
 DIMENSION input_voltage_fault fault absolute 1 100
 DIMENSION input_voltage_nominal nominal absolute 1 100
 
-CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $((nut_priority + 5)) $nut_update_every
+CHART nut_$x.input_current '' "UPS Input Current" "Ampere" input nut.input.current line $((nut_priority + 6)) $nut_update_every
 DIMENSION input_current_nominal nominal absolute 1 100
 
-CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $((nut_priority + 6)) $nut_update_every
+CHART nut_$x.input_frequency '' "UPS Input Frequency" "Hz" input nut.input.frequency line $((nut_priority + 7)) $nut_update_every
 DIMENSION input_frequency frequency absolute 1 100
 DIMENSION input_frequency_nominal nominal absolute 1 100
 
-CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $((nut_priority + 7)) $nut_update_every
+CHART nut_$x.output_voltage '' "UPS Output Voltage" "Volts" output nut.output.voltage line $((nut_priority + 8)) $nut_update_every
 DIMENSION output_voltage voltage absolute 1 100
 
 CHART nut_$x.load '' "UPS Load" "percentage" ups nut.load area $((nut_priority)) $nut_update_every
 DIMENSION load load absolute 1 100
 
-CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 8)) $nut_update_every
+CHART nut_$x.load_usage '' "UPS Load Usage" "Watts" ups nut.load_usage area $((nut_priority + 1)) $nut_update_every
+DIMENSION load_usage load_usage absolute 1 100
+
+CHART nut_$x.temp '' "UPS Temperature" "temperature" ups nut.temperature line $((nut_priority + 9)) $nut_update_every
 DIMENSION temp temp absolute 1 100
 EOF
 
     if [ "${nut_clients_chart}" = "1" ]; then
       cat << EOF2
-CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 9)) $nut_update_every
+CHART nut_$x.clients '' "UPS Connected Clients" "clients" ups nut.clients area $((nut_priority + 10)) $nut_update_every
 DIMENSION clients '' absolute 1 1
 EOF2
     fi
@@ -154,6 +157,8 @@ BEGIN {
 	input_frequency_nominal = 0;
 	output_voltage = 0;
 	load = 0;
+	load_usage = 0;
+	nompower = 0;
 	temp = 0;
 	client = 0;
 	do_clients = ${nut_clients_chart};
@@ -172,16 +177,19 @@ BEGIN {
 /^input.frequency.nominal: .*/	{ input_frequency_nominal = \$2 * 100 };
 /^output.voltage: .*/			{ output_voltage = \$2 * 100 };
 /^ups.load: .*/					{ load = \$2 * 100 };
+/^ups.realpower.nominal: .*/		{ nompower = \$2 };
 /^ups.temperature: .*/			{ temp = \$2 * 100 };
 /^ups.connected_clients: .*/	{ clients = \$2 };
 END {
+	{ load_usage = nompower * load / 100 };
+
 	print \"BEGIN nut_$x.charge $1\";
 	print \"SET battery_charge = \" battery_charge;
 	print \"END\"
 
-    print \"BEGIN nut_$x.runtime $1\";
-    print \"SET battery_runtime = \" battery_runtime;
-    print \"END\"
+	print \"BEGIN nut_$x.runtime $1\";
+	print \"SET battery_runtime = \" battery_runtime;
+	print \"END\"
 
 	print \"BEGIN nut_$x.battery_voltage $1\";
 	print \"SET battery_voltage = \" battery_voltage;
@@ -211,6 +219,10 @@ END {
 
 	print \"BEGIN nut_$x.load $1\";
 	print \"SET load = \" load;
+	print \"END\"
+
+	print \"BEGIN nut_$x.load_usage $1\";
+	print \"SET load_usage = \" load_usage;
 	print \"END\"
 
 	print \"BEGIN nut_$x.temp $1\";
