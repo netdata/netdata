@@ -48,15 +48,15 @@ LOGS_QUERY_RESULT_TYPE fetch_log_sources(BUFFER *wb){
     if(unlikely(!p_file_infos_arr || !p_file_infos_arr->count)) return NO_RESULTS_FOUND;
 
     for (int i = 0; i < p_file_infos_arr->count; i++) {
-        buffer_sprintf( wb, "\t\t \"%s\":{\n"
-                            "\t\t\t\"basename\": \"%s\",\n"
-                            "\t\t\t\"filename\": \"%s\",\n"
-                            "\t\t\t\"log type\": \"%s\",\n"
-                            "\t\t\t\"DB dir\": \"%s\",\n"
-                            "\t\t\t\"DB version\": %d,\n"
-                            "\t\t\t\"DB flush interval\": %d,\n"
-                            "\t\t\t\"DB disk space limit\": %" PRId64 "\n"
-                            "\t\t},\n", 
+        buffer_sprintf( wb, "       \"%s\": {\n"
+                            "         \"basename\": \"%s\",\n"
+                            "         \"filename\": \"%s\",\n"
+                            "         \"log type\": \"%s\",\n"
+                            "         \"DB dir\": \"%s\",\n"
+                            "         \"DB version\": %d,\n"
+                            "         \"DB flush interval\": %d,\n"
+                            "         \"DB disk space limit\": %" PRId64 "\n"
+                            "      },\n", 
                         p_file_infos_arr->data[i]->chart_name,
                         p_file_infos_arr->data[i]->file_basename,
                         p_file_infos_arr->data[i]->filename,

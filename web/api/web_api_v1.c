@@ -1602,13 +1602,18 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
     buffer_flush(w->response.data);
     w->response.data->contenttype = CT_APPLICATION_JSON;
 
-    buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"api version\": %s,\n", QUERY_VERSION);
-    buffer_strcat(w->response.data, "\t\"log sources\": {\n");
+    buffer_sprintf( w->response.data, 
+                    "{\n"
+                    "   \"api version\": %s,\n" 
+                    "   \"log sources\": {\n",
+                    QUERY_VERSION);
     LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(w->response.data);
-    buffer_strcat(w->response.data, "\n\t},\n");
-    buffer_sprintf(w->response.data, "\t\"error code\": %d,\n", err_code);
-    buffer_sprintf(w->response.data, "\t\"error\": \"");
+    buffer_sprintf( w->response.data, 
+                    "\n"
+                    "   },\n"
+                    "   \"error code\": %d,\n"
+                    "   \"error\": \"",
+                    err_code);
     switch(err_code){
         case GENERIC_ERROR:
             buffer_strcat(w->response.data, "query generic error");
@@ -1639,7 +1644,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     logs_query_params_t query_params = {0};
     query_params.quota = LOGS_MANAG_QUERY_QUOTA_DEFAULT;
     
-    int fn_off = 0, cn_off = 0;
+    unsigned int fn_off = 0, cn_off = 0;
 
     while(url) {
         char *value = mystrsep(&url, "&");
