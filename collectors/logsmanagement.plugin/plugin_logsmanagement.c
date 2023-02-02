@@ -204,7 +204,11 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
     const uint64_t  req_start_timestamp = query_params.start_timestamp,
                     req_end_timestamp = query_params.end_timestamp;
+    struct rusage start, end;
+    getrusage(RUSAGE_THREAD, &start);
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp
+    getrusage(RUSAGE_THREAD, &end);
+
     int status;
     switch(err_code){
         case INVALID_REQUEST_ERROR:
@@ -219,17 +223,20 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
     fn_off = cn_off = 0;
 
+    int update_every = 1;
+
     buffer_sprintf( dest_wb,
                     "{\n"
                     "   \"status\": %d,\n"
                     "   \"type\": \"table\",\n"
                     "   \"update_every\": %d,\n"
-                    "   \"api version\": %s,\n"
-                    "   \"requested from\": %" PRIu64 ",\n"
-                    "   \"requested until\": %" PRIu64 ",\n"
-                    "   \"requested keyword\": \"%s\",\n",
+                    "   \"logs_management_meta\": {\n"
+                    "      \"api_version\": %s,\n"
+                    "      \"requested_from\": %" PRIu64 ",\n"
+                    "      \"requested_until\": %" PRIu64 ",\n"
+                    "      \"requested_keyword\": \"%s\",\n",
                     status,
-                    1,
+                    update_every,
                     QUERY_VERSION,
                     req_start_timestamp,
                     req_end_timestamp,
@@ -237,27 +244,59 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     );
      
     buffer_sprintf( dest_wb,
-                    "   \"actual from\": %" PRIu64 ",\n"
-                    "   \"actual until\": %" PRIu64 ",\n"
-                    "   \"quota\": %zu,\n"
-                    "   \"requested filename\": [\n",
+                    "      \"actual_from\": %" PRIu64 ",\n"
+                    "      \"actual_until\": %" PRIu64 ",\n"
+                    "      \"quota\": %zu,\n"
+                    "      \"requested_filename\": [\n",
                     query_params.start_timestamp,
                     query_params.end_timestamp,
                     query_params.quota
     );
-    while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "      \"%s\",\n", query_params.filename[fn_off++]);
+    while(query_params.filename[fn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  dest_wb->len -= 2;
 
     buffer_strcat(  dest_wb, 
-                    "\n   ],\n"
-                    "   \"requested chart_name\": [\n"
+                    "\n      ],\n"
+                    "      \"requested_chart_name\": [\n"
     );
-    while(query_params.chart_name[cn_off]) buffer_sprintf(dest_wb, "      \"%s\",\n", query_params.chart_name[cn_off++]);
+    while(query_params.chart_name[cn_off]) buffer_sprintf(dest_wb, "         \"%s\",\n", query_params.chart_name[cn_off++]);
     if(query_params.chart_name[0])  dest_wb->len -= 2;
-    buffer_fast_strcat(dest_wb, "\n   ],\n", 7);
+    buffer_strcat(dest_wb, "\n      ],\n");
+
+    buffer_sprintf( dest_wb, 
+                    "      \"keyword_matches\": %d, \n"
+                    "      \"user_time\": %llu,\n"
+                    "      \"system_time\": %llu,\n"
+                    "      \"error_code\": %d,\n"
+                    "      \"error\": \"",
+                    query_params.keyword_matches,
+                    end.ru_utime.tv_sec * 1000000ULL + end.ru_utime.tv_usec - 
+                    start.ru_utime.tv_sec * 1000000ULL - start.ru_utime.tv_usec,
+                    end.ru_stime.tv_sec * 1000000ULL + end.ru_stime.tv_usec - 
+                    start.ru_stime.tv_sec * 1000000ULL - start.ru_stime.tv_usec,
+                    err_code
+    );
+    switch(err_code){
+        case GENERIC_ERROR:
+            buffer_strcat(dest_wb, "query generic error");
+            break;
+        case INVALID_REQUEST_ERROR:
+            buffer_strcat(dest_wb, "invalid request");
+            break;
+        case NO_MATCHING_CHART_OR_FILENAME_ERROR:
+            buffer_strcat(dest_wb, "no matching chart or filename found");
+            break;
+        case NO_RESULTS_FOUND:
+            buffer_strcat(dest_wb, "no results found");
+            break;
+        default:
+            buffer_strcat(dest_wb, "success");
+            break;
+    } 
+    buffer_strcat(dest_wb, "\"\n   },\n");
 
 
-    buffer_sprintf(dest_wb, "   \"data\":[\n");
+    buffer_strcat(dest_wb, "   \"data\":[\n");
 
     size_t res_off = 0;
     logs_query_res_hdr_t res_hdr;
@@ -301,6 +340,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                 dest_wb->buffer[dest_wb->len++] = '"';
             }
             else {
+                // Escape control characters like [90m
                 if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
                     while(*p != 'm'){
                         buffer_need_bytes(dest_wb, 1);
@@ -333,6 +373,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     add_table_field(dest_wb, "Logs", "Logs collected in last interval", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
     add_table_field(dest_wb, "LogsTxtSz", "Logs text length", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
     add_table_field(dest_wb, "MatchNo", "Keyword matches", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "sum", false);
+
+    buffer_sprintf( dest_wb, "   \"expires\": %lld", (long long) now_realtime_sec() + update_every);
 
     buffer_fast_strcat(dest_wb, "\n   }\n}", sizeof("\n   }\n}") - 1);
 

@@ -1683,19 +1683,19 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     query_params.results_buff = buffer_create(query_params.quota);
     
     buffer_strcat(w->response.data, "{\n");
-    buffer_sprintf(w->response.data, "\t\"api version\": %s,\n", QUERY_VERSION);
-    buffer_sprintf(w->response.data, "\t\"requested from\": %" PRIu64 ",\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"requested until\": %" PRIu64 ",\n", query_params.end_timestamp);
-    buffer_sprintf(w->response.data, "\t\"requested keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
+    buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", QUERY_VERSION);
+    buffer_sprintf(w->response.data, "\t\"requested_from\": %" PRIu64 ",\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested_until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested_keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
-    buffer_sprintf(w->response.data, "\t\"actual from\": %" PRIu64 ",\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"actual until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"actual_from\": %" PRIu64 ",\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"actual_until\": %" PRIu64 ",\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"quota\": %zu,\n", query_params.quota);
-    buffer_sprintf(w->response.data, "\t\"requested filename\":[\n");
+    buffer_sprintf(w->response.data, "\t\"requested_filename\":[\n");
     while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
     if(query_params.filename[0])  w->response.data->len -= 2;
     buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"requested chart_name\":[\n");
+    buffer_sprintf(w->response.data, "\t\"requested_chart_name\":[\n");
     while(query_params.chart_name[cn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.chart_name[cn_off++]);
     if(query_params.chart_name[0])  w->response.data->len -= 2;
     buffer_strcat(w->response.data, "\n\t],\n");
@@ -1738,6 +1738,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
                 w->response.data->buffer[w->response.data->len++] = '"';
             }
             else {
+                // Escape control characters like [90m
                 if(unlikely(iscntrl(*p) && *(p+1) == '[')) {
                     while(*p != 'm'){
                         buffer_need_bytes(w->response.data, 1);
@@ -1767,17 +1768,17 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
     
     buffer_strcat(w->response.data, "\n\t],\n");
-    buffer_sprintf(w->response.data, "\t\"keyword matches\": %d,\n", query_params.keyword_matches);
+    buffer_sprintf(w->response.data, "\t\"keyword_matches\": %d,\n", query_params.keyword_matches);
     getrusage(RUSAGE_THREAD, &end);
-    buffer_sprintf(w->response.data, "\t\"user time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 
+    buffer_sprintf(w->response.data, "\t\"user_time\": %llu,\n", end.ru_utime.tv_sec * 1000000ULL + 
                                                                  end.ru_utime.tv_usec - 
                                                                  start.ru_utime.tv_sec * 1000000ULL -
                                                                  start.ru_utime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"system time\": %llu,\n", end.ru_stime.tv_sec * 1000000ULL + 
+    buffer_sprintf(w->response.data, "\t\"system_time\": %llu,\n", end.ru_stime.tv_sec * 1000000ULL + 
                                                                    end.ru_stime.tv_usec - 
                                                                    start.ru_stime.tv_sec * 1000000ULL -
                                                                    start.ru_stime.tv_usec);
-    buffer_sprintf(w->response.data, "\t\"error code\": %d,\n", err_code);
+    buffer_sprintf(w->response.data, "\t\"error_code\": %d,\n", err_code);
     buffer_sprintf(w->response.data, "\t\"error\": \"");
     switch(err_code){
         case GENERIC_ERROR:
