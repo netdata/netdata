@@ -4482,27 +4482,27 @@ netdataDashboard.context = {
     // WMI (AD)
 
     'ad.dra_replication_intersite_compressed_traffic': {
-        info: 'Shows the compressed size, in bytes, of inbound and outbound compressed replication data (size after compression, from DSAs in other sites).'
+        info: 'The compressed size, in bytes, of inbound and outbound compressed replication data (size after compression, from DSAs in other sites).'
     },
 
     'ad.dra_replication_intrasite_compressed_traffic': {
-        info: 'Shows the number of bytes replicated that were not compressed (that is., from DSAs in the same site).'
+        info: 'The number of bytes replicated that were not compressed (that is., from DSAs in the same site).'
     },
 
     'ad.dra_replication_properties_updated': {
-        info: 'Shows the number of properties that are updated due to incoming property winning the reconciliation logic that determines the final value to be replicated.'
+        info: 'The number of properties that are updated due to incoming property winning the reconciliation logic that determines the final value to be replicated.'
     },
 
     'ad.dra_replication_objects_filtered': {
-        info: 'Shows the number of objects received from inbound replication partners that contained no updates that needed to be applied.'
+        info: 'The number of objects received from inbound replication partners that contained no updates that needed to be applied.'
     },
 
     'ad.dra_replication_pending_syncs': {
-        info: 'Shows the number of directory synchronizations that are queued for this server but not yet processed.'
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
     },
 
     'ad.dra_replication_sync_requests': {
-        info: 'Shows the number of directory synchronizations that are queued for this server but not yet processed.'
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
     },
 
     // ------------------------------------------------------------------------
