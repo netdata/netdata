@@ -1456,7 +1456,7 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
             res->full.share_time.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
             res->full.share_time.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
             res->full.share_time.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8)) / 1000; // us->ms
+            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8)) / 1000; // us->ms
         }
 
         res->updated = 1;
