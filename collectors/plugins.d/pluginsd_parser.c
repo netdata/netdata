@@ -326,7 +326,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 {
     const char *first_entry_txt = get_word(words, num_words, 1);
     const char *last_entry_txt = get_word(words, num_words, 2);
-    const char *world_time_txt = get_word(words, num_words, 3);
+    const char *wall_clock_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
@@ -336,12 +336,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
     time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
     time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
-    time_t child_world_time = (world_time_txt && *world_time_txt) ? (time_t)str2ul(world_time_txt) : now_realtime_sec();
-
-    if((first_entry_child != 0 || last_entry_child != 0) && (first_entry_child == 0 || last_entry_child == 0))
-        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_CHART_DEFINITION_END " with malformed timings (first time %ld, last time %ld, world time %ld).",
-              rrdhost_hostname(host), rrdset_id(st),
-              first_entry_child, last_entry_child, child_world_time);
+    time_t child_wall_clock_time = (wall_clock_time_txt && *wall_clock_time_txt) ? (time_t)str2ul(wall_clock_time_txt) : now_realtime_sec();
 
     bool ok = true;
     if(!rrdset_flag_check(st, RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS)) {
@@ -358,7 +353,7 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
 
         PARSER *parser = ((PARSER_USER_OBJECT *)user)->parser;
         ok = replicate_chart_request(send_to_plugin, parser, host, st,
-                                     first_entry_child, last_entry_child, child_world_time,
+                                     first_entry_child, last_entry_child, child_wall_clock_time,
                                      0, 0);
     }
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -530,7 +525,7 @@ static void inflight_functions_delete_callback(const DICTIONARY_ITEM *item __may
 }
 
 void inflight_functions_init(PARSER *parser) {
-    parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions);
+    parser->inflight.functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions, 0);
     dictionary_register_insert_callback(parser->inflight.functions, inflight_functions_insert_callback, parser);
     dictionary_register_delete_callback(parser->inflight.functions, inflight_functions_delete_callback, parser);
     dictionary_register_conflict_callback(parser->inflight.functions, inflight_functions_conflict_callback, parser);
@@ -1125,6 +1120,9 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
 
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user)
 {
+    if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
+        return PARSER_RC_OK;
+
     char *dimension = get_word(words, num_words, 1);
     char *last_collected_ut_str = get_word(words, num_words, 2);
     char *last_collected_value_str = get_word(words, num_words, 3);
@@ -1157,6 +1155,9 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
 
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user)
 {
+    if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
+        return PARSER_RC_OK;
+
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
@@ -1239,7 +1240,8 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         time_t started = st->rrdhost->receiver->replication_first_time_t;
         time_t current = ((PARSER_USER_OBJECT *) user)->replay.end_time;
 
-        worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
+        if(started && current > started)
+            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION,
                           (NETDATA_DOUBLE)(current - started) * 100.0 / (NETDATA_DOUBLE)(now - started));
     }
 
@@ -1300,10 +1302,10 @@ static void pluginsd_process_thread_cleanup(void *ptr) {
 
 inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations)
 {
-    int enabled = cd->enabled;
+    int enabled = cd->unsafe.enabled;
 
     if (!fp_plugin_input || !fp_plugin_output || !enabled) {
-        cd->enabled = 0;
+        cd->unsafe.enabled = 0;
         return 0;
     }
 
@@ -1323,7 +1325,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     clearerr(fp_plugin_output);
 
     PARSER_USER_OBJECT user = {
-        .enabled = cd->enabled,
+        .enabled = cd->unsafe.enabled,
         .host = host,
         .cd = cd,
         .trust_durations = trust_durations
@@ -1348,7 +1350,7 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
 
-    cd->enabled = user.enabled;
+    cd->unsafe.enabled = user.enabled;
     size_t count = user.count;
 
     if (likely(count)) {

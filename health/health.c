@@ -797,30 +797,15 @@ static void initialize_health(RRDHOST *host, int is_localhost) {
         if(r != 0 && errno != EEXIST)
             error("Host '%s': cannot create directory '%s'", rrdhost_hostname(host), filename);
     }
-    snprintfz(filename, FILENAME_MAX, "%s/health/health-log.db", host->varlib_dir);
-    host->health.health_log_filename = strdupz(filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/alarm-notify.sh", netdata_configured_primary_plugins_dir);
     host->health.health_default_exec = string_strdupz(config_get(CONFIG_SECTION_HEALTH, "script to execute on alarm", filename));
     host->health.health_default_recipient = string_strdupz("root");
 
-    if (!file_is_migrated(host->health.health_log_filename)) {
-        int rc = sql_create_health_log_table(host);
-        if (unlikely(rc)) {
-            log_health("[%s]: Failed to create health log table in the database", rrdhost_hostname(host));
-            health_alarm_log_load(host);
-            health_alarm_log_open(host);
-        }
-        else {
-            health_alarm_log_load(host);
-            add_migrated_file(host->health.health_log_filename, 0);
-        }
-    } else {
-        // TODO: This needs to go to the metadata thread
-        // Health should wait before accessing the table (needs to be created by the metadata thread)
-        sql_create_health_log_table(host);
-        sql_health_alarm_log_load(host);
-    }
+    // TODO: This needs to go to the metadata thread
+    // Health should wait before accessing the table (needs to be created by the metadata thread)
+    sql_create_health_log_table(host);
+    sql_health_alarm_log_load(host);
 
     // ------------------------------------------------------------------------
     // load health configuration
@@ -1058,6 +1043,9 @@ void *health_main(void *ptr) {
 
         rrdhost_foreach_read(host) {
 
+            if(unlikely(!service_running(SERVICE_HEALTH)))
+                break;
+
             if (unlikely(!host->health.health_enabled))
                 continue;
 
@@ -1106,6 +1094,9 @@ void *health_main(void *ptr) {
 
             // the first loop is to lookup values from the db
             foreach_rrdcalc_in_rrdhost_read(host, rc) {
+
+                if(unlikely(!service_running(SERVICE_HEALTH)))
+                    break;
 
                 rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -1251,6 +1242,9 @@ void *health_main(void *ptr) {
 
             if (unlikely(runnable && service_running(SERVICE_HEALTH))) {
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     if (unlikely(!(rc->run_flags & RRDCALC_FLAG_RUNNABLE)))
                         continue;
 
@@ -1431,6 +1425,9 @@ void *health_main(void *ptr) {
 
                 // process repeating alarms
                 foreach_rrdcalc_in_rrdhost_read(host, rc) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     int repeat_every = 0;
                     if(unlikely(rrdcalc_isrepeating(rc) && rc->delay_up_to_timestamp <= now)) {
                         if(unlikely(rc->status == RRDCALC_STATUS_WARNING)) {
@@ -1514,6 +1511,9 @@ void *health_main(void *ptr) {
                 // wait for all notifications to finish before allowing health to be cleaned up
                 ALARM_ENTRY *ae;
                 while (NULL != (ae = alarm_notifications_in_progress.head)) {
+                    if(unlikely(!service_running(SERVICE_HEALTH)))
+                        break;
+
                     health_alarm_wait_for_execution(ae);
                 }
                 break;
@@ -1525,14 +1525,21 @@ void *health_main(void *ptr) {
         // wait for all notifications to finish before allowing health to be cleaned up
         ALARM_ENTRY *ae;
         while (NULL != (ae = alarm_notifications_in_progress.head)) {
+            if(unlikely(!service_running(SERVICE_HEALTH)))
+                break;
+
             health_alarm_wait_for_execution(ae);
         }
 
 #ifdef ENABLE_ACLK
         if (netdata_cloud_setting && unlikely(aclk_alert_reloaded) && loop > (marked_aclk_reload_loop + 2)) {
             rrdhost_foreach_read(host) {
+                if(unlikely(!service_running(SERVICE_HEALTH)))
+                    break;
+
                 if (unlikely(!host->health.health_enabled))
                     continue;
+
                 sql_queue_removed_alerts_to_aclk(host);
             }
             aclk_alert_reloaded = 0;

@@ -22,17 +22,6 @@ static netdata_idx_t *mount_values = NULL;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
-struct netdata_static_thread mount_thread = {
-                                 .name = "MOUNT KERNEL",
-                                 .config_section = NULL,
-                                 .config_name = NULL,
-                                 .env_name = NULL,
-                                 .enabled = 1,
-                                 .thread = NULL,
-                                 .init_routine = NULL,
-                                 .start_routine = NULL
-};
-
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
@@ -239,14 +228,9 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 static void ebpf_mount_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
-    freez(mount_thread.thread);
     freez(mount_values);
 
 #ifdef LIBBPF_MAJOR_VERSION
@@ -269,21 +253,6 @@ static void ebpf_mount_free(ebpf_module_t *em)
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (mount_thread.thread)
-        netdata_thread_cancel(*mount_thread.thread);
-    ebpf_mount_free(em);
-}
-
-/**
- * Mount cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_mount_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_mount_free(em);
 }
 
@@ -298,7 +267,7 @@ static void ebpf_mount_cleanup(void *ptr)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_mount_read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = mount_hash_values;
@@ -316,36 +285,6 @@ static void read_global_table()
             val[idx] = total;
         }
     }
-}
-
-/**
- * Mount read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_mount_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_mount_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_global_table();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -372,14 +311,8 @@ static void ebpf_mount_send_data()
 */
 static void mount_collector(ebpf_module_t *em)
 {
-    mount_thread.thread = mallocz(sizeof(netdata_thread_t));
-    mount_thread.start_routine = ebpf_mount_read_hash;
-    memset(mount_hash_values, 0, sizeof(mount_hash_values));
-
     mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
-
-    netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_mount_read_hash, em);
+    memset(mount_hash_values, 0, sizeof(mount_hash_values));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -389,6 +322,7 @@ static void mount_collector(ebpf_module_t *em)
         if (ebpf_exit_plugin)
             break;
 
+        ebpf_mount_read_global_table();
         pthread_mutex_lock(&lock);
 
         ebpf_mount_send_data();

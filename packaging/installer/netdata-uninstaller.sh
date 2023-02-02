@@ -426,7 +426,7 @@ portable_del_group() {
 
   # Linux
   if command -v groupdel 1> /dev/null 2>&1; then
-    if grep -q "${groupname}" /etc/group; then
+    if get_group "${groupname}" > /dev/null 2>&1; then
       run groupdel "${groupname}" && return 0
     else
       info "Group ${groupname} already removed in a previous step."

@@ -32,11 +32,11 @@ int do_proc_loadavg(int update_every, usec_t dt) {
     }
 
     if(unlikely(procfile_lines(ff) < 1)) {
-        error("/proc/loadavg has no lines.");
+        collector_error("/proc/loadavg has no lines.");
         return 1;
     }
     if(unlikely(procfile_linewords(ff, 0) < 6)) {
-        error("/proc/loadavg has less than 6 words in it.");
+        collector_error("/proc/loadavg has less than 6 words in it.");
         return 1;
     }
 

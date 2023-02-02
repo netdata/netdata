@@ -1,7 +1,10 @@
 <!--
 title: "Samba monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/samba/README.md"
 sidebar_label: "Samba"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Apps"
 -->
 
 # Samba monitoring with Netdata

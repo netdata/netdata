@@ -113,7 +113,7 @@ int do_proc_net_sctp_snmp(int update_every, usec_t dt) {
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
-            if(unlikely(words)) error("Cannot read /proc/net/sctp/snmp line %zu. Expected 2 params, read %zu.", l, words);
+            if(unlikely(words)) collector_error("Cannot read /proc/net/sctp/snmp line %zu. Expected 2 params, read %zu.", l, words);
             continue;
         }
 

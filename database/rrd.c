@@ -135,7 +135,7 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
-char *rrdset_cache_dir(RRDHOST *host, const char *id) {
+char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
     char *ret = NULL;
 
     char b[FILENAME_MAX + 1];

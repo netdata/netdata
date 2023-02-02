@@ -330,11 +330,13 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
+bool plugin_is_enabled(struct plugind *cd);
+
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
-        .enabled = cd->enabled,
+        .enabled = plugin_is_enabled(cd),
         .host = rpt->host,
         .opaque = rpt,
         .cd = cd,
@@ -721,12 +723,14 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 
     struct plugind cd = {
-            .enabled = 1,
             .update_every = default_rrd_update_every,
-            .pid = 0,
             .serial_failures = 0,
             .successful_collections = 0,
-            .obsolete = 0,
+            .unsafe = {
+                    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                    .running = true,
+                    .enabled = true,
+            },
             .started_t = now_realtime_sec(),
             .next = NULL,
             .capabilities = 0,

@@ -86,26 +86,8 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->rrd_memory_mode = ctr->memory_mode;
 
-    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid)))) {
+    if (unlikely(rrdcontext_find_dimension_uuid(st, rrddim_id(rd), &(rd->metric_uuid))))
         uuid_generate(rd->metric_uuid);
-        bool found_in_sql = false; (void)found_in_sql;
-
-//        bool found_in_sql = true;
-//        if(unlikely(sql_find_dimension_uuid(st, rd, &rd->metric_uuid))) {
-//            found_in_sql = false;
-//            uuid_generate(rd->metric_uuid);
-//        }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        char uuid_str[UUID_STR_LEN];
-        uuid_unparse_lower(rd->metric_uuid, uuid_str);
-        error_report("Dimension UUID for host %s chart [%s] dimension [%s] not found in context. It is now set to %s (%s)",
-                     string2str(host->hostname),
-                     string2str(st->name),
-                     string2str(rd->name),
-                     uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
-#endif
-    }
 
     // initialize the db tiers
     {
@@ -184,6 +166,25 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
 }
 
+bool rrddim_finalize_collection_and_check_retention(RRDDIM *rd) {
+    size_t tiers_available = 0, tiers_said_no_retention = 0;
+
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        if(!rd->tiers[tier].db_collection_handle)
+            continue;
+
+        tiers_available++;
+
+        if(rd->tiers[tier].collect_ops->finalize(rd->tiers[tier].db_collection_handle))
+            tiers_said_no_retention++;
+
+        rd->tiers[tier].db_collection_handle = NULL;
+    }
+
+    // return true if the dimension has retention in the db
+    return (!tiers_said_no_retention || tiers_available > tiers_said_no_retention);
+}
+
 static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrddim, void *rrdset) {
     RRDDIM *rd = rrddim;
     RRDSET *st = rrdset;
@@ -198,19 +199,7 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
-    size_t tiers_available = 0, tiers_said_no_retention = 0;
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if(rd->tiers[tier].db_collection_handle) {
-            tiers_available++;
-
-            if(rd->tiers[tier].collect_ops->finalize(rd->tiers[tier].db_collection_handle))
-                tiers_said_no_retention++;
-
-            rd->tiers[tier].db_collection_handle = NULL;
-        }
-    }
-
-    if (tiers_available == tiers_said_no_retention && tiers_said_no_retention && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
+    if (!rrddim_finalize_collection_and_check_retention(rd) && rd->rrd_memory_mode == RRD_MEMORY_MODE_DBENGINE) {
         /* This metric has no data and no references */
         metaqueue_delete_dimension_uuid(&rd->metric_uuid);
     }
@@ -302,7 +291,8 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrddim_index_init(RRDSET *st) {
     if(!st->rrddim_root_index) {
-        st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
+        st->rrddim_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                           &dictionary_stats_category_rrdset_rrddim, sizeof(RRDDIM));
 
         dictionary_register_insert_callback(st->rrddim_root_index, rrddim_insert_callback, NULL);
         dictionary_register_conflict_callback(st->rrddim_root_index, rrddim_conflict_callback, NULL);
@@ -697,7 +687,7 @@ bool rrddim_memory_load_or_create_map_save(RRDSET *st, RRDDIM *rd, RRD_MEMORY_MO
     char filename[FILENAME_MAX + 1];
     char fullfilename[FILENAME_MAX + 1];
     rrdset_strncpyz_name(filename, rrddim_id(rd), FILENAME_MAX);
-    snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", st->cache_dir, filename);
+    snprintfz(fullfilename, FILENAME_MAX, "%s/%s.db", rrdset_cache_dir(st), filename);
 
     rd_on_file = (struct rrddim_map_save_v019 *)netdata_mmap(
         fullfilename, size, ((memory_mode == RRD_MEMORY_MODE_MAP) ? MAP_SHARED : MAP_PRIVATE), 1, false, NULL);

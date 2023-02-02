@@ -112,7 +112,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
         ff_lines = procfile_lines(ff);
         if(unlikely(!ff_lines)) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
             return 1;
         }
 
@@ -135,21 +135,21 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pagelines_cnt++;
         }
         if (pagelines_cnt == 0) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
             return 1;
         }
 
         // 4th line is the "Free pages count per migrate type at order". Just subtract these 8 words.
         pageorders_cnt = procfile_linewords(ff, 3);
         if (pageorders_cnt < 9) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);
             return 1;
         }
 
         pageorders_cnt -= 9;
 
         if (pageorders_cnt > MAX_PAGETYPE_ORDER) {
-            error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d",
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d",
                   (long unsigned int) pageorders_cnt, MAX_PAGETYPE_ORDER);
             return 1;
         }
@@ -158,7 +158,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         if (!pagelines) {
             pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
             if (!pagelines) {
-                error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B",
+                collector_error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B",
                       (long unsigned int) pagelines_cnt, (long unsigned int) sizeof(struct pageline));
                 return 1;
             }
@@ -291,8 +291,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         size_t words = procfile_linewords(ff, l);
 
         if (words != 7+pageorders_cnt) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu",
-                  l+1, (long unsigned int) words, (long unsigned int) 7+pageorders_cnt);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu",
+                            l+1, (long unsigned int) words, (long unsigned int) 7+pageorders_cnt);
             break;
         }
 

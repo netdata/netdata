@@ -310,7 +310,7 @@ static void puback_callback(uint16_t packet_id)
 
 static int read_query_thread_count()
 {
-    int threads = MIN(get_system_cpus()/2, 6);
+    int threads = MIN(get_netdata_cpus()/2, 6);
     threads = MAX(threads, 2);
     threads = config_get_number(CONFIG_SECTION_CLOUD, "query thread count", threads);
     if(threads < 1) {
@@ -701,7 +701,7 @@ void *aclk_main(void *ptr)
     if (wait_till_agent_claim_ready())
         goto exit;
 
-    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback, 1))) {
+    if (!(mqttwss_client = mqtt_wss_new("mqtt_wss", aclk_mqtt_wss_log_cb, msg_callback, puback_callback))) {
         error("Couldn't initialize MQTT_WSS network library");
         goto exit;
     }

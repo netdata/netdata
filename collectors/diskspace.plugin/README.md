@@ -1,7 +1,11 @@
 <!--
-title: "diskspace.plugin"
+title: "Monitor disk (diskspace.plugin)"
 description: "Monitor the disk usage space of mounted disks in real-time with the Netdata Agent, plus preconfigured alarms for disks at risk of filling up."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/diskspace.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/diskspace.plugin/README.md"
+sidebar_label: "Disks"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/System metrics"
 -->
 
 # diskspace.plugin

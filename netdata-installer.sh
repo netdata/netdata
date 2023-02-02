@@ -1200,8 +1200,8 @@ run chmod 770 "${NETDATA_CLAIMING_DIR}"
 if [ "$(id -u)" -eq 0 ]; then
   # find the admin group
   admin_group=
-  test -z "${admin_group}" && getent group root > /dev/null 2>&1 && admin_group="root"
-  test -z "${admin_group}" && getent group daemon > /dev/null 2>&1 && admin_group="daemon"
+  test -z "${admin_group}" && get_group root > /dev/null 2>&1 && admin_group="root"
+  test -z "${admin_group}" && get_group daemon > /dev/null 2>&1 && admin_group="daemon"
   test -z "${admin_group}" && admin_group="${NETDATA_GROUP}"
 
   run chown "${NETDATA_USER}:${admin_group}" "${NETDATA_LOG_DIR}"

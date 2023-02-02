@@ -54,7 +54,7 @@ static void mount_points_cleanup() {
     struct mount_point *m = mount_points_root, *last = NULL;
     while(m) {
         if (unlikely(!m->updated)) {
-            // info("Removing mount point '%s', linked after '%s'", m->name, last?last->name:"ROOT");
+            // collector_info("Removing mount point '%s', linked after '%s'", m->name, last?last->name:"ROOT");
 
             if (mount_points_last_used == m)
                 mount_points_last_used = last;
@@ -163,12 +163,12 @@ int do_getmntinfo(int update_every, usec_t dt) {
 
         // there is no mount info in sysctl MIBs
         if (unlikely(!(mntsize = getmntinfo(&mntbuf, MNT_NOWAIT)))) {
-            error("FREEBSD: getmntinfo() failed");
+            collector_error("FREEBSD: getmntinfo() failed");
             do_space = 0;
-            error("DISABLED: disk_space.* charts");
+            collector_error("DISABLED: disk_space.* charts");
             do_inodes = 0;
-            error("DISABLED: disk_inodes.* charts");
-            error("DISABLED: getmntinfo module");
+            collector_error("DISABLED: disk_inodes.* charts");
+            collector_error("DISABLED: getmntinfo module");
             return 1;
         } else {
             int i;
@@ -289,7 +289,7 @@ int do_getmntinfo(int update_every, usec_t dt) {
             }
         }
     } else {
-        error("DISABLED: getmntinfo module");
+        collector_error("DISABLED: getmntinfo module");
         return 1;
     }
 

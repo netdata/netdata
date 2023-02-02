@@ -128,7 +128,6 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     st->module_name = rrd_string_strdupz(ctr->module);
     st->priority = ctr->priority;
 
-    st->cache_dir = rrdset_cache_dir(host, chart_full_id);
     st->entries = (ctr->memory_mode != RRD_MEMORY_MODE_DBENGINE) ? align_entries_to_pagesize(ctr->memory_mode, ctr->history_entries) : 5;
     st->update_every = ctr->update_every;
     st->rrd_memory_mode = ctr->memory_mode;
@@ -185,6 +184,29 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
+void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
+    RRDHOST *host = st->rrdhost;
+
+    rrdset_flag_set(st, RRDSET_FLAG_COLLECTION_FINISHED);
+
+    if(dimensions_too) {
+        RRDDIM *rd;
+        rrddim_foreach_read(rd, st)
+            rrddim_finalize_collection_and_check_retention(rd);
+        rrddim_foreach_done(rd);
+    }
+
+    for(size_t tier = 0; tier < storage_tiers ; tier++) {
+        STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
+        if(!eng) continue;
+
+        if(st->storage_metrics_groups[tier]) {
+            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
+            st->storage_metrics_groups[tier] = NULL;
+        }
+    }
+}
+
 // the destructor - the dictionary is write locked while this runs
 static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *rrdset, void *rrdhost) {
     RRDHOST *host = rrdhost;
@@ -192,15 +214,7 @@ static void rrdset_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rrdset_flag_clear(st, RRDSET_FLAG_INDEXED_ID);
 
-    // cleanup storage engines
-    {
-        for(size_t tier = 0; tier < storage_tiers ; tier++) {
-            STORAGE_ENGINE *eng = st->rrdhost->db[tier].eng;
-            if(!eng) continue;
-
-            eng->api.collect_ops.metrics_group_release(host->db[tier].instance, st->storage_metrics_groups[tier]);
-        }
-    }
+    rrdset_finalize_collection(st, false);
 
     // remove it from the name index
     rrdset_index_del_name(host, st);
@@ -373,24 +387,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
     if(ctr->react_action & (RRDSET_REACT_NEW | RRDSET_REACT_PLUGIN_UPDATED | RRDSET_REACT_MODULE_UPDATED)) {
         if (ctr->react_action & RRDSET_REACT_NEW) {
-            if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid))) {
+            if(unlikely(rrdcontext_find_chart_uuid(st,  &st->chart_uuid)))
                 uuid_generate(st->chart_uuid);
-                bool found_in_sql = false; (void)found_in_sql;
-
-//                bool found_in_sql = true;
-//                if(unlikely(sql_find_chart_uuid(host, st, &st->chart_uuid))) {
-//                    uuid_generate(st->chart_uuid);
-//                    found_in_sql = false;
-//                }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-                char uuid_str[UUID_STR_LEN];
-                uuid_unparse_lower(st->chart_uuid, uuid_str);
-                error_report("Chart UUID for host %s chart [%s] not found in context. It is now set to %s (%s)",
-                             string2str(host->hostname),
-                             string2str(st->name), uuid_str, found_in_sql ? "found in sqlite" : "newly generated");
-#endif
-            }
         }
         rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_METADATA_UPDATE);
@@ -401,7 +399,8 @@ static void rrdset_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
 
 void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index) {
-        host->rrdset_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdset_rrddim);
+        host->rrdset_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                             &dictionary_stats_category_rrdset_rrddim, sizeof(RRDSET));
 
         dictionary_register_insert_callback(host->rrdset_root_index, rrdset_insert_callback, NULL);
         dictionary_register_conflict_callback(host->rrdset_root_index, rrdset_conflict_callback, NULL);
@@ -412,7 +411,7 @@ void rrdset_index_init(RRDHOST *host) {
     if(!host->rrdset_root_index_name) {
         host->rrdset_root_index_name = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdset_rrddim);
+            &dictionary_stats_category_rrdset_rrddim, 0);
 
         dictionary_register_insert_callback(host->rrdset_root_index_name, rrdset_name_insert_callback, host);
         dictionary_register_delete_callback(host->rrdset_root_index_name, rrdset_name_delete_callback, host);
@@ -602,13 +601,15 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     if(unlikely(!db_last_entry_s)) {
         db_last_entry_s = rrdset_last_entry_s_of_tier(st, tier);
 
-        if (unlikely(!db_last_entry_s))
+        if (unlikely(!db_last_entry_s)) {
             // we assume this is a collected RRDSET
-            db_last_entry_s = now_s;
+            db_first_entry_s = 0;
+            db_last_entry_s = 0;
+        }
     }
 
     if(unlikely(db_last_entry_s > now_s)) {
-        internal_error(true,
+        internal_error(db_last_entry_s > now_s + 1,
                        "RRDSET: 'host:%s/chart:%s' latest db time %ld is in the future, adjusting it to now %ld",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
                        db_last_entry_s, now_s);
@@ -616,16 +617,17 @@ void rrdset_get_retention_of_tier_for_collected_chart(RRDSET *st, time_t *first_
     }
 
     if(unlikely(db_first_entry_s && db_last_entry_s && db_first_entry_s >= db_last_entry_s)) {
-        internal_error(true,
-                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is equal or bigger than latest db time %ld, adjusting it last updated time - update every",
+        internal_error(db_first_entry_s > db_last_entry_s,
+                       "RRDSET: 'host:%s/chart:%s' oldest db time %ld is bigger than latest db time %ld, adjusting it to (latest time %ld - update every %ld)",
                        rrdhost_hostname(st->rrdhost), rrdset_id(st),
-                       db_first_entry_s, db_last_entry_s);
+                       db_first_entry_s, db_last_entry_s,
+                       db_last_entry_s, (time_t)st->update_every);
         db_first_entry_s = db_last_entry_s - st->update_every;
     }
 
     if(unlikely(!db_first_entry_s && db_last_entry_s))
         // this can be the case on the first data collection of a chart
-        db_first_entry_s = db_last_entry_s;
+        db_first_entry_s = db_last_entry_s - st->update_every;
 
     *first_time_s = db_first_entry_s;
     *last_time_s = db_last_entry_s;
@@ -831,7 +833,8 @@ void rrdset_delete_files(RRDSET *st) {
     }
     rrddim_foreach_done(rd);
 
-    recursively_delete_dir(st->cache_dir, "left-over chart");
+    if(st->cache_dir)
+        recursively_delete_dir(st->cache_dir, "left-over chart");
 }
 
 void rrdset_delete_obsolete_dimensions(RRDSET *st) {
@@ -1105,15 +1108,17 @@ static inline time_t tier_next_point_time_s(RRDDIM *rd, struct rrddim_tier *t, t
 }
 
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
-    if (unlikely(!t->next_point_time_s))
-        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+    if (unlikely(!t->next_point_end_time_s))
+        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
 
-    if(unlikely(sp.start_time_s > t->next_point_time_s)) {
+    if(unlikely(sp.start_time_s >= t->next_point_end_time_s)) {
+        // flush the virtual point, it is done
+
         if (likely(!storage_point_is_unset(t->virtual_point))) {
 
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time_s * USEC_PER_SEC,
+                t->next_point_end_time_s * USEC_PER_SEC,
                 t->virtual_point.sum,
                 t->virtual_point.min,
                 t->virtual_point.max,
@@ -1124,7 +1129,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         else {
             t->collect_ops->store_metric(
                 t->db_collection_handle,
-                t->next_point_time_s * USEC_PER_SEC,
+                t->next_point_end_time_s * USEC_PER_SEC,
                 NAN,
                 NAN,
                 NAN,
@@ -1134,7 +1139,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
 
         rrdset_done_statistics_points_stored_per_tier[tier]++;
         t->virtual_point.count = 0; // make the point unset
-        t->next_point_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
+        t->next_point_end_time_s = tier_next_point_time_s(rd, t, sp.end_time_s);
     }
 
     // merge the dates into our virtual point
@@ -1145,7 +1150,7 @@ void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAG
         t->virtual_point.end_time_s = sp.end_time_s;
 
     // merge the values into our virtual point
-    if (likely(!storage_point_is_empty(sp))) {
+    if (likely(!storage_point_is_gap(sp))) {
         // we aggregate only non NULLs into higher tiers
 
         if (likely(!storage_point_is_unset(t->virtual_point))) {
@@ -1483,9 +1488,13 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             next_store_ut = 0,      // the timestamp in microseconds, of the next entry to store in the db
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
+    RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
+    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED))
+        return;
+
     netdata_thread_disable_cancelability();
 
-    if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE))) {
+    if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
         rrdset_isnot_obsolete(st);
     }
@@ -1570,7 +1579,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         last_stored_ut = st->last_updated.tv_sec * USEC_PER_SEC + st->last_updated.tv_usec;
         next_store_ut  = (st->last_updated.tv_sec + st->update_every) * USEC_PER_SEC;
 
-        if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))) {
+        if(unlikely(rrdset_flags & RRDSET_FLAG_STORE_FIRST)) {
             store_this_entry = 1;
             last_collect_ut = next_store_ut - update_every_ut;
 
@@ -2069,6 +2078,13 @@ const char *rrdset_cache_filename(RRDSET *st) {
     return st_on_file->cache_filename;
 }
 
+const char *rrdset_cache_dir(RRDSET *st) {
+    if(!st->cache_dir)
+        st->cache_dir = rrdhost_cache_dir_for_rrdset_alloc(st->rrdhost, rrdset_id(st));
+
+    return st->cache_dir;
+}
+
 void rrdset_memory_file_free(RRDSET *st) {
     if(!st->st_on_file) return;
 
@@ -2099,7 +2115,7 @@ bool rrdset_memory_load_or_create_map_save(RRDSET *st, RRD_MEMORY_MODE memory_mo
         return false;
 
     char fullfilename[FILENAME_MAX + 1];
-    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", st->cache_dir);
+    snprintfz(fullfilename, FILENAME_MAX, "%s/main.db", rrdset_cache_dir(st));
 
     unsigned long size = sizeof(struct rrdset_map_save_v019);
     struct rrdset_map_save_v019 *st_on_file = (struct rrdset_map_save_v019 *)netdata_mmap(

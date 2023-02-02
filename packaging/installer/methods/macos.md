@@ -1,6 +1,10 @@
 <!--
 title: "Install Netdata on macOS"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/macos.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/macos.md"
+sidebar_label: "Install Netdata on macOS"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on macOS

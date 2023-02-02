@@ -82,7 +82,7 @@ static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
         ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
             if(unlikely(!error_shown)) {
-                error("IPC: Cannot open file '%s'.", filename);
+                collector_error("IPC: Cannot open file '%s'.", filename);
                 error_shown = 1;
             }
             goto ipc;
@@ -92,7 +92,7 @@ static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) {
         if(unlikely(!error_shown)) {
-            error("IPC: Cannot read file '%s'.", filename);
+            collector_error("IPC: Cannot read file '%s'.", filename);
             error_shown = 1;
         }
         goto ipc;
@@ -108,7 +108,7 @@ static inline int ipc_sem_get_limits(struct ipc_limits *lim) {
     }
     else {
         if(unlikely(!error_shown)) {
-            error("IPC: Invalid content in file '%s'.", filename);
+            collector_error("IPC: Invalid content in file '%s'.", filename);
             error_shown = 1;
         }
         goto ipc;
@@ -122,7 +122,7 @@ ipc:
         union semun arg = {.array = (ushort *) &seminfo};
 
         if(unlikely(semctl(0, 0, IPC_INFO, arg) < 0)) {
-            error("IPC: Failed to read '%s' and request IPC_INFO with semctl().", filename);
+            collector_error("IPC: Failed to read '%s' and request IPC_INFO with semctl().", filename);
             goto error;
         }
 
@@ -166,7 +166,7 @@ static inline int ipc_sem_get_status(struct ipc_status *st) {
         /* kernel not configured for semaphores */
         static int error_shown = 0;
         if(unlikely(!error_shown)) {
-            error("IPC: kernel is not configured for semaphores");
+            collector_error("IPC: kernel is not configured for semaphores");
             error_shown = 1;
         }
         st->semusz = 0;
@@ -195,7 +195,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
     size_t words = 0;
 
     if(unlikely(lines < 2)) {
-        error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
+        collector_error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
         return 1;
     }
 
@@ -205,7 +205,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
         words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
         if(unlikely(words < 14)) {
-            error("Cannot read %s line. Expected 14 params, read %zu.", procfile_filename(ff), words);
+            collector_error("Cannot read %s line. Expected 14 params, read %zu.", procfile_filename(ff), words);
             continue;
         }
 
@@ -250,7 +250,7 @@ int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
     size_t words = 0;
 
     if(unlikely(lines < 2)) {
-        error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
+        collector_error("Cannot read %s. Expected 2 or more lines, read %zu.", procfile_filename(ff), lines);
         return 1;
     }
 
@@ -263,7 +263,7 @@ int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
         words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) continue;
         if(unlikely(words < 16)) {
-            error("Cannot read %s line. Expected 16 params, read %zu.", procfile_filename(ff), words);
+            collector_error("Cannot read %s line. Expected 16 params, read %zu.", procfile_filename(ff), words);
             continue;
         }
 
@@ -306,11 +306,11 @@ int do_ipc(int update_every, usec_t dt) {
 
         // make sure it works
         if(ipc_sem_get_limits(&limits) == -1) {
-            error("unable to fetch semaphore limits");
+            collector_error("unable to fetch semaphore limits");
             do_sem = CONFIG_BOOLEAN_NO;
         }
         else if(ipc_sem_get_status(&status) == -1) {
-            error("unable to fetch semaphore statistics");
+            collector_error("unable to fetch semaphore statistics");
             do_sem = CONFIG_BOOLEAN_NO;
         }
         else {
@@ -362,7 +362,7 @@ int do_ipc(int update_every, usec_t dt) {
         }
 
         if(unlikely(do_sem == CONFIG_BOOLEAN_NO && do_msg == CONFIG_BOOLEAN_NO)) {
-            error("ipc module disabled");
+            collector_error("ipc module disabled");
             return 1;
         }
     }
@@ -370,7 +370,7 @@ int do_ipc(int update_every, usec_t dt) {
     if(likely(do_sem != CONFIG_BOOLEAN_NO)) {
         if(unlikely(read_limits_next < 0)) {
             if(unlikely(ipc_sem_get_limits(&limits) == -1)) {
-                error("Unable to fetch semaphore limits.");
+                collector_error("Unable to fetch semaphore limits.");
             }
             else {
                 if(semaphores_max) rrdvar_custom_host_variable_set(localhost, semaphores_max, limits.semmns);
@@ -386,7 +386,7 @@ int do_ipc(int update_every, usec_t dt) {
             read_limits_next--;
 
         if(unlikely(ipc_sem_get_status(&status) == -1)) {
-            error("Unable to get semaphore statistics");
+            collector_error("Unable to get semaphore statistics");
             return 0;
         }
 
@@ -478,8 +478,8 @@ int do_ipc(int update_every, usec_t dt) {
             long long dimensions_num = rrdset_number_of_dimensions(st_msq_messages);
 
             if(unlikely(dimensions_num > dimensions_limit)) {
-                info("Message queue statistics has been disabled");
-                info("There are %lld dimensions in memory but limit was set to %lld", dimensions_num, dimensions_limit);
+                collector_info("Message queue statistics has been disabled");
+                collector_info("There are %lld dimensions in memory but limit was set to %lld", dimensions_num, dimensions_limit);
                 rrdset_is_obsolete(st_msq_messages);
                 rrdset_is_obsolete(st_msq_bytes);
                 st_msq_messages = NULL;
@@ -487,11 +487,11 @@ int do_ipc(int update_every, usec_t dt) {
                 do_msg = CONFIG_BOOLEAN_NO;
             }
             else if(unlikely(!message_queue_root)) {
-                info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_messages), rrdset_id(st_msq_messages));
+                collector_info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_messages), rrdset_id(st_msq_messages));
                 rrdset_is_obsolete(st_msq_messages);
                 st_msq_messages = NULL;
 
-                info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_bytes), rrdset_id(st_msq_bytes));
+                collector_info("Making chart %s (%s) obsolete since it does not have any dimensions", rrdset_name(st_msq_bytes), rrdset_id(st_msq_bytes));
                 rrdset_is_obsolete(st_msq_bytes);
                 st_msq_bytes = NULL;
             }

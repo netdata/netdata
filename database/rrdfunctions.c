@@ -424,7 +424,9 @@ static bool rrd_functions_conflict_callback(const DICTIONARY_ITEM *item __maybe_
 void rrdfunctions_init(RRDHOST *host) {
     if(host->functions) return;
 
-    host->functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_functions);
+    host->functions = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                 &dictionary_stats_category_functions, sizeof(struct rrd_collector_function));
+
     dictionary_register_insert_callback(host->functions, rrd_functions_insert_callback, host);
     dictionary_register_delete_callback(host->functions, rrd_functions_delete_callback, host);
     dictionary_register_conflict_callback(host->functions, rrd_functions_conflict_callback, host);

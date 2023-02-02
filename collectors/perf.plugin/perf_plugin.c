@@ -294,15 +294,15 @@ static int perf_init() {
             if(unlikely(fd < 0)) {
                 switch errno {
                     case EACCES:
-                        error("Cannot access to the PMU: Permission denied");
+                        collector_error("Cannot access to the PMU: Permission denied");
                         break;
                     case EBUSY:
-                        error("Another event already has exclusive access to the PMU");
+                        collector_error("Another event already has exclusive access to the PMU");
                         break;
                     default:
-                        error("Cannot open perf event");
+                        collector_error("Cannot open perf event");
                 }
-                error("Disabling event %u", current_event->id);
+                collector_error("Disabling event %u", current_event->id);
                 current_event->disabled = 1;
             }
 
@@ -346,7 +346,7 @@ static void reenable_events() {
             if(ioctl(current_fd, PERF_EVENT_IOC_DISABLE, PERF_IOC_FLAG_GROUP) == -1
                || ioctl(current_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP) == -1)
             {
-                error("Cannot reenable event group");
+                collector_error("Cannot reenable event group");
             }
         }
     }
@@ -388,7 +388,7 @@ static int perf_collect() {
                 current_event->updated = 1;
             }
             else {
-                error("Cannot update value for event %u", current_event->id);
+                collector_error("Cannot update value for event %u", current_event->id);
                 return 1;
             }
         }
@@ -1272,17 +1272,18 @@ void parse_command_line(int argc, char **argv) {
             exit(1);
         }
 
-        error("ignoring parameter '%s'", argv[i]);
+        collector_error("ignoring parameter '%s'", argv[i]);
     }
 
     if(!plugin_enabled){
-        info("no charts enabled - nothing to do.");
+        collector_info("no charts enabled - nothing to do.");
         printf("DISABLE\n");
         exit(1);
     }
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------
@@ -1304,7 +1305,7 @@ int main(int argc, char **argv) {
     if(freq >= update_every)
         update_every = freq;
     else if(freq)
-        error("update frequency %d seconds is too small for PERF. Using %d.", freq, update_every);
+        collector_error("update frequency %d seconds is too small for PERF. Using %d.", freq, update_every);
 
     if(unlikely(debug)) fprintf(stderr, "perf.plugin: calling perf_init()\n");
     int perf = !perf_init();
@@ -1348,6 +1349,6 @@ int main(int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) break;
     }
 
-    info("process exiting");
+    collector_info("process exiting");
     perf_free();
 }

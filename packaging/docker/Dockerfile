@@ -76,6 +76,7 @@ RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
+    ln -sf /dev/stdout /var/log/netdata/collector.log && \
     # Add netdata user
     addgroup -g ${NETDATA_GID} -S "${DOCKER_GRP}" && \
     adduser -S -H -s /usr/sbin/nologin -u ${NETDATA_GID} -h /etc/netdata -G "${DOCKER_GRP}" "${DOCKER_USR}"
@@ -118,3 +119,11 @@ ENTRYPOINT ["/usr/sbin/run.sh"]
 HEALTHCHECK --interval=60s --timeout=10s --retries=3 CMD /usr/sbin/health.sh
 
 ONBUILD ENV NETDATA_OFFICIAL_IMAGE=false
+
+LABEL org.opencontainers.image.authors="Netdatabot <bot@netdata.cloud>"
+LABEL org.opencontainers.image.url="https://netdata.cloud"
+LABEL org.opencontainers.image.documentation="https://learn.netdata.cloud"
+LABEL org.opencontainers.image.source="https://github.com/netdata/netdata"
+LABEL org.opencontainers.image.title="Netdata Agent"
+LABEL org.opencontainers.image.description="Official Netdata Agent Docker Image"
+LABEL org.opencontainers.image.vendor="Netdata Inc."

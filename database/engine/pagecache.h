@@ -27,17 +27,12 @@ struct page_descr_with_data {
     uint8_t type;
     uint32_t update_every_s;
     uint32_t page_length;
-    uint8_t page[RRDENG_BLOCK_SIZE];
+    uint8_t *page;
 
     struct {
         struct page_descr_with_data *prev;
         struct page_descr_with_data *next;
     } link;
-
-    struct {
-        struct page_descr_with_data *prev;
-        struct page_descr_with_data *next;
-    } cache;
 };
 
 #define PAGE_INFO_SCRATCH_SZ (8)
@@ -52,6 +47,7 @@ struct rrdeng_page_info {
 struct pg_alignment {
     uint32_t page_position;
     uint32_t refcount;
+    uint16_t initial_slots;
 };
 
 struct rrdeng_query_handle;
@@ -61,7 +57,7 @@ void rrdeng_prep_wait(struct page_details_control *pdc);
 void rrdeng_prep_query(struct page_details_control *pdc);
 void pg_cache_preload(struct rrdeng_query_handle *handle);
 struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct page_details_control *pdc, time_t now_s, time_t last_update_every_s, size_t *entries);
-void init_page_cache(void);
+void pgc_and_mrg_initialize(void);
 
 void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s, time_t end_time_s, time_t update_every_s, struct rrdengine_datafile *datafile, uint64_t extent_offset, unsigned extent_size, uint32_t page_length);
 

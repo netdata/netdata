@@ -7,6 +7,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host);
 
 bool dbengine_enabled = false; // will become true if and when dbengine is initialized
 size_t storage_tiers = 3;
+bool use_direct_io = true;
 size_t storage_tiers_grouping_iterations[RRD_STORAGE_TIERS] = { 1, 60, 60, 60, 60 };
 RRD_BACKFILL storage_tiers_backfill[RRD_STORAGE_TIERS] = { RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW, RRD_BACKFILL_NEW };
 
@@ -33,10 +34,8 @@ time_t rrdhost_free_orphan_time_s = 3600;
 
 bool is_storage_engine_shared(STORAGE_INSTANCE *engine __maybe_unused) {
 #ifdef ENABLE_DBENGINE
-    for(size_t tier = 0; tier < storage_tiers ;tier++) {
-        if (engine == (STORAGE_INSTANCE *)multidb_ctx[tier])
-            return true;
-    }
+    if(!rrdeng_is_legacy(engine))
+        return true;
 #endif
 
     return false;
@@ -53,13 +52,13 @@ static inline void rrdhost_init() {
     if(unlikely(!rrdhost_root_index)) {
         rrdhost_root_index = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdhost);
+            &dictionary_stats_category_rrdhost, 0);
     }
 
     if(unlikely(!rrdhost_root_index_hostname)) {
         rrdhost_root_index_hostname = dictionary_create_advanced(
             DICT_OPTION_NAME_LINK_DONT_CLONE | DICT_OPTION_VALUE_LINK_DONT_CLONE | DICT_OPTION_DONT_OVERWRITE_VALUE,
-            &dictionary_stats_category_rrdhost);
+            &dictionary_stats_category_rrdhost, 0);
     }
 }
 
@@ -392,7 +391,6 @@ int is_legacy = 1;
             ret = rrdeng_init(
                 (struct rrdengine_instance **)&host->db[0].instance,
                 dbenginepath,
-                default_rrdeng_page_cache_mb,
                 default_rrdeng_disk_quota_mb,
                 0); // may fail here for legacy dbengine initialization
 
@@ -479,9 +477,9 @@ int is_legacy = 1;
     rrdhost_index_add_hostname(host);
 
     if(is_localhost)
-        DOUBLE_LINKED_LIST_PREPEND_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(localhost, host, prev, next);
     else
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(localhost, host, prev, next);
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(localhost, host, prev, next);
 
     rrd_unlock();
 
@@ -501,7 +499,6 @@ int is_legacy = 1;
                  ", health %s"
                  ", cache_dir '%s'"
                  ", varlib_dir '%s'"
-                 ", health_log '%s'"
                  ", alarms default handler '%s'"
                  ", alarms default recipient '%s'"
          , rrdhost_hostname(host)
@@ -521,7 +518,6 @@ int is_legacy = 1;
          , host->health.health_enabled?"enabled":"disabled"
          , host->cache_dir
          , host->varlib_dir
-         , host->health.health_log_filename
          , string2str(host->health.health_default_exec)
          , string2str(host->health.health_default_recipient)
     );
@@ -772,8 +768,26 @@ inline int rrdhost_should_be_removed(RRDHOST *host, RRDHOST *protected_host, tim
 // ----------------------------------------------------------------------------
 // RRDHOST global / startup initialization
 
+#ifdef ENABLE_DBENGINE
+struct dbengine_initialization {
+    netdata_thread_t thread;
+    char path[FILENAME_MAX + 1];
+    int disk_space_mb;
+    size_t tier;
+    int ret;
+};
+
+void *dbengine_tier_init(void *ptr) {
+    struct dbengine_initialization *dbi = ptr;
+    dbi->ret = rrdeng_init(NULL, dbi->path, dbi->disk_space_mb, dbi->tier);
+    return ptr;
+}
+#endif
+
 void dbengine_init(char *hostname) {
 #ifdef ENABLE_DBENGINE
+    use_direct_io = config_get_boolean(CONFIG_SECTION_DB, "dbengine use direct io", use_direct_io);
+
     unsigned read_num = (unsigned)config_get_number(CONFIG_SECTION_DB, "dbengine pages per extent", MAX_PAGES_PER_EXTENT);
     if (read_num > 0 && read_num <= MAX_PAGES_PER_EXTENT)
         rrdeng_pages_per_extent = read_num;
@@ -794,6 +808,9 @@ void dbengine_init(char *hostname) {
         config_set_number(CONFIG_SECTION_DB, "storage tiers", storage_tiers);
     }
 
+    bool parallel_initialization = (storage_tiers <= (size_t)get_netdata_cpus()) ? true : false;
+    parallel_initialization = config_get_boolean(CONFIG_SECTION_DB, "dbengine parallel initialization", parallel_initialization);
+
     default_rrdeng_page_fetch_timeout = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page fetch timeout secs", PAGE_CACHE_FETCH_WAIT_TIMEOUT);
     if (default_rrdeng_page_fetch_timeout < 1) {
         info("'dbengine page fetch timeout secs' cannot be %d, using 1", default_rrdeng_page_fetch_timeout);
@@ -807,6 +824,8 @@ void dbengine_init(char *hostname) {
         default_rrdeng_page_fetch_retries = 1;
         config_set_number(CONFIG_SECTION_DB, "dbengine page fetch retries", default_rrdeng_page_fetch_retries);
     }
+
+    struct dbengine_initialization tiers_init[RRD_STORAGE_TIERS] = {};
 
     size_t created_tiers = 0;
     char dbenginepath[FILENAME_MAX + 1];
@@ -827,15 +846,11 @@ void dbengine_init(char *hostname) {
         if(tier > 0)
             divisor *= 2;
 
-        int page_cache_mb = default_rrdeng_page_cache_mb / divisor;
         int disk_space_mb = default_multidb_disk_quota_mb / divisor;
         size_t grouping_iterations = storage_tiers_grouping_iterations[tier];
         RRD_BACKFILL backfill = storage_tiers_backfill[tier];
 
         if(tier > 0) {
-            snprintfz(dbengineconfig, 200, "dbengine tier %zu page cache size MB", tier);
-            page_cache_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, page_cache_mb);
-
             snprintfz(dbengineconfig, 200, "dbengine tier %zu multihost disk space MB", tier);
             disk_space_mb = config_get_number(CONFIG_SECTION_DB, dbengineconfig, disk_space_mb);
 
@@ -869,17 +884,31 @@ void dbengine_init(char *hostname) {
         }
 
         internal_error(true, "DBENGINE tier %zu grouping iterations is set to %zu", tier, storage_tiers_grouping_iterations[tier]);
-        ret = rrdeng_init(NULL, dbenginepath, page_cache_mb, disk_space_mb, tier);
-        if(ret != 0) {
+
+        tiers_init[tier].disk_space_mb = disk_space_mb;
+        tiers_init[tier].tier = tier;
+        strncpyz(tiers_init[tier].path, dbenginepath, FILENAME_MAX);
+        tiers_init[tier].ret = 0;
+
+        if(parallel_initialization)
+            netdata_thread_create(&tiers_init[tier].thread, "DBENGINE_INIT", NETDATA_THREAD_OPTION_JOINABLE,
+                                  dbengine_tier_init, &tiers_init[tier]);
+        else
+            dbengine_tier_init(&tiers_init[tier]);
+    }
+
+    for(size_t tier = 0; tier < storage_tiers ;tier++) {
+        void *ptr;
+
+        if(parallel_initialization)
+            netdata_thread_join(tiers_init[tier].thread, &ptr);
+
+        if(tiers_init[tier].ret != 0) {
             error("DBENGINE on '%s': Failed to initialize multi-host database tier %zu on path '%s'",
-                  hostname, tier, dbenginepath);
-            break;
+                  hostname, tiers_init[tier].tier, tiers_init[tier].path);
         }
-        else {
-            if (rrdeng_ctx_exceeded_disk_quota(multidb_ctx[created_tiers]))
-                rrdeng_enq_cmd(multidb_ctx[created_tiers], RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        else if(created_tiers == tier)
             created_tiers++;
-        }
     }
 
     if(created_tiers && created_tiers < storage_tiers) {
@@ -1087,7 +1116,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     if(!host) return;
 
     if (netdata_exit || force) {
-        info("Freeing all memory for host '%s'...", rrdhost_hostname(host));
+        info("RRD: 'host:%s' freeing memory...", rrdhost_hostname(host));
 
         // ------------------------------------------------------------------------
         // first remove it from the indexes, so that it will not be discoverable
@@ -1096,7 +1125,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
         rrdhost_index_del_by_guid(host);
 
         if (host->prev)
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(localhost, host, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(localhost, host, prev, next);
     }
 
     // ------------------------------------------------------------------------
@@ -1148,7 +1177,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
 #endif
 
     if (!netdata_exit && !force) {
-        info("Setting archive mode for host '%s'...", rrdhost_hostname(host));
+        info("RRD: 'host:%s' is now in archive mode...", rrdhost_hostname(host));
         rrdhost_flag_set(host, RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
         return;
     }
@@ -1189,7 +1218,6 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdpush_destinations_free(host);
     string_freez(host->health.health_default_exec);
     string_freez(host->health.health_default_recipient);
-    freez(host->health.health_log_filename);
     string_freez(host->registry_hostname);
     simple_pattern_free(host->rrdpush_send_charts_matching);
     netdata_rwlock_destroy(&host->health_log.alarm_log_rwlock);
@@ -1223,13 +1251,22 @@ void rrdhost_free_all(void) {
     rrd_unlock();
 }
 
+void rrd_finalize_collection_for_all_hosts(void) {
+    RRDHOST *host;
+    rrd_wrlock();
+    rrdhost_foreach_read(host) {
+        rrdhost_finalize_collection(host);
+    }
+    rrd_unlock();
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - save host files
 
 void rrdhost_save_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Saving/Closing database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' saving / closing database...", rrdhost_hostname(host));
 
     RRDSET *st;
 
@@ -1386,9 +1423,16 @@ void reload_host_labels(void) {
 
     rrdhost_flag_set(localhost,RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
 
-    health_label_log_save(localhost);
-
     rrdpush_send_host_labels(localhost);
+}
+
+void rrdhost_finalize_collection(RRDHOST *host) {
+    info("RRD: 'host:%s' stopping data collection...", rrdhost_hostname(host));
+
+    RRDSET *st;
+    rrdset_foreach_write(st, host)
+        rrdset_finalize_collection(st, true);
+    rrdset_foreach_done(st);
 }
 
 // ----------------------------------------------------------------------------
@@ -1397,16 +1441,18 @@ void reload_host_labels(void) {
 void rrdhost_delete_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Deleting database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' deleting disk files...", rrdhost_hostname(host));
 
     RRDSET *st;
 
-    // we get a write lock
-    // to ensure only one thread is saving the database
-    rrdset_foreach_write(st, host) {
-            rrdset_delete_files(st);
+    if(host->rrd_memory_mode == RRD_MEMORY_MODE_SAVE || host->rrd_memory_mode == RRD_MEMORY_MODE_MAP) {
+        // we get a write lock
+        // to ensure only one thread is saving the database
+        rrdset_foreach_write(st, host){
+                    rrdset_delete_files(st);
+                }
+        rrdset_foreach_done(st);
     }
-    rrdset_foreach_done(st);
 
     recursively_delete_dir(host->cache_dir, "left over host");
 }
@@ -1417,7 +1463,7 @@ void rrdhost_delete_charts(RRDHOST *host) {
 void rrdhost_cleanup_charts(RRDHOST *host) {
     if(!host) return;
 
-    info("Cleaning up database of host '%s'...", rrdhost_hostname(host));
+    info("RRD: 'host:%s' cleaning up disk files...", rrdhost_hostname(host));
 
     RRDSET *st;
     uint32_t rrdhost_delete_obsolete_charts = rrdhost_option_check(host, RRDHOST_OPTION_DELETE_OBSOLETE_CHARTS);
@@ -1444,7 +1490,7 @@ void rrdhost_cleanup_charts(RRDHOST *host) {
 // RRDHOST - save all hosts to disk
 
 void rrdhost_save_all(void) {
-    info("Saving database [%zu hosts(s)]...", rrdhost_hosts_available());
+    info("RRD: saving databases [%zu hosts(s)]...", rrdhost_hosts_available());
 
     rrd_rdlock();
 
@@ -1459,7 +1505,7 @@ void rrdhost_save_all(void) {
 // RRDHOST - save or delete all hosts from disk
 
 void rrdhost_cleanup_all(void) {
-    info("Cleaning up database [%zu hosts(s)]...", rrdhost_hosts_available());
+    info("RRD: cleaning up database [%zu hosts(s)]...", rrdhost_hosts_available());
 
     rrd_rdlock();
 

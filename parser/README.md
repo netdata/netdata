@@ -1,3 +1,9 @@
+<!--
+title: "Parser"
+custom_edit_url: https://github.com/netdata/netdata/blob/master/parser/README.md
+-->
+
+
 #### Introduction
 
 The parser will be used to process streaming and plugins input as well as metadata
@@ -18,7 +24,8 @@ Usage
 
 #### Functions
 
-----
+TODO:
+
 ##### parse_init(RRDHOST *host, void *user, void *input, int flags)
 
 Initialize an internal parser with the specified user defined data structure that will be shared across calls.
@@ -38,7 +45,6 @@ Output
   
 
 
-----
 ##### parse_push(PARSER *parser, char *line)
 
 Push a new line for processing
@@ -58,7 +64,7 @@ Returns
 - 0 line added
 - 1 error detected
   
-----   
+
 ##### parse_add_keyword(PARSER *parser, char *keyword, keyword_function callback_function)
 
 The function will add callbacks for keywords. The callback function is defined as
@@ -74,9 +80,9 @@ Input
 - keyword_function
   - The callback that will handle the keyword processing
     * The callback function should return one of the following
-      * PARSER_RC_OK -- Callback was successful (continue with other callbacks)
-      * PARSER_RC_STOP -- Stop processing callbacks (return OK)
-      * PARSER_RC_ERROR -- Callback failed, exit
+      * PARSER_RC_OK - Callback was successful (continue with other callbacks)
+      * PARSER_RC_STOP - Stop processing callbacks (return OK)
+      * PARSER_RC_ERROR - Callback failed, exit
 
 Output
 - The corresponding keyword and callback will be registered
@@ -86,7 +92,6 @@ Returns
 - > 0 which is the number of callbacks associated with this keyword.
 
    
-----
 ##### parser_next(PARSER *parser)
 Return the next item to parse
 
@@ -101,7 +106,7 @@ Returns
 - 0 Next item fetched successfully
 - 1 No more items to parse
 
-----
+
 ##### parser_action(PARSER *parser, char *input)
 Return the next item to parse
 
@@ -118,7 +123,7 @@ Returns
 - 0 Callbacks called successfully
 - 1 Failed
 
-----
+
 ##### parser_destroy(PARSER *parser)
 Cleanup a previously allocated parser
 
@@ -132,7 +137,7 @@ Output
 Returns
 - none
   
-----
+
 ##### parser_recover_input(PARSER *parser)
 Cleanup a previously allocated parser
 

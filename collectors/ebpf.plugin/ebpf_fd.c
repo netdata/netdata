@@ -32,15 +32,6 @@ struct config fd_config = { .first_section = NULL, .last_section = NULL, .mutex 
                            .index = {.avl_tree = { .root = NULL, .compar = appconfig_section_compare },
                                      .rwlock = AVL_LOCK_INITIALIZER } };
 
-struct netdata_static_thread fd_thread = {"FD KERNEL",
-                                          .config_section = NULL,
-                                          .config_name = NULL,
-                                          .env_name = NULL,
-                                          .enabled = 1,
-                                          .thread = NULL,
-                                          .init_routine = NULL,
-                                          .start_routine = NULL};
-
 static netdata_idx_t fd_hash_values[NETDATA_FD_COUNTER];
 static netdata_idx_t *fd_values = NULL;
 
@@ -373,15 +364,10 @@ static inline int ebpf_fd_load_and_attach(struct fd_bpf *obj, ebpf_module_t *em)
 static void ebpf_fd_free(ebpf_module_t *em)
 {
     pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
     pthread_mutex_unlock(&ebpf_exit_cleanup);
 
     ebpf_cleanup_publish_syscall(fd_publish_aggregated);
-    freez(fd_thread.thread);
     freez(fd_values);
     freez(fd_vector);
 
@@ -403,19 +389,6 @@ static void ebpf_fd_free(ebpf_module_t *em)
  * @param ptr thread data.
  */
 static void ebpf_fd_exit(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (fd_thread.thread)
-        netdata_thread_cancel(*fd_thread.thread);
-    ebpf_fd_free(em);
-}
-
-/**
- * Clean up the main thread.
- *
- * @param ptr thread data.
- */
-static void ebpf_fd_cleanup(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     ebpf_fd_free(em);
@@ -454,7 +427,7 @@ static void ebpf_fd_send_data(ebpf_module_t *em)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_fd_read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = fd_hash_values;
@@ -472,34 +445,6 @@ static void read_global_table()
             val[idx] = total;
         }
     }
-}
-
-/**
- * File descriptor read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_fd_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_fd_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    usec_t step = NETDATA_FD_SLEEP_MS * em->update_every;
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        read_global_table();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -976,12 +921,6 @@ static void ebpf_fd_send_cgroup_data(ebpf_module_t *em)
 */
 static void fd_collector(ebpf_module_t *em)
 {
-    fd_thread.thread = mallocz(sizeof(netdata_thread_t));
-    fd_thread.start_routine = ebpf_fd_read_hash;
-
-    netdata_thread_create(fd_thread.thread, fd_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_fd_read_hash, em);
-
     int cgroups = em->cgroup_charts;
     heartbeat_t hb;
     heartbeat_init(&hb);
@@ -992,6 +931,7 @@ static void fd_collector(ebpf_module_t *em)
             break;
 
         netdata_apps_integration_flags_t apps = em->apps_charts;
+        ebpf_fd_read_global_table();
         pthread_mutex_lock(&collect_data_mutex);
         if (apps)
             read_apps_table();

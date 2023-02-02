@@ -108,9 +108,10 @@ static struct replication_query *replication_query_prepare(
         time_t db_last_entry,
         time_t requested_after,
         time_t requested_before,
+        bool requested_enable_streaming,
         time_t query_after,
         time_t query_before,
-        bool enable_streaming,
+        bool query_enable_streaming,
         time_t wall_clock_time
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
@@ -125,11 +126,11 @@ static struct replication_query *replication_query_prepare(
 
     q->request.after = requested_after,
     q->request.before = requested_before,
-    q->request.enable_streaming = enable_streaming,
+    q->request.enable_streaming = requested_enable_streaming,
 
     q->query.after = query_after;
     q->query.before = query_before;
-    q->query.enable_streaming = enable_streaming;
+    q->query.enable_streaming = query_enable_streaming;
 
     q->wall_clock_time = wall_clock_time;
 
@@ -144,6 +145,7 @@ static struct replication_query *replication_query_prepare(
         q->query.locked_data_collection = true;
 
         if (st->last_updated.tv_sec > q->query.before) {
+#ifdef NETDATA_LOG_REPLICATION_REQUESTS
             internal_error(true,
                            "STREAM_SENDER REPLAY: 'host:%s/chart:%s' "
                            "has start_streaming = true, "
@@ -152,7 +154,8 @@ static struct replication_query *replication_query_prepare(
                            (unsigned long long) q->query.before,
                            (unsigned long long) st->last_updated.tv_sec
             );
-            q->query.before = st->last_updated.tv_sec;
+#endif
+            q->query.before = MIN(st->last_updated.tv_sec, wall_clock_time);
         }
     }
 
@@ -206,8 +209,37 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-static void replication_query_finalize(struct replication_query *q, bool executed) {
+static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+                if(!rd->exposed) continue;
+
+                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
+                               rrddim_id(rd),
+                               (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
+                               rd->last_collected_value,
+                               rd->last_calculated_value,
+                               rd->last_stored_value
+                );
+            }
+    rrddim_foreach_done(rd);
+
+    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
+                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
+                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
+    );
+}
+
+static void replication_query_finalize(BUFFER *wb, struct replication_query *q, bool executed) {
     size_t dimensions = q->dimensions;
+
+    if(wb && q->query.enable_streaming)
+        replication_send_chart_collection_state(wb, q->st);
+
+    if(q->query.locked_data_collection) {
+        netdata_spinlock_unlock(&q->st->data_collection_lock);
+        q->query.locked_data_collection = false;
+    }
 
     // release all the dictionary items acquired
     // finalize the queries
@@ -223,11 +255,6 @@ static void replication_query_finalize(struct replication_query *q, bool execute
 
         // update global statistics
         queries++;
-    }
-
-    if(q->query.locked_data_collection) {
-        netdata_spinlock_unlock(&q->st->data_collection_lock);
-        q->query.locked_data_collection = false;
     }
 
     if(executed) {
@@ -284,7 +311,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
     time_t now = after + 1;
     time_t last_end_time_in_buffer = 0;
     while(now <= before) {
-        time_t min_start_time = 0, min_end_time = 0;
+        time_t min_start_time = 0, max_start_time = 0, min_end_time = 0, max_end_time = 0, min_update_every = 0, max_update_every = 0;
         for (size_t i = 0; i < dimensions ;i++) {
             struct replication_dimension *d = &q->data[i];
             if(unlikely(!d->enabled || d->skip)) continue;
@@ -308,9 +335,16 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 continue;
             }
 
-            if(d->sp.end_time_s < now)
-                // this dimension does not have any more data
+            if(unlikely(d->sp.end_time_s < now || d->sp.end_time_s < d->sp.start_time_s))
+                // this dimension does not provide any data
                 continue;
+
+            time_t update_every = d->sp.end_time_s - d->sp.start_time_s;
+            if(unlikely(!update_every))
+                update_every = q->st->update_every;
+
+            if(unlikely(!min_update_every))
+                min_update_every = update_every;
 
             if(unlikely(!min_start_time))
                 min_start_time = d->sp.start_time_s;
@@ -318,17 +352,51 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             if(unlikely(!min_end_time))
                 min_end_time = d->sp.end_time_s;
 
+            min_update_every = MIN(min_update_every, update_every);
+            max_update_every = MAX(max_update_every, update_every);
+
             min_start_time = MIN(min_start_time, d->sp.start_time_s);
+            max_start_time = MAX(max_start_time, d->sp.start_time_s);
+
             min_end_time = MIN(min_end_time, d->sp.end_time_s);
+            max_end_time = MAX(max_end_time, d->sp.end_time_s);
         }
 
-        if(unlikely(min_end_time < now))
-            break;
+        if (unlikely(min_update_every != max_update_every ||
+                     min_start_time != max_start_time)) {
 
-        if(likely(min_start_time <= now)) {
+            time_t fix_min_start_time;
+            if(last_end_time_in_buffer &&
+                last_end_time_in_buffer >= min_start_time &&
+                last_end_time_in_buffer <= max_start_time) {
+                fix_min_start_time = last_end_time_in_buffer;
+            }
+            else
+                fix_min_start_time = min_end_time - min_update_every;
+
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "REPLAY WARNING: 'host:%s/chart:%s' "
+                              "misaligned dimensions "
+                              "update every (min: %ld, max: %ld), "
+                              "start time (min: %ld, max: %ld), "
+                              "end time (min %ld, max %ld), "
+                              "now %ld, last end time sent %ld, "
+                              "min start time is fixed to %ld",
+                        rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
+                        min_update_every, max_update_every,
+                        min_start_time, max_start_time,
+                        min_end_time, max_end_time,
+                        now, last_end_time_in_buffer,
+                        fix_min_start_time
+                        );
+
+            min_start_time = fix_min_start_time;
+        }
+
+        if(likely(min_start_time <= now && min_end_time >= now)) {
             // we have a valid point
 
-            if (unlikely(min_end_time <= min_start_time))
+            if (unlikely(min_end_time == min_start_time))
                 min_start_time = min_end_time - q->st->update_every;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -339,13 +407,15 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 #endif
 
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
-                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'."
-                                     "Interrupting replication query at %ld, before the expected %ld.",
-                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
-                               last_end_time_in_buffer, q->query.before);
-
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
+
+                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'. "
+                                     "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
+                               buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
+                               q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
+                               q->query.after, q->query.before, q->query.enable_streaming?"true":"false");
+
                 q->query.interrupted = true;
 
                 break;
@@ -366,7 +436,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 if (likely( d->sp.start_time_s <= min_end_time &&
                             d->sp.end_time_s >= min_end_time &&
                             !storage_point_is_unset(d->sp) &&
-                            !storage_point_is_empty(d->sp))) {
+                            !storage_point_is_gap(d->sp))) {
 
                     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                    rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
@@ -377,7 +447,11 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             now = min_end_time + 1;
         }
+        else if(unlikely(min_end_time < now))
+            // the query does not progress
+            break;
         else
+            // we have gap - all points are in the future
             now = min_start_time;
     }
 
@@ -403,63 +477,71 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
     q->points_generated = points_generated;
 }
 
-static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
-    RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-        if(!rd->exposed) continue;
-
-        buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
-                       rrddim_id(rd),
-                       (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
-                       rd->last_collected_value,
-                       rd->last_calculated_value,
-                       rd->last_stored_value
-        );
-    }
-    rrddim_foreach_done(rd);
-
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
-                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
-                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
-    );
-}
-
-static struct replication_query *replication_response_prepare(RRDSET *st, bool start_streaming, time_t requested_after, time_t requested_before) {
-    time_t query_after = requested_after;
-    time_t query_before = requested_before;
+static struct replication_query *replication_response_prepare(RRDSET *st, bool requested_enable_streaming, time_t requested_after, time_t requested_before) {
     time_t wall_clock_time = now_realtime_sec();
 
-    time_t db_first_entry, db_last_entry;
-    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
-
-    if (query_after < db_first_entry)
-        query_after = db_first_entry;
-
-    if (query_before > db_last_entry)
-        query_before = db_last_entry;
-
-    // if the parent asked us to start streaming, then fill the rest with the data that we have
-    if (start_streaming)
-        query_before = db_last_entry;
-
-    if (query_after > query_before) {
-        time_t tmp = query_before;
-        query_before = query_after;
-        query_after = tmp;
+    if(requested_after > requested_before) {
+        // flip them
+        time_t t = requested_before;
+        requested_before = requested_after;
+        requested_after = t;
     }
 
-    bool enable_streaming = (start_streaming || query_before == db_last_entry || !requested_after || !requested_before) ? true : false;
+    if(requested_after > wall_clock_time) {
+        requested_after = 0;
+        requested_before = 0;
+        requested_enable_streaming = true;
+    }
+
+    if(requested_before > wall_clock_time) {
+        requested_before = wall_clock_time;
+        requested_enable_streaming = true;
+    }
+
+    time_t query_after = requested_after;
+    time_t query_before = requested_before;
+    bool query_enable_streaming = requested_enable_streaming;
+
+    time_t db_first_entry = 0, db_last_entry = 0;
+    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
+
+    if(requested_after == 0 && requested_before == 0 && requested_enable_streaming == true) {
+        // no data requested - just enable streaming
+        ;
+    }
+    else {
+        if (query_after < db_first_entry)
+            query_after = db_first_entry;
+
+        if (query_before > db_last_entry)
+            query_before = db_last_entry;
+
+        // if the parent asked us to start streaming, then fill the rest with the data that we have
+        if (requested_enable_streaming)
+            query_before = db_last_entry;
+
+        if (query_after > query_before) {
+            time_t tmp = query_before;
+            query_before = query_after;
+            query_after = tmp;
+        }
+
+        query_enable_streaming = (requested_enable_streaming ||
+                                  query_before == db_last_entry ||
+                                  !requested_after ||
+                                  !requested_before) ? true : false;
+    }
 
     return replication_query_prepare(
             st,
             db_first_entry, db_last_entry,
-            requested_after, requested_before,
-            query_after, query_before, enable_streaming,
+            requested_after, requested_before, requested_enable_streaming,
+            query_after, query_before, query_enable_streaming,
             wall_clock_time);
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
-    replication_query_finalize(q, false);
+    replication_query_finalize(NULL, q, false);
 }
 
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
@@ -486,12 +568,8 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
 
-    replication_query_finalize(q, q->query.execute);
+    replication_query_finalize(wb, q, q->query.execute);
     q = NULL; // IMPORTANT: q is invalid now
-
-    // get again the world clock time
-    if(enable_streaming)
-        replication_send_chart_collection_state(wb, st);
 
     // get a fresh retention to send to the parent
     time_t wall_clock_time = now_realtime_sec();
@@ -564,14 +642,14 @@ struct replication_request_details {
     struct {
         time_t first_entry_t;               // the first entry time the child has
         time_t last_entry_t;                // the last entry time the child has
-        time_t world_time_t;                // the current time of the child
+        time_t wall_clock_time;             // the current time of the child
+        bool fixed_last_entry;              // when set we set the last entry to wall clock time
     } child_db;
 
     struct {
         time_t first_entry_t;               // the first entry time we have
         time_t last_entry_t;                // the last entry time we have
-        bool last_entry_t_adjusted_to_now;  // true, if the last entry time was in the future, and we fixed
-        time_t now;                         // the current local world clock time
+        time_t wall_clock_time;                         // the current local world clock time
     } local_db;
 
     struct {
@@ -591,8 +669,35 @@ struct replication_request_details {
     } wanted;
 };
 
-static bool send_replay_chart_cmd(struct replication_request_details *r, const char *msg __maybe_unused) {
+static void replicate_log_request(struct replication_request_details *r, const char *msg) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    internal_error(true,
+#else
+    error_limit_static_global_var(erl, 1, 0);
+    error_limit(&erl,
+#endif
+                "REPLAY ERROR: 'host:%s/chart:%s' child sent: "
+                "db from %ld to %ld%s, wall clock time %ld, "
+                "last request from %ld to %ld, "
+                "issue: %s - "
+                "sending replication request from %ld to %ld, start streaming %s",
+                rrdhost_hostname(r->st->rrdhost), rrdset_id(r->st),
+                r->child_db.first_entry_t,
+                r->child_db.last_entry_t, r->child_db.fixed_last_entry ? " (fixed)" : "",
+                r->child_db.wall_clock_time,
+                r->last_request.after,
+                r->last_request.before,
+                msg,
+                r->wanted.after,
+                r->wanted.before,
+                r->wanted.start_streaming ? "true" : "false");
+}
+
+static bool send_replay_chart_cmd(struct replication_request_details *r, const char *msg, bool log) {
     RRDSET *st = r->st;
+
+    if(log)
+        replicate_log_request(r, msg);
 
     if(st->rrdhost->receiver && (!st->rrdhost->receiver->replication_first_time_t || r->wanted.after < st->rrdhost->receiver->replication_first_time_t))
         st->rrdhost->receiver->replication_first_time_t = r->wanted.after;
@@ -610,7 +715,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
 
     internal_error(true,
                    "REPLAY: 'host:%s/chart:%s' sending replication request %ld [%s] to %ld [%s], start streaming '%s': %s: "
-                   "last[%ld - %ld] child[%ld - %ld, now %ld %s] local[%ld - %ld %s, now %ld] gap[%ld - %ld %s] %s"
+                   "last[%ld - %ld] child[%ld - %ld, now %ld %s] local[%ld - %ld, now %ld] gap[%ld - %ld %s] %s"
                    , rrdhost_hostname(r->host), rrdset_id(r->st)
                    , r->wanted.after, wanted_after_buf
                    , r->wanted.before, wanted_before_buf
@@ -620,7 +725,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
                    , r->child_db.first_entry_t, r->child_db.last_entry_t
                    , r->child_db.world_time_t, (r->child_db.world_time_t == r->local_db.now) ? "SAME" : (r->child_db.world_time_t < r->local_db.now) ? "BEHIND" : "AHEAD"
                    , r->local_db.first_entry_t, r->local_db.last_entry_t
-                   , r->local_db.last_entry_t_adjusted_to_now?"FIXED":"RAW", r->local_db.now
+                   , r->local_db.now
                    , r->gap.from, r->gap.to
                    , (r->gap.from == r->wanted.after) ? "FULL" : "PARTIAL"
                    , (st->replay.after != 0 || st->replay.before != 0) ? "OVERLAPPING" : ""
@@ -647,7 +752,7 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
 }
 
 bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST *host, RRDSET *st,
-                             time_t first_entry_child, time_t last_entry_child, time_t child_world_time,
+                             time_t child_first_entry, time_t child_last_entry, time_t child_wall_clock_time,
                              time_t prev_first_entry_wanted, time_t prev_last_entry_wanted)
 {
     struct replication_request_details r = {
@@ -660,16 +765,16 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
             .st = st,
 
             .child_db = {
-                    .first_entry_t = first_entry_child,
-                    .last_entry_t = last_entry_child,
-                    .world_time_t = child_world_time,
+                    .first_entry_t = child_first_entry,
+                    .last_entry_t = child_last_entry,
+                    .wall_clock_time = child_wall_clock_time,
+                    .fixed_last_entry = false,
             },
 
             .local_db = {
-                    .first_entry_t = rrdset_first_entry_s(st),
-                    .last_entry_t = rrdset_last_entry_s(st),
-                    .last_entry_t_adjusted_to_now = false,
-                    .now  = now_realtime_sec(),
+                    .first_entry_t = 0,
+                    .last_entry_t = 0,
+                    .wall_clock_time  = now_realtime_sec(),
             },
 
             .last_request = {
@@ -684,11 +789,13 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
             },
     };
 
-    // check our local database retention
-    if(r.local_db.last_entry_t > r.local_db.now) {
-        r.local_db.last_entry_t = r.local_db.now;
-        r.local_db.last_entry_t_adjusted_to_now = true;
+    if(r.child_db.last_entry_t > r.child_db.wall_clock_time) {
+        replicate_log_request(&r, "child's db last entry > child's wall clock time");
+        r.child_db.last_entry_t = r.child_db.wall_clock_time;
+        r.child_db.fixed_last_entry = true;
     }
+
+    rrdset_get_retention_of_tier_for_collected_chart(r.st, &r.local_db.first_entry_t, &r.local_db.last_entry_t, r.local_db.wall_clock_time, 0);
 
     // let's find the GAP we have
     if(!r.last_request.after || !r.last_request.before) {
@@ -699,7 +806,7 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
             r.gap.from = r.local_db.last_entry_t;
         else
             // we don't have any data, the gap is the max timeframe we are allowed to replicate
-            r.gap.from = r.local_db.now - r.host->rrdpush_seconds_to_replicate;
+            r.gap.from = r.local_db.wall_clock_time - r.host->rrdpush_seconds_to_replicate;
 
     }
     else {
@@ -710,27 +817,30 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
     }
 
     // we want all the data up to now
-    r.gap.to = r.local_db.now;
+    r.gap.to = r.local_db.wall_clock_time;
 
     // The gap is now r.gap.from -> r.gap.to
 
     if (unlikely(!rrdhost_option_check(host, RRDHOST_OPTION_REPLICATION)))
-        return send_replay_chart_cmd(&r, "empty replication request, replication is disabled");
-
-    if (unlikely(!r.child_db.last_entry_t))
-        return send_replay_chart_cmd(&r, "empty replication request, child has no stored data");
+        return send_replay_chart_cmd(&r, "empty replication request, replication is disabled", false);
 
     if (unlikely(!rrdset_number_of_dimensions(st)))
-        return send_replay_chart_cmd(&r, "empty replication request, chart has no dimensions");
+        return send_replay_chart_cmd(&r, "empty replication request, chart has no dimensions", false);
 
-    if (r.child_db.first_entry_t <= 0)
-        return send_replay_chart_cmd(&r, "empty replication request, first entry of the child db first entry is invalid");
+    if (unlikely(!r.child_db.first_entry_t || !r.child_db.last_entry_t))
+        return send_replay_chart_cmd(&r, "empty replication request, child has no stored data", false);
 
-    if (r.child_db.first_entry_t > r.child_db.last_entry_t)
-        return send_replay_chart_cmd(&r, "empty replication request, child timings are invalid (first entry > last entry)");
+    if (unlikely(r.child_db.first_entry_t < 0 || r.child_db.last_entry_t < 0))
+        return send_replay_chart_cmd(&r, "empty replication request, child db timestamps are invalid", true);
 
-    if (r.local_db.last_entry_t > r.child_db.last_entry_t)
-        return send_replay_chart_cmd(&r, "empty replication request, local last entry is later than the child one");
+    if (unlikely(r.child_db.first_entry_t > r.child_db.wall_clock_time))
+        return send_replay_chart_cmd(&r, "empty replication request, child db first entry is after its wall clock time", true);
+
+    if (unlikely(r.child_db.first_entry_t > r.child_db.last_entry_t))
+        return send_replay_chart_cmd(&r, "empty replication request, child timings are invalid (first entry > last entry)", true);
+
+    if (unlikely(r.local_db.last_entry_t > r.child_db.last_entry_t))
+        return send_replay_chart_cmd(&r, "empty replication request, local last entry is later than the child one", false);
 
     // let's find what the child can provide to fill that gap
 
@@ -752,15 +862,22 @@ bool replicate_chart_request(send_command callback, void *callback_data, RRDHOST
     if(r.wanted.before > r.child_db.last_entry_t)
         r.wanted.before = r.child_db.last_entry_t;
 
-    if(r.wanted.after > r.wanted.before)
-        r.wanted.after = r.wanted.before;
+    if(r.wanted.after > r.wanted.before) {
+        r.wanted.after = 0;
+        r.wanted.before = 0;
+        r.wanted.start_streaming = true;
+        return send_replay_chart_cmd(&r, "empty replication request, wanted after computed bigger than wanted before", true);
+    }
 
     // the child should start streaming immediately if the wanted duration is small, or we reached the last entry of the child
-    r.wanted.start_streaming = (r.local_db.now - r.wanted.after <= host->rrdpush_replication_step || r.wanted.before == r.child_db.last_entry_t);
+    r.wanted.start_streaming = (r.local_db.wall_clock_time - r.wanted.after <= host->rrdpush_replication_step ||
+            r.wanted.before >= r.child_db.last_entry_t ||
+            r.wanted.before >= r.child_db.wall_clock_time ||
+            r.wanted.before >= r.local_db.wall_clock_time);
 
     // the wanted timeframe is now r.wanted.after -> r.wanted.before
     // send it
-    return send_replay_chart_cmd(&r, "OK");
+    return send_replay_chart_cmd(&r, "OK", false);
 }
 
 // ----------------------------------------------------------------------------
@@ -1255,6 +1372,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     replication_response_execute_and_finalize(
             rq->q, (size_t)((unsigned long long)rq->sender->host->sender->buffer->max_size * MAX_REPLICATION_MESSAGE_PERCENT_SENDER_BUFFER / 100ULL));
 
+    rq->q = NULL;
     netdata_thread_enable_cancelability();
 
     __atomic_add_fetch(&replication_globals.atomic.executed, 1, __ATOMIC_RELAXED);
@@ -1262,6 +1380,11 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
     ret = true;
 
 cleanup:
+    if(rq->q) {
+        replication_response_cancel_and_finalize(rq->q);
+        rq->q = NULL;
+    }
+
     string_freez(rq->chart_id);
     worker_is_idle();
     return ret;
@@ -1296,7 +1419,9 @@ void replication_sender_delete_pending_requests(struct sender_state *sender) {
 }
 
 void replication_init_sender(struct sender_state *sender) {
-    sender->replication.requests = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    sender->replication.requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              NULL, sizeof(struct replication_request));
+
     dictionary_register_react_callback(sender->replication.requests, replication_request_react_callback, sender);
     dictionary_register_conflict_callback(sender->replication.requests, replication_request_conflict_callback, sender);
     dictionary_register_delete_callback(sender->replication.requests, replication_request_delete_callback, sender);
@@ -1445,15 +1570,43 @@ static void replication_initialize_workers(bool master) {
 #define REQUEST_QUEUE_EMPTY (-1)
 #define REQUEST_CHART_NOT_FOUND (-2)
 
-static int replication_execute_next_pending_request(void) {
+static int replication_execute_next_pending_request(bool cancel) {
     static __thread int max_requests_ahead = 0;
     static __thread struct replication_request *rqs = NULL;
     static __thread int rqs_last_executed = 0, rqs_last_prepared = 0;
     static __thread size_t queue_rounds = 0; (void)queue_rounds;
     struct replication_request *rq;
 
+    if(unlikely(cancel)) {
+        if(rqs) {
+            size_t cancelled = 0;
+            do {
+                if (++rqs_last_executed >= max_requests_ahead)
+                    rqs_last_executed = 0;
+
+                rq = &rqs[rqs_last_executed];
+
+                if (rq->q) {
+                    internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
+                    internal_fatal(!rq->found, "REPLAY FATAL: orphan q in rq");
+
+                    replication_response_cancel_and_finalize(rq->q);
+                    rq->q = NULL;
+                    cancelled++;
+                }
+
+                rq->executed = true;
+                rq->found = false;
+
+            } while (rqs_last_executed != rqs_last_prepared);
+
+            internal_error(true, "REPLICATION: cancelled %zu inflight queries", cancelled);
+        }
+        return REQUEST_QUEUE_EMPTY;
+    }
+
     if(unlikely(!rqs)) {
-        max_requests_ahead = get_system_cpus() / 2;
+        max_requests_ahead = get_netdata_cpus() / 2;
 
         if(max_requests_ahead > libuv_worker_threads * 2)
             max_requests_ahead = libuv_worker_threads * 2;
@@ -1472,8 +1625,8 @@ static int replication_execute_next_pending_request(void) {
             queue_rounds++;
         }
 
-        internal_fatal(queue_rounds > 1 && !rqs[rqs_last_prepared].executed,
-                       "REPLAY FATAL: query has not been executed!");
+        internal_fatal(rqs[rqs_last_prepared].q,
+                       "REPLAY FATAL: slot is used by query that has not been executed!");
 
         worker_is_busy(WORKER_JOB_FIND_NEXT);
         rqs[rqs_last_prepared] = replication_request_get_first_available();
@@ -1489,6 +1642,8 @@ static int replication_execute_next_pending_request(void) {
                 worker_is_busy(WORKER_JOB_PREPARE_QUERY);
                 rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
             }
+
+            rq->executed = false;
         }
 
     } while(rq->found && rqs_last_prepared != rqs_last_executed);
@@ -1499,14 +1654,17 @@ static int replication_execute_next_pending_request(void) {
             rqs_last_executed = 0;
 
         rq = &rqs[rqs_last_executed];
-        rq->executed = true;
 
         if(rq->found) {
+            internal_fatal(rq->executed, "REPLAY FATAL: query has already been executed!");
+
             if (rq->sender_last_flush_ut != rrdpush_sender_get_flush_time(rq->sender)) {
                 // the sender has reconnected since this request was queued,
                 // we can safely throw it away, since the parent will resend it
                 replication_response_cancel_and_finalize(rq->q);
+                rq->executed = true;
                 rq->found = false;
+                rq->q = NULL;
             }
             else if (rrdpush_sender_replication_buffer_full_get(rq->sender)) {
                 // the sender buffer is full, so we can ignore this request,
@@ -1514,7 +1672,9 @@ static int replication_execute_next_pending_request(void) {
                 // and the sender will put it back in when there is
                 // enough room in the buffer for processing replication requests
                 replication_response_cancel_and_finalize(rq->q);
+                rq->executed = true;
                 rq->found = false;
+                rq->q = NULL;
             }
             else {
                 // we can execute this,
@@ -1523,6 +1683,8 @@ static int replication_execute_next_pending_request(void) {
                 dictionary_del(rq->sender->replication.requests, string2str(rq->chart_id));
             }
         }
+        else
+            internal_fatal(rq->q, "REPLAY FATAL: slot status says slot is empty, but it has a pending query!");
 
     } while(!rq->found && rqs_last_executed != rqs_last_prepared);
 
@@ -1533,7 +1695,12 @@ static int replication_execute_next_pending_request(void) {
 
     replication_set_latest_first_time(rq->after);
 
-    if(unlikely(!replication_execute_request(rq, true))) {
+    bool chart_found = replication_execute_request(rq, true);
+    rq->executed = true;
+    rq->found = false;
+    rq->q = NULL;
+
+    if(unlikely(!chart_found)) {
         worker_is_idle();
         return REQUEST_CHART_NOT_FOUND;
     }
@@ -1543,6 +1710,7 @@ static int replication_execute_next_pending_request(void) {
 }
 
 static void replication_worker_cleanup(void *ptr __maybe_unused) {
+    replication_execute_next_pending_request(true);
     worker_unregister();
 }
 
@@ -1552,7 +1720,7 @@ static void *replication_worker_thread(void *ptr) {
     netdata_thread_cleanup_push(replication_worker_cleanup, ptr);
 
     while(service_running(SERVICE_REPLICATION)) {
-        if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
             sender_thread_buffer_free();
             worker_is_busy(WORKER_JOB_WAIT);
             worker_is_idle();
@@ -1567,6 +1735,8 @@ static void *replication_worker_thread(void *ptr) {
 static void replication_main_cleanup(void *ptr) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
+
+    replication_execute_next_pending_request(true);
 
     int threads = (int)replication_globals.main_thread.threads;
     for(int i = 0; i < threads ;i++) {
@@ -1683,7 +1853,7 @@ void *replication_thread_main(void *ptr __maybe_unused) {
             worker_is_idle();
         }
 
-        if(unlikely(replication_execute_next_pending_request() == REQUEST_QUEUE_EMPTY)) {
+        if(unlikely(replication_execute_next_pending_request(false) == REQUEST_QUEUE_EMPTY)) {
 
             worker_is_busy(WORKER_JOB_WAIT);
             replication_recursive_lock();

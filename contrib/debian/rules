@@ -95,7 +95,6 @@ override_dh_installdocs:
 
 	find . \
 		-name README.md \
-		-not -path './.travis/*' \
 		-not -path './debian/*' \
 		-not -path './contrib/*' \
 		-exec cp \

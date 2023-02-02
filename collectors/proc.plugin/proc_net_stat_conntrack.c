@@ -69,7 +69,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         for(l = 1; l < lines ;l++) {
             size_t words = procfile_linewords(ff, l);
             if(unlikely(words < 17)) {
-                if(unlikely(words)) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
+                if(unlikely(words)) collector_error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
                 continue;
             }
 

@@ -92,14 +92,14 @@ static int nfstat_init(int update_every) {
 
     nfstat_root.mnl  = mnl_socket_open(NETLINK_NETFILTER);
     if(!nfstat_root.mnl) {
-        error("NFSTAT: mnl_socket_open() failed");
+        collector_error("NFSTAT: mnl_socket_open() failed");
         return 1;
     }
 
     nfstat_root.seq = (unsigned int)now_realtime_sec() - 1;
 
     if(mnl_socket_bind(nfstat_root.mnl, 0, MNL_SOCKET_AUTOPID) < 0) {
-        error("NFSTAT: mnl_socket_bind() failed");
+        collector_error("NFSTAT: mnl_socket_bind() failed");
         return 1;
     }
     nfstat_root.portid = mnl_socket_get_portid(nfstat_root.mnl);
@@ -132,7 +132,7 @@ static int nfct_stats_attr_cb(const struct nlattr *attr, void *data) {
         return MNL_CB_OK;
 
     if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0) {
-        error("NFSTAT: mnl_attr_validate() failed");
+        collector_error("NFSTAT: mnl_attr_validate() failed");
         return MNL_CB_ERROR;
     }
 
@@ -173,7 +173,7 @@ static int nfstat_collect_conntrack() {
 
     // send the request
     if(mnl_socket_sendto(nfstat_root.mnl, nfstat_root.nlh, nfstat_root.nlh->nlmsg_len) < 0) {
-        error("NFSTAT: mnl_socket_sendto() failed");
+        collector_error("NFSTAT: mnl_socket_sendto() failed");
         return 1;
     }
 
@@ -193,7 +193,7 @@ static int nfstat_collect_conntrack() {
 
     // verify we run without issues
     if (ret == -1) {
-        error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
+        collector_error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
         return 1;
     }
 
@@ -209,7 +209,7 @@ static int nfexp_stats_attr_cb(const struct nlattr *attr, void *data)
         return MNL_CB_OK;
 
     if (mnl_attr_validate(attr, MNL_TYPE_U32) < 0) {
-        error("NFSTAT EXP: mnl_attr_validate() failed");
+        collector_error("NFSTAT EXP: mnl_attr_validate() failed");
         return MNL_CB_ERROR;
     }
 
@@ -245,7 +245,7 @@ static int nfstat_collect_conntrack_expectations() {
 
     // send the request
     if(mnl_socket_sendto(nfstat_root.mnl, nfstat_root.nlh, nfstat_root.nlh->nlmsg_len) < 0) {
-        error("NFSTAT: mnl_socket_sendto() failed");
+        collector_error("NFSTAT: mnl_socket_sendto() failed");
         return 1;
     }
 
@@ -265,7 +265,7 @@ static int nfstat_collect_conntrack_expectations() {
 
     // verify we run without issues
     if (ret == -1) {
-        error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
+        collector_error("NFSTAT: error communicating with kernel. This plugin can only work when netdata runs as root.");
         return 1;
     }
 
@@ -561,7 +561,7 @@ static int nfacct_init(int update_every) {
 
     nfacct_root.nfacct_buffer = nfacct_alloc();
     if(!nfacct_root.nfacct_buffer) {
-        error("nfacct.plugin: nfacct_alloc() failed.");
+        collector_error("nfacct.plugin: nfacct_alloc() failed.");
         return 0;
     }
 
@@ -569,12 +569,12 @@ static int nfacct_init(int update_every) {
 
     nfacct_root.mnl  = mnl_socket_open(NETLINK_NETFILTER);
     if(!nfacct_root.mnl) {
-        error("nfacct.plugin: mnl_socket_open() failed");
+        collector_error("nfacct.plugin: mnl_socket_open() failed");
         return 1;
     }
 
     if(mnl_socket_bind(nfacct_root.mnl, 0, MNL_SOCKET_AUTOPID) < 0) {
-        error("nfacct.plugin: mnl_socket_bind() failed");
+        collector_error("nfacct.plugin: mnl_socket_bind() failed");
         return 1;
     }
     nfacct_root.portid = mnl_socket_get_portid(nfacct_root.mnl);
@@ -586,7 +586,7 @@ static int nfacct_callback(const struct nlmsghdr *nlh, void *data) {
     (void)data;
 
     if(nfacct_nlmsg_parse_payload(nlh, nfacct_root.nfacct_buffer) < 0) {
-        error("NFACCT: nfacct_nlmsg_parse_payload() failed.");
+        collector_error("NFACCT: nfacct_nlmsg_parse_payload() failed.");
         return MNL_CB_OK;
     }
 
@@ -612,13 +612,13 @@ static int nfacct_collect() {
     nfacct_root.seq++;
     nfacct_root.nlh = nfacct_nlmsg_build_hdr(nfacct_root.buf, NFNL_MSG_ACCT_GET, NLM_F_DUMP, (uint32_t)nfacct_root.seq);
     if(!nfacct_root.nlh) {
-        error("NFACCT: nfacct_nlmsg_build_hdr() failed");
+        collector_error("NFACCT: nfacct_nlmsg_build_hdr() failed");
         return 1;
     }
 
     // send the request
     if(mnl_socket_sendto(nfacct_root.mnl, nfacct_root.nlh, nfacct_root.nlh->nlmsg_len) < 0) {
-        error("NFACCT: mnl_socket_sendto() failed");
+        collector_error("NFACCT: mnl_socket_sendto() failed");
         return 1;
     }
 
@@ -638,7 +638,7 @@ static int nfacct_collect() {
 
     // verify we run without issues
     if (ret == -1) {
-        error("NFACCT: error communicating with kernel. This plugin can only work when netdata runs as root.");
+        collector_error("NFACCT: error communicating with kernel. This plugin can only work when netdata runs as root.");
         return 1;
     }
 
@@ -740,11 +740,12 @@ void nfacct_signals()
 
     for (i = 0; signals[i]; i++) {
         if(sigaction(signals[i], &sa, NULL) == -1)
-            error("Cannot add the handler to signal %d", signals[i]);
+            collector_error("Cannot add the handler to signal %d", signals[i]);
     }
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     // ------------------------------------------------------------------------
@@ -813,7 +814,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        error("nfacct.plugin: ignoring parameter '%s'", argv[i]);
+        collector_error("nfacct.plugin: ignoring parameter '%s'", argv[i]);
     }
 
     nfacct_signals();
@@ -823,7 +824,7 @@ int main(int argc, char **argv) {
     if(freq >= netdata_update_every)
         netdata_update_every = freq;
     else if(freq)
-        error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
+        collector_error("update frequency %d seconds is too small for NFACCT. Using %d.", freq, netdata_update_every);
 
     if (debug)
         fprintf(stderr, "nfacct.plugin: calling nfacct_init()\n");
@@ -882,5 +883,5 @@ int main(int argc, char **argv) {
         if(now_monotonic_sec() - started_t > 14400) break;
     }
 
-    info("NFACCT process exiting");
+    collector_info("NFACCT process exiting");
 }

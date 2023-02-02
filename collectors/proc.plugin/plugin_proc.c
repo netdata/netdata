@@ -86,7 +86,7 @@ static void proc_main_cleanup(void *ptr)
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)ptr;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
 
-    info("cleaning up...");
+    collector_info("cleaning up...");
 
     if (netdev_thread) {
         netdata_thread_join(*netdev_thread, NULL);

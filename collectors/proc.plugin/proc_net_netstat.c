@@ -97,7 +97,7 @@ static void parse_line_pair(procfile *ff_netstat, ARL_BASE *base, size_t header_
     size_t w;
 
     if(unlikely(vwords > hwords)) {
-        error("File /proc/net/netstat on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
+        collector_error("File /proc/net/netstat on header line %zu has %zu words, but on value line %zu has %zu words.", header_line, hwords, values_line, vwords);
         vwords = hwords;
     }
 
@@ -366,7 +366,7 @@ static void do_proc_net_snmp6(int update_every) {
         size_t words = procfile_linewords(ff_snmp6, l);
         if (unlikely(words < 2)) {
             if (unlikely(words)) {
-                error("Cannot read /proc/net/snmp6 line %zu. Expected 2 params, read %zu.", l, words);
+                collector_error("Cannot read /proc/net/snmp6 line %zu. Expected 2 params, read %zu.", l, words);
                 continue;
             }
         }
@@ -1678,7 +1678,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff_netstat, l);
             if(unlikely(words < 2)) {
-                error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/netstat IpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
@@ -1690,7 +1690,7 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
 
             words = procfile_linewords(ff_netstat, l);
             if(unlikely(words < 2)) {
-                error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/netstat TcpExt line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
@@ -1721,13 +1721,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Ip") != 0) {
-                error("Cannot read Ip line from /proc/net/snmp.");
+                collector_error("Cannot read Ip line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp Ip line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -1741,13 +1741,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Icmp") != 0) {
-                error("Cannot read Icmp line from /proc/net/snmp.");
+                collector_error("Cannot read Icmp line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp Icmp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -1761,13 +1761,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "IcmpMsg") != 0) {
-                error("Cannot read IcmpMsg line from /proc/net/snmp.");
+                collector_error("Cannot read IcmpMsg line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 2) {
-                error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp IcmpMsg line. Expected 2+ params, read %zu.", words);
                 continue;
             }
 
@@ -1781,13 +1781,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Tcp") != 0) {
-                error("Cannot read Tcp line from /proc/net/snmp.");
+                collector_error("Cannot read Tcp line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp Tcp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -1801,13 +1801,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "Udp") != 0) {
-                error("Cannot read Udp line from /proc/net/snmp.");
+                collector_error("Cannot read Udp line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp Udp line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 
@@ -1821,13 +1821,13 @@ int do_proc_net_netstat(int update_every, usec_t dt) {
             size_t h = l++;
 
             if(strcmp(procfile_lineword(ff_snmp, l, 0), "UdpLite") != 0) {
-                error("Cannot read UdpLite line from /proc/net/snmp.");
+                collector_error("Cannot read UdpLite line from /proc/net/snmp.");
                 break;
             }
 
             words = procfile_linewords(ff_snmp, l);
             if(words < 3) {
-                error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %zu.", words);
+                collector_error("Cannot read /proc/net/snmp UdpLite line. Expected 3+ params, read %zu.", words);
                 continue;
             }
 

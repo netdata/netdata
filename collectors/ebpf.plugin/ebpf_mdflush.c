@@ -35,17 +35,6 @@ static avl_tree_lock mdflush_pub;
 // tmp store for mdflush values we get from a per-CPU eBPF map.
 static mdflush_ebpf_val_t *mdflush_ebpf_vals = NULL;
 
-static struct netdata_static_thread mdflush_threads = {
-                                        .name = "MDFLUSH KERNEL",
-                                        .config_section = NULL,
-                                        .config_name = NULL,
-                                        .env_name = NULL,
-                                        .enabled = 1,
-                                        .thread = NULL,
-                                        .init_routine = NULL,
-                                        .start_routine = NULL
-};
-
 /**
  * MDflush Free
  *
@@ -55,18 +44,10 @@ static struct netdata_static_thread mdflush_threads = {
  */
 static void ebpf_mdflush_free(ebpf_module_t *em)
 {
-    pthread_mutex_lock(&ebpf_exit_cleanup);
-    if (em->thread->enabled == NETDATA_THREAD_EBPF_RUNNING) {
-        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
-        pthread_mutex_unlock(&ebpf_exit_cleanup);
-        return;
-    }
-    pthread_mutex_unlock(&ebpf_exit_cleanup);
-
     freez(mdflush_ebpf_vals);
-    freez(mdflush_threads.thread);
-
+    pthread_mutex_lock(&ebpf_exit_cleanup);
     em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
 }
 
 /**
@@ -79,21 +60,6 @@ static void ebpf_mdflush_free(ebpf_module_t *em)
 static void mdflush_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    ebpf_mdflush_free(em);
-}
-
-/**
- * CLeanup
- *
- * Clean allocated memory.
- *
- * @param ptr thread data.
- */
-static void mdflush_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (mdflush_threads.thread)
-        netdata_thread_cancel(*mdflush_threads.thread);
     ebpf_mdflush_free(em);
 }
 
@@ -189,28 +155,6 @@ static void mdflush_read_count_map()
     }
 }
 
-/**
- * Read eBPF maps for mdflush.
- */
-static void *mdflush_reader(void *ptr)
-{
-    netdata_thread_cleanup_push(mdflush_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_MDFLUSH_SLEEP_MS * em->update_every;
-    while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-
-        mdflush_read_count_map();
-    }
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
-}
-
 static void mdflush_create_charts(int update_every)
 {
     ebpf_create_chart(
@@ -259,17 +203,6 @@ static void mdflush_collector(ebpf_module_t *em)
 
     avl_init_lock(&mdflush_pub, mdflush_val_cmp);
 
-    // create reader thread.
-    mdflush_threads.thread = mallocz(sizeof(netdata_thread_t));
-    mdflush_threads.start_routine = mdflush_reader;
-    netdata_thread_create(
-        mdflush_threads.thread,
-        mdflush_threads.name,
-        NETDATA_THREAD_OPTION_DEFAULT,
-        mdflush_reader,
-        em
-    );
-
     // create chart and static dims.
     pthread_mutex_lock(&lock);
     mdflush_create_charts(em->update_every);
@@ -285,6 +218,7 @@ static void mdflush_collector(ebpf_module_t *em)
         if (ebpf_exit_plugin)
             break;
 
+        mdflush_read_count_map();
         // write dims now for all hitherto discovered devices.
         write_begin_chart("mdstat", "mdstat_flush");
         avl_traverse_lock(&mdflush_pub, mdflush_write_dims, NULL);

@@ -25,6 +25,42 @@ struct rrdeng_main {
 
     size_t flushes_running;
     size_t evictions_running;
+    size_t cleanup_running;
+
+    struct {
+        ARAL *ar;
+
+        struct {
+            SPINLOCK spinlock;
+
+            size_t waiting;
+            struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
+            size_t executed_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
+        } unsafe;
+    } cmd_queue;
+
+    struct {
+        ARAL *ar;
+
+        struct {
+            size_t dispatched;
+            size_t executing;
+            size_t pending_cb;
+        } atomics;
+    } work_cmd;
+
+    struct {
+        ARAL *ar;
+    } handles;
+
+    struct {
+        ARAL *ar;
+    } descriptors;
+
+    struct {
+        ARAL *ar;
+    } xt_io_descr;
+
 } rrdeng_main = {
         .thread = 0,
         .loop = {},
@@ -32,6 +68,13 @@ struct rrdeng_main {
         .timer = {},
         .flushes_running = 0,
         .evictions_running = 0,
+        .cleanup_running = 0,
+
+        .cmd_queue = {
+                .unsafe = {
+                        .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                },
+        }
 };
 
 static void sanity_check(void)
@@ -64,7 +107,7 @@ static void sanity_check(void)
 // ----------------------------------------------------------------------------
 // work request cache
 
-typedef void (*work_cb)(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_t* req);
+typedef void *(*work_cb)(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_t* req);
 typedef void (*after_work_cb)(struct rrdengine_instance *ctx, void *data, struct completion *completion, uv_work_t* req, int status);
 
 struct rrdeng_work {
@@ -77,88 +120,45 @@ struct rrdeng_work {
     work_cb work_cb;
     after_work_cb after_work_cb;
     enum rrdeng_opcode opcode;
-
-    struct {
-        struct rrdeng_work *prev;
-        struct rrdeng_work *next;
-    } cache;
 };
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct rrdeng_work *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-        size_t dispatched;
-        size_t executing;
-        size_t pending_cb;
-    } atomics;
-} work_request_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-                .dispatched = 0,
-                .executing = 0,
-        },
-};
-
-static inline bool work_request_full(void) {
-    return __atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
+static void work_request_init(void) {
+    rrdeng_main.work_cmd.ar = aral_create(
+            "dbengine-work-cmd",
+            sizeof(struct rrdeng_work),
+            0,
+            65536, NULL,
+            NULL, NULL, false, false
+    );
 }
 
-static void work_request_cleanup1(void) {
-    struct rrdeng_work *item = NULL;
-
-    if(!netdata_spinlock_trylock(&work_request_globals.protected.spinlock))
-        return;
-
-    if(work_request_globals.protected.available_items && work_request_globals.protected.available > (size_t)libuv_worker_threads) {
-        item = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, item, cache.prev, cache.next);
-        work_request_globals.protected.available--;
-    }
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+static inline bool work_request_full(void) {
+    return __atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED) >= (size_t)(libuv_worker_threads - RESERVED_LIBUV_WORKER_THREADS);
 }
 
 static inline void work_done(struct rrdeng_work *work_request) {
-    netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
-    work_request_globals.protected.available++;
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
+    aral_freez(rrdeng_main.work_cmd.ar, work_request);
 }
 
-void work_standard_worker(uv_work_t *req) {
-    __atomic_add_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
+static void work_standard_worker(uv_work_t *req) {
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
     register_libuv_worker_jobs();
     worker_is_busy(UV_EVENT_WORKER_INIT);
 
     struct rrdeng_work *work_request = req->data;
-    work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
+    work_request->data = work_request->work_cb(work_request->ctx, work_request->data, work_request->completion, req);
     worker_is_idle();
 
-    __atomic_sub_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
-    __atomic_sub_fetch(&work_request_globals.atomics.executing, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
-void after_work_standard_callback(uv_work_t* req, int status) {
+static void after_work_standard_callback(uv_work_t* req, int status) {
     struct rrdeng_work *work_request = req->data;
 
     worker_is_busy(RRDENG_OPCODE_MAX + work_request->opcode);
@@ -167,7 +167,7 @@ void after_work_standard_callback(uv_work_t* req, int status) {
         work_request->after_work_cb(work_request->ctx, work_request->data, work_request->completion, req, status);
 
     work_done(work_request);
-    __atomic_sub_fetch(&work_request_globals.atomics.pending_cb, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.pending_cb, 1, __ATOMIC_RELAXED);
 
     worker_is_idle();
 }
@@ -177,21 +177,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 
     internal_fatal(rrdeng_main.tid != gettid(), "work_dispatch() can only be run from the event loop thread");
 
-    netdata_spinlock_lock(&work_request_globals.protected.spinlock);
-
-    if(likely(work_request_globals.protected.available_items)) {
-        work_request = work_request_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(work_request_globals.protected.available_items, work_request, cache.prev, cache.next);
-        work_request_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&work_request_globals.protected.spinlock);
-
-    if(unlikely(!work_request)) {
-        work_request = mallocz(sizeof(struct rrdeng_work));
-        __atomic_add_fetch(&work_request_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    work_request = aral_mallocz(rrdeng_main.work_cmd.ar);
     memset(work_request, 0, sizeof(struct rrdeng_work));
     work_request->req.data = work_request;
     work_request->ctx = ctx;
@@ -207,7 +193,7 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
         return false;
     }
 
-    __atomic_add_fetch(&work_request_globals.atomics.dispatched, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
 
     return true;
 }
@@ -215,226 +201,71 @@ static bool work_dispatch(struct rrdengine_instance *ctx, void *data, struct com
 // ----------------------------------------------------------------------------
 // page descriptor cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct page_descr_with_data *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} page_descriptor_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void page_descriptor_cleanup1(void) {
-    struct page_descr_with_data *item = NULL;
-
-    if(!netdata_spinlock_trylock(&page_descriptor_globals.protected.spinlock))
-        return;
-
-    if(page_descriptor_globals.protected.available_items && page_descriptor_globals.protected.available > MAX_PAGES_PER_EXTENT) {
-        item = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
-        page_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&page_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void page_descriptors_init(void) {
+    rrdeng_main.descriptors.ar = aral_create(
+            "dbengine-descriptors",
+            sizeof(struct page_descr_with_data),
+            0,
+            65536 * 4,
+            NULL,
+            NULL, NULL, false, false);
 }
 
 struct page_descr_with_data *page_descriptor_get(void) {
-    struct page_descr_with_data *descr = NULL;
-
-    netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-
-    if(likely(page_descriptor_globals.protected.available_items)) {
-        descr = page_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
-        page_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
-
-    if(unlikely(!descr)) {
-        descr = mallocz(sizeof(struct page_descr_with_data));
-        __atomic_add_fetch(&page_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct page_descr_with_data *descr = aral_mallocz(rrdeng_main.descriptors.ar);
     memset(descr, 0, sizeof(struct page_descr_with_data));
     return descr;
 }
 
 static inline void page_descriptor_release(struct page_descr_with_data *descr) {
-    if(unlikely(!descr)) return;
-
-    netdata_spinlock_lock(&page_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(page_descriptor_globals.protected.available_items, descr, cache.prev, cache.next);
-    page_descriptor_globals.protected.available++;
-    netdata_spinlock_unlock(&page_descriptor_globals.protected.spinlock);
+    aral_freez(rrdeng_main.descriptors.ar, descr);
 }
 
 // ----------------------------------------------------------------------------
 // extent io descriptor cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct extent_io_descriptor *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-
-} extent_io_descriptor_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void extent_io_descriptor_cleanup1(void) {
-    struct extent_io_descriptor *item = NULL;
-
-    if(!netdata_spinlock_trylock(&extent_io_descriptor_globals.protected.spinlock))
-        return;
-
-    if(extent_io_descriptor_globals.protected.available_items && extent_io_descriptor_globals.protected.available > (size_t)libuv_worker_threads) {
-        item = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, item, cache.prev, cache.next);
-        extent_io_descriptor_globals.protected.available--;
-    }
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&extent_io_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+static void extent_io_descriptor_init(void) {
+    rrdeng_main.xt_io_descr.ar = aral_create(
+            "dbengine-extent-io",
+            sizeof(struct extent_io_descriptor),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false
+            );
 }
 
 static struct extent_io_descriptor *extent_io_descriptor_get(void) {
-    struct extent_io_descriptor *xt_io_descr = NULL;
-
-    netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(likely(extent_io_descriptor_globals.protected.available_items)) {
-        xt_io_descr = extent_io_descriptor_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
-        extent_io_descriptor_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
-
-    if(unlikely(!xt_io_descr)) {
-        xt_io_descr = mallocz(sizeof(struct extent_io_descriptor));
-        __atomic_add_fetch(&extent_io_descriptor_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct extent_io_descriptor *xt_io_descr = aral_mallocz(rrdeng_main.xt_io_descr.ar);
     memset(xt_io_descr, 0, sizeof(struct extent_io_descriptor));
     return xt_io_descr;
 }
 
 static inline void extent_io_descriptor_release(struct extent_io_descriptor *xt_io_descr) {
-    if(unlikely(!xt_io_descr)) return;
-
-    netdata_spinlock_lock(&extent_io_descriptor_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(extent_io_descriptor_globals.protected.available_items, xt_io_descr, cache.prev, cache.next);
-    extent_io_descriptor_globals.protected.available++;
-    netdata_spinlock_unlock(&extent_io_descriptor_globals.protected.spinlock);
+    aral_freez(rrdeng_main.xt_io_descr.ar, xt_io_descr);
 }
 
 // ----------------------------------------------------------------------------
 // query handle cache
 
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct rrdeng_query_handle *available_items;
-        size_t available;
-    } protected;
-
-    struct {
-        size_t allocated;
-    } atomics;
-} rrdeng_query_handle_globals = {
-        .protected = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-        },
-        .atomics = {
-                .allocated = 0,
-        },
-};
-
-static void rrdeng_query_handle_cleanup1(void) {
-    struct rrdeng_query_handle *item = NULL;
-
-    if(!netdata_spinlock_trylock(&rrdeng_query_handle_globals.protected.spinlock))
-        return;
-
-    if(rrdeng_query_handle_globals.protected.available_items && rrdeng_query_handle_globals.protected.available > 10) {
-        item = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, item, cache.prev, cache.next);
-        rrdeng_query_handle_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+void rrdeng_query_handle_init(void) {
+    rrdeng_main.handles.ar = aral_create(
+            "dbengine-query-handles",
+            sizeof(struct rrdeng_query_handle),
+            0,
+            65536,
+            NULL,
+            NULL, NULL, false, false);
 }
 
 struct rrdeng_query_handle *rrdeng_query_handle_get(void) {
-    struct rrdeng_query_handle *handle = NULL;
-
-    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(likely(rrdeng_query_handle_globals.protected.available_items)) {
-        handle = rrdeng_query_handle_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
-        rrdeng_query_handle_globals.protected.available--;
-    }
-
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
-
-    if(unlikely(!handle)) {
-        handle = mallocz(sizeof(struct rrdeng_query_handle));
-        __atomic_add_fetch(&rrdeng_query_handle_globals.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct rrdeng_query_handle *handle = aral_mallocz(rrdeng_main.handles.ar);
     memset(handle, 0, sizeof(struct rrdeng_query_handle));
     return handle;
 }
 
 void rrdeng_query_handle_release(struct rrdeng_query_handle *handle) {
-    if(unlikely(!handle)) return;
-
-    netdata_spinlock_lock(&rrdeng_query_handle_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_query_handle_globals.protected.available_items, handle, cache.prev, cache.next);
-    rrdeng_query_handle_globals.protected.available++;
-    netdata_spinlock_unlock(&rrdeng_query_handle_globals.protected.spinlock);
+    aral_freez(rrdeng_main.handles.ar, handle);
 }
 
 // ----------------------------------------------------------------------------
@@ -469,7 +300,7 @@ static void wal_cleanup1(void) {
 
     if(wal_globals.protected.available_items && wal_globals.protected.available > storage_tiers) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -492,7 +323,7 @@ WAL *wal_get(struct rrdengine_instance *ctx, unsigned size) {
 
     if(likely(wal_globals.protected.available_items)) {
         wal = wal_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
         wal_globals.protected.available--;
     }
 
@@ -530,7 +361,7 @@ void wal_release(WAL *wal) {
     if(unlikely(!wal)) return;
 
     netdata_spinlock_lock(&wal_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(wal_globals.protected.available_items, wal, cache.prev, cache.next);
     wal_globals.protected.available++;
     netdata_spinlock_unlock(&wal_globals.protected.spinlock);
 }
@@ -549,60 +380,16 @@ struct rrdeng_cmd {
     struct {
         struct rrdeng_cmd *prev;
         struct rrdeng_cmd *next;
-    } cache;
-};
-
-static struct {
-    struct {
-        SPINLOCK spinlock;
-        struct rrdeng_cmd *available_items;
-        size_t available;
-
-        struct {
-            size_t allocated;
-        } atomics;
-    } cache;
-
-    struct {
-        SPINLOCK spinlock;
-        size_t waiting;
-        struct rrdeng_cmd *waiting_items_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
-        size_t executed_by_priority[STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE];
     } queue;
-
-
-} rrdeng_cmd_globals = {
-        .cache = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .available_items = NULL,
-                .available = 0,
-                .atomics = {
-                        .allocated = 0,
-                },
-        },
-        .queue = {
-                .spinlock = NETDATA_SPINLOCK_INITIALIZER,
-                .waiting = 0,
-        },
 };
 
-static void rrdeng_cmd_cleanup1(void) {
-    struct rrdeng_cmd *item = NULL;
-
-    if(!netdata_spinlock_trylock(&rrdeng_cmd_globals.cache.spinlock))
-        return;
-
-    if(rrdeng_cmd_globals.cache.available_items && rrdeng_cmd_globals.cache.available > 100) {
-        item = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, item, cache.prev, cache.next);
-        rrdeng_cmd_globals.cache.available--;
-    }
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
-
-    if(item) {
-        freez(item);
-        __atomic_sub_fetch(&rrdeng_cmd_globals.cache.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
+static void rrdeng_cmd_queue_init(void) {
+    rrdeng_main.cmd_queue.ar = aral_create("dbengine-opcodes",
+                                           sizeof(struct rrdeng_cmd),
+                                           0,
+                                           65536,
+                                           NULL,
+                                           NULL, NULL, false, false);
 }
 
 static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng_opcode opcode, STORAGE_PRIORITY priority) {
@@ -610,7 +397,7 @@ static inline STORAGE_PRIORITY rrdeng_enq_cmd_map_opcode_to_priority(enum rrdeng
         priority = STORAGE_PRIORITY_BEST_EFFORT;
 
     switch(opcode) {
-        case RRDENG_OPCODE_PREP_QUERY:
+        case RRDENG_OPCODE_QUERY:
             priority = STORAGE_PRIORITY_INTERNAL_QUERY_PREP;
             break;
 
@@ -630,41 +417,28 @@ void rrdeng_dequeue_epdl_cmd(struct rrdeng_cmd *cmd) {
 }
 
 void rrdeng_req_cmd(requeue_callback_t get_cmd_cb, void *data, STORAGE_PRIORITY priority) {
-    netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
+    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     struct rrdeng_cmd *cmd = get_cmd_cb(data);
     if(cmd) {
         priority = rrdeng_enq_cmd_map_opcode_to_priority(cmd->opcode, priority);
 
         if (cmd->priority > priority) {
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[cmd->priority], cmd, cache.prev, cache.next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[cmd->priority], cmd, queue.prev, queue.next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority], cmd, queue.prev, queue.next);
             cmd->priority = priority;
         }
     }
 
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
+    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 }
 
 void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, void *data, struct completion *completion,
                enum storage_priority priority, enqueue_callback_t enqueue_cb, dequeue_callback_t dequeue_cb) {
-    struct rrdeng_cmd *cmd = NULL;
 
     priority = rrdeng_enq_cmd_map_opcode_to_priority(opcode, priority);
 
-    netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
-    if(likely(rrdeng_cmd_globals.cache.available_items)) {
-        cmd = rrdeng_cmd_globals.cache.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
-        rrdeng_cmd_globals.cache.available--;
-    }
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
-
-    if(unlikely(!cmd)) {
-        cmd = mallocz(sizeof(struct rrdeng_cmd));
-        __atomic_add_fetch(&rrdeng_cmd_globals.cache.atomics.allocated, 1, __ATOMIC_RELAXED);
-    }
-
+    struct rrdeng_cmd *cmd = aral_mallocz(rrdeng_main.cmd_queue.ar);
     memset(cmd, 0, sizeof(struct rrdeng_cmd));
     cmd->ctx = ctx;
     cmd->opcode = opcode;
@@ -673,19 +447,19 @@ void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_opcode opcode, v
     cmd->priority = priority;
     cmd->dequeue_cb = dequeue_cb;
 
-    netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
-    rrdeng_cmd_globals.queue.waiting++;
+    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority], cmd, queue.prev, queue.next);
+    rrdeng_main.cmd_queue.unsafe.waiting++;
     if(enqueue_cb)
         enqueue_cb(cmd);
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
+    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
 static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
     for(; priority <= max_priority ; priority++)
-        if(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority])
+        if(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority])
             return true;
 
     return false;
@@ -697,15 +471,15 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
     STORAGE_PRIORITY max_priority = work_request_full() ? STORAGE_PRIORITY_INTERNAL_DBENGINE : STORAGE_PRIORITY_BEST_EFFORT;
 
     // find an opcode to execute from the queue
-    netdata_spinlock_lock(&rrdeng_cmd_globals.queue.spinlock);
+    netdata_spinlock_lock(&rrdeng_main.cmd_queue.unsafe.spinlock);
     for(STORAGE_PRIORITY priority = STORAGE_PRIORITY_INTERNAL_DBENGINE; priority <= max_priority ; priority++) {
-        cmd = rrdeng_cmd_globals.queue.waiting_items_by_priority[priority];
+        cmd = rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority];
         if(cmd) {
 
             // avoid starvation of lower priorities
             if(unlikely(priority >= STORAGE_PRIORITY_HIGH &&
                         priority < STORAGE_PRIORITY_BEST_EFFORT &&
-                        ++rrdeng_cmd_globals.queue.executed_by_priority[priority] % 50 == 0 &&
+                        ++rrdeng_main.cmd_queue.unsafe.executed_by_priority[priority] % 50 == 0 &&
                         rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(priority + 1, max_priority))) {
                 // let the others run 2% of the requests
                 cmd = NULL;
@@ -713,8 +487,8 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
             }
 
             // remove it from the queue
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(rrdeng_cmd_globals.queue.waiting_items_by_priority[priority], cmd, cache.prev, cache.next);
-            rrdeng_cmd_globals.queue.waiting--;
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(rrdeng_main.cmd_queue.unsafe.waiting_items_by_priority[priority], cmd, queue.prev, queue.next);
+            rrdeng_main.cmd_queue.unsafe.waiting--;
             break;
         }
     }
@@ -724,18 +498,14 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
         cmd->dequeue_cb = NULL;
     }
 
-    netdata_spinlock_unlock(&rrdeng_cmd_globals.queue.spinlock);
+    netdata_spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
     struct rrdeng_cmd ret;
     if(cmd) {
         // copy it, to return it
         ret = *cmd;
 
-        // put it in the cache
-        netdata_spinlock_lock(&rrdeng_cmd_globals.cache.spinlock);
-        DOUBLE_LINKED_LIST_APPEND_UNSAFE(rrdeng_cmd_globals.cache.available_items, cmd, cache.prev, cache.next);
-        rrdeng_cmd_globals.cache.available++;
-        netdata_spinlock_unlock(&rrdeng_cmd_globals.cache.spinlock);
+        aral_freez(rrdeng_main.cmd_queue.ar, cmd);
     }
     else
         ret = (struct rrdeng_cmd) {
@@ -752,14 +522,54 @@ static inline struct rrdeng_cmd rrdeng_deq_cmd(void) {
 
 // ----------------------------------------------------------------------------
 
+struct {
+    ARAL *aral[RRD_STORAGE_TIERS];
+} dbengine_page_alloc_globals = {};
+
+static inline ARAL *page_size_lookup(size_t size) {
+    for(size_t tier = 0; tier < storage_tiers ;tier++)
+        if(size == tier_page_size[tier])
+            return dbengine_page_alloc_globals.aral[tier];
+
+    return NULL;
+}
+
+static void dbengine_page_alloc_init(void) {
+    for(size_t i = storage_tiers; i > 0 ;i--) {
+        size_t tier = storage_tiers - i;
+
+        char buf[20 + 1];
+        snprintfz(buf, 20, "tier%zu-pages", tier);
+
+        dbengine_page_alloc_globals.aral[tier] = aral_create(
+                buf,
+                tier_page_size[tier],
+                64,
+                512 * tier_page_size[tier],
+                pgc_aral_statistics(),
+                NULL, NULL, false, false);
+    }
+}
+
 void *dbengine_page_alloc(size_t size) {
-    void *page = mallocz(size);
-    return page;
+    ARAL *ar = page_size_lookup(size);
+    if(ar) return aral_mallocz(ar);
+
+    return mallocz(size);
 }
 
 void dbengine_page_free(void *page, size_t size __maybe_unused) {
-    freez(page);
+    if(unlikely(!page || page == DBENGINE_EMPTY_PAGE))
+        return;
+
+    ARAL *ar = page_size_lookup(size);
+    if(ar)
+        aral_freez(ar, page);
+    else
+        freez(page);
 }
+
+// ----------------------------------------------------------------------------
 
 void *dbengine_extent_alloc(size_t size) {
     void *extent = mallocz(size);
@@ -770,7 +580,7 @@ void dbengine_extent_free(void *extent, size_t size __maybe_unused) {
     freez(extent);
 }
 
-static void commit_data_extent(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
+static void journalfile_extent_build(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
     unsigned count, payload_length, descr_size, size_bytes;
     void *buf;
     /* persistent structures */
@@ -815,8 +625,8 @@ static void after_extent_flushed_to_open(struct rrdengine_instance *ctx __maybe_
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 }
 
-static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    worker_is_busy(UV_EVENT_FLUSHED_TO_OPEN);
+static void *extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSHED_TO_OPEN);
 
     uv_fs_t *uv_fs_request = data;
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
@@ -824,11 +634,6 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
     struct rrdengine_datafile *datafile;
     unsigned i;
 
-    if (uv_fs_request->result < 0) {
-        __atomic_add_fetch(&ctx->stats.io_errors, 1, __ATOMIC_RELAXED);
-        rrd_stat_atomic_add(&global_io_errors, 1);
-        error("DBENGINE: %s: uv_fs_write: %s", __func__, uv_strerror((int)uv_fs_request->result));
-    }
     datafile = xt_io_descr->datafile;
 
     bool still_running = ctx_is_available_for_queries(ctx);
@@ -858,34 +663,107 @@ static void extent_flushed_to_open_tp_worker(struct rrdengine_instance *ctx __ma
 
     if(datafile->fileno != ctx_last_fileno_get(ctx) && still_running)
         // we just finished a flushing on a datafile that is not the active one
-        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
+    return data;
 }
 
 // Main event loop callback
-static void extent_flush_io_callback(uv_fs_t *uv_fs_request) {
-    worker_is_busy(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES);
+static void after_extent_write_datafile_io(uv_fs_t *uv_fs_request) {
+    worker_is_busy(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_WRITE);
+
     struct extent_io_descriptor *xt_io_descr = uv_fs_request->data;
     struct rrdengine_datafile *datafile = xt_io_descr->datafile;
     struct rrdengine_instance *ctx = datafile->ctx;
 
-    wal_flush_transaction_buffer(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
+    if (uv_fs_request->result < 0) {
+        ctx_io_error(ctx);
+        error("DBENGINE: %s: uv_fs_write(): %s", __func__, uv_strerror((int)uv_fs_request->result));
+    }
+
+    journalfile_v1_extent_write(ctx, xt_io_descr->datafile, xt_io_descr->wal, &rrdeng_main.loop);
 
     netdata_spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
-
     datafile->writers.flushed_to_open_running++;
-    rrdeng_enq_cmd(xt_io_descr->ctx, RRDENG_OPCODE_FLUSHED_TO_OPEN, uv_fs_request, xt_io_descr->completion,
-                   STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+    rrdeng_enq_cmd(xt_io_descr->ctx,
+                   RRDENG_OPCODE_FLUSHED_TO_OPEN,
+                   uv_fs_request,
+                   xt_io_descr->completion,
+                   STORAGE_PRIORITY_INTERNAL_DBENGINE,
+                   NULL,
+                   NULL);
+
+    worker_is_idle();
+}
+
+static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
+    bool ret = false;
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+
+    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx))
+        ret = true;
 
     netdata_spinlock_unlock(&datafile->writers.spinlock);
 
-    worker_is_idle();
+    return ret;
+}
+
+static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_instance *ctx) {
+    struct rrdengine_datafile *datafile;
+
+    // get the latest datafile
+    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+    datafile = ctx->datafiles.first->prev;
+    // become a writer on this datafile, to prevent it from vanishing
+    netdata_spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.running++;
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+    if(datafile_is_full(ctx, datafile)) {
+        // remember the datafile we have become writers to
+        struct rrdengine_datafile *old_datafile = datafile;
+
+        // only 1 datafile creation at a time
+        static netdata_mutex_t mutex = NETDATA_MUTEX_INITIALIZER;
+        netdata_mutex_lock(&mutex);
+
+        // take the latest datafile again - without this, multiple threads may create multiple files
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+        datafile = ctx->datafiles.first->prev;
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        if(datafile_is_full(ctx, datafile) && create_new_datafile_pair(ctx) == 0)
+            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
+                           NULL);
+
+        netdata_mutex_unlock(&mutex);
+
+        // get the new latest datafile again, like above
+        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
+        datafile = ctx->datafiles.first->prev;
+        // become a writer on this datafile, to prevent it from vanishing
+        netdata_spinlock_lock(&datafile->writers.spinlock);
+        datafile->writers.running++;
+        netdata_spinlock_unlock(&datafile->writers.spinlock);
+        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+
+        // release the writers on the old datafile
+        netdata_spinlock_lock(&old_datafile->writers.spinlock);
+        old_datafile->writers.running--;
+        netdata_spinlock_unlock(&old_datafile->writers.spinlock);
+    }
+
+    return datafile;
 }
 
 /*
  * Take a page list in a judy array and write them
  */
-static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_descr_with_data *base, struct completion *completion) {
+static struct extent_io_descriptor *datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_data *base, struct completion *completion) {
     int ret;
     int compressed_size, max_compressed_size = 0;
     unsigned i, count, size_bytes, pos, real_io_size;
@@ -916,7 +794,7 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
             completion_mark_complete(completion);
 
         __atomic_sub_fetch(&ctx->atomic.extents_currently_being_flushed, 1, __ATOMIC_RELAXED);
-        return 0;
+        return NULL;
     }
 
     xt_io_descr = extent_io_descriptor_get();
@@ -966,52 +844,35 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
         pos += descr->page_length;
     }
 
-    switch (compression_algorithm) {
-        case RRD_NO_COMPRESSION:
-            header->payload_length = uncompressed_payload_length;
-            break;
-        default: /* Compress */
-            compressed_size = LZ4_compress_default(xt_io_descr->buf + payload_offset, compressed_buf,
-                                               uncompressed_payload_length, max_compressed_size);
-            ctx->stats.before_compress_bytes += uncompressed_payload_length;
-            ctx->stats.after_compress_bytes += compressed_size;
-            debug(D_RRDENGINE, "LZ4 compressed %"PRIu32" bytes to %d bytes.", uncompressed_payload_length, compressed_size);
-            (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
-            extent_buffer_release(eb);
-            size_bytes = payload_offset + compressed_size + sizeof(*trailer);
-            header->payload_length = compressed_size;
-        break;
+    if(likely(compression_algorithm == RRD_LZ4)) {
+        compressed_size = LZ4_compress_default(
+                xt_io_descr->buf + payload_offset,
+                compressed_buf,
+                (int)uncompressed_payload_length,
+                max_compressed_size);
+
+        __atomic_add_fetch(&ctx->stats.before_compress_bytes, uncompressed_payload_length, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&ctx->stats.after_compress_bytes, compressed_size, __ATOMIC_RELAXED);
+
+        (void) memcpy(xt_io_descr->buf + payload_offset, compressed_buf, compressed_size);
+        extent_buffer_release(eb);
+        size_bytes = payload_offset + compressed_size + sizeof(*trailer);
+        header->payload_length = compressed_size;
+    }
+    else { // RRD_NO_COMPRESSION
+        header->payload_length = uncompressed_payload_length;
     }
 
-    // get the latest datafile
-    uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-    datafile = ctx->datafiles.first->prev;
+    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
+
+    datafile = get_datafile_to_write_extent(ctx);
     netdata_spinlock_lock(&datafile->writers.spinlock);
-    uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-
-    if(ctx_is_available_for_queries(ctx) && datafile->pos > rrdeng_target_data_file_size(ctx)) {
-        static SPINLOCK sp = NETDATA_SPINLOCK_INITIALIZER;
-        netdata_spinlock_lock(&sp);
-        if(create_new_datafile_pair(ctx) == 0)
-            rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL,
-                           NULL);
-        netdata_spinlock_unlock(&sp);
-
-        // unlock the old datafile
-        netdata_spinlock_unlock(&datafile->writers.spinlock);
-
-        // get the new datafile
-        uv_rwlock_rdlock(&ctx->datafiles.rwlock);
-        datafile = ctx->datafiles.first->prev;
-        netdata_spinlock_lock(&datafile->writers.spinlock);
-        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
-    }
-
-    datafile->writers.running++;
-
     xt_io_descr->datafile = datafile;
-    xt_io_descr->bytes = size_bytes;
     xt_io_descr->pos = datafile->pos;
+    datafile->pos += real_io_size;
+    netdata_spinlock_unlock(&datafile->writers.spinlock);
+
+    xt_io_descr->bytes = size_bytes;
     xt_io_descr->uv_fs_request.data = xt_io_descr;
     xt_io_descr->completion = completion;
 
@@ -1020,26 +881,37 @@ static unsigned do_flush_extent(struct rrdengine_instance *ctx, struct page_desc
     crc = crc32(crc, xt_io_descr->buf, size_bytes - sizeof(*trailer));
     crc32set(trailer->checksum, crc);
 
-    real_io_size = ALIGN_BYTES_CEILING(size_bytes);
     xt_io_descr->iov = uv_buf_init((void *)xt_io_descr->buf, real_io_size);
+    journalfile_extent_build(ctx, xt_io_descr);
 
-    ctx->stats.io_write_bytes += real_io_size;
-    ++ctx->stats.io_write_requests;
-    ctx->stats.io_write_extent_bytes += real_io_size;
-    ++ctx->stats.io_write_extents;
-    commit_data_extent(ctx, xt_io_descr);
-    datafile->pos += real_io_size;
-    ctx_current_disk_space_increase(ctx, real_io_size);
     ctx_last_flush_fileno_set(ctx, datafile->fileno);
+    ctx_current_disk_space_increase(ctx, real_io_size);
+    ctx_io_write_op_bytes(ctx, real_io_size);
 
-    ret = uv_fs_write(&rrdeng_main.loop, &xt_io_descr->uv_fs_request, datafile->file, &xt_io_descr->iov,
-                      1, xt_io_descr->pos, extent_flush_io_callback);
+    return xt_io_descr;
+}
 
-    fatal_assert(-1 != ret);
+static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused) {
+    struct extent_io_descriptor *xt_io_descr = data;
 
-    netdata_spinlock_unlock(&datafile->writers.spinlock);
+    if(xt_io_descr) {
+        int ret = uv_fs_write(&rrdeng_main.loop,
+                              &xt_io_descr->uv_fs_request,
+                              xt_io_descr->datafile->file,
+                              &xt_io_descr->iov,
+                              1,
+                              (int64_t) xt_io_descr->pos,
+                              after_extent_write_datafile_io);
 
-    return real_io_size;
+        fatal_assert(-1 != ret);
+    }
+}
+
+static void *extent_write_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+    struct page_descr_with_data *base = data;
+    struct extent_io_descriptor *xt_io_descr = datafile_extent_build(ctx, base, completion);
+    return xt_io_descr;
 }
 
 static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1049,11 +921,13 @@ static void after_database_rotate(struct rrdengine_instance *ctx __maybe_unused,
 struct uuid_first_time_s {
     uuid_t *uuid;
     time_t first_time_s;
-    time_t last_time_s;
     METRIC *metric;
+    size_t pages_found;
+    size_t df_matched;
+    size_t df_index_oldest;
 };
 
-static int journal_metric_uuid_compare(const void *key, const void *metric)
+static int journal_metric_compare(const void *key, const void *metric)
 {
     return uuid_compare(*(uuid_t *) key, ((struct journal_metric_list *) metric)->uuid);
 }
@@ -1074,7 +948,12 @@ struct rrdengine_datafile *datafile_release_and_acquire_next_for_retention(struc
     return next_datafile;
 }
 
-void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, Pvoid_t metric_first_time_JudyL) {
+void find_uuid_first_time(
+    struct rrdengine_instance *ctx,
+    struct rrdengine_datafile *datafile,
+    struct uuid_first_time_s *uuid_first_entry_list,
+    size_t count)
+{
     // acquire the datafile to work with it
     uv_rwlock_rdlock(&ctx->datafiles.rwlock);
     while(datafile && !datafile_acquire(datafile, DATAFILE_ACQUIRE_RETENTION))
@@ -1084,8 +963,10 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
     if (unlikely(!datafile))
         return;
 
-    unsigned v2_count = 0;
     unsigned journalfile_count = 0;
+    size_t binary_match = 0;
+    size_t not_matching_bsearches = 0;
+
     while (datafile) {
         struct journal_v2_header *j2_header = journalfile_v2_data_acquire(datafile->journalfile, NULL, 0, 0);
         if (!j2_header) {
@@ -1094,132 +975,210 @@ void find_uuid_first_time(struct rrdengine_instance *ctx, struct rrdengine_dataf
         }
 
         time_t journal_start_time_s = (time_t) (j2_header->start_time_ut / USEC_PER_SEC);
-        size_t journal_metric_count = (size_t)j2_header->metric_count;
         struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
+        struct uuid_first_time_s *uuid_original_entry;
 
-        Word_t index = 0;
-        bool first_then_next = true;
-        Pvoid_t *PValue;
-        while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-            struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+        size_t journal_metric_count = j2_header->metric_count;
 
-            struct journal_metric_list *uuid_entry = bsearch(uuid_first_t_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_uuid_compare);
+        for (size_t index = 0; index < count; ++index) {
+            uuid_original_entry = &uuid_first_entry_list[index];
 
-            if (unlikely(!uuid_entry))
+            // Check here if we should skip this
+            if (uuid_original_entry->df_matched > 3 || uuid_original_entry->pages_found > 5)
                 continue;
 
-            time_t first_time_s = uuid_entry->delta_start_s + journal_start_time_s;
-            time_t last_time_s = uuid_entry->delta_end_s + journal_start_time_s;
-            uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s , first_time_s);
-            uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s , last_time_s);
-            v2_count++;
+            struct journal_metric_list *live_entry = bsearch(uuid_original_entry->uuid,uuid_list,journal_metric_count,sizeof(*uuid_list), journal_metric_compare);
+            if (!live_entry) {
+                // Not found in this journal
+                not_matching_bsearches++;
+                continue;
+            }
+
+            uuid_original_entry->pages_found += live_entry->entries;
+            uuid_original_entry->df_matched++;
+
+            time_t old_first_time_s = uuid_original_entry->first_time_s;
+
+            // Calculate first / last for this match
+            time_t first_time_s = live_entry->delta_start_s + journal_start_time_s;
+            uuid_original_entry->first_time_s = MIN(uuid_original_entry->first_time_s, first_time_s);
+
+            if (uuid_original_entry->first_time_s != old_first_time_s)
+                uuid_original_entry->df_index_oldest = uuid_original_entry->df_matched;
+
+            binary_match++;
         }
+
         journalfile_count++;
         journalfile_v2_data_release(datafile->journalfile);
         datafile = datafile_release_and_acquire_next_for_retention(ctx, datafile);
     }
 
     // Let's scan the open cache for almost exact match
-    bool first_then_next = true;
-    Pvoid_t *PValue;
-    Word_t index = 0;
-    unsigned open_cache_count = 0;
-    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-        struct uuid_first_time_s *uuid_first_t_entry = *PValue;
+    size_t open_cache_count = 0;
+
+    size_t df_index[10] = { 0 };
+    size_t without_metric = 0;
+    size_t open_cache_gave_first_time_s = 0;
+    size_t metric_count = 0;
+    size_t without_retention = 0;
+    size_t not_needed_bsearches = 0;
+
+    for (size_t index = 0; index < count; ++index) {
+        struct uuid_first_time_s *uuid_first_t_entry = &uuid_first_entry_list[index];
+
+        metric_count++;
+
+        size_t idx = uuid_first_t_entry->df_index_oldest;
+        if(idx >= 10)
+            idx = 9;
+
+        df_index[idx]++;
+
+        not_needed_bsearches += uuid_first_t_entry->df_matched - uuid_first_t_entry->df_index_oldest;
+
+        if (unlikely(!uuid_first_t_entry->metric)) {
+            without_metric++;
+            continue;
+        }
 
         PGC_PAGE *page = pgc_page_get_and_acquire(
                 open_cache, (Word_t)ctx,
-                (Word_t)uuid_first_t_entry->metric, uuid_first_t_entry->last_time_s,
-                PGC_SEARCH_CLOSEST);
+                (Word_t)uuid_first_t_entry->metric, 0,
+                PGC_SEARCH_FIRST);
 
         if (page) {
+            time_t old_first_time_s = uuid_first_t_entry->first_time_s;
+
             time_t first_time_s = pgc_page_start_time_s(page);
-            time_t last_time_s = pgc_page_end_time_s(page);
             uuid_first_t_entry->first_time_s = MIN(uuid_first_t_entry->first_time_s, first_time_s);
-            uuid_first_t_entry->last_time_s = MAX(uuid_first_t_entry->last_time_s, last_time_s);
             pgc_page_release(open_cache, page);
             open_cache_count++;
+
+            if(uuid_first_t_entry->first_time_s != old_first_time_s) {
+                open_cache_gave_first_time_s++;
+            }
+        }
+        else {
+            if(!uuid_first_t_entry->df_index_oldest)
+                without_retention++;
         }
     }
-    info("DBENGINE: processed %u journalfiles and matched %u metric pages in v2 files and %u in open cache", journalfile_count,
-        v2_count, open_cache_count);
+    internal_error(true,
+         "DBENGINE: analyzed the retention of %zu rotated metrics of tier %d, "
+         "did %zu jv2 matching binary searches (%zu not matching, %zu overflown) in %u journal files, "
+         "%zu metrics with entries in open cache, "
+         "metrics first time found per datafile index ([not in jv2]:%zu, [1]:%zu, [2]:%zu, [3]:%zu, [4]:%zu, [5]:%zu, [6]:%zu, [7]:%zu, [8]:%zu, [bigger]: %zu), "
+         "open cache found first time %zu, "
+         "metrics without any remaining retention %zu, "
+         "metrics not in MRG %zu",
+         metric_count,
+         ctx->config.tier,
+         binary_match,
+         not_matching_bsearches,
+         not_needed_bsearches,
+         journalfile_count,
+         open_cache_count,
+         df_index[0], df_index[1], df_index[2], df_index[3], df_index[4], df_index[5], df_index[6], df_index[7], df_index[8], df_index[9],
+         open_cache_gave_first_time_s,
+         without_retention,
+         without_metric
+    );
 }
 
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
     __atomic_add_fetch(&rrdeng_cache_efficiency_stats.metrics_retention_started, 1, __ATOMIC_RELAXED);
 
     if(worker)
-        worker_is_busy(UV_EVENT_ANALYZE_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
     struct rrdengine_journalfile *journalfile = datafile_to_delete->journalfile;
     struct journal_v2_header *j2_header = journalfile_v2_data_acquire(journalfile, NULL, 0, 0);
     struct journal_metric_list *uuid_list = (struct journal_metric_list *)((uint8_t *) j2_header + j2_header->metric_offset);
 
-    Pvoid_t metric_first_time_JudyL = (Pvoid_t) NULL;
-    Pvoid_t *PValue;
-
-    unsigned count = 0;
+    size_t count = j2_header->metric_count;
     struct uuid_first_time_s *uuid_first_t_entry;
-    for (uint32_t index = 0; index < j2_header->metric_count; ++index) {
+    struct uuid_first_time_s *uuid_first_entry_list = callocz(count, sizeof(struct uuid_first_time_s));
+
+    size_t added = 0;
+    for (size_t index = 0; index < count; ++index) {
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &uuid_list[index].uuid, (Word_t) ctx);
         if (!metric)
             continue;
 
-        PValue = JudyLIns(&metric_first_time_JudyL, (Word_t) index, PJE0);
-        fatal_assert(NULL != PValue);
-        if (!*PValue) {
-            uuid_first_t_entry = mallocz(sizeof(*uuid_first_t_entry));
-            uuid_first_t_entry->metric = metric;
-            uuid_first_t_entry->first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
-            uuid_first_t_entry->last_time_s = mrg_metric_get_latest_time_s(main_mrg, metric);
-            uuid_first_t_entry->uuid = mrg_metric_uuid(main_mrg, metric);
-            *PValue = uuid_first_t_entry;
-            count++;
-        }
+        uuid_first_entry_list[added].metric = metric;
+        uuid_first_entry_list[added].first_time_s = LONG_MAX;
+        uuid_first_entry_list[added].df_matched = 0;
+        uuid_first_entry_list[added].df_index_oldest = 0;
+        uuid_first_entry_list[added].uuid = mrg_metric_uuid(main_mrg, metric);
+        added++;
     }
-    journalfile_v2_data_release(journalfile);
 
-    info("DBENGINE: recalculating retention for %u metrics", count);
+    info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+         ctx->config.tier, count, first_datafile_remaining->fileno);
+
+    journalfile_v2_data_release(journalfile);
 
     // Update the first time / last time for all metrics we plan to delete
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_V2);
+        worker_is_busy(UV_EVENT_DBENGINE_FIND_REMAINING_RETENTION);
 
-    find_uuid_first_time(ctx, first_datafile_remaining, metric_first_time_JudyL);
+    find_uuid_first_time(ctx, first_datafile_remaining, uuid_first_entry_list, added);
 
     if(worker)
-        worker_is_busy(UV_EVENT_RETENTION_UPDATE);
+        worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
-    info("DBENGINE: updating metric registry retention for %u metrics", count);
+    info("DBENGINE: updating tier %d metrics registry retention for %zu metrics",
+         ctx->config.tier, added);
 
-    Word_t index = 0;
-    bool first_then_next = true;
-    while ((PValue = JudyLFirstThenNext(metric_first_time_JudyL, &index, &first_then_next))) {
-        uuid_first_t_entry = *PValue;
-        mrg_metric_set_first_time_s(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
-        mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
-        freez(uuid_first_t_entry);
+    size_t deleted_metrics = 0, zero_retention_referenced = 0, zero_disk_retention = 0, zero_disk_but_live = 0;
+    for (size_t index = 0; index < added; ++index) {
+        uuid_first_t_entry = &uuid_first_entry_list[index];
+        if (likely(uuid_first_t_entry->first_time_s != LONG_MAX)) {
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, uuid_first_t_entry->metric, uuid_first_t_entry->first_time_s);
+            mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+        }
+        else {
+            zero_disk_retention++;
+
+            // there is no retention for this metric
+            bool has_retention = mrg_metric_zero_disk_retention(main_mrg, uuid_first_t_entry->metric);
+            if (!has_retention) {
+                bool deleted = mrg_metric_release_and_delete(main_mrg, uuid_first_t_entry->metric);
+                if(deleted)
+                    deleted_metrics++;
+                else
+                    zero_retention_referenced++;
+            }
+            else {
+                zero_disk_but_live++;
+                mrg_metric_release(main_mrg, uuid_first_t_entry->metric);
+            }
+        }
     }
+    freez(uuid_first_entry_list);
 
-    JudyLFreeArray(&metric_first_time_JudyL, PJE0);
+    internal_error(zero_disk_retention,
+                   "DBENGINE: deleted %zu metrics, zero retention but referenced %zu (out of %zu total, of which %zu have main cache retention) zero on-disk retention tier %d metrics from metrics registry",
+                   deleted_metrics, zero_retention_referenced, zero_disk_retention, zero_disk_but_live, ctx->config.tier);
 
     if(worker)
         worker_is_idle();
 }
 
-static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool worker) {
+void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile, bool update_retention, bool worker) {
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
     bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
-    if (ctx_is_available_for_queries(ctx))
+    if (update_retention)
         update_metrics_first_time_s(ctx, datafile, datafile->next, worker);
 
     while (!datafile_got_for_deletion) {
         if(worker)
-            worker_is_busy(UV_EVENT_DATAFILE_ACQUIRE);
+            worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
         datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
@@ -1242,7 +1201,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
          ctx->config.dbfiles_path, ctx->datafiles.first->tier, ctx->datafiles.first->fileno);
 
     if(worker)
-        worker_is_busy(UV_EVENT_DATAFILE_DELETE);
+        worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE);
 
     struct rrdengine_journalfile *journal_file;
     unsigned deleted_bytes, journal_file_bytes, datafile_bytes;
@@ -1255,7 +1214,7 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     journal_file = datafile->journalfile;
     datafile_bytes = datafile->pos;
-    journal_file_bytes = journal_file->pos;
+    journal_file_bytes = journalfile_current_size(journal_file);
     deleted_bytes = journalfile_v2_data_size_get(journal_file);
 
     info("DBENGINE: deleting data and journal files to maintain disk quota");
@@ -1278,31 +1237,37 @@ static void datafile_delete(struct rrdengine_instance *ctx, struct rrdengine_dat
 
     ctx_current_disk_space_decrease(ctx, deleted_bytes);
     info("DBENGINE: reclaimed %u bytes of disk space.", deleted_bytes);
+}
+
+static void *database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    datafile_delete(ctx, ctx->datafiles.first, ctx_is_available_for_queries(ctx), true);
 
     if (rrdeng_ctx_exceeded_disk_quota(ctx))
         rrdeng_enq_cmd(ctx, RRDENG_OPCODE_DATABASE_ROTATE, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
     rrdcontext_db_rotation();
-}
 
-static void database_rotate_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
-    datafile_delete(ctx, ctx->datafiles.first, true);
+    return data;
 }
 
 static void after_flush_all_hot_and_dirty_pages_of_section(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
 }
 
-static void flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *flush_all_hot_and_dirty_pages_of_section_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_QUIESCE);
     pgc_flush_all_hot_and_dirty_pages(main_cache, (Word_t)ctx);
     completion_mark_complete(&ctx->quiesce.completion);
+    return data;
 }
 
 static void after_populate_mrg(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
 }
 
-static void populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
+
     do {
         struct rrdengine_datafile *datafile = NULL;
 
@@ -1332,47 +1297,66 @@ static void populate_mrg_tp_worker(struct rrdengine_instance *ctx __maybe_unused
     } while(1);
 
     completion_mark_complete(completion);
+
+    return data;
 }
 
 static void after_ctx_shutdown(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
 }
 
-static void ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *ctx_shutdown_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_SHUTDOWN);
+
     completion_wait_for(&ctx->quiesce.completion);
     completion_destroy(&ctx->quiesce.completion);
 
+    bool logged = false;
     while(__atomic_load_n(&ctx->atomic.extents_currently_being_flushed, __ATOMIC_RELAXED) ||
-            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED))
+            __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED)) {
+        if(!logged) {
+            logged = true;
+            info("DBENGINE: waiting for %zu inflight queries to finish to shutdown tier %d...",
+                 __atomic_load_n(&ctx->atomic.inflight_queries, __ATOMIC_RELAXED),
+                 (ctx->config.legacy) ? -1 : ctx->config.tier);
+        }
         sleep_usec(1 * USEC_PER_MS);
+    }
 
     completion_mark_complete(completion);
+
+    return data;
 }
 
-static void cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *cache_flush_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     if (!main_cache)
-        return;
+        return data;
 
-    worker_is_busy(UV_EVENT_FLUSH_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE);
     pgc_flush_pages(main_cache, 0);
+
+    return data;
 }
 
-static void cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+static void *cache_evict_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
     if (!main_cache)
-        return;
+        return data;
 
-    worker_is_busy(UV_EVENT_EVICT_MAIN);
+    worker_is_busy(UV_EVENT_DBENGINE_EVICT_MAIN_CACHE);
     pgc_evict_pages(main_cache, 0, 0);
+
+    return data;
 }
 
 static void after_prep_query(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
     ;
 }
 
-static void query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
-    worker_is_busy(UV_EVENT_PREP_QUERY);
+static void *query_prep_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_QUERY);
     PDC *pdc = data;
     rrdeng_prep_query(pdc);
+    return data;
 }
 
 unsigned rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
@@ -1411,9 +1395,10 @@ void async_cb(uv_async_t *handle)
 #define TIMER_PERIOD_MS (1000)
 
 
-static void extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     EPDL *epdl = data;
     epdl_find_extent_and_populate_pages(ctx, epdl, true);
+    return data;
 }
 
 static void epdl_populate_pages_asynchronously(struct rrdengine_instance *ctx, EPDL *epdl, STORAGE_PRIORITY priority) {
@@ -1434,20 +1419,20 @@ void pdc_route_synchronously(struct rrdengine_instance *ctx, struct page_details
 }
 
 #define MAX_RETRIES_TO_START_INDEX (100)
-static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+static void *journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     unsigned count = 0;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX_WAIT);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX_WAIT);
 
     while (__atomic_load_n(&ctx->atomic.now_deleting_files, __ATOMIC_RELAXED) && count++ < MAX_RETRIES_TO_START_INDEX)
         sleep_usec(100 * USEC_PER_MS);
 
     if (count == MAX_RETRIES_TO_START_INDEX) {
         worker_is_idle();
-        return;
+        return data;
     }
 
     struct rrdengine_datafile *datafile = ctx->datafiles.first;
-    worker_is_busy(UV_EVENT_JOURNAL_INDEX);
+    worker_is_busy(UV_EVENT_DBENGINE_JOURNAL_INDEX);
     count = 0;
     while (datafile && datafile->fileno != ctx_last_fileno_get(ctx) && datafile->fileno != ctx_last_flush_fileno_get(ctx)) {
 
@@ -1475,6 +1460,8 @@ static void journal_v2_indexing_tp_worker(struct rrdengine_instance *ctx __maybe
     internal_error(count, "DBENGINE: journal indexing done; %u files processed", count);
 
     worker_is_idle();
+
+    return data;
 }
 
 static void after_do_cache_flush(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
@@ -1496,46 +1483,35 @@ static void after_journal_v2_indexing(struct rrdengine_instance *ctx __maybe_unu
 
 struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void) {
     return (struct rrdeng_buffer_sizes) {
-            .opcodes     = __atomic_load_n(&rrdeng_cmd_globals.cache.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_cmd),
-            .handles     = __atomic_load_n(&rrdeng_query_handle_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_query_handle),
-            .descriptors = __atomic_load_n(&page_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct page_descr_with_data),
+            .pgc         = pgc_aral_overhead() + pgc_aral_structures(),
+            .mrg         = mrg_aral_overhead() + mrg_aral_structures(),
+            .opcodes     = aral_overhead(rrdeng_main.cmd_queue.ar) + aral_structures(rrdeng_main.cmd_queue.ar),
+            .handles     = aral_overhead(rrdeng_main.handles.ar) + aral_structures(rrdeng_main.handles.ar),
+            .descriptors = aral_overhead(rrdeng_main.descriptors.ar) + aral_structures(rrdeng_main.descriptors.ar),
             .wal         = __atomic_load_n(&wal_globals.atomics.allocated, __ATOMIC_RELAXED) * (sizeof(WAL) + RRDENG_BLOCK_SIZE),
-            .workers     = __atomic_load_n(&work_request_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct rrdeng_work),
+            .workers     = aral_overhead(rrdeng_main.work_cmd.ar),
             .pdc         = pdc_cache_size(),
-            .xt_io       = __atomic_load_n(&extent_io_descriptor_globals.atomics.allocated, __ATOMIC_RELAXED) * sizeof(struct extent_io_descriptor),
+            .xt_io       = aral_overhead(rrdeng_main.xt_io_descr.ar) + aral_structures(rrdeng_main.xt_io_descr.ar),
             .xt_buf      = extent_buffer_cache_size(),
             .epdl        = epdl_cache_size(),
             .deol        = deol_cache_size(),
             .pd          = pd_cache_size(),
+
 #ifdef PDC_USE_JULYL
             .julyl       = julyl_cache_size(),
 #endif
     };
 }
 
-void timer_cb(uv_timer_t* handle) {
-    worker_is_busy(RRDENG_TIMER_CB);
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
+static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* req __maybe_unused, int status __maybe_unused) {
+    rrdeng_main.cleanup_running--;
+}
 
-    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_cmd_globals.queue.waiting);
-    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.dispatched, __ATOMIC_RELAXED));
-    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&work_request_globals.atomics.executing, __ATOMIC_RELAXED));
+static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
+    worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-
-    rrdeng_cmd_cleanup1();
-    work_request_cleanup1();
-    page_descriptor_cleanup1();
-    extent_io_descriptor_cleanup1();
-    pdc_cleanup1();
-    page_details_cleanup1();
-    rrdeng_query_handle_cleanup1();
     wal_cleanup1();
     extent_buffer_cleanup1();
-    epdl_cleanup1();
-    deol_cleanup1();
 
     {
         static time_t last_run_s = 0;
@@ -1550,11 +1526,46 @@ void timer_cb(uv_timer_t* handle) {
     julyl_cleanup1();
 #endif
 
+    return data;
+}
+
+void timer_cb(uv_timer_t* handle) {
+    worker_is_busy(RRDENG_TIMER_CB);
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+
+    worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_main.cmd_queue.unsafe.waiting);
+    worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
+    worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
+
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_INIT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+    rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
+
     worker_is_idle();
+}
+
+static void dbengine_initialize_structures(void) {
+    pgc_and_mrg_initialize();
+
+    pdc_init();
+    page_details_init();
+    epdl_init();
+    deol_init();
+    rrdeng_cmd_queue_init();
+    work_request_init();
+    rrdeng_query_handle_init();
+    page_descriptors_init();
+    extent_buffer_init();
+    dbengine_page_alloc_init();
+    extent_io_descriptor_init();
 }
 
 bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
     static bool spawned = false;
+    static SPINLOCK spinlock = NETDATA_SPINLOCK_INITIALIZER;
+
+    netdata_spinlock_lock(&spinlock);
 
     if(!spawned) {
         int ret;
@@ -1583,45 +1594,47 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         }
         rrdeng_main.timer.data = &rrdeng_main;
 
+        dbengine_initialize_structures();
+
         fatal_assert(0 == uv_thread_create(&rrdeng_main.thread, dbengine_event_loop, &rrdeng_main));
         spawned = true;
     }
 
+    netdata_spinlock_unlock(&spinlock);
     return true;
 }
 
 void dbengine_event_loop(void* arg) {
     sanity_check();
     uv_thread_set_name_np(pthread_self(), "DBENGINE");
+    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
 
     worker_register("DBENGINE");
 
     // opcode jobs
     worker_register_job_name(RRDENG_OPCODE_NOOP,                                     "noop");
 
+    worker_register_job_name(RRDENG_OPCODE_QUERY,                                    "query");
+    worker_register_job_name(RRDENG_OPCODE_EXTENT_WRITE,                             "extent write");
     worker_register_job_name(RRDENG_OPCODE_EXTENT_READ,                              "extent read");
-    worker_register_job_name(RRDENG_OPCODE_PREP_QUERY,                               "prep query");
-    worker_register_job_name(RRDENG_OPCODE_FLUSH_PAGES,                              "flush pages");
     worker_register_job_name(RRDENG_OPCODE_FLUSHED_TO_OPEN,                          "flushed to open");
+    worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
+    worker_register_job_name(RRDENG_OPCODE_JOURNAL_INDEX,                            "journal index");
     worker_register_job_name(RRDENG_OPCODE_FLUSH_INIT,                               "flush init");
     worker_register_job_name(RRDENG_OPCODE_EVICT_INIT,                               "evict init");
-    //worker_register_job_name(RRDENG_OPCODE_DATAFILE_CREATE,                          "datafile create");
-    worker_register_job_name(RRDENG_OPCODE_JOURNAL_FILE_INDEX,                       "journal file index");
-    worker_register_job_name(RRDENG_OPCODE_DATABASE_ROTATE,                          "db rotate");
     worker_register_job_name(RRDENG_OPCODE_CTX_SHUTDOWN,                             "ctx shutdown");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
 
     worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
 
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_QUERY,                "query cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_WRITE,         "extent write cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EXTENT_READ,          "extent read cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PREP_QUERY,           "prep query cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_PAGES,          "flush pages cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSHED_TO_OPEN,      "flushed to open cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_INDEX,        "journal index cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_FLUSH_INIT,           "flush init cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_EVICT_INIT,           "evict init cb");
-    //worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATAFILE_CREATE,      "datafile create cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_JOURNAL_FILE_INDEX,   "journal file index cb");
-    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_DATABASE_ROTATE,      "db rotate cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
 
@@ -1632,8 +1645,6 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_custom_metric(RRDENG_OPCODES_WAITING,  "opcodes waiting",  "opcodes", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_DISPATCHED, "works dispatched", "works",   WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(RRDENG_WORKS_EXECUTING,  "works executing",  "works",   WORKER_METRIC_ABSOLUTE);
-
-    extent_buffer_init();
 
     struct rrdeng_main *main = arg;
     enum rrdeng_opcode opcode;
@@ -1663,19 +1674,18 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
-                case RRDENG_OPCODE_PREP_QUERY: {
+                case RRDENG_OPCODE_QUERY: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     PDC *pdc = cmd.data;
                     work_dispatch(ctx, pdc, NULL, opcode, query_prep_tp_worker, after_prep_query);
                     break;
                 }
 
-                case RRDENG_OPCODE_FLUSH_PAGES: {
+                case RRDENG_OPCODE_EXTENT_WRITE: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct page_descr_with_data *base = cmd.data;
                     struct completion *completion = cmd.completion; // optional
-                    // for the datafile and the journalfile
-                    do_flush_extent(ctx, base, completion);
+                    work_dispatch(ctx, base, completion, opcode, extent_write_tp_worker, after_extent_write);
                     break;
                 }
 
@@ -1704,18 +1714,15 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
 
-//                case RRDENG_OPCODE_DATAFILE_CREATE: {
-//                    struct rrdengine_instance *ctx = cmd.ctx;
-//                    struct rrdengine_datafile *datafile = ctx->datafiles.first->prev;
-//                    if(datafile->pos > rrdeng_target_data_file_size(ctx) &&
-//                       create_new_datafile_pair(ctx, 1, ctx->last_fileno + 1) == 0) {
-//                        ++ctx->last_fileno;
-//                        rrdeng_enq_cmd(ctx, RRDENG_OPCODE_JOURNAL_FILE_INDEX, datafile, NULL, STORAGE_PRIORITY_CRITICAL);
-//                    }
-//                    break;
-//                }
+                case RRDENG_OPCODE_CLEANUP: {
+                    if(!rrdeng_main.cleanup_running) {
+                        rrdeng_main.cleanup_running++;
+                        work_dispatch(NULL, NULL, NULL, opcode, cleanup_tp_worker, after_cleanup);
+                    }
+                    break;
+                }
 
-                case RRDENG_OPCODE_JOURNAL_FILE_INDEX: {
+                case RRDENG_OPCODE_JOURNAL_INDEX: {
                     struct rrdengine_instance *ctx = cmd.ctx;
                     struct rrdengine_datafile *datafile = cmd.data;
                     if(!__atomic_load_n(&ctx->atomic.migration_to_v2_running, __ATOMIC_RELAXED)) {

@@ -1,6 +1,10 @@
 <!--
 title: "idlejitter.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/idlejitter.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/idlejitter.plugin/README.md"
+sidebar_label: "idlejitter.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/QoS"
 -->
 
 # idlejitter.plugin

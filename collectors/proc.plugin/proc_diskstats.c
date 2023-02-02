@@ -214,7 +214,7 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
             else if(*end == 'T')
                 return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0 * 1024.0);
             else if(unknown_units_error > 0) {
-                error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
+                collector_error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
                 unknown_units_error--;
             }
         }
@@ -269,7 +269,7 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
-            if(unlikely(words)) error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
+            if(unlikely(words)) collector_error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
             continue;
         }
 
@@ -344,7 +344,7 @@ static inline int is_major_enabled(int major) {
 }
 
 static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
-    //info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
+    //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
 
     int found = 0, preferred = 0;
 
@@ -352,7 +352,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
     DIR *dir = opendir(path);
     if (!dir) {
-        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
+        collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
         goto failed;
     }
 
@@ -363,7 +363,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 continue;
 
             if(depth <= 0) {
-                error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s/%s'. Ignoring path.", disk, major, minor, path, de->d_name);
+                collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s/%s'. Ignoring path.", disk, major, minor, path, de->d_name);
                 break;
             }
             else {
@@ -393,7 +393,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
                 ssize_t len = readlink(filename, result, result_size - 1);
                 if(len <= 0) {
-                    error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
+                    collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
                     continue;
                 }
 
@@ -409,21 +409,21 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
             struct stat sb;
             if(stat(filename, &sb) == -1) {
-                error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
+                collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
                 continue;
             }
 
             if((sb.st_mode & S_IFMT) != S_IFBLK) {
-                //info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
+                //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
                 continue;
             }
 
             if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor || strcmp(basename(filename), disk)) {
-                //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
+                //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
                 continue;
             }
 
-            //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
+            //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
             snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
 
@@ -672,7 +672,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
                     break;
                 }
                 if (unlikely(closedir(dirp) == -1))
-                    error("Unable to close dir %s", buffer);
+                    collector_error("Unable to close dir %s", buffer);
             }
         }
     }
@@ -721,15 +721,15 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             if(likely(tmp)) {
                 d->sector_size = str2i(tmp);
                 if(unlikely(d->sector_size <= 0)) {
-                    error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
+                    collector_error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
                     d->sector_size = 512;
                 }
             }
-            else error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
+            else collector_error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
 
             fclose(fpss);
         }
-        else error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
+        else collector_error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
     }
     */
 
@@ -748,103 +748,103 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_congested = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/readahead", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_readaheads = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/priority_stats", buffer); // only one cache is supported by bcache
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_priority_stats = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/internal/cache_read_races", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_read_races = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/io_errors", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_io_errors = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/dirty_data", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_dirty_data = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/writeback_rate", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_writeback_rate = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache_available_percent", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_available_percent = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_hits", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_hits = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_five_minute/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_five_minute_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_hour/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_hour_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_day/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_day_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_misses", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_misses = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_hits", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_bypass_hits = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_misses", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_bypass_misses = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_miss_collisions", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_miss_collisions = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
     }
 
     get_disk_config(d);

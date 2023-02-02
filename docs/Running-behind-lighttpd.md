@@ -1,6 +1,10 @@
 <!--
 title: "Netdata via lighttpd v1.4.x"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/Running-behind-lighttpd.md"
+sidebar_label: "Netdata via lighttpd v1.4.x"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Expose local dashboard through proxy"
 -->
 
 # Netdata via lighttpd v1.4.x
@@ -27,7 +31,7 @@ $SERVER["socket"] == ":19998" {
 }
 ```
 
----
+
 
 If the only thing the server is exposing via the web is Netdata (and thus no suburl rewriting required),
 then you can get away with just
@@ -51,7 +55,7 @@ auth.require = ( "" => ( "method" => "digest",
 
 other auth methods, and more info on htdigest, can be found in lighttpd's [mod_auth docs](http://redmine.lighttpd.net/projects/lighttpd/wiki/Docs_ModAuth).
 
----
+
 
 It seems that lighttpd (or some versions of it), fail to proxy compressed web responses.
 To solve this issue, disable web response compression in Netdata.

@@ -17,7 +17,6 @@ typedef uint8_t oomkill_ebpf_val_t;
  *****************************************************************/
 
 #define NETDATA_EBPF_MODULE_NAME_OOMKILL "oomkill"
-#define NETDATA_OOMKILL_SLEEP_MS 650000ULL
 #define NETDATA_OOMKILL_CONFIG_FILE "oomkill.conf"
 
 #define NETDATA_OOMKILL_CHART "oomkills"

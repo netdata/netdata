@@ -1,7 +1,10 @@
 <!--
 title: "OracleDB monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/oracledb/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/oracledb/README.md"
 sidebar_label: "OracleDB"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Databases"
 -->
 
 # OracleDB monitoring with Netdata

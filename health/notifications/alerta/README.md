@@ -1,7 +1,12 @@
 <!--
 title: "alerta.io"
+sidebar_label: "Alerta"
 description: "Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # alerta.io

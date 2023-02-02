@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_FD "filedescriptor"
 
-#define NETDATA_FD_SLEEP_MS 850000ULL
-
 // Menu group
 #define NETDATA_FILE_GROUP "file_access"
 

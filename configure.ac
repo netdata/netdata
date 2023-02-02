@@ -813,7 +813,7 @@ if test "$enable_cloud" != "no"; then
     if test "$can_enable_ng" = "yes"; then
         enable_aclk="yes"
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
         CXX11FLAG="-std=c++11"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -1730,7 +1730,7 @@ AC_CONFIG_FILES([
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
-    libnetdata/arrayalloc/Makefile
+    libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile

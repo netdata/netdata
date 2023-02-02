@@ -1,7 +1,10 @@
 <!--
 title: "RethinkDB monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/rethinkdbs/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/rethinkdbs/README.md"
 sidebar_label: "RethinkDB"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Databases"
 -->
 
 # RethinkDB monitoring with Netdata

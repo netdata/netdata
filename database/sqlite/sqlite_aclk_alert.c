@@ -43,6 +43,34 @@ void update_filtered(ALARM_ENTRY *ae, uint32_t unique_id, char *uuid_str) {
     ae->flags |= HEALTH_ENTRY_FLAG_ACLK_QUEUED;
 }
 
+static inline bool is_event_from_alert_variable_config(uint32_t unique_id, char *uuid_str) {
+    sqlite3_stmt *res = NULL;
+    int rc = 0;
+    bool ret = false;
+
+    char sql[ACLK_SYNC_QUERY_SIZE];
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE-1, "select hl.unique_id from health_log_%s hl, alert_hash ah where hl.unique_id = %u " \
+                                          "and hl.config_hash_id = ah.hash_id " \
+                                          "and ah.warn is null and ah.crit is null;", uuid_str, unique_id);
+
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
+    if (rc != SQLITE_OK) {
+        error_report("Failed to prepare statement when trying to check for alert variables.");
+        return false;
+    }
+
+    rc = sqlite3_step_monitored(res);
+    if (likely(rc == SQLITE_ROW)) {
+        ret = true;
+    }
+
+    rc = sqlite3_finalize(res);
+    if (unlikely(rc != SQLITE_OK))
+        error_report("Failed to finalize statement when trying to check for alert variables, rc = %d", rc);
+
+    return ret;
+}
+
 #define MAX_REMOVED_PERIOD 86400
 //decide if some events should be sent or not
 int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
@@ -57,6 +85,9 @@ int should_send_to_cloud(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     if (unlikely(uuid_is_null(ae->config_hash_id))) 
+        return 0;
+
+    if (is_event_from_alert_variable_config(ae->unique_id, uuid_str))
         return 0;
 
     char sql[ACLK_SYNC_QUERY_SIZE];
@@ -270,20 +301,38 @@ void aclk_push_alert_event(struct aclk_database_worker_config *wc, struct aclk_d
 
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, \
-                   hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name, \
-                   hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status, \
-                   hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context \
-                         from health_log_%s hl, aclk_alert_%s aa \
-                         where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null \
-                         order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
+    buffer_sprintf(sql, "select aa.sequence_id, hl.unique_id, hl.alarm_id, hl.config_hash_id, hl.updated_by_id, hl.when_key, " \
+        " hl.duration, hl.non_clear_duration, hl.flags, hl.exec_run_timestamp, hl.delay_up_to_timestamp, hl.name,  " \
+        " hl.chart, hl.family, hl.exec, hl.recipient, hl.source, hl.units, hl.info, hl.exec_code, hl.new_status,  " \
+        " hl.old_status, hl.delay, hl.new_value, hl.old_value, hl.last_repeat, hl.chart_context  " \
+        " from health_log_%s hl, aclk_alert_%s aa " \
+        " where hl.unique_id = aa.alert_unique_id and aa.date_submitted is null " \
+        " order by aa.sequence_id asc limit %d;", wc->uuid_str, wc->uuid_str, limit);
 
     rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
     if (rc != SQLITE_OK) {
-        error_report("Failed to prepare statement when trying to send an alert update via ACLK");
-        buffer_free(sql);
-        freez(claim_id);
-        return;
+
+        // Try to create tables
+        if (wc->host)
+            sql_create_health_log_table(wc->host);
+
+        BUFFER *sql_fix = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+        buffer_sprintf(sql_fix, TABLE_ACLK_ALERT, wc->uuid_str);
+        db_execute(buffer_tostring(sql_fix));
+        buffer_flush(sql_fix);
+        buffer_sprintf(sql_fix, INDEX_ACLK_ALERT, wc->uuid_str, wc->uuid_str);
+        db_execute(buffer_tostring(sql_fix));
+        buffer_free(sql_fix);
+
+        // Try again
+        rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+        if (rc != SQLITE_OK) {
+            error_report("Failed to prepare statement when trying to send an alert update via ACLK");
+
+            buffer_free(sql);
+            freez(claim_id);
+            return;
+        }
     }
 
     char uuid_str[GUID_LEN + 1];

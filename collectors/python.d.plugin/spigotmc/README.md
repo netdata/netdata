@@ -1,7 +1,10 @@
 <!--
 title: "SpigotMC monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/spigotmc/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/spigotmc/README.md"
 sidebar_label: "SpigotMC"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Webapps"
 -->
 
 # SpigotMC monitoring with Netdata

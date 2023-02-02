@@ -1,9 +1,14 @@
 <!--
-title: "Dashboard"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/web/README.md
+title: "Pop up"
+sidebar_label: "Pop up notifications"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/web/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Dashboard
+# Pop up notifications
 
 The Netdata dashboard shows HTML notifications, when it is open.
 
