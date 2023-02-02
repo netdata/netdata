@@ -592,7 +592,7 @@ netdataDashboard.menu = {
     },
 
     'ad': {
-        title: 'Active Directory (AD)',
+        title: 'Active Directory',
         icon: '<i class="fab fa-windows"></i>',
         info: undefined
     },
