@@ -80,7 +80,7 @@ void rrdr_show_plan(RRDR *r, BUFFER *wb, const char *kq, const char *sq __maybe_
 }
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, int string_value,
-    RRDR_GROUPING group_method)
+                             RRDR_TIME_GROUPING group_method)
 {
     QUERY_TARGET *qt = r->internal.qt;
 
@@ -122,7 +122,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                    , kq, kq, (long long)qt->db.last_time_s
                    , kq, kq, (long long)r->before
                    , kq, kq, (long long)r->after
-                   , kq, kq, sq, web_client_api_request_v1_data_group_to_string(group_method), sq
+                   , kq, kq, sq, time_grouping_tostring(group_method), sq
                    , kq, kq, sq);
 
     web_client_api_request_v1_data_options_to_buffer(wb, r->internal.query_options);

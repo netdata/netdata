@@ -38,7 +38,7 @@ void Host::getConfigAsJson(nlohmann::json &Json) const {
     Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;
 
     Json["host-anomaly-rate-threshold"] = Cfg.HostAnomalyRateThreshold;
-    Json["anomaly-detection-grouping-method"] = group_method2string(Cfg.AnomalyDetectionGroupingMethod);
+    Json["anomaly-detection-grouping-method"] = time_grouping_method2string(Cfg.AnomalyDetectionGroupingMethod);
     Json["anomaly-detection-query-duration"] = Cfg.AnomalyDetectionQueryDuration;
 
     Json["hosts-to-skip"] = Cfg.HostsToSkip;

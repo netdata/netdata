@@ -114,7 +114,7 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                                    time_t after, time_t before,
                                    time_t baseline_after, time_t baseline_before,
                                    size_t points, WEIGHTS_METHOD method,
-                                   RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                   RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                    size_t examined_dimensions __maybe_unused, usec_t duration,
                                    WEIGHTS_STATS *stats) {
 
@@ -164,8 +164,8 @@ static void results_header_to_json(DICTIONARY *results __maybe_unused, BUFFER *w
                        "\t\"group\": \"%s\",\n"
                        "\t\"method\": \"%s\",\n"
                        "\t\"options\": \"",
-                       web_client_api_request_v1_data_group_to_string(group),
-                       weights_method_to_string(method)
+                   time_grouping_tostring(group),
+                   weights_method_to_string(method)
                    );
 
     web_client_api_request_v1_data_options_to_buffer(wb, options);
@@ -175,7 +175,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
                                                 time_t after, time_t before,
                                                 time_t baseline_after, time_t baseline_before,
                                                 size_t points, WEIGHTS_METHOD method,
-                                                RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                 size_t examined_dimensions, usec_t duration,
                                                 WEIGHTS_STATS *stats) {
 
@@ -228,7 +228,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
                                                   time_t after, time_t before,
                                                   time_t baseline_after, time_t baseline_before,
                                                   size_t points, WEIGHTS_METHOD method,
-                                                  RRDR_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
+                                                  RRDR_TIME_GROUPING group, RRDR_OPTIONS options, uint32_t shifts,
                                                   size_t examined_dimensions, usec_t duration,
                                                   WEIGHTS_STATS *stats) {
 
@@ -500,7 +500,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         ONEWAYALLOC *owa, RRDHOST *host,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         time_t after, time_t before, size_t points, RRDR_OPTIONS options,
-        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        RRDR_TIME_GROUPING group_method, const char *group_options, size_t tier,
         WEIGHTS_STATS *stats,
         size_t *entries
         ) {
@@ -516,8 +516,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .before = before,
             .points = points,
             .options = options,
-            .group_method = group_method,
-            .group_options = group_options,
+            .time_group_method = group_method,
+            .time_group_options = group_options,
             .tier = tier,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
             .priority = STORAGE_PRIORITY_NORMAL,
@@ -567,7 +567,7 @@ static void rrdset_metric_correlations_ks2(
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
         size_t points, RRDR_OPTIONS options,
-        RRDR_GROUPING group_method, const char *group_options, size_t tier,
+        RRDR_TIME_GROUPING group_method, const char *group_options, size_t tier,
         uint32_t shifts,
         WEIGHTS_STATS *stats, bool register_zero
         ) {
@@ -633,7 +633,7 @@ static void rrdset_metric_correlations_volume(
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
-        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
         size_t tier,
         WEIGHTS_STATS *stats, bool register_zero) {
 
@@ -701,7 +701,7 @@ static void rrdset_weights_anomaly_rate(
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t after, time_t before,
-        RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+        RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
         size_t tier,
         WEIGHTS_STATS *stats, bool register_zero) {
 
@@ -804,7 +804,7 @@ static size_t spread_results_evenly(DICTIONARY *results, WEIGHTS_STATS *stats) {
 
 int web_api_v1_weights(
         RRDHOST *host, BUFFER *wb, WEIGHTS_METHOD method, WEIGHTS_FORMAT format,
-        RRDR_GROUPING group, const char *group_options,
+        RRDR_TIME_GROUPING group, const char *group_options,
         time_t baseline_after, time_t baseline_before,
         time_t after, time_t before,
         size_t points, RRDR_OPTIONS options, SIMPLE_PATTERN *contexts, size_t tier, size_t timeout) {

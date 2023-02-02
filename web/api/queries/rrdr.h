@@ -138,7 +138,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
 RRDR *rrd2rrdr_legacy(
         ONEWAYALLOC *owa,
         RRDSET *st, size_t points, time_t after, time_t before,
-        RRDR_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
+        RRDR_TIME_GROUPING group_method, time_t resampling_time, RRDR_OPTIONS options, const char *dimensions,
         const char *group_options, time_t timeout, size_t tier, QUERY_SOURCE query_source,
         STORAGE_PRIORITY priority);
 

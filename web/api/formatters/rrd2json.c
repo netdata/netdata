@@ -56,14 +56,14 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
 }
 
 int rrdset2value_api_v1(
-          RRDSET *st
+        RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
         , size_t points
         , time_t after
         , time_t before
-        , RRDR_GROUPING group_method
+        , RRDR_TIME_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options
@@ -167,7 +167,7 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
 
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->request.options;
-    RRDR_GROUPING group_method = qt->request.group_method;
+    RRDR_TIME_GROUPING group_method = qt->request.time_group_method;
 
     switch(format) {
     case DATASOURCE_SSV:

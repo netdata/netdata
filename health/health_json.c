@@ -257,11 +257,11 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                         "\t\t\t\"lookup_after\": %d,\n"
                         "\t\t\t\"lookup_before\": %d,\n"
                         "\t\t\t\"lookup_options\": \"",
-                (unsigned long) rc->db_after,
-                (unsigned long) rc->db_before,
-                group_method2string(rc->group),
-                rc->after,
-                rc->before
+                       (unsigned long) rc->db_after,
+                       (unsigned long) rc->db_before,
+                       time_grouping_method2string(rc->group),
+                       rc->after,
+                       rc->before
         );
         buffer_data_options2string(wb, rc->options);
         buffer_strcat(wb, "\",\n");
