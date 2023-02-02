@@ -61,7 +61,7 @@ sudo su -s /bin/bash netdata
 The next step is based on the collector's orchestrator. You can figure out which orchestrator the collector uses by 
 
 uses either
-by viewing the [collectors list](COLLECTORS.md) and referencing the _configuration file_ field. For example, if that
+by viewing the [collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) and referencing the _configuration file_ field. For example, if that
 field contains `go.d`, that collector uses the Go orchestrator.
 
 ```bash
@@ -108,7 +108,7 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
-All **external plugins** are managed by [plugins.d](plugins.d/README.md), which provides additional management options.
+All **external plugins** are managed by [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md), which provides additional management options.
 
 ## Internal plugins
 
@@ -165,7 +165,8 @@ through this, is to examine what other similar plugins do.
 
 ## External Plugins
 
-**External plugins** use the API and are managed by [plugins.d](plugins.d/README.md).
+**External plugins** use the API and are managed 
+by [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
 
 ## Write a custom collector
 

@@ -207,7 +207,7 @@ cd netdata
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
     cannot be used to change installation types.
--   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
+-   `--local-files`: Used for [offline installations](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
