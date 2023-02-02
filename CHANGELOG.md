@@ -6,7 +6,11 @@
 
 **Merged pull requests:**
 
+- fix link to ebpf collector [\#14405](https://github.com/netdata/netdata/pull/14405) ([ilyam8](https://github.com/ilyam8))
+- Remove equality when deciding how to use point [\#14402](https://github.com/netdata/netdata/pull/14402) ([MrZammler](https://github.com/MrZammler))
+- Fix typo on the page [\#14397](https://github.com/netdata/netdata/pull/14397) ([iorvd](https://github.com/iorvd))
 - Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
+- DBENGINE v2 - improvements part 12 [\#14379](https://github.com/netdata/netdata/pull/14379) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
 - Patch master [\#14377](https://github.com/netdata/netdata/pull/14377) ([tkatsoulas](https://github.com/tkatsoulas))
 - Revert "Delete libnetdata readme" [\#14374](https://github.com/netdata/netdata/pull/14374) ([cakrit](https://github.com/cakrit))
@@ -40,10 +44,12 @@
 - Add |nowarn and |noclear notification modifiers [\#14330](https://github.com/netdata/netdata/pull/14330) ([vobruba-martin](https://github.com/vobruba-martin))
 - Revert "Misc SSL improvements" [\#14327](https://github.com/netdata/netdata/pull/14327) ([MrZammler](https://github.com/MrZammler))
 - DBENGINE v2 - improvements part 9 [\#14326](https://github.com/netdata/netdata/pull/14326) ([ktsaou](https://github.com/ktsaou))
+- Don't send alert variables to the cloud [\#14325](https://github.com/netdata/netdata/pull/14325) ([MrZammler](https://github.com/MrZammler))
 - fix\(proc.plugin\): add "cpu" label to per core util% charts [\#14322](https://github.com/netdata/netdata/pull/14322) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - improvements part 8 [\#14319](https://github.com/netdata/netdata/pull/14319) ([ktsaou](https://github.com/ktsaou))
 - Misc SSL improvements [\#14317](https://github.com/netdata/netdata/pull/14317) ([MrZammler](https://github.com/MrZammler))
 - Use "getent group" instead of reading "/etc/group" to get group information [\#14316](https://github.com/netdata/netdata/pull/14316) ([Dim-P](https://github.com/Dim-P))
+- Add nvidia smi pci bandwidth percent collector [\#14315](https://github.com/netdata/netdata/pull/14315) ([ghanapunq](https://github.com/ghanapunq))
 - minor - kaitai for netdata datafiles [\#14312](https://github.com/netdata/netdata/pull/14312) ([underhood](https://github.com/underhood))
 - Add Collector log [\#14309](https://github.com/netdata/netdata/pull/14309) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 7 [\#14307](https://github.com/netdata/netdata/pull/14307) ([ktsaou](https://github.com/ktsaou))
@@ -356,10 +362,6 @@
 - bump go.d v0.40.2 [\#13747](https://github.com/netdata/netdata/pull/13747) ([ilyam8](https://github.com/ilyam8))
 - fix\(python.d\): set correct label source for \_collect\_job label [\#13746](https://github.com/netdata/netdata/pull/13746) ([ilyam8](https://github.com/ilyam8))
 - Provide Details on Label Filtering/Custom Labels [\#13745](https://github.com/netdata/netdata/pull/13745) ([DShreve2](https://github.com/DShreve2))
-- Fix handling of temporary directories in kickstart code. [\#13744](https://github.com/netdata/netdata/pull/13744) ([Ferroin](https://github.com/Ferroin))
-- Dont send NodeInfo during first database cleanup [\#13740](https://github.com/netdata/netdata/pull/13740) ([MrZammler](https://github.com/MrZammler))
-- CMake - add possibility to build without ACLK [\#13736](https://github.com/netdata/netdata/pull/13736) ([underhood](https://github.com/underhood))
-- Change cast to remove coverity warnings [\#13735](https://github.com/netdata/netdata/pull/13735) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
