@@ -670,13 +670,14 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             netdata_mutex_unlock(&tmp->mutex);
         }
         else {
-            buffer_free(temp_wb);
             if(!buffer_strlen(wb))
                 rrd_call_function_error(wb, "Failed to send request to the collector.", code);
         }
 
-        if (we_should_free)
+        if (we_should_free) {
             rrd_function_call_wait_free(tmp);
+            buffer_free(temp_wb);
+        }
     }
 
     return code;
