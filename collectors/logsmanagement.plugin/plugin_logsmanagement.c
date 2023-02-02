@@ -23,6 +23,10 @@
     "logsmanagement\n\n" \
     "Function 'logsmanagement' enables querying of the logs management engine and retrieval of logs stored on this node. \n\n" \
     "Arguments:\n\n" \
+    "   help\n" \
+    "      prints this help message and returns\n\n" \
+    "   sources\n" \
+    "      returns a list of available log sources to be queried\n\n" \
     "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \
     "      start timestamp in ms to search from, default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_START_DEFAULT) "\n\n" \
@@ -48,7 +52,8 @@
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_SANITIZE_KEYWORD_DEFAULT) "\n\n" \
     "   "LOGS_QRY_KW_DATA_FORMAT":STRING\n" \
     "      Grouping of results per collection interval, options: '"LOGS_QRY_KW_JSON_ARRAY"' (default), '"LOGS_QRY_KW_NEWLINE"'\n\n" \
-    "All arguments except for either '"LOGS_QRY_KW_CHARTNAME"' or '"LOGS_QRY_KW_FILENAME"' are optional."
+    "All arguments except for either '"LOGS_QRY_KW_CHARTNAME"' or '"LOGS_QRY_KW_FILENAME"' are optional.\n" \
+    "If 'help' or 'sources' is passed on, all other arguments will be ignored."
 
 
 static struct Chart_meta chart_types[] = {
@@ -133,6 +138,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     UNUSED(callback);
     UNUSED(callback_data);
 
+    int status;
+
     logs_query_params_t query_params = {  
         .start_timestamp = LOGS_MANAG_QUERY_START_DEFAULT,
         .end_timestamp = LOGS_MANAG_QUERY_END_DEFAULT, /* default from / until to return all timestamps */
@@ -156,6 +163,38 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             buffer_sprintf(dest_wb, FUNCTION_LOGSMANAGEMENT_HELP_LONG);
             dest_wb->contenttype = CT_TEXT_PLAIN;
             return HTTP_RESP_OK;
+        }
+        else if (!strcmp(value, "sources")){
+            buffer_sprintf( dest_wb, 
+                            "{\n"
+                            "   \"api version\": %s,\n" 
+                            "   \"log sources\": {\n",
+                            QUERY_VERSION);
+            LOGS_QUERY_RESULT_TYPE err_code = fetch_log_sources(dest_wb);
+            buffer_sprintf( dest_wb, 
+                            "\n"
+                            "   },\n"
+                            "   \"error code\": %d,\n"
+                            "   \"error\": \"",
+                            err_code);
+            
+            switch(err_code){
+                case GENERIC_ERROR:
+                    buffer_strcat(dest_wb, "query generic error");
+                    status = HTTP_RESP_BACKEND_FETCH_FAILED;
+                    break;
+                case NO_RESULTS_FOUND:
+                    buffer_strcat(dest_wb, "no results found");
+                    status = HTTP_RESP_OK;
+                    break;
+                default:
+                    buffer_strcat(dest_wb, "no error");
+                    status = HTTP_RESP_OK;
+                    break;
+            } 
+            buffer_strcat(dest_wb, "\"\n}");
+
+            return status;
         }
 
         char *key = mystrsep(&value, ":");
@@ -214,7 +253,6 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp
     getrusage(RUSAGE_THREAD, &end);
 
-    int status;
     switch(err_code){
         case INVALID_REQUEST_ERROR:
         case NO_MATCHING_CHART_OR_FILENAME_ERROR:

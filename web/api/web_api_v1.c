@@ -1614,21 +1614,25 @@ inline int web_client_api_request_v1_logsmanagement_sources(RRDHOST *host, struc
                     "   \"error code\": %d,\n"
                     "   \"error\": \"",
                     err_code);
+    int status;
     switch(err_code){
         case GENERIC_ERROR:
             buffer_strcat(w->response.data, "query generic error");
+            status = HTTP_RESP_BACKEND_FETCH_FAILED;
             break;
         case NO_RESULTS_FOUND:
             buffer_strcat(w->response.data, "no results found");
+            status = HTTP_RESP_OK;
             break;
         default:
             buffer_strcat(w->response.data, "no error");
+            status = HTTP_RESP_OK;
             break;
     } 
     buffer_strcat(w->response.data, "\"\n}");
 
     buffer_no_cacheable(w->response.data);
-    return HTTP_RESP_OK;
+    return status;
 }
 
 inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_client *w, char *url) {
