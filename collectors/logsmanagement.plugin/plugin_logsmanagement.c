@@ -23,17 +23,17 @@
     "logsmanagement\n\n" \
     "Function 'logsmanagement' enables querying of the logs management engine and retrieval of logs stored on this node. \n\n" \
     "Arguments:\n\n" \
-    "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \ 
-    "      start timestamp in ms to search from, default: " \ 
+    "   "LOGS_QRY_KW_START_TIME":NUMBER\n" \
+    "      start timestamp in ms to search from, default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_START_DEFAULT) "\n\n" \
     "   "LOGS_QRY_KW_END_TIME":NUMBER\n" \
-    "      end timestamp in ms to search until, default: " \ 
+    "      end timestamp in ms to search until, default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_END_DEFAULT) "\n\n" \
     "   "LOGS_QRY_KW_QUOTA":NUMBER\n" \
     "      max size of logs to return (in MiB), default: " \
             LOGS_MANAG_STR(LOGS_MANAG_QUERY_QUOTA_DEFAULT) "\n\n" \
     "   "LOGS_QRY_KW_CHARTNAME":STRING\n" \
-    "      Chart name (or names if provided multiple times) to be queried for logs, max No. of sources: " \ 
+    "      Chart name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
             LOGS_MANAG_STR(LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES) "\n\n" \
     "   "LOGS_QRY_KW_FILENAME":STRING\n" \
     "      If no 'chart_name' is provided, file name (or names if provided multiple times) to be queried for logs, max No. of sources: " \
@@ -128,6 +128,11 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                                                 void (*callback)(BUFFER *wb, int code, void *callback_data), 
                                                 void *callback_data) {
 
+    UNUSED(timeout);
+    UNUSED(collector_data);
+    UNUSED(callback);
+    UNUSED(callback_data);
+
     logs_query_params_t query_params = {  
         .start_timestamp = LOGS_MANAG_QUERY_START_DEFAULT,
         .end_timestamp = LOGS_MANAG_QUERY_END_DEFAULT, /* default from / until to return all timestamps */
@@ -217,6 +222,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             break;
         case GENERIC_ERROR:
             status = HTTP_RESP_BACKEND_FETCH_FAILED;
+            break;
         default:
             status = HTTP_RESP_OK;
     }
@@ -293,10 +299,11 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             buffer_strcat(dest_wb, "success");
             break;
     } 
-    buffer_strcat(dest_wb, "\"\n   },\n");
-
-
-    buffer_strcat(dest_wb, "   \"data\":[\n");
+    buffer_strcat(  dest_wb, 
+                    "\"\n"
+                    "   },\n"
+                    "   \"data\":[\n"
+    );
 
     size_t res_off = 0;
     logs_query_res_hdr_t res_hdr;
@@ -356,10 +363,17 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
             p++;
         }
         buffer_strcat(dest_wb, "\"");
-        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(dest_wb, "\n         ]");
-        buffer_sprintf(dest_wb, ",\n         %zu" , res_hdr.text_size);
-        buffer_sprintf(dest_wb, ",\n         %d\n      ]" , res_hdr.matches);
 
+        if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) 
+            buffer_strcat(dest_wb, "\n         ]");
+        
+        buffer_sprintf( dest_wb, 
+                        ",\n"
+                        "         %zu,\n"
+                        "         %d\n"
+                        "      ]" , 
+                        res_hdr.text_size,
+                        res_hdr.matches);
 
         res_off += sizeof(res_hdr) + res_hdr.text_size;
 
@@ -374,13 +388,15 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     add_table_field(dest_wb, "LogsTxtSz", "Logs text length", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
     add_table_field(dest_wb, "MatchNo", "Keyword matches", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "sum", false);
 
-    buffer_sprintf( dest_wb, "   \"expires\": %lld", (long long) now_realtime_sec() + update_every);
-
-    buffer_fast_strcat(dest_wb, "\n   }\n}", sizeof("\n   }\n}") - 1);
+    buffer_sprintf( dest_wb, 
+                    "\n   },"
+                    "\n   \"expires\": %lld"
+                    "\n}",
+                    (long long) now_realtime_sec() + update_every);
 
     buffer_free(query_params.results_buff);
 
-    // buffer_no_cacheable(w->response.data);  
+    // buffer_no_cacheable(dest_wb);  
 
     return status;
 }
