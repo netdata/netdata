@@ -421,10 +421,10 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
 
     buffer_fast_strcat(dest_wb, "\n   ],\n   \"columns\": {", sizeof("\n   ],\n   \"columns\": {") - 1);
     int fields_added = 0;
-    add_table_field(dest_wb, "Timestamp", "Timestamp in Milliseconds", true, "time", "milliseconds", NAN, "ascending", true, true, true, NULL, "max", false);
-    add_table_field(dest_wb, "Logs", "Logs collected in last interval", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
-    add_table_field(dest_wb, "LogsTxtSz", "Logs text length", true, "string", NULL, NAN, "ascending", true, true, true, NULL, "count_unique", false);
-    add_table_field(dest_wb, "MatchNo", "Keyword matches", true, "integer", NULL, NAN, "ascending", true, true, true, NULL, "sum", false);
+    add_table_field(dest_wb, "Timestamp", "Timestamp in Milliseconds", true, "time", "milliseconds", NAN, "ascending", true, true, false, NULL, "average", false);
+    add_table_field(dest_wb, "Logs", "Logs collected in last interval", true, "string", NULL, NAN, "ascending", false, false, false, NULL, "N/A", false);
+    add_table_field(dest_wb, "LogsTxtSz", "Logs text length", false, "integer", NULL, NAN, "ascending", true, false, false, NULL, "sum", false);
+    add_table_field(dest_wb, "MatchNo", "Keyword matches", true, "integer", NULL, NAN, "ascending", true, false, false, NULL, "sum", false);
 
     buffer_sprintf( dest_wb, 
                     "\n   },"
