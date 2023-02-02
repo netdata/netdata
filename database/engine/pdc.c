@@ -877,8 +877,8 @@ static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *
                 epdl->extent_offset, epdl->extent_size,
                 used_epdl ? "to extract page (PD)" : used_descr ? "expected page (DESCR)" : "part of a query (PDC)",
                 start_time_s, start_time_str, end_time_s, end_time_str,
-                used_epdl ? " of metric " : "",
-                used_epdl ? uuid : "",
+                used_epdl || used_descr ? " of metric " : "",
+                used_epdl || used_descr ? uuid : "",
                 msg);
 }
 
