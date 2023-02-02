@@ -1023,6 +1023,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     // Initialize the journal file to be able to access the data
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
 
+    ctx_current_disk_space_increase(ctx, journal_v2_file_size);
+
     // File is OK load it
     return 0;
 }
@@ -1378,7 +1380,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         error("DBENGINE: failed to resize file '%s'", path);
     }
     else
-        ctx_current_disk_space_increase(ctx, sizeof(struct journal_v2_header));
+        ctx_current_disk_space_increase(ctx, resize_file_to);
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
