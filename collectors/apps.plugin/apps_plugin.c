@@ -4431,7 +4431,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
             , RSS_max = 0.0
             , Shared_max = 0.0
             , Swap_max = 0.0
-            , MemPcnt_max = 0.0
+            , Memory_max = 0.0
             ;
 
     unsigned long long
@@ -4551,7 +4551,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         // memory MiB
         if(MemTotal)
-            add_value_field_ndd_with_max(wb, MemPcnt, (NETDATA_DOUBLE)p->status_vmrss * 100.0 / (NETDATA_DOUBLE)MemTotal);
+            add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->status_vmrss * 100.0 / (NETDATA_DOUBLE)MemTotal);
 
         add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->status_vmrss / memory_divisor);
         add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->status_vmshared / memory_divisor);
@@ -4568,6 +4568,10 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, LWrites, p->io_logical_bytes_written / io_divisor);
 #endif
 
+        // I/O calls
+        add_value_field_llu_with_max(wb, RCalls, p->io_read_calls / RATES_DETAIL);
+        add_value_field_llu_with_max(wb, WCalls, p->io_write_calls / RATES_DETAIL);
+
         // minor page faults
         add_value_field_llu_with_max(wb, MinFlt, p->minflt / RATES_DETAIL);
         add_value_field_llu_with_max(wb, CMinFlt, p->cminflt / RATES_DETAIL);
@@ -4578,16 +4582,8 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, CMajFlt, p->cmajflt / RATES_DETAIL);
         add_value_field_llu_with_max(wb, TMajFlt, (p->majflt + p->cmajflt) / RATES_DETAIL);
 
-        // I/O calls
-        add_value_field_llu_with_max(wb, RCalls, p->io_read_calls / RATES_DETAIL);
-        add_value_field_llu_with_max(wb, WCalls, p->io_write_calls / RATES_DETAIL);
-
-        // processes, threads, uptime
-        add_value_field_llu_with_max(wb, Processes, p->children_count);
-        add_value_field_llu_with_max(wb, Threads, p->num_threads);
-        add_value_field_llu_with_max(wb, Uptime, p->uptime);
-
         // open file descriptors
+        add_value_field_llu_with_max(wb, FDs, p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other);
         add_value_field_llu_with_max(wb, Files, p->openfds.files);
         add_value_field_llu_with_max(wb, Pipes, p->openfds.pipes);
         add_value_field_llu_with_max(wb, Sockets, p->openfds.sockets);
@@ -4597,7 +4593,11 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, SigFDs, p->openfds.signalfds);
         add_value_field_llu_with_max(wb, EvPollFDs, p->openfds.eventpolls);
         add_value_field_llu_with_max(wb, OtherFDs, p->openfds.other);
-        add_value_field_llu_with_max(wb, FDs, p->openfds.files + p->openfds.pipes + p->openfds.sockets + p->openfds.inotifies + p->openfds.eventfds + p->openfds.timerfds + p->openfds.signalfds + p->openfds.eventpolls + p->openfds.other);
+
+        // processes, threads, uptime
+        add_value_field_llu_with_max(wb, Processes, p->children_count);
+        add_value_field_llu_with_max(wb, Threads, p->num_threads);
+        add_value_field_llu_with_max(wb, Uptime, p->uptime);
 
         buffer_fast_strcat(wb, "]", 1);
 
@@ -4627,21 +4627,21 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "Gid", "Group ID", false, "integer", "value", "number", 0, NULL, NAN, "ascending", true, false, false, NULL, "count_unique", false);
 
         // CPU utilization
-        add_table_field(wb, "CPU", "Total CPU Time", true, "bar-with-integer", "bar", "number", 2, "%", CPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "UserCPU", "User CPU time", false, "bar-with-integer", "bar", "number", 2, "%", UserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "SysCPU", "System CPU Time", false, "bar-with-integer", "bar", "number", 2, "%", SysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "GuestCPU", "Guest CPU Time", false, "bar-with-integer", "bar", "number", 2, "%", GuestCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CUserCPU", "Children User CPU Time", false, "bar-with-integer", "bar", "number", 2, "%", CUserCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CSysCPU", "Children System CPU Time", false, "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time", false, "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CPU", "Total CPU Time (100% = 1 core)", true, "bar-with-integer", "bar", "number", 2, "%", CPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "UserCPU", "User CPU time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", UserCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "SysCPU", "System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", SysCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "GuestCPU", "Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", GuestCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CUserCPU", "Children User CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CUserCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CSysCPU", "Children System CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CSysCPU_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "CGuestCPU", "Children Guest CPU Time (100% = 1 core)", false, "bar-with-integer", "bar", "number", 2, "%", CGuestCPU_max, "descending", true, false, false, NULL, "sum", true);
 
         // memory
         if(MemTotal)
-            add_table_field(wb, "MemPcnt", "Memory Percentage", true, "bar-with-integer", "bar", "number", 2, "%", 100.0, "descending", true, false, false, NULL, "sum", true);
+            add_table_field(wb, "Memory", "Memory Percentage", true, "bar-with-integer", "bar", "number", 2, "%", 100.0, "descending", true, false, false, NULL, "sum", true);
 
-        add_table_field(wb, "RSS", "Resident Set Size", true, "bar-with-integer", "bar", "number", 2, "MiB", RSS_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Resident", "Resident Set Size", true, "bar-with-integer", "bar", "number", 2, "MiB", RSS_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Shared", "Shared Pages", true, "bar-with-integer", "bar", "number", 2, "MiB", Shared_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "VMSize", "Virtual Memory Size", true, "bar-with-integer", "bar", "number", 2, "MiB", VMSize_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Virtual", "Virtual Memory Size", true, "bar-with-integer", "bar", "number", 2, "MiB", VMSize_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Swap", "Swap Memory", false, "bar-with-integer", "bar", "number", 2, "MiB", Swap_max, "descending", true, false, false, NULL, "sum", true);
 
         // Physical I/O
@@ -4650,9 +4650,13 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
 
         // Logical I/O
 #ifndef __FreeBSD__
-        add_table_field(wb, "LReads", "Logical I/O Reads", false, "bar-with-integer", "bar", "number", 2, "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "LWrites", "Logical I/O Writes", false, "bar-with-integer", "bar", "number", 2, "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "LReads", "Logical I/O Reads", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LReads_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "LWrites", "Logical I/O Writes", true, "bar-with-integer", "bar", "number", 2, "KiB/s", LWrites_max, "descending", true, false, false, NULL, "sum", true);
 #endif
+
+        // I/O calls
+        add_table_field(wb, "RCalls", "I/O Read Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "WCalls", "I/O Write Calls", true, "bar-with-integer", "bar", "number", 2, "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum", true);
 
         // minor page faults
         add_table_field(wb, "MinFlt", "Minor Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", MinFlt_max, "descending", true, false, false, NULL, "sum", true);
@@ -4664,26 +4668,22 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "CMajFlt", "Children Major Page Faults/s", false, "bar-with-integer", "bar", "number", 2, "pgflts/s", CMajFlt_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "TMajFlt", "Total Major Page Faults/s", true, "bar-with-integer", "bar", "number", 2, "pgflts/s", TMajFlt_max, "descending", true, false, false, NULL, "sum", true);
 
-        // I/O calls
-        add_table_field(wb, "RCalls", "I/O Read Calls", false, "bar-with-integer", "bar", "number", 2, "calls/s", RCalls_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "WCalls", "I/O Write Calls", false, "bar-with-integer", "bar", "number", 2, "calls/s", WCalls_max, "descending", true, false, false, NULL, "sum", true);
-
-        // processes, threads, uptime
-        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "bar", "number", 0, "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "bar", "number", 0, "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "bar", "duration", 2, "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
-
         // open file descriptors
-        add_table_field(wb, "Files", "Open Files", false, "bar-with-integer", "bar", "number", 0, "fds", Files_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Pipes", "Open Pipes", false, "bar-with-integer", "bar", "number", 0, "fds", Pipes_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "Sockets", "Open Sockets", false, "bar-with-integer", "bar", "number", 0, "fds", Sockets_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar-with-integer", "bar", "number", 0, "fds", FDs_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Files", "Open Files", true, "bar-with-integer", "bar", "number", 0, "fds", Files_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Pipes", "Open Pipes", true, "bar-with-integer", "bar", "number", 0, "fds", Pipes_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Sockets", "Open Sockets", true, "bar-with-integer", "bar", "number", 0, "fds", Sockets_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "iNotiFDs", "Open iNotify Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", iNotiFDs_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "EventFDs", "Open Event Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EventFDs_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "TimerFDs", "Open Timer Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", TimerFDs_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "SigFDs", "Open Signal Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", SigFDs_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "EvPollFDs", "Open Event Poll Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", EvPollFDs_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "OtherFDs", "Other Open Descriptors", false, "bar-with-integer", "bar", "number", 0, "fds", OtherFDs_max, "descending", true, false, false, NULL, "sum", true);
-        add_table_field(wb, "FDs", "All Open File Descriptors", true, "bar-with-integer", "bar", "number", 0, "fds", FDs_max, "descending", true, false, false, NULL, "sum", true);
+
+        // processes, threads, uptime
+        add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "bar", "number", 0, "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "bar", "number", 0, "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
+        add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "bar", "duration", 2, "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
 
         buffer_strcat(
                 wb,
@@ -4699,7 +4699,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                 "\n      \"Memory\": {"
                 "\n         \"name\":\"Memory\","
                 "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"VMSize\", \"RSS\", \"Shared\", \"Swap\" ]"
+                "\n         \"columns\": [ \"Virtual\", \"Resident\", \"Shared\", \"Swap\" ]"
                 "\n      },"
         );
 
@@ -4710,7 +4710,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
                     "\n      \"MemoryPercent\": {"
                     "\n         \"name\":\"Memory Percentage\","
                     "\n         \"type\":\"stacked-bar\","
-                    "\n         \"columns\": [ \"MemPcnt\" ]"
+                    "\n         \"columns\": [ \"Memory\" ]"
                     "\n      },"
             );
 
