@@ -586,7 +586,7 @@ netdataDashboard.menu = {
     },
 
     'mssql': {
-        title: 'MS SQL',
+        title: 'MS SQL Server',
         icon: '<i class="fas fa-database"></i>',
         info: undefined
     },
