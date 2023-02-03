@@ -4564,6 +4564,13 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (NET Framework: Locks and Threads)
+
+    'netframework.clrlocksandthreads_recognized_threads': {
+        info: 'Displays the total number of threads that have been recognized by the runtime since the application started. These threads are associated with a corresponding managed thread object. The runtime does not create these threads, but they have run inside the runtime at least once.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
