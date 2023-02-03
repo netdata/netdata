@@ -20,31 +20,30 @@ This page covers detailed instructions on using and configuring the automatic on
 
 The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
 
-:::tip
-If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
-If you want to turn off [automatic updates](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
-:::
+> :bulb: Tip
+>
+> If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
+> If you want to turn off [automatic updates](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
 
 To install Netdata, run the following as your normal user:
 
 <Tabs>
-  <TabItem value="wget" label=<code>wget</code>>
+  <TabItem value="wget" label="wget">
 
   <OneLineInstallWget/>
 
   </TabItem>
-  <TabItem value="curl" label=<code>curl</code>>
+  <TabItem value="curl" label="curl">
 
   <OneLineInstallCurl/>
 
   </TabItem>
 </Tabs>
 
-:::note
-If you plan to also connect the node to Netdata Cloud,
-make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
-:::
+> :bookmark_tabs: Note
+> 
+> If you plan to also connect the node to Netdata Cloud, make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+> and `YOUR_ROOM_ID` with the ID of the room you are willing to connect the node to.
 
 ## What does `kickstart.sh` do?
 
