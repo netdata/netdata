@@ -296,12 +296,13 @@ static void oomkill_collector(ebpf_module_t *em)
     // loop and read until ebpf plugin is closed.
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (!ebpf_exit_plugin || ++counter != update_every)
+            continue;
 
+        counter = 0;
         pthread_mutex_lock(&collect_data_mutex);
         pthread_mutex_lock(&lock);
 

@@ -483,7 +483,17 @@ static void ebpf_exit()
     if (unlink(filename))
         error("Cannot remove PID file %s", filename);
 
-    ebpf_exit_plugin = 2;
+#ifdef NETDATA_INTERNAL_CHECKS
+    error("Good bye world! I was PID %d", main_thread_id);
+#endif
+    printf("DISABLE\n");
+
+    if (shm_ebpf_cgroup.header) {
+        munmap(shm_ebpf_cgroup.header, shm_ebpf_cgroup.header->body_length);
+        shm_unlink(NETDATA_SHARED_MEMORY_EBPF_CGROUP_NAME);
+    }
+
+    exit(0);
 }
 
 /**
@@ -2253,10 +2263,8 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb);
     //Plugin will be killed when it receives a signal
-    while (ebpf_exit_plugin != 2) {
+    while (!ebpf_exit_plugin) {
         (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin == 2)
-            break;
 
         // We are using a small heartbeat time to wake up thread,
         // but we should not update so frequently the shared memory data
@@ -2268,6 +2276,8 @@ int main(int argc, char **argv)
             ebpf_parse_cgroup_shm_data();
         }
     }
+
+    ebpf_stop_threads(0);
 
     return 0;
 }
