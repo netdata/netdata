@@ -361,7 +361,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 
 void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value)
 {
-    buffer_need_bytes(wb, 50);
+    buffer_need_bytes(wb, 512);
 
     if(isnan(value) || isinf(value)) {
         buffer_strcat(wb, "null");

@@ -319,7 +319,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
 void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st);
 void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st);
 void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
-void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st);
+void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st, const char *rrddim_keyword, const char *rrdset_keyword);
 
 bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);

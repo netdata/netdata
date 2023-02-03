@@ -78,7 +78,7 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 static inline void pluginsd_lock_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && !u->replay.locked_data_collection) {
-        netdata_spinlock_lock(&u->st->data_collection_lock);
+        // netdata_spinlock_lock(&u->st->data_collection_lock);
         u->replay.locked_data_collection = true;
     }
 }
@@ -86,7 +86,7 @@ static inline void pluginsd_lock_data_collection(void *user) {
 static inline void pluginsd_unlock_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && u->replay.locked_data_collection) {
-        netdata_spinlock_unlock(&u->st->data_collection_lock);
+        // netdata_spinlock_unlock(&u->st->data_collection_lock);
         u->replay.locked_data_collection = false;
     }
 }
@@ -1169,7 +1169,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user) {
     return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 }
 
-PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user)
+PARSER_RC pluginsd_replay_rrddim_collection_state_internal(char **words, size_t num_words, void *user, const char *keyword, const char *parent_keyword)
 {
     if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
         return PARSER_RC_OK;
@@ -1180,13 +1180,13 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     char *last_calculated_value_str = get_word(words, num_words, 4);
     char *last_stored_value_str = get_word(words, num_words, 5);
 
-    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, keyword);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, keyword, parent_keyword);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
+    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, keyword);
     if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
@@ -1204,7 +1204,11 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user)
+PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user) {
+    return pluginsd_replay_rrddim_collection_state_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+}
+
+PARSER_RC pluginsd_replay_rrdset_collection_state_internal(char **words, size_t num_words, void *user, const char *keyword, const char *parent_keyword)
 {
     if(((PARSER_USER_OBJECT *) user)->replay.rset_enabled == false)
         return PARSER_RC_OK;
@@ -1212,10 +1216,10 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
-    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, keyword);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, keyword, parent_keyword);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
@@ -1236,6 +1240,10 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     st->counter_done++;
 
     return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user) {
+    return pluginsd_replay_rrdset_collection_state_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 }
 
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
@@ -1367,6 +1375,14 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
 
     return PARSER_RC_OK;
+}
+
+PARSER_RC pluginsd_rrddim_collection_state_v2(char **words, size_t num_words, void *user) {
+    return pluginsd_replay_rrddim_collection_state_internal(words, num_words, user, PLUGINSD_KEYWORD_RRDDIM_STATE_V2, PLUGINSD_KEYWORD_BEGIN_V2);
+}
+
+PARSER_RC pluginsd_rrdset_collection_state_v2(char **words, size_t num_words, void *user) {
+    return pluginsd_replay_rrdset_collection_state_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 }
 
 PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {

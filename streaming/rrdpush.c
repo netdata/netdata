@@ -390,23 +390,44 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
+    BUFFER *wb = rsb->wb;
+
     if(unlikely(rsb->last_point_end_time_ut != point_end_time_ut)) {
         time_t end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
         time_t start_time_s = end_time_s - rd->rrdset->update_every;
 
-        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_BEGIN_V2 " '%s' %llu %llu %llu\n",
-                       rrdset_id(rd->rrdset),
-                       (unsigned long long) start_time_s,
-                       (unsigned long long) end_time_s,
-                       (unsigned long long) rsb->wall_clock_time
-        );
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " \"", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
+        buffer_fast_strcat(wb, "\" ", 2);
+        buffer_print_llu(wb, start_time_s);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_llu(wb, end_time_s);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_llu(wb, rsb->wall_clock_time);
+        buffer_fast_strcat(wb, "\n", 1);
+
+//        buffer_sprintf(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '%s' %llu %llu %llu\n",
+//                       rrdset_id(rd->rrdset),
+//                       (unsigned long long) start_time_s,
+//                       (unsigned long long) end_time_s,
+//                       (unsigned long long) rsb->wall_clock_time
+//        );
 
         rsb->last_point_end_time_ut = point_end_time_ut;
         rsb->points_added++;
     }
 
-    buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
-                   rrddim_id(rd), n, flags & SN_FLAG_RESET ? "R" : "");
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " \"", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+    buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+    buffer_fast_strcat(wb, "\" ", 2);
+    buffer_rrd_value(wb, n);
+    if(unlikely(flags & SN_FLAG_RESET))
+        buffer_fast_strcat(wb, " R\n", 3);
+    else
+        buffer_fast_strcat(wb, "\n", 1);
+
+//    buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
+//                   rrddim_id(rd), n, flags & SN_FLAG_RESET ? "R" : "");
 }
 
 void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
@@ -414,8 +435,8 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
         return;
 
     if(rsb->v2 && rsb->points_added) {
-        rrdpush_send_chart_collection_state(rsb->wb, st);
-        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n");
+        rrdpush_send_chart_collection_state(rsb->wb, st, PLUGINSD_KEYWORD_RRDDIM_STATE_V2, PLUGINSD_KEYWORD_RRDSET_STATE_v2);
+        buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
     }
 
     sender_commit(st->rrdhost->sender, rsb->wb);

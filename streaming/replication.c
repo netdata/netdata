@@ -209,32 +209,54 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
+void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st, const char *rrddim_keyword, const char *rrdset_keyword) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
                 if(!rd->exposed) continue;
 
-                buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
-                               rrddim_id(rd),
-                               (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
-                               rd->last_collected_value,
-                               rd->last_calculated_value,
-                               rd->last_stored_value
-                );
+                buffer_strcat(wb, rrddim_keyword);
+                buffer_fast_strcat(wb, " '", 2);
+                buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+                buffer_fast_strcat(wb, "' ", 2);
+                buffer_print_llu(wb, (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec);
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_print_ll(wb, rd->last_collected_value);
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_rrd_value(wb, rd->last_calculated_value);
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_rrd_value(wb, rd->last_stored_value);
+                buffer_fast_strcat(wb, "\n", 1);
+
+//                buffer_sprintf(wb, "%s \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
+//                               rrddim_keyword,
+//                               rrddim_id(rd),
+//                               (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
+//                               rd->last_collected_value,
+//                               rd->last_calculated_value,
+//                               rd->last_stored_value
+//                );
             }
     rrddim_foreach_done(rd);
 
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " %llu %llu\n",
-                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
-                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
-    );
+    buffer_strcat(wb, rrdset_keyword);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec);
+    buffer_fast_strcat(wb, "\n", 1);
+
+//    buffer_sprintf(wb, "%s %llu %llu\n",
+//                   rrdset_keyword,
+//                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
+//                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
+//    );
 }
 
 static void replication_query_finalize(BUFFER *wb, struct replication_query *q, bool executed) {
     size_t dimensions = q->dimensions;
 
     if(wb && q->query.enable_streaming)
-        rrdpush_send_chart_collection_state(wb, q->st);
+        rrdpush_send_chart_collection_state(wb, q->st, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
 
     if(q->query.locked_data_collection) {
         netdata_spinlock_unlock(&q->st->data_collection_lock);
@@ -422,11 +444,19 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             }
             last_end_time_in_buffer = min_end_time;
 
-            buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
-                           (unsigned long long) min_start_time,
-                           (unsigned long long) min_end_time,
-                           (unsigned long long) wall_clock_time
-            );
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
+            buffer_print_llu(wb, min_start_time);
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_llu(wb, min_end_time);
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_llu(wb, wall_clock_time);
+            buffer_fast_strcat(wb, "\n", 1);
+
+//            buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
+//                           (unsigned long long) min_start_time,
+//                           (unsigned long long) min_end_time,
+//                           (unsigned long long) wall_clock_time
+//            );
 
             // output the replay values for this time
             for (size_t i = 0; i < dimensions; i++) {
@@ -438,8 +468,17 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                             !storage_point_is_unset(d->sp) &&
                             !storage_point_is_gap(d->sp))) {
 
-                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
-                                   rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
+                    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
+                    buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
+                    buffer_fast_strcat(wb, "\" ", 2);
+                    buffer_rrd_value(wb, d->sp.sum);
+                    if(unlikely(d->sp.flags & SN_FLAG_RESET))
+                        buffer_fast_strcat(wb, " R\n", 3);
+                    else
+                        buffer_fast_strcat(wb, "\n", 1);
+
+//                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" %s \"%s\"\n",
+//                                   rrddim_id(d->rd), value_str, d->sp.flags & SN_FLAG_RESET ? "R" : "");
 
                     points_generated++;
                 }
@@ -556,7 +595,11 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // holding the host's buffer lock for too long
     BUFFER *wb = sender_start(host->sender);
 
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 2);
+    buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
+    buffer_fast_strcat(wb, "'\n", 2);
+
+//    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " \"%s\"\n", rrdset_id(st));
 
     bool locked_data_collection = q->query.locked_data_collection;
     q->query.locked_data_collection = false;
@@ -578,23 +621,38 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
 
     // end with first/last entries we have, and the first start time and
     // last end time of the data we sent
-    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",
 
-                   // current chart update every
-                   (int)st->update_every
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
+    buffer_print_ll(wb, st->update_every);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, db_first_entry);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, db_last_entry);
+    buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
+    buffer_print_llu(wb, after);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, before);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_llu(wb, wall_clock_time);
+    buffer_fast_strcat(wb, "\n", 1);
 
-                   // child first db time, child end db time
-                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
-
-                   // start streaming boolean
-                   , enable_streaming ? "true" : "false"
-
-                   // after requested, before requested ('before' can be altered by the child when the request had enable_streaming true)
-                   , (unsigned long long)after, (unsigned long long)before
-
-                   // child world clock time
-                   , (unsigned long long)wall_clock_time
-                   );
+//    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",
+//
+//                   // current chart update every
+//                   (int)st->update_every
+//
+//                   // child first db time, child end db time
+//                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
+//
+//                   // start streaming boolean
+//                   , enable_streaming ? "true" : "false"
+//
+//                   // after requested, before requested ('before' can be altered by the child when the request had enable_streaming true)
+//                   , (unsigned long long)after, (unsigned long long)before
+//
+//                   // child world clock time
+//                   , (unsigned long long)wall_clock_time
+//                   );
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
