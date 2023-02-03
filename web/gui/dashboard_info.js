@@ -4512,7 +4512,7 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
-    // WMI (NET Framework)
+    // WMI (NET Framework: Exception)
 
     'netframework.clrexception_thrown': {
         info: 'The exceptions includes both .NET exceptions and unmanaged exceptions that are converted into .NET exceptions.'
@@ -4524,6 +4524,17 @@ netdataDashboard.context = {
 
     'netframework.clrexception_finally': {
         info: 'The metric counts only the finally blocks executed for an exception; finally blocks on normal code paths are not counted by this counter.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Interop)
+
+    'netframework.clrinterop_com_callable_wrapper': {
+        info: 'A COM callable wrappers (CCW) is a proxy for a managed object being referenced from an unmanaged COM client.'
+    },
+
+    'netframework.clrinterop_stubs_created': {
+        info: 'The Stubs are responsible for marshaling arguments and return values from managed to unmanaged code, and vice versa, during a COM interop call or a platform invoke call.'
     },
 
     // ------------------------------------------------------------------------
