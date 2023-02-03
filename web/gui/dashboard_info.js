@@ -4512,6 +4512,21 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (NET Framework)
+
+    'netframework.clrexception_thrown': {
+        info: 'The exceptions includes both .NET exceptions and unmanaged exceptions that are converted into .NET exceptions.'
+    },
+
+    'netframework.clrexception_filters': {
+        info: 'An exception filter evaluates regardless of whether an exception is handled.'
+    },
+
+    'netframework.clrexception_finally': {
+        info: 'The metric counts only the finally blocks executed for an exception; finally blocks on normal code paths are not counted by this counter.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
