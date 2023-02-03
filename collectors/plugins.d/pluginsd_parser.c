@@ -1393,8 +1393,10 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->v2.stream_buffer.wb)
+    if(u->v2.stream_buffer.wb) {
         rrdset_push_metrics_finished(&u->v2.stream_buffer, st);
+        rrdcontext_collected_rrdset(st);
+    }
 
     return PARSER_RC_OK;
 }
