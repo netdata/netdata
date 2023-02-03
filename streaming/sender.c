@@ -102,9 +102,13 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
     if(unlikely(!src || !src_len))
         return;
 
-    fprintf(stderr, "\n\n%s\n\n", src);
-
     netdata_mutex_lock(&s->mutex);
+
+    fprintf(stderr,
+            "\n--- SEND BEGIN: %s ----\n"
+            "%s"
+            "\n--- SEND END ----------------------------------------\n"
+            , rrdhost_hostname(s->host), src);
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
