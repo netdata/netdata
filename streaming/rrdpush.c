@@ -394,7 +394,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         time_t end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
         time_t start_time_s = end_time_s - rd->rrdset->update_every;
 
-        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '%s' %llu %llu %llu\n",
+        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_BEGIN_V2 " '%s' %llu %llu %llu\n",
                        rrdset_id(rd->rrdset),
                        (unsigned long long) start_time_s,
                        (unsigned long long) end_time_s,
