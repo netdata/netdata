@@ -1269,7 +1269,8 @@ void rrdset_thread_rda_free(void) {
 }
 
 static inline size_t rrdset_done_interpolate(
-        RRDSET *st
+        RRDSET_STREAM_BUFFER *rsb
+        , RRDSET *st
         , struct rda_item *rda_base
         , size_t rda_slots
         , usec_t update_every_ut
@@ -1401,6 +1402,9 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, current_time_s, 0, false);
 
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
+
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rrdcontext_collected_rrddim(rd);
                 continue;
@@ -1414,6 +1418,9 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
 
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, new_value, dim_storage_flags);
+
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
                 rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = new_value;
@@ -1422,6 +1429,9 @@ static inline size_t rrdset_done_interpolate(
                 (void) ml_is_anomalous(rd, current_time_s, 0, false);
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
+
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
 
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
                 rrdcontext_collected_rrddim(rd);
@@ -1467,6 +1477,10 @@ void rrdset_done(RRDSET *st) {
 
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
+
+    RRDSET_STREAM_BUFFER stream_buffer = { .wb = NULL, };
+    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
+        stream_buffer = rrdset_push_metric_initialize(st, now.tv_sec);
 
     netdata_spinlock_lock(&st->data_collection_lock);
 
@@ -1595,8 +1609,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 after_first_database_work:
     st->counter_done++;
 
-    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
-        rrdset_done_push(st);
+    if(stream_buffer.wb)
+        rrdset_push_metrics_v1(&stream_buffer, st);
 
     uint32_t has_reset_value = 0;
 
@@ -1857,7 +1871,8 @@ after_first_database_work:
 // #endif
 
     rrdset_done_interpolate(
-            st
+            &stream_buffer
+            , st
             , rda_base
             , rda_slots
             , update_every_ut
@@ -1928,6 +1943,7 @@ after_second_database_work:
     }
 
     netdata_spinlock_unlock(&st->data_collection_lock);
+    rrdset_push_metrics_finished(&stream_buffer, st);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------

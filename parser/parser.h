@@ -114,10 +114,13 @@ PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user);
 
-PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user);
+PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user);
+
+PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user);
+PARSER_RC pluginsd_end_v2(char **words, size_t num_words, void *user);
 
 #endif

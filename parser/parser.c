@@ -69,11 +69,14 @@ PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, 
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,              pluginsd_function);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
 
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_rrdset_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN_V2,            pluginsd_begin_v2);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END_V2,              pluginsd_end_v2);
     }
 
     return parser;

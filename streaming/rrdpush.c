@@ -378,7 +378,52 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     return true;
 }
 
-void rrdset_done_push(RRDSET *st) {
+void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+    if(!rsb->wb || rsb->v2)
+        return;
+
+    RRDHOST *host = st->rrdhost;
+    rrdpush_send_chart_metrics(rsb->wb, st, host->sender, rsb->rrdset_flags);
+}
+
+void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+    if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
+        return;
+
+    if(unlikely(rsb->last_point_end_time_ut != point_end_time_ut)) {
+        time_t end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+        time_t start_time_s = end_time_s - rd->rrdset->update_every;
+
+        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '%s' %llu %llu %llu\n",
+                       rrdset_id(rd->rrdset),
+                       (unsigned long long) start_time_s,
+                       (unsigned long long) end_time_s,
+                       (unsigned long long) rsb->wall_clock_time
+        );
+
+        rsb->last_point_end_time_ut = point_end_time_ut;
+        rsb->points_added++;
+    }
+
+    buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
+                   rrddim_id(rd), n, flags & SN_FLAG_RESET ? "R" : "");
+}
+
+void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+    if(!rsb->wb)
+        return;
+
+    if(rsb->v2 && rsb->points_added) {
+        rrdpush_send_chart_collection_state(rsb->wb, st);
+        buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n");
+    }
+
+    sender_commit(st->rrdhost->sender, rsb->wb);
+
+    *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
+}
+
+RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
@@ -395,7 +440,7 @@ void rrdset_done_push(RRDSET *st) {
             error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
-        return;
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
         info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
@@ -408,17 +453,25 @@ void rrdset_done_push(RRDSET *st) {
 
     if(unlikely((exposed_upstream && replication_in_progress) ||
                 !should_send_chart_matching(st, rrdset_flags)))
-        return;
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
-    BUFFER *wb = sender_start(host->sender);
-
-    if(unlikely(!exposed_upstream))
+    if(unlikely(!exposed_upstream)) {
+        BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
+        sender_commit(host->sender, wb);
+    }
 
-    if (likely(!replication_in_progress))
-        rrdpush_send_chart_metrics(wb, st, host->sender, rrdset_flags);
+    if(replication_in_progress)
+        return (RRDSET_STREAM_BUFFER) {
+                .wb = NULL,
+        };
 
-    sender_commit(host->sender, wb);
+    return (RRDSET_STREAM_BUFFER) {
+        .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
+        .rrdset_flags = rrdset_flags,
+        .wb = sender_start(host->sender),
+        .wall_clock_time = wall_clock_time,
+    };
 }
 
 // labels
@@ -1077,6 +1130,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
     if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
     if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
+    if(caps & STREAM_CAP_INTERPOLATED) buffer_strcat(wb, "INTERPOLATED ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

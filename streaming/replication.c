@@ -209,7 +209,7 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
+void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
                 if(!rd->exposed) continue;
@@ -234,7 +234,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
     size_t dimensions = q->dimensions;
 
     if(wb && q->query.enable_streaming)
-        replication_send_chart_collection_state(wb, q->st);
+        rrdpush_send_chart_collection_state(wb, q->st);
 
     if(q->query.locked_data_collection) {
         netdata_spinlock_unlock(&q->st->data_collection_lock);
