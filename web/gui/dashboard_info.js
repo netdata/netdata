@@ -4553,6 +4553,17 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (NET Framework: Loading)
+
+    'netframework.clrloading_loader_heap_size': {
+        info: 'The memory committed by the class loader across all application domains is the physical space reserved in the disk paging file.'
+    },
+
+    'netframework.clrloading_assemblies_loaded': {
+        info: 'If the assembly is loaded as domain-neutral from multiple application domains, the metric is incremented only once.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
