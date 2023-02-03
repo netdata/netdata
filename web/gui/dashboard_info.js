@@ -609,6 +609,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'netframework': {
+        title: '.NET Framework',
+        icon: '<i class="fas fa-laptop-code"></i>',
+        info: undefined
+    },
+
     'perf': {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
