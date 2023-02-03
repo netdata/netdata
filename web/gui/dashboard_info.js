@@ -4538,6 +4538,21 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (NET Framework: JIT)
+
+    'netframework.clrjit_methods': {
+        info: 'The metric does not include pre-JIT-compiled methods.'
+    },
+
+    'netframework.clrjit_time': {
+        info: 'The metric is updated at the end of every JIT compilation phase. A JIT compilation phase occurs when a method and its dependencies are compiled.'
+    },
+
+    'netframework.clrjit_standard_failure': {
+        info: 'The failure can occur if the MSIL cannot be verified or if there is an internal error in the JIT compiler.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
