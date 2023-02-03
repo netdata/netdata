@@ -405,7 +405,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         rsb->points_added++;
     }
 
-    buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
+    buffer_sprintf(rsb->wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                    rrddim_id(rd), n, flags & SN_FLAG_RESET ? "R" : "");
 }
 
