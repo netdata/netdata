@@ -1361,7 +1361,12 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 }
 
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
-    return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+
+    if(u->v2.stream_buffer.wb)
+        return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
+
+    return PARSER_RC_OK;
 }
 
 PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {
@@ -1372,7 +1377,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->replay.rset_enabled == true && u->v2.stream_buffer.wb)
+    if(u->v2.stream_buffer.wb)
         rrdset_push_metrics_finished(&u->v2.stream_buffer, st);
 
     return PARSER_RC_OK;

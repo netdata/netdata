@@ -102,6 +102,8 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
     if(unlikely(!src || !src_len))
         return;
 
+    fprintf(stderr, "\n\n%s\n\n", src);
+
     netdata_mutex_lock(&s->mutex);
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
