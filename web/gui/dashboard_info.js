@@ -4571,6 +4571,41 @@ netdataDashboard.context = {
     },
 
     // ------------------------------------------------------------------------
+    // WMI (NET Framework: Memory)
+
+    'netframework.clrmemory_heap_size': {
+        info: 'The metric does not indicate the current number of bytes allocated.'
+    },
+
+    'netframework.clrmemory_promoted': {
+        info: 'Memory is promoted when it survives a garbage collection.'
+    },
+
+    'netframework.clrmemory_number_gc_handles': {
+        info: 'Garbage collection handles are handles to resources external to the common language runtime and the managed environment.'
+    },
+
+    'netframework.clrmemory_induced_gc': {
+        info: 'The metric is updated when an explicit call to GC.Collect happens.'
+    },
+
+    'netframework.clrmemory_number_sink_blocks_in_use': {
+        info: 'Synchronization blocks are per-object data structures allocated for storing synchronization information. They hold weak references to managed objects and must be scanned by the garbage collector.'
+    },
+
+    'netframework.clrmemory_committed': {
+        info: 'Committed memory is the physical memory for which space has been reserved in the disk paging file.'
+    },
+
+    'netframework.clrmemory_reserved': {
+        info: 'Reserved memory is the virtual memory space reserved for the application when no disk or main memory pages have been used.'
+    },
+
+    'netframework.clrmemory_gc_time': {
+        info: 'Displays the percentage of time that was spent performing a garbage collection in the last sample.'
+    },
+
+    // ------------------------------------------------------------------------
     // APACHE
 
     'apache.connections': {
