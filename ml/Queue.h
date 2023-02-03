@@ -32,8 +32,15 @@ public:
         while (Q.empty()) {
             pthread_cond_wait(&CV, M.inner());
 
-            if (Exit)
-                pthread_exit(nullptr);
+            if (Exit) {
+                // This should happen only when we are destroying a host.
+                // Callers should use a flag dedicated to checking if we
+                // are about to delete the host or exit the agent. The original
+                // implementation would call pthread_exit which would cause
+                // the queue's mutex to be destroyed twice (and fail on the
+                // 2nd time)
+                return { T(), 0 };
+            }
         }
 
         T V = Q.front();
