@@ -1,10 +1,10 @@
 <!--
 title: "External plugins overview"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md"
-sidebar_label: "plugins.d"
+sidebar_label: "External plugins overview"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/plugins.d"
+learn_rel_path: "Developers"
 -->
 
 # External plugins overview
