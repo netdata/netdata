@@ -201,23 +201,26 @@ static void mdflush_collector(ebpf_module_t *em)
 {
     mdflush_ebpf_vals = callocz(ebpf_nprocs, sizeof(mdflush_ebpf_val_t));
 
+    int update_every = em->update_every;
     avl_init_lock(&mdflush_pub, mdflush_val_cmp);
 
     // create chart and static dims.
     pthread_mutex_lock(&lock);
-    mdflush_create_charts(em->update_every);
+    mdflush_create_charts(update_every);
     ebpf_update_stats(&plugin_statistics, em);
     pthread_mutex_unlock(&lock);
 
     // loop and read from published data until ebpf plugin is closed.
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = em->update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        counter = 0;
         mdflush_read_count_map();
         // write dims now for all hitherto discovered devices.
         write_begin_chart("mdstat", "mdstat_flush");

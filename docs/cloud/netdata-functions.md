@@ -34,7 +34,7 @@ functions - [plugins.d](https://github.com/netdata/netdata/blob/master/collector
 
 If you have ideas or requests for other functions:
 * open a [Feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
-* engage with out community on [Netdata discord server](https://discord.com/invite/mPZ6WZKKG2).
+* engage with our community on the [Netdata Discord server](https://discord.com/invite/mPZ6WZKKG2).
 #### How do functions work with streaming?
 
 Via streaming, the definitions of functions are transmitted to a parent node so it knows all the functions available on
