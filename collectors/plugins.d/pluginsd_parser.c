@@ -148,8 +148,11 @@ PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user)
     ((PARSER_USER_OBJECT *)user)->st = st;
 
     usec_t microseconds = 0;
-    if (microseconds_txt && *microseconds_txt)
-        microseconds = str2ull(microseconds_txt);
+    if (microseconds_txt && *microseconds_txt) {
+        long long t = str2ll(microseconds_txt, NULL);
+        if(t >= 0)
+            microseconds = t;
+    }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     if(st->replay.log_next_data_collection) {
