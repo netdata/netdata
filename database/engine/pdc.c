@@ -822,6 +822,66 @@ static inline struct page_details *epdl_get_pd_load_link_list_from_metric_start_
     return pd_list;
 }
 
+static void epdl_extent_loading_error_log(struct rrdengine_instance *ctx, EPDL *epdl, struct rrdeng_extent_page_descr *descr, const char *msg) {
+    char uuid[UUID_STR_LEN] = "";
+    time_t start_time_s = 0;
+    time_t end_time_s = 0;
+    bool used_epdl = false;
+    bool used_descr = false;
+
+    if (descr) {
+        start_time_s = (time_t)(descr->start_time_ut / USEC_PER_SEC);
+        end_time_s = (time_t)(descr->end_time_ut / USEC_PER_SEC);
+        uuid_unparse_lower(descr->uuid, uuid);
+        used_descr = true;
+    }
+    else if (epdl) {
+        struct page_details *pd = NULL;
+
+        Word_t start = 0;
+        Pvoid_t *pd_by_start_time_s_judyL = PDCJudyLFirst(epdl->page_details_by_metric_id_JudyL, &start, PJE0);
+        if(pd_by_start_time_s_judyL) {
+            start = 0;
+            Pvoid_t *pd_pptr = PDCJudyLFirst(*pd_by_start_time_s_judyL, &start, PJE0);
+            if(pd_pptr) {
+                pd = *pd_pptr;
+                start_time_s = pd->first_time_s;
+                end_time_s = pd->last_time_s;
+                METRIC *metric = (METRIC *)pd->metric_id;
+                uuid_t *u = mrg_metric_uuid(main_mrg, metric);
+                uuid_unparse_lower(*u, uuid);
+                used_epdl = true;
+            }
+        }
+    }
+
+    if(!used_epdl && !used_descr && epdl && epdl->pdc) {
+        start_time_s = epdl->pdc->start_time_s;
+        end_time_s = epdl->pdc->end_time_s;
+    }
+
+    char start_time_str[LOG_DATE_LENGTH + 1] = "";
+    if(start_time_s)
+        log_date(start_time_str, LOG_DATE_LENGTH, start_time_s);
+
+    char end_time_str[LOG_DATE_LENGTH + 1] = "";
+    if(end_time_s)
+        log_date(end_time_str, LOG_DATE_LENGTH, end_time_s);
+
+    error_limit_static_global_var(erl, 1, 0);
+    error_limit(&erl,
+                "DBENGINE: error while reading extent from datafile %u of tier %d, at offset %" PRIu64 " (%u bytes) "
+                "%s from %ld (%s) to %ld (%s) %s%s: "
+                "%s",
+                epdl->datafile->fileno, ctx->config.tier,
+                epdl->extent_offset, epdl->extent_size,
+                used_epdl ? "to extract page (PD)" : used_descr ? "expected page (DESCR)" : "part of a query (PDC)",
+                start_time_s, start_time_str, end_time_s, end_time_str,
+                used_epdl || used_descr ? " of metric " : "",
+                used_epdl || used_descr ? uuid : "",
+                msg);
+}
+
 static bool epdl_populate_pages_from_extent_data(
         struct rrdengine_instance *ctx,
         void *data,
@@ -870,11 +930,7 @@ static bool epdl_populate_pages_from_extent_data(
         (payload_length != trailer_offset - payload_offset) ||
         (data_length != payload_offset + payload_length + sizeof(*trailer))
             ) {
-
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but header is INVALID", __func__,
-                    epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno);
-
+        epdl_extent_loading_error_log(ctx, epdl, NULL, "header is INVALID");
         return false;
     }
 
@@ -884,10 +940,7 @@ static bool epdl_populate_pages_from_extent_data(
     if (unlikely(ret)) {
         ctx_io_error(ctx);
         have_read_error = true;
-
-        error_limit_static_global_var(erl, 1, 0);
-        error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, but CRC32 check FAILED", __func__,
-                    epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno);
+        epdl_extent_loading_error_log(ctx, epdl, NULL, "CRC32 checksum FAILED");
     }
 
     if(worker)
@@ -938,18 +991,18 @@ static bool epdl_populate_pages_from_extent_data(
         time_t start_time_s = (time_t) (header->descr[i].start_time_ut / USEC_PER_SEC);
 
         if(!page_length || !start_time_s) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, having page %u (out of %u) EMPTY",
-                        __func__, epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno, i, count);
+            char log[200 + 1];
+            snprintfz(log, 200, "page %u (out of %u) is EMPTY", i, count);
+            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
             continue;
         }
 
         METRIC *metric = mrg_metric_get_and_acquire(main_mrg, &header->descr[i].uuid, (Word_t)ctx);
         Word_t metric_id = (Word_t)metric;
         if(!metric) {
-            error_limit_static_global_var(erl, 1, 0);
-            error_limit(&erl, "%s: Extent at offset %"PRIu64" (%u bytes) was read from datafile %u, having page %u (out of %u) for unknown UUID",
-                        __func__, epdl->extent_offset, epdl->extent_size, epdl->datafile->fileno, i, count);
+            char log[200 + 1];
+            snprintfz(log, 200, "page %u (out of %u) has unknown UUID", i, count);
+            epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
             continue;
         }
         mrg_metric_release(main_mrg, metric);
@@ -980,10 +1033,11 @@ static bool epdl_populate_pages_from_extent_data(
             }
             else {
                 if (unlikely(page_offset + vd.page_length > uncompressed_payload_length)) {
-                    error_limit_static_global_var(erl, 10, 0);
-                    error_limit(&erl,
-                                "DBENGINE: page %u offset %u + page length %zu exceeds the uncompressed buffer size %u",
-                                i, page_offset, vd.page_length, uncompressed_payload_length);
+                    char log[200 + 1];
+                    snprintfz(log, 200, "page %u (out of %u) offset %u + page length %zu, "
+                                        "exceeds the uncompressed buffer size %u",
+                                        i, count, page_offset, vd.page_length, uncompressed_payload_length);
+                    epdl_extent_loading_error_log(ctx, epdl, &header->descr[i], log);
 
                     page_data = DBENGINE_EMPTY_PAGE;
                     stats_load_invalid_page++;
