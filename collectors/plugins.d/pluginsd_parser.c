@@ -62,6 +62,10 @@ static inline RRDHOST *pluginsd_require_host_from_parent(void *user, const char 
     return host;
 }
 
+static inline RRDHOST *pluginsd_get_host_from_parent(void *user) {
+    return ((PARSER_USER_OBJECT *) user)->host;
+}
+
 static inline RRDSET *pluginsd_require_chart_from_parent(void *user, const char *cmd, const char *parent_cmd) {
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
 
@@ -1361,7 +1365,9 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(rc == PARSER_RC_OK && u->replay.rset_enabled == true) {
-        if(!u->v2.stream_buffer.wb)
+        RRDHOST *host = pluginsd_get_host_from_parent(user);
+        RRDSET *st = pluginsd_get_chart_from_parent(user);
+        if(host && st && !u->v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
             u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, u->replay.wall_clock_time);
     }
 
@@ -1371,7 +1377,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
 
-    if(u->v2.stream_buffer.wb)
+    if(u->replay.rset_enabled == true)
         return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
 
     return PARSER_RC_OK;
