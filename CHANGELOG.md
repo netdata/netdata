@@ -6,9 +6,17 @@
 
 **Merged pull requests:**
 
+- fix functions memory leak [\#14419](https://github.com/netdata/netdata/pull/14419) ([ktsaou](https://github.com/ktsaou))
+- Minor fixes in markdown links [\#14415](https://github.com/netdata/netdata/pull/14415) ([tkatsoulas](https://github.com/tkatsoulas))
+- fix kubelet alarms [\#14414](https://github.com/netdata/netdata/pull/14414) ([ilyam8](https://github.com/ilyam8))
+- DBENGINE v2 - bug fixes [\#14413](https://github.com/netdata/netdata/pull/14413) ([ktsaou](https://github.com/ktsaou))
+- fix\(cgroups.plugin\): fix collecting full pressure stall time [\#14410](https://github.com/netdata/netdata/pull/14410) ([ilyam8](https://github.com/ilyam8))
+- feat\(charts.d\): add load usage \(Watts\) to nuts collector [\#14407](https://github.com/netdata/netdata/pull/14407) ([ilyam8](https://github.com/ilyam8))
 - fix link to ebpf collector [\#14405](https://github.com/netdata/netdata/pull/14405) ([ilyam8](https://github.com/ilyam8))
 - Remove equality when deciding how to use point [\#14402](https://github.com/netdata/netdata/pull/14402) ([MrZammler](https://github.com/MrZammler))
+- add help line to functions response [\#14399](https://github.com/netdata/netdata/pull/14399) ([ktsaou](https://github.com/ktsaou))
 - Fix typo on the page [\#14397](https://github.com/netdata/netdata/pull/14397) ([iorvd](https://github.com/iorvd))
+- Fix kickstart and updater not working with BusyBox wget [\#14392](https://github.com/netdata/netdata/pull/14392) ([Dim-P](https://github.com/Dim-P))
 - Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
 - DBENGINE v2 - improvements part 12 [\#14379](https://github.com/netdata/netdata/pull/14379) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
@@ -35,6 +43,8 @@
 - Add missing entries in README.md [\#14351](https://github.com/netdata/netdata/pull/14351) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add ansible.md to learn [\#14350](https://github.com/netdata/netdata/pull/14350) ([cakrit](https://github.com/cakrit))
 - Delete BUILD.md [\#14348](https://github.com/netdata/netdata/pull/14348) ([cakrit](https://github.com/cakrit))
+- Patch convert rel links [\#14344](https://github.com/netdata/netdata/pull/14344) ([tkatsoulas](https://github.com/tkatsoulas))
+- Update dashboard [\#14342](https://github.com/netdata/netdata/pull/14342) ([thiagoftsm](https://github.com/thiagoftsm))
 - minor fix on notification doc \(Discord\) [\#14339](https://github.com/netdata/netdata/pull/14339) ([tkatsoulas](https://github.com/tkatsoulas))
 - DBENGINE v2 - improvements part 11 [\#14337](https://github.com/netdata/netdata/pull/14337) ([ktsaou](https://github.com/ktsaou))
 - Update the Get started doc [\#14336](https://github.com/netdata/netdata/pull/14336) ([Ancairon](https://github.com/Ancairon))
@@ -353,15 +363,6 @@
 - fix bad merge [\#13764](https://github.com/netdata/netdata/pull/13764) ([ktsaou](https://github.com/ktsaou))
 - Remove anomaly rates chart. [\#13763](https://github.com/netdata/netdata/pull/13763) ([vkalintiris](https://github.com/vkalintiris))
 - add 1m delay for tcp reset alarms [\#13761](https://github.com/netdata/netdata/pull/13761) ([ilyam8](https://github.com/ilyam8))
-- Use /bin/sh instead of ls to detect glibc [\#13758](https://github.com/netdata/netdata/pull/13758) ([MrZammler](https://github.com/MrZammler))
-- Add ZFS rate charts [\#13757](https://github.com/netdata/netdata/pull/13757) ([vlvkobal](https://github.com/vlvkobal))
-- Count currently streaming senders on the localhost [\#13755](https://github.com/netdata/netdata/pull/13755) ([MrZammler](https://github.com/MrZammler))
-- Fix streaming crash when child reconnects and is archived on the parent [\#13754](https://github.com/netdata/netdata/pull/13754) ([stelfrag](https://github.com/stelfrag))
-- Add CloudLinux OS detection to the updater script [\#13752](https://github.com/netdata/netdata/pull/13752) ([Pulseeey](https://github.com/Pulseeey))
-- Add CloudLinux OS detection to kickstart [\#13750](https://github.com/netdata/netdata/pull/13750) ([Pulseeey](https://github.com/Pulseeey))
-- bump go.d v0.40.2 [\#13747](https://github.com/netdata/netdata/pull/13747) ([ilyam8](https://github.com/ilyam8))
-- fix\(python.d\): set correct label source for \_collect\_job label [\#13746](https://github.com/netdata/netdata/pull/13746) ([ilyam8](https://github.com/ilyam8))
-- Provide Details on Label Filtering/Custom Labels [\#13745](https://github.com/netdata/netdata/pull/13745) ([DShreve2](https://github.com/DShreve2))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
