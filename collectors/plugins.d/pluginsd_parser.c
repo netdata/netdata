@@ -1378,7 +1378,10 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 
     if(u->v2.stream_buffer.wb && u->v2.stream_buffer.v2) {
         BUFFER *wb = u->v2.stream_buffer.wb;
-        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " ", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 1);
+        buffer_need_bytes(wb, 1024);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
+        buffer_fast_strcat(wb, "' ", 2);
         buffer_strcat(wb, update_every_str);
         buffer_fast_strcat(wb, " ", 1);
         buffer_strcat(wb, end_time_str);
