@@ -1412,7 +1412,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 }
 
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
-    timing_init();
+    // timing_init();
 
     char *dimension = get_word(words, num_words, 1);
     char *collected_str = get_word(words, num_words, 2);
@@ -1428,7 +1428,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    timing_step(TIMING_STEP_PREPARE);
+    // timing_step(TIMING_STEP_PREPARE);
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
     if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
@@ -1437,7 +1437,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
         rrddim_isnot_obsolete(st, rd);
 
-    timing_step(TIMING_STEP_LOOKUP_DIMENSION);
+    // timing_step(TIMING_STEP_LOOKUP_DIMENSION);
 
     // ------------------------------------------------------------------------
     // parse the parameters
@@ -1457,7 +1457,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         flags = SN_EMPTY_SLOT;
     }
 
-    timing_step(TIMING_STEP_PARSE);
+    // timing_step(TIMING_STEP_PARSE);
 
     // ------------------------------------------------------------------------
     // propagate it forward
@@ -1478,7 +1478,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         u->v2.stream_buffer.points_added++;
     }
 
-    timing_step(TIMING_STEP_PROPAGATE);
+    // timing_step(TIMING_STEP_PROPAGATE);
 
     // ------------------------------------------------------------------------
     // store it
@@ -1494,9 +1494,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
     rrddim_acquired_release(rda);
 
-    timing_step(TIMING_STEP_STORE);
-
-    timing_report();
+    // timing_step(TIMING_STEP_STORE);
+    // timing_report();
 
     return PARSER_RC_OK;
 }
