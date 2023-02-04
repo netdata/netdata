@@ -2101,10 +2101,10 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
             if(!last_action_time)
                 return;
 
-            usec_t timing_step = now_monotonic_usec();
-            __atomic_add_fetch(&timing_steps[step].time, timing_step - last_action_time, __ATOMIC_RELAXED);
+            usec_t now = now_monotonic_usec();
+            __atomic_add_fetch(&timing_steps[step].time, now - last_action_time, __ATOMIC_RELAXED);
             __atomic_add_fetch(&timing_steps[step].count, 1, __ATOMIC_RELAXED);
-            last_action_time = timing_step;
+            last_action_time = now;
             break;
         }
 
