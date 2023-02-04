@@ -1492,6 +1492,8 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // propagate the whole chart update in v1
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+    u->data_collections_count++;
+
     if(u->v2.stream_buffer.wb && !u->v2.stream_buffer.v2)
         rrdset_push_metrics_v1(&u->v2.stream_buffer, st);
 
