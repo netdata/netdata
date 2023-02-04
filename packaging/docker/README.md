@@ -11,6 +11,8 @@ learn_rel_path: "Installation"
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+# Install Netdata with Docker
+
 Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
 you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
 
@@ -42,24 +44,25 @@ and unfortunately not something we can realistically work around.
 
 ## Create a new Netdata Agent container
 
-:::note
-All `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit.
-This is required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved.
-Failure to do so may cause a task running in a container to hang and consume 100% of the CPU core.
+> :bookmark_tabs: Note
+>
+> All `docker run` commands and `docker-compose` configurations explicitly set the `nofile` limit.
+> This is required on some distros until [14177](https://github.com/netdata/netdata/issues/14177) is resolved.
+> Failure to do so may cause a task running in a container to hang and consume 100% of the CPU core.
+>  
+> <details>
+> <summary>What are these "some distros"?</summary>
+>
+> If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
+>
+> ```bash
+> [fedora37 ~]$ docker run --rm busybox grep open /proc/self/limits
+> Max open files            1073741816           1073741816           files
+> ```
+>  
+> </details>
 
-<details>
-<summary>What are these "some distros"?</summary>
-
-If `LimitNOFILE=infinity` results in an open file limit of 1073741816:
-
-```bash
-[fedora37 ~]$ docker run --rm busybox grep open /proc/self/limits
-Max open files            1073741816           1073741816           files
-```
-</details>
-:::
-
-You can create a new Agent container using either `docker run` or Docker Compose. After using either method, you can
+You can create a new Agent container using either `docker run` or `docker-compose`. After using either method, you can
 visit the Agent dashboard `http://NODE:19999`.
 
 Both methods create a [bind mount](https://docs.docker.com/storage/bind-mounts/) for Netdata's configuration files
@@ -68,9 +71,11 @@ you want to access the configuration files from your _host_ machine, see [host-e
 configuration](#host-editable-configuration).
 
 <Tabs>
-<TabItem value="docker_run" label=<code>docker run</code>>
+<TabItem value="docker_run" label="docker run">
 
-Use the `docker run` command, along with the following options, to start a new container.
+<h3> Using the <code>docker run</code> command </h3>
+
+Run the following command along with the following options on your terminal, to start a new container.
 
 ```bash
 docker run -d --name=netdata \
@@ -90,12 +95,16 @@ docker run -d --name=netdata \
   netdata/netdata
 ```
 
-:::note
-If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
-:::
+> :bookmark_tabs: Note
+>  
+> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
 </TabItem>
-<TabItem value="docker compose" label=<code>docker-compose</code>>
+<TabItem value="docker compose" label="docker-compose">
+
+<h3> Using the <code>docker-compose</code> command</h3>
+
+#### Steps
 
 1. Copy the following code and paste into a new file called `docker-compose.yml`
 
@@ -134,9 +143,9 @@ If you plan to Claim the node to Netdata Cloud, you can find the command with th
 
 2. Run `docker-compose up -d` in the same directory as the `docker-compose.yml` file to start the container.
 
-:::note
-If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
-:::
+> :bookmark_tabs: Note
+>  
+> If you plan to Claim the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
 </TabItem>
 </Tabs>
@@ -197,7 +206,9 @@ to restart the container: `docker restart netdata`.
 
 ### Host-editable configuration
 
-> **Warning**: [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
+> :warning: Warning
+>  
+> The [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
 > the host system.
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
@@ -377,8 +388,10 @@ services:
 
 #### Giving group access to the Docker socket (less safe)
 
+> :warning: Caution
+>  
 > You should seriously consider the necessity of activating this option, as it grants to the `netdata`
-user access to the privileged socket connection of docker service and therefore your whole machine.
+> user access to the privileged socket connection of docker service and therefore your whole machine.
 
 If you want to have your container names resolved by Netdata, make the `netdata` user be part of the group that owns the
 socket.
@@ -407,6 +420,8 @@ grep docker /etc/group | cut -d ':' -f 3
 
 #### Running as root (unsafe)
 
+> :warning: Caution
+>  
 > You should seriously consider the necessity of activating this option, as it grants to the `netdata` user access to
 > the privileged socket connection of docker service, and therefore your whole machine.
 
