@@ -472,10 +472,14 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
                     buffer_rrd_value(wb, d->sp.sum);
+                    buffer_fast_strcat(wb, " '", 2);
+
+                    if(likely(d->sp.flags & SN_FLAG_NOT_ANOMALOUS))
+                        buffer_fast_strcat(wb, "A", 1);
                     if(unlikely(d->sp.flags & SN_FLAG_RESET))
-                        buffer_fast_strcat(wb, " R\n", 3);
-                    else
-                        buffer_fast_strcat(wb, "\n", 1);
+                        buffer_fast_strcat(wb, "R", 1);
+
+                    buffer_fast_strcat(wb, "'\n", 2);
 
 //                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" %s \"%s\"\n",
 //                                   rrddim_id(d->rd), value_str, d->sp.flags & SN_FLAG_RESET ? "R" : "");

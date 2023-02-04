@@ -1068,29 +1068,56 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *user, const char *keyword, const char *parent_keyword)
+static inline SN_FLAGS pluginsd_parse_storage_number_flags(const char *flags_str) {
+    SN_FLAGS flags = SN_FLAG_NONE;
+
+    char c;
+    while ((c = *flags_str++)) {
+        switch (c) {
+            case 'A':
+                flags |= SN_FLAG_NOT_ANOMALOUS;
+                break;
+
+            case 'R':
+                flags |= SN_FLAG_RESET;
+                break;
+
+            case 'E':
+                flags = SN_EMPTY_SLOT;
+                return flags;
+
+            default:
+                error("unknown SN_FLAGS flag '%c'", c);
+                break;
+        }
+    }
+
+    return flags;
+}
+
+PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
 {
     char *dimension = get_word(words, num_words, 1);
     char *value_str = get_word(words, num_words, 2);
     char *flags_str = get_word(words, num_words, 3);
 
-    RRDHOST *host = pluginsd_require_host_from_parent(user, keyword);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, keyword, parent_keyword);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
     PARSER_USER_OBJECT *u = user;
     if(!u->replay.rset_enabled) {
         error_limit_static_thread_var(erl, 1, 0);
         error_limit(&erl, "PLUGINSD: 'host:%s/chart:%s' got a %s but it is disabled by %s errors",
-                    rrdhost_hostname(host), rrdset_id(st), keyword, parent_keyword);
+                    rrdhost_hostname(host), rrdset_id(st), PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
         // we have to return OK here
         return PARSER_RC_OK;
     }
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, keyword);
+    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_SET);
     if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
 
     if (unlikely(!u->replay.start_time || !u->replay.end_time)) {
@@ -1098,10 +1125,10 @@ PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *use
               rrdhost_hostname(host),
               rrdset_id(st),
               dimension,
-              keyword,
+              PLUGINSD_KEYWORD_REPLAY_SET,
               u->replay.start_time,
               u->replay.end_time,
-              parent_keyword);
+              PLUGINSD_KEYWORD_REPLAY_BEGIN);
         return PLUGINSD_DISABLE_PLUGIN(user);
     }
 
@@ -1118,27 +1145,9 @@ PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *use
 
         if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
             NETDATA_DOUBLE value = strtondd(value_str, NULL);
-            SN_FLAGS flags = SN_FLAG_NONE;
+            SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
 
-            char c;
-            while ((c = *flags_str++)) {
-                switch (c) {
-                    case 'R':
-                        flags |= SN_FLAG_RESET;
-                        break;
-
-                    case 'E':
-                        flags |= SN_EMPTY_SLOT;
-                        value = NAN;
-                        break;
-
-                    default:
-                        error("unknown flag '%c'", c);
-                        break;
-                }
-            }
-
-            if (!netdata_double_isnumber(value)) {
+            if (!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT)) {
                 value = NAN;
                 flags = SN_EMPTY_SLOT;
             }
@@ -1171,10 +1180,6 @@ PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *use
 
     rrddim_acquired_release(rda);
     return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user) {
-    return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 }
 
 PARSER_RC pluginsd_replay_rrddim_collection_state_internal(char **words, size_t num_words, void *user, const char *keyword, const char *parent_keyword)
@@ -1382,13 +1387,16 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
     pluginsd_set_chart_from_parent(user, st);
 
+    if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED))
+        rrdset_isnot_obsolete(st);
+
     pluginsd_lock_data_collection(user);
 
     time_t update_every = (time_t)str2ul(update_every_str);
     time_t end_time = (time_t)str2ul(end_time_str);
 
     time_t wall_clock_time;
-    if(likely(*wall_clock_time_str == 'R'))
+    if(likely(*wall_clock_time_str == '#'))
         wall_clock_time = end_time;
     else
         wall_clock_time = (time_t)str2ul(wall_clock_time_str);
@@ -1433,11 +1441,63 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 }
 
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
+    char *dimension = get_word(words, num_words, 1);
+    char *collected_str = get_word(words, num_words, 2);
+    char *value_str = get_word(words, num_words, 3);
+    char *flags_str = get_word(words, num_words, 4);
+
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_SET_V2);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+
+    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+
+    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
+    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
+
+    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
+    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED))
+        rrddim_isnot_obsolete(st, rd);
+
+    collected_number collected_value = str2ll(collected_str, NULL);
+
+    NETDATA_DOUBLE value;
+    if(*value_str == '#')
+        value = (NETDATA_DOUBLE)collected_value;
+    else
+        value = strtondd(value_str, NULL);
+
+    SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
+
+    if (unlikely(!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT))) {
+        value = NAN;
+        flags = SN_EMPTY_SLOT;
+    }
+
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+    if(u->v2.stream_buffer.wb) {
+        BUFFER *wb = u->v2.stream_buffer.wb;
+        buffer_need_bytes(wb, 1024);
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+        buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+        buffer_fast_strcat(wb, "' ", 2);
+        buffer_strcat(wb, collected_str);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_strcat(wb, value_str);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_sn_flags(wb, flags);
+        buffer_fast_strcat(wb, "\n", 1);
+    }
 
-    if(u->replay.rset_enabled == true)
-        return pluginsd_replay_set_internal(words, num_words, user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
+    rrddim_store_metric(rd, u->replay.end_time_ut, value, flags);
+    rd->last_collected_time.tv_sec = u->replay.end_time;
+    rd->last_collected_time.tv_usec = 0;
+    rd->last_collected_value = collected_value;
+    rd->last_stored_value = value;
+    rd->last_calculated_value = value;
+    rd->collections_counter++;
 
+    rrddim_acquired_release(rda);
     return PARSER_RC_OK;
 }
 

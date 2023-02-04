@@ -403,7 +403,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_print_llu(wb, end_time_s);
         buffer_fast_strcat(wb, " ", 1);
         if(end_time_s == rsb->wall_clock_time)
-            buffer_fast_strcat(wb, "R", 1);
+            buffer_fast_strcat(wb, "#", 1);
         else
             buffer_print_llu(wb, rsb->wall_clock_time);
         buffer_fast_strcat(wb, "\n", 1);
@@ -417,11 +417,15 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, "' ", 2);
     buffer_print_ll(wb, rd->last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_rrd_value(wb, n);
-    if(unlikely(flags & SN_FLAG_RESET))
-        buffer_fast_strcat(wb, " R\n", 3);
+
+    if((NETDATA_DOUBLE)rd->last_calculated_value == n)
+        buffer_fast_strcat(wb, "#", 1);
     else
-        buffer_fast_strcat(wb, " ''\n", 1);
+        buffer_rrd_value(wb, n);
+
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_sn_flags(wb, flags);
+    buffer_fast_strcat(wb, "\n", 1);
 }
 
 void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
