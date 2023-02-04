@@ -36,8 +36,6 @@
 
 #define PLUGINSD_KEYWORD_BEGIN_V2               "BN"
 #define PLUGINSD_KEYWORD_SET_V2                 "ST"
-#define PLUGINSD_KEYWORD_RRDDIM_STATE_V2        "DS"
-#define PLUGINSD_KEYWORD_RRDSET_STATE_v2        "CS"
 #define PLUGINSD_KEYWORD_END_V2                 "ED"
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds

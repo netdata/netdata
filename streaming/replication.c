@@ -209,13 +209,12 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st, const char *rrddim_keyword, const char *rrdset_keyword) {
+void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
     RRDDIM *rd;
     rrddim_foreach_read(rd, st) {
                 if(!rd->exposed) continue;
 
-                buffer_strcat(wb, rrddim_keyword);
-                buffer_fast_strcat(wb, " '", 2);
+                buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
                 buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
                 buffer_fast_strcat(wb, "' ", 2);
                 buffer_print_llu(wb, (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec);
@@ -226,37 +225,21 @@ void rrdpush_send_chart_collection_state(BUFFER *wb, RRDSET *st, const char *rrd
                 buffer_fast_strcat(wb, " ", 1);
                 buffer_rrd_value(wb, rd->last_stored_value);
                 buffer_fast_strcat(wb, "\n", 1);
-
-//                buffer_sprintf(wb, "%s \"%s\" %llu %lld " NETDATA_DOUBLE_FORMAT " " NETDATA_DOUBLE_FORMAT "\n",
-//                               rrddim_keyword,
-//                               rrddim_id(rd),
-//                               (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec,
-//                               rd->last_collected_value,
-//                               rd->last_calculated_value,
-//                               rd->last_stored_value
-//                );
             }
     rrddim_foreach_done(rd);
 
-    buffer_strcat(wb, rrdset_keyword);
-    buffer_fast_strcat(wb, " ", 1);
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
     buffer_print_llu(wb, (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec);
     buffer_fast_strcat(wb, " ", 1);
     buffer_print_llu(wb, (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec);
     buffer_fast_strcat(wb, "\n", 1);
-
-//    buffer_sprintf(wb, "%s %llu %llu\n",
-//                   rrdset_keyword,
-//                   (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec,
-//                   (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec
-//    );
 }
 
 static void replication_query_finalize(BUFFER *wb, struct replication_query *q, bool executed) {
     size_t dimensions = q->dimensions;
 
     if(wb && q->query.enable_streaming)
-        rrdpush_send_chart_collection_state(wb, q->st, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
+        replication_send_chart_collection_state(wb, q->st);
 
     if(q->query.locked_data_collection) {
         netdata_spinlock_unlock(&q->st->data_collection_lock);

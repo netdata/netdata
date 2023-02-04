@@ -432,10 +432,8 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     if(!rsb->wb)
         return;
 
-    if(rsb->v2 && rsb->points_added) {
-        rrdpush_send_chart_collection_state(rsb->wb, st, PLUGINSD_KEYWORD_RRDDIM_STATE_V2, PLUGINSD_KEYWORD_RRDSET_STATE_v2);
+    if(rsb->v2 && rsb->points_added)
         buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
-    }
 
     sender_commit(st->rrdhost->sender, rsb->wb);
 
