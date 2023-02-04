@@ -62,10 +62,6 @@ static inline RRDHOST *pluginsd_require_host_from_parent(void *user, const char 
     return host;
 }
 
-static inline RRDHOST *pluginsd_get_host_from_parent(void *user) {
-    return ((PARSER_USER_OBJECT *) user)->host;
-}
-
 static inline RRDSET *pluginsd_require_chart_from_parent(void *user, const char *cmd, const char *parent_cmd) {
     RRDSET *st = ((PARSER_USER_OBJECT *) user)->st;
 
@@ -132,8 +128,14 @@ static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, cons
     return st;
 }
 
-static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(void *user) {
+static inline PARSER_RC PLUGINSD_DISABLE_PLUGIN(void *user, const char *keyword, const char *msg) {
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
+
+    if(keyword && msg) {
+        error_limit_static_global_var(erl, 1, 0);
+        error_limit(&erl, "PLUGINSD: keyword %s: %s", keyword, msg);
+    }
+
     return PARSER_RC_ERROR;
 }
 
@@ -143,13 +145,13 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
     char *value = get_word(words, num_words, 2);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_SET);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
 
@@ -170,10 +172,10 @@ PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user)
     char *microseconds_txt = get_word(words, num_words, 2);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_BEGIN);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     pluginsd_set_chart_from_parent(user, st);
 
@@ -217,10 +219,10 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
     UNUSED(num_words);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_END, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
@@ -238,7 +240,7 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
 PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user)
 {
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CHART);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     char *type = get_word(words, num_words, 1);
     char *name = get_word(words, num_words, 2);
@@ -261,19 +263,14 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user)
     }
 
     // make sure we have the required variables
-    if (unlikely((!type || !*type || !id || !*id))) {
-        error("PLUGINSD: 'host:%s' requested a CHART, without a type.id. Disabling it.",
-              rrdhost_hostname(host));
-
-        ((PARSER_USER_OBJECT *) user)->enabled = 0;
-        return PARSER_RC_ERROR;
-    }
+    if (unlikely((!type || !*type || !id || !*id)))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_CHART, "missing parameters");
 
     // parse the name, and make sure it does not include 'type.'
     if (unlikely(name && *name)) {
         // when data are streamed from child nodes
         // name will be type.name
-        // so we have to remove 'type.' from name too
+        // so, we have to remove 'type.' from name too
         size_t len = strlen(type);
         if (strncmp(type, name, len) == 0 && name[len] == '.')
             name = &name[len + 1];
@@ -362,10 +359,10 @@ PARSER_RC pluginsd_chart_definition_end(char **words, size_t num_words, void *us
     const char *wall_clock_time_txt = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_CHART_DEFINITION_END, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     time_t first_entry_child = (first_entry_txt && *first_entry_txt) ? (time_t)str2ul(first_entry_txt) : 0;
     time_t last_entry_child = (last_entry_txt && *last_entry_txt) ? (time_t)str2ul(last_entry_txt) : 0;
@@ -409,22 +406,13 @@ PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
     char *options = get_word(words, num_words, 6);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_DIMENSION);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_DIMENSION, PLUGINSD_KEYWORD_CHART);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    if (unlikely(!id)) {
-        error("PLUGINSD: 'host:%s/chart:%s' got a DIMENSION, without an id. Disabling it.",
-              rrdhost_hostname(host), st ? rrdset_id(st) : "UNSET");
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
-
-    if (unlikely(!st)) {
-        error("PLUGINSD: 'host:%s' got a DIMENSION, without a CHART. Disabling it.",
-              rrdhost_hostname(host));
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
+    if (unlikely(!id))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_DIMENSION, "missing dimension id");
 
     long multiplier = 1;
     if (multiplier_s && *multiplier_s) {
@@ -742,7 +730,7 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user)
     NETDATA_DOUBLE v;
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_VARIABLE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_get_chart_from_parent(user);
 
@@ -760,13 +748,8 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user)
         }
     }
 
-    if (unlikely(!name || !*name)) {
-        error("PLUGINSD: 'host:%s/chart:%s' got a VARIABLE without a variable name. Disabling it.",
-              rrdhost_hostname(host), st ? rrdset_id(st):"UNSET");
-
-        ((PARSER_USER_OBJECT *)user)->enabled = 0;
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
+    if (unlikely(!name || !*name))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_VARIABLE, "missing variable name");
 
     if (unlikely(!value || !*value))
         value = NULL;
@@ -780,14 +763,8 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user)
         return PARSER_RC_OK;
     }
 
-    if (!global && !st) {
-        error("PLUGINSD: 'host:%s/chart:%s' cannot update CHART VARIABLE '%s' without a chart",
-              rrdhost_hostname(host),
-              st ? rrdset_id(st):"UNSET",
-              name
-              );
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
+    if (!global && !st)
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_VARIABLE, "no chart is defined and no GLOBAL is given");
 
     char *endptr = NULL;
     v = (NETDATA_DOUBLE)str2ndd(value, &endptr);
@@ -855,10 +832,8 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user)
     const char *label_source = get_word(words, num_words, 2);
     const char *value = get_word(words, num_words, 3);
 
-    if (!name || !label_source || !value) {
-        error("PLUGINSD: ignoring malformed or empty LABEL command.");
-        return PLUGINSD_DISABLE_PLUGIN(user);
-    }
+    if (!name || !label_source || !value)
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_LABEL, "missing parameters");
 
     char *store = (char *)value;
     bool allocated_store = false;
@@ -904,7 +879,7 @@ PARSER_RC pluginsd_label(char **words, size_t num_words, void *user)
 PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_OVERWRITE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
@@ -928,7 +903,7 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user)
 
     if (!name || !value || !*label_source) {
         error("Ignoring malformed or empty CHART LABEL command.");
-        return PLUGINSD_DISABLE_PLUGIN(user);
+        return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
     }
 
     if(unlikely(!((PARSER_USER_OBJECT *) user)->chart_rrdlabels_linked_temporarily)) {
@@ -946,17 +921,17 @@ PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user)
 PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_CLABEL_COMMIT);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily) {
         error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.",
               rrdhost_hostname(host));
-        return PLUGINSD_DISABLE_PLUGIN(user);
+        return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
     }
 
     rrdlabels_remove_all_unmarked(((PARSER_USER_OBJECT *)user)->chart_rrdlabels_linked_temporarily);
@@ -975,7 +950,7 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
     char *child_now_str = get_word(words, num_words, 4);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st;
     if (likely(!id || !*id))
@@ -983,7 +958,7 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
     else
         st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
     pluginsd_set_chart_from_parent(user, st);
 
     if(start_time_str && end_time_str) {
@@ -1099,10 +1074,10 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
     char *flags_str = get_word(words, num_words, 3);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     PARSER_USER_OBJECT *u = user;
     if(!u->replay.rset_enabled) {
@@ -1115,7 +1090,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
     }
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     if (unlikely(!u->replay.start_time || !u->replay.end_time)) {
         error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s with invalid timestamps %ld to %ld from a %s. Disabling it.",
@@ -1126,7 +1101,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
               u->replay.start_time,
               u->replay.end_time,
               PLUGINSD_KEYWORD_REPLAY_BEGIN);
-        return PLUGINSD_DISABLE_PLUGIN(user);
+        return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
     }
 
     if (unlikely(!value_str || !*value_str))
@@ -1191,13 +1166,13 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     char *last_stored_value_str = get_word(words, num_words, 5);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
@@ -1224,10 +1199,10 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
@@ -1278,10 +1253,10 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     PARSER_USER_OBJECT *user_object = user;
 
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_END);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_END, PLUGINSD_KEYWORD_REPLAY_BEGIN);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     internal_error(true,
@@ -1365,11 +1340,14 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     char *end_time_str = get_word(words, num_words, 3);
     char *wall_clock_time_str = get_word(words, num_words, 4);
 
+    if(unlikely(!id || !update_every_str || !end_time_str || !wall_clock_time_str))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_BEGIN_V2, "missing parameters");
+
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
     pluginsd_set_chart_from_parent(user, st);
 
     if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED))
@@ -1434,14 +1412,17 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     char *value_str = get_word(words, num_words, 3);
     char *flags_str = get_word(words, num_words, 4);
 
+    if(unlikely(!dimension || !collected_str || !value_str || !flags_str))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_SET_V2, "missing parameters");
+
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_SET_V2);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED))
@@ -1498,10 +1479,10 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
 PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_END_V2);
-    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_END_V2, PLUGINSD_KEYWORD_BEGIN_V2);
-    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     // ------------------------------------------------------------------------
     // unblock data collection
