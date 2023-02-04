@@ -2069,3 +2069,89 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
         closedir(dir);
     }
 }
+
+struct timing_steps {
+    const char *name;
+    usec_t time;
+    size_t count;
+} timing_steps[TIMING_STEP_MAX + 1] = {
+        [TIMING_STEP_INTERNAL] = { .name = "internal", .time = 0, },
+
+        [TIMING_STEP_PREPARE] = { .name = "prepare", .time = 0, },
+        [TIMING_STEP_LOOKUP_DIMENSION] = { .name = "lookup dim", .time = 0, },
+        [TIMING_STEP_PARSE] = { .name = "parse", .time = 0, },
+        [TIMING_STEP_PROPAGATE] = { .name = "propagate", .time = 0, },
+        [TIMING_STEP_STORE] = { .name = "store", .time = 0, },
+
+        // terminator
+        [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },
+};
+
+void timing_action(TIMING_ACTION action, TIMING_STEP step) {
+    static __thread usec_t last_action_time = 0;
+    static __thread struct timing_steps timings2[TIMING_STEP_MAX + 1] = {};
+    static __thread BUFFER *wb = NULL;
+
+    switch(action) {
+        case TIMING_ACTION_INIT:
+            last_action_time = now_monotonic_usec();
+            break;
+
+        case TIMING_ACTION_STEP: {
+            if(!last_action_time)
+                return;
+
+            usec_t timing_step = now_monotonic_usec();
+            __atomic_add_fetch(&timing_steps[step].time, timing_step - last_action_time, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&timing_steps[step].count, 1, __ATOMIC_RELAXED);
+            last_action_time = timing_step;
+            break;
+        }
+
+        case TIMING_ACTION_FINISH: {
+            if(!last_action_time)
+                return;
+
+            usec_t expected = __atomic_load_n(&timing_steps[TIMING_STEP_INTERNAL].time, __ATOMIC_RELAXED);
+            if(last_action_time - expected < 10 * USEC_PER_SEC) {
+                last_action_time = 0;
+                return;
+            }
+
+            if(!__atomic_compare_exchange_n(&timing_steps[TIMING_STEP_INTERNAL].time, &expected, last_action_time, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+                last_action_time = 0;
+                return;
+            }
+
+            struct timing_steps timings3[TIMING_STEP_MAX + 1];
+            memcpy(timings3, timing_steps, sizeof(timings3));
+
+            usec_t total = 0;
+            for(size_t t = 1; t < TIMING_STEP_MAX ; t++)
+                total += timings3[t].time - timings2[t].time;
+
+            if(!wb)
+                wb = buffer_create(1024, NULL);
+
+            buffer_flush(wb);
+
+            for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
+                if(!timing_steps[t].count) continue;
+
+                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: count %6zu, time %10.2f ms (%7.2f %%)\n",
+                               t,
+                               timing_steps[t].name ? timing_steps[t].name : "x",
+                               timings3[t].count - timings2[t].count,
+                               (double) (timings3[t].time - timings2[t].time) / USEC_PER_MS,
+                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total
+                );
+            }
+
+            info("TIMINGS REPORT:\n%sTIMINGS REPORT: total %0.2f ms", buffer_tostring(wb), (double)total / USEC_PER_MS);
+
+            memcpy(timings2, timings3, sizeof(timings2));
+
+            last_action_time = 0;
+        }
+    }
+}

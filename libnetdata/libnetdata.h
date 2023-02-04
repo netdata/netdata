@@ -661,6 +661,29 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
     }
 }
 
+typedef enum {
+    TIMING_STEP_INTERNAL = 0,
+    TIMING_STEP_PREPARE,
+    TIMING_STEP_LOOKUP_DIMENSION,
+    TIMING_STEP_PARSE,
+    TIMING_STEP_PROPAGATE,
+    TIMING_STEP_STORE,
+
+    // terminator
+    TIMING_STEP_MAX,
+} TIMING_STEP;
+
+typedef enum {
+    TIMING_ACTION_INIT,
+    TIMING_ACTION_STEP,
+    TIMING_ACTION_FINISH,
+} TIMING_ACTION;
+
+#define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
+#define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
+#define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+void timing_action(TIMING_ACTION action, TIMING_STEP step);
+
 # ifdef __cplusplus
 }
 # endif
