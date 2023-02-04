@@ -1178,8 +1178,8 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
     if(last_collected_ut > dim_last_collected_ut) {
-        rd->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
-        rd->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
+        rd->last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
+        rd->last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
     }
 
     rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
@@ -1207,15 +1207,15 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
     if(last_collected_ut > chart_last_collected_ut) {
-        st->last_collected_time.tv_sec = last_collected_ut / USEC_PER_SEC;
-        st->last_collected_time.tv_usec = last_collected_ut % USEC_PER_SEC;
+        st->last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
+        st->last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
     }
 
     usec_t chart_last_updated_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec;
     usec_t last_updated_ut = last_updated_ut_str ? str2ull(last_updated_ut_str) : 0;
     if(last_updated_ut > chart_last_updated_ut) {
-        st->last_updated.tv_sec = last_updated_ut / USEC_PER_SEC;
-        st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
+        st->last_updated.tv_sec = (time_t)(last_updated_ut / USEC_PER_SEC);
+        st->last_updated.tv_usec = (last_updated_ut % USEC_PER_SEC);
     }
 
     st->counter++;
@@ -1376,7 +1376,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if(!u->v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
         u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, wall_clock_time);
 
-    if(u->v2.stream_buffer.wb) {
+    if(u->v2.stream_buffer.wb && u->v2.stream_buffer.v2) {
         BUFFER *wb = u->v2.stream_buffer.wb;
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " ", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 1);
         buffer_strcat(wb, update_every_str);
@@ -1447,7 +1447,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     // propagate it forward
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->v2.stream_buffer.wb) {
+    if(u->v2.stream_buffer.wb && u->v2.stream_buffer.v2) {
         BUFFER *wb = u->v2.stream_buffer.wb;
         buffer_need_bytes(wb, 1024);
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
@@ -1485,6 +1485,13 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     // ------------------------------------------------------------------------
+    // propagate the whole chart update in v1
+
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+    if(u->v2.stream_buffer.wb && !u->v2.stream_buffer.v2)
+        rrdset_push_metrics_v1(&u->v2.stream_buffer, st);
+
+    // ------------------------------------------------------------------------
     // unblock data collection
 
     pluginsd_unlock_data_collection(user);
@@ -1493,7 +1500,6 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // ------------------------------------------------------------------------
     // propagate it forward
 
-    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->v2.stream_buffer.wb)
         rrdset_push_metrics_finished(&u->v2.stream_buffer, st);
 
