@@ -415,12 +415,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    collected_number last_collected_value = rd->last_collected_value;
-    if(unlikely(rd->last_collected_value < 0)) {
-        buffer_fast_strcat(wb, "-", 1);
-        last_collected_value = -last_collected_value;
-    }
-    buffer_print_llu_hex(wb, last_collected_value);
+    buffer_print_ll_hex(wb, rd->last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
     if((NETDATA_DOUBLE)rd->last_collected_value == n)

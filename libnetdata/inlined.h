@@ -146,6 +146,13 @@ static inline unsigned long long str2ull_hex_or_dec(const char *s) {
         return str2ull(s);
 }
 
+static inline long long str2ll_hex_or_dec(const char *s) {
+    if(*s == '-')
+        return -(long long)str2ull_hex_or_dec(&s[1]);
+    else
+        return (long long)str2ull_hex_or_dec(s);
+}
+
 static inline long long str2ll(const char *s, char **endptr) {
     int negative = 0;
 

@@ -160,7 +160,7 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
               rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
 
     if (value && *value)
-        rrddim_set_by_pointer(st, rd, strtoll(value, NULL, 0));
+        rrddim_set_by_pointer(st, rd, str2ll_hex_or_dec(value));
 
     rrddim_acquired_release(rda);
     return PARSER_RC_OK;
@@ -416,14 +416,14 @@ PARSER_RC pluginsd_dimension(char **words, size_t num_words, void *user)
 
     long multiplier = 1;
     if (multiplier_s && *multiplier_s) {
-        multiplier = strtol(multiplier_s, NULL, 0);
+        multiplier = str2ll_hex_or_dec(multiplier_s);
         if (unlikely(!multiplier))
             multiplier = 1;
     }
 
     long divisor = 1;
     if (likely(divisor_s && *divisor_s)) {
-        divisor = strtol(divisor_s, NULL, 0);
+        divisor = str2ll_hex_or_dec(divisor_s);
         if (unlikely(!divisor))
             divisor = 1;
     }
@@ -1059,7 +1059,6 @@ static inline SN_FLAGS pluginsd_parse_storage_number_flags(const char *flags_str
                 return flags;
 
             default:
-                // error("unknown SN_FLAGS flag '%c'", c);
                 break;
         }
     }
@@ -1437,11 +1436,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    collected_number collected_value;
-    if(unlikely(*collected_str == '-'))
-        collected_value = (collected_number)-str2ull_hex_or_dec(&collected_str[1]);
-    else
-        collected_value = (collected_number)str2ull_hex_or_dec(collected_str);
+    collected_number collected_value = (collected_number)str2ll_hex_or_dec(collected_str);
 
     NETDATA_DOUBLE value;
     if(*value_str == '#')

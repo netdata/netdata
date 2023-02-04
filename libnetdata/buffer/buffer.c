@@ -191,7 +191,7 @@ static unsigned char bits03_to_hex[16] = {
     [15] = 'F'
 };
 
-void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
+inline void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
 {
     unsigned char buffer[sizeof(unsigned long long) * 2 + 2 + 1];   // 8 bytes * 2 + '0x' + '\0'
     unsigned char *e = &buffer[sizeof(unsigned long long) * 2 + 2];
@@ -218,6 +218,15 @@ void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
     *p   = '0';
 
     buffer_fast_strcat(wb, (char *)p, e - p);
+}
+
+void buffer_print_ll_hex(BUFFER *wb, long long value) {
+    if(value < 0) {
+        buffer_fast_strcat(wb, "-", 1);
+        value = -value;
+    }
+
+    buffer_print_llu_hex(wb, value);
 }
 
 inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
