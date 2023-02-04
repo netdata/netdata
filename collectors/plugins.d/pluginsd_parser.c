@@ -971,25 +971,23 @@ PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size_t num_words _
     return PARSER_RC_OK;
 }
 
-PARSER_RC pluginsd_replay_begin_internal(char **words, size_t num_words, void *user, const char *keyword) {
+PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
     char *id = get_word(words, num_words, 1);
     char *start_time_str = get_word(words, num_words, 2);
     char *end_time_str = get_word(words, num_words, 3);
     char *child_now_str = get_word(words, num_words, 4);
 
-    RRDHOST *host = pluginsd_require_host_from_parent(user, keyword);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
     RRDSET *st;
     if (likely(!id || !*id))
-        st = pluginsd_require_chart_from_parent(user, keyword, keyword);
+        st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_BEGIN, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     else
-        st = pluginsd_find_chart(host, id, keyword);
+        st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
     pluginsd_set_chart_from_parent(user, st);
-
-    pluginsd_lock_data_collection(user);
 
     if(start_time_str && end_time_str) {
         time_t start_time = (time_t)str2ul(start_time_str);
@@ -1011,13 +1009,12 @@ PARSER_RC pluginsd_replay_begin_internal(char **words, size_t num_words, void *u
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         internal_error(
-                keyword == PLUGINSD_KEYWORD_REPLAY_BEGIN &&
                 (!st->replay.start_streaming && (end_time < st->replay.after || start_time > st->replay.before)),
                 "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, which does not match our request (%ld to %ld).",
                 rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time, st->replay.after, st->replay.before);
 
         internal_error(
-                keyword == PLUGINSD_KEYWORD_REPLAY_BEGIN,
+                true,
                 "REPLAY: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN " from %ld to %ld, child wall clock is %ld (%s), had requested %ld to %ld",
                 rrdhost_hostname(st->rrdhost), rrdset_id(st),
                 start_time, end_time, wall_clock_time, wall_clock_comes_from_child ? "from child" : "parent time",
@@ -1052,9 +1049,10 @@ PARSER_RC pluginsd_replay_begin_internal(char **words, size_t num_words, void *u
             return PARSER_RC_OK;
         }
 
-        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a %s from %ld to %ld, but timestamps are invalid "
+        error("PLUGINSD REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_BEGIN
+              " from %ld to %ld, but timestamps are invalid "
               "(now is %ld [%s], tolerance %ld). Ignoring " PLUGINSD_KEYWORD_REPLAY_SET,
-              rrdhost_hostname(st->rrdhost), rrdset_id(st), keyword, start_time, end_time,
+              rrdhost_hostname(st->rrdhost), rrdset_id(st), start_time, end_time,
               wall_clock_time, wall_clock_comes_from_child ? "child wall clock" : "parent wall clock", tolerance);
     }
 
@@ -1068,10 +1066,6 @@ PARSER_RC pluginsd_replay_begin_internal(char **words, size_t num_words, void *u
     ((PARSER_USER_OBJECT *) user)->replay.wall_clock_time = 0;
     ((PARSER_USER_OBJECT *) user)->replay.rset_enabled = false;
     return PARSER_RC_OK;
-}
-
-PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
-    return pluginsd_replay_begin_internal(words, num_words, user, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 }
 
 PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *user, const char *keyword, const char *parent_keyword)
@@ -1149,9 +1143,19 @@ PARSER_RC pluginsd_replay_set_internal(char **words, size_t num_words, void *use
                 flags = SN_EMPTY_SLOT;
             }
 
-            if(u->v2.stream_buffer.wb)
-                buffer_sprintf(u->v2.stream_buffer.wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" \"%s\" \"%s\"\n",
-                               dimension, value_str, flags_str);
+            if(u->v2.stream_buffer.wb) {
+                BUFFER *wb = u->v2.stream_buffer.wb;
+                buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+                buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+                buffer_fast_strcat(wb, "' ", 2);
+                buffer_strcat(wb, value_str);
+                buffer_fast_strcat(wb, " '", 2);
+                buffer_strcat(wb, flags_str);
+                buffer_fast_strcat(wb, "'\n", 2);
+
+//                buffer_sprintf(u->v2.stream_buffer.wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" \"%s\" \"%s\"\n",
+//                               dimension, value_str, flags_str);
+            }
 
             rrddim_store_metric(rd, u->replay.end_time_ut, value, flags);
             rd->last_collected_time.tv_sec = u->replay.end_time;
@@ -1205,6 +1209,9 @@ PARSER_RC pluginsd_replay_rrddim_collection_state_internal(char **words, size_t 
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
     rd->last_stored_value = last_stored_value_str ? str2ndd(last_stored_value_str, NULL) : 0.0;
     rrddim_acquired_release(rda);
+
+    // FIXME - add these to streaming buffer
+
     return PARSER_RC_OK;
 }
 
@@ -1239,6 +1246,8 @@ PARSER_RC pluginsd_replay_rrdset_collection_state_internal(char **words, size_t 
         st->last_updated.tv_sec = last_updated_ut / USEC_PER_SEC;
         st->last_updated.tv_usec = last_updated_ut % USEC_PER_SEC;
     }
+
+    // FIXME - add these to streaming buffer
 
     st->counter++;
     st->counter_done++;
@@ -1361,17 +1370,66 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
 }
 
 PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
-    PARSER_RC rc = pluginsd_replay_begin_internal(words, num_words, user, PLUGINSD_KEYWORD_BEGIN_V2);
+    char *id = get_word(words, num_words, 1);
+    char *update_every_str = get_word(words, num_words, 2);
+    char *end_time_str = get_word(words, num_words, 3);
+    char *wall_clock_time_str = get_word(words, num_words, 4);
+
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_BEGIN_V2);
+    if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
+
+    RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
+    if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
+    pluginsd_set_chart_from_parent(user, st);
+
+    pluginsd_lock_data_collection(user);
+
+    time_t update_every = (time_t)str2ul(update_every_str);
+    time_t end_time = (time_t)str2ul(end_time_str);
+
+    time_t wall_clock_time;
+    if(likely(*wall_clock_time_str == 'R'))
+        wall_clock_time = end_time;
+    else
+        wall_clock_time = (time_t)str2ul(wall_clock_time_str);
+
+    if (unlikely(update_every != st->update_every))
+        rrdset_set_update_every_s(st, update_every);
+
+    st->last_collected_time.tv_sec = end_time;
+    st->last_collected_time.tv_usec = 0;
+
+    st->last_updated.tv_sec = end_time;
+    st->last_updated.tv_usec = 0;
+
+    st->counter++;
+    st->counter_done++;
+
+    // these are only needed for db mode RAM, SAVE, MAP, ALLOC
+    st->current_entry++;
+    if(st->current_entry >= st->entries)
+        st->current_entry -= st->entries;
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(rc == PARSER_RC_OK && u->replay.rset_enabled == true) {
-        RRDHOST *host = pluginsd_get_host_from_parent(user);
-        RRDSET *st = pluginsd_get_chart_from_parent(user);
-        if(host && st && !u->v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
-            u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, u->replay.wall_clock_time);
+    u->v2.update_every = update_every;
+    u->v2.end_time = end_time;
+    u->v2.wall_clock_time = wall_clock_time;
+
+    if(!u->v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
+        u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, u->replay.wall_clock_time);
+
+    if(u->v2.stream_buffer.wb) {
+        BUFFER *wb = u->v2.stream_buffer.wb;
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " ", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 1);
+        buffer_strcat(wb, update_every_str);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_strcat(wb, end_time_str);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_strcat(wb, wall_clock_time_str);
+        buffer_fast_strcat(wb, "\n", 1);
     }
 
-    return rc;
+    return PARSER_RC_OK;
 }
 
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {

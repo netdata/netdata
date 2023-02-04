@@ -33,6 +33,9 @@ typedef struct parser_user_object {
 
     struct {
         RRDSET_STREAM_BUFFER stream_buffer;
+        time_t update_every;
+        time_t end_time;
+        time_t wall_clock_time;
     } v2;
 } PARSER_USER_OBJECT;
 
