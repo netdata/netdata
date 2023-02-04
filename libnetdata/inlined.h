@@ -138,7 +138,7 @@ static inline unsigned long long str2ull_hex_or_dec(const char *s) {
             if (c <= '9')
                 n += c - '0';
             else
-                n += c - 'A';
+                n += c - 'A' + 10;
         }
         return n;
     }
