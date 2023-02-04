@@ -18,8 +18,6 @@ typedef struct parser_user_object {
     int enabled;
 
     struct {
-        bool locked_data_collection;
-
         time_t start_time;
         time_t end_time;
 
@@ -32,6 +30,7 @@ typedef struct parser_user_object {
     } replay;
 
     struct {
+        bool locked_data_collection;
         RRDSET_STREAM_BUFFER stream_buffer;
         time_t update_every;
         time_t end_time;

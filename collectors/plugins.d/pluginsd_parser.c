@@ -81,26 +81,23 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 
 static inline void pluginsd_lock_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->st && !u->replay.locked_data_collection) {
+    if(u->st && !u->v2.locked_data_collection) {
         // netdata_spinlock_lock(&u->st->data_collection_lock);
-        u->replay.locked_data_collection = true;
+        u->v2.locked_data_collection = true;
     }
 }
 
 static inline void pluginsd_unlock_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->st && u->replay.locked_data_collection) {
+    if(u->st && u->v2.locked_data_collection) {
         // netdata_spinlock_unlock(&u->st->data_collection_lock);
-        u->replay.locked_data_collection = false;
+        u->v2.locked_data_collection = false;
     }
 }
 
 static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-
-    if(u->st && u->replay.locked_data_collection)
-        pluginsd_unlock_data_collection(user);
-
+    pluginsd_unlock_data_collection(user);
     u->st = st;
 }
 
@@ -1378,8 +1375,6 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED))
         rrdset_isnot_obsolete(st);
 
-    pluginsd_lock_data_collection(user);
-
     time_t update_every = (time_t)str2ul(update_every_str);
     time_t end_time = (time_t)str2ul(end_time_str);
 
@@ -1392,19 +1387,8 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if (unlikely(update_every != st->update_every))
         rrdset_set_update_every_s(st, update_every);
 
-    st->last_collected_time.tv_sec = end_time;
-    st->last_collected_time.tv_usec = 0;
-
-    st->last_updated.tv_sec = end_time;
-    st->last_updated.tv_usec = 0;
-
-    st->counter++;
-    st->counter_done++;
-
-    // these are only needed for db mode RAM, SAVE, MAP, ALLOC
-    st->current_entry++;
-    if(st->current_entry >= st->entries)
-        st->current_entry -= st->entries;
+    // ------------------------------------------------------------------------
+    // propagate it forward
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     u->v2.update_every = update_every;
@@ -1412,7 +1396,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     u->v2.wall_clock_time = wall_clock_time;
 
     if(!u->v2.stream_buffer.wb && rrdhost_has_rrdpush_sender_enabled(st->rrdhost))
-        u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, u->replay.wall_clock_time);
+        u->v2.stream_buffer = rrdset_push_metric_initialize(u->st, wall_clock_time);
 
     if(u->v2.stream_buffer.wb) {
         BUFFER *wb = u->v2.stream_buffer.wb;
@@ -1424,6 +1408,22 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
         buffer_strcat(wb, wall_clock_time_str);
         buffer_fast_strcat(wb, "\n", 1);
     }
+
+    // ------------------------------------------------------------------------
+    // store it
+
+    pluginsd_lock_data_collection(user);
+    st->last_collected_time.tv_sec = end_time;
+    st->last_collected_time.tv_usec = 0;
+    st->last_updated.tv_sec = end_time;
+    st->last_updated.tv_usec = 0;
+    st->counter++;
+    st->counter_done++;
+
+    // these are only needed for db mode RAM, SAVE, MAP, ALLOC
+    st->current_entry++;
+    if(st->current_entry >= st->entries)
+        st->current_entry -= st->entries;
 
     return PARSER_RC_OK;
 }
@@ -1462,6 +1462,9 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         flags = SN_EMPTY_SLOT;
     }
 
+    // ------------------------------------------------------------------------
+    // propagate it forward
+
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->v2.stream_buffer.wb) {
         BUFFER *wb = u->v2.stream_buffer.wb;
@@ -1478,8 +1481,11 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         u->v2.stream_buffer.points_added++;
     }
 
-    rrddim_store_metric(rd, u->replay.end_time_ut, value, flags);
-    rd->last_collected_time.tv_sec = u->replay.end_time;
+    // ------------------------------------------------------------------------
+    // store it
+
+    rrddim_store_metric(rd, u->v2.end_time * USEC_PER_SEC, value, flags);
+    rd->last_collected_time.tv_sec = u->v2.end_time;
     rd->last_collected_time.tv_usec = 0;
     rd->last_collected_value = collected_value;
     rd->last_stored_value = value;
@@ -1491,17 +1497,24 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 }
 
 PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {
-    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_END_V2);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_SET, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_END_V2, PLUGINSD_KEYWORD_BEGIN_V2);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user);
 
+    // ------------------------------------------------------------------------
+    // unblock data collection
+
+    pluginsd_unlock_data_collection(user);
+    rrdcontext_collected_rrdset(st);
+
+    // ------------------------------------------------------------------------
+    // propagate it forward
+
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(u->v2.stream_buffer.wb) {
+    if(u->v2.stream_buffer.wb)
         rrdset_push_metrics_finished(&u->v2.stream_buffer, st);
-        rrdcontext_collected_rrdset(st);
-    }
 
     return PARSER_RC_OK;
 }
