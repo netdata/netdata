@@ -1356,14 +1356,14 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     // ------------------------------------------------------------------------
     // parse the parameters
 
-    time_t update_every = (time_t)strtoull(update_every_str, NULL, 16);
-    time_t end_time = (time_t)strtoull(end_time_str, NULL, 16);
+    time_t update_every = (time_t)str2ull_hex_or_dec(update_every_str);
+    time_t end_time = (time_t)str2ull_hex_or_dec(end_time_str);
 
     time_t wall_clock_time;
     if(likely(*wall_clock_time_str == '#'))
         wall_clock_time = end_time;
     else
-        wall_clock_time = (time_t)strtoull(wall_clock_time_str, NULL, 16);
+        wall_clock_time = (time_t)str2ull_hex_or_dec(wall_clock_time_str);
 
     if (unlikely(update_every != st->update_every))
         rrdset_set_update_every_s(st, update_every);
@@ -1439,9 +1439,9 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
     collected_number collected_value;
     if(unlikely(*collected_str == '-'))
-        collected_value = (collected_number)-strtoull(&collected_str[1], NULL, 16);
+        collected_value = (collected_number)-str2ull_hex_or_dec(&collected_str[1]);
     else
-        collected_value = (collected_number)strtoull(collected_str, NULL, 16);
+        collected_value = (collected_number)str2ull_hex_or_dec(collected_str);
 
     NETDATA_DOUBLE value;
     if(*value_str == '#')
