@@ -1353,14 +1353,17 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED))
         rrdset_isnot_obsolete(st);
 
-    time_t update_every = (time_t)str2ul(update_every_str);
-    time_t end_time = (time_t)str2ul(end_time_str);
+    // ------------------------------------------------------------------------
+    // parse the parameters
+
+    time_t update_every = (time_t)strtoull(update_every_str, NULL, 16);
+    time_t end_time = (time_t)strtoull(end_time_str, NULL, 16);
 
     time_t wall_clock_time;
     if(likely(*wall_clock_time_str == '#'))
         wall_clock_time = end_time;
     else
-        wall_clock_time = (time_t)str2ul(wall_clock_time_str);
+        wall_clock_time = (time_t)strtoull(wall_clock_time_str, NULL, 16);
 
     if (unlikely(update_every != st->update_every))
         rrdset_set_update_every_s(st, update_every);
@@ -1428,10 +1431,17 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-    if(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED))
+    if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
         rrddim_isnot_obsolete(st, rd);
 
-    collected_number collected_value = str2ll(collected_str, NULL);
+    // ------------------------------------------------------------------------
+    // parse the parameters
+
+    collected_number collected_value;
+    if(unlikely(*collected_str == '-'))
+        collected_value = (collected_number)-strtoull(&collected_str[1], NULL, 16);
+    else
+        collected_value = (collected_number)strtoull(collected_str, NULL, 16);
 
     NETDATA_DOUBLE value;
     if(*value_str == '#')

@@ -398,14 +398,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_llu(wb, rd->rrdset->update_every);
+        buffer_print_llu_hex(wb, rd->rrdset->update_every);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_llu(wb, end_time_s);
+        buffer_print_llu_hex(wb, end_time_s);
         buffer_fast_strcat(wb, " ", 1);
         if(end_time_s == rsb->wall_clock_time)
             buffer_fast_strcat(wb, "#", 1);
         else
-            buffer_print_llu(wb, rsb->wall_clock_time);
+            buffer_print_llu_hex(wb, rsb->wall_clock_time);
         buffer_fast_strcat(wb, "\n", 1);
 
         rsb->last_point_end_time_ut = point_end_time_ut;
@@ -415,7 +415,12 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_ll(wb, rd->last_collected_value);
+    collected_number last_collected_value = rd->last_collected_value;
+    if(unlikely(rd->last_collected_value < 0)) {
+        buffer_fast_strcat(wb, "-", 1);
+        last_collected_value = -last_collected_value;
+    }
+    buffer_print_llu_hex(wb, last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
     if((NETDATA_DOUBLE)rd->last_collected_value == n)
