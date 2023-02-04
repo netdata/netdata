@@ -490,13 +490,12 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
 
     if(likely(handle->page)) {
         /* Make alignment decisions */
-        if (handle->page_position == handle->alignment->page_position) {
+        if (likely(handle->page_position == handle->alignment->page_position)) {
             /* this is the leading dimension that defines chart alignment */
             perfect_page_alignment = true;
         }
-
-        /* is the metric far enough out of alignment with the others? */
-        if (unlikely(handle->page_position + 1 < handle->alignment->page_position))
+        else if (unlikely(handle->page_position + 1 < handle->alignment->page_position))
+            /* is the metric far enough out of alignment with the others? */
             handle->options |= RRDENG_CHO_UNALIGNED;
 
         if (unlikely((handle->options & RRDENG_CHO_UNALIGNED) &&
@@ -516,34 +515,22 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     else
         data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
 
-    switch (ctx->config.page_type) {
-        case PAGE_METRICS: {
-            storage_number *tier0_metric_data = data;
-            tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
-        }
-        break;
-
-        case PAGE_TIER: {
-            storage_number_tier1_t *tier12_metric_data = data;
-            storage_number_tier1_t number_tier1;
-            number_tier1.sum_value = (float)n;
-            number_tier1.min_value = (float)min_value;
-            number_tier1.max_value = (float)max_value;
-            number_tier1.anomaly_count = anomaly_count;
-            number_tier1.count = count;
-            tier12_metric_data[handle->page_position] = number_tier1;
-        }
-        break;
-
-        default: {
-            static bool logged = false;
-            if(!logged) {
-                error("DBENGINE: cannot store metric on unknown page type id %d", ctx->config.page_type);
-                logged = true;
-            }
-        }
-        break;
+    if(likely(ctx->config.page_type == PAGE_METRICS)) {
+        storage_number *tier0_metric_data = data;
+        tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
     }
+    else if(likely(ctx->config.page_type == PAGE_TIER)) {
+        storage_number_tier1_t *tier12_metric_data = data;
+        storage_number_tier1_t number_tier1;
+        number_tier1.sum_value = (float) n;
+        number_tier1.min_value = (float) min_value;
+        number_tier1.max_value = (float) max_value;
+        number_tier1.anomaly_count = anomaly_count;
+        number_tier1.count = count;
+        tier12_metric_data[handle->page_position] = number_tier1;
+    }
+    else
+        fatal("DBENGINE: cannot store metric on unknown page type id %d", ctx->config.page_type);
 
     if(unlikely(!handle->page)){
         rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);

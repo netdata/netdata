@@ -1411,7 +1411,46 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     return PARSER_RC_OK;
 }
 
+#define TIMING_PREPARE 1
+#define TIMING_PARSE 2
+#define TIMING_PROPAGATE 3
+#define TIMING_STORE 4
+static usec_t timings[5] = {}, timings2[5] = {};
+
+#define timing_init() usec_t timing_started = now_monotonic_usec(), timing_step
+#define timing_step(id) do { timing_step = now_monotonic_usec(); __atomic_add_fetch(&timings[id], timing_step - timing_started, __ATOMIC_RELAXED); timing_started = timing_step; } while(0)
+
+static void timing_report(usec_t now) {
+    usec_t expected = __atomic_load_n(&timings[0], __ATOMIC_RELAXED);
+    if(now - expected < 5 * USEC_PER_SEC)
+        return;
+
+    if(!__atomic_compare_exchange_n(&timings[0], &expected, now, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        return;
+
+    usec_t timings3[5];
+    memcpy(timings3, timings, sizeof(timings));
+
+    usec_t total =
+            (timings3[1] - timings2[1]) +
+            (timings3[2] - timings2[2]) +
+            (timings3[3] - timings2[3]) +
+            (timings3[4] - timings2[4]) ;
+
+    internal_error(true,
+                   "TIMINGS: prepare %0.2f ms (%0.2f %%), parse %0.2f ms (%0.2f %%), propagate %0.2f ms (%0.2f %%), store %0.2f ms (%0.2f %%)",
+                    (double)(timings3[TIMING_PREPARE] - timings2[TIMING_PREPARE]) / USEC_PER_MS, (double)(timings3[TIMING_PREPARE] - timings2[TIMING_PREPARE]) * 100.0 / total,
+                    (double)(timings3[TIMING_PARSE] - timings2[TIMING_PARSE]) / USEC_PER_MS, (double)(timings3[TIMING_PARSE] - timings2[TIMING_PARSE]) * 100.0 / total,
+                    (double)(timings3[TIMING_PROPAGATE] - timings2[TIMING_PROPAGATE]) / USEC_PER_MS, (double)(timings3[TIMING_PROPAGATE] - timings2[TIMING_PROPAGATE]) * 100.0 / total,
+                    (double)(timings3[TIMING_STORE] - timings2[TIMING_STORE]) / USEC_PER_MS, (double)(timings3[TIMING_STORE] - timings2[TIMING_STORE]) * 100.0 / total
+                   );
+
+    memcpy(timings2, timings3, sizeof(timings));
+}
+
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
+    timing_init();
+
     char *dimension = get_word(words, num_words, 1);
     char *collected_str = get_word(words, num_words, 2);
     char *value_str = get_word(words, num_words, 3);
@@ -1433,6 +1472,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
         rrddim_isnot_obsolete(st, rd);
 
+    timing_step(TIMING_PREPARE);
+
     // ------------------------------------------------------------------------
     // parse the parameters
 
@@ -1450,6 +1491,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         value = NAN;
         flags = SN_EMPTY_SLOT;
     }
+
+    timing_step(TIMING_PARSE);
 
     // ------------------------------------------------------------------------
     // propagate it forward
@@ -1470,6 +1513,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         u->v2.stream_buffer.points_added++;
     }
 
+    timing_step(TIMING_PROPAGATE);
+
     // ------------------------------------------------------------------------
     // store it
 
@@ -1483,6 +1528,11 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->updated = true;
 
     rrddim_acquired_release(rda);
+
+    timing_step(TIMING_STORE);
+
+    timing_report(timing_started);
+
     return PARSER_RC_OK;
 }
 
