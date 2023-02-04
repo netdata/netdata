@@ -34,9 +34,9 @@
 #define PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE    "RSSTATE"
 #define PLUGINSD_KEYWORD_REPLAY_END             "REND"
 
-#define PLUGINSD_KEYWORD_BEGIN_V2               "BN"
-#define PLUGINSD_KEYWORD_SET_V2                 "ST"
-#define PLUGINSD_KEYWORD_END_V2                 "ED"
+#define PLUGINSD_KEYWORD_BEGIN_V2               "BEGIN2"
+#define PLUGINSD_KEYWORD_SET_V2                 "SET2"
+#define PLUGINSD_KEYWORD_END_V2                 "END2"
 
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
