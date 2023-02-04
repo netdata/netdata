@@ -1472,6 +1472,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->last_stored_value = value;
     rd->last_calculated_value = value;
     rd->collections_counter++;
+    rd->updated = true;
 
     rrddim_acquired_release(rda);
     return PARSER_RC_OK;
