@@ -1437,8 +1437,7 @@ static void timing_report(usec_t now) {
             (timings3[3] - timings2[3]) +
             (timings3[4] - timings2[4]) ;
 
-    internal_error(true,
-                   "TIMINGS: prepare %0.2f ms (%0.2f %%), parse %0.2f ms (%0.2f %%), propagate %0.2f ms (%0.2f %%), store %0.2f ms (%0.2f %%)",
+    info(           "TIMINGS: prepare %0.2f ms (%0.2f %%), parse %0.2f ms (%0.2f %%), propagate %0.2f ms (%0.2f %%), store %0.2f ms (%0.2f %%)",
                     (double)(timings3[TIMING_PREPARE] - timings2[TIMING_PREPARE]) / USEC_PER_MS, (double)(timings3[TIMING_PREPARE] - timings2[TIMING_PREPARE]) * 100.0 / total,
                     (double)(timings3[TIMING_PARSE] - timings2[TIMING_PARSE]) / USEC_PER_MS, (double)(timings3[TIMING_PARSE] - timings2[TIMING_PARSE]) * 100.0 / total,
                     (double)(timings3[TIMING_PROPAGATE] - timings2[TIMING_PROPAGATE]) / USEC_PER_MS, (double)(timings3[TIMING_PROPAGATE] - timings2[TIMING_PROPAGATE]) * 100.0 / total,
