@@ -418,7 +418,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_print_ll(wb, rd->last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
-    if((NETDATA_DOUBLE)rd->last_calculated_value == n)
+    if((NETDATA_DOUBLE)rd->last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
     else
         buffer_rrd_value(wb, n);
