@@ -1059,7 +1059,7 @@ static inline SN_FLAGS pluginsd_parse_storage_number_flags(const char *flags_str
                 return flags;
 
             default:
-                error("unknown SN_FLAGS flag '%c'", c);
+                // error("unknown SN_FLAGS flag '%c'", c);
                 break;
         }
     }
