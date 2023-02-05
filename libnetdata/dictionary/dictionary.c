@@ -445,16 +445,16 @@ static inline void DICTIONARY_STATS_SEARCH_IGNORES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->spin_locks.search_spins, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->callbacks.inserts, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->callbacks.inserts, 1, __ATOMIC_RELEASE);
 }
 static inline void DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->callbacks.conflicts, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->callbacks.conflicts, 1, __ATOMIC_RELEASE);
 }
 static inline void DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->callbacks.reacts, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->callbacks.reacts, 1, __ATOMIC_RELEASE);
 }
 static inline void DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->callbacks.deletes, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->callbacks.deletes, 1, __ATOMIC_RELEASE);
 }
 static inline void DICTIONARY_STATS_GARBAGE_COLLECTIONS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.garbage_collections, 1, __ATOMIC_RELAXED);
@@ -501,17 +501,17 @@ static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELEASE);
     return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
-    __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELEASE);
     return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
-    return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_RELAXED);
+    return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_ACQUIRE);
 }
 
 static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY_ITEM *item) {
@@ -535,8 +535,8 @@ static void dictionary_execute_insert_callback(DICTIONARY *dict, DICTIONARY_ITEM
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
     dict->hooks->ins_callback(item, item->shared->value, constructor_data?constructor_data:dict->hooks->ins_callback_data);
+    DICTIONARY_STATS_CALLBACK_INSERTS_PLUS1(dict);
 }
 
 static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *new_value, void *constructor_data) {
@@ -553,10 +553,13 @@ static bool dictionary_execute_conflict_callback(DICTIONARY *dict, DICTIONARY_IT
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
-    return dict->hooks->conflict_callback(
+    bool ret = dict->hooks->conflict_callback(
         item, item->shared->value, new_value,
         constructor_data ? constructor_data : dict->hooks->conflict_callback_data);
+
+    DICTIONARY_STATS_CALLBACK_CONFLICTS_PLUS1(dict);
+
+    return ret;
 }
 
 static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM *item, void *constructor_data) {
@@ -573,9 +576,10 @@ static void dictionary_execute_react_callback(DICTIONARY *dict, DICTIONARY_ITEM 
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict);
     dict->hooks->react_callback(item, item->shared->value,
                                 constructor_data?constructor_data:dict->hooks->react_callback_data);
+
+    DICTIONARY_STATS_CALLBACK_REACTS_PLUS1(dict);
 }
 
 static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM *item) {
@@ -593,8 +597,9 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
                    dict->creation_line,
                    dict->creation_file);
 
-    DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
     dict->hooks->del_callback(item, item->shared->value, dict->hooks->del_callback_data);
+
+    DICTIONARY_STATS_CALLBACK_DELETES_PLUS1(dict);
 }
 
 // ----------------------------------------------------------------------------
