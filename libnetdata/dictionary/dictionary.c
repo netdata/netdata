@@ -417,13 +417,11 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
         entries = __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_RELAXED);
     }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely(entries == 0))
-        fatal("DICT: negative number of entries in dictionary created from %s() (%zu@%s)",
-              dict->creation_function,
-              dict->creation_line,
-              dict->creation_file);
-#endif
+    internal_fatal(entries == 0,
+                   "DICT: negative number of entries in dictionary created from %s() (%zu@%s)",
+                   dict->creation_function,
+                   dict->creation_line,
+                   dict->creation_file);
 }
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
@@ -637,8 +635,8 @@ static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
         netdata_rwlock_init(&dict->index.rwlock);
         netdata_rwlock_init(&dict->items.rwlock);
-        return 0;
     }
+
     return 0;
 }
 
@@ -646,8 +644,8 @@ static inline size_t dictionary_locks_destroy(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
         netdata_rwlock_destroy(&dict->index.rwlock);
         netdata_rwlock_destroy(&dict->items.rwlock);
-        return 0;
     }
+
     return 0;
 }
 
@@ -668,7 +666,7 @@ static inline bool ll_recursive_lock_is_thread_the_writer(DICTIONARY *dict) {
     return tid > 0 && tid == __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED);
 }
 
-static void ll_recursive_lock(DICTIONARY *dict, char rw) {
+static inline void ll_recursive_lock(DICTIONARY *dict, char rw) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
@@ -688,7 +686,7 @@ static void ll_recursive_lock(DICTIONARY *dict, char rw) {
     }
 }
 
-static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
+static inline void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     if(unlikely(is_dictionary_single_threaded(dict)))
         return;
 
@@ -711,10 +709,10 @@ static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
     }
 }
 
-void dictionary_write_lock(DICTIONARY *dict) {
+inline void dictionary_write_lock(DICTIONARY *dict) {
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 }
-void dictionary_write_unlock(DICTIONARY *dict) {
+inline void dictionary_write_unlock(DICTIONARY *dict) {
     ll_recursive_unlock(dict, DICTIONARY_LOCK_WRITE);
 }
 
@@ -808,25 +806,22 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
     (void)deleted;
     (void)examined;
 
-    internal_error(false, "DICTIONARY: garbage collected dictionary created by %s (%zu@%s), examined %zu items, deleted %zu items, still pending %zu items",
-                   dict->creation_function, dict->creation_line, dict->creation_file, examined, deleted, pending);
-
+    internal_error(false, "DICTIONARY: garbage collected dictionary created by %s (%zu@%s), "
+                          "examined %zu items, deleted %zu items, still pending %zu items",
+                          dict->creation_function, dict->creation_line, dict->creation_file,
+                          examined, deleted, pending);
 }
 
 // ----------------------------------------------------------------------------
 // reference counters
 
-static inline size_t reference_counter_init(DICTIONARY *dict) {
-    (void)dict;
-
+static inline size_t reference_counter_init(DICTIONARY *dict __maybe_unused) {
     // allocate memory required for reference counters
     // return number of bytes
     return 0;
 }
 
-static inline size_t reference_counter_free(DICTIONARY *dict) {
-    (void)dict;
-
+static inline size_t reference_counter_free(DICTIONARY *dict __maybe_unused) {
     // free memory required for reference counters
     // return number of bytes
     return 0;
@@ -835,13 +830,13 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     REFCOUNT refcount;
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
+    if(unlikely(is_dictionary_single_threaded(dict)))
         refcount = ++item->refcount;
-    }
-    else {
+
+    else
         // increment the refcount
         refcount = __atomic_add_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
-    }
+
 
     if(refcount <= 0) {
         internal_error(
@@ -887,6 +882,7 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         // get the flags before decrementing any reference counters
         // (the other way around may lead to use-after-free)
         is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
+    }
 
     // decrement the refcount
     refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE);
