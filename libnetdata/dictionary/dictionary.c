@@ -10,15 +10,14 @@ typedef enum __attribute__ ((__packed__)) {
     DICT_FLAG_DESTROYED             = (1 << 0), // this dictionary has been destroyed
 } DICT_FLAGS;
 
-#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_SEQ_CST)
-#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define dict_flag_check(dict, flag) (__atomic_load_n(&((dict)->flags), __ATOMIC_RELAXED) & (flag))
+#define dict_flag_set(dict, flag)   __atomic_or_fetch(&((dict)->flags), flag, __ATOMIC_RELAXED)
+#define dict_flag_clear(dict, flag) __atomic_and_fetch(&((dict)->flags), ~(flag), __ATOMIC_RELAXED)
 
 // flags macros
 #define is_dictionary_destroyed(dict) dict_flag_check(dict, DICT_FLAG_DESTROYED)
 
 // configuration options macros
-#define is_dictionary_single_threaded(dict) ((dict)->options & DICT_OPTION_SINGLE_THREADED)
 #define is_view_dictionary(dict) ((dict)->master)
 #define is_master_dictionary(dict) (!is_view_dictionary(dict))
 
@@ -37,13 +36,13 @@ typedef enum __attribute__ ((__packed__)) item_flags {
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
 
-#define item_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_SEQ_CST) & (flag))
-#define item_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_SEQ_CST)
-#define item_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define item_flag_check(item, flag) (__atomic_load_n(&((item)->flags), __ATOMIC_RELAXED) & (flag))
+#define item_flag_set(item, flag)   __atomic_or_fetch(&((item)->flags), flag, __ATOMIC_RELAXED)
+#define item_flag_clear(item, flag) __atomic_and_fetch(&((item)->flags), ~(flag), __ATOMIC_RELAXED)
 
-#define item_shared_flag_check(item, flag) (__atomic_load_n(&((item)->shared->flags), __ATOMIC_SEQ_CST) & (flag))
-#define item_shared_flag_set(item, flag)   __atomic_or_fetch(&((item)->shared->flags), flag, __ATOMIC_SEQ_CST)
-#define item_shared_flag_clear(item, flag) __atomic_and_fetch(&((item)->shared->flags), ~(flag), __ATOMIC_SEQ_CST)
+#define item_shared_flag_check(item, flag) (__atomic_load_n(&((item)->shared->flags), __ATOMIC_RELAXED) & (flag))
+#define item_shared_flag_set(item, flag)   __atomic_or_fetch(&((item)->shared->flags), flag, __ATOMIC_RELAXED)
+#define item_shared_flag_clear(item, flag) __atomic_and_fetch(&((item)->shared->flags), ~(flag), __ATOMIC_RELAXED)
 
 #define REFCOUNT_DELETING         (-100)
 
@@ -298,7 +297,7 @@ static inline void dictionary_hooks_allocate(DICTIONARY *dict) {
 static inline size_t dictionary_hooks_free(DICTIONARY *dict) {
     if(!dict->hooks) return 0;
 
-    REFCOUNT links = __atomic_sub_fetch(&dict->hooks->links, 1, __ATOMIC_SEQ_CST);
+    REFCOUNT links = __atomic_sub_fetch(&dict->hooks->links, 1, __ATOMIC_ACQUIRE);
     if(links == 0) {
         freez(dict->hooks);
         dict->hooks = NULL;
@@ -358,7 +357,7 @@ size_t dictionary_version(DICTIONARY *dict) {
     // this is required for views to return the right number
     garbage_collect_pending_deletes(dict);
 
-    return __atomic_load_n(&dict->version, __ATOMIC_SEQ_CST);
+    return __atomic_load_n(&dict->version, __ATOMIC_RELAXED);
 }
 size_t dictionary_entries(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
@@ -366,7 +365,7 @@ size_t dictionary_entries(DICTIONARY *dict) {
     // this is required for views to return the right number
     garbage_collect_pending_deletes(dict);
 
-    long int entries = __atomic_load_n(&dict->entries, __ATOMIC_SEQ_CST);
+    long int entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
     if(entries < 0)
         fatal("DICTIONARY: entries is negative: %ld", entries);
 
@@ -375,7 +374,7 @@ size_t dictionary_entries(DICTIONARY *dict) {
 size_t dictionary_referenced_items(DICTIONARY *dict) {
     if(unlikely(!dict)) return 0;
 
-    long int referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_SEQ_CST);
+    long int referenced_items = __atomic_load_n(&dict->referenced_items, __ATOMIC_RELAXED);
     if(referenced_items < 0)
         fatal("DICTIONARY: referenced items is negative: %ld", referenced_items);
 
@@ -387,7 +386,7 @@ long int dictionary_stats_for_registry(DICTIONARY *dict) {
     return (dict->stats->memory.index + dict->stats->memory.dict);
 }
 void dictionary_version_increment(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
 
 // ----------------------------------------------------------------------------
@@ -402,17 +401,9 @@ static inline void DICTIONARY_ENTRIES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.inserts, 1, __ATOMIC_RELAXED);
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->version++;
-        dict->entries++;
-        dict->referenced_items++;
-
-    }
-    else {
-        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&dict->entries, 1, __ATOMIC_SEQ_CST);
-        __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
-    }
+    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->entries, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->referenced_items, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     // statistics
@@ -420,14 +411,8 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.entries, 1, __ATOMIC_RELAXED);
 
     size_t entries; (void)entries;
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        dict->version++;
-        entries = dict->entries++;
-    }
-    else {
-        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
-        entries = __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_SEQ_CST);
-    }
+    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
+    entries = __atomic_fetch_sub(&dict->entries, 1, __ATOMIC_RELAXED);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(entries == 0))
@@ -439,11 +424,7 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
 }
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
-
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        dict->version++;
-    else
-        __atomic_fetch_add(&dict->version, 1, __ATOMIC_SEQ_CST);
+    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_TRAVERSALS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.traversals, 1, __ATOMIC_RELAXED);
@@ -498,21 +479,14 @@ static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
 
 static inline long int DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
-
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return ++dict->referenced_items;
-    else
-        return __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
+    return __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
 
     long int referenced_items;
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        referenced_items = --dict->referenced_items;
-    else
-        referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_SEQ_CST);
+    referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(unlikely(referenced_items < 0))
@@ -528,38 +502,20 @@ static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
 
 static inline long int DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
-
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return ++dict->pending_deletion_items;
-    else
-        return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
+    return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
     __atomic_fetch_sub(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELAXED);
-
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return --dict->pending_deletion_items;
-    else
-        return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_SEQ_CST);
+    return __atomic_sub_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return dict->pending_deletion_items;
-    else
-        return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_SEQ_CST);
+    return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_RELAXED);
 }
 
-static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY *dict, DICTIONARY_ITEM *item) {
-    if(unlikely(dict && is_dictionary_single_threaded(dict))) // this is an exception, dict can be null
-        return item->refcount;
-    else
-        return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
-}
-
-static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET_SOLE(DICTIONARY_ITEM *item) {
-    return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_SEQ_CST);
+static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY_ITEM *item) {
+    return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_ACQUIRE);
 }
 
 // ----------------------------------------------------------------------------
@@ -645,44 +601,35 @@ static void dictionary_execute_delete_callback(DICTIONARY *dict, DICTIONARY_ITEM
 // dictionary locks
 
 static inline size_t dictionary_locks_init(DICTIONARY *dict) {
-    if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_init(&dict->index.rwlock);
-        netdata_rwlock_init(&dict->items.rwlock);
-        return 0;
-    }
+    netdata_rwlock_init(&dict->index.rwlock);
+    netdata_rwlock_init(&dict->items.rwlock);
     return 0;
 }
 
 static inline size_t dictionary_locks_destroy(DICTIONARY *dict) {
-    if(likely(!is_dictionary_single_threaded(dict))) {
-        netdata_rwlock_destroy(&dict->index.rwlock);
-        netdata_rwlock_destroy(&dict->items.rwlock);
-        return 0;
-    }
+    netdata_rwlock_destroy(&dict->index.rwlock);
+    netdata_rwlock_destroy(&dict->items.rwlock);
     return 0;
 }
 
 static inline void ll_recursive_lock_set_thread_as_writer(DICTIONARY *dict) {
     pid_t expected = 0, desired = gettid();
-    if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
-        fatal("DICTIONARY: Cannot set thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_SEQ_CST));
+    if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        fatal("DICTIONARY: Cannot set thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
 }
 
 static inline void ll_recursive_unlock_unset_thread_writer(DICTIONARY *dict) {
     pid_t expected = gettid(), desired = 0;
-    if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
-        fatal("DICTIONARY: Cannot unset thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_SEQ_CST));
+    if(!__atomic_compare_exchange_n(&dict->items.writer_pid, &expected, desired, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+        fatal("DICTIONARY: Cannot unset thread %d as exclusive writer, expected %d, desired %d, found %d.", gettid(), expected, desired, __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED));
 }
 
 static inline bool ll_recursive_lock_is_thread_the_writer(DICTIONARY *dict) {
     pid_t tid = gettid();
-    return tid > 0 && tid == __atomic_load_n(&dict->items.writer_pid, __ATOMIC_SEQ_CST);
+    return tid > 0 && tid == __atomic_load_n(&dict->items.writer_pid, __ATOMIC_RELAXED);
 }
 
 static void ll_recursive_lock(DICTIONARY *dict, char rw) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     if(ll_recursive_lock_is_thread_the_writer(dict)) {
         dict->items.writer_depth++;
         return;
@@ -700,9 +647,6 @@ static void ll_recursive_lock(DICTIONARY *dict, char rw) {
 }
 
 static void ll_recursive_unlock(DICTIONARY *dict, char rw) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     if(ll_recursive_lock_is_thread_the_writer(dict) && dict->items.writer_depth > 0) {
         dict->items.writer_depth--;
         return;
@@ -730,29 +674,17 @@ void dictionary_write_unlock(DICTIONARY *dict) {
 }
 
 static inline void dictionary_index_lock_rdlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     netdata_rwlock_rdlock(&dict->index.rwlock);
 }
 
 static inline void dictionary_index_rdlock_unlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     netdata_rwlock_unlock(&dict->index.rwlock);
 }
 
 static inline void dictionary_index_lock_wrlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     netdata_rwlock_wrlock(&dict->index.rwlock);
 }
 static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
-    if(unlikely(is_dictionary_single_threaded(dict)))
-        return;
-
     netdata_rwlock_unlock(&dict->index.rwlock);
 }
 
@@ -760,8 +692,8 @@ static inline void dictionary_index_wrlock_unlock(DICTIONARY *dict) {
 // items garbage collector
 
 static void garbage_collect_pending_deletes(DICTIONARY *dict) {
-    usec_t last_master_deletion_us = dict->hooks?__atomic_load_n(&dict->hooks->last_master_deletion_us, __ATOMIC_SEQ_CST):0;
-    usec_t last_gc_run_us = __atomic_load_n(&dict->last_gc_run_us, __ATOMIC_SEQ_CST);
+    usec_t last_master_deletion_us = dict->hooks?__atomic_load_n(&dict->hooks->last_master_deletion_us, __ATOMIC_RELAXED):0;
+    usec_t last_gc_run_us = __atomic_load_n(&dict->last_gc_run_us, __ATOMIC_RELAXED);
 
     bool is_view = is_view_dictionary(dict);
 
@@ -773,7 +705,7 @@ static void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
     ll_recursive_lock(dict, DICTIONARY_LOCK_WRITE);
 
-    __atomic_store_n(&dict->last_gc_run_us, now_realtime_usec(), __ATOMIC_SEQ_CST);
+    __atomic_store_n(&dict->last_gc_run_us, now_realtime_usec(), __ATOMIC_RELAXED);
 
     if(is_view)
         dictionary_index_lock_wrlock(dict);
@@ -846,13 +778,8 @@ static inline size_t reference_counter_free(DICTIONARY *dict) {
 static void item_acquire(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     REFCOUNT refcount;
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        refcount = ++item->refcount;
-    }
-    else {
-        // increment the refcount
-        refcount = __atomic_add_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
-    }
+    // increment the refcount
+    refcount = __atomic_add_fetch(&item->refcount, 1, __ATOMIC_ACQUIRE);
 
     if(refcount <= 0) {
         internal_error(
@@ -890,18 +817,12 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     bool is_deleted;
     REFCOUNT refcount;
 
-    if(unlikely(is_dictionary_single_threaded(dict))) {
-        is_deleted = item->flags & ITEM_FLAG_DELETED;
-        refcount = --item->refcount;
-    }
-    else {
-        // get the flags before decrementing any reference counters
-        // (the other way around may lead to use-after-free)
-        is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
+    // get the flags before decrementing any reference counters
+    // (the other way around may lead to use-after-free)
+    is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
 
-        // decrement the refcount
-        refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
-    }
+    // decrement the refcount
+    refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE);
 
     if(refcount < 0) {
         internal_error(
@@ -937,7 +858,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
     int ret = RC_ITEM_OK;
 
-    refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+    refcount = DICTIONARY_ITEM_REFCOUNT_GET(item);
 
     do {
         spins++;
@@ -956,7 +877,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
 
         desired = refcount + 1;
 
-    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
 
     // if ret == ITEM_OK, we acquired the item
 
@@ -979,7 +900,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
                 dict_item_set_deleted(dict, item);
 
                 // decrement the refcount we incremented above
-                if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST) == 0) {
+                if (__atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE) == 0) {
                     // this is a deleted item, and we are the last one
                     DICTIONARY_PENDING_DELETES_PLUS1(dict);
                 }
@@ -988,7 +909,7 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
             } else {
                 // this is traversal / walkthrough
                 // decrement the refcount we incremented above
-                __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_SEQ_CST);
+                __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE);
             }
 
             return RC_ITEM_MARKED_FOR_DELETION;
@@ -1015,7 +936,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 
     int ret = RC_ITEM_OK;
 
-    refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+    refcount = DICTIONARY_ITEM_REFCOUNT_GET(item);
 
     do {
         spins++;
@@ -1037,7 +958,7 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
             ret = RC_ITEM_IS_CURRENTLY_BEING_CREATED;
             break;
         }
-    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->refcount, &refcount, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(ret == RC_ITEM_OK)
@@ -1055,8 +976,8 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 static inline bool item_shared_release_and_check_if_it_can_be_freed(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item) {
     // if we can set refcount to REFCOUNT_DELETING, we can delete this item
 
-    REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST);
-    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+    REFCOUNT links = __atomic_sub_fetch(&item->shared->links, 1, __ATOMIC_RELEASE);
+    if(links == 0 && __atomic_compare_exchange_n(&item->shared->links, &links, REFCOUNT_DELETING, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
 
         // we can delete it
         return true;
@@ -1290,7 +1211,7 @@ static DICTIONARY_ITEM *dict_item_create(DICTIONARY *dict __maybe_unused, size_t
     if(master_item) {
         item->shared = master_item->shared;
 
-        if(unlikely(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_SEQ_CST) <= 1))
+        if(unlikely(__atomic_add_fetch(&item->shared->links, 1, __ATOMIC_ACQUIRE) <= 1))
             fatal("DICTIONARY: attempted to link to a shared item structure that had zero references");
     }
     else {
@@ -1478,7 +1399,7 @@ static void dict_item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item
         item_shared_flag_set(item, ITEM_FLAG_DELETED);
 
         if(dict->hooks)
-            __atomic_store_n(&dict->hooks->last_master_deletion_us, now_realtime_usec(), __ATOMIC_SEQ_CST);
+            __atomic_store_n(&dict->hooks->last_master_deletion_us, now_realtime_usec(), __ATOMIC_RELAXED);
     }
 }
 
@@ -1486,7 +1407,7 @@ static void dict_item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item
 static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ITEM_FLAGS expected, desired;
 
-    expected = __atomic_load_n(&item->flags, __ATOMIC_SEQ_CST);
+    expected = __atomic_load_n(&item->flags, __ATOMIC_RELAXED);
 
     do {
 
@@ -1495,7 +1416,7 @@ static bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
 
         desired = expected | ITEM_FLAG_DELETED;
 
-    } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
+    } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
 
     DICTIONARY_ENTRIES_MINUS1(dict);
     return true;
@@ -1927,7 +1848,7 @@ static inline void api_internal_check_with_trace(DICTIONARY *dict, DICTIONARY_IT
     }
 
     if(item) {
-        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(dict, item);
+        REFCOUNT refcount = DICTIONARY_ITEM_REFCOUNT_GET(item);
         if (unlikely(refcount <= 0)) {
             internal_error(
                 true,
@@ -2063,11 +1984,11 @@ DICTIONARY *dictionary_create_view(DICTIONARY *master) {
 
     dictionary_hooks_allocate(master);
 
-    if(unlikely(__atomic_load_n(&master->hooks->links, __ATOMIC_SEQ_CST)) < 1)
+    if(unlikely(__atomic_load_n(&master->hooks->links, __ATOMIC_RELAXED)) < 1)
         fatal("DICTIONARY: attempted to create a view that has %d links", master->hooks->links);
 
     dict->hooks = master->hooks;
-    __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_SEQ_CST);
+    __atomic_add_fetch(&master->hooks->links, 1, __ATOMIC_ACQUIRE);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     dict->creation_function = function;
@@ -2255,7 +2176,7 @@ void *dictionary_acquired_item_value(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
 
 size_t dictionary_acquired_item_references(DICT_ITEM_CONST DICTIONARY_ITEM *item) {
     if(likely(item))
-        return DICTIONARY_ITEM_REFCOUNT_GET_SOLE(item);
+        return DICTIONARY_ITEM_REFCOUNT_GET(item);
 
     return 0;
 }
@@ -2472,7 +2393,7 @@ int dictionary_sorted_walkthrough_rw(DICTIONARY *dict, char rw, int (*callback)(
     DICTIONARY_STATS_WALKTHROUGHS_PLUS1(dict);
 
     ll_recursive_lock(dict, rw);
-    size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_SEQ_CST);
+    size_t entries = __atomic_load_n(&dict->entries, __ATOMIC_RELAXED);
     DICTIONARY_ITEM **array = mallocz(sizeof(DICTIONARY_ITEM *) * entries);
 
     size_t i;
@@ -3293,12 +3214,12 @@ static void *unittest_dict_master_thread(void *arg) {
 
     DICTIONARY_ITEM *item = NULL;
     int loops = 0;
-    while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
+    while(!__atomic_load_n(&tv->join, __ATOMIC_RELAXED)) {
 
         if(!item)
             item = dictionary_set_and_acquire_item(tv->master, "ITEM1", "123", strlen("123") + 1);
 
-        if(__atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST) != NULL) {
+        if(__atomic_load_n(&tv->item_master, __ATOMIC_RELAXED) != NULL) {
             dictionary_acquired_item_release(tv->master, item);
             dictionary_del(tv->master, "ITEM1");
             item = NULL;
@@ -3307,7 +3228,7 @@ static void *unittest_dict_master_thread(void *arg) {
         }
 
         dictionary_acquired_item_dup(tv->master, item); // for the view thread
-        __atomic_store_n(&tv->item_master, item, __ATOMIC_SEQ_CST);
+        __atomic_store_n(&tv->item_master, item, __ATOMIC_RELAXED);
         dictionary_del(tv->master, "ITEM1");
 
 
@@ -3333,13 +3254,13 @@ static void *unittest_dict_view_thread(void *arg) {
 
     DICTIONARY_ITEM *m_item = NULL;
 
-    while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST)) {
-        if(!(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST)))
+    while(!__atomic_load_n(&tv->join, __ATOMIC_RELAXED)) {
+        if(!(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_RELAXED)))
             continue;
 
         DICTIONARY_ITEM *v_item = dictionary_view_set_and_acquire_item(tv->view, "ITEM2", m_item);
         dictionary_acquired_item_release(tv->master, m_item);
-        __atomic_store_n(&tv->item_master, NULL, __ATOMIC_SEQ_CST);
+        __atomic_store_n(&tv->item_master, NULL, __ATOMIC_RELAXED);
 
         for(int i = 0; i < tv->dups ; i++) {
             dictionary_acquired_item_dup(tv->view, v_item);
@@ -3351,7 +3272,7 @@ static void *unittest_dict_view_thread(void *arg) {
 
         dictionary_del(tv->view, "ITEM2");
 
-        while(!__atomic_load_n(&tv->join, __ATOMIC_SEQ_CST) && !(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_SEQ_CST))) {
+        while(!__atomic_load_n(&tv->join, __ATOMIC_RELAXED) && !(m_item = __atomic_load_n(&tv->item_master, __ATOMIC_RELAXED))) {
             dictionary_acquired_item_dup(tv->view, v_item);
             dictionary_acquired_item_release(tv->view, v_item);
         }

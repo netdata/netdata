@@ -140,40 +140,31 @@ static size_t aral_align_alloc_size(ARAL *ar, uint64_t size) {
 }
 
 static inline void aral_lock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_lock(&ar->aral_lock.spinlock);
+    netdata_spinlock_lock(&ar->aral_lock.spinlock);
 }
 
 static inline void aral_unlock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_unlock(&ar->aral_lock.spinlock);
+    netdata_spinlock_unlock(&ar->aral_lock.spinlock);
 }
 
-static inline void aral_page_free_lock(ARAL *ar, ARAL_PAGE *page) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_lock(&page->free.spinlock);
+static inline void aral_page_free_lock(ARAL *ar __maybe_unused, ARAL_PAGE *page) {
+    netdata_spinlock_lock(&page->free.spinlock);
 }
 
-static inline void aral_page_free_unlock(ARAL *ar, ARAL_PAGE *page) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_unlock(&page->free.spinlock);
+static inline void aral_page_free_unlock(ARAL *ar __maybe_unused, ARAL_PAGE *page) {
+    netdata_spinlock_unlock(&page->free.spinlock);
 }
 
 static inline bool aral_adders_trylock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        return netdata_spinlock_trylock(&ar->adders.spinlock);
-
-    return true;
+    return netdata_spinlock_trylock(&ar->adders.spinlock);
 }
 
 static inline void aral_adders_lock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_lock(&ar->adders.spinlock);
+    netdata_spinlock_lock(&ar->adders.spinlock);
 }
 
 static inline void aral_adders_unlock(ARAL *ar) {
-    if(likely(!(ar->config.options & ARAL_LOCKLESS)))
-        netdata_spinlock_unlock(&ar->adders.spinlock);
+    netdata_spinlock_unlock(&ar->adders.spinlock);
 }
 
 static void aral_delete_leftover_files(const char *name, const char *path, const char *required_prefix) {
