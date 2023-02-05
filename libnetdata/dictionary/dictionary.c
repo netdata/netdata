@@ -882,10 +882,10 @@ static void item_release(DICTIONARY *dict, DICTIONARY_ITEM *item) {
         // get the flags before decrementing any reference counters
         // (the other way around may lead to use-after-free)
         is_deleted = item_flag_check(item, ITEM_FLAG_DELETED);
-    }
 
-    // decrement the refcount
-    refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE);
+        // decrement the refcount
+        refcount = __atomic_sub_fetch(&item->refcount, 1, __ATOMIC_RELEASE);
+    }
 
     if(refcount < 0) {
         internal_error(
