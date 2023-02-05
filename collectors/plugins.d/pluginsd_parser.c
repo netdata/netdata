@@ -94,11 +94,22 @@ static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     return false;
 }
 
-static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st) {
+static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-    if(pluginsd_unlock_rrdset_data_collection(user))
-        error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock has been unlocked",
-              rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st));
+
+    if(pluginsd_unlock_rrdset_data_collection(user)) {
+        error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
+              rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
+    }
+
+    if(u->v2.ml_locked) {
+        ml_chart_update_end(u->st);
+        u->v2.ml_locked = false;
+
+        error("PLUGINSD: 'host:%s/chart:%s/' stale ML lock found during %s, it has been unlocked",
+              rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
+    }
+
     u->st = st;
 }
 
@@ -182,7 +193,7 @@ PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user)
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    pluginsd_set_chart_from_parent(user, st);
+    pluginsd_set_chart_from_parent(user, st, PLUGINSD_KEYWORD_BEGIN);
 
     usec_t microseconds = 0;
     if (microseconds_txt && *microseconds_txt) {
@@ -232,7 +243,7 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
-    pluginsd_set_chart_from_parent(user, NULL);
+    pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_END);
     ((PARSER_USER_OBJECT *) user)->data_collections_count++;
 
     struct timeval now;
@@ -352,7 +363,7 @@ PARSER_RC pluginsd_chart(char **words, size_t num_words, void *user)
             rrdset_flag_clear(st, RRDSET_FLAG_STORE_FIRST);
         }
     }
-    pluginsd_set_chart_from_parent(user, st);
+    pluginsd_set_chart_from_parent(user, st, PLUGINSD_KEYWORD_CHART);
 
     return PARSER_RC_OK;
 }
@@ -815,8 +826,8 @@ PARSER_RC pluginsd_variable(char **words, size_t num_words, void *user)
 
 PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, void *user)
 {
-    debug(D_PLUGINSD, "requested a FLUSH");
-    pluginsd_set_chart_from_parent(user, NULL);
+    debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
+    pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_FLUSH);
     ((PARSER_USER_OBJECT *) user)->replay.start_time = 0;
     ((PARSER_USER_OBJECT *) user)->replay.end_time = 0;
     ((PARSER_USER_OBJECT *) user)->replay.start_time_ut = 0;
@@ -964,7 +975,7 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
         st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
-    pluginsd_set_chart_from_parent(user, st);
+    pluginsd_set_chart_from_parent(user, st, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(start_time_str && end_time_str) {
         time_t start_time = (time_t)str2ul(start_time_str);
@@ -1301,7 +1312,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
             rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
         }
 
-        pluginsd_set_chart_from_parent(user, NULL);
+        pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_REPLAY_END);
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         else
@@ -1314,7 +1325,7 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
         return PARSER_RC_OK;
     }
 
-    pluginsd_set_chart_from_parent(user, NULL);
+    pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_REPLAY_END);
 
     rrdcontext_updated_retention_rrdset(st);
 
@@ -1339,7 +1350,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     RRDSET *st = pluginsd_find_chart(host, id, PLUGINSD_KEYWORD_BEGIN_V2);
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    pluginsd_set_chart_from_parent(user, st);
+    pluginsd_set_chart_from_parent(user, st, PLUGINSD_KEYWORD_BEGIN_V2);
 
     if(unlikely(rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE | RRDSET_FLAG_ARCHIVED)))
         rrdset_isnot_obsolete(st);
@@ -1388,6 +1399,9 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
         buffer_fast_strcat(wb, " ", 1);
         buffer_strcat(wb, wall_clock_time_str);
         buffer_fast_strcat(wb, "\n", 1);
+
+        u->v2.stream_buffer.last_point_end_time_s = end_time;
+        u->v2.stream_buffer.begin_v2_added = true;
     }
 
     // ------------------------------------------------------------------------
@@ -1475,7 +1489,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     // ------------------------------------------------------------------------
     // propagate it forward in v2
 
-    if(u->v2.stream_buffer.v2 && u->v2.stream_buffer.wb) {
+    if(u->v2.stream_buffer.v2 && u->v2.stream_buffer.begin_v2_added && u->v2.stream_buffer.wb) {
         BUFFER *wb = u->v2.stream_buffer.wb;
         buffer_need_bytes(wb, 1024);
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
@@ -1487,7 +1501,6 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_sn_flags(wb, flags);
         buffer_fast_strcat(wb, "\n", 1);
-        u->v2.stream_buffer.points_added++;
     }
 
     // timing_step(TIMING_STEP_PROPAGATE);
@@ -1538,13 +1551,15 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // ------------------------------------------------------------------------
     // propagate the whole chart update in v1
 
-    if(unlikely(!u->v2.stream_buffer.v2 && u->v2.stream_buffer.wb))
+    if(unlikely(!u->v2.stream_buffer.v2 && !u->v2.stream_buffer.begin_v2_added && u->v2.stream_buffer.wb))
         rrdset_push_metrics_v1(&u->v2.stream_buffer, st);
 
     // ------------------------------------------------------------------------
     // unblock data collection
 
     ml_chart_update_end(st);
+    u->v2.ml_locked = false;
+
     pluginsd_unlock_rrdset_data_collection(user);
     rrdcontext_collected_rrdset(st);
 
@@ -1552,6 +1567,18 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
     // propagate it forward
 
     rrdset_push_metrics_finished(&u->v2.stream_buffer, st);
+
+
+    // ------------------------------------------------------------------------
+    // cleanup RRDSET / RRDDIM
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+                rd->calculated_value = 0;
+                rd->collected_value = 0;
+                rd->updated = false;
+            }
+    rrddim_foreach_done(rd);
 
     // ------------------------------------------------------------------------
     // reset state

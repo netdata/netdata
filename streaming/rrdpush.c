@@ -391,25 +391,24 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         return;
 
     BUFFER *wb = rsb->wb;
-
-    if(unlikely(rsb->last_point_end_time_ut != point_end_time_ut)) {
-        time_t end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    time_t point_end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    if(unlikely(rsb->last_point_end_time_s != point_end_time_s)) {
 
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
         buffer_print_llu_hex(wb, rd->rrdset->update_every);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_llu_hex(wb, end_time_s);
+        buffer_print_llu_hex(wb, point_end_time_s);
         buffer_fast_strcat(wb, " ", 1);
-        if(end_time_s == rsb->wall_clock_time)
+        if(point_end_time_s == rsb->wall_clock_time)
             buffer_fast_strcat(wb, "#", 1);
         else
             buffer_print_llu_hex(wb, rsb->wall_clock_time);
         buffer_fast_strcat(wb, "\n", 1);
 
-        rsb->last_point_end_time_ut = point_end_time_ut;
-        rsb->points_added++;
+        rsb->last_point_end_time_s = point_end_time_s;
+        rsb->begin_v2_added = true;
     }
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
@@ -432,8 +431,12 @@ void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
     if(!rsb->wb)
         return;
 
-    if(rsb->v2 && rsb->points_added)
+    if(rsb->v2 && rsb->begin_v2_added) {
+        if(unlikely(rsb->rrdset_flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+            rrdsetvar_print_to_streaming_custom_chart_variables(st, rsb->wb);
+
         buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
+    }
 
     sender_commit(st->rrdhost->sender, rsb->wb);
 

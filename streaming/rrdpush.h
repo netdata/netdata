@@ -308,10 +308,10 @@ int configured_as_parent();
 
 typedef struct rrdset_stream_buffer {
     bool v2;
-    uint64_t rrdset_flags; // RRDSET_FLAGS
-    usec_t last_point_end_time_ut;
-    size_t points_added;
+    bool begin_v2_added;
     time_t wall_clock_time;
+    uint64_t rrdset_flags; // RRDSET_FLAGS
+    time_t last_point_end_time_s;
     BUFFER *wb;
 } RRDSET_STREAM_BUFFER;
 
