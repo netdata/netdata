@@ -333,9 +333,10 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
                 error_limit_static_global_var(erl, 1, 0);
                 error_limit(&erl,
-                               "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
-                               rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
-                               (unsigned long long) now);
+                            "STREAM_SENDER REPLAY ERROR: 'host:%s/chart:%s/dim:%s': db does not advance the query "
+                            "beyond time %llu (tried 1000 times to get the next point and always got back a point in the past)",
+                            rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st), rrddim_id(d->rd),
+                            (unsigned long long) now);
 
                 continue;
             }
@@ -379,9 +380,10 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             else
                 fix_min_start_time = min_end_time - min_update_every;
 
+#ifdef NETDATA_INTERNAL_CHECKS
             error_limit_static_global_var(erl, 1, 0);
             error_limit(&erl, "REPLAY WARNING: 'host:%s/chart:%s' "
-                              "misaligned dimensions "
+                              "misaligned dimensions, "
                               "update every (min: %ld, max: %ld), "
                               "start time (min: %ld, max: %ld), "
                               "end time (min %ld, max %ld), "
@@ -394,6 +396,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                         now, last_end_time_in_buffer,
                         fix_min_start_time
                         );
+#endif
 
             min_start_time = fix_min_start_time;
         }
@@ -415,7 +418,8 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 q->query.before = last_end_time_in_buffer;
                 q->query.enable_streaming = false;
 
-                internal_error(true, "REPLICATION: buffer size %zu is more than the max message size %zu for chart '%s' of host '%s'. "
+                internal_error(true, "REPLICATION: current buffer size %zu is more than the "
+                                     "max message size %zu for chart '%s' of host '%s'. "
                                      "Interrupting replication request (%ld to %ld, %s) at %ld to %ld, %s.",
                                buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
                                q->request.after, q->request.before, q->request.enable_streaming?"true":"false",

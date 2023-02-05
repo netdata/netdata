@@ -29,12 +29,13 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
+PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     parser->user = user;
+    parser->user_cleanup_cb = cleanup_cb;
     parser->fd = fd;
     parser->fp_input = fp_input;
     parser->fp_output = fp_output;
