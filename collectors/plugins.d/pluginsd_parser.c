@@ -78,7 +78,7 @@ static inline RRDSET *pluginsd_get_chart_from_parent(void *user) {
 static inline void pluginsd_lock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && !u->v2.locked_data_collection) {
-        // netdata_spinlock_lock(&u->st->data_collection_lock);
+        netdata_spinlock_lock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = true;
     }
 }
@@ -86,7 +86,7 @@ static inline void pluginsd_lock_rrdset_data_collection(void *user) {
 static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     if(u->st && u->v2.locked_data_collection) {
-        // netdata_spinlock_unlock(&u->st->data_collection_lock);
+        netdata_spinlock_unlock(&u->st->data_collection_lock);
         u->v2.locked_data_collection = false;
         return true;
     }
@@ -1527,15 +1527,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
 void pluginsd_cleanup_v2(void *user) {
     // this is called when the thread is stopped while processing
-
-    PARSER_USER_OBJECT *u = user;
-
-    pluginsd_unlock_rrdset_data_collection(user);
-
-    if(u->st && u->v2.ml_locked) {
-        ml_chart_update_end(u->st);
-        u->v2.ml_locked = false;
-    }
+    pluginsd_set_chart_from_parent(user, NULL, "THREAD CLEANUP");
 }
 
 PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {
