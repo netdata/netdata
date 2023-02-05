@@ -1123,20 +1123,6 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
                 flags = SN_EMPTY_SLOT;
             }
 
-            if(u->v2.stream_buffer.wb) {
-                BUFFER *wb = u->v2.stream_buffer.wb;
-                buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
-                buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
-                buffer_fast_strcat(wb, "' ", 2);
-                buffer_strcat(wb, value_str);
-                buffer_fast_strcat(wb, " '", 2);
-                buffer_strcat(wb, flags_str);
-                buffer_fast_strcat(wb, "'\n", 2);
-
-//                buffer_sprintf(u->v2.stream_buffer.wb, PLUGINSD_KEYWORD_SET_V2 " \"%s\" \"%s\" \"%s\"\n",
-//                               dimension, value_str, flags_str);
-            }
-
             rrddim_store_metric(rd, u->replay.end_time_ut, value, flags);
             rd->last_collected_time.tv_sec = u->replay.end_time;
             rd->last_collected_time.tv_usec = 0;
@@ -1197,10 +1183,10 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     char *last_collected_ut_str = get_word(words, num_words, 1);
     char *last_updated_ut_str = get_word(words, num_words, 2);
 
-    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
+    RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE);
     if(!host) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
+    RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
