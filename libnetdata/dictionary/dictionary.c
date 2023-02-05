@@ -174,7 +174,7 @@ struct dictionary {
     long int referenced_items;          // how many items of the dictionary are currently being used by 3rd parties
     long int pending_deletion_items;    // how many items of the dictionary have been deleted, but have not been removed yet
 
-#ifdef NETDATA_INTERNAL_CHECKS
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
     netdata_mutex_t global_pointer_registry_mutex;
     Pvoid_t global_pointer_registry;
 #endif
@@ -204,59 +204,47 @@ static inline int item_is_not_referenced_and_can_be_removed_advanced(DICTIONARY 
 // ----------------------------------------------------------------------------
 // validate each pointer is indexed once - internal checks only
 
+#ifdef NETDATA_DICTIONARY_VALIDATE_POINTERS
 static inline void pointer_index_init(DICTIONARY *dict __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_init(&dict->global_pointer_registry_mutex);
-#else
-    ;
-#endif
 }
 
 static inline void pointer_destroy_index(DICTIONARY *dict __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     JudyHSFreeArray(&dict->global_pointer_registry, PJE0);
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
-#else
-    ;
-#endif
 }
 static inline void pointer_add(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSIns(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
     if(*PValue != NULL)
         fatal("pointer already exists in registry");
     *PValue = item;
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
-#else
-    ;
-#endif
 }
 
 static inline void pointer_check(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     Pvoid_t *PValue = JudyHSGet(dict->global_pointer_registry, &item, sizeof(void *));
     if(PValue == NULL)
         fatal("pointer is not found in registry");
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
-#else
-    ;
-#endif
 }
 
 static inline void pointer_del(DICTIONARY *dict __maybe_unused, DICTIONARY_ITEM *item __maybe_unused) {
-#ifdef NETDATA_INTERNAL_CHECKS
     netdata_mutex_lock(&dict->global_pointer_registry_mutex);
     int ret = JudyHSDel(&dict->global_pointer_registry, &item, sizeof(void *), PJE0);
     if(!ret)
         fatal("pointer to be deleted does not exist in registry");
     netdata_mutex_unlock(&dict->global_pointer_registry_mutex);
-#else
-    ;
-#endif
 }
+#else // !NETDATA_DICTIONARY_VALIDATE_POINTERS
+#define pointer_index_init(dict) debug_dummy()
+#define pointer_destroy_index(dict) debug_dummy()
+#define pointer_add(dict, item) debug_dummy()
+#define pointer_check(dict, item) debug_dummy()
+#define pointer_del(dict, item) debug_dummy()
+#endif // !NETDATA_DICTIONARY_VALIDATE_POINTERS
 
 // ----------------------------------------------------------------------------
 // memory statistics
@@ -509,9 +497,8 @@ static inline long int DICTIONARY_PENDING_DELETES_GET(DICTIONARY *dict) {
     return __atomic_load_n(&dict->pending_deletion_items, __ATOMIC_ACQUIRE);
 }
 
-static inline REFCOUNT DICTIONARY_ITEM_REFCOUNT_GET(DICTIONARY_ITEM *item) {
-    return (REFCOUNT)__atomic_load_n(&item->refcount, __ATOMIC_ACQUIRE);
-}
+#define DICTIONARY_ITEM_REFCOUNT_GET(item) \
+    (REFCOUNT)__atomic_load_n(&((item)->refcount), __ATOMIC_ACQUIRE)
 
 // ----------------------------------------------------------------------------
 // callbacks execution
@@ -882,9 +869,9 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
     // if ret == ITEM_OK, we acquired the item
 
     if(ret == RC_ITEM_OK) {
-        if (is_view_dictionary(dict) &&
+        if (unlikely(is_view_dictionary(dict) &&
             item_shared_flag_check(item, ITEM_FLAG_DELETED) &&
-            !item_flag_check(item, ITEM_FLAG_DELETED)) {
+            !item_flag_check(item, ITEM_FLAG_DELETED))) {
             // but, we can't use this item
 
             if (having_index_lock) {
@@ -918,7 +905,6 @@ static int item_check_and_acquire_advanced(DICTIONARY *dict, DICTIONARY_ITEM *it
         if(desired == 1)
             DICTIONARY_REFERENCED_ITEMS_PLUS1(dict);
     }
-
 
     if(unlikely(spins > 1 && dict->stats))
         DICTIONARY_STATS_CHECK_SPINS_PLUS(dict, spins - 1);
