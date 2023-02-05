@@ -423,8 +423,8 @@ static inline void DICTIONARY_ENTRIES_MINUS1(DICTIONARY *dict) {
 #endif
 }
 static inline void DICTIONARY_VALUE_RESETS_PLUS1(DICTIONARY *dict) {
-    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
     __atomic_fetch_add(&dict->stats->ops.resets, 1, __ATOMIC_RELAXED);
+    __atomic_fetch_add(&dict->version, 1, __ATOMIC_RELAXED);
 }
 static inline void DICTIONARY_STATS_TRAVERSALS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.traversals, 1, __ATOMIC_RELAXED);
@@ -476,28 +476,33 @@ static inline void DICTIONARY_STATS_DICT_DESTROY_QUEUED_MINUS1(DICTIONARY *dict)
 static inline void DICTIONARY_STATS_DICT_FLUSHES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->ops.flushes, 1, __ATOMIC_RELAXED);
 }
-static inline void DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
-    __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
+
+static inline long int DICTIONARY_REFERENCED_ITEMS_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+    return __atomic_add_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
 }
 
-static inline void DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
-    long int referenced_items; (void)referenced_items;
+static inline long int DICTIONARY_REFERENCED_ITEMS_MINUS1(DICTIONARY *dict) {
+    __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+
+    long int referenced_items;
     referenced_items = __atomic_sub_fetch(&dict->referenced_items, 1, __ATOMIC_RELAXED);
 
-    internal_fatal(referenced_items < 0,
-                   "DICT: negative number of referenced items (%ld) in dictionary created from %s() (%zu@%s)",
-                   referenced_items,
-                   dict->creation_function,
-                   dict->creation_line,
-                   dict->creation_file);
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(referenced_items < 0))
+        fatal("DICT: negative number of referenced items (%ld) in dictionary created from %s() (%zu@%s)",
+              referenced_items,
+              dict->creation_function,
+              dict->creation_line,
+              dict->creation_file);
+#endif
 
-    __atomic_fetch_sub(&dict->stats->items.referenced, 1, __ATOMIC_RELAXED);
+    return referenced_items;
 }
 
-static inline void DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
-    __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
+static inline long int DICTIONARY_PENDING_DELETES_PLUS1(DICTIONARY *dict) {
     __atomic_fetch_add(&dict->stats->items.pending_deletion, 1, __ATOMIC_RELEASE);
+    return __atomic_add_fetch(&dict->pending_deletion_items, 1, __ATOMIC_RELAXED);
 }
 
 static inline long int DICTIONARY_PENDING_DELETES_MINUS1(DICTIONARY *dict) {
