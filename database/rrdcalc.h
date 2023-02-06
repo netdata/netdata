@@ -220,7 +220,7 @@ struct alert_config {
 
 void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc);
 
-void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
+int rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st);
 
 const RRDCALC_ACQUIRED *rrdcalc_from_rrdset_get(RRDSET *st, const char *alert_name);
 void rrdcalc_from_rrdset_release(RRDSET *st, const RRDCALC_ACQUIRED *rca);

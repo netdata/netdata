@@ -369,7 +369,8 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
     return true;
 }
 
-void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
+int rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
+    int matched = 0;
     RRDHOST *host = st->rrdhost;
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
@@ -378,10 +379,14 @@ void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
         if(rc->rrdset)
             continue;
 
-        if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st)))
+        if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st))) {
             rrdcalc_link_to_rrdset(st, rc);
+            matched = 1;
+        }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
+
+    return matched;
 }
 
 static inline int rrdcalc_check_and_link_rrdset_callback(RRDSET *st, void *rrdcalc) {

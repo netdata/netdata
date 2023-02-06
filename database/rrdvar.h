@@ -60,7 +60,11 @@ const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope, DICTIONARY *dic
 void rrdvar_release_and_del(DICTIONARY *dict, const RRDVAR_ACQUIRED *rva);
 
 DICTIONARY *rrdvariables_create(void);
+DICTIONARY *health_rrdvariables_create(void);
 void rrdvariables_destroy(DICTIONARY *dict);
+
+void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st);
+int health_variable_check(DICTIONARY *dict, RRDSET *st, RRDDIM *rd);
 
 void rrdvar_delete_all(DICTIONARY *dict);
 
