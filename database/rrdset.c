@@ -1502,10 +1502,10 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
-    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED))
+    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
+        netdata_spinlock_unlock(&st->data_collection_lock);
         return;
-
-    netdata_thread_disable_cancelability();
+    }
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
@@ -1969,8 +1969,6 @@ after_second_database_work:
     }
 
     rrdcontext_collected_rrdset(st);
-
-    netdata_thread_enable_cancelability();
 
     store_metric_collection_completed();
 }

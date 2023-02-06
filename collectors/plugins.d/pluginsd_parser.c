@@ -1389,7 +1389,12 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 
     if(u->v2.stream_buffer.v2 && u->v2.stream_buffer.wb) {
         BUFFER *wb = u->v2.stream_buffer.wb;
+
         buffer_need_bytes(wb, 1024);
+
+        if(unlikely(u->v2.stream_buffer.begin_v2_added))
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
+
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
         buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
         buffer_fast_strcat(wb, "' ", 2);
@@ -1423,7 +1428,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
 }
 
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
-    // timing_init();
+    timing_init();
 
     char *dimension = get_word(words, num_words, 1);
     char *collected_str = get_word(words, num_words, 2);
@@ -1433,13 +1438,15 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(unlikely(!dimension || !collected_str || !value_str || !flags_str))
         return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_SET_V2, "missing parameters");
 
+    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
+
     RRDHOST *host = pluginsd_require_host_from_parent(user, PLUGINSD_KEYWORD_SET_V2);
     if(unlikely(!host)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET_V2, PLUGINSD_KEYWORD_BEGIN_V2);
     if(unlikely(!st)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    // timing_step(TIMING_STEP_PREPARE);
+    timing_step(TIMING_STEP_PREPARE);
 
     RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
     if(unlikely(!rda)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
@@ -1448,9 +1455,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
         rrddim_isnot_obsolete(st, rd);
 
-    PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
-
-    // timing_step(TIMING_STEP_LOOKUP_DIMENSION);
+    timing_step(TIMING_STEP_LOOKUP_DIMENSION);
 
     // ------------------------------------------------------------------------
     // parse the parameters
@@ -1465,7 +1470,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
     SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
 
-    // timing_step(TIMING_STEP_PARSE);
+    timing_step(TIMING_STEP_PARSE);
 
     // ------------------------------------------------------------------------
     // check value and ML
@@ -1486,6 +1491,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
             flags |= SN_FLAG_NOT_ANOMALOUS;
     }
 
+    timing_step(TIMING_STEP_ML);
+
     // ------------------------------------------------------------------------
     // propagate it forward in v2
 
@@ -1503,7 +1510,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         buffer_fast_strcat(wb, "\n", 1);
     }
 
-    // timing_step(TIMING_STEP_PROPAGATE);
+    timing_step(TIMING_STEP_PROPAGATE);
 
     // ------------------------------------------------------------------------
     // store it
@@ -1519,8 +1526,8 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
     rrddim_acquired_release(rda);
 
-    // timing_step(TIMING_STEP_STORE);
-    // timing_report();
+    timing_step(TIMING_STEP_STORE);
+    timing_report();
 
     return PARSER_RC_OK;
 }

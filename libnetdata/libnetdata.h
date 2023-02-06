@@ -663,10 +663,22 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 
 typedef enum {
     TIMING_STEP_INTERNAL = 0,
+
     TIMING_STEP_PREPARE,
     TIMING_STEP_LOOKUP_DIMENSION,
     TIMING_STEP_PARSE,
+    TIMING_STEP_ML,
     TIMING_STEP_PROPAGATE,
+    TIMING_STEP_RRDSET_STORE,
+    TIMING_STEP_DBENGINE_FIRST_CHECK,
+    TIMING_STEP_DBENGINE_ALIGNMENT,
+    TIMING_STEP_DBENGINE_CHECK_DATA,
+    TIMING_STEP_DBENGINE_PACK,
+    TIMING_STEP_DBENGINE_PAGE_FIN,
+    TIMING_STEP_DBENGINE_MRG_UPDATE,
+    TIMING_STEP_DBENGINE_PAGE_ALLOC,
+    TIMING_STEP_DBENGINE_CREATE_NEW_PAGE,
+    TIMING_STEP_DBENGINE_FLUSH_PAGE,
     TIMING_STEP_STORE,
 
     // terminator
@@ -679,9 +691,15 @@ typedef enum {
     TIMING_ACTION_FINISH,
 } TIMING_ACTION;
 
+#ifdef NETDATA_TIMING_REPORT
 #define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
 #define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
 #define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+#else
+#define timing_init() debug_dummy()
+#define timing_step(step) debug_dummy()
+#define timing_report() debug_dummy()
+#endif
 void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 # ifdef __cplusplus

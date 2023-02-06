@@ -185,6 +185,8 @@ typedef enum __attribute__ ((__packed__)) {
 struct rrdeng_collect_handle {
     struct metric *metric;
     struct pgc_page *page;
+    void *data;
+    size_t data_size;
     struct pg_alignment *alignment;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;

@@ -257,6 +257,8 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     handle = callocz(1, sizeof(struct rrdeng_collect_handle));
     handle->metric = metric;
     handle->page = NULL;
+    handle->data = NULL;
+    handle->data_size = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
     handle->update_every_ut = (usec_t)update_every * USEC_PER_SEC;
@@ -340,6 +342,8 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     handle->page_flags = 0;
     handle->page_position = 0;
     handle->page_entries_max = 0;
+    handle->data = NULL;
+    handle->data_size = 0;
 
     // important!
     // we should never zero page end time ut, because this will allow
@@ -348,6 +352,8 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *collection_h
     // handle->page_start_time_ut;
 
     check_and_fix_mrg_update_every(handle);
+
+    timing_step(TIMING_STEP_DBENGINE_FLUSH_PAGE);
 }
 
 static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *handle,
@@ -414,6 +420,8 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
         handle->page_flags |= RRDENG_PAGE_CREATED_IN_FUTURE;
 
     check_and_fix_mrg_update_every(handle);
+
+    timing_step(TIMING_STEP_DBENGINE_CREATE_NEW_PAGE);
 }
 
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
@@ -469,7 +477,11 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     }
 
     *data_size = size;
-    return dbengine_page_alloc(size);
+    void *d = dbengine_page_alloc(size);
+
+    timing_step(TIMING_STEP_DBENGINE_PAGE_ALLOC);
+
+    return d;
 }
 
 static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_handle,
@@ -485,8 +497,6 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
 
     bool perfect_page_alignment = false;
-    void *data;
-    size_t data_size;
 
     if(likely(handle->page)) {
         /* Make alignment decisions */
@@ -504,23 +514,22 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
             handle->options &= ~RRDENG_CHO_UNALIGNED;
             handle->page_flags |= RRDENG_PAGE_UNALIGNED;
             rrdeng_store_metric_flush_current_page(collection_handle);
-
-            data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
-        }
-        else {
-            data = pgc_page_data(handle->page);
-            data_size = pgc_page_data_size(main_cache, handle->page);
         }
     }
-    else
-        data = rrdeng_alloc_new_metric_data(handle, &data_size, point_in_time_ut);
+
+    timing_step(TIMING_STEP_DBENGINE_ALIGNMENT);
+
+    if(unlikely(!handle->data))
+        handle->data = rrdeng_alloc_new_metric_data(handle, &handle->data_size, point_in_time_ut);
+
+    timing_step(TIMING_STEP_DBENGINE_CHECK_DATA);
 
     if(likely(ctx->config.page_type == PAGE_METRICS)) {
-        storage_number *tier0_metric_data = data;
+        storage_number *tier0_metric_data = handle->data;
         tier0_metric_data[handle->page_position] = pack_storage_number(n, flags);
     }
     else if(likely(ctx->config.page_type == PAGE_TIER)) {
-        storage_number_tier1_t *tier12_metric_data = data;
+        storage_number_tier1_t *tier12_metric_data = handle->data;
         storage_number_tier1_t number_tier1;
         number_tier1.sum_value = (float) n;
         number_tier1.min_value = (float) min_value;
@@ -532,8 +541,10 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     else
         fatal("DBENGINE: cannot store metric on unknown page type id %d", ctx->config.page_type);
 
+    timing_step(TIMING_STEP_DBENGINE_PACK);
+
     if(unlikely(!handle->page)){
-        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, data, data_size);
+        rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->data, handle->data_size);
         // handle->position is set to 1 already
 
         if (0 == handle->alignment->page_position) {
@@ -556,8 +567,12 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     if (perfect_page_alignment)
         handle->alignment->page_position = handle->page_position;
 
+    timing_step(TIMING_STEP_DBENGINE_PAGE_FIN);
+
     // update the metric information
     mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC));
+
+    timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
 }
 
 static void store_metric_next_error_log(struct rrdeng_collect_handle *handle, usec_t point_in_time_ut, const char *msg) {
@@ -599,6 +614,8 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                               const uint16_t anomaly_count,
                               const SN_FLAGS flags)
 {
+    timing_step(TIMING_STEP_RRDSET_STORE);
+
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -606,9 +623,48 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         handle->page_flags |= RRDENG_PAGE_FUTURE_POINT;
 #endif
 
-    if(likely(handle->page_end_time_ut + handle->update_every_ut == point_in_time_ut)) {
+    usec_t delta_ut = point_in_time_ut - handle->page_end_time_ut;
+
+    if(likely(delta_ut == handle->update_every_ut)) {
         // happy path
         ;
+    }
+    else if(unlikely(point_in_time_ut > handle->page_end_time_ut)) {
+        if(handle->page) {
+            if (unlikely(delta_ut < handle->update_every_ut)) {
+                handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
+                rrdeng_store_metric_flush_current_page(collection_handle);
+            }
+            else if (unlikely(delta_ut % handle->update_every_ut)) {
+                handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
+                rrdeng_store_metric_flush_current_page(collection_handle);
+            }
+            else {
+                size_t points_gap = delta_ut / handle->update_every_ut;
+                size_t page_remaining_points = handle->page_entries_max - handle->page_position;
+
+                if (points_gap >= page_remaining_points) {
+                    handle->page_flags |= RRDENG_PAGE_BIG_GAP;
+                    rrdeng_store_metric_flush_current_page(collection_handle);
+                }
+                else {
+                    // loop to fill the gap
+                    handle->page_flags |= RRDENG_PAGE_GAP;
+
+                    usec_t stop_ut = point_in_time_ut - handle->update_every_ut;
+                    for (usec_t this_ut = handle->page_end_time_ut + handle->update_every_ut;
+                         this_ut <= stop_ut;
+                         this_ut = handle->page_end_time_ut + handle->update_every_ut) {
+                        rrdeng_store_metric_append_point(
+                                collection_handle,
+                                this_ut,
+                                NAN, NAN, NAN,
+                                1, 0,
+                                SN_EMPTY_SLOT);
+                    }
+                }
+            }
+        }
     }
     else if(unlikely(point_in_time_ut < handle->page_end_time_ut)) {
         handle->page_flags |= RRDENG_PAGE_PAST_COLLECTION;
@@ -616,49 +672,13 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
         return;
     }
 
-    else if(unlikely(point_in_time_ut == handle->page_end_time_ut)) {
+    else /* if(unlikely(point_in_time_ut == handle->page_end_time_ut)) */ {
         handle->page_flags |= RRDENG_PAGE_REPEATED_COLLECTION;
         store_metric_next_error_log(handle, point_in_time_ut, "is at the same time as the");
         return;
     }
 
-    else if(handle->page) {
-        usec_t delta_ut = point_in_time_ut - handle->page_end_time_ut;
-
-        if(unlikely(delta_ut < handle->update_every_ut)) {
-            handle->page_flags |= RRDENG_PAGE_STEP_TOO_SMALL;
-            rrdeng_store_metric_flush_current_page(collection_handle);
-        }
-        else if(unlikely(delta_ut % handle->update_every_ut)) {
-            handle->page_flags |= RRDENG_PAGE_STEP_UNALIGNED;
-            rrdeng_store_metric_flush_current_page(collection_handle);
-        }
-        else {
-            size_t points_gap = delta_ut / handle->update_every_ut;
-            size_t page_remaining_points = handle->page_entries_max - handle->page_position;
-
-            if(points_gap >= page_remaining_points) {
-                handle->page_flags |= RRDENG_PAGE_BIG_GAP;
-                rrdeng_store_metric_flush_current_page(collection_handle);
-            }
-            else {
-                // loop to fill the gap
-                handle->page_flags |= RRDENG_PAGE_GAP;
-
-                usec_t stop_ut = point_in_time_ut - handle->update_every_ut;
-                for(usec_t this_ut = handle->page_end_time_ut + handle->update_every_ut;
-                    this_ut <= stop_ut ;
-                    this_ut = handle->page_end_time_ut + handle->update_every_ut) {
-                    rrdeng_store_metric_append_point(
-                            collection_handle,
-                            this_ut,
-                            NAN, NAN, NAN,
-                            1, 0,
-                            SN_EMPTY_SLOT);
-                }
-            }
-        }
-    }
+    timing_step(TIMING_STEP_DBENGINE_FIRST_CHECK);
 
     rrdeng_store_metric_append_point(collection_handle,
                                      point_in_time_ut,

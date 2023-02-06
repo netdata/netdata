@@ -2080,7 +2080,18 @@ struct timing_steps {
         [TIMING_STEP_PREPARE] = { .name = "prepare", .time = 0, },
         [TIMING_STEP_LOOKUP_DIMENSION] = { .name = "lookup dim", .time = 0, },
         [TIMING_STEP_PARSE] = { .name = "parse", .time = 0, },
+        [TIMING_STEP_ML] = { .name = "ml", .time = 0, },
         [TIMING_STEP_PROPAGATE] = { .name = "propagate", .time = 0, },
+        [TIMING_STEP_RRDSET_STORE] = { .name = "rrdset store", .time = 0, },
+        [TIMING_STEP_DBENGINE_FIRST_CHECK] = { .name = "db 1st check", .time = 0, },
+        [TIMING_STEP_DBENGINE_ALIGNMENT] = { .name = "db align", .time = 0, },
+        [TIMING_STEP_DBENGINE_CHECK_DATA] = { .name = "db check data", .time = 0, },
+        [TIMING_STEP_DBENGINE_PACK] = { .name = "db pack", .time = 0, },
+        [TIMING_STEP_DBENGINE_PAGE_FIN] = { .name = "db page fin", .time = 0, },
+        [TIMING_STEP_DBENGINE_MRG_UPDATE] = { .name = "db mrg update", .time = 0, },
+        [TIMING_STEP_DBENGINE_PAGE_ALLOC] = { .name = "db page alloc", .time = 0, },
+        [TIMING_STEP_DBENGINE_CREATE_NEW_PAGE] = { .name = "db new page", .time = 0, },
+        [TIMING_STEP_DBENGINE_FLUSH_PAGE] = { .name = "db page flush", .time = 0, },
         [TIMING_STEP_STORE] = { .name = "store", .time = 0, },
 
         // terminator
@@ -2138,12 +2149,13 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
             for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
                 if(!timing_steps[t].count) continue;
 
-                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: count %6zu, time %10.2f ms (%7.2f %%)\n",
+                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: count %8zu, time %10.2f ms (%7.2f %%), average %7.2f usec/run\n",
                                t,
                                timing_steps[t].name ? timing_steps[t].name : "x",
                                timings3[t].count - timings2[t].count,
                                (double) (timings3[t].time - timings2[t].time) / USEC_PER_MS,
-                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total
+                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total,
+                               (double)(timings3[t].time - timings2[t].time) / (double)(timings3[t].count - timings2[t].count)
                 );
             }
 
