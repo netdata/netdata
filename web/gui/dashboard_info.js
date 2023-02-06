@@ -4522,18 +4522,18 @@ netdataDashboard.context = {
         info: 'An exception filter evaluates regardless of whether an exception is handled.'
     },
 
-    'netframework.clrexception_finally': {
+    'netframework.clrexception_finallys': {
         info: 'The metric counts only the finally blocks executed for an exception; finally blocks on normal code paths are not counted by this counter.'
     },
 
     // ------------------------------------------------------------------------
     // WMI (NET Framework: Interop)
 
-    'netframework.clrinterop_com_callable_wrapper': {
+    'netframework.clrinterop_com_callable_wrappers': {
         info: 'A COM callable wrappers (CCW) is a proxy for a managed object being referenced from an unmanaged COM client.'
     },
 
-    'netframework.clrinterop_stubs_created': {
+    'netframework.clrinterop_interop_stubs_created': {
         info: 'The Stubs are responsible for marshaling arguments and return values from managed to unmanaged code, and vice versa, during a COM interop call or a platform invoke call.'
     },
 
@@ -4548,7 +4548,7 @@ netdataDashboard.context = {
         info: 'The metric is updated at the end of every JIT compilation phase. A JIT compilation phase occurs when a method and its dependencies are compiled.'
     },
 
-    'netframework.clrjit_standard_failure': {
+    'netframework.clrjit_standard_failures': {
         info: 'The failure can occur if the MSIL cannot be verified or if there is an internal error in the JIT compiler.'
     },
 
