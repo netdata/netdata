@@ -525,10 +525,8 @@ int is_legacy = 1;
 //        rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_INFO | RRDHOST_FLAG_METADATA_UPDATE);
         ml_host_new(host);
         ml_host_start_training_thread(host);
-    } else {
+    } else
         rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_ARCHIVED | RRDHOST_FLAG_ORPHAN);
-        metadata_queue_load_host_context(host);
-    }
 
     return host;
 }

@@ -16,7 +16,6 @@ struct aclk_sync_config_s {
     uv_mutex_t cmd_mutex;
     uv_cond_t cmd_cond;
     bool initialized;
-    volatile unsigned is_shutting_down;
     volatile unsigned queue_size;
     struct aclk_database_cmdqueue cmd_queue;
 } aclk_sync_config = { 0 };
@@ -189,7 +188,7 @@ int aclk_database_enq_cmd_noblock(struct aclk_database_cmd *cmd)
 
     /* wait for free space in queue */
     uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    if ((queue_size = aclk_sync_config.queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE || aclk_sync_config.is_shutting_down) {
+    if ((queue_size = aclk_sync_config.queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
         uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
         return 1;
     }
@@ -210,10 +209,6 @@ static void aclk_database_enq_cmd(struct aclk_database_cmd *cmd)
 
     /* wait for free space in queue */
     uv_mutex_lock(&aclk_sync_config.cmd_mutex);
-    if (aclk_sync_config.is_shutting_down) {
-        uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
-        return;
-    }
     while ((queue_size = aclk_sync_config.queue_size) == ACLK_DATABASE_CMD_Q_MAX_SIZE) {
         uv_cond_wait(&aclk_sync_config.cmd_cond, &aclk_sync_config.cmd_mutex);
     }
@@ -238,12 +233,11 @@ struct aclk_database_cmd aclk_database_deq_cmd(void)
 
     uv_mutex_lock(&aclk_sync_config.cmd_mutex);
     queue_size = aclk_sync_config.queue_size;
-    if (queue_size == 0 || aclk_sync_config.is_shutting_down) {
+    if (queue_size == 0) {
         memset(&ret, 0, sizeof(ret));
         ret.opcode = ACLK_DATABASE_NOOP;
         ret.completion = NULL;
-        if (aclk_sync_config.is_shutting_down)
-            uv_cond_signal(&aclk_sync_config.cmd_cond);
+
     } else {
         /* dequeue command */
         ret = aclk_sync_config.cmd_queue.cmd_array[aclk_sync_config.cmd_queue.head];
@@ -260,15 +254,6 @@ struct aclk_database_cmd aclk_database_deq_cmd(void)
     uv_mutex_unlock(&aclk_sync_config.cmd_mutex);
 
     return ret;
-}
-
-void aclk_sync_exit_all()
-{
-    if (unlikely(false == aclk_sync_config.initialized))
-        return;
-
-    aclk_sync_config.is_shutting_down = 1;
-    uv_cond_signal(&aclk_sync_config.cmd_cond);
 }
 
 enum {
@@ -395,8 +380,11 @@ static void timer_cb(uv_timer_t *handle)
 
 static void aclk_synchronization(void *arg __maybe_unused)
 {
-    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
+    struct aclk_sync_config_s *config = arg;
+    uv_thread_set_name_np(config->thread,  "ACLKSYNC");
     worker_register("ACLKSYNC");
+    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
+
     worker_register_job_name(ACLK_DATABASE_NOOP,                 "noop");
     worker_register_job_name(ACLK_DATABASE_ALARM_HEALTH_LOG,     "alert log");
     worker_register_job_name(ACLK_DATABASE_CLEANUP,              "cleanup");
@@ -406,12 +394,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
     worker_register_job_name(ACLK_DATABASE_PUSH_ALERT_SNAPSHOT,  "alert snapshot");
     worker_register_job_name(ACLK_DATABASE_QUEUE_REMOVED_ALERTS, "alerts check");
     worker_register_job_name(ACLK_DATABASE_TIMER,                "timer");
-
-    struct aclk_sync_config_s *config = arg;
-
-    service_register(SERVICE_THREAD_TYPE_LIBUV, aclk_sync_exit_all, NULL, config, false);
-
-    uv_thread_set_name_np(config->thread,  "ACLKSYNC");
 
     uv_loop_t *loop = &config->loop;
     fatal_assert(0 == uv_loop_init(loop));
@@ -427,11 +409,13 @@ static void aclk_synchronization(void *arg __maybe_unused)
     config->cleanup_after = config->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
     config->initialized = true;
 
-    while (likely(service_running(SERVICE_ACLKSYNC) && false == config->is_shutting_down)) {
+    while (likely(service_running(SERVICE_ACLKSYNC))) {
         enum aclk_database_opcode opcode;
         struct aclk_database_cmd cmd;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
+
+//        info("ACLK SYNC: Event loop run shutdown = %d", config->is_shutting_down);
 
         /* wait for commands */
         do {
@@ -488,11 +472,13 @@ static void aclk_synchronization(void *arg __maybe_unused)
         uv_close((uv_handle_t *)&config->timer_req, NULL);
 
     uv_close((uv_handle_t *)&config->async, NULL);
+//    uv_close((uv_handle_t *)&config->async_exit, NULL);
     uv_cond_destroy(&config->cmd_cond);
     (void) uv_loop_close(loop);
 
     worker_unregister();
-    info("Shutting down ACLK synchronization event loop");
+    service_exits();
+    info("ACLK SYNC: Shutting down ACLK synchronization event loop");
 }
 
 // -------------------------------------------------------------
@@ -577,6 +563,8 @@ void sql_aclk_sync_init(void)
         error_report("SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
+    // Trigger host context load for hosts that have been created
+    metadata_queue_load_host_context(NULL);
 
 #ifdef ENABLE_ACLK
     rc = sqlite3_exec_monitored(db_meta, "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni " \

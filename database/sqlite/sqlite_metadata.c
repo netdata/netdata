@@ -857,6 +857,30 @@ struct scan_metadata_payload {
     uint32_t max_count;
 };
 
+struct host_context_load_thread {
+    uv_thread_t thread;
+    RRDHOST *host;
+    bool busy;
+    bool finished;
+};
+
+static void restore_host_context(void *arg)
+{
+    struct host_context_load_thread *hclt = arg;
+    RRDHOST *host = hclt->host;
+
+    usec_t started_ut = now_monotonic_usec(); (void)started_ut;
+    rrdhost_load_rrdcontext_data(host);
+    usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+
+    internal_error(true, "METADATA: 'host:%s' context load in %0.2f ms", rrdhost_hostname(host),
+        (double)(ended_ut - started_ut) / USEC_PER_MS);
+
+    __atomic_store_n(&hclt->finished, true, __ATOMIC_RELEASE);
+}
+
 // Callback after scan of hosts is done
 static void after_start_host_load_context(uv_work_t *req, int status __maybe_unused)
 {
@@ -864,27 +888,84 @@ static void after_start_host_load_context(uv_work_t *req, int status __maybe_unu
     freez(data);
 }
 
-// Worker thread to load a host context
-static void start_host_load_context(uv_work_t *req __maybe_unused)
+#define MAX_FIND_THREAD_RETRIES (10)
+
+static void cleanup_finished_threads(struct host_context_load_thread *hclt, size_t max_thread_slots, bool wait)
+{
+    for (size_t index = 0; index < max_thread_slots; index++) {
+       if (__atomic_load_n(&(hclt[index].finished), __ATOMIC_RELAXED)
+           || (wait && __atomic_load_n(&(hclt[index].busy), __ATOMIC_ACQUIRE))) {
+           int rc = uv_thread_join(&(hclt[index].thread));
+           if (rc)
+                error("Failed to join thread, rc = %d",rc);
+           __atomic_store_n(&(hclt[index].busy), false, __ATOMIC_RELEASE);
+           __atomic_store_n(&(hclt[index].finished), false, __ATOMIC_RELEASE);
+       }
+    }
+}
+
+static size_t find_available_thread_slot(struct host_context_load_thread *hclt, size_t max_thread_slots, size_t *found_index)
+{
+    size_t index;
+
+    size_t retries = MAX_FIND_THREAD_RETRIES;
+    while (retries--) {
+       index = 0;
+       while (index < max_thread_slots) {
+           if (false == __atomic_load_n(&(hclt[index].busy), __ATOMIC_ACQUIRE)) {
+                *found_index = index;
+                return true;
+           }
+           index++;
+       }
+       sleep_usec(10 * USEC_PER_MS);
+    }
+    return false;
+}
+
+static void start_all_host_load_context(uv_work_t *req __maybe_unused)
 {
     register_libuv_worker_jobs();
 
     struct scan_metadata_payload *data = req->data;
+    UNUSED(data);
 
-    worker_is_busy(UV_EVENT_METADATA_STORE);
-
-    RRDHOST *host = data->host;
-    internal_error(true, "METADATA: 'host:%s' loading context load", rrdhost_hostname(host));
-
+    worker_is_busy(UV_EVENT_HOST_CONTEXT_LOAD);
     usec_t started_ut = now_monotonic_usec(); (void)started_ut;
 
-    rrdhost_load_rrdcontext_data(host);
-    rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD | RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+    RRDHOST *host;
 
+    size_t max_threads = MIN(get_netdata_cpus() / 2, 6);
+    struct host_context_load_thread *hclt = callocz(max_threads, sizeof(*hclt));
+
+    size_t thread_index;
+    dfe_start_reentrant(rrdhost_root_index, host) {
+       if (rrdhost_flag_check(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS) ||
+           !rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+           continue;
+
+       rrdhost_flag_set(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
+       internal_error(true, "METADATA: 'host:%s' loading context", rrdhost_hostname(host));
+
+       cleanup_finished_threads(hclt, max_threads, false);
+       bool found_slot = find_available_thread_slot(hclt, max_threads, &thread_index);
+
+       if (unlikely(!found_slot)) {
+           struct host_context_load_thread hclt_sync = {.host = host};
+           restore_host_context(&hclt_sync);
+       }
+       else {
+           __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
+           hclt[thread_index].host = host;
+           assert(0 == uv_thread_create(&hclt[thread_index].thread, restore_host_context, &hclt[thread_index]));
+       }
+    }
+    dfe_done(host);
+
+    cleanup_finished_threads(hclt, max_threads, true);
+    freez(hclt);
     usec_t ended_ut = now_monotonic_usec(); (void)ended_ut;
-    internal_error(true, "METADATA: 'host:%s' context load in %0.2f ms",
-                   rrdhost_hostname(host),
-                   (double)(ended_ut - started_ut) / USEC_PER_MS);
+    internal_error(true, "METADATA: 'host:ALL' contexts loaded in %0.2f ms", (double)(ended_ut - started_ut) / USEC_PER_MS);
 
     worker_is_idle();
 }
@@ -1105,7 +1186,6 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
 
 static void metadata_event_loop(void *arg)
 {
-    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
     worker_register("METASYNC");
     worker_register_job_name(METADATA_DATABASE_NOOP,        "noop");
     worker_register_job_name(METADATA_DATABASE_TIMER,       "timer");
@@ -1122,6 +1202,7 @@ static void metadata_event_loop(void *arg)
     uv_work_t metadata_cleanup_worker;
 
     uv_thread_set_name_np(wc->thread, "METASYNC");
+//    service_register(SERVICE_THREAD_TYPE_EVENT_LOOP, NULL, NULL, NULL, true);
     loop = wc->loop = mallocz(sizeof(uv_loop_t));
     ret = uv_loop_init(loop);
     if (ret) {
@@ -1250,22 +1331,12 @@ static void metadata_event_loop(void *arg)
                     if (unittest_running)
                         break;
 
-                    host = (RRDHOST *) cmd.param[0];
-                    if (unlikely(rrdhost_flag_check(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS)))
-                        break;
-
-                    data = mallocz(sizeof(*data));
+                    data = callocz(1,sizeof(*data));
                     data->request.data = data;
                     data->wc = wc;
-                    data->max_count = 0;
-                    data->completion = NULL;  // Completion by the worker
-                    data->host = host;
-                    rrdhost_flag_set(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
                     if (unlikely(
-                            uv_queue_work(loop,&data->request,
-                                          start_host_load_context,
+                            uv_queue_work(loop,&data->request, start_all_host_load_context,
                                           after_start_host_load_context))) {
-                        rrdhost_flag_clear(host, RRDHOST_FLAG_CONTEXT_LOAD_IN_PROGRESS);
                         freez(data);
                     }
                     break;
