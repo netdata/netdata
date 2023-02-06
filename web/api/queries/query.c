@@ -2273,7 +2273,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->internal.grouping_reset(r);
 
         if(ops[c]) {
-            r->od[c] |= RRDR_DIMENSION_SELECTED;
+            r->od[c] |= RRDR_DIMENSION_QUERIED;
             rrd2rrdr_query_execute(r, c, ops[c]);
             continue;
         }
@@ -2394,7 +2394,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // mark them as NONZERO to send them all
             for (size_t c = 0, max = qt->query.used; c < max; c++) {
                 if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-                if (unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
+                if (unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
                 r->od[c] |= RRDR_DIMENSION_NONZERO;
             }
         }

@@ -541,7 +541,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     if(unlikely(r->od[0] & RRDR_DIMENSION_HIDDEN))
         goto cleanup;
 
-    if(unlikely(!(r->od[0] & RRDR_DIMENSION_SELECTED)))
+    if(unlikely(!(r->od[0] & RRDR_DIMENSION_QUERIED)))
         goto cleanup;
 
     if(unlikely(!(r->od[0] & RRDR_DIMENSION_NONZERO)))
