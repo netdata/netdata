@@ -2114,7 +2114,20 @@ parse_args() {
       "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
+      "--release-channel")
+        RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        case "${RELEASE_CHANNEL}" in
+          nightly|stable|default)
+            shift 1
+            ;;
+          *)
+            echo "Unrecognized value for --release-channel. Valid release channels are: stable, nightly, default"
+            exit 1
+            ;;
+        esac
+        ;;
       "--stable-channel") RELEASE_CHANNEL="stable" ;;
+      "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-method")
