@@ -1994,6 +1994,7 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
             if (do_ecn == CONFIG_BOOLEAN_YES || ( do_ecn == CONFIG_BOOLEAN_AUTO &&
                                                 ( netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES ||
 #if __FreeBSD_version < 1400074
+// See https://github.com/freebsd/freebsd-src/commit/1a70101a870015304d5b2446b480d8677d8aad36
                                                   tcpstat.tcps_ecn_ce ||
                                                   tcpstat.tcps_ecn_ect0 ||
                                                   tcpstat.tcps_ecn_ect1
