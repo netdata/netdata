@@ -2275,8 +2275,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
             rrd2rrdr_query_execute(r, c, ops[c]);
-            continue;
         }
+        else
+            continue;
 
         global_statistics_rrdr_query_completed(
                 1,
