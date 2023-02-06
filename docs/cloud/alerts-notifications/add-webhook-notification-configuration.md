@@ -9,7 +9,7 @@ learn_rel_path: "Operations/Alerts"
 learn_docs_purpose: "Instructions on how to add notification configuration for webhook"
 -->
 
-From the Cloud interface, you can manage your space's notification settings and from these you can add specific configuration to get notifications delivered on a webhook using a predefined schema.
+From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on a webhook using a predefined schema.
 
 #### Prerequisites
 
