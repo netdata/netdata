@@ -1007,13 +1007,6 @@ static void start_metadata_hosts(uv_work_t *req __maybe_unused)
         transaction_started = !db_execute("BEGIN TRANSACTION;");
 
     dfe_start_reentrant(rrdhost_root_index, host) {
-
-        if (rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD)) {
-            rrdhost_load_rrdcontext_data(host);
-            rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
-            continue;
-        }
-
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
