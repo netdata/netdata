@@ -379,9 +379,6 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
 }
 
 void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
-    if(!rsb->wb || rsb->v2)
-        return;
-
     RRDHOST *host = st->rrdhost;
     rrdpush_send_chart_metrics(rsb->wb, st, host->sender, rsb->rrdset_flags);
 }
@@ -485,9 +482,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
     }
 
     if(replication_in_progress)
-        return (RRDSET_STREAM_BUFFER) {
-                .wb = NULL,
-        };
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
     return (RRDSET_STREAM_BUFFER) {
         .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),

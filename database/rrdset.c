@@ -1513,8 +1513,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
-                st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
+    if(unlikely(st->usec_since_last_update > MAX(st->entries, 60) * update_every_ut)) {
         info("host '%s', chart '%s': took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
             " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
@@ -1608,7 +1607,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 after_first_database_work:
     st->counter_done++;
 
-    if(stream_buffer.wb)
+    if(stream_buffer.wb && !stream_buffer.v2)
         rrdset_push_metrics_v1(&stream_buffer, st);
 
     uint32_t has_reset_value = 0;

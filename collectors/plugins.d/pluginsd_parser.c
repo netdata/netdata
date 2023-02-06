@@ -1562,6 +1562,7 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
 
     pluginsd_unlock_rrdset_data_collection(user);
     rrdcontext_collected_rrdset(st);
+    store_metric_collection_completed();
 
     // ------------------------------------------------------------------------
     // propagate it forward
