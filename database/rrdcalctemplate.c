@@ -61,13 +61,13 @@ void rrdcalctemplate_check_rrddim_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSE
     }
 }
 
-int rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
+void rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, RRDHOST *host) {
     if(!rrdcalctemplate_check_rrdset_conditions(rt, st, host))
-        return 0;
+        return;
 
     if(!rt->foreach_dimension_pattern) {
         rrdcalc_add_from_rrdcalctemplate(host, rt, st, NULL, NULL);
-        return 1;
+        return;
     }
 
     RRDDIM *rd;
@@ -75,22 +75,16 @@ int rrdcalctemplate_check_conditions_and_link(RRDCALCTEMPLATE *rt, RRDSET *st, R
         rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
     }
     rrddim_foreach_done(rd);
-
-    return 1;
 }
 
-int rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st) {
-    int matched = 0;
-
+void rrdcalctemplate_link_matching_templates_to_rrdset(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
 
     RRDCALCTEMPLATE *rt;
     foreach_rrdcalctemplate_read(host, rt) {
-        matched += rrdcalctemplate_check_conditions_and_link(rt, st, host);
+        rrdcalctemplate_check_conditions_and_link(rt, st, host);
     }
     foreach_rrdcalctemplate_done(rt);
-
-    return matched;
 }
 
 static void rrdcalctemplate_free_internals(RRDCALCTEMPLATE *rt) {

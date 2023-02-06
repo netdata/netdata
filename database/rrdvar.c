@@ -237,6 +237,7 @@ int health_variable_check(DICTIONARY *dict, RRDSET *st, RRDDIM *rd) {
     }
 
     string_freez(helper_str);
+
     return 0;
 }
 

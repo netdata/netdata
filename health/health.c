@@ -915,22 +915,19 @@ static int update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
 }
 
 static void health_execute_delayed_initializations(RRDHOST *host) {
-    int matched;
     RRDSET *st;
 
     if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION)) return;
     rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_HEALTH_INITIALIZATION);
 
     rrdset_foreach_reentrant(st, host) {
-        matched = 0;
-
         if(!rrdset_flag_check(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION)) continue;
         rrdset_flag_clear(st, RRDSET_FLAG_PENDING_HEALTH_INITIALIZATION);
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
-        matched = rrdcalc_link_matching_alerts_to_rrdset(st);
-        matched += rrdcalctemplate_link_matching_templates_to_rrdset(st);
+        rrdcalc_link_matching_alerts_to_rrdset(st);
+        rrdcalctemplate_link_matching_templates_to_rrdset(st);
 
         RRDDIM *rd;
         rrddim_foreach_read(rd, st) {
@@ -946,19 +943,14 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
                 if(rrdcalctemplate_check_rrdset_conditions(rt, st, host)) {
                     rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
-                    matched++;
                 }
             }
             foreach_rrdcalctemplate_done(rt);
 
-            if (!matched)
-                matched = health_variable_check(health_rrdvars, st, rd);
+            if(health_variable_check(health_rrdvars, st, rd))
+                    rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
-
-        if (matched) {
-            rrdvar_store_for_chart(host, st);
-        }
     }
     rrdset_foreach_done(st);
 }

@@ -245,6 +245,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     if(!rc->units)
         rc->units = string_dup(st->units);
 
+    rrdvar_store_for_chart(host, st);
+
     rrdcalc_update_info_using_rrdset_labels(rc);
 
     time_t now = now_realtime_sec();
@@ -369,8 +371,7 @@ static inline bool rrdcalc_check_if_it_matches_rrdset(RRDCALC *rc, RRDSET *st) {
     return true;
 }
 
-int rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
-    int matched = 0;
+void rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
     RRDHOST *host = st->rrdhost;
     // debug(D_HEALTH, "find matching alarms for chart '%s'", st->id);
 
@@ -379,14 +380,10 @@ int rrdcalc_link_matching_alerts_to_rrdset(RRDSET *st) {
         if(rc->rrdset)
             continue;
 
-        if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st))) {
+        if(unlikely(rrdcalc_check_if_it_matches_rrdset(rc, st)))
             rrdcalc_link_to_rrdset(st, rc);
-            matched = 1;
-        }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
-
-    return matched;
 }
 
 static inline int rrdcalc_check_and_link_rrdset_callback(RRDSET *st, void *rrdcalc) {
