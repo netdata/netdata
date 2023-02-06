@@ -371,7 +371,7 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
             .end_time_s = point_in_time_s,
             .size = data_size,
             .data = data,
-            .update_every_s = update_every_s,
+            .update_every_s = (uint32_t) update_every_s,
             .hot = true
     };
 
