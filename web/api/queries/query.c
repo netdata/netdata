@@ -2275,6 +2275,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_SELECTED;
             rrd2rrdr_query_execute(r, c, ops[c]);
+            continue;
         }
 
         global_statistics_rrdr_query_completed(
@@ -2385,15 +2386,23 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // free all resources used by the grouping method
     r->internal.grouping_free(r);
 
-    // when all the dimensions are zero, we should return all of them
-    if(unlikely((qt->window.options & RRDR_OPTION_NONZERO) && !dimensions_nonzero && !(r->result_options & RRDR_RESULT_OPTION_CANCEL))) {
-        // all the dimensions are zero
-        // mark them as NONZERO to send them all
-        for(size_t c = 0, max = qt->query.used; c < max ; c++) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            r->od[c] |= RRDR_DIMENSION_NONZERO;
+    if(likely(dimensions_used)) {
+        // when all the dimensions are zero, we should return all of them
+        if (unlikely((qt->window.options & RRDR_OPTION_NONZERO) && !dimensions_nonzero &&
+                     !(r->result_options & RRDR_RESULT_OPTION_CANCEL))) {
+            // all the dimensions are zero
+            // mark them as NONZERO to send them all
+            for (size_t c = 0, max = qt->query.used; c < max; c++) {
+                if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+                if (unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
+                r->od[c] |= RRDR_DIMENSION_NONZERO;
+            }
         }
+
+        return r;
     }
 
-    return r;
+    // we couldn't query any dimension
+    rrdr_free(owa, r);
+    return NULL;
 }
