@@ -9,7 +9,7 @@ learn_rel_path: "Operations/Alerts"
 learn_docs_purpose: "Instructions on how to add notification configuration for PagerDuty"
 -->
 
-From the Cloud interface, you can manage your space's notification settings and from these you can add specific configuration to get notifications delivered on PagerDuty.
+From the Cloud interface, you can manage your space's notification settings and from these you can add a specific configuration to get notifications delivered on PagerDuty.
 
 #### Prerequisites
 
@@ -17,7 +17,7 @@ To add PagerDuty notification configurations you need
 
 - A Cloud account
 - Access to the space as and **administrator**
-- Space will needs to be on **Business** plan or higher
+- Space needs to be on **Business** plan or higher
 - Have a PagerDuty service to receive events, for mode details check [how to configure this on PagerDuty](#settings-on-pagerduty)
 
 #### Steps
