@@ -26,7 +26,7 @@ being able to join any room. We also aligned the offered roles to the target aud
 
 #### Which functionalities are available for each role?
 
-In more detail, you can find on the following tables detailing which functionalities are available for each role on each domain.
+In more detail, you can find on the following tables which functionalities are available for each role on each domain.
 
 ##### Space Management
 
