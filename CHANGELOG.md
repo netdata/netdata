@@ -1,11 +1,13 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...v1.38.0)
 
 **Merged pull requests:**
 
+- Updated w1sensor.chart.py [\#14435](https://github.com/netdata/netdata/pull/14435) ([martindue](https://github.com/martindue))
+- replication to streaming transition when there are gaps [\#14434](https://github.com/netdata/netdata/pull/14434) ([ktsaou](https://github.com/ktsaou))
 - turn error\(\) to internal\_error\(\) [\#14428](https://github.com/netdata/netdata/pull/14428) ([ktsaou](https://github.com/ktsaou))
 - Fix typo on the netdata-functions.md [\#14426](https://github.com/netdata/netdata/pull/14426) ([lokerhp](https://github.com/lokerhp))
 - Update screenshot of timezone selector [\#14425](https://github.com/netdata/netdata/pull/14425) ([cakrit](https://github.com/cakrit))
@@ -362,9 +364,6 @@
 - allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
 - Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
 - Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
-- Rename variable for old CentOS version [\#13775](https://github.com/netdata/netdata/pull/13775) ([thiagoftsm](https://github.com/thiagoftsm))
-- Further improvements to the new service installation code. [\#13774](https://github.com/netdata/netdata/pull/13774) ([Ferroin](https://github.com/Ferroin))
-- Pandas collector [\#13773](https://github.com/netdata/netdata/pull/13773) ([andrewm4894](https://github.com/andrewm4894))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
