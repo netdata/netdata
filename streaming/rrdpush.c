@@ -426,7 +426,7 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_rrd_value(wb, n);
 
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_sn_flags(wb, flags);
+    buffer_print_sn_flags(wb, flags, true);
     buffer_fast_strcat(wb, "\n", 1);
 }
 

@@ -88,6 +88,7 @@ struct replication_query {
         bool locked_data_collection;
         bool execute;
         bool interrupted;
+        bool send_anomaly_bit;
     } query;
 
     time_t wall_clock_time;
@@ -112,7 +113,8 @@ static struct replication_query *replication_query_prepare(
         time_t query_after,
         time_t query_before,
         bool query_enable_streaming,
-        time_t wall_clock_time
+        time_t wall_clock_time,
+        bool send_anomaly_bit
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
     struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
@@ -131,6 +133,7 @@ static struct replication_query *replication_query_prepare(
     q->query.after = query_after;
     q->query.before = query_before;
     q->query.enable_streaming = query_enable_streaming;
+    q->query.send_anomaly_bit = send_anomaly_bit;
 
     q->wall_clock_time = wall_clock_time;
 
@@ -439,12 +442,6 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
             buffer_print_llu(wb, wall_clock_time);
             buffer_fast_strcat(wb, "\n", 1);
 
-//            buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' %llu %llu %llu\n",
-//                           (unsigned long long) min_start_time,
-//                           (unsigned long long) min_end_time,
-//                           (unsigned long long) wall_clock_time
-//            );
-
             // output the replay values for this time
             for (size_t i = 0; i < dimensions; i++) {
                 struct replication_dimension *d = &q->data[i];
@@ -459,17 +456,9 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
                     buffer_rrd_value(wb, d->sp.sum);
-                    buffer_fast_strcat(wb, " '", 2);
-
-                    if(likely(d->sp.flags & SN_FLAG_NOT_ANOMALOUS))
-                        buffer_fast_strcat(wb, "A", 1);
-                    if(unlikely(d->sp.flags & SN_FLAG_RESET))
-                        buffer_fast_strcat(wb, "R", 1);
-
-                    buffer_fast_strcat(wb, "'\n", 2);
-
-//                    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" %s \"%s\"\n",
-//                                   rrddim_id(d->rd), value_str, d->sp.flags & SN_FLAG_RESET ? "R" : "");
+                    buffer_fast_strcat(wb, " ", 1);
+                    buffer_print_sn_flags(wb, d->sp.flags, q->query.send_anomaly_bit);
+                    buffer_fast_strcat(wb, "\n", 1);
 
                     points_generated++;
                 }
@@ -507,7 +496,13 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
     q->points_generated = points_generated;
 }
 
-static struct replication_query *replication_response_prepare(RRDSET *st, bool requested_enable_streaming, time_t requested_after, time_t requested_before) {
+static struct replication_query *replication_response_prepare(
+        RRDSET *st,
+        bool requested_enable_streaming,
+        time_t requested_after,
+        time_t requested_before,
+        bool send_anomaly_bit
+        ) {
     time_t wall_clock_time = now_realtime_sec();
 
     if(requested_after > requested_before) {
@@ -533,7 +528,8 @@ static struct replication_query *replication_response_prepare(RRDSET *st, bool r
     bool query_enable_streaming = requested_enable_streaming;
 
     time_t db_first_entry = 0, db_last_entry = 0;
-    rrdset_get_retention_of_tier_for_collected_chart(st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
+    rrdset_get_retention_of_tier_for_collected_chart(
+            st, &db_first_entry, &db_last_entry, wall_clock_time, 0);
 
     if(requested_after == 0 && requested_before == 0 && requested_enable_streaming == true) {
         // no data requested - just enable streaming
@@ -567,7 +563,7 @@ static struct replication_query *replication_response_prepare(RRDSET *st, bool r
             db_first_entry, db_last_entry,
             requested_after, requested_before, requested_enable_streaming,
             query_after, query_before, query_enable_streaming,
-            wall_clock_time);
+            wall_clock_time, send_anomaly_bit);
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
@@ -1410,7 +1406,12 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(likely(workers))
             worker_is_busy(WORKER_JOB_PREPARE_QUERY);
 
-        rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+        rq->q = replication_response_prepare(
+                rq->st,
+                rq->start_streaming,
+                rq->after,
+                rq->before,
+                stream_has_capability(rq->sender, STREAM_CAP_INTERPOLATED));
     }
 
     if(likely(workers))
@@ -1689,7 +1690,12 @@ static int replication_execute_next_pending_request(bool cancel) {
 
             if (rq->st && !rq->q) {
                 worker_is_busy(WORKER_JOB_PREPARE_QUERY);
-                rq->q = replication_response_prepare(rq->st, rq->start_streaming, rq->after, rq->before);
+                rq->q = replication_response_prepare(
+                        rq->st,
+                        rq->start_streaming,
+                        rq->after,
+                        rq->before,
+                        stream_has_capability(rq->sender, STREAM_CAP_INTERPOLATED));
             }
 
             rq->executed = false;

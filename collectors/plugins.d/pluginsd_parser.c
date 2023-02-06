@@ -1075,6 +1075,7 @@ static inline SN_FLAGS pluginsd_parse_storage_number_flags(const char *flags_str
                 return flags;
 
             default:
+                internal_error(true, "Unknown SN_FLAGS flag '%c'", c);
                 break;
         }
     }
@@ -1506,7 +1507,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
         buffer_fast_strcat(wb, " ", 1);
         buffer_strcat(wb, value_str);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_sn_flags(wb, flags);
+        buffer_print_sn_flags(wb, flags, true);
         buffer_fast_strcat(wb, "\n", 1);
     }
 

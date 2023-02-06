@@ -247,14 +247,14 @@ inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     wb->buffer[wb->len] = '\0';
 }
 
-void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags) {
+void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
     if(unlikely(flags == SN_EMPTY_SLOT)) {
         buffer_fast_strcat(wb, "E", 1);
         return;
     }
 
     size_t printed = 0;
-    if(likely(flags & SN_FLAG_NOT_ANOMALOUS)) {
+    if(likely(send_anomaly_bit && (flags & SN_FLAG_NOT_ANOMALOUS))) {
         buffer_fast_strcat(wb, "A", 1);
         printed++;
     }
