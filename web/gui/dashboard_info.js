@@ -4515,7 +4515,7 @@ netdataDashboard.context = {
     // WMI (NET Framework: Exception)
 
     'netframework.clrexception_thrown': {
-        info: 'The exceptions includes both .NET exceptions and unmanaged exceptions that are converted into .NET exceptions.'
+        info: 'The exceptions include both .NET exceptions and unmanaged exceptions that are converted into .NET exceptions.'
     },
 
     'netframework.clrexception_filters': {
@@ -4574,7 +4574,7 @@ netdataDashboard.context = {
     // WMI (NET Framework: Memory)
 
     'netframework.clrmemory_heap_size': {
-        info: 'The metric does not indicate the current number of bytes allocated.'
+        info: 'The metric shows maximum bytes that can be allocated, but it does not indicate the current number of bytes allocated.'
     },
 
     'netframework.clrmemory_promoted': {
