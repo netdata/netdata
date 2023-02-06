@@ -1,4 +1,4 @@
----
+<!--
 title: "Kubernetes visualizations"
 description: "Netdata Cloud features rich, zero-configuration Kubernetes monitoring for the resource utilization and application metrics of Kubernetes (k8s) clusters."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md"
@@ -6,7 +6,7 @@ sidebar_label: "Kubernetes visualizations"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Operations/Visualizations"
----
+-->
 
 Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in
 the default [Overview](/docs/cloud/visualize/overview/) dashboard.
