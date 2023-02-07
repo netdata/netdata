@@ -57,8 +57,9 @@ char *ml_get_host_runtime_info(RRDHOST *RH) {
     return NULL;
 }
 
-void ml_chart_update_begin(RRDSET *RS) {
+bool ml_chart_update_begin(RRDSET *RS) {
     (void) RS;
+    return false;
 }
 
 void ml_chart_update_end(RRDSET *RS) {
