@@ -1,5 +1,19 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.38.0...HEAD)
+
+**Merged pull requests:**
+
+- minor fix in the metadata of libnetdata/ebpf AND log documents [\#14445](https://github.com/netdata/netdata/pull/14445) ([tkatsoulas](https://github.com/tkatsoulas))
+- Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
+- Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
+- kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
+- add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
+- Roles permissions docs [\#14391](https://github.com/netdata/netdata/pull/14391) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
+
 ## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...v1.38.0)
@@ -360,10 +374,6 @@
 - Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
 - minor - add host labels for ephemerality and nodes with unstable connections [\#13784](https://github.com/netdata/netdata/pull/13784) ([underhood](https://github.com/underhood))
 - Add a thread to asynchronously process metadata updates [\#13783](https://github.com/netdata/netdata/pull/13783) ([stelfrag](https://github.com/stelfrag))
-- Parser cleanup  [\#13782](https://github.com/netdata/netdata/pull/13782) ([stelfrag](https://github.com/stelfrag))
-- allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
-- Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
