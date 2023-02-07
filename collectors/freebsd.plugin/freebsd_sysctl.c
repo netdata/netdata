@@ -1991,15 +1991,34 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
                 rrdset_done(st_listen);
             }
 
-            if (do_ecn == CONFIG_BOOLEAN_YES || (do_ecn == CONFIG_BOOLEAN_AUTO &&
-                                                 (tcpstat.tcps_ecn_ce ||
+            if (do_ecn == CONFIG_BOOLEAN_YES || ( do_ecn == CONFIG_BOOLEAN_AUTO &&
+                                                ( netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES ||
+#if __FreeBSD_version < 1400074
+// See https://github.com/freebsd/freebsd-src/commit/1a70101a870015304d5b2446b480d8677d8aad36
+                                                  tcpstat.tcps_ecn_ce ||
                                                   tcpstat.tcps_ecn_ect0 ||
-                                                  tcpstat.tcps_ecn_ect1 ||
-                                                  netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
+                                                  tcpstat.tcps_ecn_ect1
+#else
+                                                  tcpstat.tcps_ecn_rcvce ||
+                                                  tcpstat.tcps_ecn_rcvect0 ||
+                                                  tcpstat.tcps_ecn_rcvect1 ||
+                                                  tcpstat.tcps_ecn_sndect0 ||
+                                                  tcpstat.tcps_ecn_sndect1
+#endif                                                  
+                                                  ))) {
                 do_ecn = CONFIG_BOOLEAN_YES;
 
                 static RRDSET *st = NULL;
-                static RRDDIM *rd_ce = NULL, *rd_no_ect = NULL, *rd_ect0 = NULL, *rd_ect1 = NULL;
+                static RRDDIM *rd_rcvce = NULL, 
+#if __FreeBSD_version < 1400074
+                              *rd_ect0 = NULL, 
+                              *rd_ect1 = NULL;
+#else
+                              *rd_rcvect0 = NULL, 
+                              *rd_rcvect1 = NULL,
+                              *rd_sndect0 = NULL,
+                              *rd_sndect1 = NULL;
+#endif                                                              
 
                 if (unlikely(!st)) {
                     st = rrdset_create_localhost(
@@ -2019,20 +2038,32 @@ int do_net_inet_tcp_stats(int update_every, usec_t dt) {
 
                     rrdset_flag_set(st, RRDSET_FLAG_DETAIL);
 
-                    rd_ce     = rrddim_add(st, "InCEPkts", "CEP", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_no_ect = rrddim_add(st, "InNoECTPkts", "NoECTP", -1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_ect0   = rrddim_add(st, "InECT0Pkts", "ECTP0", 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    rd_ect1   = rrddim_add(st, "InECT1Pkts", "ECTP1", 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_rcvce     = rrddim_add(st, "InCEPkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#if __FreeBSD_version < 1400074
+                    rd_ect0      = rrddim_add(st, "ECT0Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_ect1      = rrddim_add(st, "ECT1Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#else
+                    rd_rcvect0   = rrddim_add(st, "InECT0Pkts",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_rcvect1   = rrddim_add(st, "InECT1Pkts",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_sndect0   = rrddim_add(st, "OutECT0Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                    rd_sndect1   = rrddim_add(st, "OutECT1Pkts", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+#endif
                 }
 
-                rrddim_set_by_pointer(st, rd_ce,     tcpstat.tcps_ecn_ce);
-                rrddim_set_by_pointer(st, rd_no_ect, tcpstat.tcps_ecn_ce - (tcpstat.tcps_ecn_ect0 +
-                                                                            tcpstat.tcps_ecn_ect1));
-                rrddim_set_by_pointer(st, rd_ect0,   tcpstat.tcps_ecn_ect0);
-                rrddim_set_by_pointer(st, rd_ect1,   tcpstat.tcps_ecn_ect1);
+                
+#if __FreeBSD_version < 1400074
+                rrddim_set_by_pointer(st, rd_rcvce,     tcpstat.tcps_ecn_ce);
+                rrddim_set_by_pointer(st, rd_ect0,      tcpstat.tcps_ecn_ect0);
+                rrddim_set_by_pointer(st, rd_ect1,      tcpstat.tcps_ecn_ect1);
+#else
+                rrddim_set_by_pointer(st, rd_rcvce,     tcpstat.tcps_ecn_rcvce);
+                rrddim_set_by_pointer(st, rd_rcvect0,   tcpstat.tcps_ecn_rcvect0);
+                rrddim_set_by_pointer(st, rd_rcvect1,   tcpstat.tcps_ecn_rcvect1);
+                rrddim_set_by_pointer(st, rd_sndect0,   tcpstat.tcps_ecn_sndect0);
+                rrddim_set_by_pointer(st, rd_sndect1,   tcpstat.tcps_ecn_sndect1);
+#endif
                 rrdset_done(st);
             }
-
         }
     } else {
         collector_error("DISABLED: net.inet.tcp.stats module");
