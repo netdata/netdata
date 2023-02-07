@@ -29,12 +29,13 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
+PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     parser->user = user;
+    parser->user_cleanup_cb = cleanup_cb;
     parser->fd = fd;
     parser->fp_input = fp_input;
     parser->fp_output = fp_output;
@@ -69,11 +70,15 @@ PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, 
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,              pluginsd_function);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
 
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_rrdset_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN_V2,            pluginsd_begin_v2);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET_V2,              pluginsd_set_v2);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END_V2,              pluginsd_end_v2);
     }
 
     return parser;

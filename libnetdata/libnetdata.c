@@ -2069,3 +2069,116 @@ void for_each_open_fd(OPEN_FD_ACTION action, OPEN_FD_EXCLUDE excluded_fds){
         closedir(dir);
     }
 }
+
+struct timing_steps {
+    const char *name;
+    usec_t time;
+    size_t count;
+} timing_steps[TIMING_STEP_MAX + 1] = {
+        [TIMING_STEP_INTERNAL] = { .name = "internal", .time = 0, },
+
+        [TIMING_STEP_BEGIN2_PREPARE] = { .name = "BEGIN2 prepare", .time = 0, },
+        [TIMING_STEP_BEGIN2_FIND_CHART] = { .name = "BEGIN2 find chart", .time = 0, },
+        [TIMING_STEP_BEGIN2_PARSE] = { .name = "BEGIN2 parse", .time = 0, },
+        [TIMING_STEP_BEGIN2_ML] = { .name = "BEGIN2 ml", .time = 0, },
+        [TIMING_STEP_BEGIN2_PROPAGATE] = { .name = "BEGIN2 propagate", .time = 0, },
+        [TIMING_STEP_BEGIN2_STORE] = { .name = "BEGIN2 store", .time = 0, },
+
+        [TIMING_STEP_SET2_PREPARE] = { .name = "SET2 prepare", .time = 0, },
+        [TIMING_STEP_SET2_LOOKUP_DIMENSION] = { .name = "SET2 find dimension", .time = 0, },
+        [TIMING_STEP_SET2_PARSE] = { .name = "SET2 parse", .time = 0, },
+        [TIMING_STEP_SET2_ML] = { .name = "SET2 ml", .time = 0, },
+        [TIMING_STEP_SET2_PROPAGATE] = { .name = "SET2 propagate", .time = 0, },
+        [TIMING_STEP_RRDSET_STORE_METRIC] = { .name = "SET2 rrdset store", .time = 0, },
+        [TIMING_STEP_DBENGINE_FIRST_CHECK] = { .name = "db 1st check", .time = 0, },
+        [TIMING_STEP_DBENGINE_CHECK_DATA] = { .name = "db check data", .time = 0, },
+        [TIMING_STEP_DBENGINE_PACK] = { .name = "db pack", .time = 0, },
+        [TIMING_STEP_DBENGINE_PAGE_FIN] = { .name = "db page fin", .time = 0, },
+        [TIMING_STEP_DBENGINE_MRG_UPDATE] = { .name = "db mrg update", .time = 0, },
+        [TIMING_STEP_DBENGINE_PAGE_ALLOC] = { .name = "db page alloc", .time = 0, },
+        [TIMING_STEP_DBENGINE_CREATE_NEW_PAGE] = { .name = "db new page", .time = 0, },
+        [TIMING_STEP_DBENGINE_FLUSH_PAGE] = { .name = "db page flush", .time = 0, },
+        [TIMING_STEP_SET2_STORE] = { .name = "SET2 store", .time = 0, },
+
+        [TIMING_STEP_END2_PREPARE] = { .name = "END2 prepare", .time = 0, },
+        [TIMING_STEP_END2_PUSH_V1] = { .name = "END2 push v1", .time = 0, },
+        [TIMING_STEP_END2_ML] = { .name = "END2 ml", .time = 0, },
+        [TIMING_STEP_END2_RRDSET] = { .name = "END2 rrdset", .time = 0, },
+        [TIMING_STEP_END2_PROPAGATE] = { .name = "END2 propagate", .time = 0, },
+        [TIMING_STEP_END2_STORE] = { .name = "END2 store", .time = 0, },
+
+        // terminator
+        [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },
+};
+
+void timing_action(TIMING_ACTION action, TIMING_STEP step) {
+    static __thread usec_t last_action_time = 0;
+    static struct timing_steps timings2[TIMING_STEP_MAX + 1] = {};
+
+    switch(action) {
+        case TIMING_ACTION_INIT:
+            last_action_time = now_monotonic_usec();
+            break;
+
+        case TIMING_ACTION_STEP: {
+            if(!last_action_time)
+                return;
+
+            usec_t now = now_monotonic_usec();
+            __atomic_add_fetch(&timing_steps[step].time, now - last_action_time, __ATOMIC_RELAXED);
+            __atomic_add_fetch(&timing_steps[step].count, 1, __ATOMIC_RELAXED);
+            last_action_time = now;
+            break;
+        }
+
+        case TIMING_ACTION_FINISH: {
+            if(!last_action_time)
+                return;
+
+            usec_t expected = __atomic_load_n(&timing_steps[TIMING_STEP_INTERNAL].time, __ATOMIC_RELAXED);
+            if(last_action_time - expected < 10 * USEC_PER_SEC) {
+                last_action_time = 0;
+                return;
+            }
+
+            if(!__atomic_compare_exchange_n(&timing_steps[TIMING_STEP_INTERNAL].time, &expected, last_action_time, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+                last_action_time = 0;
+                return;
+            }
+
+            struct timing_steps timings3[TIMING_STEP_MAX + 1];
+            memcpy(timings3, timing_steps, sizeof(timings3));
+
+            size_t total_reqs = 0;
+            usec_t total_usec = 0;
+            for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
+                total_usec += timings3[t].time - timings2[t].time;
+                total_reqs += timings3[t].count - timings2[t].count;
+            }
+
+            BUFFER *wb = buffer_create(1024, NULL);
+
+            for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
+                size_t requests = timings3[t].count - timings2[t].count;
+                if(!requests) continue;
+
+                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: # %10zu, t %11.2f ms (%6.2f %%), avg %6.2f usec/run\n",
+                               t,
+                               timing_steps[t].name ? timing_steps[t].name : "x",
+                               requests,
+                               (double) (timings3[t].time - timings2[t].time) / (double)USEC_PER_MS,
+                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total_usec,
+                               (double) (timings3[t].time - timings2[t].time) / (double)requests
+                );
+            }
+
+            info("TIMINGS REPORT:\n%sTIMINGS REPORT:                        total # %10zu, t %11.2f ms",
+                 buffer_tostring(wb), total_reqs, (double)total_usec / USEC_PER_MS);
+
+            memcpy(timings2, timings3, sizeof(timings2));
+
+            last_action_time = 0;
+            buffer_free(wb);
+        }
+    }
+}

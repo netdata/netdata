@@ -378,7 +378,72 @@ bool rrdset_push_chart_definition_now(RRDSET *st) {
     return true;
 }
 
-void rrdset_done_push(RRDSET *st) {
+void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+    RRDHOST *host = st->rrdhost;
+    rrdpush_send_chart_metrics(rsb->wb, st, host->sender, rsb->rrdset_flags);
+}
+
+void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags) {
+    if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
+        return;
+
+    BUFFER *wb = rsb->wb;
+    time_t point_end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
+    if(unlikely(rsb->last_point_end_time_s != point_end_time_s)) {
+
+        if(unlikely(rsb->begin_v2_added))
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
+
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
+        buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
+        buffer_fast_strcat(wb, "' ", 2);
+        buffer_print_llu_hex(wb, rd->rrdset->update_every);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_llu_hex(wb, point_end_time_s);
+        buffer_fast_strcat(wb, " ", 1);
+        if(point_end_time_s == rsb->wall_clock_time)
+            buffer_fast_strcat(wb, "#", 1);
+        else
+            buffer_print_llu_hex(wb, rsb->wall_clock_time);
+        buffer_fast_strcat(wb, "\n", 1);
+
+        rsb->last_point_end_time_s = point_end_time_s;
+        rsb->begin_v2_added = true;
+    }
+
+    buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
+    buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+    buffer_fast_strcat(wb, "' ", 2);
+    buffer_print_ll_hex(wb, rd->last_collected_value);
+    buffer_fast_strcat(wb, " ", 1);
+
+    if((NETDATA_DOUBLE)rd->last_collected_value == n)
+        buffer_fast_strcat(wb, "#", 1);
+    else
+        buffer_rrd_value(wb, n);
+
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_sn_flags(wb, flags, true);
+    buffer_fast_strcat(wb, "\n", 1);
+}
+
+void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
+    if(!rsb->wb)
+        return;
+
+    if(rsb->v2 && rsb->begin_v2_added) {
+        if(unlikely(rsb->rrdset_flags & RRDSET_FLAG_UPSTREAM_SEND_VARIABLES))
+            rrdsetvar_print_to_streaming_custom_chart_variables(st, rsb->wb);
+
+        buffer_fast_strcat(rsb->wb, PLUGINSD_KEYWORD_END_V2 "\n", sizeof(PLUGINSD_KEYWORD_END_V2) - 1 + 1);
+    }
+
+    sender_commit(st->rrdhost->sender, rsb->wb);
+
+    *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
+}
+
+RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time) {
     RRDHOST *host = st->rrdhost;
 
     // fetch the flags we need to check with one atomic operation
@@ -395,7 +460,7 @@ void rrdset_done_push(RRDSET *st) {
             error("STREAM %s [send]: not ready - collected metrics are not sent to parent.", rrdhost_hostname(host));
         }
 
-        return;
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
     }
     else if(unlikely(host_flags & RRDHOST_FLAG_RRDPUSH_SENDER_LOGGED_STATUS)) {
         info("STREAM %s [send]: sending metrics to parent...", rrdhost_hostname(host));
@@ -408,17 +473,23 @@ void rrdset_done_push(RRDSET *st) {
 
     if(unlikely((exposed_upstream && replication_in_progress) ||
                 !should_send_chart_matching(st, rrdset_flags)))
-        return;
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
-    BUFFER *wb = sender_start(host->sender);
-
-    if(unlikely(!exposed_upstream))
+    if(unlikely(!exposed_upstream)) {
+        BUFFER *wb = sender_start(host->sender);
         replication_in_progress = rrdpush_send_chart_definition(wb, st);
+        sender_commit(host->sender, wb);
+    }
 
-    if (likely(!replication_in_progress))
-        rrdpush_send_chart_metrics(wb, st, host->sender, rrdset_flags);
+    if(replication_in_progress)
+        return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
-    sender_commit(host->sender, wb);
+    return (RRDSET_STREAM_BUFFER) {
+        .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
+        .rrdset_flags = rrdset_flags,
+        .wb = sender_start(host->sender),
+        .wall_clock_time = wall_clock_time,
+    };
 }
 
 // labels
@@ -1077,6 +1148,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_FUNCTIONS) buffer_strcat(wb, "FUNCTIONS ");
     if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
     if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
+    if(caps & STREAM_CAP_INTERPOLATED) buffer_strcat(wb, "INTERPOLATED ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {

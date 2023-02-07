@@ -45,9 +45,7 @@ struct rrdeng_page_info {
 };
 
 struct pg_alignment {
-    uint32_t page_position;
     uint32_t refcount;
-    uint16_t initial_slots;
 };
 
 struct rrdeng_query_handle;

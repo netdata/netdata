@@ -74,6 +74,8 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 
 void buffer_char_replace(BUFFER *wb, char from, char to);
 
+void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
+
 char *print_number_lu_r(char *str, unsigned long uvalue);
 char *print_number_llu_r(char *str, unsigned long long uvalue);
 char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
@@ -81,6 +83,7 @@ char *print_number_llu_r_smart(char *str, unsigned long long uvalue);
 void buffer_print_llu(BUFFER *wb, unsigned long long uvalue);
 void buffer_print_ll(BUFFER *wb, long long value);
 void buffer_print_llu_hex(BUFFER *wb, unsigned long long value);
+void buffer_print_ll_hex(BUFFER *wb, long long value);
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->size - buffer->len < needed_free_size))

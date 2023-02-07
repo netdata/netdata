@@ -184,6 +184,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
+void pluginsd_rrdset_cleanup(RRDSET *st);
+
 void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     RRDHOST *host = st->rrdhost;
 
@@ -205,6 +207,8 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
             st->storage_metrics_groups[tier] = NULL;
         }
     }
+
+    pluginsd_rrdset_cleanup(st);
 }
 
 // the destructor - the dictionary is write locked while this runs
@@ -1229,6 +1233,8 @@ void rrddim_store_metric(RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n,
 
         store_metric_at_tier(rd, tier, t, sp, point_end_time_ut);
     }
+
+    rrdcontext_collected_rrddim(rd);
 }
 
 void store_metric_collection_completed() {
@@ -1269,7 +1275,8 @@ void rrdset_thread_rda_free(void) {
 }
 
 static inline size_t rrdset_done_interpolate(
-        RRDSET *st
+        RRDSET_STREAM_BUFFER *rsb
+        , RRDSET *st
         , struct rda_item *rda_base
         , size_t rda_slots
         , usec_t update_every_ut
@@ -1401,8 +1408,10 @@ static inline size_t rrdset_done_interpolate(
             if(unlikely(!store_this_entry)) {
                 (void) ml_is_anomalous(rd, current_time_s, 0, false);
 
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
+
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
-                rrdcontext_collected_rrddim(rd);
                 continue;
             }
 
@@ -1414,8 +1423,10 @@ static inline size_t rrdset_done_interpolate(
                     dim_storage_flags &= ~((storage_number)SN_FLAG_NOT_ANOMALOUS);
                 }
 
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, new_value, dim_storage_flags);
+
                 rrddim_store_metric(rd, next_store_ut, new_value, dim_storage_flags);
-                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = new_value;
             }
             else {
@@ -1423,8 +1434,10 @@ static inline size_t rrdset_done_interpolate(
 
                 rrdset_debug(st, "%s: STORE[%ld] = NON EXISTING ", rrddim_name(rd), current_entry);
 
+                if(rsb->wb && rsb->v2)
+                    rrddim_push_metrics_v2(rsb, rd, next_store_ut, NAN, SN_FLAG_NONE);
+
                 rrddim_store_metric(rd, next_store_ut, NAN, SN_FLAG_NONE);
-                rrdcontext_collected_rrddim(rd);
                 rd->last_stored_value = NAN;
             }
 
@@ -1468,6 +1481,10 @@ void rrdset_done(RRDSET *st) {
 void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next) {
     if(unlikely(!service_running(SERVICE_COLLECTORS))) return;
 
+    RRDSET_STREAM_BUFFER stream_buffer = { .wb = NULL, };
+    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
+        stream_buffer = rrdset_push_metric_initialize(st, now.tv_sec);
+
     netdata_spinlock_lock(&st->data_collection_lock);
 
     if (pending_rrdset_next)
@@ -1489,10 +1506,10 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
 
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
-    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED))
+    if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
+        netdata_spinlock_unlock(&st->data_collection_lock);
         return;
-
-    netdata_thread_disable_cancelability();
+    }
 
     if (unlikely(rrdset_flags & RRDSET_FLAG_OBSOLETE)) {
         error("Chart '%s' has the OBSOLETE flag set, but it is collected.", rrdset_id(st));
@@ -1500,8 +1517,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > st->entries * update_every_ut &&
-                st->rrd_memory_mode != RRD_MEMORY_MODE_DBENGINE && st->rrd_memory_mode != RRD_MEMORY_MODE_NONE)) {
+    if(unlikely(st->usec_since_last_update > MAX(st->entries, 60) * update_every_ut)) {
         info("host '%s', chart '%s': took too long to be updated (counter #%zu, update #%zu, %0.3" NETDATA_DOUBLE_MODIFIER
             " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done, (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
         rrdset_reset(st);
@@ -1595,8 +1611,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
 after_first_database_work:
     st->counter_done++;
 
-    if(unlikely(rrdhost_has_rrdpush_sender_enabled(st->rrdhost)))
-        rrdset_done_push(st);
+    if(stream_buffer.wb && !stream_buffer.v2)
+        rrdset_push_metrics_v1(&stream_buffer, st);
 
     uint32_t has_reset_value = 0;
 
@@ -1857,7 +1873,8 @@ after_first_database_work:
 // #endif
 
     rrdset_done_interpolate(
-            st
+            &stream_buffer
+            , st
             , rda_base
             , rda_slots
             , update_every_ut
@@ -1928,6 +1945,7 @@ after_second_database_work:
     }
 
     netdata_spinlock_unlock(&st->data_collection_lock);
+    rrdset_push_metrics_finished(&stream_buffer, st);
 
     // ALL DONE ABOUT THE DATA UPDATE
     // --------------------------------------------------------------------
@@ -1954,8 +1972,6 @@ after_second_database_work:
     }
 
     rrdcontext_collected_rrdset(st);
-
-    netdata_thread_enable_cancelability();
 
     store_metric_collection_completed();
 }

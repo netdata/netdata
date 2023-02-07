@@ -122,6 +122,37 @@ static inline unsigned long long str2ull(const char *s) {
     return n;
 }
 
+static inline unsigned long long str2ull_hex_or_dec(const char *s) {
+    unsigned long long n = 0;
+    char c;
+
+    if(likely(s[0] == '0' && s[1] == 'x')) {
+        const char *e = &s[sizeof(unsigned long long) * 2 + 2 + 1]; // max number of character to iterate: 8 bytes * 2 + '0x' + '\0'
+
+        // skip 0x
+        s += 2;
+
+        for (c = *s; ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F')) && s < e; c = *(++s)) {
+            n = n << 4;
+
+            if (c <= '9')
+                n += c - '0';
+            else
+                n += c - 'A' + 10;
+        }
+        return n;
+    }
+    else
+        return str2ull(s);
+}
+
+static inline long long str2ll_hex_or_dec(const char *s) {
+    if(*s == '-')
+        return -(long long)str2ull_hex_or_dec(&s[1]);
+    else
+        return (long long)str2ull_hex_or_dec(s);
+}
+
 static inline long long str2ll(const char *s, char **endptr) {
     int negative = 0;
 

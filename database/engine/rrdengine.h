@@ -160,9 +160,7 @@ struct jv2_page_info {
 };
 
 typedef enum __attribute__ ((__packed__)) {
-    RRDENG_CHO_UNALIGNED        = (1 << 0), // set when this metric is not page aligned according to page alignment
-    RRDENG_FIRST_PAGE_ALLOCATED = (1 << 1), // set when this metric has allocated its first page
-    RRDENG_1ST_METRIC_WRITER = (1 << 2),
+    RRDENG_1ST_METRIC_WRITER    = (1 << 0),
 } RRDENG_COLLECT_HANDLE_OPTIONS;
 
 typedef enum __attribute__ ((__packed__)) {
@@ -185,6 +183,8 @@ typedef enum __attribute__ ((__packed__)) {
 struct rrdeng_collect_handle {
     struct metric *metric;
     struct pgc_page *page;
+    void *data;
+    size_t data_size;
     struct pg_alignment *alignment;
     RRDENG_COLLECT_HANDLE_OPTIONS options;
     uint8_t type;

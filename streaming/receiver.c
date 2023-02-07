@@ -332,6 +332,10 @@ static void streaming_parser_thread_cleanup(void *ptr) {
 
 bool plugin_is_enabled(struct plugind *cd);
 
+void streaming_parser_cleanup(void *user) {
+    pluginsd_cleanup_v2(user);
+}
+
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
@@ -343,7 +347,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+    PARSER *parser = parser_init(rpt->host, &user, streaming_parser_cleanup, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
 
     rrd_collector_started();
 
@@ -416,7 +420,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     }
 
 done:
-    result = user.count;
+    result = user.data_collections_count;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);

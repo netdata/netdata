@@ -37,7 +37,7 @@ char *ml_get_host_info(RRDHOST *RH);
 char *ml_get_host_runtime_info(RRDHOST *RH);
 char *ml_get_host_models(RRDHOST *RH);
 
-void ml_chart_update_begin(RRDSET *RS);
+bool ml_chart_update_begin(RRDSET *RS);
 void ml_chart_update_end(RRDSET *RS);
 
 bool ml_is_anomalous(RRDDIM *RD, time_t curr_t, double value, bool exists);

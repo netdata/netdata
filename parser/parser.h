@@ -46,6 +46,8 @@ typedef struct parser_data {
     struct parser_data *next;
 } PARSER_DATA;
 
+typedef void (*parser_cleanup_t)(void *user);
+
 typedef struct parser {
     size_t worker_job_next_id;
     uint8_t version;                // Parser version
@@ -59,6 +61,7 @@ typedef struct parser {
     PARSER_DATA    *data;           // extra input
     PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
     void    *user;                  // User defined structure to hold extra state between calls
+    parser_cleanup_t user_cleanup_cb;
     uint32_t flags;
     size_t line;
 
@@ -90,7 +93,7 @@ typedef struct parser {
 
 int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
 
-PARSER *parser_init(RRDHOST *host, void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
+PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser);
 int parser_action(PARSER *working_parser, char *input);
@@ -114,10 +117,15 @@ PARSER_RC pluginsd_overwrite(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_clabel_commit(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_clabel(char **words, size_t num_words, void *user);
 
-PARSER_RC pluginsd_replay_rrdset_begin(char **words, size_t num_words, void *user);
+PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user);
+
+PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user);
+PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user);
+PARSER_RC pluginsd_end_v2(char **words, size_t num_words, void *user);
+void pluginsd_cleanup_v2(void *user);
 
 #endif
