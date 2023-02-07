@@ -7,15 +7,15 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     chart_data_web_log_t *chart_data = chart_meta->chart_data_web_log;
     long chart_prio = chart_meta->base_prio;
 
-    /* Number of lines - initialise */
+    /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "Log lines parsed"
-            , "lines/s"
+            , "Collected log rows"
+            , "rows"
             , "logsmanagement.plugin"
             , NULL
             , ++chart_prio
@@ -23,8 +23,8 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , RRDSET_TYPE_AREA
     );
     // TODO: Change dim_lines_total to RRD_ALGORITHM_INCREMENTAL
-    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total lines", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New lines", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total rows", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New rows", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     /* Vhost - initialise */
     if(p_file_info->parser_config->chart_config & CHART_VHOST){
@@ -35,7 +35,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "vhost"
                 , NULL
                 , "Requests by Vhost"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -53,7 +53,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "port"
                 , NULL
                 , "Requests by Port"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -71,7 +71,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "ip version"
                 , NULL
                 , "Requests by IP version"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -132,7 +132,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "http methods"
                 , NULL
                 , "Requests Per HTTP Method"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -153,7 +153,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "http versions"
                 , NULL
                 , "Requests Per HTTP Version"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -175,7 +175,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "bandwidth"
                 , NULL
                 , "Bandwidth"
-                , "kilobits/s"
+                , "kilobits"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -216,7 +216,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "responses"
                 , NULL
                 , "Response Codes"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -240,7 +240,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "responses"
                 , NULL
                 , "Detailed Response Codes"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -261,7 +261,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "responses"
                 , NULL
                 , "Response Statuses"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -284,7 +284,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "ssl protocol"
                 , NULL
                 , "Requests Per SSL Protocol"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -309,7 +309,7 @@ void web_log_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "ssl cipher suite"
                 , NULL
                 , "Requests by SSL cipher suite"
-                , "requests/s"
+                , "requests"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio

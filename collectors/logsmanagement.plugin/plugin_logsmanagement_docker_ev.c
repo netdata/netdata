@@ -7,15 +7,15 @@ void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *char
     chart_data_docker_ev_t *chart_data = chart_meta->chart_data_docker_ev;
     long chart_prio = chart_meta->base_prio;
 
-    /* Number of lines - initialise */
+    /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "Log lines parsed"
-            , "lines/s"
+            , "Collected log rows"
+            , "rows"
             , "logsmanagement.plugin"
             , NULL
             , ++chart_prio
@@ -23,8 +23,8 @@ void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *char
             , RRDSET_TYPE_AREA
     );
     // TODO: Change dim_lines_total to RRD_ALGORITHM_INCREMENTAL
-    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total lines", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New lines", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total rows", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New rows", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     /* Docker events type - initialise */
     if(p_file_info->parser_config->chart_config & CHART_DOCKER_EV_TYPE){
@@ -35,7 +35,7 @@ void docker_ev_chart_init(struct File_info *p_file_info, struct Chart_meta *char
                 , "docker events"
                 , NULL
                 , "Events type"
-                , "events types/s"
+                , "events types"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio

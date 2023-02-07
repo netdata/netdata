@@ -602,7 +602,7 @@ void *logsmanagement_plugin_main(void *ptr){
                         , "regex charts"
                         , NULL
                         , p_file_info->parser_cus_config[cus_off]->chart_name
-                        , "matches/s"
+                        , "matches"
                         , "logsmanagement.plugin"
                         , NULL
                         , chart_data_arr[i]->base_prio + 1000 + cus_off

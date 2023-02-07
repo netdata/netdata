@@ -7,15 +7,15 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
     chart_data_systemd_t *chart_data = chart_meta->chart_data_systemd;
     long chart_prio = chart_meta->base_prio;
 
-    /* Number of lines - initialise */
+    /* Number of collected logs - initialise */
     chart_data->st_lines = rrdset_create_localhost(
             (char *) p_file_info->chart_name
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "lines parsed"
+            , "collected logs"
             , NULL
-            , "Log lines parsed"
-            , "lines/s"
+            , "Collected log rows"
+            , "rows"
             , "logsmanagement.plugin"
             , NULL
             , ++chart_prio
@@ -23,8 +23,8 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
             , RRDSET_TYPE_AREA
     );
     // TODO: Change dim_lines_total to RRD_ALGORITHM_INCREMENTAL
-    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total lines", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New lines", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    chart_data->dim_lines_total = rrddim_add(chart_data->st_lines, "Total rows", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    chart_data->dim_lines_rate = rrddim_add(chart_data->st_lines, "New rows", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
 
     /* Syslog priority value - initialise */
     if(p_file_info->parser_config->chart_config & CHART_SYSLOG_PRIOR){
@@ -35,7 +35,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "priority"
                 , NULL
                 , "Priority Value"
-                , "priority values/s"
+                , "priority values"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -54,7 +54,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "priority"
                 , NULL
                 , "Severity Levels"
-                , "severity levels/s"
+                , "severity levels"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
@@ -81,7 +81,7 @@ void systemd_chart_init(struct File_info *p_file_info, struct Chart_meta *chart_
                 , "priority"
                 , NULL
                 , "Facility Levels"
-                , "facility levels/s"
+                , "facility levels"
                 , "logsmanagement.plugin"
                 , NULL
                 , ++chart_prio
