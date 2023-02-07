@@ -435,9 +435,6 @@ ebpf_sync_syscalls_t local_syscalls[] = {
 };
 
 
-// Link with apps.plugin
-ebpf_process_stat_t *global_process_stat = NULL;
-
 // Link with cgroup.plugin
 netdata_ebpf_cgroup_shm_t shm_ebpf_cgroup = {NULL, NULL};
 int shm_fd_ebpf_cgroup = -1;
@@ -1387,7 +1384,6 @@ static void ebpf_allocate_common_vectors()
     }
 
     ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
-    global_process_stat = callocz((size_t)ebpf_nprocs, sizeof(ebpf_process_stat_t));
 }
 
 /**
