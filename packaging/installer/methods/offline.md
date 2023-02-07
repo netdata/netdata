@@ -54,16 +54,16 @@ target system. This can be done in any manner you like, as long as filenames are
 
 After copying the files, simply run the `install.sh` script located in the
 offline install source directory. It accepts all the [same options as the kickstart
-script](/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
+script](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md#optional-parameters-to-alter-your-installation) for further
 customization of the installation, though it will default to not enabling automatic updates (as they are not
 supported on offline installs).
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to

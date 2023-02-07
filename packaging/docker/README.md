@@ -16,7 +16,7 @@ you get set up quickly, and doesn't install anything permanent on the system, wh
 See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on our [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
@@ -176,7 +176,7 @@ to restart the container: `docker restart netdata`.
 
 ### Host-editable configuration
 
-> **Warning**: [edit-config](/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
+> **Warning**: [edit-config](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) script doesn't work when executed on
 > the host system.
 
 If you want to make your container's configuration directory accessible from the host system, you need to use a
@@ -322,7 +322,7 @@ your machine from within the container. Please read the following carefully.
 #### Docker socket proxy (safest option)
 
 Deploy a Docker socket proxy that accepts and filters out requests using something like
-[HAProxy](/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
+[HAProxy](https://github.com/netdata/netdata/blob/master/docs/Running-behind-haproxy.md) so that it restricts connections to read-only access to the CONTAINERS
 endpoint.
 
 The reason it's safer to expose the socket to the proxy is because Netdata has a TCP port exposed outside the Docker
@@ -441,13 +441,13 @@ services:
 ### Pass command line options to Netdata
 
 Since we use an [ENTRYPOINT](https://docs.docker.com/engine/reference/builder/#entrypoint) directive, you can provide
-[Netdata daemon command line options](/daemon/README.md#command-line-options) such as the IP address Netdata will be
+[Netdata daemon command line options](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options) such as the IP address Netdata will be
 running on, using the [command instruction](https://docs.docker.com/engine/reference/builder/#cmd). 
 
 ## Install the Agent using Docker Compose with SSL/TLS enabled HTTP Proxy
 
 For a permanent installation on a public server, you should [secure the Netdata
-instance](/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
+instance](https://github.com/netdata/netdata/blob/master/docs/netdata-security.md). This section contains an example of how to install Netdata with an SSL
 reverse proxy and basic authentication.
 
 You can use the following `docker-compose.yml` and Caddyfile files to run Netdata with Docker. Replace the domains and

@@ -12,7 +12,7 @@ learn_rel_path: "Setup"
 
 When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
 or application's standard installation procedure. For example, the [Nginx
-collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/nginx) searches at
+collector](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md) searches at
 `http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
 metrics on that endpoint, the collector begins gathering them.
 
@@ -24,7 +24,7 @@ enable or configure a collector to gather all available metrics from your system
 You can enable/disable collectors individually, or enable/disable entire orchestrators, using their configuration files.
 For example, you can change the behavior of the Go orchestrator, or any of its collectors, by editing `go.d.conf`.
 
-Use `edit-config` from your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) to open
+Use `edit-config` from your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) to open
 the orchestrator primary configuration file:
 
 ```bash
@@ -37,14 +37,14 @@ enable/disable it with `yes` and `no` settings. Uncomment any line you change to
 start.
 
 After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 ## Configure a collector
 
-First, [find the collector](/collectors/COLLECTORS.md) you want to edit and open its documentation. Some software has
+First, [find the collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) you want to edit and open its documentation. Some software has
 collectors written in multiple languages. In these cases, you should always pick the collector written in Go.
 
-Use `edit-config` from your [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory) to open a
+Use `edit-config` from your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory) to open a
 collector's configuration file. For example, edit the Nginx collector with the following:
 
 ```bash
@@ -57,16 +57,16 @@ configure that collector. Uncomment any line you change to ensure the collector'
 read it on start.
 
 After you make your changes, restart the Agent with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 ## What's next?
 
-Read high-level overviews on how Netdata collects [system metrics](/docs/collect/system-metrics.md), [container
-metrics](/docs/collect/container-metrics.md), and [application metrics](/docs/collect/application-metrics.md).
+Read high-level overviews on how Netdata collects [system metrics](https://github.com/netdata/netdata/blob/master/docs/collect/system-metrics.md), [container
+metrics](https://github.com/netdata/netdata/blob/master/docs/collect/container-metrics.md), and [application metrics](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md).
 
 If you're already collecting all metrics from your systems, containers, and applications, it's time to move into
-Netdata's visualization features. [See an overview of your infrastructure](/docs/visualize/overview-infrastructure.md)
+Netdata's visualization features. [See an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md)
 using Netdata Cloud, or learn how to [interact with dashboards and
-charts](/docs/visualize/interact-dashboards-charts.md).
+charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md).
 
 

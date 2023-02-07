@@ -321,12 +321,12 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s, RRDSET_FLAGS flags) {
+static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s __maybe_unused, RRDSET_FLAGS flags) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
-    if(stream_has_capability(s, STREAM_CAP_REPLICATION) || st->last_collected_time.tv_sec > st->upstream_resync_time_s)
+    if(st->last_collected_time.tv_sec > st->upstream_resync_time_s)
         buffer_print_llu(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);
@@ -498,8 +498,8 @@ int connect_to_one_of_destinations(
             // move the current item to the end of the list
             // without this, this destination will break the loop again and again
             // not advancing the destinations to find one that may work
-            DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, d, prev, next);
-            DOUBLE_LINKED_LIST_APPEND_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, d, prev, next);
+            DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(host->destinations, d, prev, next);
 
             break;
         }
@@ -522,7 +522,7 @@ bool destinations_init_add_one(char *entry, void *data) {
 
     __atomic_add_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);
 
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(t->list, d, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(t->list, d, prev, next);
 
     t->count++;
     info("STREAM: added streaming destination No %d: '%s' to host '%s'", t->count, string2str(d->destination), rrdhost_hostname(t->host));
@@ -549,7 +549,7 @@ void rrdpush_destinations_init(RRDHOST *host) {
 void rrdpush_destinations_free(RRDHOST *host) {
     while (host->destinations) {
         struct rrdpush_destinations *tmp = host->destinations;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(host->destinations, tmp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->destinations, tmp, prev, next);
         string_freez(tmp->destination);
         freez(tmp);
         __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_senders, sizeof(struct rrdpush_destinations), __ATOMIC_RELAXED);

@@ -64,7 +64,7 @@ void julyl_cleanup1(void) {
 
     if(julyl_globals.protected.available_items && julyl_globals.protected.available > 10) {
         item = julyl_globals.protected.available_items;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(julyl_globals.protected.available_items, item, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(julyl_globals.protected.available_items, item, cache.prev, cache.next);
         julyl_globals.protected.available--;
     }
 
@@ -85,7 +85,7 @@ struct JulyL *julyl_get(void) {
 
     j = julyl_globals.protected.available_items;
     if(likely(j)) {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
         julyl_globals.protected.available--;
     }
 
@@ -114,7 +114,7 @@ static void julyl_release(struct JulyL *j) {
     __atomic_add_fetch(&julyl_globals.atomics.reallocs, j->reallocs, __ATOMIC_RELAXED);
 
     netdata_spinlock_lock(&julyl_globals.protected.spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(julyl_globals.protected.available_items, j, cache.prev, cache.next);
     julyl_globals.protected.available++;
     netdata_spinlock_unlock(&julyl_globals.protected.spinlock);
 }

@@ -2151,23 +2151,19 @@ static void read_listen_table()
 void *ebpf_socket_read_hash(void *ptr)
 {
     netdata_thread_cleanup_push(ebpf_socket_cleanup, ptr);
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = NETDATA_SOCKET_READ_SLEEP_MS * em->update_every;
     int fd_ipv4 = socket_maps[NETDATA_SOCKET_TABLE_IPV4].map_fd;
     int fd_ipv6 = socket_maps[NETDATA_SOCKET_TABLE_IPV6].map_fd;
-    uint32_t network_connection = network_viewer_opt.enabled;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin)
+           continue;
 
         pthread_mutex_lock(&nv_mutex);
-        read_listen_table();
-        if (network_connection) {
-            ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
-            ebpf_read_socket_hash_table(fd_ipv6, AF_INET6);
-        }
+        ebpf_read_socket_hash_table(fd_ipv4, AF_INET);
+        ebpf_read_socket_hash_table(fd_ipv6, AF_INET6);
         pthread_mutex_unlock(&nv_mutex);
     }
 
@@ -2856,37 +2852,42 @@ static void ebpf_socket_send_cgroup_data(int update_every)
 /**
  * Main loop for this collector.
  *
- * @param step the number of microseconds used with heart beat
  * @param em   the structure with thread information
  */
-static void socket_collector(usec_t step, ebpf_module_t *em)
+static void socket_collector(ebpf_module_t *em)
 {
     heartbeat_t hb;
     heartbeat_init(&hb);
+    uint32_t network_connection = network_viewer_opt.enabled;
 
-    socket_threads.thread = mallocz(sizeof(netdata_thread_t));
-    socket_threads.start_routine = ebpf_socket_read_hash;
+    if (network_connection) {
+        socket_threads.thread = mallocz(sizeof(netdata_thread_t));
+        socket_threads.start_routine = ebpf_socket_read_hash;
 
-    netdata_thread_create(socket_threads.thread, socket_threads.name,
-                          NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
+        netdata_thread_create(socket_threads.thread, socket_threads.name,
+                              NETDATA_THREAD_OPTION_DEFAULT, ebpf_socket_read_hash, em);
+    }
 
     int cgroups = em->cgroup_charts;
     if (cgroups)
         ebpf_socket_update_cgroup_algorithm();
 
     int socket_global_enabled = em->global_charts;
-    uint32_t network_connection = network_viewer_opt.enabled;
     int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
 
+        counter = 0;
         netdata_apps_integration_flags_t socket_apps_enabled = em->apps_charts;
-        pthread_mutex_lock(&collect_data_mutex);
-        if (socket_global_enabled)
+        if (socket_global_enabled) {
+            read_listen_table();
             read_hash_global_tables();
+        }
 
+        pthread_mutex_lock(&collect_data_mutex);
         if (socket_apps_enabled)
             ebpf_socket_update_apps_data();
 
@@ -3966,7 +3967,7 @@ void *ebpf_socket_thread(void *ptr)
 
     pthread_mutex_unlock(&lock);
 
-    socket_collector((usec_t)(em->update_every * USEC_PER_SEC), em);
+    socket_collector(em);
 
 endsocket:
     ebpf_update_disabled_plugin_stats(em);

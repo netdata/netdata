@@ -293,7 +293,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
         q->query.before = expanded_before;
 }
 
-static void replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
+static bool replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     replication_query_align_to_optimal_before(q);
 
     time_t after = q->query.after;
@@ -311,7 +311,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
     time_t now = after + 1;
     time_t last_end_time_in_buffer = 0;
     while(now <= before) {
-        time_t min_start_time = 0, min_end_time = 0;
+        time_t min_start_time = 0, max_start_time = 0, min_end_time = 0, max_end_time = 0, min_update_every = 0, max_update_every = 0;
         for (size_t i = 0; i < dimensions ;i++) {
             struct replication_dimension *d = &q->data[i];
             if(unlikely(!d->enabled || d->skip)) continue;
@@ -339,14 +339,58 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 // this dimension does not provide any data
                 continue;
 
+            time_t update_every = d->sp.end_time_s - d->sp.start_time_s;
+            if(unlikely(!update_every))
+                update_every = q->st->update_every;
+
+            if(unlikely(!min_update_every))
+                min_update_every = update_every;
+
             if(unlikely(!min_start_time))
                 min_start_time = d->sp.start_time_s;
 
             if(unlikely(!min_end_time))
                 min_end_time = d->sp.end_time_s;
 
+            min_update_every = MIN(min_update_every, update_every);
+            max_update_every = MAX(max_update_every, update_every);
+
             min_start_time = MIN(min_start_time, d->sp.start_time_s);
+            max_start_time = MAX(max_start_time, d->sp.start_time_s);
+
             min_end_time = MIN(min_end_time, d->sp.end_time_s);
+            max_end_time = MAX(max_end_time, d->sp.end_time_s);
+        }
+
+        if (unlikely(min_update_every != max_update_every ||
+                     min_start_time != max_start_time)) {
+
+            time_t fix_min_start_time;
+            if(last_end_time_in_buffer &&
+                last_end_time_in_buffer >= min_start_time &&
+                last_end_time_in_buffer <= max_start_time) {
+                fix_min_start_time = last_end_time_in_buffer;
+            }
+            else
+                fix_min_start_time = min_end_time - min_update_every;
+
+            error_limit_static_global_var(erl, 1, 0);
+            error_limit(&erl, "REPLAY WARNING: 'host:%s/chart:%s' "
+                              "misaligned dimensions "
+                              "update every (min: %ld, max: %ld), "
+                              "start time (min: %ld, max: %ld), "
+                              "end time (min %ld, max %ld), "
+                              "now %ld, last end time sent %ld, "
+                              "min start time is fixed to %ld",
+                        rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
+                        min_update_every, max_update_every,
+                        min_start_time, max_start_time,
+                        min_end_time, max_end_time,
+                        now, last_end_time_in_buffer,
+                        fix_min_start_time
+                        );
+
+            min_start_time = fix_min_start_time;
         }
 
         if(likely(min_start_time <= now && min_end_time >= now)) {
@@ -392,7 +436,7 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
                 if (likely( d->sp.start_time_s <= min_end_time &&
                             d->sp.end_time_s >= min_end_time &&
                             !storage_point_is_unset(d->sp) &&
-                            !storage_point_is_empty(d->sp))) {
+                            !storage_point_is_gap(d->sp))) {
 
                     buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"%s\" " NETDATA_DOUBLE_FORMAT " \"%s\"\n",
                                    rrddim_id(d->rd), d->sp.sum, d->sp.flags & SN_FLAG_RESET ? "R" : "");
@@ -431,6 +475,12 @@ static void replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
     q->points_read = points_read;
     q->points_generated = points_generated;
+
+    bool finished_with_gap = false;
+    if(last_end_time_in_buffer < before - q->st->update_every)
+        finished_with_gap = true;
+
+    return finished_with_gap;
 }
 
 static struct replication_query *replication_response_prepare(RRDSET *st, bool requested_enable_streaming, time_t requested_after, time_t requested_before) {
@@ -517,8 +567,9 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     bool locked_data_collection = q->query.locked_data_collection;
     q->query.locked_data_collection = false;
 
+    bool finished_with_gap = false;
     if(q->query.execute)
-        replication_query_execute(wb, q, max_msg_size);
+        finished_with_gap = replication_query_execute(wb, q, max_msg_size);
 
     time_t after = q->request.after;
     time_t before = q->query.before;
@@ -565,6 +616,9 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
                 rrdset_flag_clear(st, RRDSET_FLAG_SENDER_REPLICATION_IN_PROGRESS);
                 rrdset_flag_set(st, RRDSET_FLAG_SENDER_REPLICATION_FINISHED);
                 rrdhost_sender_replicating_charts_minus_one(st->rrdhost);
+
+                if(!finished_with_gap)
+                    st->upstream_resync_time_s = 0;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
                 internal_error(true, "STREAM_SENDER REPLAY: 'host:%s/chart:%s' streaming starts",
@@ -1375,7 +1429,9 @@ void replication_sender_delete_pending_requests(struct sender_state *sender) {
 }
 
 void replication_init_sender(struct sender_state *sender) {
-    sender->replication.requests = dictionary_create(DICT_OPTION_DONT_OVERWRITE_VALUE);
+    sender->replication.requests = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              NULL, sizeof(struct replication_request));
+
     dictionary_register_react_callback(sender->replication.requests, replication_request_react_callback, sender);
     dictionary_register_conflict_callback(sender->replication.requests, replication_request_conflict_callback, sender);
     dictionary_register_delete_callback(sender->replication.requests, replication_request_delete_callback, sender);
@@ -1560,7 +1616,7 @@ static int replication_execute_next_pending_request(bool cancel) {
     }
 
     if(unlikely(!rqs)) {
-        max_requests_ahead = get_system_cpus() / 2;
+        max_requests_ahead = get_netdata_cpus() / 2;
 
         if(max_requests_ahead > libuv_worker_threads * 2)
             max_requests_ahead = libuv_worker_threads * 2;

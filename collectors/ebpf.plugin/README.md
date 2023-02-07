@@ -15,7 +15,7 @@ The Netdata Agent provides many [eBPF](https://ebpf.io/what-is-ebpf/) programs t
 > ❗ eBPF monitoring only works on Linux systems and with specific Linux kernels, including all kernels newer than `4.11.0`, and all kernels on CentOS 7.6 or later. For kernels older than `4.11.0`, improved support is in active development.
 
 This document provides comprehensive details about the `ebpf.plugin`.
-For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
+For hands-on configuration and troubleshooting tips see our [tutorial on troubleshooting apps with eBPF metrics](https://github.com/netdata/netdata/blob/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
 
 <figure>
   <img src="https://user-images.githubusercontent.com/1153921/74746434-ad6a1e00-5222-11ea-858a-a7882617ae02.png" alt="An example of VFS charts, made possible by the eBPF collector plugin" />
@@ -44,12 +44,12 @@ If your Agent is v1.22 or older, you may to enable the collector yourself.
 
 To enable or disable the entire eBPF collector: 
 
-1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
 
-2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit `netdata.conf`.
+2.  Use the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit `netdata.conf`.
 
     ```bash
     ./edit-config netdata.conf
@@ -69,11 +69,11 @@ You can configure the eBPF collector's behavior to fine-tune which metrics you r
 
 To edit the `ebpf.d.conf`:
 
-1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
-2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/ebpf.d.conf).
+2.  Use the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit [`ebpf.d.conf`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/ebpf.d.conf).
 
     ```bash
     ./edit-config ebpf.d.conf
@@ -105,7 +105,7 @@ accepts the following values:
 #### Integration with `apps.plugin`
 
 The eBPF collector also creates charts for each running application through an integration with the
-[`apps.plugin`](/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
+[`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md). This integration helps you understand how specific applications
 interact with the Linux kernel.
 
 If you want to enable `apps.plugin` integration, change the "apps" setting to "yes".
@@ -123,7 +123,7 @@ it runs.
 #### Integration with `cgroups.plugin`
 
 The eBPF collector also creates charts for each cgroup through an integration with the
-[`cgroups.plugin`](/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
+[`cgroups.plugin`](https://github.com/netdata/netdata/blob/master/collectors/cgroups.plugin/README.md). This integration helps you understand how a specific cgroup
 interacts with the Linux kernel.
 
 The integration with `cgroups.plugin` is disabled by default to avoid creating overhead on your system. If you want to
@@ -245,7 +245,7 @@ The eBPF collector enables and runs the following eBPF programs by default:
 You can also enable the following eBPF programs:
 
 -   `cachestat`: Netdata's eBPF data collector creates charts about the memory page cache. When the integration with
-    [`apps.plugin`](/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
+    [`apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md) is enabled, this collector creates charts for the whole host _and_
     for each application.
 -   `dcstat` : This eBPF program creates charts that show information about file access using directory cache. It appends
     `kprobes` for `lookup_fast()` and `d_lookup()` to identify if files are inside directory cache, outside and files are
@@ -262,11 +262,11 @@ You can configure each thread of the eBPF data collector. This allows you to ove
 
 To configure an eBPF thread:
 
-1.  Navigate to the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory).
+1.  Navigate to the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory).
     ```bash
     cd /etc/netdata
     ```
-2.  Use the [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
+2.  Use the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) script to edit a thread configuration file. The following configuration files are available:
 
     -   `network.conf`: Configuration for the [`network` thread](#network-configuration). This config file overwrites the global options and also
         lets you specify which network the eBPF collector monitors.
@@ -305,7 +305,7 @@ You can configure the information shown on `outbound` and `inbound` charts with 
 
 When you define a `ports` setting, Netdata will collect network metrics for that specific port. For example, if you
 write `ports = 19999`, Netdata will collect only connections for itself. The `hostnames` setting accepts
-[simple patterns](/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
+[simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). The `ports`, and `ips` settings accept negation (`!`) to deny
 specific values or asterisk alone to define all values.
 
 In the above example, Netdata will collect metrics for all ports between 1 and 443, with the exception of 53 (domain)
@@ -882,7 +882,7 @@ significantly increases kernel memory usage by several hundred MB.
 
 If your node is experiencing high memory usage and there is no obvious culprit to be found in the `apps.mem` chart,
 consider testing for high kernel memory usage by [disabling eBPF monitoring](#configuring-ebpfplugin). Next,
-[restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
+[restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see if system memory
 usage (see the `system.ram` chart) has dropped significantly.
 
 Beginning with `v1.31`, kernel memory usage is configurable via the [`pid table size` setting](#ebpf-load-mode)

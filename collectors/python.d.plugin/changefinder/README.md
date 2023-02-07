@@ -97,7 +97,7 @@ leave the `changefinder.conf` file alone to begin with. Then you can return to i
 a bit more once the collector is running for a while and you have a feeling for its performance on your node._
 
 Edit the `python.d/changefinder.conf` configuration file using `edit-config` from the your
-agent's [config directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
+agent's [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

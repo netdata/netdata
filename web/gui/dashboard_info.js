@@ -579,6 +579,36 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'iis': {
+        title: 'IIS',
+        icon: '<i class="fas fa-eye"></i>',
+        info: undefined
+    },
+
+    'mssql': {
+        title: 'MS SQL Server',
+        icon: '<i class="fas fa-database"></i>',
+        info: undefined
+    },
+
+    'ad': {
+        title: 'Active Directory',
+        icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
+    'adcs': {
+        title: 'AD Certification Service',
+        icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
+    'adfs': {
+        title: 'AD Federation Service',
+        icon: '<i class="fab fa-windows"></i>',
+        info: undefined
+    },
+
     'perf': {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
@@ -4391,10 +4421,10 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // WMI (IIS)
 
-    'wmi.iis_website_isapi_extension_requests_count': {
+    'iis.website_isapi_extension_requests_count': {
         info: 'The number of <a href="https://learn.microsoft.com/en-us/previous-versions/iis/6.0-sdk/ms525282(v=vs.90)" target="_blank">ISAPI extension</a> requests that are processed concurrently by the web service.'
     },
-    'wmi.iis_website_errors_rate': {
+    'iis.website_errors_rate': {
         info: '<p>The number of requests that cannot be satisfied by the server.</p><p><b>DocumentLocked</b> - the requested document was locked. Usually reported as HTTP error 423. <b>DocumentNotFound</b> - the requested document was not found. Usually reported as HTTP error 404.</p>'
     },
 
@@ -4403,6 +4433,76 @@ netdataDashboard.context = {
 
     'wmi.service_status': {
         info: 'The current <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of the service.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (MSSQL)
+
+    'mssql.instance_accessmethods_page_splits': {
+        info : 'Page split happens when the page does not have more space. This chart shows the number of page splits per second that occur as the result of overflowing index pages.'
+    },
+
+    'mssql.instance_cache_hit_ratio': {
+        info : 'Indicates the percentage of pages found in the buffer cache without having to read from disk. The ratio is the total number of cache hits divided by the total number of cache lookups over the last few thousand page accesses. After a long period of time, the ratio moves very little. Because reading from the cache is much less expensive than reading from disk, you want this ratio to be high.'
+    },
+
+    'mssql.instance_bufman_checkpoint_pages': {
+        info : 'Indicates the number of pages flushed to disk per second by a checkpoint or other operation that require all dirty pages to be flushed.'
+    },
+
+    'mssql.instance_bufman_page_life_expectancy': {
+        info : 'Indicates the number of seconds a page will stay in the buffer pool without references.'
+    },
+
+    'mssql.instance_memmgr_external_benefit_of_memory': {
+        info : 'It is used by the engine to balance memory usage between cache and is useful to support when troubleshooting cases with unexpected cache growth. The value is presented as an integer based on an internal calculation.'
+    },
+
+    'mssql.instance_sql_errors': {
+        info: 'Errors in Microsoft SQL Server.</p><p><b>Db_offline</b> - Tracks severe errors that cause SQL Server to take the current database offline. <b>Info</b> - Information related to error messages that provide information to users but do not cause errors. <b>Kill_connection</b> - Tracks severe errors that cause SQL Server to kill the current connection. <b>User</b> - User errors.</p>'
+    },
+
+    'mssql.instance_sqlstats_auto_parameterization_attempts': {
+        info: 'Auto-parameterization occurs when an instance of SQL Server tries to parameterize a Transact-SQL request by replacing some literals with parameters so that reuse of the resulting cached execution plan across multiple similar-looking requests is possible. Note that auto-parameterizations are also known as simple parameterizations in newer versions of SQL Server. This counter does not include forced parameterizations.'
+    },
+
+    'mssql.instance_sqlstats_batch_requests': {
+        info: 'This statistic is affected by all constraints (such as I/O, number of users, cache size, complexity of requests, and so on). High batch requests mean good throughput.'
+    },
+
+    'mssql.instance_sqlstats_safe_auto_parameterization_attempts': {
+        info: 'Note that auto-parameterizations are also known as simple parameterizations in later versions of SQL Server.'
+    },
+
+    'mssql.instance_sqlstats_sql_compilations': {
+        info: 'Indicates the number of times the compile code path is entered. Includes compiles caused by statement-level recompilations in SQL Server. After SQL Server user activity is stable, this value reaches a steady state.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (AD)
+
+    'ad.dra_replication_intersite_compressed_traffic': {
+        info: 'The compressed size, in bytes, of inbound and outbound compressed replication data (size after compression, from DSAs in other sites).'
+    },
+
+    'ad.dra_replication_intrasite_compressed_traffic': {
+        info: 'The number of bytes replicated that were not compressed (that is., from DSAs in the same site).'
+    },
+
+    'ad.dra_replication_properties_updated': {
+        info: 'The number of properties that are updated due to incoming property winning the reconciliation logic that determines the final value to be replicated.'
+    },
+
+    'ad.dra_replication_objects_filtered': {
+        info: 'The number of objects received from inbound replication partners that contained no updates that needed to be applied.'
+    },
+
+    'ad.dra_replication_pending_syncs': {
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
+    },
+
+    'ad.dra_replication_sync_requests': {
+        info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
     },
 
     // ------------------------------------------------------------------------

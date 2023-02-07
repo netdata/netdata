@@ -243,7 +243,7 @@ STORAGE_COLLECT_HANDLE *rrdeng_store_metric_init(STORAGE_METRIC_HANDLE *db_metri
     struct rrdengine_instance *ctx = mrg_metric_ctx(metric);
 
     bool is_1st_metric_writer = true;
-    if(!mrg_metric_writer_acquire(main_mrg, metric)) {
+    if(!mrg_metric_set_writer(main_mrg, metric)) {
         is_1st_metric_writer = false;
         char uuid[UUID_STR_LEN + 1];
         uuid_unparse(*mrg_metric_uuid(main_mrg, metric), uuid);
@@ -696,7 +696,7 @@ int rrdeng_store_metric_finalize(STORAGE_COLLECT_HANDLE *collection_handle) {
     if(!(handle->options & RRDENG_1ST_METRIC_WRITER))
         __atomic_sub_fetch(&ctx->atomic.collectors_running_duplicate, 1, __ATOMIC_RELAXED);
 
-    if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_writer_release(main_mrg, handle->metric))
+    if((handle->options & RRDENG_1ST_METRIC_WRITER) && !mrg_metric_clear_writer(main_mrg, handle->metric))
         internal_fatal(true, "DBENGINE: metric is already released");
 
     time_t first_time_s, last_time_s, update_every_s;
@@ -738,12 +738,12 @@ static void register_query_handle(struct rrdeng_query_handle *handle) {
     handle->started_time_s = now_realtime_sec();
 
     netdata_spinlock_lock(&global_query_handle_spinlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(global_query_handle_ll, handle, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     netdata_spinlock_unlock(&global_query_handle_spinlock);
 }
 static void unregister_query_handle(struct rrdeng_query_handle *handle) {
     netdata_spinlock_lock(&global_query_handle_spinlock);
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(global_query_handle_ll, handle, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(global_query_handle_ll, handle, prev, next);
     netdata_spinlock_unlock(&global_query_handle_spinlock);
 }
 #else
@@ -861,7 +861,10 @@ static bool rrdeng_load_page_next(struct storage_engine_query_handle *rrddim_han
         else {
             position = (handle->now_s - page_start_time_s) * (entries - 1) / (page_end_time_s - page_start_time_s);
             time_t point_end_time_s = page_start_time_s + position * page_update_every_s;
-            if(point_end_time_s < handle->now_s && position + 1 < entries) {
+            while(point_end_time_s < handle->now_s && position + 1 < entries) {
+                // https://github.com/netdata/netdata/issues/14411
+                // we really need a while() here, because the delta may be
+                // 2 points at higher tiers
                 position++;
                 point_end_time_s = page_start_time_s + position * page_update_every_s;
             }
@@ -1090,12 +1093,12 @@ static void rrdeng_populate_mrg(struct rrdengine_instance *ctx) {
         datafiles++;
     uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    size_t cpus = get_system_cpus() / 2;
+    size_t cpus = get_netdata_cpus() / storage_tiers;
     if(cpus > datafiles)
         cpus = datafiles;
 
-    if(cpus < 2)
-        cpus = 2;
+    if(cpus < 1)
+        cpus = 1;
 
     if(cpus > (size_t)libuv_worker_threads)
         cpus = (size_t)libuv_worker_threads;
@@ -1158,7 +1161,7 @@ void rrdeng_exit_mode(struct rrdengine_instance *ctx) {
 /*
  * Returns 0 on success, negative on error
  */
-int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
                 unsigned disk_space_mb, size_t tier) {
     struct rrdengine_instance *ctx;
     uint32_t max_open_files;
@@ -1191,8 +1194,6 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->config.tier = (int)tier;
     ctx->config.page_type = tier_page_type[tier];
     ctx->config.global_compress_alg = RRD_LZ4;
-    if (page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB)
-        page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
     if (disk_space_mb < RRDENG_MIN_DISK_SPACE_MB)
         disk_space_mb = RRDENG_MIN_DISK_SPACE_MB;
     ctx->config.max_disk_space = disk_space_mb * 1048576LLU;
@@ -1202,15 +1203,10 @@ int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned p
     ctx->atomic.transaction_id = 1;
     ctx->quiesce.enabled = false;
 
-    init_page_cache();
-    if (!init_rrd_files(ctx)) {
-        if(rrdeng_dbengine_spawn(ctx)) {
-            // success - we run this ctx too
-            rrdeng_populate_mrg(ctx);
-            return 0;
-        }
-
-        finalize_rrd_files(ctx);
+    if (rrdeng_dbengine_spawn(ctx) && !init_rrd_files(ctx)) {
+        // success - we run this ctx too
+        rrdeng_populate_mrg(ctx);
+        return 0;
     }
 
     if (ctx->config.legacy) {

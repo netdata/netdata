@@ -22,9 +22,11 @@ This page covers detailed instructions on using and configuring the automatic on
 
 The kickstart script works on all Linux distributions and macOS environments. By default, automatic nightly updates are enabled. If you are installing on macOS, make sure to check the [install documentation for macOS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md) before continuing.
 
+
 > :bulb: Tip
 >
 > If you are unsure whether you want nightly or stable releases, read the [installation guide](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#nightly-vs-stable-releases).  
+
 > If you want to turn off [automatic updates](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#automatic-updates), use the `--no-updates` option. You can find more installation options below.
 
 To install Netdata, run the following as your normal user:
@@ -104,6 +106,7 @@ The `kickstart.sh` script accepts a number of optional parameters to control how
   See [connecting through a proxy](https://github.com/netdata/netdata/blob/master/claim/README.md#connect-through-a-proxy) for details.
 - `--claim-url`: Specify a URL to use when connecting to the cloud. Defaults to `https://api.netdata.cloud`.
 
+
 Additionally, the following environment variables may be used to further customize how the script runs (most users
 should not need to use special values for any of these):
 
@@ -114,6 +117,7 @@ should not need to use special values for any of these):
   we try to use sudo, doas, or pkexec (in that order of preference), but if you need special options for one of
   those to work, or have a different tool to do the same thing on your system, you can specify it here.
 - `DISABLE_TELEMETRY`: If set to a value other than 0, behave as if `--disable-telemetry` was specified.
+
 
 ### Native packages
 

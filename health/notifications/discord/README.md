@@ -1,5 +1,5 @@
 <!--
-title: "Discordapp.com"
+title: "Discord.com"
 sidebar_label: "Discord"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/discord/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Setup/Notification/Agent"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Discordapp.com
+# Discord.com
 
 This is what you will get:
 
@@ -16,7 +16,7 @@ This is what you will get:
 
 You need:
 
-1.  The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
+1.  The **incoming webhook URL** as given by Discord. Create a webhook by following the official [Discord documentation](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks). You can use the same on all your Netdata servers (or you can have multiple if you like - your decision).
 2.  One or more Discord channels to post the messages to.
 
 Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system run `/etc/netdata/edit-config health_alarm_notify.conf`), like this:
@@ -32,8 +32,8 @@ Set them in `/etc/netdata/health_alarm_notify.conf` (to edit it on your system r
 SEND_DISCORD="YES"
 
 # Create a webhook by following the official documentation -
-# https://support.discordapp.com/hc/en-us/articles/228383668-Intro-to-Webhooks
-DISCORD_WEBHOOK_URL="https://discordapp.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+# https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks
+DISCORD_WEBHOOK_URL="https://discord.com/api/webhooks/XXXXXXXXXXXXX/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
 
 # if a role's recipients are not configured, a notification will be send to
 # this discord channel (empty = do not send a notification for unconfigured
@@ -50,6 +50,4 @@ role_recipients_discord[dba]="databases systems"
 role_recipients_discord[webmaster]="marketing development"
 ```
 
-The keywords `systems`, `databases`, `marketing`, `development` are discordapp.com channels (they should already exist within your discord server).
-
-
+The keywords `systems`, `databases`, `marketing`, `development` are discord.com channels (they should already exist within your discord server).

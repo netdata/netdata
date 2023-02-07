@@ -22,7 +22,7 @@ Here are a few ways to enrich your existing monitoring and troubleshooting stack
 ## Collect metrics from Prometheus endpoints
 
 Netdata automatically detects 600 popular endpoints and collects per-second metrics from them via the [generic
-Prometheus collector](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/modules/prometheus). This even
+Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md). This even
 includes support for Windows 10 via [`windows_exporter`](https://github.com/prometheus-community/windows_exporter).
 
 This collector is installed and enabled on all Agent installations by default, so you don't need to waste time
@@ -35,8 +35,8 @@ troubleshoot anomalies.
 Netdata can send its per-second metrics to external time-series databases, such as InfluxDB, Prometheus, Graphite,
 TimescaleDB, ElasticSearch, AWS Kinesis Data Streams, Google Cloud Pub/Sub Service, and many others.
 
-To [export metrics to external time-series databases](/docs/export/external-databases.md), you configure an [exporting
-_connector_](/docs/export/enable-connector.md). These connectors support filtering and resampling for granular control
+To [export metrics to external time-series databases](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md), you configure an [exporting
+_connector_](https://github.com/netdata/netdata/blob/master/docs/export/enable-connector.md). These connectors support filtering and resampling for granular control
 over which metrics you export, and at what volume. You can export resampled metrics as collected, as averages, or the
 sum of interpolated values based on your needs and other monitoring tools.
 
@@ -57,6 +57,6 @@ charts, or use Netdata's health watchdog to send notifications whenever an anoma
 ## What's next?
 
 Whether you're using Netdata standalone or as part of a larger monitoring stack, the next step is the same: [**Get
-Netdata**](/docs/get-started.mdx).
+Netdata**](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
 
 

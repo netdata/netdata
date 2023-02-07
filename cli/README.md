@@ -39,6 +39,6 @@ aclk-state [json]
     Returns current state of ACLK and Cloud connection. (optionally in json)
 ```
 
-Those commands are the same that can be sent to netdata via [signals](/daemon/README.md#command-line-options).
+Those commands are the same that can be sent to netdata via [signals](https://github.com/netdata/netdata/blob/master/daemon/README.md#command-line-options).
 
 

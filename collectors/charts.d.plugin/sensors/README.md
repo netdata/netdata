@@ -31,7 +31,7 @@ One chart for every sensor chip found and each of the above will be created.
 ## Enable the collector
 
 The `sensors` collector is disabled by default. To enable it, edit the `charts.d.conf` file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -48,7 +48,7 @@ sensors=force
 ## Configuration
 
 Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

@@ -43,7 +43,7 @@ static void netdata_popen_tracking_add_pid_unsafe(pid_t pid) {
     mp = mallocz(sizeof(struct netdata_popen));
     mp->pid = pid;
 
-    DOUBLE_LINKED_LIST_PREPEND_UNSAFE(netdata_popen_root, mp, prev, next);
+    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
 }
 
 // myp_del deletes pid if we're tracking.
@@ -61,7 +61,7 @@ static void netdata_popen_tracking_del_pid(pid_t pid) {
     }
 
     if(mp) {
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(netdata_popen_root, mp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
         freez(mp);
     }
     else
@@ -96,7 +96,7 @@ void netdata_popen_tracking_cleanup(void) {
 
     while(netdata_popen_root) {
         struct netdata_popen *mp = netdata_popen_root;
-        DOUBLE_LINKED_LIST_REMOVE_UNSAFE(netdata_popen_root, mp, prev, next);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(netdata_popen_root, mp, prev, next);
         freez(mp);
     }
 

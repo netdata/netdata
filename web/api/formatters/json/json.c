@@ -111,6 +111,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     // print the header lines
     for(c = 0, i = 0; c < used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
@@ -180,7 +181,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 // google supports one annotation per row
                 int annotation_found = 0;
                 for(c = 0; c < used ; c++) {
-                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
+                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
 
                     if(unlikely(co[c] & RRDR_VALUE_RESET)) {
                         buffer_fast_strcat(wb, overflow_annotation, overflow_annotation_len);
@@ -215,6 +216,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0; c < used ;c++) {
+                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
+
                 NETDATA_DOUBLE n;
                 if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                     n = ar[c];
@@ -234,6 +237,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         // for each dimension
         for(c = 0; c < used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             NETDATA_DOUBLE n;

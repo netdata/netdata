@@ -13,8 +13,8 @@ learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 Netdata allows you to send custom notifications to any endpoint you choose.
 
 To configure custom notifications, you will need to customize `health_alarm_notify.conf`. Open the file for editing
-using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config
-directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
+using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
 
 You can look at the other senders in `/usr/libexec/netdata/plugins.d/alarm-notify.sh` for examples of how to modify the `custom_sender()` function in `health_alarm_notify.conf`.
 

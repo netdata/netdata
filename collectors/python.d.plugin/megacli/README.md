@@ -56,7 +56,7 @@ systemctl restart netdata.service
 ## Enable the collector
 
 The `megacli` collector is disabled by default. To enable it, use `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
 file.
 
 ```bash
@@ -70,7 +70,7 @@ with `sudo systemctl restart netdata`, or the appropriate method for your system
 ## Configuration
 
 Edit the `python.d/megacli.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -84,6 +84,6 @@ do_battery: yes
 ```
 
 Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate
-method](/docs/configure/start-stop-restart.md) for your system.
+method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 

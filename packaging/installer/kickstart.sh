@@ -302,12 +302,21 @@ EOF
   if command -v curl > /dev/null 2>&1; then
     curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
   elif command -v wget > /dev/null 2>&1; then
-    wget -q -O - --no-check-certificate \
-    --method POST \
-    --timeout=1 \
-    --header 'Content-Type: application/json' \
-    --body-data "${REQ_BODY}" \
-     "${TELEMETRY_URL}" > /dev/null
+    if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
+      # BusyBox-compatible version of wget, there is no --no-check-certificate option
+      wget -q -O - \
+      -T 1 \
+      --header 'Content-Type: application/json' \
+      --post-data "${REQ_BODY}" \
+      "${TELEMETRY_URL}" > /dev/null
+    else
+      wget -q -O - --no-check-certificate \
+      --method POST \
+      --timeout=1 \
+      --header 'Content-Type: application/json' \
+      --body-data "${REQ_BODY}" \
+      "${TELEMETRY_URL}" > /dev/null
+    fi
   fi
 }
 
@@ -397,7 +406,7 @@ success_banner() {
 cleanup() {
   if [ -z "${NO_CLEANUP}" ] && [ -n "${tmpdir}" ]; then
     cd || true
-    ${ROOTCMD} rm -rf "${tmpdir}"
+    run_as_root rm -rf "${tmpdir}"
   fi
 }
 
@@ -486,6 +495,16 @@ run() {
   fi
 
   return ${ret}
+}
+
+run_as_root() {
+  confirm_root_support
+
+  if [ "$(id -u)" -ne "0" ]; then
+    printf >&2 "Root privileges required to run %s\n" "${*}"
+  fi
+
+  run ${ROOTCMD} "${@}"
 }
 
 run_script() {
@@ -592,7 +611,7 @@ get_redirect() {
   if command -v curl > /dev/null 2>&1; then
     run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
-    run sh -c "wget --max-redirect=0 ${url} 2>&1 | grep Location | cut -d ' ' -f2  | grep -o '[^/]*$'" || return 1
+    run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -o '[^/]*$'" || return 1
   else
     fatal "${ERROR_F0003}" F0003
   fi
@@ -791,6 +810,7 @@ uninstall() {
       return 0
     else
       progress "Found existing netdata-uninstaller. Running it.."
+      # shellcheck disable=SC2086
       if ! run_script "${uninstaller}" ${FLAGS}; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -804,6 +824,7 @@ uninstall() {
       progress "Downloading netdata-uninstaller ..."
       download "${uninstaller_url}" "${tmpdir}/netdata-uninstaller.sh"
       chmod +x "${tmpdir}/netdata-uninstaller.sh"
+      # shellcheck disable=SC2086
       if ! run_script "${tmpdir}/netdata-uninstaller.sh" ${FLAGS}; then
         warning "Uninstaller failed. Some parts of Netdata may still be present on the system."
       fi
@@ -849,7 +870,7 @@ detect_existing_install() {
   if [ -n "${ndprefix}" ]; then
     typefile="${ndprefix}/etc/netdata/.install-type"
     if [ -r "${typefile}" ]; then
-      ${ROOTCMD} sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
+      run_as_root sh -c "cat \"${typefile}\" > \"${tmpdir}/install-type\""
       # shellcheck disable=SC1090,SC1091
       . "${tmpdir}/install-type"
     else
@@ -859,7 +880,7 @@ detect_existing_install() {
     envfile="${ndprefix}/etc/netdata/.environment"
     if [ "${INSTALL_TYPE}" = "unknown" ] || [ "${INSTALL_TYPE}" = "custom" ]; then
       if [ -r "${envfile}" ]; then
-        ${ROOTCMD} sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
+        run_as_root sh -c "cat \"${envfile}\" > \"${tmpdir}/environment\""
         # shellcheck disable=SC1091
         . "${tmpdir}/environment"
         if [ -n "${NETDATA_IS_STATIC_INSTALL}" ]; then
@@ -1013,30 +1034,30 @@ soft_disable_cloud() {
 
   cloud_prefix="${INSTALL_PREFIX}/var/lib/netdata/cloud.d"
 
-  run ${ROOTCMD} mkdir -p "${cloud_prefix}"
+  run_as_root mkdir -p "${cloud_prefix}"
 
   cat > "${tmpdir}/cloud.conf" << EOF
 [global]
   enabled = no
 EOF
 
-  run ${ROOTCMD} cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
+  run_as_root cp "${tmpdir}/cloud.conf" "${cloud_prefix}/cloud.conf"
 
   if [ -z "${NETDATA_NO_START}" ]; then
     case "${SYSTYPE}" in
-      Darwin) run ${ROOTCMD} launchctl kickstart -k com.github.netdata ;;
-      FreeBSD) run ${ROOTCMD} service netdata restart ;;
+      Darwin) run_as_root launchctl kickstart -k com.github.netdata ;;
+      FreeBSD) run_as_root service netdata restart ;;
       Linux)
-        initpath="$(${ROOTCMD} readlink /proc/1/exe)"
+        initpath="$(run_as_root readlink /proc/1/exe)"
 
         if command -v service > /dev/null 2>&1; then
-          run ${ROOTCMD} service netdata restart
+          run_as_root service netdata restart
         elif command -v rc-service > /dev/null 2>&1; then
-          run ${ROOTCMD} rc-service netdata restart
+          run_as_root rc-service netdata restart
         elif [ "$(basename "${initpath}" 2> /dev/null)" = "systemd" ]; then
-          run ${ROOTCMD} systemctl restart netdata
+          run_as_root systemctl restart netdata
         elif [ -f /etc/init.d/netdata ]; then
-          run ${ROOTCMD} /etc/init.d/netdata restart
+          run_as_root /etc/init.d/netdata restart
         fi
         ;;
     esac
@@ -1135,7 +1156,7 @@ claim() {
   fi
 
   # shellcheck disable=SC2086
-  run ${ROOTCMD} "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}
+  run_as_root "${NETDATA_CLAIM_PATH}" -token="${NETDATA_CLAIM_TOKEN}" -rooms="${NETDATA_CLAIM_ROOMS}" -url="${NETDATA_CLAIM_URL}" ${NETDATA_CLAIM_EXTRA}
   case $? in
     0)
       progress "Successfully claimed node"
@@ -1215,16 +1236,16 @@ set_auto_updates() {
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to enable automatic updates."
     # This first case is for catching using a new kickstart script with an old build. It can be safely removed after v1.34.0 is released.
-    elif ! grep -q '\-\-enable-auto-updates' ${updater}; then
+    elif ! grep -q '\-\-enable-auto-updates' "${updater}"; then
       echo
-    elif ! ${ROOTCMD} ${updater} --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
+    elif ! run_as_root "${updater}" --enable-auto-updates "${NETDATA_AUTO_UPDATE_TYPE}"; then
       warning "Failed to enable auto updates. Netdata will still work, but you will need to update manually."
     fi
   else
     if [ "${DRY_RUN}" -eq 1 ]; then
       progress "Would have attempted to disable automatic updates."
     else
-      ${ROOTCMD} ${updater} --disable-auto-updates
+      run_as_root "${updater}" --disable-auto-updates
     fi
   fi
 }
@@ -1314,7 +1335,7 @@ check_special_native_deps() {
         progress "EPEL is available, attempting to install so that required dependencies are available."
 
         # shellcheck disable=SC2086
-        if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} epel-release; then
+        if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} epel-release; then
           warning "Failed to install EPEL, even though it is required to install native packages on this system."
           return 1
         fi
@@ -1494,21 +1515,21 @@ try_package_install() {
 
     if [ -n "${needs_early_refresh}" ]; then
       # shellcheck disable=SC2086
-      if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+      if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         warning "${failed_refresh_msg}"
         return 2
       fi
     fi
 
     # shellcheck disable=SC2086
-    if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
+    if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
       warning "Failed to install repository configuration package."
       return 2
     fi
 
     if [ -n "${repo_subcmd}" ]; then
       # shellcheck disable=SC2086
-      if ! run ${ROOTCMD} env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+      if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
         fatal "${failed_refresh_msg}" F0205
       fi
     fi
@@ -1529,7 +1550,7 @@ try_package_install() {
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
@@ -1539,23 +1560,23 @@ try_package_install() {
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
 
   if [ "${NETDATA_DISABLE_TELEMETRY}" -eq 1 ]; then
-    run ${ROOTCMD} mkdir -p "/etc/netdata"
-    run ${ROOTCMD} touch "/etc/netdata/.opt-out-from-anonymous-statistics"
+    run_as_root mkdir -p "/etc/netdata"
+    run_as_root touch "/etc/netdata/.opt-out-from-anonymous-statistics"
   fi
 
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} env ${env} ${pm_cmd} install ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
+  if ! run_as_root env ${env} ${pm_cmd} install ${pkg_install_opts} "netdata${NATIVE_VERSION}"; then
     warning "Failed to install Netdata package."
     if [ -z "${NO_CLEANUP}" ]; then
       progress "Attempting to uninstall repository configuration package."
       # shellcheck disable=SC2086
-      run ${ROOTCMD} env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
+      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${repoconfig_name}"
     fi
     return 2
   fi
@@ -1648,7 +1669,7 @@ try_static_install() {
 
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run ${ROOTCMD} sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+  if ! run_as_root sh "${tmpdir}/${netdata_agent}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
     warning "Failed to install static build of Netdata on ${SYSARCH}."
     run rm -rf /opt/netdata
     return 2
@@ -1657,16 +1678,16 @@ try_static_install() {
   if [ "${DRY_RUN}" -ne 1 ]; then
   install_type_file="/opt/netdata/etc/netdata/.install-type"
     if [ -f "${install_type_file}" ]; then
-      ${ROOTCMD} sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
-      ${ROOTCMD} chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
+      run_as_root sh -c "cat \"${install_type_file}\" > \"${tmpdir}/install-type\""
+      run_as_root chown "$(id -u)":"$(id -g)" "${tmpdir}/install-type"
       # shellcheck disable=SC1090,SC1091
       . "${tmpdir}/install-type"
       cat > "${tmpdir}/install-type" <<- EOF
 	INSTALL_TYPE='kickstart-static'
 	PREBUILT_ARCH='${PREBUILT_ARCH}'
 	EOF
-      ${ROOTCMD} chown netdata:netdata "${tmpdir}/install-type"
-      ${ROOTCMD} cp "${tmpdir}/install-type" "${install_type_file}"
+      run_as_root chown netdata:netdata "${tmpdir}/install-type"
+      run_as_root cp "${tmpdir}/install-type" "${install_type_file}"
     fi
   fi
 }
@@ -1719,14 +1740,8 @@ install_local_build_dependencies() {
     opts="--dont-wait --non-interactive"
   fi
 
-  if [ "${SYSTYPE}" = "Darwin" ]; then
-    sudo=""
-  else
-    sudo="${ROOTCMD}"
-  fi
-
   # shellcheck disable=SC2086
-  if ! run ${sudo} "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
+  if ! run_as_root "${bash}" "${tmpdir}/install-required-packages.sh" ${opts} netdata; then
     warning "Failed to install all required packages, but installation might still be possible."
   fi
 }
@@ -2105,7 +2120,20 @@ parse_args() {
       "--dont-wait"|"--non-interactive") INTERACTIVE=0 ;;
       "--interactive") INTERACTIVE=1 ;;
       "--dry-run") DRY_RUN=1 ;;
+      "--release-channel")
+        RELEASE_CHANNEL="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        case "${RELEASE_CHANNEL}" in
+          nightly|stable|default)
+            shift 1
+            ;;
+          *)
+            echo "Unrecognized value for --release-channel. Valid release channels are: stable, nightly, default"
+            exit 1
+            ;;
+        esac
+        ;;
       "--stable-channel") RELEASE_CHANNEL="stable" ;;
+      "--nightly-channel") RELEASE_CHANNEL="nightly" ;;
       "--no-updates") NETDATA_AUTO_UPDATES=0 ;;
       "--auto-update") NETDATA_AUTO_UPDATES="1" ;;
       "--auto-update-method")

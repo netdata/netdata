@@ -23,7 +23,7 @@ An unsynchronized clock may indicate a hardware clock error, or an issue with UT
 
 ## Configuration
 
-Edit the `netdata.conf` configuration file using [`edit-config`](/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config directory](/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
+Edit the `netdata.conf` configuration file using [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#use-edit-config-to-edit-configuration-files) from the [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md#the-netdata-config-directory), which is typically at `/etc/netdata`.
 
 Scroll down to the `[plugin:timex]` section to find the available options:
 

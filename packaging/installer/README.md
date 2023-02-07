@@ -24,7 +24,7 @@ packages. We recommend you install Netdata using one of the methods listed below
 checksum-verified packages.
 
 Netdata collects anonymous usage information by default and sends it to our self hosted [PostHog](https://github.com/PostHog/posthog) installation. PostHog is an open source product analytics platform, you can read
-about the information collected, and learn how to-opt, on our [anonymous statistics](/docs/anonymous-statistics.md)
+about the information collected, and learn how to-opt, on our [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md)
 page.
 
 The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
@@ -49,17 +49,17 @@ This script will preferentially use native DEB/RPM packages if we provide them f
 
 To see more information about this installation script, including how to disable automatic updates, get nightly vs.
 stable releases, or disable anonymous statistics, see the [`kickstart.sh` method
-page](/packaging/installer/methods/kickstart.md).
+page](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md).
 
 Scroll down for details about [automatic updates](#automatic-updates) or [nightly vs. stable
 releases](#nightly-vs-stable-releases).
 
 ### Post-installation
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
+[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
 
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
@@ -68,7 +68,7 @@ external databases, and more.
 ## Have a different operating system, or want to try another method?
 
 Netdata works on many different platforms. To see all supported platforms, check out our [platform support
-policy](/packaging/PLATFORM_SUPPORT.md).
+policy](https://github.com/netdata/netdata/blob/master/packaging/PLATFORM_SUPPORT.md).
 
 Below, you can find a few additional installation methods, followed by separate instructions for a variety of unique
 operating systems.
@@ -123,7 +123,7 @@ wget -O /tmp/netdata-kickstart.sh https://my-netdata.io/kickstart.sh && sh /tmp/
 ```
 
 With automatic updates disabled, you can choose exactly when and how you [update
-Netdata](/packaging/installer/UPDATE.md).
+Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md).
 
 ### Network usage of Netdata’s automatic updater
 
@@ -182,8 +182,8 @@ man-in-the-middle attacks.
 ### CentOS 6 and CentOS 8
 
 To install the Agent on certain CentOS and RHEL systems, you must enable non-default repositories, such as EPEL or
-PowerTools, to gather hard dependencies. See the [CentOS 6](/packaging/installer/methods/manual.md#centos--rhel-6x) and
-[CentOS 8](/packaging/installer/methods/manual.md#centos--rhel-8x) sections for more information.
+PowerTools, to gather hard dependencies. See the [CentOS 6](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#centos--rhel-6x) and
+[CentOS 8](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#centos--rhel-8x) sections for more information.
 
 ### Access to file is not permitted
 
@@ -217,6 +217,6 @@ both.
 
 Our current build process has some issues when using certain configurations of the `clang` C compiler on Linux. See [the
 section on `nonrepresentable section on output`
-errors](/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
+errors](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md#nonrepresentable-section-on-output-errors) for a workaround.
 
 

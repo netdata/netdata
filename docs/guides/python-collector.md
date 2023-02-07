@@ -10,9 +10,9 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/pyth
 
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](/docs/collect/how-collectors-work.md) to fetch metrics from hundreds of system,
+The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) to fetch metrics from hundreds of system,
 container, and service endpoints. While the Netdata team and community has built [powerful
-collectors](/collectors/COLLECTORS.md) for most system, container, and service/application endpoints, there are plenty
+collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for most system, container, and service/application endpoints, there are plenty
 of custom applications that can't be monitored by default.
 
 ## Problem
@@ -29,7 +29,7 @@ covered here, or use the included examples for collecting and organizing either 
 ## What you need to get started
 
 - A physical or virtual Linux system, which we'll call a _node_.
-- A working installation of the free and open-source [Netdata](/docs/get-started.mdx) monitoring agent.
+- A working installation of the free and open-source [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) monitoring agent.
 
 ## Jobs and elements of a Python collector
 
@@ -90,7 +90,7 @@ context, charttype]`, where:
   that is `A.B`, with `A` being the name of the collector, and `B` being the name of the specific metric.
 - `charttype`: Either `line`, `area`, or `stacked`. If null line is the default value.
 
-You can read more about `family` and `context` in the [web dashboard](/web/README.md#families) doc.
+You can read more about `family` and `context` in the [web dashboard](https://github.com/netdata/netdata/blob/master/web/README.md#families) doc.
 
 Once the chart has been defined, you should define the dimensions of the chart. Dimensions are basically the metrics to
 be represented in this chart and each chart can have more than one dimension. In order to define the dimensions, the
@@ -166,7 +166,7 @@ class Service(UrlService):
 
 In our use-case, we use the `SimpleService` framework, since there is no framework class that suits our needs.
 
-You can read more about the [framework classes](/collectors/python.d.plugin/README.md#how-to-write-a-new-module) from
+You can read more about the [framework classes](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#how-to-write-a-new-module) from
 the Netdata documentation.
 
 ## An example collector using weather station data
@@ -348,7 +348,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new humidity
+[Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new humidity
 chart:
 
 ![A snapshot of the modified chart](https://i.imgur.com/XOeCBmg.png)
@@ -405,7 +405,7 @@ ORDER = [
 ]
 ```
 
-[Restart Netdata](/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new
+[Restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) with `sudo systemctl restart netdata` to see the new
 min/max/average temperature chart with multiple dimensions:
 
 ![A snapshot of the modified chart](https://i.imgur.com/g7E8lnG.png)
@@ -459,7 +459,7 @@ variables and inform the user about the defaults. For example, take a look at th
 [GitHub](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/example/example.conf).
 
 You can read more about the configuration file on the [`python.d.plugin`
-documentation](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin). 
+documentation](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md). 
 
 ## What's next?
 
@@ -470,7 +470,7 @@ Now you are ready to start developing our Netdata python Collector and share it 
 - If you need help while developing your collector, join our [Netdata
   Community](https://community.netdata.cloud/c/agent-development/9) to chat about it.
 - Follow the
-  [checklist](https://learn.netdata.cloud/docs/agent/collectors/python.d.plugin#pull-request-checklist-for-python-plugins)
+  [checklist](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#pull-request-checklist-for-python-plugins)
   to contribute the collector to the Netdata Agent [repository](https://github.com/netdata/netdata).
 - Check out the [example](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/example) Python
   collector, which is a minimal example collector you could also use as a starting point. Once comfortable with that,

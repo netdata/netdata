@@ -495,7 +495,7 @@ int journalfile_create(struct rrdengine_journalfile *journalfile, struct rrdengi
     char path[RRDENG_PATH_MAX];
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
-    fd = open_file_direct_io(path, O_CREAT | O_RDWR | O_TRUNC, &file);
+    fd = open_file_for_io(path, O_CREAT | O_RDWR | O_TRUNC, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
         return fd;
@@ -605,7 +605,9 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
                 false);
 
         if(!vd.is_valid) {
-            mrg_metric_release(main_mrg, metric);
+            if(metric)
+                mrg_metric_release(main_mrg, metric);
+
             continue;
         }
 
@@ -702,7 +704,7 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
 static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile)
 {
     uv_file file;
-    uint64_t file_size;//, data_file_size;
+    uint64_t file_size;
     int ret;
     uint64_t pos, pos_i, max_id, id;
     unsigned size_bytes;
@@ -712,33 +714,26 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
 
     file = journalfile->file;
     file_size = journalfile->unsafe.pos;
-    //data_file_size = journalfile->datafile->pos; TODO: utilize this?
 
     max_id = 1;
-    bool journal_is_mmapped = (journalfile->data != NULL);
-    if (unlikely(!journal_is_mmapped)) {
-        ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
-        if (unlikely(ret))
-            fatal("DBENGINE: posix_memalign:%s", strerror(ret));
-    }
-    else
-        buf = journalfile->data +  sizeof(struct rrdeng_jf_sb);
-    for (pos = sizeof(struct rrdeng_jf_sb) ; pos < file_size ; pos += READAHEAD_BYTES) {
-        size_bytes = MIN(READAHEAD_BYTES, file_size - pos);
-        if (unlikely(!journal_is_mmapped)) {
-            iov = uv_buf_init(buf, size_bytes);
-            ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
-            if (ret < 0) {
-                error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
-                uv_fs_req_cleanup(&req);
-                goto skip_file;
-            }
-            fatal_assert(req.result >= 0);
-            uv_fs_req_cleanup(&req);
-            ctx_io_read_op_bytes(ctx, size_bytes);
-        }
+    ret = posix_memalign((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
+    if (unlikely(ret))
+        fatal("DBENGINE: posix_memalign:%s", strerror(ret));
 
-        for (pos_i = 0 ; pos_i < size_bytes ; ) {
+    for (pos = sizeof(struct rrdeng_jf_sb); pos < file_size; pos += READAHEAD_BYTES) {
+        size_bytes = MIN(READAHEAD_BYTES, file_size - pos);
+        iov = uv_buf_init(buf, size_bytes);
+        ret = uv_fs_read(NULL, &req, file, &iov, 1, pos, NULL);
+        if (ret < 0) {
+            error("DBENGINE: uv_fs_read: pos=%" PRIu64 ", %s", pos, uv_strerror(ret));
+            uv_fs_req_cleanup(&req);
+            goto skip_file;
+        }
+        fatal_assert(req.result >= 0);
+        uv_fs_req_cleanup(&req);
+        ctx_io_read_op_bytes(ctx, size_bytes);
+
+        for (pos_i = 0; pos_i < size_bytes;) {
             unsigned max_size;
 
             max_size = pos + size_bytes - pos_i;
@@ -750,12 +745,9 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
                 pos_i += ret;
             max_id = MAX(max_id, id);
         }
-        if (likely(journal_is_mmapped))
-            buf += size_bytes;
     }
 skip_file:
-    if (unlikely(!journal_is_mmapped))
-        posix_memfree(buf);
+    posix_memfree(buf);
     return max_id;
 }
 
@@ -1030,6 +1022,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     // Initialize the journal file to be able to access the data
     journalfile_v2_data_set(journalfile, fd, data_start, journal_v2_file_size);
+
+    ctx_current_disk_space_increase(ctx, journal_v2_file_size);
 
     // File is OK load it
     return 0;
@@ -1386,7 +1380,7 @@ void journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         error("DBENGINE: failed to resize file '%s'", path);
     }
     else
-        ctx_current_disk_space_increase(ctx, sizeof(struct journal_v2_header));
+        ctx_current_disk_space_increase(ctx, resize_file_to);
 }
 
 int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfile *journalfile,
@@ -1397,49 +1391,55 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     int ret, fd, error;
     uint64_t file_size, max_id;
     char path[RRDENG_PATH_MAX];
+    bool loaded_v2 = false;
 
-    // Do not try to load the latest file (always rebuild and live migrate)
-    if (datafile->fileno != ctx_last_fileno_get(ctx)) {
-        if (!journalfile_v2_load(ctx, journalfile, datafile)) {
-//            unmap_journal_file(journalfile);
-            return 0;
-        }
-    }
+    // Do not try to load jv2 of the latest file
+    if (datafile->fileno != ctx_last_fileno_get(ctx))
+        loaded_v2 = journalfile_v2_load(ctx, journalfile, datafile) == 0;
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    // If it is not the last file, open read only
-    fd = open_file_direct_io(path, O_RDWR, &file);
+    fd = open_file_for_io(path, O_RDWR, &file, use_direct_io);
     if (fd < 0) {
         ctx_fs_error(ctx);
+
+        if(loaded_v2)
+            return 0;
+
         return fd;
     }
 
     ret = check_file_properties(file, &file_size, sizeof(struct rrdeng_df_sb));
-    if (ret)
-        goto error;
+    if (ret) {
+        error = ret;
+        goto cleanup;
+    }
+
+    if(loaded_v2) {
+        journalfile->unsafe.pos = file_size;
+        error = 0;
+        goto cleanup;
+    }
+
     file_size = ALIGN_BYTES_FLOOR(file_size);
+    journalfile->unsafe.pos = file_size;
+    journalfile->file = file;
 
     ret = journalfile_check_superblock(file);
     if (ret) {
         info("DBENGINE: invalid journal file '%s' ; superblock check failed.", path);
-        goto error;
+        error = ret;
+        goto cleanup;
     }
     ctx_io_read_op_bytes(ctx, sizeof(struct rrdeng_jf_sb));
 
-    journalfile->file = file;
-    journalfile->unsafe.pos = file_size;
-
-    journalfile->data = netdata_mmap(path, file_size, MAP_SHARED, 0, !(datafile->fileno == ctx_last_fileno_get(ctx)), NULL);
-    info("DBENGINE: loading journal file '%s' using %s.", path, journalfile->data?"MMAP":"uv_fs_read");
+    info("DBENGINE: loading journal file '%s'", path);
 
     max_id = journalfile_iterate_transactions(ctx, journalfile);
 
     __atomic_store_n(&ctx->atomic.transaction_id, MAX(__atomic_load_n(&ctx->atomic.transaction_id, __ATOMIC_RELAXED), max_id + 1), __ATOMIC_RELAXED);
 
     info("DBENGINE: journal file '%s' loaded (size:%"PRIu64").", path, file_size);
-    if (likely(journalfile->data))
-        netdata_munmap(journalfile->data, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
@@ -1455,8 +1455,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     return 0;
 
-error:
-    error = ret;
+cleanup:
     ret = uv_fs_close(NULL, &req, file, NULL);
     if (ret < 0) {
         error("DBENGINE: uv_fs_close(%s): %s", path, uv_strerror(ret));
