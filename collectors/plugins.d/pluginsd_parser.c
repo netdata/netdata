@@ -94,15 +94,28 @@ static inline bool pluginsd_unlock_rrdset_data_collection(void *user) {
     return false;
 }
 
+void pluginsd_rrdset_cleanup(RRDSET *st) {
+    for(size_t i = 0; i < st->pluginsd.used ; i++) {
+        if (st->pluginsd.rda[i]) {
+            rrddim_acquired_release(st->pluginsd.rda[i]);
+            st->pluginsd.rda[i] = NULL;
+        }
+    }
+    freez(st->pluginsd.rda);
+    st->pluginsd.size = 0;
+    st->pluginsd.used = 0;
+    st->pluginsd.pos = 0;
+}
+
 static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const char *keyword) {
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
 
-    if(pluginsd_unlock_rrdset_data_collection(user)) {
+    if(unlikely(pluginsd_unlock_rrdset_data_collection(user))) {
         error("PLUGINSD: 'host:%s/chart:%s/' stale data collection lock found during %s; it has been unlocked",
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
 
-    if(u->v2.ml_locked) {
+    if(unlikely(u->v2.ml_locked)) {
         ml_chart_update_end(u->st);
         u->v2.ml_locked = false;
 
@@ -110,23 +123,56 @@ static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const 
               rrdhost_hostname(u->st->rrdhost), rrdset_id(u->st), keyword);
     }
 
+    if(st) {
+        size_t dims = dictionary_entries(st->rrddim_root_index);
+        if(unlikely(st->pluginsd.size < dims)) {
+            st->pluginsd.rda = reallocz(st->pluginsd.rda, dims * sizeof(RRDDIM_ACQUIRED *));
+            st->pluginsd.size = dims;
+        }
+        st->pluginsd.pos = 0;
+    }
+
     u->st = st;
 }
 
-static inline RRDDIM_ACQUIRED *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, const char *cmd) {
+static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, const char *dimension, const char *cmd) {
     if (unlikely(!dimension || !*dimension)) {
         error("PLUGINSD: 'host:%s/chart:%s' got a %s, without a dimension.",
               rrdhost_hostname(host), rrdset_id(st), cmd);
         return NULL;
     }
 
-    RRDDIM_ACQUIRED *rda = rrddim_find_and_acquire(st, dimension);
+    RRDDIM_ACQUIRED *rda;
 
-    if (unlikely(!rda))
+    if(likely(st->pluginsd.pos < st->pluginsd.used)) {
+        rda = st->pluginsd.rda[st->pluginsd.pos];
+        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
+        if(likely(strcmp(rrddim_id(rd), dimension) == 0)) {
+            st->pluginsd.pos++;
+            return rd;
+        }
+        else {
+            rrddim_acquired_release(rda);
+            st->pluginsd.rda[st->pluginsd.pos] = NULL;
+        }
+    }
+
+    rda = rrddim_find_and_acquire(st, dimension);
+    if (unlikely(!rda)) {
         error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s but dimension does not exist.",
               rrdhost_hostname(host), rrdset_id(st), dimension, cmd);
 
-    return rda;
+        return NULL;
+    }
+
+    if(likely(st->pluginsd.pos < st->pluginsd.size)) {
+        st->pluginsd.rda[st->pluginsd.pos++] = rda;
+
+        if(unlikely(st->pluginsd.used < st->pluginsd.pos))
+            st->pluginsd.used = st->pluginsd.pos;
+    }
+
+    return rrddim_acquired_to_rrddim(rda);
 }
 
 static inline RRDSET *pluginsd_find_chart(RRDHOST *host, const char *chart, const char *cmd) {
@@ -166,10 +212,8 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_SET, PLUGINSD_KEYWORD_CHART);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
-
-    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET);
+    if(!rd) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
         debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
@@ -178,7 +222,6 @@ PARSER_RC pluginsd_set(char **words, size_t num_words, void *user)
     if (value && *value)
         rrddim_set_by_pointer(st, rd, str2ll_hex_or_dec(value));
 
-    rrddim_acquired_release(rda);
     return PARSER_RC_OK;
 }
 
@@ -1105,8 +1148,8 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
         return PARSER_RC_OK;
     }
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_SET);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_SET);
+    if(!rd) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     if (unlikely(!u->replay.start_time || !u->replay.end_time)) {
         error("PLUGINSD: 'host:%s/chart:%s/dim:%s' got a %s with invalid timestamps %ld to %ld from a %s. Disabling it.",
@@ -1127,8 +1170,6 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
         flags_str = "";
 
     if (likely(value_str)) {
-        RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-
         RRDDIM_FLAGS rd_flags = rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED);
 
         if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
@@ -1152,7 +1193,6 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
         }
     }
 
-    rrddim_acquired_release(rda);
     return PARSER_RC_OK;
 }
 
@@ -1173,10 +1213,9 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     RRDSET *st = pluginsd_require_chart_from_parent(user, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, PLUGINSD_KEYWORD_REPLAY_BEGIN);
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
-    if(!rda) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE);
+    if(!rd) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
     usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str) : 0;
     if(last_collected_ut > dim_last_collected_ut) {
@@ -1187,7 +1226,6 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
     rd->last_stored_value = last_stored_value_str ? str2ndd(last_stored_value_str, NULL) : 0.0;
-    rrddim_acquired_release(rda);
 
     return PARSER_RC_OK;
 }
@@ -1462,10 +1500,9 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
 
     timing_step(TIMING_STEP_SET2_PREPARE);
 
-    RRDDIM_ACQUIRED *rda = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
-    if(unlikely(!rda)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
+    RRDDIM *rd = pluginsd_acquire_dimension(host, st, dimension, PLUGINSD_KEYWORD_SET_V2);
+    if(unlikely(!rd)) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
-    RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED)))
         rrddim_isnot_obsolete(st, rd);
 
@@ -1537,8 +1574,6 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     rd->last_calculated_value = value;
     rd->collections_counter++;
     rd->updated = true;
-
-    rrddim_acquired_release(rda);
 
     timing_step(TIMING_STEP_SET2_STORE);
 

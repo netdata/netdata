@@ -184,6 +184,8 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     ml_chart_new(st);
 }
 
+void pluginsd_rrdset_cleanup(RRDSET *st);
+
 void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
     RRDHOST *host = st->rrdhost;
 
@@ -205,6 +207,8 @@ void rrdset_finalize_collection(RRDSET *st, bool dimensions_too) {
             st->storage_metrics_groups[tier] = NULL;
         }
     }
+
+    pluginsd_rrdset_cleanup(st);
 }
 
 // the destructor - the dictionary is write locked while this runs

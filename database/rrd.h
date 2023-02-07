@@ -702,6 +702,13 @@ struct rrdset {
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
+    struct {
+        size_t pos;
+        size_t size;
+        size_t used;
+        RRDDIM_ACQUIRED **rda;
+    } pluginsd;
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     struct {
         bool log_next_data_collection;
