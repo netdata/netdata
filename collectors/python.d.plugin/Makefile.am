@@ -70,7 +70,6 @@ include oracledb/Makefile.inc
 include pandas/Makefile.inc
 include postfix/Makefile.inc
 include puppet/Makefile.inc
-include rabbitmq/Makefile.inc
 include rethinkdbs/Makefile.inc
 include retroshare/Makefile.inc
 include riakkv/Makefile.inc
