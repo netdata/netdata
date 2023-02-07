@@ -9,22 +9,12 @@ learn_rel_path: "Operations/Visualizations"
 -->
 
 Netdata Cloud features enhanced visualizations for the resource utilization of Kubernetes (k8s) clusters, embedded in
-the default [Overview](/docs/cloud/visualize/overview/) dashboard.
+the default [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md) dashboard.
 
 These visualizations include a health map for viewing the status of k8s pods/containers, in addition to composite charts
 for viewing per-second CPU, memory, disk, and networking metrics from k8s nodes.
 
-## Before you begin
-
-In order to use the Kubernetes visualizations in Netdata Cloud, you need:
-
-- A Kubernetes cluster running Kubernetes v1.9 or newer.
-- A Netdata deployment using the latest version of the [Helm chart](https://github.com/netdata/helmchart), which
-  installs [v1.29.2](https://github.com/netdata/netdata/releases) or newer of the Netdata Agent.
-- To connect your Kubernetes cluster to Netdata Cloud.
-- To enable the feature flag described below.
-
-See our [Kubernetes deployment instructions](/docs/agent/packaging/installer/methods/kubernetes/) for details on
+See our [Kubernetes deployment instructions](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md) for details on
 installation and connecting to Netdata Cloud.
 
 ## Available Kubernetes metrics
@@ -87,7 +77,7 @@ and `k8s_node_name`. The default is `k8s_controller_name`.
 
 ### Filtering
 
-Filtering behaves identically to the [node filter in War Rooms](/docs/cloud/war-rooms#node-filter), with the ability to
+Filtering behaves identically to the [node filter in War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md#node-filter), with the ability to
 filter pods/containers by `container_id` and `namespace`.
 
 ### Detailed information
@@ -120,7 +110,7 @@ problematic behavior to investigate further, troubleshoot, and remediate with `k
 The Kubernetes composite charts show real-time and historical resource utilization metrics from nodes, pods, or
 containers within your Kubernetes deployment.
 
-See the [Overview](/docs/cloud/visualize/overview#definition-bar) doc for details on how composite charts work. These
+See the [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md#definition-bar) doc for details on how composite charts work. These
 work similarly, but in addition to visualizing _by dimension_ and _by node_, Kubernetes composite charts can also be
 grouped by the following labels:
 
@@ -148,7 +138,3 @@ There are some caveats and known issues with Kubernetes monitoring with Netdata 
   [drained](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/) from your Kubernetes cluster. These
   drained nodes will be marked "unreachable" and will show up in War Room management screens/dropdowns. The same applies
   for any ephemeral nodes created and destroyed during horizontal scaling.
-
-## What's next?
-
-For more information about monitoring a k8s cluster with Netdata, see our guide: [_Kubernetes monitoring with Netdata: Overview and visualizations_](/guides/monitor/kubernetes-k8s-netdata/).
