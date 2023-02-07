@@ -131,6 +131,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     for(c = 0, i = 0; c < query_used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
@@ -155,6 +156,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
     for(c = 0, i = 0; c < query_used ; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         if(i) buffer_strcat(wb, ", ");
@@ -260,9 +262,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         for (c = 0, i = 0; c < query_used; c++) {
             QUERY_METRIC *qm = &qt->query.array[c];
 
-            if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
-                continue;
-
+            if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if (unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
             if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
                 continue;
 
@@ -295,8 +296,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
                 for (c = 0, i = 0; c < query_used; c++) {
                     QUERY_METRIC *qm = &qt->query.array[c];
 
-                    if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN))
-                        continue;
+                    if (unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+                    if (unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
                     if (unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO)))
                         continue;
 
@@ -351,6 +352,8 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
             for(c = 0; c < query_used ;c++) {
+                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
+
                 NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
                 NETDATA_DOUBLE n = cn[c];
 
@@ -365,6 +368,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
 
         for(c = 0, i = 0; c < query_used ;c++) {
             if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
             if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
             if(i) buffer_strcat(wb, ", ");
