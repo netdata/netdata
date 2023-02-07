@@ -22,6 +22,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
         for (c = 0; c < used; c++) {
+            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
             NETDATA_DOUBLE n = cn[c];
 
             if(likely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
@@ -37,6 +38,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
     // for each dimension
     for (c = 0; c < used; c++) {
         if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
+        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
         if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
 
         NETDATA_DOUBLE n = cn[c];
