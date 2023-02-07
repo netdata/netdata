@@ -481,14 +481,14 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
         log_date(actual_before_buf, LOG_DATE_LENGTH, actual_before);
         internal_error(true,
                        "STREAM_SENDER REPLAY: 'host:%s/chart:%s': sending data %llu [%s] to %llu [%s] (requested %llu [delta %lld] to %llu [delta %lld])",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
                        (unsigned long long)actual_after, actual_after_buf, (unsigned long long)actual_before, actual_before_buf,
                        (unsigned long long)after, (long long)(actual_after - after), (unsigned long long)before, (long long)(actual_before - before));
     }
     else
         internal_error(true,
                        "STREAM_SENDER REPLAY: 'host:%s/chart:%s': nothing to send (requested %llu to %llu)",
-                       rrdhost_hostname(st->rrdhost), rrdset_id(st),
+                       rrdhost_hostname(q->st->rrdhost), rrdset_id(q->st),
                        (unsigned long long)after, (unsigned long long)before);
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
 
@@ -778,9 +778,9 @@ static bool send_replay_chart_cmd(struct replication_request_details *r, const c
                    , msg
                    , r->last_request.after, r->last_request.before
                    , r->child_db.first_entry_t, r->child_db.last_entry_t
-                   , r->child_db.world_time_t, (r->child_db.world_time_t == r->local_db.now) ? "SAME" : (r->child_db.world_time_t < r->local_db.now) ? "BEHIND" : "AHEAD"
+                   , r->child_db.wall_clock_time, (r->child_db.wall_clock_time == r->local_db.wall_clock_time) ? "SAME" : (r->child_db.wall_clock_time < r->local_db.wall_clock_time) ? "BEHIND" : "AHEAD"
                    , r->local_db.first_entry_t, r->local_db.last_entry_t
-                   , r->local_db.now
+                   , r->local_db.wall_clock_time
                    , r->gap.from, r->gap.to
                    , (r->gap.from == r->wanted.after) ? "FULL" : "PARTIAL"
                    , (st->replay.after != 0 || st->replay.before != 0) ? "OVERLAPPING" : ""

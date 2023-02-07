@@ -1312,14 +1312,13 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
             rrdset_flag_clear(st, RRDSET_FLAG_SYNC_CLOCK);
             rrdhost_receiver_replicating_charts_minus_one(st->rrdhost);
         }
-
-        pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_REPLAY_END);
-
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
         else
             internal_error(true, "REPLAY ERROR: 'host:%s/chart:%s' got a " PLUGINSD_KEYWORD_REPLAY_END " with enable_streaming = true, but there is no replication in progress for this chart.",
                   rrdhost_hostname(host), rrdset_id(st));
 #endif
+
+        pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_REPLAY_END);
 
         worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, 100.0);
 
