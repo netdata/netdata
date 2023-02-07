@@ -3,6 +3,16 @@
 #ifndef NETDATA_EBPF_APPS_H
 #define NETDATA_EBPF_APPS_H 1
 
+// The default value is at least 32 times smaller than maximum number of PIDs allowed on system,
+// this is only possible because we are using ARAL (https://github.com/netdata/netdata/tree/master/libnetdata/aral).
+#ifndef NETDATA_EBPF_ALLOC_MAX_PID
+# define NETDATA_EBPF_ALLOC_MAX_PID 1024
+#endif
+
+extern ARAL *ebpf_aral_apps_pid_stat;
+void ebpf_aral_init(void);
+struct ebpf_pid_stat *ebpf_target_get(void);
+
 #include "libnetdata/threads/threads.h"
 #include "libnetdata/locks/locks.h"
 #include "libnetdata/avl/avl.h"
