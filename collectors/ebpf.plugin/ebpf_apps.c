@@ -349,11 +349,11 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 #define MAX_NAME 100
 #define MAX_CMDLINE 16384
 
-struct ebpf_pid_stat **all_pids = NULL;    // to avoid allocations, we pre-allocate the
+struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the
                                       // the entire pid space.
 struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
 
-size_t all_pids_count = 0; // the number of processes running
+size_t ebpf_all_pids_count = 0; // the number of processes running
 
 struct ebpf_target
     *apps_groups_default_target = NULL, // the default target
@@ -478,8 +478,8 @@ static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
  */
 static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 {
-    if (unlikely(all_pids[pid]))
-        return all_pids[pid];
+    if (unlikely(ebpf_all_pids[pid]))
+        return ebpf_all_pids[pid];
 
     struct ebpf_pid_stat *p = callocz(1, sizeof(struct ebpf_pid_stat));
 
@@ -491,8 +491,8 @@ static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 
     p->pid = pid;
 
-    all_pids[pid] = p;
-    all_pids_count++;
+    ebpf_all_pids[pid] = p;
+    ebpf_all_pids_count++;
 
     return p;
 }
@@ -716,7 +716,7 @@ static inline void link_all_processes_to_their_parents(void)
             continue;
         }
 
-        pp = all_pids[p->ppid];
+        pp = ebpf_all_pids[p->ppid];
         if (likely(pp)) {
             p->parent = pp;
             pp->children_count++;
@@ -809,12 +809,12 @@ static void apply_apps_groups_targets_inheritance(void)
     }
 
     // init goes always to default target
-    if (all_pids[INIT_PID])
-        all_pids[INIT_PID]->target = apps_groups_default_target;
+    if (ebpf_all_pids[INIT_PID])
+        ebpf_all_pids[INIT_PID]->target = apps_groups_default_target;
 
     // pid 0 goes always to default target
-    if (all_pids[0])
-        all_pids[0]->target = apps_groups_default_target;
+    if (ebpf_all_pids[0])
+        ebpf_all_pids[0]->target = apps_groups_default_target;
 
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
@@ -830,8 +830,8 @@ static void apply_apps_groups_targets_inheritance(void)
             p->sortlist = sortlist++;
     }
 
-    if (all_pids[1])
-        all_pids[1]->sortlist = sortlist++;
+    if (ebpf_all_pids[1])
+        ebpf_all_pids[1]->sortlist = sortlist++;
 
     // give a target to all merged child processes
     found = 1;
@@ -881,7 +881,7 @@ static inline void post_aggregate_targets(struct ebpf_target *root)
  */
 static inline void del_pid_entry(pid_t pid)
 {
-    struct ebpf_pid_stat *p = all_pids[pid];
+    struct ebpf_pid_stat *p = ebpf_all_pids[pid];
 
     if (unlikely(!p)) {
         error("attempted to free pid %d that is not allocated.", pid);
@@ -905,8 +905,8 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->cmdline);
     freez(p);
 
-    all_pids[pid] = NULL;
-    all_pids_count--;
+    ebpf_all_pids[pid] = NULL;
+    ebpf_all_pids_count--;
 }
 
 /**
@@ -923,7 +923,7 @@ int get_pid_comm(pid_t pid, size_t n, char *dest)
 {
     struct ebpf_pid_stat *stat;
 
-    stat = all_pids[pid];
+    stat = ebpf_all_pids[pid];
     if (unlikely(stat == NULL)) {
         return -1;
     }
@@ -1091,7 +1091,7 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
  */
 void collect_data_for_all_processes(int tbl_pid_stats_fd)
 {
-    if (unlikely(!all_pids))
+    if (unlikely(!ebpf_all_pids))
         return;
 
     struct ebpf_pid_stat *pids = ebpf_root_of_pids; // global list of all processes running

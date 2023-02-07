@@ -593,7 +593,7 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
  */
 static void ebpf_create_apps_charts(struct ebpf_target *root)
 {
-    if (unlikely(!all_pids))
+    if (unlikely(!ebpf_all_pids))
         return;
 
     struct ebpf_target *w;
@@ -1079,7 +1079,7 @@ static void process_collector(ebpf_module_t *em)
             pthread_mutex_lock(&collect_data_mutex);
 
             ebpf_create_apps_charts(apps_groups_root_target);
-            if (all_pids_count > 0) {
+            if (ebpf_all_pids_count > 0) {
                 if (apps_enabled) {
                     ebpf_process_update_apps_data();
                 }
