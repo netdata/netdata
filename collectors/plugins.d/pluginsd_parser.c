@@ -102,6 +102,7 @@ void pluginsd_rrdset_cleanup(RRDSET *st) {
         }
     }
     freez(st->pluginsd.rda);
+    st->pluginsd.rda = NULL;
     st->pluginsd.size = 0;
     st->pluginsd.used = 0;
     st->pluginsd.pos = 0;
@@ -129,6 +130,10 @@ static inline void pluginsd_set_chart_from_parent(void *user, RRDSET *st, const 
             st->pluginsd.rda = reallocz(st->pluginsd.rda, dims * sizeof(RRDDIM_ACQUIRED *));
             st->pluginsd.size = dims;
         }
+
+        if(st->pluginsd.pos > st->pluginsd.used && st->pluginsd.pos <= st->pluginsd.size)
+            st->pluginsd.used = st->pluginsd.pos;
+
         st->pluginsd.pos = 0;
     }
 
@@ -147,7 +152,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     if(likely(st->pluginsd.pos < st->pluginsd.used)) {
         rda = st->pluginsd.rda[st->pluginsd.pos];
         RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-        if(likely(strcmp(rrddim_id(rd), dimension) == 0)) {
+        if (likely(rd && strcmp(rrddim_id(rd), dimension) == 0)) {
             st->pluginsd.pos++;
             return rd;
         }
@@ -165,12 +170,8 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
         return NULL;
     }
 
-    if(likely(st->pluginsd.pos < st->pluginsd.size)) {
+    if(likely(st->pluginsd.pos < st->pluginsd.size))
         st->pluginsd.rda[st->pluginsd.pos++] = rda;
-
-        if(unlikely(st->pluginsd.used < st->pluginsd.pos))
-            st->pluginsd.used = st->pluginsd.pos;
-    }
 
     return rrddim_acquired_to_rrddim(rda);
 }
