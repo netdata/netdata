@@ -186,9 +186,9 @@ void ebpf_process_remove_pids()
  *
  * @param root the target list.
  */
-void ebpf_process_send_apps_data(struct target *root, ebpf_module_t *em)
+void ebpf_process_send_apps_data(struct ebpf_target *root, ebpf_module_t *em)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_SYSCALL_APPS_TASK_PROCESS);
@@ -532,7 +532,7 @@ static void ebpf_create_statistic_charts(ebpf_module_t *em)
  */
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_TASK_PROCESS,
                                "Process started",
                                EBPF_COMMON_DIMENSION_CALL,
@@ -591,12 +591,12 @@ void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  * @param root a pointer for the targets.
  */
-static void ebpf_create_apps_charts(struct target *root)
+static void ebpf_create_apps_charts(struct ebpf_target *root)
 {
     if (unlikely(!all_pids))
         return;
 
-    struct target *w;
+    struct ebpf_target *w;
     int newly_added = 0;
 
     for (w = root; w; w = w->next) {

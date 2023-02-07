@@ -980,11 +980,11 @@ long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t off
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_socket_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_socket_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
     UNUSED(em);
 
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_NET_APPS_CONNECTION_TCP_V4);
@@ -1217,7 +1217,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  */
 void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     int order = 20080;
     ebpf_create_charts_on_apps(NETDATA_NET_APPS_CONNECTION_TCP_V4,
                                "Calls to tcp_v4_connection", EBPF_COMMON_DIMENSION_CONNECTIONS,

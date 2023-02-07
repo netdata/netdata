@@ -47,7 +47,7 @@ struct pid_fd {
     int fd;
 };
 
-struct target {
+struct ebpf_target {
     char compare[MAX_COMPARE_NAME + 1];
     uint32_t comparehash;
     size_t comparelen;
@@ -57,9 +57,6 @@ struct target {
 
     char name[MAX_NAME + 1];
 
-    uid_t uid;
-    gid_t gid;
-
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
     netdata_publish_dcstat_t dcstat;
@@ -68,57 +65,8 @@ struct target {
     netdata_fd_stat_t fd;
     netdata_publish_shm_t shm;
 
-    /* These variables are not necessary for eBPF collector
-    kernel_uint_t minflt;
-    kernel_uint_t cminflt;
-    kernel_uint_t majflt;
-    kernel_uint_t cmajflt;
-    kernel_uint_t utime;
-    kernel_uint_t stime;
-    kernel_uint_t gtime;
-    kernel_uint_t cutime;
-    kernel_uint_t cstime;
-    kernel_uint_t cgtime;
-    kernel_uint_t num_threads;
-    // kernel_uint_t rss;
-
-    kernel_uint_t status_vmsize;
-    kernel_uint_t status_vmrss;
-    kernel_uint_t status_vmshared;
-    kernel_uint_t status_rssfile;
-    kernel_uint_t status_rssshmem;
-    kernel_uint_t status_vmswap;
-
-    kernel_uint_t io_logical_bytes_read;
-    kernel_uint_t io_logical_bytes_written;
-    // kernel_uint_t io_read_calls;
-    // kernel_uint_t io_write_calls;
-    kernel_uint_t io_storage_bytes_read;
-    kernel_uint_t io_storage_bytes_written;
-    // kernel_uint_t io_cancelled_write_bytes;
-
-    int *target_fds;
-    int target_fds_size;
-
-    kernel_uint_t openfiles;
-    kernel_uint_t openpipes;
-    kernel_uint_t opensockets;
-    kernel_uint_t openinotifies;
-    kernel_uint_t openeventfds;
-    kernel_uint_t opentimerfds;
-    kernel_uint_t opensignalfds;
-    kernel_uint_t openeventpolls;
-    kernel_uint_t openother;
-    */
-
     kernel_uint_t starttime;
     kernel_uint_t collected_starttime;
-
-    /*
-    kernel_uint_t uptime_min;
-    kernel_uint_t uptime_sum;
-    kernel_uint_t uptime_max;
-    */
 
     unsigned int processes; // how many processes have been merged to this
     int exposed;            // if set, we have sent this to netdata
@@ -130,14 +78,14 @@ struct target {
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
-    struct target *target; // the one that will be reported to netdata
-    struct target *next;
+    struct ebpf_target *target; // the one that will be reported to netdata
+    struct ebpf_target *next;
 };
 
-extern struct target *apps_groups_default_target;
-extern struct target *apps_groups_root_target;
-extern struct target *users_root_target;
-extern struct target *groups_root_target;
+extern struct ebpf_target *apps_groups_default_target;
+extern struct ebpf_target *apps_groups_root_target;
+extern struct ebpf_target *users_root_target;
+extern struct ebpf_target *groups_root_target;
 
 struct ebpf_pid_stat {
     int32_t pid;
@@ -164,9 +112,9 @@ struct ebpf_pid_stat {
 
     // each process gets a unique number
 
-    struct target *target;       // app_groups.conf targets
-    struct target *user_target;  // uid based targets
-    struct target *group_target; // gid based targets
+    struct ebpf_target *target;       // app_groups.conf targets
+    struct ebpf_target *user_target;  // uid based targets
+    struct ebpf_target *group_target; // gid based targets
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
@@ -260,14 +208,14 @@ static inline void debug_log_int(const char *fmt, ...)
 //
 extern struct ebpf_pid_stat **all_pids;
 
-int ebpf_read_apps_groups_conf(struct target **apps_groups_default_target,
-                                      struct target **apps_groups_root_target,
-                                      const char *path,
-                                      const char *file);
+int ebpf_read_apps_groups_conf(struct ebpf_target **apps_groups_default_target,
+                               struct ebpf_target **apps_groups_root_target,
+                               const char *path,
+                               const char *file);
 
-void clean_apps_groups_target(struct target *apps_groups_root_target);
+void clean_apps_groups_target(struct ebpf_target *apps_groups_root_target);
 
-size_t zero_all_targets(struct target *root);
+size_t zero_all_targets(struct ebpf_target *root);
 
 int am_i_running_as_root();
 

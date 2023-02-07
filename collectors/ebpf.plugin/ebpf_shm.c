@@ -513,9 +513,9 @@ static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *
  *
  * @param root the target list.
 */
-void ebpf_shm_send_apps_data(struct target *root)
+void ebpf_shm_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_shm_sum_pids(&w->shm, w->root_pid);
@@ -895,7 +895,7 @@ static void shm_collector(ebpf_module_t *em)
  */
 void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_SHMGET_CHART,
                                "Calls to syscall <code>shmget(2)</code>.",
                                EBPF_COMMON_DIMENSION_CALL,

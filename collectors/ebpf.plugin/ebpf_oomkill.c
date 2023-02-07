@@ -54,7 +54,7 @@ static void oomkill_cleanup(void *ptr)
 static void oomkill_write_data(int32_t *keys, uint32_t total)
 {
     // for each app, see if it was OOM killed. record as 1 if so otherwise 0.
-    struct target *w;
+    struct ebpf_target *w;
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (likely(w->exposed && w->processes)) {
             bool was_oomkilled = false;
@@ -334,7 +334,7 @@ static void oomkill_collector(ebpf_module_t *em)
  */
 void ebpf_oomkill_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_OOMKILL_CHART,
                                "OOM kills",
                                EBPF_COMMON_DIMENSION_KILLS,

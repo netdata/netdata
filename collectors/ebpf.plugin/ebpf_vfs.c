@@ -606,9 +606,9 @@ static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *
  * @param em   the structure with thread information
  * @param root the target list.
  */
-void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct target *root)
+void ebpf_vfs_send_apps_data(ebpf_module_t *em, struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_vfs_sum_pids(&w->vfs, w->root_pid);
@@ -1683,7 +1683,7 @@ static void ebpf_create_global_charts(ebpf_module_t *em)
  **/
 void ebpf_vfs_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
 
     ebpf_create_charts_on_apps(NETDATA_SYSCALL_APPS_FILE_DELETED,
                                "Files deleted",

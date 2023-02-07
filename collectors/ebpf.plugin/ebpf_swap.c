@@ -435,9 +435,9 @@ static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_swap_send_apps_data(struct target *root)
+void ebpf_swap_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (unlikely(w->exposed && w->processes)) {
             ebpf_swap_sum_pids(&w->swap, w->root_pid);
@@ -707,7 +707,7 @@ static void swap_collector(ebpf_module_t *em)
  */
 void ebpf_swap_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_MEM_SWAP_READ_CHART,
                                "Calls to function <code>swap_readpage</code>.",
                                EBPF_COMMON_DIMENSION_CALL,

@@ -120,9 +120,9 @@ int am_i_running_as_root()
  *
  * @return it returns the number of structures that was reset.
  */
-size_t zero_all_targets(struct target *root)
+size_t zero_all_targets(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     size_t count = 0;
 
     for (w = root; w; w = w->next) {
@@ -149,9 +149,9 @@ size_t zero_all_targets(struct target *root)
  *
  * @param agrt the pointer to be cleaned.
  */
-void clean_apps_groups_target(struct target *agrt)
+void clean_apps_groups_target(struct ebpf_target *agrt)
 {
-    struct target *current_target;
+    struct ebpf_target *current_target;
     while (agrt) {
         current_target = agrt;
         agrt = current_target->target;
@@ -170,7 +170,7 @@ void clean_apps_groups_target(struct target *agrt)
  *
  * @return It returns the target on success and NULL otherwise
  */
-struct target *get_apps_groups_target(struct target **agrt, const char *id, struct target *target, const char *name)
+struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char *id, struct ebpf_target *target, const char *name)
 {
     int tdebug = 0, thidden = target ? target->hidden : 0, ends_with = 0;
     const char *nid = id;
@@ -188,7 +188,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
     uint32_t hash = simple_hash(id);
 
     // find if it already exists
-    struct target *w, *last = *agrt;
+    struct ebpf_target *w, *last = *agrt;
     for (w = *agrt; w; w = w->next) {
         if (w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
             return w;
@@ -215,7 +215,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
             "Internal Error: request to link process '%s' to target '%s' which is linked to target '%s'", id,
             target->id, target->target->id);
 
-    w = callocz(1, sizeof(struct target));
+    w = callocz(1, sizeof(struct ebpf_target));
     strncpyz(w->id, nid, MAX_NAME);
     w->idhash = simple_hash(w->id);
 
@@ -267,7 +267,7 @@ struct target *get_apps_groups_target(struct target **agrt, const char *id, stru
  *
  * @return It returns 0 on success and -1 otherwise
  */
-int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const char *path, const char *file)
+int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **agrt, const char *path, const char *file)
 {
     char filename[FILENAME_MAX + 1];
 
@@ -297,7 +297,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
             continue;
 
         // find a possibly existing target
-        struct target *w = NULL;
+        struct ebpf_target *w = NULL;
 
         // loop through all words, skipping the first one (the name)
         for (word = 0; word < words; word++) {
@@ -312,7 +312,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
                 continue;
 
             // add this target
-            struct target *n = get_apps_groups_target(agrt, s, w, name);
+            struct ebpf_target *n = get_apps_groups_target(agrt, s, w, name);
             if (!n) {
                 error("Cannot create target '%s' (line %zu, word %zu)", s, line, word);
                 continue;
@@ -331,7 +331,7 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
     if (!*agdt)
         fatal("Cannot create default target");
 
-    struct target *ptr = *agdt;
+    struct ebpf_target *ptr = *agdt;
     if (ptr->target)
         *agdt = ptr->target;
 
@@ -355,7 +355,7 @@ struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes 
 
 size_t all_pids_count = 0; // the number of processes running
 
-struct target
+struct ebpf_target
     *apps_groups_default_target = NULL, // the default target
     *apps_groups_root_target = NULL,    // apps_groups.conf defined
     *users_root_target = NULL,          // users
@@ -509,7 +509,7 @@ static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
     uint32_t hash = simple_hash(p->comm);
     size_t pclen = strlen(p->comm);
 
-    struct target *w;
+    struct ebpf_target *w;
     for (w = apps_groups_root_target; w; w = w->next) {
         // if(debug_enabled || (p->target && p->target->debug_enabled)) debug_log_int("\t\tcomparing '%s' with '%s'", w->compare, p->comm);
 
@@ -860,9 +860,9 @@ static void apply_apps_groups_targets_inheritance(void)
  *
  * @param root the targets that will be updated.
  */
-static inline void post_aggregate_targets(struct target *root)
+static inline void post_aggregate_targets(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     for (w = root; w; w = w->next) {
         if (w->collected_starttime) {
             if (!w->starttime || w->collected_starttime < w->starttime) {
@@ -1060,7 +1060,7 @@ static inline void read_proc_filesystem()
  * @param p the pid with information to update
  * @param o never used
  */
-static inline void aggregate_pid_on_target(struct target *w, struct ebpf_pid_stat *p, struct target *o)
+static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pid_stat *p, struct ebpf_target *o)
 {
     UNUSED(o);
 

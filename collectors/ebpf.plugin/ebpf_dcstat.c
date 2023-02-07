@@ -342,7 +342,7 @@ static void ebpf_dcstat_exit(void *ptr)
  */
 void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr)
 {
-    struct target *root = ptr;
+    struct ebpf_target *root = ptr;
     ebpf_create_charts_on_apps(NETDATA_DC_HIT_CHART,
                                "Percentage of files inside directory cache",
                                EBPF_COMMON_DIMENSION_PERCENTAGE,
@@ -563,9 +563,9 @@ void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_targe
  *
  * @param root the target list.
 */
-void ebpf_dcache_send_apps_data(struct target *root)
+void ebpf_dcache_send_apps_data(struct ebpf_target *root)
 {
-    struct target *w;
+    struct ebpf_target *w;
     collected_number value;
 
     write_begin_chart(NETDATA_APPS_FAMILY, NETDATA_DC_HIT_CHART);

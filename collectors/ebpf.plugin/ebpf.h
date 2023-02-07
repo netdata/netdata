@@ -235,7 +235,7 @@ void ebpf_create_charts_on_apps(char *name,
                                        char *charttype,
                                        int order,
                                        char *algorithm,
-                                       struct target *root,
+                                       struct ebpf_target *root,
                                        int update_every,
                                        char *module);
 
