@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud.  
 
-To see what our Netdata Cloud Kubernetes visualizations have to offer, read the[Kubernetes visualizations Concept](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+To see what our Netdata Cloud Kubernetes visualizations have to offer, read the [Kubernetes visualizations Concept](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
 
 By following these directions, you will use Netdata's [Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) to create a Kubernetes monitoring deployment on your cluster.
 
