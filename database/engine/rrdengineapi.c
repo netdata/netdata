@@ -446,13 +446,21 @@ static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, 
     size_t max_size = tier_page_size[ctx->config.tier];
     size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
-    size_t slots = 3 + aligned_allocation_entries(
-            max_slots - 3,
-            indexing_partition((Word_t) handle->alignment, max_slots - 3),
+    size_t slots = aligned_allocation_entries(
+            max_slots,
+            indexing_partition((Word_t) handle->alignment, max_slots),
             (time_t) (point_in_time_ut / USEC_PER_SEC)
     );
 
+    if(slots < max_slots / 3)
+        slots = max_slots / 3;
+
+    if(slots < 3)
+        slots = 3;
+
     size_t size = slots * CTX_POINT_SIZE_BYTES(ctx);
+
+    // internal_error(true, "PAGE ALLOC %zu bytes (%zu max)", size, max_size);
 
     internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
     internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
