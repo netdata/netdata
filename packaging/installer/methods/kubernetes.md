@@ -19,7 +19,7 @@ To see what our Netdata Cloud Kubernetes visualizations have to offer, read the 
 
 By following these directions, you will use Netdata's [Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) to create a Kubernetes monitoring deployment on your cluster.
 
-The Helm chart installs one `parent` pod for storing metrics and managing alarm notifications, plus an additional
+The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) installs one `parent` pod for storing metrics and managing alarm notifications, plus an additional
 `child` pod for every node in the cluster, responsible for collecting metrics from the node, Kubernetes control planes,
 pods/containers, and [supported application-specific
 metrics](https://github.com/netdata/helmchart#service-discovery-and-supported-services).
