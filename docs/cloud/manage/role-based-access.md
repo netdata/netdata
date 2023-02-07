@@ -9,25 +9,24 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Explanation of Netdata roles and permissions linked to them"
 -->
 
-Netdata Cloud provides an out-of-the-box role-based-access mechanism that allows you to control what functionalities in the app users can access.
-
-This is achieved through the set of pre-defined roles that are available and have associated permissions, depending on the purpose of each one of them.
+Netdata Cloud already provides a role-based-access mechanism, that allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
 #### What roles are available?
 
-Depending on the plan associated with your space you will have different roles available:
+With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
+being able to join any room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
 
 | **Role** | **Community** | **Pro** | **Business** |
 | :-- | :--: | :--: | :--: |
-| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings. It also allows access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| **Managers**<p>This role allows users to manage War Rooms and Users. It also allows access to all War Rooms in the space.</p> | - | - | :heavy_check_mark: |
-| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities. It also allows access to all War Rooms in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
-| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms.</p> | - | - | :heavy_check_mark: |
-| **Billing**<p>This role is for users that need to manage billing options and see invoices.</p> | - | - | :heavy_check_mark: |
+| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: |
+| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
+| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: |
+| **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: |
 
 #### Which functionalities are available for each role?
 
-In more detail, you can find on the following table which functionalities are available for each role.
+In more detail, you can find on the following tables which functionalities are available for each role on each domain.
 
 ##### Space Management
 
@@ -108,7 +107,7 @@ Notes:
 | :-- | :--: | :--: | :--: | :--: | :--: | :-- |
 | See all functions in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - |
 | Run any function in Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - |
-| Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | There isn't any function on this category yet, so subject to change. |
+| Run read-only function in Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | |
 | Run sensitive function in Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | There isn't any function on this category yet, so subject to change. |
 
 ##### Events feed
