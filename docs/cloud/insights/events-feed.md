@@ -9,8 +9,7 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Present the Netdata Events feed."
 -->
 
-Netdata Cloud provides the Events feed which is a powerful feature that keeps track of events that happen both on your infrastructure and in your Space.
-You will be able to use it to investigate events that occurred in the past and can be key to your troubleshooting task.
+Netdata Cloud provides the Events feed which is a powerful feature that tracks events that happen on your infrastructure, or in your Space. The feed lets you investigate events that occurred in the past, which is obviously invaluable for troubleshooting. Common use cases are ones like when a node goes offline, and you want to understand what events happened before that. A detailed event history can also assist in attributing sudden pattern changes in a time series to specific changes in your environment.
 
 #### What are the available events?
 
@@ -28,9 +27,9 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 | **Event name** | **Description** |  **Example** |
 | :-- | :-- | :-- |
-| Node Become Live | The node is collecting and streaming metrics to Cloud.| TO-DO |
-| Node Become Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | TO-DO |
-| Node Become Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| TO-DO |
+| Node Become Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` is on live **state** |
+| Node Become Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` is on **stale** state |
+| Node Become Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` is on **offline** state |
 | Node Created | The node is created but it is still Unseen on Cloud, didn't establish a successful connection yet.| TO-DO |
 | Node Removed | The node was removed from the Space through the `Delete` action, if it becomes Live again it will be automatically added. | TO-DO |
 | Node Restored | The node is restored, if node becomes Live after a remove action it is re-added to the Space. | TO-DO |
@@ -42,7 +41,7 @@ TO-DO: Agent events?
 
 | **Event name** | **Description** |  **Example** |
 | :-- | :-- | :-- |
-| Node Alert State Changed | These are node alert state transition events and can be seen as an alert history log. You will be able to see transitions to or from any of these states: Cleared, Warning, Critical, Removed, Error or Unknown | TO-DO |
+| Node Alert State Changed | These are node alert state transition events and can be seen as an alert history log. You will be able to see transitions to or from any of these states: Cleared, Warning, Critical, Removed, Error or Unknown | <p>Transition to Cleared</p><p>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` recovered with value **8.33%** </p><p>Transition from Cleared to Warning or Critical</p><p> `httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` was raised to **WARNING** with value **10%**</p><p>Transition from Warning to Critical</p><p>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` escalated to **CRITICAL** with value **25%**</p>Transition from Critical to Warning</p><p>`httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` was demoted to **WARNING** with value **10%**</p><p>Transition to Removed</p><p>Alert `httpcheck_web_service_bad_status` for `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` is no longer available, state can't be assessed.</p><p>Transition to Error</p><p>For this alert `httpcheck_web_service_bad_status` related to `httpcheck_netdata_cloud.request_status` on `netdata-parent-xyz` we couldn't calculate the current value ⓘ</p> |
 
 #### Who can access the events?
 
