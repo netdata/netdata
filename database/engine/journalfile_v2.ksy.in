@@ -22,7 +22,10 @@ seq:
   - id: metric_trailer
     type: journal_v2_block_trailer
   - id: page_blocs
-    type: jounral_v2_page_blocs
+    type: journal_v2_page_block
+    repeat: expr
+    repeat-expr: _root.journal_v2_header.metric_count
+  - id: padding
     size: _root._io.size - _root._io.pos - 4
   - id: journal_file_trailer
     type: journal_v2_block_trailer
@@ -145,8 +148,3 @@ ifdef(`VIRT_MEMBERS',
         repeat-expr: hdr.entries
       - id: block_trailer
         type: journal_v2_block_trailer
-  jounral_v2_page_blocs:
-    seq:
-      - id: blocs
-        type: journal_v2_page_block
-        repeat: eos
