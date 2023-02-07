@@ -2077,12 +2077,19 @@ struct timing_steps {
 } timing_steps[TIMING_STEP_MAX + 1] = {
         [TIMING_STEP_INTERNAL] = { .name = "internal", .time = 0, },
 
-        [TIMING_STEP_PREPARE] = { .name = "prepare", .time = 0, },
-        [TIMING_STEP_LOOKUP_DIMENSION] = { .name = "lookup dim", .time = 0, },
-        [TIMING_STEP_PARSE] = { .name = "parse", .time = 0, },
-        [TIMING_STEP_ML] = { .name = "ml", .time = 0, },
-        [TIMING_STEP_PROPAGATE] = { .name = "propagate", .time = 0, },
-        [TIMING_STEP_RRDSET_STORE] = { .name = "rrdset store", .time = 0, },
+        [TIMING_STEP_BEGIN2_PREPARE] = { .name = "BEGIN2 prepare", .time = 0, },
+        [TIMING_STEP_BEGIN2_FIND_CHART] = { .name = "BEGIN2 find chart", .time = 0, },
+        [TIMING_STEP_BEGIN2_PARSE] = { .name = "BEGIN2 parse", .time = 0, },
+        [TIMING_STEP_BEGIN2_ML] = { .name = "BEGIN2 ml", .time = 0, },
+        [TIMING_STEP_BEGIN2_PROPAGATE] = { .name = "BEGIN2 propagate", .time = 0, },
+        [TIMING_STEP_BEGIN2_STORE] = { .name = "BEGIN2 store", .time = 0, },
+
+        [TIMING_STEP_SET2_PREPARE] = { .name = "SET2 prepare", .time = 0, },
+        [TIMING_STEP_SET2_LOOKUP_DIMENSION] = { .name = "SET2 find dimension", .time = 0, },
+        [TIMING_STEP_SET2_PARSE] = { .name = "SET2 parse", .time = 0, },
+        [TIMING_STEP_SET2_ML] = { .name = "SET2 ml", .time = 0, },
+        [TIMING_STEP_SET2_PROPAGATE] = { .name = "SET2 propagate", .time = 0, },
+        [TIMING_STEP_RRDSET_STORE_METRIC] = { .name = "SET2 rrdset store", .time = 0, },
         [TIMING_STEP_DBENGINE_FIRST_CHECK] = { .name = "db 1st check", .time = 0, },
         [TIMING_STEP_DBENGINE_CHECK_DATA] = { .name = "db check data", .time = 0, },
         [TIMING_STEP_DBENGINE_PACK] = { .name = "db pack", .time = 0, },
@@ -2091,7 +2098,14 @@ struct timing_steps {
         [TIMING_STEP_DBENGINE_PAGE_ALLOC] = { .name = "db page alloc", .time = 0, },
         [TIMING_STEP_DBENGINE_CREATE_NEW_PAGE] = { .name = "db new page", .time = 0, },
         [TIMING_STEP_DBENGINE_FLUSH_PAGE] = { .name = "db page flush", .time = 0, },
-        [TIMING_STEP_STORE] = { .name = "store", .time = 0, },
+        [TIMING_STEP_SET2_STORE] = { .name = "SET2 store", .time = 0, },
+
+        [TIMING_STEP_END2_PREPARE] = { .name = "END2 prepare", .time = 0, },
+        [TIMING_STEP_END2_PUSH_V1] = { .name = "END2 push v1", .time = 0, },
+        [TIMING_STEP_END2_ML] = { .name = "END2 ml", .time = 0, },
+        [TIMING_STEP_END2_RRDSET] = { .name = "END2 rrdset", .time = 0, },
+        [TIMING_STEP_END2_PROPAGATE] = { .name = "END2 propagate", .time = 0, },
+        [TIMING_STEP_END2_STORE] = { .name = "END2 store", .time = 0, },
 
         // terminator
         [TIMING_STEP_MAX] = { .name = NULL, .time = 0, },
@@ -2136,9 +2150,10 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
             struct timing_steps timings3[TIMING_STEP_MAX + 1];
             memcpy(timings3, timing_steps, sizeof(timings3));
 
-            usec_t total = 0;
+            size_t total_reqs = 0;
+            usec_t total_usec = 0;
             for(size_t t = 1; t < TIMING_STEP_MAX ; t++)
-                total += timings3[t].time - timings2[t].time;
+                total_usec += timings3[t].time - timings2[t].time;
 
             if(!wb)
                 wb = buffer_create(1024, NULL);
@@ -2146,19 +2161,23 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
             buffer_flush(wb);
 
             for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
-                if(!timing_steps[t].count) continue;
+                size_t requests = timings3[t].count - timings2[t].count;
+                if(!requests) continue;
 
-                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: count %8zu, time %10.2f ms (%7.2f %%), average %7.2f usec/run\n",
+                total_reqs += requests;
+
+                buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: # %10zu, t %11.2f ms (%6.2f %%), avg %6.2f usec/run\n",
                                t,
                                timing_steps[t].name ? timing_steps[t].name : "x",
-                               timings3[t].count - timings2[t].count,
-                               (double) (timings3[t].time - timings2[t].time) / USEC_PER_MS,
-                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total,
-                               (double)(timings3[t].time - timings2[t].time) / (double)(timings3[t].count - timings2[t].count)
+                               requests,
+                               (double) (timings3[t].time - timings2[t].time) / (double)USEC_PER_MS,
+                               (double) (timings3[t].time - timings2[t].time) * 100.0 / (double) total_usec,
+                               (double) (timings3[t].time - timings2[t].time) / (double)requests
                 );
             }
 
-            info("TIMINGS REPORT:\n%sTIMINGS REPORT: total %0.2f ms", buffer_tostring(wb), (double)total / USEC_PER_MS);
+            info("TIMINGS REPORT:\n%sTIMINGS REPORT:                        total # %10zu, t %11.2f ms",
+                 buffer_tostring(wb), total_reqs, (double)total_usec / USEC_PER_MS);
 
             memcpy(timings2, timings3, sizeof(timings2));
 

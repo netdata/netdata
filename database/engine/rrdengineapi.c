@@ -572,7 +572,7 @@ void rrdeng_store_metric_next(STORAGE_COLLECT_HANDLE *collection_handle,
                               const uint16_t anomaly_count,
                               const SN_FLAGS flags)
 {
-    timing_step(TIMING_STEP_RRDSET_STORE);
+    timing_step(TIMING_STEP_RRDSET_STORE_METRIC);
 
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
 
