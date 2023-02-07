@@ -1376,12 +1376,12 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user) {
     if (unlikely(update_every != st->update_every))
         rrdset_set_update_every_s(st, update_every);
 
+    pluginsd_lock_rrdset_data_collection(user);
+
     timing_step(TIMING_STEP_BEGIN2_PARSE);
 
     // ------------------------------------------------------------------------
     // prepare our state
-
-    pluginsd_lock_rrdset_data_collection(user);
 
     PARSER_USER_OBJECT *u = (PARSER_USER_OBJECT *) user;
     u->v2.update_every = update_every;
