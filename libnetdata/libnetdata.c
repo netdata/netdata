@@ -2113,8 +2113,7 @@ struct timing_steps {
 
 void timing_action(TIMING_ACTION action, TIMING_STEP step) {
     static __thread usec_t last_action_time = 0;
-    static __thread struct timing_steps timings2[TIMING_STEP_MAX + 1] = {};
-    static __thread BUFFER *wb = NULL;
+    static struct timing_steps timings2[TIMING_STEP_MAX + 1] = {};
 
     switch(action) {
         case TIMING_ACTION_INIT:
@@ -2142,7 +2141,7 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
                 return;
             }
 
-            if(!__atomic_compare_exchange_n(&timing_steps[TIMING_STEP_INTERNAL].time, &expected, last_action_time, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+            if(!__atomic_compare_exchange_n(&timing_steps[TIMING_STEP_INTERNAL].time, &expected, last_action_time, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
                 last_action_time = 0;
                 return;
             }
@@ -2152,19 +2151,16 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
 
             size_t total_reqs = 0;
             usec_t total_usec = 0;
-            for(size_t t = 1; t < TIMING_STEP_MAX ; t++)
+            for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
                 total_usec += timings3[t].time - timings2[t].time;
+                total_reqs += timings3[t].count - timings2[t].count;
+            }
 
-            if(!wb)
-                wb = buffer_create(1024, NULL);
-
-            buffer_flush(wb);
+            BUFFER *wb = buffer_create(1024, NULL);
 
             for(size_t t = 1; t < TIMING_STEP_MAX ; t++) {
                 size_t requests = timings3[t].count - timings2[t].count;
                 if(!requests) continue;
-
-                total_reqs += requests;
 
                 buffer_sprintf(wb, "TIMINGS REPORT: [%3zu. %-20s]: # %10zu, t %11.2f ms (%6.2f %%), avg %6.2f usec/run\n",
                                t,
@@ -2182,6 +2178,7 @@ void timing_action(TIMING_ACTION action, TIMING_STEP step) {
             memcpy(timings2, timings3, sizeof(timings2));
 
             last_action_time = 0;
+            buffer_free(wb);
         }
     }
 }
