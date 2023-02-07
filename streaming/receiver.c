@@ -728,15 +728,12 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
     struct plugind cd = {
             .update_every = default_rrd_update_every,
-            .serial_failures = 0,
-            .successful_collections = 0,
             .unsafe = {
                     .spinlock = NETDATA_SPINLOCK_INITIALIZER,
                     .running = true,
                     .enabled = true,
             },
             .started_t = now_realtime_sec(),
-            .capabilities = 0,
     };
 
     // put the client IP and port into the buffers used by plugins.d
@@ -806,8 +803,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     rrdpush_receive_log_status(rpt, "ready to receive data", "CONNECTED");
-
-    cd.capabilities = rpt->capabilities;
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

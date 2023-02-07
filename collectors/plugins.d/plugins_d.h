@@ -72,7 +72,6 @@ struct plugind {
     } unsafe;
 
     time_t started_t;
-    uint32_t capabilities;              // follows the same principles as streaming capabilities
 
     struct plugind *prev;
     struct plugind *next;
