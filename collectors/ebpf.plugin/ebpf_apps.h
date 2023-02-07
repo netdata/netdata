@@ -40,13 +40,6 @@
 // ----------------------------------------------------------------------------
 // pid_stat
 //
-// structure to store data for each process running
-// see: man proc for the description of the fields
-
-struct pid_fd {
-    int fd;
-};
-
 struct ebpf_target {
     char compare[MAX_COMPARE_NAME + 1];
     uint32_t comparehash;
@@ -97,9 +90,6 @@ struct ebpf_pid_stat {
     // char state;
     int32_t ppid;
 
-    struct pid_fd *fds; // array of fds it uses
-    size_t fds_size;    // the size of the fds array
-
     int children_count;              // number of processes directly referencing this
     unsigned char keep : 1;          // 1 when we need to keep this process in memory even after it exited
     int keeploops;                   // increases by 1 every time keep is 1 and updated 0
@@ -118,13 +108,6 @@ struct ebpf_pid_stat {
 
     usec_t stat_collected_usec;
     usec_t last_stat_collected_usec;
-
-    usec_t io_collected_usec;
-    usec_t last_io_collected_usec;
-
-    kernel_uint_t uptime;
-
-    char *fds_dirname; // the full directory name in /proc/PID/fd
 
     char *stat_filename;
     char *status_filename;
@@ -152,7 +135,7 @@ struct pid_on_target {
 // ----------------------------------------------------------------------------
 // Structures used to read information from kernel ring
 typedef struct ebpf_process_stat {
-    uint64_t pid_tgid;
+    uint64_t pid_tgid; // This cannot be removed, because it is used inside kernel ring.
     uint32_t pid;
 
     //Counter
