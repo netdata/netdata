@@ -26,6 +26,7 @@ typedef enum rrdvar_options {
     RRDVAR_FLAG_RRDCALC_FAMILY_VAR          = (1 << 4), // this is a an alarm variable, attached to a family
     RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR    = (1 << 5), // this is a an alarm variable, attached to the host, using the chart id
     RRDVAR_FLAG_RRDCALC_HOST_CHARTNAME_VAR  = (1 << 6), // this is a an alarm variable, attached to the host, using the chart name
+    RRDVAR_FLAG_CONFIG_VAR                  = (1 << 7), // this is a an alarm variable, read from alarm config
 
     // this is 24 bit
     // to increase it you have to set change the bitfield in
@@ -47,6 +48,7 @@ int rrdvar_fix_name(char *variable);
 STRING *rrdvar_name_to_string(const char *name);
 
 const RRDVAR_ACQUIRED *rrdvar_custom_host_variable_add_and_acquire(RRDHOST *host, const char *name);
+void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value);
 void rrdvar_custom_host_variable_set(RRDHOST *host, const RRDVAR_ACQUIRED *rva, NETDATA_DOUBLE value);
 
 int rrdvar_walkthrough_read(DICTIONARY *dict, int (*callback)(const DICTIONARY_ITEM *item, void *rrdvar, void *data), void *data);

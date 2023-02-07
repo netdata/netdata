@@ -133,6 +133,19 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
     return (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
 }
 
+inline void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
+    if(unlikely(!dict || !name)) return;
+
+    struct rrdvar_constructor tmp = {
+        .name = name,
+        .value = value,
+        .type = type,
+        .options = options,
+        .react_action = RRDVAR_REACT_NONE,
+    };
+    dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+}
+
 void rrdvar_delete_all(DICTIONARY *dict) {
     dictionary_flush(dict);
 }

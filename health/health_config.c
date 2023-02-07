@@ -221,9 +221,9 @@ static inline void parse_variables_and_store_in_health_rrdvars(char *value, size
 
             buffer[i] = '\0';
 
-            //check and try to store only variables
+            //TODO: check and try to store only variables
             STRING *name_string = rrdvar_name_to_string(buffer);
-            rrdvar_add_and_acquire("health", health_rrdvars, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_RRDCALC_HOST_CHARTID_VAR, NULL);
+            rrdvar_add("health", health_rrdvars, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CONFIG_VAR, NULL);
             string_freez(name_string);
         } else
             s++;
