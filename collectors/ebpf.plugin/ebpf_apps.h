@@ -34,21 +34,21 @@
 #include "ebpf_swap.h"
 #include "ebpf_vfs.h"
 
-#define MAX_COMPARE_NAME 100
-#define MAX_NAME 100
+#define EBPF_MAX_COMPARE_NAME 100
+#define EBPF_MAX_NAME 100
 
 // ----------------------------------------------------------------------------
 // pid_stat
 //
 struct ebpf_target {
-    char compare[MAX_COMPARE_NAME + 1];
+    char compare[EBPF_MAX_COMPARE_NAME + 1];
     uint32_t comparehash;
     size_t comparelen;
 
-    char id[MAX_NAME + 1];
+    char id[EBPF_MAX_NAME + 1];
     uint32_t idhash;
 
-    char name[MAX_NAME + 1];
+    char name[EBPF_MAX_NAME + 1];
 
     // Changes made to simplify integration between apps and eBPF.
     netdata_publish_cachestat_t cachestat;
@@ -82,7 +82,7 @@ extern struct ebpf_target *groups_root_target;
 
 struct ebpf_pid_stat {
     int32_t pid;
-    char comm[MAX_COMPARE_NAME + 1];
+    char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
 
     uint32_t log_thrown;

@@ -190,7 +190,7 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
     // find if it already exists
     struct ebpf_target *w, *last = *agrt;
     for (w = *agrt; w; w = w->next) {
-        if (w->idhash == hash && strncmp(nid, w->id, MAX_NAME) == 0)
+        if (w->idhash == hash && strncmp(nid, w->id, EBPF_MAX_NAME) == 0)
             return w;
 
         last = w;
@@ -216,17 +216,17 @@ struct ebpf_target *get_apps_groups_target(struct ebpf_target **agrt, const char
             target->id, target->target->id);
 
     w = callocz(1, sizeof(struct ebpf_target));
-    strncpyz(w->id, nid, MAX_NAME);
+    strncpyz(w->id, nid, EBPF_MAX_NAME);
     w->idhash = simple_hash(w->id);
 
     if (unlikely(!target))
         // copy the name
-        strncpyz(w->name, name, MAX_NAME);
+        strncpyz(w->name, name, EBPF_MAX_NAME);
     else
         // copy the id
-        strncpyz(w->name, nid, MAX_NAME);
+        strncpyz(w->name, nid, EBPF_MAX_NAME);
 
-    strncpyz(w->compare, nid, MAX_COMPARE_NAME);
+    strncpyz(w->compare, nid, EBPF_MAX_COMPARE_NAME);
     size_t len = strlen(w->compare);
     if (w->compare[len - 1] == '*') {
         w->compare[len - 1] = '\0';
@@ -345,8 +345,6 @@ int ebpf_read_apps_groups_conf(struct ebpf_target **agdt, struct ebpf_target **a
 // ----------------------------------------------------------------------------
 // string lengths
 
-#define MAX_COMPARE_NAME 100
-#define MAX_NAME 100
 #define MAX_CMDLINE 16384
 
 struct ebpf_pid_stat **ebpf_all_pids = NULL;    // to avoid allocations, we pre-allocate the
@@ -640,7 +638,7 @@ static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
                 debug_log("\tJust added %d (%s)", p->pid, comm);
         }
 
-        strncpyz(p->comm, comm, MAX_COMPARE_NAME);
+        strncpyz(p->comm, comm, EBPF_MAX_COMPARE_NAME);
 
         // /proc/<pid>/cmdline
         if (likely(proc_pid_cmdline_is_needed))
