@@ -1,4 +1,4 @@
----
+<!--
 title: "Interact with charts"
 description: >-
     "Learn how to get the most out of Netdata's charts. These charts will help you make sense of all the
@@ -9,7 +9,7 @@ sidebar_label: "Interact with charts"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Operations/Visualizations"
----
+-->
 
 > ⚠️ This new version of charts is currently **only** available on Netdata Cloud. We didn't want to keep this valuable
 > feature from you, so after we get this into your hands on the Cloud, we will collect and implement your feedback.

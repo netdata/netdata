@@ -1,4 +1,4 @@
----
+<!--
 title: "Metric Correlations"
 description: "Quickly find metrics and charts closely related to a particular timeframe of interest anywhere in your infrastructure to discover the root cause faster."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md"
@@ -6,7 +6,7 @@ sidebar_label: "Metric Correlations"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Operations"
----
+-->
 
 The Metric Correlations (MC) feature lets you quickly find metrics and charts related to a particular window of interest that you want to explore further. By displaying the standard Netdata dashboard, filtered to show only charts that are relevant to the window of interest, you can get to the root cause sooner.
 

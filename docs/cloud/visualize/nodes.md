@@ -1,4 +1,4 @@
----
+<!--
 title: "Nodes view"
 description: "See charts from all your nodes in one pane of glass, then dive in to embedded dashboards for granular troubleshooting of ongoing issues."
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md"
@@ -6,7 +6,7 @@ sidebar_label: "Nodes view"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Operations/Visualizations"
----
+-->
 
 The Nodes view lets you see and customize key metrics from any number of Agent-monitored nodes and seamlessly navigate
 to any node's dashboard for troubleshooting performance issues or anomalies using Netdata's highly-granular metrics.

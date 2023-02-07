@@ -321,12 +321,12 @@ static inline bool rrdpush_send_chart_definition(BUFFER *wb, RRDSET *st) {
 }
 
 // sends the current chart dimensions
-static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s, RRDSET_FLAGS flags) {
+static void rrdpush_send_chart_metrics(BUFFER *wb, RRDSET *st, struct sender_state *s __maybe_unused, RRDSET_FLAGS flags) {
     buffer_fast_strcat(wb, "BEGIN \"", 7);
     buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
     buffer_fast_strcat(wb, "\" ", 2);
 
-    if(stream_has_capability(s, STREAM_CAP_REPLICATION) || st->last_collected_time.tv_sec > st->upstream_resync_time_s)
+    if(st->last_collected_time.tv_sec > st->upstream_resync_time_s)
         buffer_print_llu(wb, st->usec_since_last_update);
     else
         buffer_fast_strcat(wb, "0", 1);

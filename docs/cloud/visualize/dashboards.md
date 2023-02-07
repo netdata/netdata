@@ -1,4 +1,4 @@
----
+<!--
 title: "Build new dashboards"
 description: >-
     "Design new dashboards that target your infrastructure's unique needs and share them with your team for
@@ -8,7 +8,7 @@ sidebar_label: "Build new dashboards"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Operations/Visualizations"
----
+-->
 
 With Netdata Cloud, you can build new dashboards that target your infrastructure's unique needs. Put key metrics from
 any number of distributed systems in one place for a bird's eye view of your infrastructure.

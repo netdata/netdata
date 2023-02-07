@@ -2,11 +2,35 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.38.0...HEAD)
 
 **Merged pull requests:**
 
+- minor fix in the metadata of libnetdata/ebpf AND log documents [\#14445](https://github.com/netdata/netdata/pull/14445) ([tkatsoulas](https://github.com/tkatsoulas))
+- Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
+- Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
+- kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
+- add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
+- Roles permissions docs [\#14391](https://github.com/netdata/netdata/pull/14391) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.37.1...v1.38.0)
+
+**Merged pull requests:**
+
+- Updated w1sensor.chart.py [\#14435](https://github.com/netdata/netdata/pull/14435) ([martindue](https://github.com/martindue))
+- replication to streaming transition when there are gaps [\#14434](https://github.com/netdata/netdata/pull/14434) ([ktsaou](https://github.com/ktsaou))
+- turn error\(\) to internal\_error\(\) [\#14428](https://github.com/netdata/netdata/pull/14428) ([ktsaou](https://github.com/ktsaou))
+- Fix typo on the netdata-functions.md [\#14426](https://github.com/netdata/netdata/pull/14426) ([lokerhp](https://github.com/lokerhp))
+- Update screenshot of timezone selector [\#14425](https://github.com/netdata/netdata/pull/14425) ([cakrit](https://github.com/cakrit))
+- Stop training thread from processing training requests once cancelled. [\#14423](https://github.com/netdata/netdata/pull/14423) ([vkalintiris](https://github.com/vkalintiris))
+- Check on parents the microseconds delta sent by agents [\#14422](https://github.com/netdata/netdata/pull/14422) ([ktsaou](https://github.com/ktsaou))
+- better logging of invalid pages detected on dbengine files [\#14420](https://github.com/netdata/netdata/pull/14420) ([ktsaou](https://github.com/ktsaou))
 - fix functions memory leak [\#14419](https://github.com/netdata/netdata/pull/14419) ([ktsaou](https://github.com/ktsaou))
+- Move under Developer in Learn [\#14417](https://github.com/netdata/netdata/pull/14417) ([cakrit](https://github.com/cakrit))
+- Libnetdata readmes learn [\#14416](https://github.com/netdata/netdata/pull/14416) ([cakrit](https://github.com/cakrit))
 - Minor fixes in markdown links [\#14415](https://github.com/netdata/netdata/pull/14415) ([tkatsoulas](https://github.com/tkatsoulas))
 - fix kubelet alarms [\#14414](https://github.com/netdata/netdata/pull/14414) ([ilyam8](https://github.com/ilyam8))
 - DBENGINE v2 - bug fixes [\#14413](https://github.com/netdata/netdata/pull/14413) ([ktsaou](https://github.com/ktsaou))
@@ -18,6 +42,7 @@
 - Fix typo on the page [\#14397](https://github.com/netdata/netdata/pull/14397) ([iorvd](https://github.com/iorvd))
 - Fix kickstart and updater not working with BusyBox wget [\#14392](https://github.com/netdata/netdata/pull/14392) ([Dim-P](https://github.com/Dim-P))
 - Fix publishing Docker Images to secondary registries. [\#14389](https://github.com/netdata/netdata/pull/14389) ([Ferroin](https://github.com/Ferroin))
+- Reduce service exit [\#14381](https://github.com/netdata/netdata/pull/14381) ([thiagoftsm](https://github.com/thiagoftsm))
 - DBENGINE v2 - improvements part 12 [\#14379](https://github.com/netdata/netdata/pull/14379) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin v0.50.0 [\#14378](https://github.com/netdata/netdata/pull/14378) ([ilyam8](https://github.com/ilyam8))
 - Patch master [\#14377](https://github.com/netdata/netdata/pull/14377) ([tkatsoulas](https://github.com/tkatsoulas))
@@ -188,7 +213,6 @@
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
 - Introduce the new Structure of the documentation [\#13915](https://github.com/netdata/netdata/pull/13915) ([Ancairon](https://github.com/Ancairon))
 - Finish renaming the `--install` option to `--install-prefix`. [\#13881](https://github.com/netdata/netdata/pull/13881) ([Ferroin](https://github.com/Ferroin))
-- Support HTTP proxy Basic auth [\#13762](https://github.com/netdata/netdata/pull/13762) ([underhood](https://github.com/underhood))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -350,19 +374,6 @@
 - Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
 - minor - add host labels for ephemerality and nodes with unstable connections [\#13784](https://github.com/netdata/netdata/pull/13784) ([underhood](https://github.com/underhood))
 - Add a thread to asynchronously process metadata updates [\#13783](https://github.com/netdata/netdata/pull/13783) ([stelfrag](https://github.com/stelfrag))
-- Parser cleanup  [\#13782](https://github.com/netdata/netdata/pull/13782) ([stelfrag](https://github.com/stelfrag))
-- allow netdata installer to install and run netdata as any user [\#13780](https://github.com/netdata/netdata/pull/13780) ([ktsaou](https://github.com/ktsaou))
-- Update libbpf 1.0.1 [\#13778](https://github.com/netdata/netdata/pull/13778) ([thiagoftsm](https://github.com/thiagoftsm))
-- Bump websockets submodule [\#13776](https://github.com/netdata/netdata/pull/13776) ([underhood](https://github.com/underhood))
-- Rename variable for old CentOS version [\#13775](https://github.com/netdata/netdata/pull/13775) ([thiagoftsm](https://github.com/thiagoftsm))
-- Further improvements to the new service installation code. [\#13774](https://github.com/netdata/netdata/pull/13774) ([Ferroin](https://github.com/Ferroin))
-- Pandas collector [\#13773](https://github.com/netdata/netdata/pull/13773) ([andrewm4894](https://github.com/andrewm4894))
-- dbengine free from RRDSET and RRDDIM [\#13772](https://github.com/netdata/netdata/pull/13772) ([ktsaou](https://github.com/ktsaou))
-- bump go.d.plugin v0.40.3 [\#13771](https://github.com/netdata/netdata/pull/13771) ([ilyam8](https://github.com/ilyam8))
-- Update fping plugin documentation with better details about the required version. [\#13765](https://github.com/netdata/netdata/pull/13765) ([Ferroin](https://github.com/Ferroin))
-- fix bad merge [\#13764](https://github.com/netdata/netdata/pull/13764) ([ktsaou](https://github.com/ktsaou))
-- Remove anomaly rates chart. [\#13763](https://github.com/netdata/netdata/pull/13763) ([vkalintiris](https://github.com/vkalintiris))
-- add 1m delay for tcp reset alarms [\#13761](https://github.com/netdata/netdata/pull/13761) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
