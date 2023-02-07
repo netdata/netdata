@@ -67,4 +67,19 @@ if [ -n "${NETDATA_CLAIM_URL}" ] && [ -n "${NETDATA_CLAIM_TOKEN}" ] && [ ! -f /v
                              -daemon-not-running
 fi
 
+if [ -n "${NETDATA_EXTRA_APK_PACKAGES}" ]; then
+  echo "Fetching APK repository metadata."
+  if ! apk update; then
+    NETDATA_FAILED_APK_UPDATE=1
+    echo "Failed to fetch APK repository metadata."
+  fi
+fi
+
+if [ -n "${NETDATA_EXTRA_APK_PACKAES}" ] && [ -z "${NETDATA_FAILED_APK_UPDATE}" ]; then
+  echo "Installing supplementary packages."
+  if ! apk add --no-cache --no-interactive "${NETDATA_EXTRA_APK_PACKAGES}"; then
+    echo "Failed to install supplementary packages."
+  fi
+fi
+
 exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" "$@"
