@@ -958,7 +958,7 @@ static void ebpf_socket_send_data(ebpf_module_t *em)
  *
  * @return it returns the sum of all PIDs
  */
-long long ebpf_socket_sum_values_for_pids(struct pid_on_target *root, size_t offset)
+long long ebpf_socket_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
 {
     long long ret = 0;
     while (root) {

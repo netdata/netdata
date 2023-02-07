@@ -560,7 +560,7 @@ static void ebpf_update_fd_cgroup()
  * @param fd   the output
  * @param root list of pids
  */
-static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct pid_on_target *root)
+static void ebpf_fd_sum_pids(netdata_fd_stat_t *fd, struct ebpf_pid_on_target *root)
 {
     uint32_t open_call = 0;
     uint32_t close_call = 0;

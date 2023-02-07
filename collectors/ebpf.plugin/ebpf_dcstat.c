@@ -540,7 +540,7 @@ static void ebpf_dc_read_global_table()
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct pid_on_target *root)
+void ebpf_dcstat_sum_pids(netdata_publish_dcstat_t *publish, struct ebpf_pid_on_target *root)
 {
     memset(&publish->curr, 0, sizeof(netdata_dcstat_pid_t));
     netdata_dcstat_pid_t *dst = &publish->curr;

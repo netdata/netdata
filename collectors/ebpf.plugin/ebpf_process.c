@@ -143,7 +143,7 @@ static void ebpf_process_send_data(ebpf_module_t *em)
  *
  * @return it returns the sum of all PIDs
  */
-long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t offset)
+long long ebpf_process_sum_values_for_pids(struct ebpf_pid_on_target *root, size_t offset)
 {
     long long ret = 0;
     while (root) {
@@ -604,7 +604,7 @@ static void ebpf_create_apps_charts(struct ebpf_target *root)
             continue;
 
         if (unlikely(w->processes && (debug_enabled || w->debug_enabled))) {
-            struct pid_on_target *pid_on_target;
+            struct ebpf_pid_on_target *pid_on_target;
 
             fprintf(
                 stderr, "ebpf.plugin: target '%s' has aggregated %u process%s:", w->name, w->processes,

@@ -540,7 +540,7 @@ static void ebpf_vfs_read_global_table()
  * @param swap output structure
  * @param root link list with structure to be used
  */
-static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct pid_on_target *root)
+static void ebpf_vfs_sum_pids(netdata_publish_vfs_t *vfs, struct ebpf_pid_on_target *root)
 {
     netdata_publish_vfs_t accumulator;
     memset(&accumulator, 0, sizeof(accumulator));

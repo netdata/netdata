@@ -49,7 +49,7 @@ int ebpf_read_hash_table(void *ep, int fd, uint32_t pid)
  *
  * @return
  */
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids)
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids)
 {
     size_t count = 0;
     while (pids) {
@@ -129,10 +129,10 @@ size_t zero_all_targets(struct ebpf_target *root)
         count++;
 
         if (unlikely(w->root_pid)) {
-            struct pid_on_target *pid_on_target = w->root_pid;
+            struct ebpf_pid_on_target *pid_on_target = w->root_pid;
 
             while (pid_on_target) {
-                struct pid_on_target *pid_on_target_to_free = pid_on_target;
+                struct ebpf_pid_on_target *pid_on_target_to_free = pid_on_target;
                 pid_on_target = pid_on_target->next;
                 freez(pid_on_target_to_free);
             }
@@ -1073,7 +1073,7 @@ static inline void aggregate_pid_on_target(struct ebpf_target *w, struct ebpf_pi
     }
 
     w->processes++;
-    struct pid_on_target *pid_on_target = mallocz(sizeof(struct pid_on_target));
+    struct ebpf_pid_on_target *pid_on_target = mallocz(sizeof(struct ebpf_pid_on_target));
     pid_on_target->pid = p->pid;
     pid_on_target->next = w->root_pid;
     w->root_pid = pid_on_target;

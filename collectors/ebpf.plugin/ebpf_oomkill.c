@@ -58,7 +58,7 @@ static void oomkill_write_data(int32_t *keys, uint32_t total)
     for (w = apps_groups_root_target; w != NULL; w = w->next) {
         if (likely(w->exposed && w->processes)) {
             bool was_oomkilled = false;
-            struct pid_on_target *pids = w->root_pid;
+            struct ebpf_pid_on_target *pids = w->root_pid;
             while (pids) {
                 uint32_t j;
                 for (j = 0; j < total; j++) {

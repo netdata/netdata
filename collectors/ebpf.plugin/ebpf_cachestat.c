@@ -694,7 +694,7 @@ static void cachestat_send_global(netdata_publish_cachestat_t *publish)
  * @param publish  output structure.
  * @param root     structure with listed IPs
  */
-void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct pid_on_target *root)
+void ebpf_cachestat_sum_pids(netdata_publish_cachestat_t *publish, struct ebpf_pid_on_target *root)
 {
     memcpy(&publish->prev, &publish->current,sizeof(publish->current));
     memset(&publish->current, 0, sizeof(publish->current));

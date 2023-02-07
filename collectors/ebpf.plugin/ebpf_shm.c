@@ -487,7 +487,7 @@ static void ebpf_shm_read_global_table()
 /**
  * Sum values for all targets.
  */
-static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct pid_on_target *root)
+static void ebpf_shm_sum_pids(netdata_publish_shm_t *shm, struct ebpf_pid_on_target *root)
 {
     while (root) {
         int32_t pid = root->pid;

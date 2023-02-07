@@ -69,7 +69,7 @@ struct ebpf_target {
     int starts_with; // if set, the compare string matches only the
                      // beginning of the command
 
-    struct pid_on_target *root_pid; // list of aggregated pids for target debugging
+    struct ebpf_pid_on_target *root_pid; // list of aggregated pids for target debugging
 
     struct ebpf_target *target; // the one that will be reported to netdata
     struct ebpf_target *next;
@@ -127,9 +127,9 @@ struct ebpf_pid_stat {
 //
 // - Each entry in /etc/apps_groups.conf creates a target.
 // - Each user and group used by a process in the system, creates a target.
-struct pid_on_target {
+struct ebpf_pid_on_target {
     int32_t pid;
-    struct pid_on_target *next;
+    struct ebpf_pid_on_target *next;
 };
 
 // ----------------------------------------------------------------------------
@@ -210,9 +210,9 @@ int get_pid_comm(pid_t pid, size_t n, char *dest);
 
 size_t read_processes_statistic_using_pid_on_target(ebpf_process_stat_t **ep,
                                                            int fd,
-                                                           struct pid_on_target *pids);
+                                                           struct ebpf_pid_on_target *pids);
 
-size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct pid_on_target *pids);
+size_t read_bandwidth_statistic_using_pid_on_target(ebpf_bandwidth_t **ep, int fd, struct ebpf_pid_on_target *pids);
 
 void collect_data_for_all_processes(int tbl_pid_stats_fd);
 

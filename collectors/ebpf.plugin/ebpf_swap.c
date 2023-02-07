@@ -410,7 +410,7 @@ static void ebpf_swap_read_global_table()
  * @param swap
  * @param root
  */
-static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct pid_on_target *root)
+static void ebpf_swap_sum_pids(netdata_publish_swap_t *swap, struct ebpf_pid_on_target *root)
 {
     uint64_t local_read = 0;
     uint64_t local_write = 0;
