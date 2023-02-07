@@ -608,6 +608,7 @@ bundle_protobuf() {
   [ -n "${GITHUB_ACTIONS}" ] && echo "::group::Bundling protobuf."
 
   PROTOBUF_PACKAGE_VERSION="$(cat packaging/protobuf.version)"
+  PROTOBUF_TAG="$(grep -o '[^.][^.].*$' packaging/protobuf.version)"
 
   if [ -f "${PWD}/externaldeps/protobuf/.version" ] && [ "${PROTOBUF_PACKAGE_VERSION}" = "$(cat "${PWD}/externaldeps/protobuf/.version")" ]
   then
@@ -620,7 +621,7 @@ bundle_protobuf() {
   PROTOBUF_PACKAGE_BASENAME="protobuf-cpp-${PROTOBUF_PACKAGE_VERSION}.tar.gz"
 
   if fetch_and_verify "protobuf" \
-    "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_PACKAGE_VERSION}/${PROTOBUF_PACKAGE_BASENAME}" \
+    "https://github.com/protocolbuffers/protobuf/releases/download/v${PROTOBUF_TAG}/${PROTOBUF_PACKAGE_BASENAME}" \
     "${PROTOBUF_PACKAGE_BASENAME}" \
     "${tmp}" \
     "${NETDATA_LOCAL_TARBALL_VERRIDE_PROTOBUF}"; then
