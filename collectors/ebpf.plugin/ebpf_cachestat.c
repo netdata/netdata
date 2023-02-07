@@ -521,7 +521,7 @@ static void read_apps_table()
 {
     netdata_cachestat_pid_t *cv = cachestat_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = cachestat_maps[NETDATA_CACHESTAT_PID_STATS].map_fd;
     size_t length = sizeof(netdata_cachestat_pid_t)*ebpf_nprocs;
     while (pids) {

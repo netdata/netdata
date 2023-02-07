@@ -349,9 +349,9 @@ int ebpf_read_apps_groups_conf(struct target **agdt, struct target **agrt, const
 #define MAX_NAME 100
 #define MAX_CMDLINE 16384
 
-struct pid_stat **all_pids = NULL;    // to avoid allocations, we pre-allocate the
+struct ebpf_pid_stat **all_pids = NULL;    // to avoid allocations, we pre-allocate the
                                       // the entire pid space.
-struct pid_stat *root_of_pids = NULL; // global list of all processes running
+struct ebpf_pid_stat *ebpf_root_of_pids = NULL; // global list of all processes running
 
 size_t all_pids_count = 0; // the number of processes running
 
@@ -416,7 +416,7 @@ static inline void debug_log_dummy(void)
  *
  * @return It returns the status value.
  */
-static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
+static inline int managed_log(struct ebpf_pid_stat *p, uint32_t log, int status)
 {
     if (unlikely(!status)) {
         // error("command failed log %u, errno %d", log, errno);
@@ -476,18 +476,18 @@ static inline int managed_log(struct pid_stat *p, uint32_t log, int status)
  *
  * @return It returns the pid entry structure
  */
-static inline struct pid_stat *get_pid_entry(pid_t pid)
+static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
 {
     if (unlikely(all_pids[pid]))
         return all_pids[pid];
 
-    struct pid_stat *p = callocz(1, sizeof(struct pid_stat));
+    struct ebpf_pid_stat *p = callocz(1, sizeof(struct ebpf_pid_stat));
 
-    if (likely(root_of_pids))
-        root_of_pids->prev = p;
+    if (likely(ebpf_root_of_pids))
+        ebpf_root_of_pids->prev = p;
 
-    p->next = root_of_pids;
-    root_of_pids = p;
+    p->next = ebpf_root_of_pids;
+    ebpf_root_of_pids = p;
 
     p->pid = pid;
 
@@ -502,7 +502,7 @@ static inline struct pid_stat *get_pid_entry(pid_t pid)
  *
  * @param p the pid_stat structure to assign for a target.
  */
-static inline void assign_target_to_pid(struct pid_stat *p)
+static inline void assign_target_to_pid(struct ebpf_pid_stat *p)
 {
     targets_assignment_counter++;
 
@@ -543,11 +543,11 @@ static inline void assign_target_to_pid(struct pid_stat *p)
 /**
  * Read cmd line from /proc/PID/cmdline
  *
- * @param p  the pid_stat_structure.
+ * @param p  the ebpf_pid_stat_structure.
  *
  * @return It returns 1 on success and 0 otherwise.
  */
-static inline int read_proc_pid_cmdline(struct pid_stat *p)
+static inline int read_proc_pid_cmdline(struct ebpf_pid_stat *p)
 {
     static char cmdline[MAX_CMDLINE + 1];
 
@@ -596,7 +596,7 @@ cleanup:
  * @param p the pid stat structure to store the data.
  * @param ptr an useless argument.
  */
-static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr)
+static inline int read_proc_pid_stat(struct ebpf_pid_stat *p, void *ptr)
 {
     UNUSED(ptr);
 
@@ -673,7 +673,7 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
         return 0;
     }
 
-    struct pid_stat *p = get_pid_entry(pid);
+    struct ebpf_pid_stat *p = get_pid_entry(pid);
     if (unlikely(!p || p->read))
         return 0;
     p->read = 1;
@@ -701,11 +701,11 @@ static inline int collect_data_for_pid(pid_t pid, void *ptr)
  */
 static inline void link_all_processes_to_their_parents(void)
 {
-    struct pid_stat *p, *pp;
+    struct ebpf_pid_stat *p, *pp;
 
     // link all children to their parents
     // and update children count on parents
-    for (p = root_of_pids; p; p = p->next) {
+    for (p = ebpf_root_of_pids; p; p = p->next) {
         // for each process found
 
         p->sortlist = 0;
@@ -738,7 +738,7 @@ static inline void link_all_processes_to_their_parents(void)
  */
 static void apply_apps_groups_targets_inheritance(void)
 {
-    struct pid_stat *p = NULL;
+    struct ebpf_pid_stat *p = NULL;
 
     // children that do not have a target
     // inherit their target from their parent
@@ -747,7 +747,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             // if this process does not have a target
             // and it has a parent
             // and its parent has a target
@@ -773,7 +773,7 @@ static void apply_apps_groups_targets_inheritance(void)
             loops++;
         found = 0;
 
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             if (unlikely(!p->sortlist && !p->children_count))
                 p->sortlist = sortlist++;
 
@@ -819,7 +819,7 @@ static void apply_apps_groups_targets_inheritance(void)
     // give a default target on all top level processes
     if (unlikely(debug_enabled))
         loops++;
-    for (p = root_of_pids; p; p = p->next) {
+    for (p = ebpf_root_of_pids; p; p = p->next) {
         // if the process is not merged itself
         // then is is a top level process
         if (unlikely(!p->merged && !p->target))
@@ -839,7 +839,7 @@ static void apply_apps_groups_targets_inheritance(void)
         if (unlikely(debug_enabled))
             loops++;
         found = 0;
-        for (p = root_of_pids; p; p = p->next) {
+        for (p = ebpf_root_of_pids; p; p = p->next) {
             if (unlikely(!p->target && p->merged && p->parent && p->parent->target)) {
                 p->target = p->parent->target;
                 found++;
@@ -881,7 +881,7 @@ static inline void post_aggregate_targets(struct target *root)
  */
 static inline void del_pid_entry(pid_t pid)
 {
-    struct pid_stat *p = all_pids[pid];
+    struct ebpf_pid_stat *p = all_pids[pid];
 
     if (unlikely(!p)) {
         error("attempted to free pid %d that is not allocated.", pid);
@@ -890,8 +890,8 @@ static inline void del_pid_entry(pid_t pid)
 
     debug_log("process %d %s exited, deleting it.", pid, p->comm);
 
-    if (root_of_pids == p)
-        root_of_pids = p->next;
+    if (ebpf_root_of_pids == p)
+        ebpf_root_of_pids = p->next;
 
     if (p->next)
         p->next->prev = p->prev;
@@ -921,7 +921,7 @@ static inline void del_pid_entry(pid_t pid)
  */
 int get_pid_comm(pid_t pid, size_t n, char *dest)
 {
-    struct pid_stat *stat;
+    struct ebpf_pid_stat *stat;
 
     stat = all_pids[pid];
     if (unlikely(stat == NULL)) {
@@ -991,9 +991,9 @@ void cleanup_variables_from_other_threads(uint32_t pid)
  */
 void cleanup_exited_pids()
 {
-    struct pid_stat *p = NULL;
+    struct ebpf_pid_stat *p = NULL;
 
-    for (p = root_of_pids; p;) {
+    for (p = ebpf_root_of_pids; p;) {
         if (!p->updated && (!p->keep || p->keeploops > 0)) {
             if (unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, p->comm);
@@ -1060,7 +1060,7 @@ static inline void read_proc_filesystem()
  * @param p the pid with information to update
  * @param o never used
  */
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o)
+static inline void aggregate_pid_on_target(struct target *w, struct ebpf_pid_stat *p, struct target *o)
 {
     UNUSED(o);
 
@@ -1094,7 +1094,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
     if (unlikely(!all_pids))
         return;
 
-    struct pid_stat *pids = root_of_pids; // global list of all processes running
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids; // global list of all processes running
     while (pids) {
         if (pids->updated_twice) {
             pids->read = 0; // mark it as not read, so that collect_data_for_pid() will read it
@@ -1113,7 +1113,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
     read_proc_filesystem();
 
     uint32_t key;
-    pids = root_of_pids; // global list of all processes running
+    pids = ebpf_root_of_pids; // global list of all processes running
     // while (bpf_map_get_next_key(tbl_pid_stats_fd, &key, &next_key) == 0) {
     while (pids) {
         key = pids->pid;
@@ -1148,7 +1148,7 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
 
     // this has to be done, before the cleanup
     // // concentrate everything on the targets
-    for (pids = root_of_pids; pids; pids = pids->next)
+    for (pids = ebpf_root_of_pids; pids; pids = pids->next)
         aggregate_pid_on_target(pids->target, pids, NULL);
 
     post_aggregate_targets(apps_groups_root_target);

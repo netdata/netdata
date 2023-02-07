@@ -341,7 +341,7 @@ static void read_apps_table()
 {
     netdata_publish_swap_t *cv = swap_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int fd = swap_maps[NETDATA_PID_SWAP_TABLE].map_fd;
     size_t length = sizeof(netdata_publish_swap_t)*ebpf_nprocs;
     while (pids) {

@@ -166,7 +166,7 @@ long long ebpf_process_sum_values_for_pids(struct pid_on_target *root, size_t of
  */
 void ebpf_process_remove_pids()
 {
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     int pid_fd = process_maps[NETDATA_PROCESS_PID_TABLE].map_fd;
     while (pids) {
         uint32_t pid = pids->pid;
@@ -288,7 +288,7 @@ static void read_hash_global_tables()
  */
 static void ebpf_process_update_apps_data()
 {
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     while (pids) {
         uint32_t current_pid = pids->pid;
         ebpf_process_stat_t *ps = global_process_stats[current_pid];

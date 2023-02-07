@@ -787,7 +787,7 @@ static void vfs_fill_pid(uint32_t current_pid, netdata_publish_vfs_t *publish)
  */
 static void ebpf_vfs_read_apps()
 {
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     netdata_publish_vfs_t *vv = vfs_vector;
     int fd = vfs_maps[NETDATA_VFS_PID].map_fd;
     size_t length = sizeof(netdata_publish_vfs_t) * ebpf_nprocs;

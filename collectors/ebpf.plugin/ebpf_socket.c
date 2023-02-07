@@ -2275,7 +2275,7 @@ static void ebpf_socket_update_apps_data()
     int fd = socket_maps[NETDATA_SOCKET_TABLE_BANDWIDTH].map_fd;
     ebpf_bandwidth_t *eb = bandwidth_vector;
     uint32_t key;
-    struct pid_stat *pids = root_of_pids;
+    struct ebpf_pid_stat *pids = ebpf_root_of_pids;
     while (pids) {
         key = pids->pid;
 
