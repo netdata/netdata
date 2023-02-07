@@ -2084,7 +2084,6 @@ struct timing_steps {
         [TIMING_STEP_PROPAGATE] = { .name = "propagate", .time = 0, },
         [TIMING_STEP_RRDSET_STORE] = { .name = "rrdset store", .time = 0, },
         [TIMING_STEP_DBENGINE_FIRST_CHECK] = { .name = "db 1st check", .time = 0, },
-        [TIMING_STEP_DBENGINE_ALIGNMENT] = { .name = "db align", .time = 0, },
         [TIMING_STEP_DBENGINE_CHECK_DATA] = { .name = "db check data", .time = 0, },
         [TIMING_STEP_DBENGINE_PACK] = { .name = "db pack", .time = 0, },
         [TIMING_STEP_DBENGINE_PAGE_FIN] = { .name = "db page fin", .time = 0, },

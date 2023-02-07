@@ -424,57 +424,38 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
     timing_step(TIMING_STEP_DBENGINE_CREATE_NEW_PAGE);
 }
 
+static size_t aligned_allocation_entries(size_t max_slots, size_t target_slot, time_t now_s) {
+    size_t slots = target_slot;
+    size_t pos = (now_s % max_slots);
+
+    if(pos > slots)
+        slots += max_slots - pos;
+
+    else if(pos < slots)
+        slots -= pos;
+
+    else
+        slots = max_slots;
+
+    return slots;
+}
+
 static void *rrdeng_alloc_new_metric_data(struct rrdeng_collect_handle *handle, size_t *data_size, usec_t point_in_time_ut) {
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
-    size_t size;
 
-    if(handle->options & RRDENG_FIRST_PAGE_ALLOCATED) {
-        // any page except the first
-        size = tier_page_size[ctx->config.tier];
-    }
-    else {
-        size_t final_slots = 0;
+    size_t max_size = tier_page_size[ctx->config.tier];
+    size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
 
-        // the first page
-        handle->options |= RRDENG_FIRST_PAGE_ALLOCATED;
-        size_t max_size = tier_page_size[ctx->config.tier];
-        size_t max_slots = max_size / CTX_POINT_SIZE_BYTES(ctx);
+    size_t slots = 3 + aligned_allocation_entries(
+            max_slots - 3,
+            indexing_partition((Word_t) handle->alignment, max_slots - 3),
+            (time_t) (point_in_time_ut / USEC_PER_SEC)
+    );
 
-        if(handle->alignment->initial_slots) {
-            final_slots = handle->alignment->initial_slots;
-        }
-        else {
-            max_slots -= 3;
+    size_t size = slots * CTX_POINT_SIZE_BYTES(ctx);
 
-            size_t smaller_slot = indexing_partition((Word_t)handle->alignment, max_slots);
-            final_slots = smaller_slot;
-
-            time_t now_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
-            size_t current_pos = (now_s % max_slots);
-
-            if(current_pos > final_slots)
-                final_slots += max_slots - current_pos;
-
-            else if(current_pos < final_slots)
-                final_slots -= current_pos;
-
-            if(final_slots < 3) {
-                final_slots += 3;
-                smaller_slot += 3;
-
-                if(smaller_slot >= max_slots)
-                    smaller_slot -= max_slots;
-            }
-
-            max_slots += 3;
-            handle->alignment->initial_slots = smaller_slot + 3;
-
-            internal_fatal(handle->alignment->initial_slots < 3 || handle->alignment->initial_slots >= max_slots, "ooops! wrong distribution of metrics across time");
-            internal_fatal(final_slots < 3 || final_slots >= max_slots, "ooops! wrong distribution of metrics across time");
-        }
-
-        size = final_slots * CTX_POINT_SIZE_BYTES(ctx);
-    }
+    internal_fatal(slots < 3 || slots > max_slots, "ooops! wrong distribution of metrics across time");
+    internal_fatal(size > tier_page_size[ctx->config.tier] || size < CTX_POINT_SIZE_BYTES(ctx) * 2, "ooops! wrong page size");
 
     *data_size = size;
     void *d = dbengine_page_alloc(size);
@@ -495,29 +476,6 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
 {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)collection_handle;
     struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
-
-    bool perfect_page_alignment = false;
-
-    if(likely(handle->page)) {
-        /* Make alignment decisions */
-        if (likely(handle->page_position == handle->alignment->page_position)) {
-            /* this is the leading dimension that defines chart alignment */
-            perfect_page_alignment = true;
-        }
-        else if (unlikely(handle->page_position + 1 < handle->alignment->page_position))
-            /* is the metric far enough out of alignment with the others? */
-            handle->options |= RRDENG_CHO_UNALIGNED;
-
-        if (unlikely((handle->options & RRDENG_CHO_UNALIGNED) &&
-                     /* did the other metrics change page? */
-                     handle->alignment->page_position <= 1)) {
-            handle->options &= ~RRDENG_CHO_UNALIGNED;
-            handle->page_flags |= RRDENG_PAGE_UNALIGNED;
-            rrdeng_store_metric_flush_current_page(collection_handle);
-        }
-    }
-
-    timing_step(TIMING_STEP_DBENGINE_ALIGNMENT);
 
     if(unlikely(!handle->data))
         handle->data = rrdeng_alloc_new_metric_data(handle, &handle->data_size, point_in_time_ut);
@@ -546,11 +504,6 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
     if(unlikely(!handle->page)){
         rrdeng_store_metric_create_new_page(handle, ctx, point_in_time_ut, handle->data, handle->data_size);
         // handle->position is set to 1 already
-
-        if (0 == handle->alignment->page_position) {
-            /* this is the leading dimension that defines chart alignment */
-            perfect_page_alignment = true;
-        }
     }
     else {
         // update an existing page
@@ -563,9 +516,6 @@ static void rrdeng_store_metric_append_point(STORAGE_COLLECT_HANDLE *collection_
             rrdeng_store_metric_flush_current_page(collection_handle);
         }
     }
-
-    if (perfect_page_alignment)
-        handle->alignment->page_position = handle->page_position;
 
     timing_step(TIMING_STEP_DBENGINE_PAGE_FIN);
 
