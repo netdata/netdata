@@ -222,11 +222,8 @@ configure any of these collectors according to your setup and infrastructure.
   usage, jobs rates, commands, and more.
 - [Pulsar](https://github.com/netdata/go.d.plugin/blob/master/modules/pulsar/README.md): Collect summary,
   namespaces, and topics performance statistics.
-- [RabbitMQ (Go)](https://github.com/netdata/go.d.plugin/blob/master/modules/rabbitmq/README.md): Collect message
+- [RabbitMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/rabbitmq/README.md): Collect message
   broker overview, system and per virtual host metrics.
-- [RabbitMQ (Python)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rabbitmq/README.md):
-  Collect message broker global and per virtual
-  host metrics.
 - [VerneMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/vernemq/README.md): Monitor MQTT broker
   health and performance metrics. It collects all available info for both MQTTv3 and v5 communication
 
