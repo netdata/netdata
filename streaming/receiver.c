@@ -736,7 +736,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
                     .enabled = true,
             },
             .started_t = now_realtime_sec(),
-            .next = NULL,
             .capabilities = 0,
     };
 

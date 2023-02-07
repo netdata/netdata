@@ -60,6 +60,7 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
+    RRDHOST *host;                      // the host the plugin collects data for
     int update_every;                   // the plugin default data collection frequency
 
     struct {
@@ -72,6 +73,8 @@ struct plugind {
 
     time_t started_t;
     uint32_t capabilities;              // follows the same principles as streaming capabilities
+
+    struct plugind *prev;
     struct plugind *next;
 };
 
