@@ -65,7 +65,6 @@ include memcached/Makefile.inc
 include monit/Makefile.inc
 include nvidia_smi/Makefile.inc
 include nsd/Makefile.inc
-include ntpd/Makefile.inc
 include openldap/Makefile.inc
 include oracledb/Makefile.inc
 include pandas/Makefile.inc
