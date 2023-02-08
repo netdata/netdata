@@ -29,6 +29,16 @@ static inline uint32_t djb2_hash32(const char* name) {
     return hash;
 }
 
+static inline uint32_t small_hash32(const char *name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 0;
+    while (*s) {
+        hash += hash << 5;
+        hash ^= (uint32_t) *s++;
+    }
+    return hash;
+}
+
 // https://stackoverflow.com/a/107657
 static inline uint32_t larson_hash32(const char *name) {
     unsigned char *s = (unsigned char *) name;

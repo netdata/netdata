@@ -6,13 +6,16 @@
 #include "../libnetdata.h"
 
 #define WORKER_PARSER_FIRST_JOB 3
-#define PARSER_KEYWORDS_HASHTABLE_SIZE 80 // unittest finds this magic number
+#define PARSER_KEYWORDS_HASHTABLE_SIZE 56 // unittest finds this magic number
 
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
-//#define parser_hash_function(s) djb2_hash(s)
-#define parser_hash_function(s) simple_hash(s)
+//#define parser_hash_function(s) djb2_hash32(s)
+//#define parser_hash_function(s) fnv1_hash32(s)
+//#define parser_hash_function(s) fnv1a_hash32(s)
+//#define parser_hash_function(s) larson_hash32(s)
+#define parser_hash_function(s) small_hash32(s)
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
