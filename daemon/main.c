@@ -1317,7 +1317,7 @@ void post_conf_load(char **user)
 int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
-int parser_unittest(void);
+int pluginsd_parser_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1438,7 +1438,7 @@ int main(int argc, char **argv) {
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
 
-                            if (parser_unittest())
+                            if (pluginsd_parser_unittest())
                                 return 1;
 
                             if (unit_test_static_threads())

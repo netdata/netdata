@@ -3,10 +3,9 @@
 #ifndef NETDATA_INCREMENTAL_PARSER_H
 #define NETDATA_INCREMENTAL_PARSER_H 1
 
-#include "daemon/common.h"
+#include "../libnetdata.h"
 
 #define PARSER_MAX_CALLBACKS 1
-#define PARSER_MAX_RECOVER_KEYWORDS 128
 #define WORKER_PARSER_FIRST_JOB 3
 #define PARSER_KEYWORDS_HASHTABLE_SIZE 40
 
@@ -22,9 +21,7 @@ typedef enum __attribute__ ((__packed__)) parser_rc {
 
 typedef enum __attribute__ ((__packed__)) parser_input_type {
     PARSER_INPUT_SPLIT          = (1 << 1),
-    PARSER_INIT_PLUGINSD        = (1 << 2),
-    PARSER_INIT_STREAMING       = (1 << 3),
-    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 4),
+    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 2),
 } PARSER_INPUT_TYPE;
 
 typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data);
@@ -50,7 +47,6 @@ typedef void (*parser_cleanup_t)(void *user);
 typedef struct parser {
     size_t worker_job_next_id;
     uint8_t version;                // Parser version
-    RRDHOST *host;
     int fd;                         // Socket
     FILE *fp_input;                 // Input source e.g. stream
     FILE *fp_output;                // Stream to send commands to plugin
@@ -79,7 +75,7 @@ typedef struct parser {
     } inflight;
 } PARSER;
 
-PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
+PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser, char *buffer, size_t buffer_size);
 int parser_action(PARSER *working_parser, char *input);
@@ -109,7 +105,5 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_end_v2(char **words, size_t num_words, void *user);
 void pluginsd_cleanup_v2(void *user);
-
-int parser_unittest(void);
 
 #endif

@@ -547,6 +547,7 @@ extern char *netdata_configured_host_prefix;
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
+#include "parser/parser.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"

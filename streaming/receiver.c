@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "parser/parser.h"
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
@@ -347,8 +346,10 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, streaming_parser_cleanup, NULL, NULL, fd,
-                                 PARSER_INPUT_SPLIT | PARSER_INIT_STREAMING, ssl);
+    PARSER *parser = parser_init(&user, streaming_parser_cleanup, NULL, NULL, fd,
+                                 PARSER_INPUT_SPLIT, ssl);
+
+    pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
     rrd_collector_started();
 

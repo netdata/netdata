@@ -1695,8 +1695,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     };
 
     // fp_plugin_output = our input; fp_plugin_input = our output
-    PARSER *parser = parser_init(host, &user, NULL, fp_plugin_output, fp_plugin_input, -1,
-                                 PARSER_INPUT_SPLIT | PARSER_INIT_PLUGINSD, NULL);
+    PARSER *parser = parser_init(&user, NULL, fp_plugin_output, fp_plugin_input, -1,
+                                 PARSER_INPUT_SPLIT, NULL);
+
+    pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
 
     rrd_collector_started();
 
@@ -1726,4 +1728,63 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
         cd->serial_failures++;
 
     return count;
+}
+
+void pluginsd_keywords_init(PARSER *parser, PLUGINSD_KEYWORDS types) {
+
+    if (types & PARSER_INIT_PLUGINSD) {
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
+    }
+
+    if (types & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {
+        // plugins.d plugins and streaming
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL,          pluginsd_label);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE,      pluginsd_overwrite);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT,  pluginsd_clabel_commit);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
+
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
+
+        inflight_functions_init(parser);
+    }
+
+    if (types & PARSER_INIT_STREAMING) {
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
+
+        // replication
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
+
+        // streaming metrics v2
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN_V2,            pluginsd_begin_v2);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET_V2,              pluginsd_set_v2);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END_V2,              pluginsd_end_v2);
+    }
+}
+
+int pluginsd_parser_unittest(void) {
+    PARSER *p;
+
+    // check for hashtable collisions
+
+    p = parser_init(NULL, NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD);
+    parser_destroy(p);
+
+    p = parser_init(NULL, NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(p, PARSER_INIT_STREAMING);
+    parser_destroy(p);
+
+    return 0;
 }

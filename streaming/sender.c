@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "parser/parser.h"
 
 #define WORKER_SENDER_JOB_CONNECT                    0
 #define WORKER_SENDER_JOB_PIPE_READ                  1

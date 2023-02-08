@@ -28,7 +28,7 @@ static inline int find_first_keyword(const char *src, char *dst, int dst_size, i
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd,
+PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd,
                     PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
@@ -43,47 +43,7 @@ PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE
     parser->ssl_output = ssl;
 #endif
     parser->flags = flags;
-    parser->host = host;
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
-    inflight_functions_init(parser);
-
-    if (flags & PARSER_INIT_PLUGINSD) {
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
-    }
-
-    if (flags & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {
-        // plugins.d plugins and streaming
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL,          pluginsd_label);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE,      pluginsd_overwrite);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT,  pluginsd_clabel_commit);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
-
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
-    }
-
-    if (flags & PARSER_INIT_STREAMING) {
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
-
-        // replication
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_begin);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
-
-        // streaming metrics v2
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN_V2,            pluginsd_begin_v2);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET_V2,              pluginsd_set_v2);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_END_V2,              pluginsd_end_v2);
-    }
 
     return parser;
 }
@@ -122,15 +82,15 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     if(t) {
         for(int i = 0; i < t->func_no ;i++) {
             if (t->functions_array[i] == func) {
-                error("PLUGINSD: 'host:%s', duplicate definition of the same function for keyword '%s'",
-                      rrdhost_hostname(parser->host), keyword);
+                error("PARSER: duplicate definition of the same function for keyword '%s'",
+                      keyword);
                 return i;
             }
         }
 
         if (t->func_no == PARSER_MAX_CALLBACKS) {
-            error("PLUGINSD: 'host:%s', maximum number of callbacks reached on keyword '%s'",
-                  rrdhost_hostname(parser->host), keyword);
+            error("PARSER: maximum number of callbacks reached on keyword '%s'",
+                  keyword);
             return 0;
         }
 
@@ -147,7 +107,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
 
     if(parser->keywords.hashtable[slot])
-        fatal("PLUGINSD: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
+        fatal("PARSER: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
               "Change the hashtable size.",
               parser->keywords.hashtable[slot]->keyword,
               parser->keywords.hashtable[slot]->hash,
@@ -201,13 +161,13 @@ int parser_next(PARSER *parser, char *buffer, size_t buffer_size)
 
     if (unlikely(!tmp)) {
         if (feof((FILE *)parser->fp_input))
-            error("PLUGINSD: 'host:%s', read failed: end of file", rrdhost_hostname(parser->host));
+            error("PARSER: read failed: end of file");
 
         else if (ferror((FILE *)parser->fp_input))
-            error("PLUGINSD: 'host:%s', read failed: input error", rrdhost_hostname(parser->host));
+            error("PARSER: read failed: input error");
 
         else
-            error("PLUGINSD: 'host:%s', read failed: unknown error", rrdhost_hostname(parser->host));
+            error("PARSER: read failed: unknown error");
 
         return 1;
     }
@@ -301,19 +261,4 @@ inline int parser_action(PARSER *parser, char *input)
 #endif
 
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
-}
-
-
-int parser_unittest(void) {
-    PARSER *p;
-
-    // check for hashtable collisions
-
-    p = parser_init(NULL, NULL, NULL, NULL, NULL, -1, PARSER_INIT_PLUGINSD, NULL);
-    parser_destroy(p);
-
-    p = parser_init(NULL, NULL, NULL, NULL, NULL, -1, PARSER_INIT_STREAMING, NULL);
-    parser_destroy(p);
-
-    return 0;
 }
