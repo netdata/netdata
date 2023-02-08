@@ -93,6 +93,15 @@ DICTIONARY *rrdvariables_create(void) {
     return dict;
 }
 
+DICTIONARY *health_rrdvariables_create(void) {
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_rrdhealth, 0);
+
+    dictionary_register_insert_callback(dict, rrdvar_insert_callback, NULL);
+    dictionary_register_delete_callback(dict, rrdvar_delete_callback, NULL);
+
+    return dict;
+}
+
 void rrdvariables_destroy(DICTIONARY *dict) {
     dictionary_destroy(dict);
 }
@@ -122,6 +131,19 @@ inline const RRDVAR_ACQUIRED *rrdvar_add_and_acquire(const char *scope __maybe_u
         .react_action = RRDVAR_REACT_NONE,
     };
     return (const RRDVAR_ACQUIRED *)dictionary_set_and_acquire_item_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
+}
+
+inline void rrdvar_add(const char *scope __maybe_unused, DICTIONARY *dict, STRING *name, RRDVAR_TYPE type, RRDVAR_FLAGS options, void *value) {
+    if(unlikely(!dict || !name)) return;
+
+    struct rrdvar_constructor tmp = {
+        .name = name,
+        .value = value,
+        .type = type,
+        .options = options,
+        .react_action = RRDVAR_REACT_NONE,
+    };
+    dictionary_set_advanced(dict, string2str(name), (ssize_t)string_strlen(name) + 1, NULL, sizeof(RRDVAR), &tmp);
 }
 
 void rrdvar_delete_all(DICTIONARY *dict) {
@@ -209,6 +231,52 @@ NETDATA_DOUBLE rrdvar2number(const RRDVAR_ACQUIRED *rva) {
             error("I don't know how to convert RRDVAR type %u to NETDATA_DOUBLE", rv->type);
             return NAN;
     }
+}
+
+int health_variable_check(DICTIONARY *dict, RRDSET *st, RRDDIM *rd) {
+    if (!dict || !st || !rd) return 0;
+
+    STRING *helper_str;
+    char helper[RRDVAR_MAX_LENGTH + 1];
+    snprintfz(helper, RRDVAR_MAX_LENGTH, "%s.%s", string2str(st->name), string2str(rd->name));
+    helper_str = string_strdupz(helper);
+
+    const RRDVAR_ACQUIRED *rva;
+    rva = rrdvar_get_and_acquire(dict, helper_str);
+    if(rva) {
+        dictionary_acquired_item_release(dict, (const DICTIONARY_ITEM *)rva);
+        string_freez(helper_str);
+        return 1;
+    }
+
+    string_freez(helper_str);
+
+    return 0;
+}
+
+void rrdvar_store_for_chart(RRDHOST *host, RRDSET *st) {
+    if (!st) return;
+
+    if(!st->rrdfamily)
+        st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
+
+    if(!st->rrdvars)
+        st->rrdvars = rrdvariables_create();
+
+    rrddimvar_index_init(st);
+
+    rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+    rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
+    rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
+    rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
+
+    RRDDIM *rd;
+    rrddim_foreach_read(rd, st) {
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
+        rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
+    }
+    rrddim_foreach_done(rd);
 }
 
 int health_variable_lookup(STRING *variable, RRDCALC *rc, NETDATA_DOUBLE *result) {

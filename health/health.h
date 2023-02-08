@@ -32,6 +32,7 @@ extern unsigned int default_health_enabled;
 
 extern char *silencers_filename;
 extern SIMPLE_PATTERN *conf_enabled_alarms;
+extern DICTIONARY *health_rrdvars;
 
 void health_init(void);
 
