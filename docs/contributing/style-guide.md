@@ -378,9 +378,9 @@ this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of th
 the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
 
 For example, here is the frontmatter for the guide
-about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/docs/guides/deploy/ansible.md).
+about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md).
 
-
+<img width="751" alt="image" src="https://user-images.githubusercontent.com/43294513/217607958-ef0f270d-7947-4d91-a9a5-56b17b4255ee.png">
 
 Questions about frontmatter in
 documentation? [Ask on our community forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).

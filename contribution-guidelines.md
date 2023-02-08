@@ -685,21 +685,11 @@ Some documents, like the Ansible guide and others in the `/docs/guides` folder, 
 this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of the path to the document in question. End
 the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
 
-For example, here is the frontmatter for the guide about [deploying the Netdata Agent with
-Ansible](https://github.com/netdata/netdata/blob/master/docs/guides/deploy/ansible.md).
+For example, here is the frontmatter for the guide
+about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md).
 
-```markdown
-<!--
-title: Deploy Netdata with Ansible
-description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
-image: /img/seo/guides/deploy/ansible.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/deploy/ansible.md
--->
+<img width="751" alt="image" src="https://user-images.githubusercontent.com/43294513/217607958-ef0f270d-7947-4d91-a9a5-56b17b4255ee.png">
 
-# Deploy Netdata with Ansible
-
-...
-```
 
 Questions about frontmatter in documentation? [Ask on our community
 forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
