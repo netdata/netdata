@@ -1949,11 +1949,11 @@ static struct {
     uint32_t (*hash)(const char *s);
     size_t slots_needed;
 } hashers[] = {
-    { .name = "djb2_hash32(s)", djb2_hash32, .slots_needed = 0, },
-    { .name = "fnv1_hash32(s)", fnv1_hash32, .slots_needed = 0, },
-    { .name = "fnv1a_hash32(s)", fnv1a_hash32, .slots_needed = 0, },
-    { .name = "larson_hash32(s)", larson_hash32, .slots_needed = 0, },
-    { .name = "small_hash32(s)", small_hash32, .slots_needed = 0, },
+    { .name = "djb2_hash32(s)",            djb2_hash32, .slots_needed = 0, },
+    { .name = "fnv1_hash32(s)",            fnv1_hash32, .slots_needed = 0, },
+    { .name = "fnv1a_hash32(s)",           fnv1a_hash32, .slots_needed = 0, },
+    { .name = "larson_hash32(s)",          larson_hash32, .slots_needed = 0, },
+    { .name = "pluginsd_parser_hash32(s)", pluginsd_parser_hash32, .slots_needed = 0, },
 
     // terminator
     { .name = NULL, NULL, .slots_needed = 0, },

@@ -15,7 +15,7 @@
 //#define parser_hash_function(s) fnv1_hash32(s)
 //#define parser_hash_function(s) fnv1a_hash32(s)
 //#define parser_hash_function(s) larson_hash32(s)
-#define parser_hash_function(s) small_hash32(s)
+#define parser_hash_function(s) pluginsd_parser_hash32(s)
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {

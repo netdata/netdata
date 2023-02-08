@@ -51,7 +51,12 @@ PARSER *parser_init(void *user, FILE *fp_input, FILE *fp_output, int fd,
 static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *command) {
     uint32_t hash = parser_hash_function(command);
     uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
-    return parser->keywords.hashtable[slot];
+    PARSER_KEYWORD *t = parser->keywords.hashtable[slot];
+
+    if(likely(t && strcmp(t->keyword, command) == 0))
+        return t;
+
+    return NULL;
 }
 
 /*
