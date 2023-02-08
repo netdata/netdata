@@ -1695,7 +1695,8 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     };
 
     // fp_plugin_output = our input; fp_plugin_input = our output
-    PARSER *parser = parser_init(host, &user, NULL, fp_plugin_output, fp_plugin_input, -1, PARSER_INPUT_SPLIT, NULL);
+    PARSER *parser = parser_init(host, &user, NULL, fp_plugin_output, fp_plugin_input, -1,
+                                 PARSER_INPUT_SPLIT | PARSER_INIT_PLUGINSD, NULL);
 
     rrd_collector_started();
 

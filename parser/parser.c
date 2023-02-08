@@ -29,7 +29,8 @@ inline int find_first_keyword(const char *str, char *keyword, int max_size, int 
  * 
  */
 
-PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
+PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd,
+                    PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
@@ -47,35 +48,39 @@ PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE
     parser->worker_job_next_id = WORKER_PARSER_FIRST_JOB;
     inflight_functions_init(parser);
 
-#ifdef ENABLE_HTTPS
-    parser->bytesleft = 0;
-    parser->readfrom = NULL;
-#endif
-
-    if (unlikely(!(flags & PARSER_NO_PARSE_INIT))) {
+    if (flags & PARSER_INIT_PLUGINSD) {
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FLUSH,          pluginsd_flush);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_DISABLE,        pluginsd_disable);
+    }
+
+    if (flags & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {
+        // plugins.d plugins and streaming
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART,          pluginsd_chart);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_DIMENSION,      pluginsd_dimension);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_VARIABLE,       pluginsd_variable);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_LABEL,          pluginsd_label);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_OVERWRITE,      pluginsd_overwrite);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT,  pluginsd_clabel_commit);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_CLABEL,         pluginsd_clabel);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
-
-        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,              pluginsd_function);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION,       pluginsd_function);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
 
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN,          pluginsd_begin);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_SET,            pluginsd_set);
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_END,            pluginsd_end);
+    }
+
+    if (flags & PARSER_INIT_STREAMING) {
+        parser_add_keyword(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
+
+        // replication
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN,        pluginsd_replay_begin);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_SET,          pluginsd_replay_set);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_REPLAY_END,          pluginsd_replay_end);
 
+        // streaming metrics v2
         parser_add_keyword(parser, PLUGINSD_KEYWORD_BEGIN_V2,            pluginsd_begin_v2);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_SET_V2,              pluginsd_set_v2);
         parser_add_keyword(parser, PLUGINSD_KEYWORD_END_V2,              pluginsd_end_v2);
@@ -110,6 +115,32 @@ int parser_push(PARSER *parser, char *line)
     return 0;
 }
 
+uint32_t djdb2_hash(const char* str) {
+    unsigned int hash = 5381;
+    char c;
+
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+}
+
+
+static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *command) {
+    uint32_t hash = djdb2_hash(command);
+    uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
+    PARSER_KEYWORD *t = parser->keywords.hashtable[slot];
+
+    while(t) {
+        if (hash == t->hash && (!strcmp(command, t->keyword)))
+            return t;
+
+        t = t->next;
+    }
+
+    return NULL;
+}
+
 /*
  * Add a keyword and the corresponding function that will be called
  * Multiple functions may be added
@@ -122,49 +153,64 @@ int parser_push(PARSER *parser, char *line)
 
 int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
 {
-    PARSER_KEYWORD  *tmp_keyword;
-
     if (strcmp(keyword, "_read") == 0) {
-        parser->read_function = (void *) func;
+        parser->keywords.read_function = (void *) func;
         return 0;
     }
 
     if (strcmp(keyword, "_eof") == 0) {
-        parser->eof_function = (void *) func;
+        parser->keywords.eof_function = (void *) func;
         return 0;
     }
 
     if (strcmp(keyword, "_unknown") == 0) {
-        parser->unknown_function = (void *) func;
+        parser->keywords.unknown_function = (void *) func;
         return 0;
     }
 
-    uint32_t    keyword_hash = simple_hash(keyword);
-
-    tmp_keyword = parser->keyword;
-
-    while (tmp_keyword) {
-        if (tmp_keyword->keyword_hash == keyword_hash && (!strcmp(tmp_keyword->keyword, keyword))) {
-                if (tmp_keyword->func_no == PARSER_MAX_CALLBACKS)
-                    return 0;
-                tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
-                return tmp_keyword->func_no;
+    PARSER_KEYWORD *t = parser_find_keyword(parser, keyword);
+    if(t) {
+        for(int i = 0; i < t->func_no ;i++) {
+            if (t->func[i] == func) {
+                error("PLUGINSD: 'host:%s', duplicate definition of the same function for keyword '%s'",
+                      rrdhost_hostname(parser->host), keyword);
+                return i;
+            }
         }
-        tmp_keyword = tmp_keyword->next;
+
+        if (t->func_no == PARSER_MAX_CALLBACKS) {
+            error("PLUGINSD: 'host:%s', maximum number of callbacks reached on keyword '%s'",
+                  rrdhost_hostname(parser->host), keyword);
+            return 0;
+        }
+
+        t->func[t->func_no++] = (void *) func;
+        return t->func_no;
     }
 
-    tmp_keyword = callocz(1, sizeof(*tmp_keyword));
+    t = callocz(1, sizeof(*t));
+    t->worker_job_id = parser->worker_job_next_id++;
+    t->keyword = strdupz(keyword);
+    t->hash = djdb2_hash(keyword);
+    t->func[t->func_no++] = (void *) func;
 
-    tmp_keyword->worker_job_id = parser->worker_job_next_id++;
-    tmp_keyword->keyword = strdupz(keyword);
-    tmp_keyword->keyword_hash = keyword_hash;
-    tmp_keyword->func[tmp_keyword->func_no++] = (void *) func;
+    uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
 
-    worker_register_job_name(tmp_keyword->worker_job_id, tmp_keyword->keyword);
+    if(parser->keywords.hashtable[slot])
+        internal_error(true, "PLUGINSD: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
+                             "Consider increasing the hashtable size.",
+                             parser->keywords.hashtable[slot]->keyword,
+                             parser->keywords.hashtable[slot]->hash,
+                             t->keyword,
+                             t->hash,
+                             slot
+                             );
 
-    tmp_keyword->next = parser->keyword;
-    parser->keyword = tmp_keyword;
-    return tmp_keyword->func_no;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(parser->keywords.hashtable[slot], t, prev, next);
+
+    worker_register_job_name(t->worker_job_id, t->keyword);
+
+    return t->func_no;
 }
 
 /*
@@ -182,12 +228,14 @@ void parser_destroy(PARSER *parser)
     PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;
     
     // Remove keywords
-    tmp_keyword = parser->keyword;
-    while (tmp_keyword) {
-        tmp_keyword_next = tmp_keyword->next;
-        freez(tmp_keyword->keyword);
-        freez(tmp_keyword);
-        tmp_keyword =  tmp_keyword_next;
+    for(size_t i = 0 ; i < PARSER_KEYWORDS_HASHTABLE_SIZE; i++) {
+        tmp_keyword = parser->keywords.hashtable[i];
+        while (tmp_keyword) {
+            tmp_keyword_next = tmp_keyword->next;
+            freez(tmp_keyword->keyword);
+            freez(tmp_keyword);
+            tmp_keyword = tmp_keyword_next;
+        }
     }
     
     // Remove pushed data if any
@@ -227,16 +275,16 @@ int parser_next(PARSER *parser)
         return 0;
     }
 
-    if (unlikely(parser->read_function))
-        tmp = parser->read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->fp_input);
+    if (unlikely(parser->keywords.read_function))
+        tmp = parser->keywords.read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->fp_input);
     else if(likely(parser->fp_input))
         tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->fp_input);
     else
         tmp = NULL;
 
     if (unlikely(!tmp)) {
-        if (unlikely(parser->eof_function)) {
-            int rc = parser->eof_function(parser->fp_input);
+        if (unlikely(parser->keywords.eof_function)) {
+            int rc = parser->keywords.eof_function(parser->fp_input);
             error("read failed: user defined function returned %d", rc);
         }
         else {
@@ -280,12 +328,6 @@ inline int parser_action(PARSER *parser, char *input)
     if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
         return 0;
 
-    PARSER_KEYWORD *tmp_keyword = parser->keyword;
-    if (unlikely(!tmp_keyword)) {
-        internal_error(true, "called without a keyword");
-        return 1;
-    }
-
     if (unlikely(!input))
         input = parser->buffer;
 
@@ -322,26 +364,22 @@ inline int parser_action(PARSER *parser, char *input)
         return 0;
 
     size_t num_words = 0;
-    if ((parser->flags & PARSER_INPUT_KEEP_ORIGINAL) == PARSER_INPUT_KEEP_ORIGINAL)
+    if (parser->flags & PARSER_INPUT_KEEP_ORIGINAL)
         num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
-    uint32_t command_hash = simple_hash(command);
-
     size_t worker_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES + 1; // set an invalid value by default
-    while(tmp_keyword) {
-        if (command_hash == tmp_keyword->keyword_hash && (!strcmp(command, tmp_keyword->keyword))) {
-            action_function_list = &tmp_keyword->func[0];
-            worker_job_id = tmp_keyword->worker_job_id;
-            break;
-        }
-        tmp_keyword = tmp_keyword->next;
+
+    PARSER_KEYWORD *tmp_keyword = parser_find_keyword(parser, command);
+    if(likely(tmp_keyword)) {
+        action_function_list = &tmp_keyword->func[0];
+        worker_job_id = tmp_keyword->worker_job_id;
     }
 
     if (unlikely(!action_function_list)) {
-        if (unlikely(parser->unknown_function))
-            rc = parser->unknown_function(words, num_words, parser->user);
+        if (unlikely(parser->keywords.unknown_function))
+            rc = parser->keywords.unknown_function(words, num_words, parser->user);
         else
             rc = PARSER_RC_ERROR;
     }

@@ -13,18 +13,18 @@
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
 // PARSER return codes
-typedef enum parser_rc {
+typedef enum __attribute__ ((__packed__)) parser_rc {
     PARSER_RC_OK,       // Callback was successful, go on
     PARSER_RC_STOP,     // Callback says STOP
     PARSER_RC_ERROR     // Callback failed (abort rest of callbacks)
 } PARSER_RC;
 
-typedef enum parser_input_type {
+typedef enum __attribute__ ((__packed__)) parser_input_type {
     PARSER_INPUT_SPLIT          = (1 << 1),
     PARSER_INPUT_KEEP_ORIGINAL  = (1 << 2),
     PARSER_INPUT_PROCESSED      = (1 << 3),
-    PARSER_NO_PARSE_INIT        = (1 << 4),
-    PARSER_NO_ACTION_INIT       = (1 << 5),
+    PARSER_INIT_PLUGINSD        = (1 << 4),
+    PARSER_INIT_STREAMING       = (1 << 5),
     PARSER_DEFER_UNTIL_KEYWORD  = (1 << 6),
 } PARSER_INPUT_TYPE;
 
@@ -33,12 +33,14 @@ typedef enum parser_input_type {
 typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data);
 
 typedef struct parser_keyword {
-    size_t      worker_job_id;
-    char        *keyword;
-    uint32_t    keyword_hash;
-    int         func_no;
-    keyword_function    func[PARSER_MAX_CALLBACKS+1];
-    struct      parser_keyword *next;
+    size_t worker_job_id;
+    char *keyword;
+    uint32_t hash;
+    int func_no;
+    keyword_function func[PARSER_MAX_CALLBACKS+1];
+
+    struct parser_keyword *prev;
+    struct parser_keyword *next;
 } PARSER_KEYWORD;
 
 typedef struct parser_data {
@@ -47,6 +49,8 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef void (*parser_cleanup_t)(void *user);
+
+#define PARSER_KEYWORDS_HASHTABLE_SIZE 40
 
 typedef struct parser {
     size_t worker_job_next_id;
@@ -58,24 +62,19 @@ typedef struct parser {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *ssl_output;
 #endif
-    PARSER_DATA    *data;           // extra input
-    PARSER_KEYWORD  *keyword;       // List of parse keywords and functions
-    void    *user;                  // User defined structure to hold extra state between calls
+    PARSER_DATA *data;              // extra input
+    void *user;                     // User defined structure to hold extra state between calls
     parser_cleanup_t user_cleanup_cb;
     uint32_t flags;
     size_t line;
 
-    char *(*read_function)(char *buffer, long unsigned int, void *input);
-    int (*eof_function)(void *input);
-    keyword_function unknown_function;
-    char buffer[PLUGINSD_LINE_MAX];
-    char *recover_location[PARSER_MAX_RECOVER_KEYWORDS+1];
-    char recover_input[PARSER_MAX_RECOVER_KEYWORDS];
-#ifdef ENABLE_HTTPS
-    int bytesleft;
-    char tmpbuffer[PLUGINSD_LINE_MAX];
-    char *readfrom;
-#endif
+    struct {
+        char *(*read_function)(char *buffer, long unsigned int, void *input);
+        int (*eof_function)(void *input);
+        keyword_function unknown_function;
+
+        PARSER_KEYWORD *hashtable[PARSER_KEYWORDS_HASHTABLE_SIZE];
+    } keywords;
 
     struct {
         const char *end_keyword;
@@ -89,6 +88,9 @@ typedef struct parser {
         usec_t smaller_timeout;
     } inflight;
 
+    char buffer[PLUGINSD_LINE_MAX];
+    char *recover_location[PARSER_MAX_RECOVER_KEYWORDS+1];
+    char recover_input[PARSER_MAX_RECOVER_KEYWORDS];
 } PARSER;
 
 int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));

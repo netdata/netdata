@@ -347,7 +347,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, streaming_parser_cleanup, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+    PARSER *parser = parser_init(rpt->host, &user, streaming_parser_cleanup, NULL, NULL, fd,
+                                 PARSER_INPUT_SPLIT | PARSER_INIT_STREAMING, ssl);
 
     rrd_collector_started();
 
