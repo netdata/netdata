@@ -76,9 +76,10 @@ void parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     uint32_t hash = parser_hash_function(keyword);
     uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
 
-    if(parser->keywords.hashtable[slot])
+    if(unlikely(parser->keywords.hashtable[slot]))
         fatal("PARSER: hashtable collision between keyword '%s' and '%s' on slot %u. "
-              "Change the hashtable size.",
+              "Change the hashtable size and / or the hashing function. "
+              "Run the unit test to find the optimal values.",
               parser->keywords.hashtable[slot]->keyword,
               t->keyword,
               slot
