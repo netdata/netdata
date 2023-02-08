@@ -25,7 +25,7 @@ To access the Events feed you need:
 1. You will be presented with a table listing the events that occurred from the timeframe defined on the date time picker
 1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on event types and filters 
 
-Note: When you try to query a longer period than what your space allows you will see the following message:
+Note: When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
 > Your current plan provides access to events up to the last _X_ hours/days."
 
 #### Event types and filters
