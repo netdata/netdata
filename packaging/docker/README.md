@@ -13,18 +13,6 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata with Docker
 
-Running the Netdata Agent in a container works best for an internal network or to quickly analyze a host. Docker helps
-you get set up quickly, and doesn't install anything permanent on the system, which makes uninstalling the Agent easy.
-
-See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
-
-Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self-hosted PostHog instance within the Netdata infrastructure. Read
-about the information collected, and learn how to-opt, on our [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md)
-page.
-
-The usage statistics are _vital_ for us, as we use them to discover bugs and prioritize new features. We thank you for
-_actively_ contributing to Netdata's future.
-
 ## Limitations running the Agent in Docker
 
 For monitoring the whole host, running the Agent in a container can limit its capabilities. Some data, like the host OS
@@ -151,6 +139,8 @@ docker run -d --name=netdata \
 </Tabs>
 
 ## Docker tags
+
+See our full list of Docker images at [Docker Hub](https://hub.docker.com/r/netdata/netdata).
 
 The official `netdata/netdata` Docker image provides the following named tags:
 
