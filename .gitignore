@@ -235,3 +235,8 @@ judyltablesgen
 # m4 generated ksys
 database/engine/journalfile_v2.ksy
 database/engine/journalfile_v2_virtmemb.ksy
+
+# manualy generated makefile
+!database/engine/tooling/Makefile
+database/engine/tooling/generated_parsers/*.rb
+database/engine/tooling/generated_parsers/*.py
