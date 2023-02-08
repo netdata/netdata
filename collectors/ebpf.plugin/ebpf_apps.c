@@ -23,6 +23,9 @@ void ebpf_aral_init(void)
     ebpf_aral_process_stat = aral_create("ebpf-proc_stat", sizeof(ebpf_process_stat_t),
                                           0, NETDATA_EBPF_ALLOC_MAX_PID,
                                           NULL, NULL, NULL, false, false);
+#ifdef NETDATA_DEV_MODE
+    info("Plugin is using ARAL with values %d", NETDATA_EBPF_ALLOC_MAX_PID);
+#endif
 }
 
 /**
