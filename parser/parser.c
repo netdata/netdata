@@ -3,19 +3,18 @@
 #include "parser.h"
 #include "collectors/plugins.d/pluginsd_parser.h"
 
-inline int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char))
-{
-    const char *s = str, *keyword_start;
+static inline int find_first_keyword(const char *src, char *dst, int dst_size, int (*custom_isspace)(char)) {
+    const char *s = src, *keyword_start;
 
     while (unlikely(custom_isspace(*s))) s++;
     keyword_start = s;
 
-    while (likely(*s && !custom_isspace(*s)) && max_size > 1) {
-        *keyword++ = *s++;
-        max_size--;
+    while (likely(*s && !custom_isspace(*s)) && dst_size > 1) {
+        *dst++ = *s++;
+        dst_size--;
     }
-    *keyword = '\0';
-    return max_size == 0 ? 0 : (int) (s - keyword_start);
+    *dst = '\0';
+    return dst_size == 0 ? 0 : (int) (s - keyword_start);
 }
 
 /*
@@ -140,8 +139,10 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
  *       : 0 Error
  */
 
-int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
-{
+int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
+    if(unlikely(!keyword || !*keyword || !func))
+        return 0;
+
     if (strcmp(keyword, "_read") == 0) {
         parser->keywords.read_function = (void *) func;
         return 0;
@@ -152,15 +153,10 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
         return 0;
     }
 
-    if (strcmp(keyword, "_unknown") == 0) {
-        parser->keywords.unknown_function = (void *) func;
-        return 0;
-    }
-
     PARSER_KEYWORD *t = parser_find_keyword(parser, keyword);
     if(t) {
         for(int i = 0; i < t->func_no ;i++) {
-            if (t->func[i] == func) {
+            if (t->functions_array[i] == func) {
                 error("PLUGINSD: 'host:%s', duplicate definition of the same function for keyword '%s'",
                       rrdhost_hostname(parser->host), keyword);
                 return i;
@@ -173,7 +169,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
             return 0;
         }
 
-        t->func[t->func_no++] = (void *) func;
+        t->functions_array[t->func_no++] = (void *) func;
         return t->func_no;
     }
 
@@ -181,7 +177,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
     t->worker_job_id = parser->worker_job_next_id++;
     t->keyword = strdupz(keyword);
     t->hash = djb2_hash(keyword);
-    t->func[t->func_no++] = (void *) func;
+    t->functions_array[t->func_no++] = func;
 
     uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
 
@@ -302,9 +298,6 @@ inline int parser_action(PARSER *parser, char *input)
 
     PARSER_RC rc = PARSER_RC_OK;
     char *words[PLUGINSD_MAX_WORDS];
-    char command[PLUGINSD_LINE_MAX + 1];
-    keyword_function action_function;
-    keyword_function *action_function_list = NULL;
 
     if (unlikely(!parser)) {
         internal_error(true, "parser is NULL");
@@ -321,6 +314,7 @@ inline int parser_action(PARSER *parser, char *input)
         input = parser->buffer;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
+        char command[PLUGINSD_LINE_MAX + 1];
         bool has_keyword = find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space);
 
         if(!has_keyword || strcmp(command, parser->defer.end_keyword) != 0) {
@@ -349,40 +343,34 @@ inline int parser_action(PARSER *parser, char *input)
         return 0;
     }
 
-    if (unlikely(!find_first_keyword(input, command, PLUGINSD_LINE_MAX, pluginsd_space)))
-        return 0;
-
-    size_t num_words = 0;
-    if (parser->flags & PARSER_INPUT_KEEP_ORIGINAL)
+    size_t num_words;
+    if (unlikely(parser->flags & PARSER_INPUT_KEEP_ORIGINAL))
         num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
     else
         num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
 
-    size_t worker_job_id = WORKER_UTILIZATION_MAX_JOB_TYPES + 1; // set an invalid value by default
+    const char *command = get_word(words, num_words, 0);
 
-    PARSER_KEYWORD *tmp_keyword = parser_find_keyword(parser, command);
-    if(likely(tmp_keyword)) {
-        action_function_list = &tmp_keyword->func[0];
-        worker_job_id = tmp_keyword->worker_job_id;
-    }
+    if(unlikely(!command))
+        return 0;
 
-    if (unlikely(!action_function_list)) {
-        if (unlikely(parser->keywords.unknown_function))
-            rc = parser->keywords.unknown_function(words, num_words, parser->user);
-        else
-            rc = PARSER_RC_ERROR;
-    }
-    else {
+    PARSER_KEYWORD *t = parser_find_keyword(parser, command);
+    if(likely(t)) {
+        keyword_function *func = t->functions_array;
+        size_t worker_job_id = t->worker_job_id;
+
         worker_is_busy(worker_job_id);
-        while ((action_function = *action_function_list) != NULL) {
-                rc = action_function(words, num_words, parser->user);
-                if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
-                    break;
 
-                action_function_list++;
-        }
+        do {
+            rc = (*func)(words, num_words, parser->user);
+            if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
+                break;
+        } while(*(++func));
+
         worker_is_idle();
     }
+    else
+        rc = PARSER_RC_ERROR;
 
     if (likely(input == parser->buffer))
         parser->flags |= PARSER_INPUT_PROCESSED;
@@ -406,7 +394,7 @@ inline int parser_action(PARSER *parser, char *input)
     }
 #endif
 
-    return (rc == PARSER_RC_ERROR);
+    return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }
 
 inline int parser_recover_input(PARSER *parser)

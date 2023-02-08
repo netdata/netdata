@@ -36,7 +36,7 @@ typedef struct parser_keyword {
     char *keyword;
     uint32_t hash;
     int func_no;
-    keyword_function func[PARSER_MAX_CALLBACKS + 1];
+    keyword_function functions_array[PARSER_MAX_CALLBACKS + 1];
 
     struct parser_keyword *prev;
     struct parser_keyword *next;
@@ -89,8 +89,6 @@ typedef struct parser {
     char *recover_location[PARSER_MAX_RECOVER_KEYWORDS+1];
     char recover_input[PARSER_MAX_RECOVER_KEYWORDS];
 } PARSER;
-
-int find_first_keyword(const char *str, char *keyword, int max_size, int (*custom_isspace)(char));
 
 PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);

@@ -1894,6 +1894,11 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
     while (unlikely(custom_isspace(*s)))
         s++;
 
+    if(unlikely(!*s)) {
+        words[i] = NULL;
+        return 0;
+    }
+
     // check for quote
     if (unlikely(*s == '\'' || *s == '"')) {
         quote = *s; // remember the quote
@@ -1905,13 +1910,13 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
 
     // while we have something
     while (likely(*s)) {
-        // if it is escape
+        // if it is an escape
         if (unlikely(*s == '\\' && s[1])) {
             s += 2;
             continue;
         }
 
-        // if it is quote
+        // if it is a quote
         else if (unlikely(*s == quote)) {
             quote = 0;
             if (recover && rec < max_recover) {
@@ -1937,7 +1942,7 @@ inline size_t quoted_strings_splitter(char *str, char **words, size_t max_words,
             while (likely(custom_isspace(*s)))
                 s++;
 
-            // check for quote
+            // check for a quote
             if (unlikely(*s == '\'' || *s == '"')) {
                 quote = *s; // remember the quote
                 s++;        // skip the quote

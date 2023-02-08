@@ -152,7 +152,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     if(likely(st->pluginsd.pos < st->pluginsd.used)) {
         rda = st->pluginsd.rda[st->pluginsd.pos];
         RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-        if (likely(rd && strcmp(rrddim_id(rd), dimension) == 0)) {
+        if (likely(rd && string_strcmp(rd->id, dimension) == 0)) {
             st->pluginsd.pos++;
             return rd;
         }
@@ -883,7 +883,7 @@ PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe
 {
     info("PLUGINSD: plugin called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
-    return PARSER_RC_ERROR;
+    return PARSER_RC_STOP;
 }
 
 PARSER_RC pluginsd_label(char **words, size_t num_words, void *user)

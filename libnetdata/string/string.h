@@ -13,6 +13,7 @@ STRING *string_dup(STRING *string);
 void string_freez(STRING *string);
 size_t string_strlen(STRING *string);
 const char *string2str(STRING *string) NEVERNULL;
+int string_strcmp(STRING *string, const char *s);
 
 // keep common prefix/suffix and replace everything else with [x]
 STRING *string_2way_merge(STRING *a, STRING *b);
