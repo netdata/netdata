@@ -1384,6 +1384,7 @@ static void ebpf_allocate_common_vectors()
     }
 
     ebpf_all_pids = callocz((size_t)pid_max, sizeof(struct ebpf_pid_stat *));
+    ebpf_aral_init();
 }
 
 /**

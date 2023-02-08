@@ -519,7 +519,7 @@ static inline struct ebpf_pid_stat *get_pid_entry(pid_t pid)
     if (unlikely(ebpf_all_pids[pid]))
         return ebpf_all_pids[pid];
 
-    struct ebpf_pid_stat *p = callocz(1, sizeof(struct ebpf_pid_stat));
+    struct ebpf_pid_stat *p = ebpf_pid_stat_get();
 
     if (likely(ebpf_root_of_pids))
         ebpf_root_of_pids->prev = p;
@@ -941,7 +941,7 @@ static inline void del_pid_entry(pid_t pid)
     freez(p->io_filename);
     freez(p->cmdline_filename);
     freez(p->cmdline);
-    freez(p);
+    ebpf_pid_stat_release(p);
 
     ebpf_all_pids[pid] = NULL;
     ebpf_all_pids_count--;
