@@ -22,11 +22,9 @@ typedef enum __attribute__ ((__packed__)) parser_rc {
 
 typedef enum __attribute__ ((__packed__)) parser_input_type {
     PARSER_INPUT_SPLIT          = (1 << 1),
-    PARSER_INPUT_KEEP_ORIGINAL  = (1 << 2),
-    PARSER_INPUT_PROCESSED      = (1 << 3),
-    PARSER_INIT_PLUGINSD        = (1 << 4),
-    PARSER_INIT_STREAMING       = (1 << 5),
-    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 6),
+    PARSER_INIT_PLUGINSD        = (1 << 2),
+    PARSER_INIT_STREAMING       = (1 << 3),
+    PARSER_DEFER_UNTIL_KEYWORD  = (1 << 4),
 } PARSER_INPUT_TYPE;
 
 typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data);
@@ -59,17 +57,12 @@ typedef struct parser {
 #ifdef ENABLE_HTTPS
     struct netdata_ssl *ssl_output;
 #endif
-    PARSER_DATA *data;              // extra input
     void *user;                     // User defined structure to hold extra state between calls
     parser_cleanup_t user_cleanup_cb;
     uint32_t flags;
     size_t line;
 
     struct {
-        char *(*read_function)(char *buffer, long unsigned int, void *input);
-        int (*eof_function)(void *input);
-        keyword_function unknown_function;
-
         PARSER_KEYWORD *hashtable[PARSER_KEYWORDS_HASHTABLE_SIZE];
     } keywords;
 
@@ -84,21 +77,13 @@ typedef struct parser {
         DICTIONARY *functions;
         usec_t smaller_timeout;
     } inflight;
-
-    char buffer[PLUGINSD_LINE_MAX];
-    char *recover_location[PARSER_MAX_RECOVER_KEYWORDS+1];
-    char recover_input[PARSER_MAX_RECOVER_KEYWORDS];
 } PARSER;
 
 PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
-int parser_next(PARSER *working_parser);
+int parser_next(PARSER *working_parser, char *buffer, size_t buffer_size);
 int parser_action(PARSER *working_parser, char *input);
-int parser_push(PARSER *working_parser, char *line);
 void parser_destroy(PARSER *working_parser);
-int parser_recover_input(PARSER *working_parser);
-
-size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugin_input, FILE *fp_plugin_output, int trust_durations);
 
 PARSER_RC pluginsd_set(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_begin(char **words, size_t num_words, void *user);
@@ -124,5 +109,7 @@ PARSER_RC pluginsd_begin_v2(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_end_v2(char **words, size_t num_words, void *user);
 void pluginsd_cleanup_v2(void *user);
+
+int parser_unittest(void);
 
 #endif

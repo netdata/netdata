@@ -89,31 +89,6 @@ PARSER *parser_init(RRDHOST *host, void *user, parser_cleanup_t cleanup_cb, FILE
 }
 
 
-/*
- * Push a new line into the parsing stream
- *
- * This line will be the next one to process ie the next fetch will get this one
- *
- */
-
-int parser_push(PARSER *parser, char *line)
-{
-    PARSER_DATA    *tmp_parser_data;
-    
-    if (unlikely(!parser))
-        return 1;
-
-    if (unlikely(!line))
-        return 0;
-
-    tmp_parser_data = callocz(1, sizeof(*tmp_parser_data));
-    tmp_parser_data->line = strdupz(line);
-    tmp_parser_data->next = parser->data;
-    parser->data = tmp_parser_data;
-
-    return 0;
-}
-
 static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *command) {
     uint32_t hash = djb2_hash(command);
     uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
@@ -142,16 +117,6 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
 int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     if(unlikely(!keyword || !*keyword || !func))
         return 0;
-
-    if (strcmp(keyword, "_read") == 0) {
-        parser->keywords.read_function = (void *) func;
-        return 0;
-    }
-
-    if (strcmp(keyword, "_eof") == 0) {
-        parser->keywords.eof_function = (void *) func;
-        return 0;
-    }
 
     PARSER_KEYWORD *t = parser_find_keyword(parser, keyword);
     if(t) {
@@ -182,14 +147,14 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
 
     if(parser->keywords.hashtable[slot])
-        internal_error(true, "PLUGINSD: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
-                             "Consider increasing the hashtable size.",
-                             parser->keywords.hashtable[slot]->keyword,
-                             parser->keywords.hashtable[slot]->hash,
-                             t->keyword,
-                             t->hash,
-                             slot
-                             );
+        fatal("PLUGINSD: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
+              "Change the hashtable size.",
+              parser->keywords.hashtable[slot]->keyword,
+              parser->keywords.hashtable[slot]->hash,
+              t->keyword,
+              t->hash,
+              slot
+              );
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(parser->keywords.hashtable[slot], t, prev, next);
 
@@ -209,29 +174,18 @@ void parser_destroy(PARSER *parser)
 
     dictionary_destroy(parser->inflight.functions);
 
-    PARSER_KEYWORD  *tmp_keyword, *tmp_keyword_next;
-    PARSER_DATA     *tmp_parser_data, *tmp_parser_data_next;
-    
     // Remove keywords
     for(size_t i = 0 ; i < PARSER_KEYWORDS_HASHTABLE_SIZE; i++) {
-        tmp_keyword = parser->keywords.hashtable[i];
-        while (tmp_keyword) {
-            tmp_keyword_next = tmp_keyword->next;
-            freez(tmp_keyword->keyword);
-            freez(tmp_keyword);
-            tmp_keyword = tmp_keyword_next;
+        PARSER_KEYWORD  *t, *next;
+        t = parser->keywords.hashtable[i];
+        while (t) {
+            next = t->next;
+            freez(t->keyword);
+            freez(t);
+            t = next;
         }
     }
     
-    // Remove pushed data if any
-    tmp_parser_data = parser->data;
-    while (tmp_parser_data) {
-        tmp_parser_data_next = tmp_parser_data->next;
-        freez(tmp_parser_data->line);
-        freez(tmp_parser_data);
-        tmp_parser_data =  tmp_parser_data_next;
-    }
-
     freez(parser);
 }
 
@@ -241,47 +195,23 @@ void parser_destroy(PARSER *parser)
  *
  */
 
-int parser_next(PARSER *parser)
+int parser_next(PARSER *parser, char *buffer, size_t buffer_size)
 {
-    char    *tmp = NULL;
-
-    if (unlikely(!parser))
-        return 1;
-
-    parser->flags &= ~(PARSER_INPUT_PROCESSED);
-
-    PARSER_DATA  *tmp_parser_data = parser->data;
-
-    if (unlikely(tmp_parser_data)) {
-        strncpyz(parser->buffer, tmp_parser_data->line, PLUGINSD_LINE_MAX);
-        parser->data = tmp_parser_data->next;
-        freez(tmp_parser_data->line);
-        freez(tmp_parser_data);
-        return 0;
-    }
-
-    if (unlikely(parser->keywords.read_function))
-        tmp = parser->keywords.read_function(parser->buffer, PLUGINSD_LINE_MAX, parser->fp_input);
-    else if(likely(parser->fp_input))
-        tmp = fgets(parser->buffer, PLUGINSD_LINE_MAX, (FILE *)parser->fp_input);
-    else
-        tmp = NULL;
+    char *tmp = fgets(buffer, (int)buffer_size, (FILE *)parser->fp_input);
 
     if (unlikely(!tmp)) {
-        if (unlikely(parser->keywords.eof_function)) {
-            int rc = parser->keywords.eof_function(parser->fp_input);
-            error("read failed: user defined function returned %d", rc);
-        }
-        else {
-            if (feof((FILE *)parser->fp_input))
-                error("read failed: end of file");
-            else if (ferror((FILE *)parser->fp_input))
-                error("read failed: input error");
-            else
-                error("read failed: unknown error");
-        }
+        if (feof((FILE *)parser->fp_input))
+            error("PLUGINSD: 'host:%s', read failed: end of file", rrdhost_hostname(parser->host));
+
+        else if (ferror((FILE *)parser->fp_input))
+            error("PLUGINSD: 'host:%s', read failed: input error", rrdhost_hostname(parser->host));
+
+        else
+            error("PLUGINSD: 'host:%s', read failed: unknown error", rrdhost_hostname(parser->host));
+
         return 1;
     }
+
     return 0;
 }
 
@@ -295,23 +225,6 @@ int parser_next(PARSER *parser)
 inline int parser_action(PARSER *parser, char *input)
 {
     parser->line++;
-
-    PARSER_RC rc = PARSER_RC_OK;
-    char *words[PLUGINSD_MAX_WORDS];
-
-    if (unlikely(!parser)) {
-        internal_error(true, "parser is NULL");
-        return 1;
-    }
-
-    parser->recover_location[0] = 0x0;
-
-    // if not direct input check if we have reprocessed this
-    if (unlikely(!input && parser->flags & PARSER_INPUT_PROCESSED))
-        return 0;
-
-    if (unlikely(!input))
-        input = parser->buffer;
 
     if(unlikely(parser->flags & PARSER_DEFER_UNTIL_KEYWORD)) {
         char command[PLUGINSD_LINE_MAX + 1];
@@ -343,23 +256,19 @@ inline int parser_action(PARSER *parser, char *input)
         return 0;
     }
 
-    size_t num_words;
-    if (unlikely(parser->flags & PARSER_INPUT_KEEP_ORIGINAL))
-        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, parser->recover_input, parser->recover_location, PARSER_MAX_RECOVER_KEYWORDS);
-    else
-        num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
-
+    char *words[PLUGINSD_MAX_WORDS];
+    size_t num_words = pluginsd_split_words(input, words, PLUGINSD_MAX_WORDS);
     const char *command = get_word(words, num_words, 0);
 
     if(unlikely(!command))
         return 0;
 
+    PARSER_RC rc;
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
     if(likely(t)) {
         keyword_function *func = t->functions_array;
-        size_t worker_job_id = t->worker_job_id;
 
-        worker_is_busy(worker_job_id);
+        worker_is_busy(t->worker_job_id);
 
         do {
             rc = (*func)(words, num_words, parser->user);
@@ -371,9 +280,6 @@ inline int parser_action(PARSER *parser, char *input)
     }
     else
         rc = PARSER_RC_ERROR;
-
-    if (likely(input == parser->buffer))
-        parser->flags |= PARSER_INPUT_PROCESSED;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(rc == PARSER_RC_ERROR) {
@@ -397,15 +303,17 @@ inline int parser_action(PARSER *parser, char *input)
     return (rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP);
 }
 
-inline int parser_recover_input(PARSER *parser)
-{
-    if (unlikely(!parser))
-        return 1;
 
-    for(int i=0; i < PARSER_MAX_RECOVER_KEYWORDS && parser->recover_location[i]; i++)
-        *(parser->recover_location[i]) = parser->recover_input[i];
+int parser_unittest(void) {
+    PARSER *p;
 
-    parser->recover_location[0] = 0x0;
+    // check for hashtable collisions
+
+    p = parser_init(NULL, NULL, NULL, NULL, NULL, -1, PARSER_INIT_PLUGINSD, NULL);
+    parser_destroy(p);
+
+    p = parser_init(NULL, NULL, NULL, NULL, NULL, -1, PARSER_INIT_STREAMING, NULL);
+    parser_destroy(p);
 
     return 0;
 }

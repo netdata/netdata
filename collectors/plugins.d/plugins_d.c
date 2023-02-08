@@ -18,7 +18,7 @@ inline size_t pluginsd_initialize_plugin_directories()
     }
 
     // Parse it and store it to plugin directories
-    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace, NULL, NULL, 0);
+    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
 }
 
 static inline void plugin_set_disabled(struct plugind *cd) {

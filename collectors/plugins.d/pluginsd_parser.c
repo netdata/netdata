@@ -1705,9 +1705,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     user.parser = parser;
+    char buffer[PLUGINSD_LINE_MAX + 1];
 
-    while (likely(!parser_next(parser))) {
-        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  NULL)))
+    while (likely(!parser_next(parser, buffer, PLUGINSD_LINE_MAX))) {
+        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  buffer)))
             break;
     }
 

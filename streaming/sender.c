@@ -937,7 +937,7 @@ void execute_commands(struct sender_state *s) {
         // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 

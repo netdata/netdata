@@ -4336,7 +4336,7 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     struct pid_stat *p;
 
     char *words[PLUGINSD_MAX_WORDS] = { NULL };
-    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+    size_t num_words = pluginsd_split_words(function, words, PLUGINSD_MAX_WORDS);
 
     struct target *category = NULL, *user = NULL, *group = NULL;
     const char *process_name = NULL;
@@ -4809,7 +4809,7 @@ void *reader_main(void *arg __maybe_unused) {
     while(!apps_plugin_exit && (s = fgets(buffer, PLUGINSD_LINE_MAX, stdin))) {
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(buffer, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 
