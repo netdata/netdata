@@ -5,9 +5,10 @@
 
 #include "daemon/common.h"
 
-#define PARSER_MAX_CALLBACKS 20
+#define PARSER_MAX_CALLBACKS 1
 #define PARSER_MAX_RECOVER_KEYWORDS 128
 #define WORKER_PARSER_FIRST_JOB 3
+#define PARSER_KEYWORDS_HASHTABLE_SIZE 40
 
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
@@ -28,8 +29,6 @@ typedef enum __attribute__ ((__packed__)) parser_input_type {
     PARSER_DEFER_UNTIL_KEYWORD  = (1 << 6),
 } PARSER_INPUT_TYPE;
 
-#define PARSER_INPUT_FULL   (PARSER_INPUT_SPLIT|PARSER_INPUT_ORIGINAL)
-
 typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user_data);
 
 typedef struct parser_keyword {
@@ -37,7 +36,7 @@ typedef struct parser_keyword {
     char *keyword;
     uint32_t hash;
     int func_no;
-    keyword_function func[PARSER_MAX_CALLBACKS+1];
+    keyword_function func[PARSER_MAX_CALLBACKS + 1];
 
     struct parser_keyword *prev;
     struct parser_keyword *next;
@@ -49,8 +48,6 @@ typedef struct parser_data {
 } PARSER_DATA;
 
 typedef void (*parser_cleanup_t)(void *user);
-
-#define PARSER_KEYWORDS_HASHTABLE_SIZE 40
 
 typedef struct parser {
     size_t worker_job_next_id;
