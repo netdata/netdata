@@ -1,7 +1,7 @@
 <!--
 title: "Introduction"
 sidebar_label: "Introduction"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/intro.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md"
 learn_status: "Published"
 sidebar_position: "1"
 learn_topic_type: "Getting started"
@@ -110,6 +110,49 @@ Netdata Cloud is free! You can add an entire infrastructure of nodes, invite all
 
 While Netdata Cloud offers a centralized method of monitoring your Agents, your metrics data is not stored or centralized in any way. Metrics data remains with your nodes and is only streamed to your browser, through Cloud, when you're viewing the Netdata Cloud interface.
 
+## Use Netdata standalone or as part of your monitoring stack
+
+Netdata is an extremely powerful monitoring, visualization, and troubleshooting platform. While you can use it as an
+effective standalone tool, we also designed it to be open and interoperable with other tools you might already be using.
+
+Netdata helps you collect everything and scales to infrastructure of any size, but it doesn't lock-in data or force you
+to use specific tools or methodologies. Each feature is extensible and interoperable so they can work in parallel with
+other tools. For example, you can use Netdata to collect metrics, visualize metrics with a second open-source program,
+and centralize your metrics in a cloud-based time-series database solution for long-term storage or further analysis.
+
+You can build a new monitoring stack, including Netdata, or integrate Netdata's metrics with your existing monitoring
+stack. No matter which route you take, Netdata helps you monitor infrastructure of any size.
+
+Here are a few ways to enrich your existing monitoring and troubleshooting stack with Netdata:
+
+### Collect metrics from Prometheus endpoints
+
+Netdata automatically detects 600 popular endpoints and collects per-second metrics from them via the [generic
+Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md). This even
+includes support for Windows 10 via [`windows_exporter`](https://github.com/prometheus-community/windows_exporter).
+
+This collector is installed and enabled on all Agent installations by default, so you don't need to waste time
+configuring Netdata. Netdata will detect these Prometheus metrics endpoints and collect even more granular metrics than
+your existing solutions. You can now use all of Netdata's meaningfully-visualized charts to diagnose issues and
+troubleshoot anomalies.
+
+### Export metrics to external time-series databases
+
+Netdata can send its per-second metrics to external time-series databases, such as InfluxDB, Prometheus, Graphite,
+TimescaleDB, ElasticSearch, AWS Kinesis Data Streams, Google Cloud Pub/Sub Service, and many others.
+
+Once you have Netdata's metrics in a secondary time-series database, you can use them however you'd like, such as
+additional visualization/dashboarding tools or aggregation of data from multiple sources.
+
+### Visualize metrics with Grafana
+
+One popular monitoring stack is Netdata, Prometheus, and Grafana. Netdata acts as the stack's metrics collection
+powerhouse, Prometheus as the time-series database, and Grafana as the visualization platform. You can also use Grafite instead of Prometheus,
+or  directly use the [Netdata source plugin for Grafana](https://blog.netdata.cloud/introducing-netdata-source-plugin-for-grafana/)
+
+Of course, just because you export or visualize metrics elsewhere, it doesn't mean Netdata's equivalent features
+disappear. You can always build new dashboards in Netdata Cloud, drill down into per-second metrics using Netdata's
+charts, or use Netdata's health watchdog to send notifications whenever an anomaly strikes.
 
 ## Community
 
