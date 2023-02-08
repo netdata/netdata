@@ -814,7 +814,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 alert_cfg->warn = string_strdupz(value);
@@ -825,7 +825,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 alert_cfg->crit = string_strdupz(value);
@@ -836,7 +836,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 alert_cfg->exec = string_strdupz(value);
@@ -1079,7 +1079,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 alert_cfg->warn = string_strdupz(value);
@@ -1090,7 +1090,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 alert_cfg->crit = string_strdupz(value);
@@ -1101,7 +1101,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
-                parse_variables_and_store_in_health_rrdvars(value, strlen(value));
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 alert_cfg->exec = string_strdupz(value);
