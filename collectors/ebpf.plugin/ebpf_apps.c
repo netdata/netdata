@@ -1069,7 +1069,7 @@ void cleanup_exited_pids()
             p = p->next;
 
             // Clean process structure
-            freez(global_process_stats[r]);
+            ebpf_process_stat_release(global_process_stats[r]);
             global_process_stats[r] = NULL;
 
             cleanup_variables_from_other_threads(r);
@@ -1183,13 +1183,13 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
         key = pids->pid;
         ebpf_process_stat_t *w = global_process_stats[key];
         if (!w) {
-            w = callocz(1, sizeof(ebpf_process_stat_t));
+            w = ebpf_process_stat_get();
             global_process_stats[key] = w;
         }
 
         if (bpf_map_lookup_elem(tbl_pid_stats_fd, &key, w)) {
             // Clean Process structures
-            freez(w);
+            ebpf_process_stat_release(w);
             global_process_stats[key] = NULL;
 
             cleanup_variables_from_other_threads(key);
