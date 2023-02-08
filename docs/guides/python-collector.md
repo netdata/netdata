@@ -6,6 +6,9 @@ author: "Panagiotis Papaioannou"
 author_title: "University of Patras"
 author_img: "/img/authors/panagiotis-papaioannou.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 
 # Develop a custom data collector in Python

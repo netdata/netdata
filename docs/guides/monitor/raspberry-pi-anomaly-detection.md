@@ -6,6 +6,9 @@ author: "Andy Maguire"
 author_title: "Senior Machine Learning Engineer"
 author_img: "/img/authors/andy-maguire.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/raspberry-pi-anomaly-detection.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 We love IoT and edge at Netdata, we also love machine learning. Even better if we can combine the two to ease the pain

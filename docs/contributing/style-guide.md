@@ -2,6 +2,10 @@
 title: "Netdata style guide"
 description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
+sidebar_label: "Netdata style guide"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Contribute"
 -->
 
 # Netdata style guide

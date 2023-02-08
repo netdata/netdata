@@ -2,6 +2,10 @@
 title: "Contributing to documentation"
 description: "Want to contribute to Netdata's documentation? This guide will set you up with the tools to help others learn about health and performance monitoring."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/contributing-documentation.md
+sidebar_label: "Contributing to documentation"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Contributing to documentation

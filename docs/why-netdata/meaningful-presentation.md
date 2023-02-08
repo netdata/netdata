@@ -1,6 +1,10 @@
 <!--
 title: "Meaningful presentation"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/meaningful-presentation.md
+sidebar_label: "Meaningful presentation"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts/Why Netdata"
 -->
 
 # Meaningful presentation

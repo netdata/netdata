@@ -2,6 +2,9 @@
 title: Export and visualize Netdata metrics in Graphite 
 description: "Use Netdata to collect and export thousands of metrics to Graphite for long-term storage or further analysis."
 image: /img/seo/guides/export/export-netdata-metrics-graphite.png
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 
