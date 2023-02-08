@@ -115,19 +115,8 @@ int parser_push(PARSER *parser, char *line)
     return 0;
 }
 
-uint32_t djdb2_hash(const char* str) {
-    unsigned int hash = 5381;
-    char c;
-
-    while ((c = *str++))
-        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
-    return hash;
-}
-
-
 static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *command) {
-    uint32_t hash = djdb2_hash(command);
+    uint32_t hash = djb2_hash(command);
     uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
     PARSER_KEYWORD *t = parser->keywords.hashtable[slot];
 
@@ -191,7 +180,7 @@ int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func)
     t = callocz(1, sizeof(*t));
     t->worker_job_id = parser->worker_job_next_id++;
     t->keyword = strdupz(keyword);
-    t->hash = djdb2_hash(keyword);
+    t->hash = djb2_hash(keyword);
     t->func[t->func_no++] = (void *) func;
 
     uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;

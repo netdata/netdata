@@ -21,6 +21,14 @@ typedef uint64_t kernel_uint_t;
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
 
+static inline uint32_t djb2_hash(const char* name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 5381;
+    while (*s)
+        hash = ((hash << 5) + hash) + *s++; // hash * 33 + char
+    return hash;
+}
+
 static inline uint32_t simple_hash(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hval = 0x811c9dc5;
