@@ -37,8 +37,6 @@ typedef struct parser_keyword {
     keyword_function func;
 } PARSER_KEYWORD;
 
-typedef void (*parser_cleanup_t)(void *user);
-
 typedef struct parser {
     size_t worker_job_next_id;
     uint8_t version;                // Parser version
@@ -49,7 +47,6 @@ typedef struct parser {
     struct netdata_ssl *ssl_output;
 #endif
     void *user;                     // User defined structure to hold extra state between calls
-    parser_cleanup_t user_cleanup_cb;
     uint32_t flags;
     size_t line;
 
@@ -70,7 +67,7 @@ typedef struct parser {
     } inflight;
 } PARSER;
 
-PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
+PARSER *parser_init(void *user, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
 void parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser, char *buffer, size_t buffer_size);
 int parser_action(PARSER *working_parser, char *input);

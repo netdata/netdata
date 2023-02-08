@@ -22,6 +22,15 @@ typedef struct parser_user_object {
     size_t data_collections_count;
     int enabled;
 
+    struct {
+        bool parsing_host;
+        uuid_t machine_guid;
+        char machine_guid_str[UUID_STR_LEN];
+        STRING *hostname;
+        char *tags;
+        DICTIONARY *rrdlabels;
+    } host_define;
+
     struct parser_user_object_replay {
         time_t start_time;
         time_t end_time;

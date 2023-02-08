@@ -28,14 +28,13 @@ static inline int find_first_keyword(const char *src, char *dst, int dst_size, i
  * 
  */
 
-PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd,
+PARSER *parser_init(void *user, FILE *fp_input, FILE *fp_output, int fd,
                     PARSER_INPUT_TYPE flags, void *ssl __maybe_unused)
 {
     PARSER *parser;
 
     parser = callocz(1, sizeof(*parser));
     parser->user = user;
-    parser->user_cleanup_cb = cleanup_cb;
     parser->fd = fd;
     parser->fp_input = fp_input;
     parser->fp_output = fp_output;
