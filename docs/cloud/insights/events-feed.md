@@ -52,7 +52,13 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 All users will be able to see events from the Topology and Alerts domain but Auditing events, once these are added, only be accessible to administrators.
 
-## Related Topics
+## How to use the events feed
+
+1. Click on the **Events** tab (located near the top of your screen)
+1. You will be presented with a table listing the events that occurred from the timeframe defined on the date time picker
+1. You can use the filtering capabilities available on right-hand bar to slice through the results provided. See more details on event types and filters 
+
+Note: When you try to query a longer period than what your space allows you will see an error message highlighting that you are querying data outside of your plan.
 
 ### Related Tasks
 
