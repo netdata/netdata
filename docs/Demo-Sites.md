@@ -1,16 +1,16 @@
 <!--
-title: "Demo sites"
+title: "Live demos"
 date: 2020-03-26
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
-sidebar_label: "Demo sites"
+sidebar_label: "Live demos"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Possible old, not wanted documents"
+learn_topic_type: "Getting started"
+sidebar_position: "300"
 -->
 
 # Demo sites
 
-You can also view live demos of Netdata at **https://app.netdata.cloud/spaces/netdata-demo**
+See the live Netdata Cloud demo with rooms for specific use cases at **https://app.netdata.cloud/spaces/netdata-demo**
 
 | Location            | Netdata demo URL                                                                                                                              | 60 mins reqs                                                                                                                                                                                                                                                 | VM donated by                                      |
 | :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| :------------------------------------------------- |
