@@ -27,9 +27,9 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 | **Event name** | **Description** |  **Example** |
 | :-- | :-- | :-- |
-| Node Become Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` is on **live** state |
-| Node Become Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` is on **stale** state |
-| Node Become Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` is on **offline** state |
+| Node Became Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` is on **live** state |
+| Node Became Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` is on **stale** state |
+| Node Became Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` is on **offline** state |
 | Node Created | The node is created but it is still `Unseen` on Cloud, didn't establish a successful connection yet.| Node `ip-xyz.ec2.internal` is on **unseen** state |
 | Node Removed |The node was removed from the Space, for example by using the `Delete` action on the node. This is a soft delete in that the node gets marked as deleted, but retains the association with this space. If it becomes live again, it will be restored (see `Node Restored` below) and reappear in this space as before. | Node `ip-xyz.ec2.internal` was **deleted (soft)** |
 | Node Restored | The node was restored. See `Node Removed` above. | Node `ip-xyz.ec2.internal` was **restored** |
