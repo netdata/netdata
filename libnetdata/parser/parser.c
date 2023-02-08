@@ -50,18 +50,9 @@ PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FIL
 
 
 static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *command) {
-    uint32_t hash = djb2_hash(command);
+    uint32_t hash = parser_hash_function(command);
     uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
-    PARSER_KEYWORD *t = parser->keywords.hashtable[slot];
-
-    while(t) {
-        if (hash == t->hash && (!strcmp(command, t->keyword)))
-            return t;
-
-        t = t->next;
-    }
-
-    return NULL;
+    return parser->keywords.hashtable[slot];
 }
 
 /*
@@ -74,53 +65,30 @@ static inline PARSER_KEYWORD *parser_find_keyword(PARSER *parser, const char *co
  *       : 0 Error
  */
 
-int parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
-    if(unlikely(!keyword || !*keyword || !func))
-        return 0;
+void parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
+    if(unlikely(!parser || !keyword || !*keyword || !func))
+        fatal("PARSER: invalid parameters");
 
-    PARSER_KEYWORD *t = parser_find_keyword(parser, keyword);
-    if(t) {
-        for(int i = 0; i < t->func_no ;i++) {
-            if (t->functions_array[i] == func) {
-                error("PARSER: duplicate definition of the same function for keyword '%s'",
-                      keyword);
-                return i;
-            }
-        }
-
-        if (t->func_no == PARSER_MAX_CALLBACKS) {
-            error("PARSER: maximum number of callbacks reached on keyword '%s'",
-                  keyword);
-            return 0;
-        }
-
-        t->functions_array[t->func_no++] = (void *) func;
-        return t->func_no;
-    }
-
-    t = callocz(1, sizeof(*t));
+    PARSER_KEYWORD *t = callocz(1, sizeof(*t));
     t->worker_job_id = parser->worker_job_next_id++;
     t->keyword = strdupz(keyword);
-    t->hash = djb2_hash(keyword);
-    t->functions_array[t->func_no++] = func;
+    t->hash = parser_hash_function(keyword);
+    t->slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
+    t->func = func;
 
-    uint32_t slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
-
-    if(parser->keywords.hashtable[slot])
+    if(parser->keywords.hashtable[t->slot])
         fatal("PARSER: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
               "Change the hashtable size.",
-              parser->keywords.hashtable[slot]->keyword,
-              parser->keywords.hashtable[slot]->hash,
+              parser->keywords.hashtable[t->slot]->keyword,
+              parser->keywords.hashtable[t->slot]->hash,
               t->keyword,
               t->hash,
-              slot
+              t->slot
               );
 
-    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(parser->keywords.hashtable[slot], t, prev, next);
+    parser->keywords.hashtable[t->slot] = t;
 
     worker_register_job_name(t->worker_job_id, t->keyword);
-
-    return t->func_no;
 }
 
 /*
@@ -136,13 +104,10 @@ void parser_destroy(PARSER *parser)
 
     // Remove keywords
     for(size_t i = 0 ; i < PARSER_KEYWORDS_HASHTABLE_SIZE; i++) {
-        PARSER_KEYWORD  *t, *next;
-        t = parser->keywords.hashtable[i];
-        while (t) {
-            next = t->next;
+        PARSER_KEYWORD  *t = parser->keywords.hashtable[i];
+        if (t) {
             freez(t->keyword);
             freez(t);
-            t = next;
         }
     }
     
@@ -226,16 +191,8 @@ inline int parser_action(PARSER *parser, char *input)
     PARSER_RC rc;
     PARSER_KEYWORD *t = parser_find_keyword(parser, command);
     if(likely(t)) {
-        keyword_function *func = t->functions_array;
-
         worker_is_busy(t->worker_job_id);
-
-        do {
-            rc = (*func)(words, num_words, parser->user);
-            if (unlikely(rc == PARSER_RC_ERROR || rc == PARSER_RC_STOP))
-                break;
-        } while(*(++func));
-
+        rc = (*t->func)(words, num_words, parser->user);
         worker_is_idle();
     }
     else

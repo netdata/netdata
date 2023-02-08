@@ -5,12 +5,14 @@
 
 #include "../libnetdata.h"
 
-#define PARSER_MAX_CALLBACKS 1
 #define WORKER_PARSER_FIRST_JOB 3
-#define PARSER_KEYWORDS_HASHTABLE_SIZE 40
+#define PARSER_KEYWORDS_HASHTABLE_SIZE 80 // unittest finds this magic number
 
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
+
+//#define parser_hash_function(s) djb2_hash(s)
+#define parser_hash_function(s) simple_hash(s)
 
 // PARSER return codes
 typedef enum __attribute__ ((__packed__)) parser_rc {
@@ -30,11 +32,8 @@ typedef struct parser_keyword {
     size_t worker_job_id;
     char *keyword;
     uint32_t hash;
-    int func_no;
-    keyword_function functions_array[PARSER_MAX_CALLBACKS + 1];
-
-    struct parser_keyword *prev;
-    struct parser_keyword *next;
+    uint32_t slot;
+    keyword_function func;
 } PARSER_KEYWORD;
 
 typedef struct parser_data {
@@ -76,7 +75,7 @@ typedef struct parser {
 } PARSER;
 
 PARSER *parser_init(void *user, parser_cleanup_t cleanup_cb, FILE *fp_input, FILE *fp_output, int fd, PARSER_INPUT_TYPE flags, void *ssl);
-int parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
+void parser_add_keyword(PARSER *working_parser, char *keyword, keyword_function func);
 int parser_next(PARSER *working_parser, char *buffer, size_t buffer_size);
 int parser_action(PARSER *working_parser, char *input);
 void parser_destroy(PARSER *working_parser);
