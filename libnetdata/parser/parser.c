@@ -72,21 +72,20 @@ void parser_add_keyword(PARSER *parser, char *keyword, keyword_function func) {
     PARSER_KEYWORD *t = callocz(1, sizeof(*t));
     t->worker_job_id = parser->worker_job_next_id++;
     t->keyword = strdupz(keyword);
-    t->hash = parser_hash_function(keyword);
-    t->slot = t->hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
     t->func = func;
 
-    if(parser->keywords.hashtable[t->slot])
-        fatal("PARSER: hashtable collision between keyword '%s' (%u) and '%s' (%u) on slot %u. "
+    uint32_t hash = parser_hash_function(keyword);
+    uint32_t slot = hash % PARSER_KEYWORDS_HASHTABLE_SIZE;
+
+    if(parser->keywords.hashtable[slot])
+        fatal("PARSER: hashtable collision between keyword '%s' and '%s' on slot %u. "
               "Change the hashtable size.",
-              parser->keywords.hashtable[t->slot]->keyword,
-              parser->keywords.hashtable[t->slot]->hash,
+              parser->keywords.hashtable[slot]->keyword,
               t->keyword,
-              t->hash,
-              t->slot
+              slot
               );
 
-    parser->keywords.hashtable[t->slot] = t;
+    parser->keywords.hashtable[slot] = t;
 
     worker_register_job_name(t->worker_job_id, t->keyword);
 }

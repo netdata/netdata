@@ -31,15 +31,8 @@ typedef PARSER_RC (*keyword_function)(char **words, size_t num_words, void *user
 typedef struct parser_keyword {
     size_t worker_job_id;
     char *keyword;
-    uint32_t hash;
-    uint32_t slot;
     keyword_function func;
 } PARSER_KEYWORD;
-
-typedef struct parser_data {
-    char  *line;
-    struct parser_data *next;
-} PARSER_DATA;
 
 typedef void (*parser_cleanup_t)(void *user);
 
