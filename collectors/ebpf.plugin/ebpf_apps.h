@@ -224,6 +224,7 @@ extern netdata_publish_dcstat_t **dcstat_pid;
 #ifndef NETDATA_EBPF_ALLOC_MAX_PID
 # define NETDATA_EBPF_ALLOC_MAX_PID 1024
 #endif
+#define NETDATA_EBPF_ALLOC_MIN_ELEMENTS 256
 
 extern void ebpf_aral_init(void);
 

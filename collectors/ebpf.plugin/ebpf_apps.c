@@ -16,6 +16,12 @@ ARAL *ebpf_aral_process_stat;
  */
 void ebpf_aral_init(void)
 {
+    size_t max_elements = NETDATA_EBPF_ALLOC_MAX_PID;
+    if (max_elements < NETDATA_EBPF_ALLOC_MIN_ELEMENTS) {
+        error("Number of elements given is too small, adjusting it for %d", NETDATA_EBPF_ALLOC_MIN_ELEMENTS);
+        max_elements = NETDATA_EBPF_ALLOC_MIN_ELEMENTS;
+    }
+
     ebpf_aral_apps_pid_stat = aral_create("ebpf-pid_stat", sizeof(struct ebpf_pid_stat),
                                           0, NETDATA_EBPF_ALLOC_MAX_PID,
                                           NULL, NULL, NULL, false, false);
