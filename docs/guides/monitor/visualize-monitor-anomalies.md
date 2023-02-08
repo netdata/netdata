@@ -1,5 +1,6 @@
 <!--
 title: "Monitor and visualize anomalies with Netdata (part 2)"
+sidebar_label: "Monitor and visualize anomalies with Netdata (part 2)"
 description: "Using unsupervised anomaly detection and machine learning, get notified "
 image: /img/seo/guides/monitor/visualize-monitor-anomalies.png
 author: "Joel Hans"

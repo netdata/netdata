@@ -1,5 +1,6 @@
 <!--
 title: "Monitor Nginx or Apache web server log files with Netdata"
+sidebar_label: "Monitor Nginx or Apache web server log files with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/collect-apache-nginx-web-logs.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

@@ -1,5 +1,6 @@
 <!--
 title: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
+sidebar_label: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
 description: "Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
 image: /img/seo/guides/monitor/lamp-stack.png
 author: "Joel Hans"

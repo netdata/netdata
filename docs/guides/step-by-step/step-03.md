@@ -1,5 +1,6 @@
 <!--
 title: "Step 3. Monitor more than one system with Netdata"
+sidebar_label: "Step 3. Monitor more than one system with Netdata"
 date: 2020-05-01
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-03.md
 learn_status: "Published"

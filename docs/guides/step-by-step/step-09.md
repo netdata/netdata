@@ -1,5 +1,6 @@
 <!--
 title: "Step 9. Long-term metrics storage"
+sidebar_label: "Step 9. Long-term metrics storage"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-09.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

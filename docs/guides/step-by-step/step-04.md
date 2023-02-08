@@ -1,5 +1,6 @@
 <!--
 title: "Step 4. The basics of configuring Netdata"
+sidebar_label: "Step 4. The basics of configuring Netdata"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-04.md
 learn_status: "Published"

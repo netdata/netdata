@@ -1,5 +1,6 @@
 <!--
 title: "Step 10. Set up a proxy"
+sidebar_label: "Step 10. Set up a proxy"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-10.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

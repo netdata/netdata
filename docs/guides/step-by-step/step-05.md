@@ -1,5 +1,6 @@
 <!--
 title: "Step 5. Health monitoring alarms and notifications"
+sidebar_label: "Step 5. Health monitoring alarms and notifications"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-05.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

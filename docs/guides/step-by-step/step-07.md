@@ -1,5 +1,6 @@
 <!--
 title: "Step 7. Netdata's dashboard in depth"
+sidebar_label: "Step 7. Netdata's dashboard in depth"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-07.md
 learn_status: "Published"

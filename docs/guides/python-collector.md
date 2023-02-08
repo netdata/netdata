@@ -1,5 +1,6 @@
 <!--
 title: "Develop a custom data collector in Python"
+sidebar_label: "Develop a custom data collector in Python"
 description: "Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box."
 image: /img/seo/guides/python-collector.png
 author: "Panagiotis Papaioannou"

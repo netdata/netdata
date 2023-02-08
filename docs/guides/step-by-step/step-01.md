@@ -1,5 +1,6 @@
 <!--
 title: "Step 1. Netdata's building blocks"
+sidebar_label: "Step 1. Netdata's building blocks"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-01.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

@@ -1,5 +1,6 @@
 <!--
 title: "Unsupervised anomaly detection for Raspberry Pi monitoring"
+sidebar_label: "Unsupervised anomaly detection for Raspberry Pi monitoring"
 description: "Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi."
 image: /img/seo/guides/monitor/raspberry-pi-anomaly-detection.png
 author: "Andy Maguire"

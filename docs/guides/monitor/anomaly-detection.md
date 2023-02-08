@@ -1,5 +1,6 @@
 <!--
 title: "Machine learning (ML) powered anomaly detection"
+sidebar_label: "Machine learning (ML) powered anomaly detection"
 description: "Detect anomalies in any system, container, or application in your infrastructure with machine learning and the open-source Netdata Agent."
 image: /img/seo/guides/monitor/anomaly-detection.png
 author: "Andrew Maguire"

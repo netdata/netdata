@@ -1,5 +1,6 @@
 <!--
 title: "Monitor CockroachDB metrics with Netdata"
+sidebar_label: "Monitor CockroachDB metrics with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor-cockroachdb.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

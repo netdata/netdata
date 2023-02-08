@@ -1,5 +1,6 @@
 <!--
 title: "Netdata Longer Metrics Retention"
+sidebar_label: "Netdata Longer Metrics Retention"
 description: ""
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/longer-metrics-storage.md
 learn_status: "Published"

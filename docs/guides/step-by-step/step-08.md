@@ -1,5 +1,6 @@
 <!--
 title: "Step 8. Build your first custom dashboard"
+sidebar_label: "Step 8. Build your first custom dashboard"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-08.md
 learn_status: "Published"
 learn_topic_type: "Tasks"

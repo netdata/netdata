@@ -1,5 +1,6 @@
 <!--
 title: "Troubleshoot Agent-Cloud connectivity issues"
+sidebar_label: "Troubleshoot Agent-Cloud connectivity issues"
 description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
 learn_status: "Published"

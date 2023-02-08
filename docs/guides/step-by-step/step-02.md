@@ -1,5 +1,6 @@
 <!--
 title: "Step 2. Get to know Netdata's dashboard"
+sidebar_label: "Step 2. Get to know Netdata's dashboard"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-02.md
 learn_status: "Published"

@@ -1,5 +1,6 @@
 <!--
 title: "Monitor a Hadoop cluster with Netdata"
+sidebar_label: "Monitor a Hadoop cluster with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor-hadoop-cluster.md
 learn_status: "Published"
 learn_topic_type: "Tasks"
