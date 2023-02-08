@@ -1,6 +1,10 @@
 <!--
-title: "shell exporter"
+title: "Shell exporter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/exporters/shell/README.md
+sidebar_label: "Shell exporter"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web/Api/Exporters"
 -->
 
 # shell exporter

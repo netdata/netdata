@@ -1,6 +1,10 @@
 <!--
 title: "Atlassian Confluence dashboards"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/confluence/README.md
+sidebar_label: "Atlassian Confluence dashboards"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Developers/Web"
 -->
 
 # Atlassian Confluence dashboards
