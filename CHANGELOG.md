@@ -6,12 +6,20 @@
 
 **Merged pull requests:**
 
+- Add mention of cloud in next steps UI etc [\#14459](https://github.com/netdata/netdata/pull/14459) ([cakrit](https://github.com/cakrit))
+- do not report dimensions that failed to be queried [\#14447](https://github.com/netdata/netdata/pull/14447) ([ktsaou](https://github.com/ktsaou))
+- Fix agent build failure on FreeBSD 14.0 due to new tcpstat struct [\#14446](https://github.com/netdata/netdata/pull/14446) ([Dim-P](https://github.com/Dim-P))
 - minor fix in the metadata of libnetdata/ebpf AND log documents [\#14445](https://github.com/netdata/netdata/pull/14445) ([tkatsoulas](https://github.com/tkatsoulas))
+- Roles permissions docs [\#14444](https://github.com/netdata/netdata/pull/14444) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
+- Streaming interpolated values [\#14431](https://github.com/netdata/netdata/pull/14431) ([ktsaou](https://github.com/ktsaou))
 - Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
 - kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
 - add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
 - Roles permissions docs [\#14391](https://github.com/netdata/netdata/pull/14391) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- add note about not needing to have room id [\#14390](https://github.com/netdata/netdata/pull/14390) ([andrewm4894](https://github.com/andrewm4894))
+- Update the "Kubernetes visualizations" doc [\#14347](https://github.com/netdata/netdata/pull/14347) ([Ancairon](https://github.com/Ancairon))
+- Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
@@ -362,18 +370,6 @@
 - Use string\_freez instead of freez in rrdhost\_init\_timezone [\#13798](https://github.com/netdata/netdata/pull/13798) ([MrZammler](https://github.com/MrZammler))
 - Fix runtime directory ownership when installed as non-root user. [\#13797](https://github.com/netdata/netdata/pull/13797) ([Ferroin](https://github.com/Ferroin))
 - Fix minor typo in systemdunits.conf alert [\#13796](https://github.com/netdata/netdata/pull/13796) ([tkatsoulas](https://github.com/tkatsoulas))
-- Also enable rrdvars from health [\#13795](https://github.com/netdata/netdata/pull/13795) ([MrZammler](https://github.com/MrZammler))
-- feat\(python.d\): respect NETDATA\_INTERNALS\_MONITORING [\#13793](https://github.com/netdata/netdata/pull/13793) ([ilyam8](https://github.com/ilyam8))
-- Array Allocator Memory Leak Fix [\#13792](https://github.com/netdata/netdata/pull/13792) ([ktsaou](https://github.com/ktsaou))
-- Add variants of functions allowing callers to specify the time to use. [\#13791](https://github.com/netdata/netdata/pull/13791) ([vkalintiris](https://github.com/vkalintiris))
-- Remove extern from function declared in headers. [\#13790](https://github.com/netdata/netdata/pull/13790) ([vkalintiris](https://github.com/vkalintiris))
-- full memory tracking and profiling of Netdata Agent [\#13789](https://github.com/netdata/netdata/pull/13789) ([ktsaou](https://github.com/ktsaou))
-- allow disabling netdata monitoring section of the dashboard [\#13788](https://github.com/netdata/netdata/pull/13788) ([ktsaou](https://github.com/ktsaou))
-- Stop pulling in netcat as a mandatory dependency. [\#13787](https://github.com/netdata/netdata/pull/13787) ([Ferroin](https://github.com/Ferroin))
-- Initialize st-\>rrdvars from rrdset insert callback [\#13786](https://github.com/netdata/netdata/pull/13786) ([MrZammler](https://github.com/MrZammler))
-- Add Ubuntu 22.10 to supported distros, CI, and package builds. [\#13785](https://github.com/netdata/netdata/pull/13785) ([Ferroin](https://github.com/Ferroin))
-- minor - add host labels for ephemerality and nodes with unstable connections [\#13784](https://github.com/netdata/netdata/pull/13784) ([underhood](https://github.com/underhood))
-- Add a thread to asynchronously process metadata updates [\#13783](https://github.com/netdata/netdata/pull/13783) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
