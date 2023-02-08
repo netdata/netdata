@@ -33,8 +33,8 @@ static inline uint32_t small_hash32(const char *name) {
     unsigned char *s = (unsigned char *) name;
     uint32_t hash = 0;
     while (*s) {
-        hash += hash << 5;
-        hash ^= (uint32_t) *s++;
+        hash <<= 5;
+        hash += (uint32_t) *s++ - ' ';
     }
     return hash;
 }

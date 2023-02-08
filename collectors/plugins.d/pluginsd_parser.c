@@ -1928,13 +1928,14 @@ void pluginsd_keywords_init(PARSER *parser, PLUGINSD_KEYWORDS types) {
 struct pluginsd_user_unittest {
     size_t size;
     const char **hashtable;
+    uint32_t (*hash)(const char *s);
     size_t collisions;
 };
 
 void pluginsd_keyword_collision_check(PARSER *parser, char *keyword, keyword_function func __maybe_unused) {
     struct pluginsd_user_unittest *u = parser->user;
 
-    uint32_t hash = parser_hash_function(keyword);
+    uint32_t hash = u->hash(keyword);
     uint32_t slot = hash % u->size;
 
     if(u->hashtable[slot])
@@ -1943,42 +1944,61 @@ void pluginsd_keyword_collision_check(PARSER *parser, char *keyword, keyword_fun
     u->hashtable[slot] = keyword;
 }
 
+static struct {
+    const char *name;
+    uint32_t (*hash)(const char *s);
+    size_t slots_needed;
+} hashers[] = {
+    { .name = "djb2_hash32(s)", djb2_hash32, .slots_needed = 0, },
+    { .name = "fnv1_hash32(s)", fnv1_hash32, .slots_needed = 0, },
+    { .name = "fnv1a_hash32(s)", fnv1a_hash32, .slots_needed = 0, },
+    { .name = "larson_hash32(s)", larson_hash32, .slots_needed = 0, },
+    { .name = "small_hash32(s)", small_hash32, .slots_needed = 0, },
+
+    // terminator
+    { .name = NULL, NULL, .slots_needed = 0, },
+};
+
 int pluginsd_parser_unittest(void) {
     PARSER *p;
     size_t slots_to_check = 1000;
-    size_t i;
+    size_t i, h;
 
     // check for hashtable collisions
-    for(i = 10; i < slots_to_check ; i++) {
-        struct pluginsd_user_unittest user = {
-            .size = i,
-            .hashtable = callocz(i, sizeof(const char *)),
-            .collisions = 0,
-        };
+    for(h = 0; hashers[h].name ;h++) {
+        hashers[h].slots_needed = slots_to_check * 1000000;
 
-        p = parser_init(&user, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
-        pluginsd_keywords_init_internal(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING, pluginsd_keyword_collision_check);
-        parser_destroy(p);
+        for (i = 10; i < slots_to_check; i++) {
+            struct pluginsd_user_unittest user = {
+                    .hash = hashers[h].hash,
+                    .size = i,
+                    .hashtable = callocz(i, sizeof(const char *)),
+                    .collisions = 0,
+            };
 
-        freez(user.hashtable);
+            p = parser_init(&user, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+            pluginsd_keywords_init_internal(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING,
+                                            pluginsd_keyword_collision_check);
+            parser_destroy(p);
 
-        if(!user.collisions)
-            break;
+            freez(user.hashtable);
+
+            if (!user.collisions) {
+                hashers[h].slots_needed = i;
+                break;
+            }
+        }
     }
 
-    if(i == PARSER_KEYWORDS_HASHTABLE_SIZE) {
-        // validate it will work
-
-        p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
-        pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
-        parser_destroy(p);
-        return 0;
+    for(h = 0; hashers[h].name ;h++) {
+        if(hashers[h].slots_needed > 1000)
+            info("PARSER: hash function '%s' cannot be used without collisions under %zu slots", hashers[h].name, slots_to_check);
+        else
+            info("PARSER: hash function '%s' needs PARSER_KEYWORDS_HASHTABLE_SIZE (in parser.h) set to %zu", hashers[h].name, hashers[h].slots_needed);
     }
 
-    if(i < slots_to_check)
-        info("PARSER: hashtable size (PARSER_KEYWORDS_HASHTABLE_SIZE in parser.h) should be %zu", i);
-    else
-        info("PARSER: hashtable size (PARSER_KEYWORDS_HASHTABLE_SIZE in parser.h) cannot be unique up to %zu", slots_to_check);
-
-    return 1;
+    p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
+    parser_destroy(p);
+    return 0;
 }

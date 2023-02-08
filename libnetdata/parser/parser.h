@@ -6,11 +6,11 @@
 #include "../libnetdata.h"
 
 #define WORKER_PARSER_FIRST_JOB 3
-#define PARSER_KEYWORDS_HASHTABLE_SIZE 56 // unittest finds this magic number
 
 // this has to be in-sync with the same at receiver.c
 #define WORKER_RECEIVER_JOB_REPLICATION_COMPLETION (WORKER_PARSER_FIRST_JOB - 3)
 
+#define PARSER_KEYWORDS_HASHTABLE_SIZE 73 // unittest finds this magic number
 //#define parser_hash_function(s) djb2_hash32(s)
 //#define parser_hash_function(s) fnv1_hash32(s)
 //#define parser_hash_function(s) fnv1a_hash32(s)
