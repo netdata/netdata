@@ -1,7 +1,7 @@
 <!--
 title: "Events feed"
 sidebar_label: "Events feed"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/events-feed.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md"
 sidebar_position: "2800"
 learn_status: "Published"
 learn_topic_type: "Concepts"
@@ -56,4 +56,4 @@ All users will be able to see events from the Topology and Alerts domain but Aud
 
 ### Related Tasks
 
-- [How to use the Events feed?](https://github.com/netdata/netdata/blob/master/docs/cloud/view-evetns-feed.md)
+- [How to use the Events feed?](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/view-events-feed.md)

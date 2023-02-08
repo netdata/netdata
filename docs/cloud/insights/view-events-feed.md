@@ -1,7 +1,7 @@
 ---
 title: "How to use the Events Feed"
 sidebar_label: "How to use the Events Feed"
-custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/view-evetns-feed.md"
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/cloud/insights/view-events-feed.md"
 learn_status: "Published"
 sidebar_position: "5"
 learn_topic_type: "Tasks"
@@ -16,7 +16,7 @@ Netdata Cloud Events feed allows you to have insights into events that occurred 
 To access the Events feed you need:
 - A Netdata Cloud account
 
-> ⚠️ Based on your space's plan different allowances are defined to query past data. See more details at [What are the available events?](https://github.com/netdata/netdata/blob/master/docs/cloud/events-feed.md#what-are-the-available-events)
+> ⚠️ Based on your space's plan different allowances are defined to query past data. See more details at [What are the available events?](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md#what-are-the-available-events)
 > on the events feed documentation.
 
 ### Steps
@@ -52,4 +52,4 @@ Note: When you try to query a longer period than what your space allows you will
 ## Related Topics
 
 ### **Related Concepts**
-- [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/events-feed.md)
+- [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
