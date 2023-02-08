@@ -57,7 +57,7 @@ The installation process securely connects your Kubernetes cluster to stream met
 
   > :bookmark_tabs: Note
   >  
-  > If you plan to Connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+  > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
 
   For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 
@@ -70,7 +70,7 @@ Run `kubectl get services` and `kubectl get pods` to confirm that your cluster n
 
 <h3> Connect an existing Netdata installation to Netdata Cloud </h3>
 
-On an existing installation, in order to Connect it to Netdata Cloud you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override.
+On an existing installation, in order to connect it to Netdata Cloud you will need to override the configuration values by running the `helm upgrade` command and provide a file with the values to override.
 
 #### Steps
 
