@@ -1,6 +1,5 @@
 <!--
 title: "Step ∞. You're finished!"
-sidebar_label: "Step ∞. You're finished!"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-99.md
 sidebar_label: "Step ∞. You're finished!"
 learn_status: "Published"
