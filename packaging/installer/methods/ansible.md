@@ -1,12 +1,8 @@
 <!--
 title: "Deploy Netdata with Ansible"
 description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
-<<<<<<< HEAD:packaging/installer/methods/ansible.md
 image: /img/seo/guides/deploy/ansible.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md
-=======
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/deploy/ansible.md
->>>>>>> 4ccc5b116 (add missing sidebar_labels to files left behind):docs/guides/deploy/ansible.md
 sidebar_label: "Install Netdata with Ansible"
 learn_status: "Published"
 learn_topic_type: "Tasks"
