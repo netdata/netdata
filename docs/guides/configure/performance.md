@@ -1,8 +1,12 @@
 <!--
-title: How to optimize the Netdata Agent's performance
+title: "How to optimize the Netdata Agent's performance"
+sidebar_label: "How to optimize the Netdata Agent's performance"
 description: "While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems."
 image: /img/seo/guides/configure/performance.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/configure/performance.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 
 # How to optimize the Netdata Agent's performance

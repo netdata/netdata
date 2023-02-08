@@ -1,6 +1,10 @@
 <!--
 title: "Donations"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Donations-netdata-has-received.md
+sidebar_label: "Donations"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Donations

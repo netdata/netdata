@@ -1,6 +1,10 @@
 <!--
 title: "Use host labels to organize systems, metrics, and alarms"
+sidebar_label: "Use host labels to organize systems, metrics, and alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/using-host-labels.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 
 # Use host labels to organize systems, metrics, and alarms

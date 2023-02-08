@@ -1,6 +1,10 @@
 <!--
 title: "Step 1. Netdata's building blocks"
+sidebar_label: "Step 1. Netdata's building blocks"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-01.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 1. Netdata's building blocks
@@ -29,9 +33,16 @@ be)](https://blog.netdata.cloud/posts/redefining-monitoring-netdata/)_.
 
 In the first step of the Netdata guide, you'll learn about:
 
--   [Netdata's core features](#netdatas-core-features)
--   [Why you should use Netdata](#why-you-should-use-netdata)
--   [How Netdata has complementary systems, not competitors](#how-netdata-has-complementary-systems-not-competitors)
+- [Step 1. Netdata's building blocks](#step-1-netdatas-building-blocks)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Netdata's core features](#netdatas-core-features)
+  - [Why you should use Netdata](#why-you-should-use-netdata)
+    - [Per-second data collection](#per-second-data-collection)
+    - [Unlimited metrics](#unlimited-metrics)
+    - [Meaningful presentation](#meaningful-presentation)
+    - [Immediate results](#immediate-results)
+  - [How Netdata has complementary systems, not competitors](#how-netdata-has-complementary-systems-not-competitors)
+  - [What's next?](#whats-next)
 
 Let's get started!
 

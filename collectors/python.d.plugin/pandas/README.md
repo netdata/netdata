@@ -1,6 +1,10 @@
 <!--
-title: "Pandas"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/pandas/README.md
+title: "Pandas Netdata Collector"
+sidebar_label: "Pandas Netdata Collector"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references"
 -->
 
 # Pandas Netdata Collector

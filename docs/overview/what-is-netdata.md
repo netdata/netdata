@@ -2,6 +2,10 @@
 title: "What is Netdata?"
 description: "Netdata is distributed, real-time performance and health monitoring for systems and applications on a single node or an entire infrastructure."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/overview/what-is-netdata.md
+sidebar_label: "What is Netdata"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Getting started"
 -->
 
 # What is Netdata?

@@ -1,6 +1,10 @@
 <!--
 title: "Security design"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-security.md
+sidebar_label: "Add more charts to Netdata"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts"
 -->
 
 # Security design
@@ -9,16 +13,21 @@ We have given special attention to all aspects of Netdata, ensuring that everyth
 
 **Table of Contents**
 
-1.  [Your data is safe with Netdata](#your-data-is-safe-with-netdata)
-2.  [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
-3.  [Netdata is read-only](#netdata-is-read-only)
-4.  [Netdata viewers authentication](#netdata-viewers-authentication)
-    *   [Why Netdata should be protected](#why-netdata-should-be-protected)
-    *   [Protect Netdata from the internet](#protect-netdata-from-the-internet)
-        * [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
-        * [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
-        * [Other methods](#other-methods)
-5.  [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
+- [Security design](#security-design)
+	- [Your data is safe with Netdata](#your-data-is-safe-with-netdata)
+	- [Your systems are safe with Netdata](#your-systems-are-safe-with-netdata)
+	- [Netdata is read-only](#netdata-is-read-only)
+	- [Netdata viewers authentication](#netdata-viewers-authentication)
+		- [Why Netdata should be protected](#why-netdata-should-be-protected)
+		- [Protect Netdata from the internet](#protect-netdata-from-the-internet)
+			- [Expose Netdata only in a private LAN](#expose-netdata-only-in-a-private-lan)
+			- [Fine-grained access control](#fine-grained-access-control)
+			- [Use an authenticating web server in proxy mode](#use-an-authenticating-web-server-in-proxy-mode)
+			- [Other methods](#other-methods)
+	- [Anonymous Statistics](#anonymous-statistics)
+		- [Registry or how to not send any information to a third party server](#registry-or-how-to-not-send-any-information-to-a-third-party-server)
+		- [Opt-out of anonymous statistics](#opt-out-of-anonymous-statistics)
+	- [Netdata directories](#netdata-directories)
 
 ## Your data is safe with Netdata
 

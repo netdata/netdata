@@ -1,6 +1,10 @@
 <!--
 title: "Step 9. Long-term metrics storage"
+sidebar_label: "Step 9. Long-term metrics storage"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-09.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 9. Long-term metrics storage
@@ -22,9 +26,12 @@ or disk it uses. Second, you can archive metrics to an external database. For th
 
 In this step of the Netdata guide, you'll learn how to:
 
--   [Tweak the database engine's settings](#tweak-the-database-engines-settings)
--   [Archive metrics to an external database](#archive-metrics-to-an-external-database)
-    -   [Use the MongoDB database](#archive-metrics-via-the-mongodb-exporting-connector)
+- [Step 9. Long-term metrics storage](#step-9-long-term-metrics-storage)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Tweak the database engine's settings](#tweak-the-database-engines-settings)
+  - [Archive metrics to an external database](#archive-metrics-to-an-external-database)
+    - [Archive metrics via the MongoDB exporting connector](#archive-metrics-via-the-mongodb-exporting-connector)
+  - [What's next?](#whats-next)
 
 Let's get started!
 

@@ -1,6 +1,10 @@
 <!--
 title: "Netdata for IoT"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md
+sidebar_label: "Netdata for IoT"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Guides"
 -->
 
 # Netdata for IoT

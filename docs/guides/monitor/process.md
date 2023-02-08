@@ -1,8 +1,12 @@
 <!--
 title: Monitor any process in real-time with Netdata
+sidebar_label: Monitor any process in real-time with Netdata
 description: "Tap into Netdata's powerful collectors, with per-second utilization metrics for every process, to troubleshoot faster and make data-informed decisions."
 image: /img/seo/guides/monitor/process.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/process.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 # Monitor any process in real-time with Netdata

@@ -2,6 +2,10 @@
 title: "Netdata style guide"
 description: "The Netdata style guide establishes editorial guidelines for all of Netdata's writing, including documentation, blog posts, in-product UX copy, and more."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/contributing/style-guide.md
+sidebar_label: "Netdata style guide"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Contribute"
 -->
 
 # Netdata style guide
@@ -374,20 +378,9 @@ this case, replace `/docs` with `/img/seo`, and then rebuild the remainder of th
 the path with `.png`. A member of the Netdata team will assist in creating the image when publishing the content.
 
 For example, here is the frontmatter for the guide
-about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/docs/guides/deploy/ansible.md).
+about [deploying the Netdata Agent with Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md).
 
-```markdown
-<!--
-title: Deploy Netdata with Ansible
-description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
-image: /img/seo/guides/deploy/ansible.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/deploy/ansible.md
--->
-
-# Deploy Netdata with Ansible
-
-...
-```
+<img width="751" alt="image" src="https://user-images.githubusercontent.com/43294513/217607958-ef0f270d-7947-4d91-a9a5-56b17b4255ee.png">
 
 Questions about frontmatter in
 documentation? [Ask on our community forum](https://community.netdata.cloud/c/blog-posts-and-articles/6).
@@ -401,7 +394,7 @@ Links should always reference the full path to the document, beginning at the ro
 
 For example, if you want to link to our node configuration document, link
 to `https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md`. To reference
-the guide for deploying the Netdata Agent with Ansible, link to `/docs/guides/deploy/ansible.md`.
+the guide for deploying the Netdata Agent with Ansible, link to `/packaging/installer/methods/ansible.md`.
 
 ### References to UI elements
 

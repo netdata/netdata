@@ -2,6 +2,10 @@
 title: "Create new dashboards"
 description: "Create new dashboards in Netdata Cloud, with any number of metrics from any node on your infrastructure, for targeted troubleshooting."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/visualize/create-dashboards.md
+sidebar_label: "Create new dashboards"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Operations/Netdata Cloud Visualizations"
 -->
 
 # Create new dashboards

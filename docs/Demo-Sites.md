@@ -2,6 +2,10 @@
 title: "Demo sites"
 date: 2020-03-26
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md
+sidebar_label: "Demo sites"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Demo sites

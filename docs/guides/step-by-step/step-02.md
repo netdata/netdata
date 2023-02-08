@@ -1,7 +1,11 @@
 <!--
 title: "Step 2. Get to know Netdata's dashboard"
+sidebar_label: "Step 2. Get to know Netdata's dashboard"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-02.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 2. Get to know Netdata's dashboard
@@ -18,11 +22,18 @@ over here and dig in.
 
 In this step of the Netdata guide, you'll learn how to:
 
--   [Visit and explore the dashboard](#visit-and-explore-the-dashboard)
--   [Explore available charts using menus](#explore-available-charts-using-menus)
--   [Read the descriptions accompanying charts](#read-the-descriptions-accompanying-charts)
--   [Interact with charts](#interact-with-charts)
--   [See raised alarms and the alarm log](#see-raised-alarms-and-the-alarm-log)
+- [Step 2. Get to know Netdata's dashboard](#step-2-get-to-know-netdatas-dashboard)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Visit and explore the dashboard](#visit-and-explore-the-dashboard)
+  - [Explore available charts using menus](#explore-available-charts-using-menus)
+  - [Read the descriptions accompanying charts](#read-the-descriptions-accompanying-charts)
+  - [Understand charts, dimensions, families, and contexts](#understand-charts-dimensions-families-and-contexts)
+  - [Interact with charts](#interact-with-charts)
+    - [Pan, zoom, highlight, and reset charts](#pan-zoom-highlight-and-reset-charts)
+    - [Show and hide dimensions](#show-and-hide-dimensions)
+    - [Resize charts](#resize-charts)
+  - [See raised alarms and the alarm log](#see-raised-alarms-and-the-alarm-log)
+  - [What's next?](#whats-next)
 
 Let's get started!
 
