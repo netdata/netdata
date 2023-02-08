@@ -7,6 +7,7 @@
 // ----------------------------------------------------------------------------
 // ARAL vectors used to speed up processing
 ARAL *ebpf_aral_apps_pid_stat;
+ARAL *ebpf_aral_process_stat;
 
 /**
  * eBPF ARAL Init
@@ -16,6 +17,10 @@ ARAL *ebpf_aral_apps_pid_stat;
 void ebpf_aral_init(void)
 {
     ebpf_aral_apps_pid_stat = aral_create("ebpf-pid_stat", sizeof(struct ebpf_pid_stat),
+                                          0, NETDATA_EBPF_ALLOC_MAX_PID,
+                                          NULL, NULL, NULL, false, false);
+
+    ebpf_aral_process_stat = aral_create("ebpf-proc_stat", sizeof(ebpf_process_stat_t),
                                           0, NETDATA_EBPF_ALLOC_MAX_PID,
                                           NULL, NULL, NULL, false, false);
 }
@@ -42,6 +47,30 @@ struct ebpf_pid_stat *ebpf_pid_stat_get(void)
 void ebpf_pid_stat_release(struct ebpf_pid_stat *stat)
 {
     aral_freez(ebpf_aral_apps_pid_stat, stat);
+}
+
+/**
+ * eBPF process stat get
+ *
+ * Get a ebpf_pid_stat entry to be used with a specific PID.
+ *
+ * @return it returns the address on success.
+ */
+ebpf_process_stat_t *ebpf_process_stat_get(void)
+{
+    ebpf_process_stat_t *target = aral_mallocz(ebpf_aral_process_stat);
+    memset(target, 0, sizeof(ebpf_process_stat_t));
+    return target;
+}
+
+/**
+ * eBPF process release
+ *
+ * @param stat Release a target after usage.
+ */
+void ebpf_process_stat_release(ebpf_process_stat_t *stat)
+{
+    aral_freez(ebpf_aral_process_stat, stat);
 }
 
 // ----------------------------------------------------------------------------
