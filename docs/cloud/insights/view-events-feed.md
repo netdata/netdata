@@ -25,11 +25,12 @@ To access the Events feed you need:
 1. You will be presented with a table listing the events that occurred from the timeframe defined on the date time picker
 1. You can use the filtering capabilities available on right-hand bar to slice through the results provide. See more details on event types and filters 
 
-TO-DO: Add details on error on space not having permission to access previous past data and also the Event inspector once it is done
+Note: When you try to query a longer period than what your space allows you will see the following message:
+> Your current plan provides access to events up to the last _X_ hours/days."
 
 #### Event types and filters
 
-| Event type | Tags | Nodes | Alert Status | Alert Names | Chart Name | 
+| Event type | Tags | Nodes | Alert Status | Alert Names | Chart Names | 
 | :-- | :-- | :-- | :-- | :-- | :-- |
 | Node Become Live | node, lifecycle | Node name | - | - | - |
 | Node Become Stale | node, lifecycle | Node name | - | - | - |
@@ -38,7 +39,15 @@ TO-DO: Add details on error on space not having permission to access previous pa
 | Node Removed | node, lifecycle | Node name | - | - | - |
 | Node Restored | node, lifecycle | Node name | - | - | - |
 | Node Deleted | node, lifecycle | Node name | - | - | - |
+| Agent Claimed | agent | - | - | - | - | 
+| Agent Connected | agent | - | - | - | - | 
+| Agent Disconnected | agent | - | - | - | - | 
+| Agent Authenticated | agent | - | - | - | - | 
+| Agent Authentication Failed | agent | - | - | - | - | 
+| Space Statistics | space, node, statistics | Node name | - | - | - |
 | Node Alert State Changed | alert, node | Node name | Cleared, Warning, Critical, Removed, Error or Unknown | Alert name | Chart name |
+
+
 
 ## Related Topics
 
