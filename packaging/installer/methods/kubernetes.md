@@ -37,20 +37,9 @@ To deploy Kubernetes monitoring with Netdata, you need:
 
 ## Deploy Netdata on your Kubernetes Cluster
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-To start [Kubernetes monitoring](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md), you must first install Netdata, and then
-[connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
-connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations like the health map and time-series composite charts.
-=======
-First, you need to install Netdata, and then connect your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). The connection process securely
-connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
-=======
 First, you need to install Netdata, and then connect your Kubernetes cluster to [Netdata Cloud](https://app.netdata.cloud). 
 The connection process securely connects your Kubernetes cluster to stream metrics data to Netdata Cloud, enabling Kubernetes-specific visualizations
->>>>>>> 634c765d1 (Make the file GitHub friendly)
 like the health map and time-series composite charts.
->>>>>>> 7824ceadb (Suggestions from code review)
 
 <Tabs groupId="installation_type">
 <TabItem value="new_installations" label="New Installations">
