@@ -36,7 +36,7 @@ Idempotency means you can run an Ansible playbook against your nodes any number 
 operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
 
 In this guide, we'll walk through the process of using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/netdata-agent-deployment/ansible-quickstart) to automatically
+playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/) to automatically
 deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
 your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
 minutes.
