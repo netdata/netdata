@@ -85,17 +85,6 @@ typedef enum netdata_publish_process {
     NETDATA_KEY_PUBLISH_PROCESS_END
 } netdata_publish_process_t;
 
-typedef struct ebpf_process_publish_apps {
-    // Number of calls during the last read
-    uint64_t call_do_exit;
-    uint64_t call_release_task;
-    uint64_t create_process;
-    uint64_t create_thread;
-
-    // Number of errors during the last read
-    uint64_t task_err;
-} ebpf_process_publish_apps_t;
-
 enum ebpf_process_tables {
     NETDATA_PROCESS_PID_TABLE,
     NETDATA_PROCESS_GLOBAL_TABLE,

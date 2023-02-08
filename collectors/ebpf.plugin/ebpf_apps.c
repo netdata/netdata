@@ -1043,9 +1043,6 @@ void cleanup_exited_pids()
             freez(global_process_stats[r]);
             global_process_stats[r] = NULL;
 
-            freez(current_apps_data[r]);
-            current_apps_data[r] = NULL;
-
             cleanup_variables_from_other_threads(r);
 
             del_pid_entry(r);
@@ -1165,9 +1162,6 @@ void collect_data_for_all_processes(int tbl_pid_stats_fd)
             // Clean Process structures
             freez(w);
             global_process_stats[key] = NULL;
-
-            freez(current_apps_data[key]);
-            current_apps_data[key] = NULL;
 
             cleanup_variables_from_other_threads(key);
 
