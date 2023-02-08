@@ -30,12 +30,17 @@ At a high-level view, these are the domains from which the Events feed will prov
 | Node Become Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` is on live **state** |
 | Node Become Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` is on **stale** state |
 | Node Become Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` is on **offline** state |
-| Node Created | The node is created but it is still Unseen on Cloud, didn't establish a successful connection yet.| TO-DO |
-| Node Removed | The node was removed from the Space through the `Delete` action, if it becomes Live again it will be automatically added. | TO-DO |
-| Node Restored | The node is restored, if node becomes Live after a remove action it is re-added to the Space. | TO-DO |
-| Node Deleted | The node is deleted from the Space, see this as a hard delete and won't be re-added to the Space if it becomes live. | TO-DO |
+| Node Created | The node is created but it is still Unseen on Cloud, didn't establish a successful connection yet.| Node `ip-xyz.ec2.internal` is on **unseen** state |
+| Node Removed | The node was removed from the Space through the `Delete` action, if it becomes Live again it will be automatically added. | Node `ip-xyz.ec2.internal` was **deleted(soft)** |
+| Node Restored | The node is restored, if node becomes Live after a remove action it is re-added to the Space. | Node `ip-xyz.ec2.internal` was **restored** |
+| Node Deleted | The node is deleted from the Space, see this as a hard delete and won't be re-added to the Space if it becomes live. | Node `ip-xyz.ec2.internal` was **deleted(hard)** |
+| Agent Claimed | <p>The agent was successfully registered to Netdata Cloud and is able to connect.</p><p>These events can only be seen on _All nodes_ War Room.</p> | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` was claimed. |
+| Agent Connected | <p>The agent connected to the Netdata Cloud MQTT server (Agent-Cloud Link established).</p><p>These events can only be seen on _All nodes_ War Room.</p>  | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has connected to Cloud. |
+| Agent Disconnected | <p>The agent disconnected from the Netdata Cloud MQTT server (Agent-Cloud Link severed).</p><p>These events can only be seen on _All nodes_ War Room.</p> | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has disconnected from Cloud: **Connection Timeout**. |
+| Agent Authenticated | <p>The agent successfully authenticated itself to Netdata Cloud.</p><p>These events can only be seen on _All nodes_ War Room.</p> | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has successfully authenticated. |
+| Agent Authentication Failed | <p>The agent failed to authenticate itself to Netdata Cloud.</p><p>These events can only be seen on _All nodes_ War Room.</p> | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has failed to authenticate. |
+| Space Statistics | <p>Daily snapshot of space node statistics.</p><p>These events can only be seen on _All nodes_ War Room.</p> | Space statistics. Nodes: **22 live**, **21 stale**, **18 removed**, **61 total**. |
 
-TO-DO: Agent events?
 
 ##### Alert events
 
