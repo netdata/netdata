@@ -1,6 +1,10 @@
 <!--
 title: "Read documentation on <https://learn.netdata.cloud>"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/README.md
+sidebar_label: "Old welcome to Documentation message doc"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Read documentation on <https://learn.netdata.cloud>

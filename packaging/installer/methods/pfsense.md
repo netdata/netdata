@@ -2,6 +2,10 @@
 title: "Install Netdata on pfSense"
 description: "Install Netdata on pfSense to monitor the health and performance of firewalls with thousands of real-time, per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/pfsense.md
+sidebar_label: "Install Netdata on pfSense"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on pfSense

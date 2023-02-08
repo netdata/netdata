@@ -2,6 +2,10 @@
 title: "Use the Agent with Netdata Cloud"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/agent-cloud.md
+sidebar_label: "Use the Agent with Netdata Cloud"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Use the Agent with Netdata Cloud

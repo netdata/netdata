@@ -1,6 +1,10 @@
 <!--
 title: "Netdata contrib"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/contrib/README.md
+sidebar_label: "Netdata contrib"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers"
 -->
 
 # Netdata contrib
