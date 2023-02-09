@@ -94,7 +94,7 @@ DICTIONARY *rrdvariables_create(void) {
 }
 
 DICTIONARY *health_rrdvariables_create(void) {
-    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED, &dictionary_stats_category_rrdhealth, 0);
+    DICTIONARY *dict = dictionary_create_advanced(DICT_OPTION_NONE, &dictionary_stats_category_rrdhealth, 0);
 
     dictionary_register_insert_callback(dict, rrdvar_insert_callback, NULL);
     dictionary_register_delete_callback(dict, rrdvar_delete_callback, NULL);
