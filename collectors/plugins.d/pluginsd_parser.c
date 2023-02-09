@@ -409,6 +409,7 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
     pluginsd_host_define_cleanup(user);
 
     u->host = host;
+    pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_HOST_DEFINE_END);
 
     return PARSER_RC_OK;
 }
