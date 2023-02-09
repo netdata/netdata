@@ -5,8 +5,9 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-st
 learn_status: "Published"
 sidebar_position: "1"
 learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
+learn_rel_path: "Slugs"
 learn_docs_purpose: "Present netdata in a nutshell"
+slug: "/getting-started"
 -->
 
 ## What is Netdata ?
