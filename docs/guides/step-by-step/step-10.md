@@ -1,6 +1,10 @@
 <!--
 title: "Step 10. Set up a proxy"
+sidebar_label: "Step 10. Set up a proxy"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-10.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 10. Set up a proxy
@@ -24,10 +28,17 @@ publicly-accessible remote server.
 
 In this step of the Netdata guide, you'll learn:
 
--   [What a proxy is and the benefits of using one](#wait-whats-a-proxy)
--   [How to connect Netdata to Nginx](#connect-netdata-to-nginx)
--   [How to enable HTTPS in Nginx](#enable-https-in-nginx)
--   [How to secure your Netdata dashboard with a password](#secure-your-netdata-dashboard-with-a-password)
+- [Step 10. Set up a proxy](#step-10-set-up-a-proxy)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Wait. What's a proxy?](#wait-whats-a-proxy)
+  - [Required before you start](#required-before-you-start)
+    - [Nginx and Certbot](#nginx-and-certbot)
+    - [Fully qualified domain name](#fully-qualified-domain-name)
+    - [Subdomain for Netdata](#subdomain-for-netdata)
+  - [Connect Netdata to Nginx](#connect-netdata-to-nginx)
+  - [Enable HTTPS in Nginx](#enable-https-in-nginx)
+  - [Secure your Netdata dashboard with a password](#secure-your-netdata-dashboard-with-a-password)
+  - [What's next?](#whats-next)
 
 Let's dive in!
 

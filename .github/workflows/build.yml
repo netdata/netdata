@@ -232,7 +232,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Build test environment
         id: build1
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
         with:
           push: false
@@ -250,7 +250,7 @@ jobs:
       - name: Build test environment (attempt 2)
         if: ${{ steps.build1.outcome == 'failure' }}
         id: build2
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         continue-on-error: true # We retry 3 times at 5 minute intervals if there is a failure here.
         with:
           push: false
@@ -268,7 +268,7 @@ jobs:
       - name: Build test environment (attempt 3)
         if: ${{ steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure' }}
         id: build3
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           push: false
           load: false
@@ -657,7 +657,7 @@ jobs:
           credentials_json: ${{ secrets.GCS_STORAGE_SERVICE_KEY_JSON }}
       - name: Setup GCS
         id: gcs-setup
-        uses: google-github-actions/setup-gcloud@v1.0.1
+        uses: google-github-actions/setup-gcloud@v1.1.0
       - name: Upload Artifacts
         id: upload
         uses: google-github-actions/upload-cloud-storage@v1.0.0

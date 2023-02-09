@@ -1,11 +1,15 @@
 <!--
 title: "Monitor and visualize anomalies with Netdata (part 2)"
+sidebar_label: "Monitor and visualize anomalies with Netdata (part 2)"
 description: "Using unsupervised anomaly detection and machine learning, get notified "
 image: /img/seo/guides/monitor/visualize-monitor-anomalies.png
 author: "Joel Hans"
 author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/visualize-monitor-anomalies.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 Welcome to part 2 of our series of guides on using _unsupervised anomaly detection_ to detect issues with your systems,

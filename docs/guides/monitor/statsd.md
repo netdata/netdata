@@ -1,11 +1,15 @@
 <!--
 title: How to use any StatsD data source with Netdata
+sidebar_label: How to use any StatsD data source with Netdata
 description: "Learn how to monitor any custom application instrumented with StatsD with per-second metrics and fully customizable, interactive charts."
 image: /img/seo/guides/monitor/statsd.png
 author: "Odysseas Lamtzidis"
 author_title: "Developer Advocate"
 author_img: "/img/authors/odysseas-lamtzidis.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/statsd.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 # StatsD Guide

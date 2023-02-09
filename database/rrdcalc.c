@@ -245,6 +245,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     if(!rc->units)
         rc->units = string_dup(st->units);
 
+    rrdvar_store_for_chart(host, st);
+
     rrdcalc_update_info_using_rrdset_labels(rc);
 
     time_t now = now_realtime_sec();

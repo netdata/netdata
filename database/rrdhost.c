@@ -1226,6 +1226,7 @@ void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host, bool force) {
     rrdfamily_index_destroy(host);
     rrdfunctions_destroy(host);
     rrdvariables_destroy(host->rrdvars);
+    rrdvariables_destroy(health_rrdvars);
 
     rrdhost_destroy_rrdcontexts(host);
 

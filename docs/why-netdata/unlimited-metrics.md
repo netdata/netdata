@@ -1,6 +1,10 @@
 <!--
 title: "Unlimited metrics"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/unlimited-metrics.md
+sidebar_label: "Unlimited metrics"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts/Why Netdata"
 -->
 
 # Unlimited metrics

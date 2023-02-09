@@ -1,8 +1,11 @@
 <!--
 title: "Single-node monitoring with Netdata"
-sidebar_label: "Single-node monitoring"
 description: "Learn dashboard basics, configuring your nodes, and collecting metrics from applications to create a powerful single-node monitoring tool."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/single-node.md
+sidebar_label: "Infrastructure monitoring with Netdata"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Possible old, not wanted documents"
 -->
 
 # Single-node monitoring with Netdata

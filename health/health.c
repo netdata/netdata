@@ -17,6 +17,11 @@
 #error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 10
 #endif
 
+unsigned int default_health_enabled = 1;
+char *silencers_filename;
+SIMPLE_PATTERN *conf_enabled_alarms = NULL;
+DICTIONARY *health_rrdvars;
+
 static bool prepare_command(BUFFER *wb,
                             const char *exec,
                             const char *recipient,
@@ -156,10 +161,6 @@ static bool prepare_command(BUFFER *wb,
 
     return true;
 }
-
-unsigned int default_health_enabled = 1;
-char *silencers_filename;
-SIMPLE_PATTERN *conf_enabled_alarms = NULL;
 
 // the queue of executed alarm notifications that haven't been waited for yet
 static struct {
@@ -925,19 +926,6 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
         worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDSET);
 
-        if(!st->rrdfamily)
-            st->rrdfamily = rrdfamily_add_and_acquire(host, rrdset_family(st));
-
-        if(!st->rrdvars)
-            st->rrdvars = rrdvariables_create();
-
-        rrddimvar_index_init(st);
-
-        rrdsetvar_add_and_leave_released(st, "last_collected_t", RRDVAR_TYPE_TIME_T, &st->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "green", RRDVAR_TYPE_CALCULATED, &st->green, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "red", RRDVAR_TYPE_CALCULATED, &st->red, RRDVAR_FLAG_NONE);
-        rrdsetvar_add_and_leave_released(st, "update_every", RRDVAR_TYPE_INT, &st->update_every, RRDVAR_FLAG_NONE);
-
         rrdcalc_link_matching_alerts_to_rrdset(st);
         rrdcalctemplate_link_matching_templates_to_rrdset(st);
 
@@ -948,19 +936,19 @@ static void health_execute_delayed_initializations(RRDHOST *host) {
 
             worker_is_busy(WORKER_HEALTH_JOB_DELAYED_INIT_RRDDIM);
 
-            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_CALCULATED, NULL, NULL, &rd->last_stored_value, RRDVAR_FLAG_NONE);
-            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_COLLECTED, NULL, "_raw", &rd->last_collected_value, RRDVAR_FLAG_NONE);
-            rrddimvar_add_and_leave_released(rd, RRDVAR_TYPE_TIME_T, NULL, "_last_collected_t", &rd->last_collected_time.tv_sec, RRDVAR_FLAG_NONE);
-
             RRDCALCTEMPLATE *rt;
             foreach_rrdcalctemplate_read(host, rt) {
                 if(!rt->foreach_dimension_pattern)
                     continue;
 
-                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host))
+                if(rrdcalctemplate_check_rrdset_conditions(rt, st, host)) {
                     rrdcalctemplate_check_rrddim_conditions_and_link(rt, st, rd, host);
+                }
             }
             foreach_rrdcalctemplate_done(rt);
+
+            if(health_variable_check(health_rrdvars, st, rd))
+                    rrdvar_store_for_chart(host, st);
         }
         rrddim_foreach_done(rd);
     }

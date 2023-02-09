@@ -78,6 +78,8 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 /usr/libexec/netdata/plugins.d/alarm-notify.sh test "ROLE"
 ```
 
+If you are [running your own registry](https://github.com/netdata/netdata/blob/master/registry/README.md#run-your-own-registry), add `export NETDATA_REGISTRY_URL=[YOUR_URL]` before calling `alarm-notify.sh`.
+
 Note that in versions before 1.16, the plugins.d directory may be installed in a different location in certain OSs (e.g. under `/usr/lib/netdata`). You can always find the location of the alarm-notify.sh script in `netdata.conf`.
 
 If you need to dig even deeper, you can trace the execution with `bash -x`. Note that in test mode, alarm-notify.sh calls itself with many more arguments. So first do

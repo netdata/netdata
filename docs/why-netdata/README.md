@@ -1,6 +1,10 @@
 <!--
 title: "Why Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/why-netdata/README.md
+sidebar_label: "Why Netdata"
+learn_status: "Published"
+learn_topic_type: "Concepts"
+learn_rel_path: "Concepts/Why Netdata"
 -->
 
 # Why Netdata

@@ -1,7 +1,11 @@
 <!--
 title: "Step 4. The basics of configuring Netdata"
+sidebar_label: "Step 4. The basics of configuring Netdata"
 date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-04.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 4. The basics of configuring Netdata
@@ -17,10 +21,13 @@ Next up: configuration.
 
 We'll talk about Netdata's default configuration, and then you'll learn how to do the following:
 
--   [Find your `netdata.conf` file](#find-your-netdataconf-file)
--   [Use edit-config to open `netdata.conf`](#use-edit-config-to-open-netdataconf)
--   [Navigate the structure of `netdata.conf`](#the-structure-of-netdataconf)
--   [Edit your `netdata.conf` file](#edit-your-netdataconf-file)
+- [Step 4. The basics of configuring Netdata](#step-4-the-basics-of-configuring-netdata)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Find your `netdata.conf` file](#find-your-netdataconf-file)
+  - [Use edit-config to open `netdata.conf`](#use-edit-config-to-open-netdataconf)
+  - [The structure of `netdata.conf`](#the-structure-of-netdataconf)
+    - [Edit your `netdata.conf` file](#edit-your-netdataconf-file)
+  - [What's next?](#whats-next)
 
 ## Find your `netdata.conf` file
 

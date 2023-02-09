@@ -1,6 +1,10 @@
 <!--
 title: "Install Netdata on FreeNAS"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freenas.md
+sidebar_label: "Install Netdata on FreeNAS"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on FreeNAS

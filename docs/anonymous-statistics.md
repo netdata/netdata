@@ -1,6 +1,10 @@
 <!--
 title: "Anonymous statistics"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/anonymous-statistics.md
+sidebar_label: "Anonymous statistics"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References"
 -->
 
 # Anonymous statistics

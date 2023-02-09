@@ -1,6 +1,10 @@
 <!--
 title: "A GitHub star is important"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/a-github-star-is-important.md
+sidebar_label: "A GitHub star is important"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Misc"
 -->
 
 # A GitHub star is important

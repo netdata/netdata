@@ -4,13 +4,13 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-version="7.82.0"
+version="7.87.0"
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building cURL" || true
 
 fetch "curl-${version}" "https://curl.haxx.se/download/curl-${version}.tar.gz" \
-    910cc5fe279dc36e2cca534172c94364cf3fcf7d6494ba56e6c61a390881ddce curl
+    8a063d664d1c23d35526b87a2bf15514962ffdd8ef7fd40519191b3c23e39548 curl
 
 export CFLAGS="-I/openssl-static/include -pipe"
 export LDFLAGS="-static -L/openssl-static/lib"

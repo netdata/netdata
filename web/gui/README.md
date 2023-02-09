@@ -2,6 +2,10 @@
 title: "Local Agent dashboard"
 description: "The local Netdata Agent dashboard is the heart of health monitoring and performance troubleshooting, with hundreds of real-time charts."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/gui/README.md
+sidebar_label: "Local Agent dashboard"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References"
 -->
 
 # Local Agent dashboard
@@ -28,10 +32,14 @@ behind an [Nginx proxy](https://github.com/netdata/netdata/blob/master/docs/Runn
 
 Beyond charts, the local dashboard can be broken down into three key areas:
 
-1.  [**Sections**](#sections)
-2.  [**Time & date picker**](#time--date-picker)
-3.  [**Metrics menus/submenus**](#metrics-menus)
-4.  [**Netdata Cloud menus: Spaces, War Rooms, and Visited nodes)**](#cloud-menus-spaces-war-rooms-and-visited-nodes)
+- [Local Agent dashboard](#local-agent-dashboard)
+  - [Navigating the local dashboard](#navigating-the-local-dashboard)
+    - [Sections](#sections)
+    - [Time \& date picker](#time--date-picker)
+    - [Metrics menus](#metrics-menus)
+    - [Cloud menus (Spaces, War Rooms, and Visited nodes)](#cloud-menus-spaces-war-rooms-and-visited-nodes)
+  - [Customizing the local dashboard](#customizing-the-local-dashboard)
+  - [Custom dashboards](#custom-dashboards)
 
 ![Annotated screenshot of the local Agent
 dashboard](https://user-images.githubusercontent.com/1153921/101509403-f7e59400-3935-11eb-9abd-cbecfa3ee49a.png)

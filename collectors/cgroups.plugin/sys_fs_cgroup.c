@@ -589,7 +589,8 @@ void netdata_cgroup_ebpf_initialize_shm()
                                                                        PROT_READ | PROT_WRITE, MAP_SHARED,
                                                                        shm_fd_cgroup_ebpf, 0);
 
-    if (!shm_cgroup_ebpf.header) {
+    if (unlikely(MAP_FAILED == shm_cgroup_ebpf.header)) {
+        shm_cgroup_ebpf.header = NULL;
         collector_error("Cannot map shared memory used between cgroup and eBPF, integration won't happen");
         goto end_init_shm;
     }
@@ -606,6 +607,7 @@ void netdata_cgroup_ebpf_initialize_shm()
 
     collector_error("Cannot create semaphore, integration between eBPF and cgroup won't happen");
     munmap(shm_cgroup_ebpf.header, length);
+    shm_cgroup_ebpf.header = NULL;
 
 end_init_shm:
     close(shm_fd_cgroup_ebpf);

@@ -1,11 +1,15 @@
 <!--
 title: "Develop a custom data collector in Python"
+sidebar_label: "Develop a custom data collector in Python"
 description: "Learn how write a custom data collector in Python, which you'll use to collect metrics from and monitor any application that isn't supported out of the box."
 image: /img/seo/guides/python-collector.png
 author: "Panagiotis Papaioannou"
 author_title: "University of Patras"
 author_img: "/img/authors/panagiotis-papaioannou.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 
 # Develop a custom data collector in Python

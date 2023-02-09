@@ -185,6 +185,51 @@ static inline int health_parse_repeat(
     return 1;
 }
 
+static inline int isvariableterm(const char s) {
+    if(isalnum(s) || s == '.' || s == '_')
+        return 0;
+
+    return 1;
+}
+
+static inline void parse_variables_and_store_in_health_rrdvars(char *value, size_t len) {
+    const char *s = value;
+    char buffer[RRDVAR_MAX_LENGTH];
+
+    // $
+    while (*s) {
+        if(*s == '$') {
+            size_t i = 0;
+            s++;
+
+            if(*s == '{') {
+                // ${variable_name}
+
+                s++;
+                while (*s && *s != '}' && i < len)
+                    buffer[i++] = *s++;
+
+                if(*s == '}')
+                    s++;
+            }
+            else {
+                // $variable_name
+
+                while (*s && !isvariableterm(*s) && i < len)
+                    buffer[i++] = *s++;
+            }
+
+            buffer[i] = '\0';
+
+            //TODO: check and try to store only variables
+            STRING *name_string = rrdvar_name_to_string(buffer);
+            rrdvar_add("health", health_rrdvars, name_string, RRDVAR_TYPE_CALCULATED, RRDVAR_FLAG_CONFIG_VAR, NULL);
+            string_freez(name_string);
+        } else
+            s++;
+    }
+}
+
 /**
  * Health pattern from Foreach
  *
@@ -769,6 +814,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 alert_cfg->warn = string_strdupz(value);
@@ -779,6 +825,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 alert_cfg->crit = string_strdupz(value);
@@ -789,6 +836,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalc_name(rc), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 alert_cfg->exec = string_strdupz(value);
@@ -1031,6 +1079,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
                 alert_cfg->warn = string_strdupz(value);
@@ -1041,6 +1090,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
                 alert_cfg->crit = string_strdupz(value);
@@ -1051,6 +1101,7 @@ static int health_readfile(const char *filename, void *data) {
                     error("Health configuration at line %zu of file '%s' for template '%s' at key '%s' has unparse-able expression '%s': %s at '%s'",
                             line, filename, rrdcalctemplate_name(rt), key, value, expression_strerror(error), failed_at);
                 }
+                parse_variables_and_store_in_health_rrdvars(value, HEALTH_CONF_MAX_LINE);
             }
             else if(hash == hash_exec && !strcasecmp(key, HEALTH_EXEC_KEY)) {
                 alert_cfg->exec = string_strdupz(value);
@@ -1184,6 +1235,9 @@ void health_readdir(RRDHOST *host, const char *user_path, const char *stock_path
         log_health("[%s]: Netdata will not load stock alarms.", rrdhost_hostname(host));
         stock_path = user_path;
     }
+
+    if (!health_rrdvars)
+        health_rrdvars = health_rrdvariables_create();
 
     recursive_config_double_dir_load(user_path, stock_path, subpath, health_readfile, (void *) host, 0);
     log_health("[%s]: Read health configuration.", rrdhost_hostname(host));

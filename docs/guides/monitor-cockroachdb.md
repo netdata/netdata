@@ -1,6 +1,10 @@
 <!--
 title: "Monitor CockroachDB metrics with Netdata"
+sidebar_label: "Monitor CockroachDB metrics with Netdata"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor-cockroachdb.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides"
 -->
 
 # Monitor CockroachDB metrics with Netdata
@@ -20,9 +24,12 @@ Let's dive in and walk through the process of monitoring CockroachDB metrics wit
 
 ## What's in this guide
 
-- [Configure the CockroachDB collector](#configure-the-cockroachdb-collector)
+- [Monitor CockroachDB metrics with Netdata](#monitor-cockroachdb-metrics-with-netdata)
+  - [What's in this guide](#whats-in-this-guide)
+  - [Configure the CockroachDB collector](#configure-the-cockroachdb-collector)
     - [Manual setup for a local CockroachDB database](#manual-setup-for-a-local-cockroachdb-database)
-- [Tweak CockroachDB alarms](#tweak-cockroachdb-alarms)
+  - [Tweak CockroachDB alarms](#tweak-cockroachdb-alarms)
+  - [What's next?](#whats-next)
 
 ## Configure the CockroachDB collector
 

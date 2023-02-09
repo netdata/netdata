@@ -1,6 +1,10 @@
 <!--
 title: "Parser"
 custom_edit_url: https://github.com/netdata/netdata/blob/master/parser/README.md
+sidebar_label: "Parser"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Database"
 -->
 
 

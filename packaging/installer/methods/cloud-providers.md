@@ -2,6 +2,10 @@
 title: "Install Netdata on cloud providers"
 description: "The Netdata Agent runs on all popular cloud providers, but often requires additional steps and configuration for full functionality."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/cloud-providers.md
+sidebar_label: "Install Netdata on cloud providers"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on cloud providers
@@ -18,9 +22,13 @@ aims to document some of those steps for popular cloud providers.
 > issue](https://github.com/netdata/netdata/issues/new?labels=feature+request,+needs+triage&template=feature_request.md)
 > with your process and instructions on using the provider's interface to complete the workaround.
 
--   [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
--   [Post-installation configuration](#post-installation-configuration)
-    -   [Add a firewall rule to access Netdata's dashboard](#add-a-firewall-rule-to-access-netdatas-dashboard)
+- [Install Netdata on cloud providers](#install-netdata-on-cloud-providers)
+  - [Recommended installation methods for cloud providers](#recommended-installation-methods-for-cloud-providers)
+  - [Post-installation configuration](#post-installation-configuration)
+    - [Add a firewall rule to access Netdata's dashboard](#add-a-firewall-rule-to-access-netdatas-dashboard)
+      - [Google Cloud Platform (GCP)](#google-cloud-platform-gcp)
+      - [Amazon Web Services (AWS) / EC2](#amazon-web-services-aws--ec2)
+      - [Azure](#azure)
 
 ## Recommended installation methods for cloud providers
 

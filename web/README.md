@@ -2,6 +2,10 @@
 title: "Dashboards"
 description: "Every Netdata Agent comes bundled with hundreds of interactive, customizable charts designed by monitoring and troubleshooting experts."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/README.md
+sidebar_label: "Dashboards"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web"
 -->
 
 # Dashboards

@@ -1,6 +1,10 @@
 <!--
 title: "Step 6. Collect metrics from more services and apps"
+sidebar_label: "Step 6. Collect metrics from more services and apps"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-06.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 6. Collect metrics from more services and apps
@@ -21,9 +25,12 @@ source you want to monitor.
 
 We'll begin with an overview on Netdata's collector architecture, and then dive into the following:
 
--   [Netdata's collector architecture](#netdatas-collector-architecture)
--   [Enable and disable plugins](#enable-and-disable-plugins)
--   [Enable the Nginx collector as an example](#example-enable-the-nginx-collector)
+- [Step 6. Collect metrics from more services and apps](#step-6-collect-metrics-from-more-services-and-apps)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Netdata's collector architecture](#netdatas-collector-architecture)
+  - [Enable and disable plugins](#enable-and-disable-plugins)
+  - [Example: Enable the Nginx collector](#example-enable-the-nginx-collector)
+  - [What's next?](#whats-next)
 
 ## Netdata's collector architecture
 

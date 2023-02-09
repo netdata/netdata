@@ -1,6 +1,10 @@
 <!--
 title: "Step 8. Build your first custom dashboard"
+sidebar_label: "Step 8. Build your first custom dashboard"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-08.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 8. Build your first custom dashboard
@@ -14,11 +18,19 @@ really flexible. 🤸
 
 In this step of the Netdata guide, you'll learn:
 
--   [Why you might want a custom dashboard](#why-should-i-create-a-custom-dashboard)
--   [How to create and prepare your `custom-dashboard.html` file](#create-and-prepare-your-custom-dashboardhtml-file)
--   [Where to add `dashboard.js` to your custom dashboard file](#add-dashboardjs-to-your-custom-dashboard-file)
--   [How to add basic styling](#add-some-basic-styling)
--   [How to add charts of different types, shapes, and sizes](#creating-your-dashboards-charts)
+- [Step 8. Build your first custom dashboard](#step-8-build-your-first-custom-dashboard)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Why should I create a custom dashboard?](#why-should-i-create-a-custom-dashboard)
+  - [Create and prepare your `custom-dashboard.html` file](#create-and-prepare-your-custom-dashboardhtml-file)
+  - [Add `dashboard.js` to your custom dashboard file](#add-dashboardjs-to-your-custom-dashboard-file)
+  - [Add some basic styling](#add-some-basic-styling)
+  - [Creating your dashboard's charts](#creating-your-dashboards-charts)
+    - [The chart unique ID (required)](#the-chart-unique-id-required)
+    - [Set chart duration](#set-chart-duration)
+    - [Set chart size](#set-chart-size)
+  - [Final touches](#final-touches)
+  - [The final `custom-dashboard.html`](#the-final-custom-dashboardhtml)
+  - [What's next?](#whats-next)
 
 Let's get on with it!
 

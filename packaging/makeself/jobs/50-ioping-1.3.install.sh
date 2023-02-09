@@ -4,13 +4,13 @@
 # shellcheck source=packaging/makeself/functions.sh
 . "$(dirname "${0}")/../functions.sh" "${@}" || exit 1
 
-version='1.2'
+version='1.3'
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Building ioping" || true
 
 fetch "ioping-${version}" "https://github.com/koct9i/ioping/archive/v${version}.tar.gz" \
-    d3e4497c653a1e96df67c72ce2b70da18e9f5e3b93179a5bb57a6e30ceacfa75 ioping
+    7aa48e70aaa766bc112dea57ebbe56700626871052380709df3a26f46766e8c8 ioping
 
 export CFLAGS="-static -pipe"
 
