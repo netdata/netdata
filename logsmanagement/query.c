@@ -145,7 +145,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
      * it won't have been updated in db_search() due to the
      * (p_query_params->results_buff->len >=  p_query_params->quota) condition */
     if (p_query_params->results_buff->len <  p_query_params->quota) {
-        const Circ_buff_t *circ_buffs[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
+        Circ_buff_t *circ_buffs[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES] = {NULL};
         int pfi_off = -1;
         while(p_file_infos[++pfi_off]){
             circ_buffs[pfi_off] = p_file_infos[pfi_off]->circ_buff;

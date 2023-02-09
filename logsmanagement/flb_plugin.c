@@ -742,7 +742,8 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                               "%Y-%m-%dT%H:%M:%S.000000000%z", localtime(&ts.tv_sec)))) { /* TODO: do what if error? */};
             const size_t docker_ev_timeNano_s_size = sizeof "802840200";
             char docker_ev_timeNano_s[docker_ev_timeNano_s_size];
-            snprintfz(docker_ev_timeNano_s, docker_ev_timeNano_s_size, "%ld", docker_ev_timeNano % 1000000000);
+            snprintfz(  docker_ev_timeNano_s, docker_ev_timeNano_s_size, "%0*ld", 
+                        (int) docker_ev_timeNano_s_size, docker_ev_timeNano % 1000000000);
             memcpy(&docker_ev_datetime[20], &docker_ev_timeNano_s, docker_ev_timeNano_s_size - 1);
 
             new_tmp_text_size += docker_ev_datetime_size; // -1 for null terminator, +1 for ' ' character

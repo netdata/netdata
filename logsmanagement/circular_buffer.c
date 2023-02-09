@@ -96,7 +96,7 @@ static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void 
  * @param buffs Buffers to be searched
  * @param p_query_params Query parameters to search according to.
  */
-void circ_buff_search(const Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
+void circ_buff_search(Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
 
     BUFFER *const results = p_query_params->results_buff;
     logs_query_res_hdr_t res_hdr = {0}; // result header
