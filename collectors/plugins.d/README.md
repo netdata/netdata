@@ -181,7 +181,7 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 The template is:
 
-> HOST_DEFINE machine_guid hostname \[tags]
+> HOST_DEFINE machine_guid hostname
 
 where:
 
@@ -192,10 +192,6 @@ where:
 -   `hostname`
 
     is the hostname of the virtual host
-
--   `tags`
-
-    is optional and may include a series of words, separated by space and enclosed in single or double quotes, which will be used as the host tags
 
 #### HOST_LABEL
 

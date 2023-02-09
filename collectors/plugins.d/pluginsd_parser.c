@@ -300,12 +300,10 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
 static void pluginsd_host_define_cleanup(void *user) {
     PARSER_USER_OBJECT *u = user;
 
-    freez(u->host_define.tags);
     string_freez(u->host_define.hostname);
     dictionary_destroy(u->host_define.rrdlabels);
 
     u->host_define.hostname = NULL;
-    u->host_define.tags = NULL;
     u->host_define.rrdlabels = NULL;
     u->host_define.parsing_host = false;
 }
@@ -324,7 +322,6 @@ static PARSER_RC pluginsd_host_define(char **words, size_t num_words, void *user
 
     char *guid = get_word(words, num_words, 1);
     char *hostname = get_word(words, num_words, 2);
-    char *tags = get_word(words, num_words, 3); // optional
 
     if(unlikely(!guid || !*guid || !hostname || !*hostname))
         return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE, "missing parameters");
@@ -337,7 +334,6 @@ static PARSER_RC pluginsd_host_define(char **words, size_t num_words, void *user
         return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE, "cannot parse MACHINE_GUID - is it a valid UUID?");
 
     u->host_define.hostname = string_strdupz(hostname);
-    u->host_define.tags = (tags && *tags) ? strdupz(tags) : NULL;
     u->host_define.rrdlabels = rrdlabels_create();
     u->host_define.parsing_host = true;
 
@@ -380,7 +376,7 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
             netdata_configured_timezone,
             netdata_configured_abbrev_timezone,
             netdata_configured_utc_offset,
-            u->host_define.tags ? u->host_define.tags : "",
+            NULL,
             program_name,
             program_version,
             default_rrd_update_every,

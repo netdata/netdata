@@ -27,7 +27,6 @@ typedef struct parser_user_object {
         uuid_t machine_guid;
         char machine_guid_str[UUID_STR_LEN];
         STRING *hostname;
-        char *tags;
         DICTIONARY *rrdlabels;
     } host_define;
 
