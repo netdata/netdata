@@ -31,15 +31,15 @@ for sub_dir, dirs, files in os.walk(root_dir):
                 blocks = [block.split('\n') for block in data.split('\n\n')]
                 blocks = [block for block in blocks if len(block)>=3]
                 for block in blocks:
-                    conf_dict = {'file': file.name}
-                    re.sub(r'\\\s*\n[^:]', ' ', data)
+                    conf_dict = {'file': file.name.split('/')[-1]}
                     for line in block:
                         if any(f'{word}:' in line for word in keyword_list) and not line.startswith('#'):
                             line_parts = line.strip().split(':', 1)
                             key = line_parts[0].strip()
                             value = line_parts[1].strip()
                             conf_dict[key] = value
-                    configs.append(conf_dict)
+                    if len(conf_dict.keys()) > 1:
+                        configs.append(conf_dict)
 
 #%%
 
