@@ -5,8 +5,10 @@
 import os
 import pandas as pd
 
-root_dir = './health/health.d'
-out_dir = './docs/'
+#root_dir = './health/health.d'
+#out_dir = './docs/'
+root_dir = '../../health/health.d'
+out_dir = '../../docs/'
 
 
 #%%
@@ -37,5 +39,6 @@ print(df_configs)
 df_configs.to_csv(f'{out_dir}/health_confs.csv', index=False)
 
 
-
 #%%
+
+df_configs
