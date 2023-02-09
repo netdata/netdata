@@ -48,7 +48,4 @@ print(df_configs)
 
 df_configs.to_csv(f'{out_dir}/health_confs.csv', index=False)
 
-
 #%%
-
-df_configs
