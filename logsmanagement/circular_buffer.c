@@ -84,25 +84,39 @@ static int circ_buff_items_qsort_timestamp_fnc (const void * item_a, const void 
             (int64_t)(*(Circ_buff_item_t**)item_b)->timestamp);
 }
 
-void circ_buff_search_compound(Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
+/**
+ * @brief Search circular buffers according to the query_params.
+ * @details If multiple buffers are to be searched, the results will be sorted
+ * according to timestamps.
+ * 
+ * Note that buff->tail can only be changed through circ_buff_read_item(), and 
+ * circ_buff_search() and circ_buff_read_item() are mutually exclusive due 
+ * to uv_mutex_lock() and uv_mutex_unlock() in queries and when writing to DB.
+ * 
+ * @param buffs Buffers to be searched
+ * @param p_query_params Query parameters to search according to.
+ */
+void circ_buff_search(const Circ_buff_t *const buffs[], logs_query_params_t *const p_query_params) {
 
     BUFFER *const results = p_query_params->results_buff;
     logs_query_res_hdr_t res_hdr = {0}; // result header
 
     int buffs_size = 0, buff_max_num_of_items = 0;
 
+    if(unlikely(buffs[0] == NULL)) return; // No buffs to be searched
     while(buffs[buffs_size]){
         if(buffs[buffs_size]->num_of_items > buff_max_num_of_items) 
             buff_max_num_of_items = buffs[buffs_size]->num_of_items;
         buffs_size++;
     }
 
-    Circ_buff_item_t **const items = mallocz((buffs_size * buff_max_num_of_items + 1) * sizeof(Circ_buff_item_t));
-
+    Circ_buff_item_t *items[buffs_size * buff_max_num_of_items + 1]; // worst case allocation
     int items_off = 0;
 
     for(int buff_off = 0; buffs[buff_off]; buff_off++){
         Circ_buff_t *buff = buffs[buff_off];
+        /* TODO: The following 3 operations need to be replaced with a struct
+         * to gurantee atomicity. */
         int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
         int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
         int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
@@ -114,9 +128,11 @@ void circ_buff_search_compound(Circ_buff_t *const buffs[], logs_query_params_t *
     }
 
     items[items_off] = NULL;
-    if(unlikely(items[0] == NULL)) return;
 
-    qsort(items, items_off, sizeof(items[0]), circ_buff_items_qsort_timestamp_fnc);
+    if(unlikely(items[0] == NULL)) // No items to be searched
+        return;
+    else if(buffs[1] != NULL) // More than 1 buffers to search, so sorting is needed.
+        qsort(items, items_off, sizeof(items[0]), circ_buff_items_qsort_timestamp_fnc);
  
     for (int i = 0; items[i]; i++) {
         res_hdr.timestamp = items[i]->timestamp;
@@ -135,73 +151,6 @@ void circ_buff_search_compound(Circ_buff_t *const buffs[], logs_query_params_t *
             }
             else {
                 res_hdr.matches = search_keyword(   items[i]->data, res_hdr.text_size, 
-                                                    &results->buffer[results->len + sizeof(res_hdr)], 
-                                                    &res_hdr.text_size, p_query_params->keyword, NULL, 
-                                                    p_query_params->ignore_case);
-                if(likely(res_hdr.matches > 0)) {
-                    m_assert(res_hdr.text_size > 0, "res_hdr.text_size can't be <= 0");
-                    res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
-                }
-                else if(unlikely(res_hdr.matches == 0)) m_assert(res_hdr.text_size == 0, "res_hdr.text_size must be == 0");
-                else break; /* res_hdr.matches < 0 - error during keyword search */        
-            }
-
-            if(res_hdr.text_size){
-                memcpy(&results->buffer[results->len], &res_hdr, sizeof(res_hdr));
-                results->len += sizeof(res_hdr) + res_hdr.text_size; 
-                p_query_params->keyword_matches += res_hdr.matches;
-            }
-
-            if(results->len >= p_query_params->quota){
-                p_query_params->end_timestamp = res_hdr.timestamp;
-                break;
-            }
-        }
-    }
-
-    freez(items);
-}
-
-/**
- * @brief Search circular buffer according to the query_params.
- * @details buff->tail can only be changed through circ_buff_read_item(), and 
- * circ_buff_search() and circ_buff_read_item() are mutually exclusive due 
- * to uv_mutex_lock() and uv_mutex_unlock() in queries and when writing to DB.
- * @param buff Buffer to be searched
- * @param p_query_params Query parameters to search according to.
- * @param max_query_page_size Max query size; if exceeded, search will stop.
- */
-void circ_buff_search(  Circ_buff_t *const buff, logs_query_params_t *const p_query_params) {
-
-    int head = __atomic_load_n(&buff->head, __ATOMIC_SEQ_CST) % buff->num_of_items;
-    int tail = __atomic_load_n(&buff->tail, __ATOMIC_SEQ_CST) % buff->num_of_items;
-    int full = __atomic_load_n(&buff->full, __ATOMIC_SEQ_CST);
-
-    if ((head == tail) && !full) {
-        debug(D_LOGS_MANAG, "Circ buff empty! Won't be searched.");
-        return;  // Nothing to do if buff is empty
-    }
-    
-    BUFFER *results = p_query_params->results_buff;
-    logs_query_res_hdr_t res_hdr = {0}; // result header
-
-    for (int i = tail; i != head; i = (i + 1) % buff->num_of_items) {
-        res_hdr.timestamp = buff->items[i].timestamp;
-        res_hdr.text_size = buff->items[i].text_size;
-
-        if (res_hdr.timestamp >= p_query_params->start_timestamp && 
-            res_hdr.timestamp <= p_query_params->end_timestamp) {
-
-            /* In case of search_keyword, less than sizeof(res_hdr) + temp_msg.text_size 
-             * space is required, but go for worst case scenario for now */
-            buffer_increase(results, sizeof(res_hdr) + res_hdr.text_size); 
-
-            if(!p_query_params->keyword || !*p_query_params->keyword || !strcmp(p_query_params->keyword, " ")){
-                res_hdr.text_size--; // res_hdr.text_size-- to get rid of last '\0' or '\n' 
-                memcpy(&results->buffer[results->len + sizeof(res_hdr)], buff->items[i].data, res_hdr.text_size);
-            }
-            else {
-                res_hdr.matches = search_keyword(   buff->items[i].data, res_hdr.text_size, 
                                                     &results->buffer[results->len + sizeof(res_hdr)], 
                                                     &res_hdr.text_size, p_query_params->keyword, NULL, 
                                                     p_query_params->ignore_case);
