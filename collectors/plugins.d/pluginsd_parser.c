@@ -407,6 +407,9 @@ static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t nu
     u->host = host;
     pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_HOST_DEFINE_END);
 
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+    rrdcontext_host_child_connected(host);
+
     return PARSER_RC_OK;
 }
 
