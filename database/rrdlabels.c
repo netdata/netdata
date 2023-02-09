@@ -959,6 +959,24 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
     return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
+#ifdef ENABLE_JSONC
+static int labels_2_json_cb(const struct dictionary_item *item, void *val, void* user_ctx)
+{
+    json_object *tmp, *j = (json_object *)user_ctx;
+    RRDLABEL *lbl = (RRDLABEL *) val;
+    tmp = json_object_new_string(string2str(lbl->label_value));
+    json_object_object_add(j, dictionary_acquired_item_name(item), tmp);
+}
+
+json_object *rrdlabels_to_json(DICTIONARY *labels)
+{
+    json_object *j = json_object_new_object();
+    dictionary_walkthrough_read(labels, labels_2_json_cb, (void *)j);
+
+    return j;
+}
+#endif
+
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if(!st->rrdlabels)
         st->rrdlabels = rrdlabels_create();
