@@ -1180,7 +1180,7 @@ static inline void generate_info_mirrored_hosts(json_object *j)
         host_status = json_object_new_object();
         netdata_mutex_lock(&host->receiver_lock);
         JSON_ADD_STRING("guid", host->machine_guid, host_status)
-        JSON_ADD_STRING("reachable", ((host->receiver || host == localhost) ? "true" : "false"), host_status)
+        JSON_ADD_BOOL("reachable", (host->receiver || host == localhost), host_status)
         tmp = json_object_new_int(host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
         json_object_object_add(host_status, "hops", tmp);
         netdata_mutex_unlock(&host->receiver_lock);
