@@ -34,7 +34,7 @@ typedef struct web_buffer {
     struct {
         const char *key_quote;
         const char *value_quote;
-        size_t depth;
+        int depth;
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
@@ -110,5 +110,14 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->size - buffer->len < needed_free_size))
         buffer_increase(buffer, needed_free_size);
 }
+
+void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote);
+void buffer_json_finalize(BUFFER *wb);
+void buffer_json_member_object_open(BUFFER *wb, const char *key);
+void buffer_json_member_object_close(BUFFER *wb);
+void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value);
+void buffer_json_member_add_uint64_t(BUFFER *wb, const char *key, uint64_t value);
+void buffer_json_member_add_int64_t(BUFFER *wb, const char *key, int64_t value);
+void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value);
 
 #endif /* NETDATA_WEB_BUFFER_H */

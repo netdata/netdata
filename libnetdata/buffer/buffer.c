@@ -230,15 +230,22 @@ void buffer_print_ll_hex(BUFFER *wb, long long value) {
 }
 
 inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
-    if(unlikely(!txt || !*txt)) return;
+    if(unlikely(!txt || !*txt || !len)) return;
 
     buffer_need_bytes(wb, len + 1);
 
+    const char *t = txt;
     char *s = &wb->buffer[wb->len];
-    const char *end = &txt[len + 1];
+    const char *end = &txt[len];
 
-    while(txt != end)
-        *s++ = *txt++;
+    while(t != end
+#ifdef NETDATA_INTERNAL_CHECKS
+    && *t
+#endif
+    )
+        *s++ = *t++;
+
+    internal_fatal(t != end && !*t, "BUFFER: invalid string length given to %s(). Given %zu, but actual is %zu", __FUNCTION__, len, strlen(txt));
 
     wb->len += len;
 
@@ -619,7 +626,7 @@ static inline void buffer_json_add_comma_newline_spacing(BUFFER *wb) {
     else
         buffer_fast_strcat(wb, "\n", 1);
 
-    buffer_fast_strcat(wb, json_spacing, wb->json.depth);
+    buffer_fast_strcat(wb, json_spacing, wb->json.depth + 1);
 }
 
 static inline void buffer_json_add_key(BUFFER *wb, const char *key) {
@@ -639,7 +646,7 @@ void buffer_json_member_object_open(BUFFER *wb, const char *key) {
 
     buffer_json_add_comma_newline_spacing(wb);
     buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":{", 3);
+    buffer_fast_strcat(wb, ":{", 2);
 
     wb->json.depth++;
     wb->json.stack[wb->json.depth].count = 0;
@@ -647,9 +654,12 @@ void buffer_json_member_object_open(BUFFER *wb, const char *key) {
 }
 
 void buffer_json_member_object_close(BUFFER *wb) {
-    internal_fatal(wb->json.stack[wb->json.depth].type != BUFFER_JSON_MEMBER_OBJECT, "A member object is expected");
+    internal_fatal(wb->json.depth < 0, "nothing is open to close it");
+    internal_fatal(wb->json.stack[wb->json.depth].type != BUFFER_JSON_MEMBER_OBJECT &&
+                           wb->json.stack[wb->json.depth].type != BUFFER_JSON_ANONYMOUS_OBJECT,
+                           "A member object is expected");
     buffer_fast_strcat(wb, "\n", 1);
-    buffer_fast_strcat(wb, json_spacing, wb->json.depth - 1);
+    buffer_fast_strcat(wb, json_spacing, wb->json.depth);
     buffer_fast_strcat(wb, "}", 1);
     wb->json.depth--;
 }
@@ -698,23 +708,20 @@ void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE v
     wb->json.stack[wb->json.depth].count++;
 }
 
-void buffer_json_anonymous_object_close(BUFFER *wb) {
-    ;
-}
-
 void buffer_json_array_close(BUFFER *wb) {
-    ;
+    internal_fatal(wb->json.depth < 0, "nothing is open to close it");
+    buffer_fast_strcat(wb, "\n", 1);
+    buffer_fast_strcat(wb, json_spacing, wb->json.depth);
+    buffer_fast_strcat(wb, "]", 1);
+    wb->json.depth--;
 }
 
 void buffer_json_finalize(BUFFER *wb) {
-    while(wb->json.depth > 0) {
+    while(wb->json.depth >= 0) {
         switch(wb->json.stack[wb->json.depth].type) {
+            case BUFFER_JSON_ANONYMOUS_OBJECT:
             case BUFFER_JSON_MEMBER_OBJECT:
                 buffer_json_member_object_close(wb);
-                break;
-
-            case BUFFER_JSON_ANONYMOUS_OBJECT:
-                buffer_json_anonymous_object_close(wb);
                 break;
 
             case BUFFER_JSON_ARRAY:
@@ -726,7 +733,41 @@ void buffer_json_finalize(BUFFER *wb) {
                 break;
         }
     }
+}
 
-    buffer_fast_strcat(wb, "\n}", 2);
+// ----------------------------------------------------------------------------
+// unit test
+
+static int buffer_expect(BUFFER *wb, const char *expected) {
+    const char *generated = buffer_tostring(wb);
+
+    if(strcmp(generated, expected) != 0) {
+        error("BUFFER: json mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
+              generated, expected);
+        return 1;
+    }
+
+    return 0;
+}
+
+int buffer_unittest(void) {
+    int errors = 0;
+    BUFFER *wb = buffer_create(0, NULL);
+
+    buffer_json_initialize(wb, "\"", "\"");
+    buffer_json_finalize(wb);
+    buffer_expect(wb, "{\n}");
+
+    buffer_flush(wb);
+
+    buffer_json_initialize(wb, "\"", "\"");
+    buffer_json_member_add_string(wb, "hello", "world");
+    buffer_json_member_add_string(wb, "alpha", "this: \" is a double quote");
+    buffer_json_member_object_open(wb, "object1");
+    buffer_json_member_add_string(wb, "hello", "world");
+    buffer_json_finalize(wb);
+    buffer_expect(wb, "{\n \"hello\":\"world\",\n \"alpha\":\"this: \\\" is a double quote\",\n \"object1\":{\n  \"hello\":\"world\"\n }\n}");
+
+    return errors;
 }
 
