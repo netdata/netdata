@@ -92,7 +92,7 @@ void web_client_api_v1_init(void) {
     for(i = 0; api_v1_data_google_formats[i].name ; i++)
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
 
-    web_client_api_v1_init_grouping();
+    time_grouping_init();
 
 	uuid_t uuid;
 
@@ -604,7 +604,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
     size_t tier = 0;
-    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = 0;
 
@@ -638,7 +638,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "format")) {
             format = web_client_api_request_v1_data_format(value);
@@ -734,8 +734,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .points = points,
             .format = format,
             .options = options,
-            .group_method = group,
-            .group_options = group_options,
+            .time_group_method = group,
+            .time_group_options = group_options,
             .resampling_time = group_time,
             .tier = tier,
             .chart_label_key = chart_label_key,
@@ -1372,7 +1372,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     int options_count = 0;
-    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     size_t tier = 0;
     const char *group_options = NULL, *contexts_str = NULL;
@@ -1407,7 +1407,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
             timeout = (int) strtoul(value, NULL, 0);
 
         else if(!strcmp(name, "group"))
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
 
         else if(!strcmp(name, "options")) {
             if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;

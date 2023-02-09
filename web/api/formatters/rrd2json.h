@@ -58,14 +58,14 @@ void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
 int rrdset2value_api_v1(
-          RRDSET *st
+        RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
         , size_t points
         , time_t after
         , time_t before
-        , RRDR_GROUPING group_method
+        , RRDR_TIME_GROUPING group_method
         , const char *group_options
         , time_t resampling_time
         , uint32_t options

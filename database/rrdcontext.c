@@ -2768,8 +2768,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , (long long)qt->request.after
                   , (long long)qt->request.before
                   , qt->request.points
-                  , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                  , qt->request.group_options?qt->request.group_options:""
+                  , time_grouping_tostring(qt->request.time_group_method)
+                  , qt->request.time_group_options ? qt->request.time_group_options : ""
                   , options_buffer
                   , resampling_buffer
                   , tier_buffer
@@ -2783,8 +2783,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , (long long)qt->request.after
                 , (long long)qt->request.before
                 , qt->request.points
-                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                , qt->request.group_options?qt->request.group_options:""
+                , time_grouping_tostring(qt->request.time_group_method)
+                , qt->request.time_group_options ? qt->request.time_group_options : ""
                 , options_buffer
                 , resampling_buffer
                 , tier_buffer
@@ -2798,8 +2798,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , (long long)qt->request.after
                 , (long long)qt->request.before
                 , qt->request.points
-                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                , qt->request.group_options?qt->request.group_options:""
+                , time_grouping_tostring(qt->request.time_group_method)
+                , qt->request.time_group_options ? qt->request.time_group_options : ""
                 , options_buffer
                 , resampling_buffer
                 , tier_buffer

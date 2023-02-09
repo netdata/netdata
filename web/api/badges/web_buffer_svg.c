@@ -923,7 +923,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);
