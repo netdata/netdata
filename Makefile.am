@@ -78,6 +78,7 @@ dist_noinst_DATA = \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
+    database/engine/journalfile_v2.ksy.in \
     $(NULL)
 
 # until integrated within build
@@ -555,6 +556,20 @@ if ENABLE_DBENGINE
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
+    
+    RRD_PLUGIN_KSY_BUILTFILES = \
+        database/engine/journalfile_v2.ksy \
+        database/engine/journalfile_v2_virtmemb.ksy \
+        $(NULL)
+
+    BUILT_SOURCES += $(RRD_PLUGIN_KSY_BUILTFILES)
+    CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
+
+database/engine/journalfile_v2.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
+
+database/engine/journalfile_v2_virtmemb.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 -DVIRT_MEMBERS $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
 endif
 
 API_PLUGIN_FILES = \

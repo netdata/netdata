@@ -231,3 +231,7 @@ Session.*.vim
 # Judy stuff
 JudyLTables.c
 judyltablesgen
+
+# m4 generated ksys
+database/engine/journalfile_v2.ksy
+database/engine/journalfile_v2_virtmemb.ksy
