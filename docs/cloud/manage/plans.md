@@ -17,7 +17,7 @@ We also provide paid subscriptions that designed to provide additional features 
 
 The plan is an attribute that is directly attached to your space(s) and that dictates what capabilities and customizations you have on your space. If you have different spaces you can have different Netdata plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your spaces.
 
-Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of:
+Netdata Cloud plans, with the exception of Community, work as subscriptions and overall consist of two pricing components:
 * A flat fee component, that is a price per space, and
 * An on-demand metered component, that is related to your usage of Netdata which directly links to the [number of nodes you have running](#running-nodes-and-billing)
 
@@ -53,18 +53,14 @@ It is ok to change your mind. We allow to change your plan, billing frequency or
 
 To achieve this you will need to:
 * Move to the Community plan, where we will cancel the current subscription and:
-   * Issue a credit to you for the unused period, in case you are on an **yearly plan**
+   * Issue a credit to you for the unused period, in case you are on a **yearly plan**
    * Charge you only for the current used period and issue a credit for the unused period related to the flat fee, in case you are on a **monthly plan**
 * Select the new subscription with the change that you want
 
-Note: This is a temporary approach and we are working on making this flow seamless and effortless to you.
-
-<!--
- TODO: This credit balance will be available for a period of X months/years. 
- -->
-
-> ⚠️ On a move to Community, cancellation of active subscription, please note that you will have all your notification methods configurations active for a period of 24 hours.
-> After that, any of those that won't available on your space's plan at that time will be automatically disabled. You can always re-enable them once you move to the proper paid plan.
+> ⚠️
+> * On a move to Community, cancellation of an active subscription, please note that you will have all your notification methods configurations active for a period of 24 hours.
+>   After that, any of those that won't available on your space's plan at that time will be automatically disabled. You can always re-enable them once you move to the proper paid plan.
+> * Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the the **end of the following year**.
 
 ### Areas impacted by plans
 
@@ -73,18 +69,18 @@ Note: This is a temporary approach and we are working on making this flow seamle
 Depending on the plan associated to your space you will have different roles available:
 
 | **Role** | **Community** | **Pro** | **Business** |
-| :-- | :-- | :-- | :-- |
-| **Administrators**<p>Unrestricted access to all features and management of a Space.</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| **Managers**<p>Same as admins, but can't add nodes, or manage space settings.</p> | - | - | :heavy_check_mark: |
-| **Troubleshooters**<p>Same as managers, but can’t manage users or rooms.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
-| **Observers**<p>Read only role, restricted to specific rooms.</p> | - | - | :heavy_check_mark: |
-| **Billing**<p>Access to billing details and subscription management.</p> | - | - | :heavy_check_mark: |
+| :-- | :--: | :--: | :--: |
+| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: |
+| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
+| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: |
+| **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: |
 
-For mode details check the documentation under [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md).
+For more details check the documentation under [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md).
 
 ##### Events feed
 
-The plan you have subscribed to will determine the amount of historical data you will be able to query:
+The plan you have subscribed on your space will determine the amount of historical data you will be able to query:
 
 | **Type of events** | **Community** | **Pro** | **Business** |
 | :-- | :-- | :-- | :-- |
@@ -92,14 +88,14 @@ The plan you have subscribed to will determine the amount of historical data you
 | **Topology events**<p>Node state transition events, e.g. live or offline.</p>| 4 hours | 7 days | 14 days |
 | **Alert events**<p>Alert state transition events, can be seen as an alert history log.</p>| 4 hours | 7 days | 90 days |
 
-For mode details check the documentation under [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/events-feed.md).
+For more details check the documentation under [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md).
 
 ##### Notification integrations
 
-Your plan will determine what type of notifications methods will be available for you to configure on your space:
-* **Community** - Email and discord
-* **Pro** - Email, discord and webhook
-* **Business** - Unlimited, this includes slack, pagerduty, etc.
+The plan on your space will determine what type of notifications methods will be available to you:
+* **Community** - Email and Discord
+* **Pro** - Email, Discord and webhook
+* **Business** - Unlimited, this includes Slack, PagerDuty, etc.
 
 For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx).
 
@@ -113,9 +109,4 @@ For mode details check the documentation under [Alert Notifications](https://git
 
 
 #### Related Tasks
-- [Inspect alerts](https://github.com/netdata/netdata/blob/rework-learn/docs/tasks/operations/inspect-alerts.md)
-- [Manage notification methods](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/manage-notification-methods.md)
-- [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/add-webhook-notification-configuration.md)
-- [Add discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/add-discord-notification-configuration.md)
-- [Add slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/add-slack-notification-configuration.md)
-- [Add pagerduty notification configuration](https://github.com/netdata/netdata/blob/master/docs/tasks/operations/add-pagerduty-notification-configuration.md)
+- [View Plan & Billing](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/view-plan-billing.md)
