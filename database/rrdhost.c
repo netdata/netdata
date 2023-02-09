@@ -1279,6 +1279,33 @@ void rrdhost_save_charts(RRDHOST *host) {
     rrdset_foreach_done(st);
 }
 
+struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels) {
+    struct rrdhost_system_info *info = callocz(1, sizeof(struct rrdhost_system_info));
+    info->hops = 1;
+
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_provider_type, "_cloud_provider_type");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_instance_type, "_cloud_instance_type");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->cloud_instance_region, "_cloud_instance_region");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_os_name, "_os_name");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_os_version, "_os_version");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->kernel_version, "_kernel_version");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_cores, "_system_cores");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_cpu_freq, "_system_cpu_freq");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_ram_total, "_system_ram_total");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->host_disk_space, "_system_disk_space");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->architecture, "_architecture");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->virtualization, "_virtualization");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->container, "_container");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->container_detection, "_container_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->virt_detection, "_virt_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->is_k8s_node, "_is_k8s_node");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->install_type, "_install_type");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->prebuilt_arch, "_prebuilt_arch");
+    rrdlabels_get_value_strdup_or_null(labels, &localhost->system_info->prebuilt_dist, "_prebuilt_dist");
+
+    return info;
+}
+
 static void rrdhost_load_auto_labels(void) {
     DICTIONARY *labels = localhost->rrdlabels;
 
@@ -1289,8 +1316,7 @@ static void rrdhost_load_auto_labels(void) {
         rrdlabels_add(labels, "_cloud_instance_type", localhost->system_info->cloud_instance_type, RRDLABEL_SRC_AUTO);
 
     if (localhost->system_info->cloud_instance_region)
-        rrdlabels_add(
-            labels, "_cloud_instance_region", localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(labels, "_cloud_instance_region", localhost->system_info->cloud_instance_region, RRDLABEL_SRC_AUTO);
 
     if (localhost->system_info->host_os_name)
         rrdlabels_add(labels, "_os_name", localhost->system_info->host_os_name, RRDLABEL_SRC_AUTO);
@@ -1354,8 +1380,7 @@ void rrdhost_set_is_parent_label(int count) {
     DICTIONARY *labels = localhost->rrdlabels;
 
     if (count == 0 || count == 1) {
-        rrdlabels_add(
-                      labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
+        rrdlabels_add(labels, "_is_parent", (count) ? "true" : "false", RRDLABEL_SRC_AUTO);
 
         //queue a node info
 #ifdef ENABLE_ACLK

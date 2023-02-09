@@ -175,6 +175,83 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 
 `DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
 
+#### HOST_DEFINE
+
+`HOST_DEFINE` defines a new (or updates an existing) virtual host.
+
+The template is:
+
+> HOST_DEFINE machine_guid hostname
+
+where:
+
+-   `machine_guid`
+
+    uniquely identifies the host, this is what will be needed to add charts to the host.
+
+-   `hostname`
+
+    is the hostname of the virtual host
+
+#### HOST_LABEL
+
+`HOST_LABEL` adds a key-value pair to the virtual host labels. It has to be given between `HOST_DEFINE` and `HOST_DEFINE_END`.
+
+The template is:
+
+> HOST_LABEL key value
+
+where:
+
+-   `key`
+
+    uniquely identifies the key of the label
+
+-   `value`
+
+    is the value associated with this key
+
+There are a few special keys that are used to define the system information of the monitored system:
+
+- `_cloud_provider_type`
+- `_cloud_instance_type`
+- `_cloud_instance_region`
+- `_os_name`
+- `_os_version`
+- `_kernel_version`
+- `_system_cores`
+- `_system_cpu_freq`
+- `_system_ram_total`
+- `_system_disk_space`
+- `_architecture`
+- `_virtualization`
+- `_container`
+- `_container_detection`
+- `_virt_detection`
+- `_is_k8s_node`
+- `_install_type`
+- `_prebuilt_arch`
+- `_prebuilt_dist`
+
+#### HOST_DEFINE_END
+
+`HOST_DEFINE_END` commits the host information, creating a new host entity, or updating an existing one with the same `machine_guid`.
+
+#### HOST 
+
+`HOST` switches data collection between hosts.
+
+The template is:
+
+> HOST machine_guid
+
+where:
+
+-   `machine_guid`
+
+    is the UUID of the host to switch to. After this command, every other command following it is assumed to be associated with this host.
+    Setting machine_guid to `localhost` switches data collection to the local host.
+
 #### CHART
 
 `CHART` defines a new chart.

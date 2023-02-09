@@ -107,7 +107,6 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    parser \
     spawn \
     $(NULL)
 
@@ -160,6 +159,8 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
+    libnetdata/parser/parser.c \
+    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -677,11 +678,6 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
-PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
-    $(NULL)
-
 if ENABLE_ACLK
 ACLK_FILES = \
     aclk/aclk_util.c \
@@ -949,7 +945,6 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \

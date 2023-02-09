@@ -152,7 +152,7 @@ static inline RRDDIM *pluginsd_acquire_dimension(RRDHOST *host, RRDSET *st, cons
     if(likely(st->pluginsd.pos < st->pluginsd.used)) {
         rda = st->pluginsd.rda[st->pluginsd.pos];
         RRDDIM *rd = rrddim_acquired_to_rrddim(rda);
-        if (likely(rd && strcmp(rrddim_id(rd), dimension) == 0)) {
+        if (likely(rd && string_strcmp(rd->id, dimension) == 0)) {
             st->pluginsd.pos++;
             return rd;
         }
@@ -293,6 +293,146 @@ PARSER_RC pluginsd_end(char **words, size_t num_words, void *user)
     struct timeval now;
     now_realtime_timeval(&now);
     rrdset_timed_done(st, now, /* pending_rrdset_next = */ false);
+
+    return PARSER_RC_OK;
+}
+
+static void pluginsd_host_define_cleanup(void *user) {
+    PARSER_USER_OBJECT *u = user;
+
+    string_freez(u->host_define.hostname);
+    dictionary_destroy(u->host_define.rrdlabels);
+
+    u->host_define.hostname = NULL;
+    u->host_define.rrdlabels = NULL;
+    u->host_define.parsing_host = false;
+}
+
+static inline bool pluginsd_validate_machine_guid(const char *guid, uuid_t *uuid, char *output) {
+    if(uuid_parse(guid, *uuid))
+        return false;
+
+    uuid_unparse_lower(*uuid, output);
+
+    return true;
+}
+
+static PARSER_RC pluginsd_host_define(char **words, size_t num_words, void *user) {
+    PARSER_USER_OBJECT *u = user;
+
+    char *guid = get_word(words, num_words, 1);
+    char *hostname = get_word(words, num_words, 2);
+
+    if(unlikely(!guid || !*guid || !hostname || !*hostname))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE, "missing parameters");
+
+    if(unlikely(u->host_define.parsing_host))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE,
+            "another host definition is already open - did you send " PLUGINSD_KEYWORD_HOST_DEFINE_END "?");
+
+    if(!pluginsd_validate_machine_guid(guid, &u->host_define.machine_guid, u->host_define.machine_guid_str))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE, "cannot parse MACHINE_GUID - is it a valid UUID?");
+
+    u->host_define.hostname = string_strdupz(hostname);
+    u->host_define.rrdlabels = rrdlabels_create();
+    u->host_define.parsing_host = true;
+
+    return PARSER_RC_OK;
+}
+
+static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words, void *user, DICTIONARY *dict, const char *keyword) {
+    PARSER_USER_OBJECT *u = user;
+
+    char *name = get_word(words, num_words, 1);
+    char *value = get_word(words, num_words, 2);
+
+    if(!name || !*name || !value)
+        return PLUGINSD_DISABLE_PLUGIN(user, keyword, "missing parameters");
+
+    if(!u->host_define.parsing_host || !dict)
+        return PLUGINSD_DISABLE_PLUGIN(user, keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
+
+    rrdlabels_add(dict, name, value, RRDLABEL_SRC_CONFIG);
+
+    return PARSER_RC_OK;
+}
+
+static PARSER_RC pluginsd_host_labels(char **words, size_t num_words, void *user) {
+    PARSER_USER_OBJECT *u = user;
+    return pluginsd_host_dictionary(words, num_words, user, u->host_define.rrdlabels, PLUGINSD_KEYWORD_HOST_LABEL);
+}
+
+static PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, void *user) {
+    PARSER_USER_OBJECT *u = user;
+
+    if(!u->host_define.parsing_host)
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST_DEFINE_END, "missing initialization, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
+
+    RRDHOST *host = rrdhost_find_or_create(
+            string2str(u->host_define.hostname),
+            string2str(u->host_define.hostname),
+            u->host_define.machine_guid_str,
+            "Netdata Virtual Host 1.0",
+            netdata_configured_timezone,
+            netdata_configured_abbrev_timezone,
+            netdata_configured_utc_offset,
+            NULL,
+            program_name,
+            program_version,
+            default_rrd_update_every,
+            default_rrd_history_entries,
+            default_rrd_memory_mode,
+            default_health_enabled,
+            default_rrdpush_enabled,
+            default_rrdpush_destination,
+            default_rrdpush_api_key,
+            default_rrdpush_send_charts_matching,
+            default_rrdpush_enable_replication,
+            default_rrdpush_seconds_to_replicate,
+            default_rrdpush_replication_step,
+            rrdhost_labels_to_system_info(u->host_define.rrdlabels),
+            false
+            );
+
+    if(host->rrdlabels) {
+        rrdlabels_migrate_to_these(host->rrdlabels, u->host_define.rrdlabels);
+    }
+    else {
+        host->rrdlabels = u->host_define.rrdlabels;
+        u->host_define.rrdlabels = NULL;
+    }
+
+    pluginsd_host_define_cleanup(user);
+
+    u->host = host;
+    pluginsd_set_chart_from_parent(user, NULL, PLUGINSD_KEYWORD_HOST_DEFINE_END);
+
+    rrdhost_flag_clear(host, RRDHOST_FLAG_ORPHAN);
+    rrdcontext_host_child_connected(host);
+
+    return PARSER_RC_OK;
+}
+
+static PARSER_RC pluginsd_host(char **words, size_t num_words, void *user) {
+    PARSER_USER_OBJECT *u = user;
+
+    char *guid = get_word(words, num_words, 1);
+
+    if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
+        u->host = localhost;
+        return PARSER_RC_OK;
+    }
+
+    uuid_t uuid;
+    char uuid_str[UUID_STR_LEN];
+    if(!pluginsd_validate_machine_guid(guid, &uuid, uuid_str))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST, "cannot parse MACHINE_GUID - is it a valid UUID?");
+
+    RRDHOST *host = rrdhost_find_by_guid(uuid_str);
+    if(unlikely(!host))
+        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
+
+    u->host = host;
 
     return PARSER_RC_OK;
 }
@@ -883,7 +1023,7 @@ PARSER_RC pluginsd_disable(char **words __maybe_unused, size_t num_words __maybe
 {
     info("PLUGINSD: plugin called DISABLE. Disabling it.");
     ((PARSER_USER_OBJECT *) user)->enabled = 0;
-    return PARSER_RC_ERROR;
+    return PARSER_RC_STOP;
 }
 
 PARSER_RC pluginsd_label(char **words, size_t num_words, void *user)
@@ -1654,8 +1794,8 @@ PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size_t num_words __maybe_
 static void pluginsd_process_thread_cleanup(void *ptr) {
     PARSER *parser = (PARSER *)ptr;
 
-    if(parser->user_cleanup_cb)
-        parser->user_cleanup_cb(parser->user);
+    pluginsd_cleanup_v2(parser->user);
+    pluginsd_host_define_cleanup(parser->user);
 
     rrd_collector_finished();
     parser_destroy(parser);
@@ -1695,7 +1835,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     };
 
     // fp_plugin_output = our input; fp_plugin_input = our output
-    PARSER *parser = parser_init(host, &user, NULL, fp_plugin_output, fp_plugin_input, -1, PARSER_INPUT_SPLIT, NULL);
+    PARSER *parser = parser_init(&user, fp_plugin_output, fp_plugin_input, -1,
+                                 PARSER_INPUT_SPLIT, NULL);
+
+    pluginsd_keywords_init(parser, PARSER_INIT_PLUGINSD);
 
     rrd_collector_started();
 
@@ -1704,9 +1847,10 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
     netdata_thread_cleanup_push(pluginsd_process_thread_cleanup, parser);
 
     user.parser = parser;
+    char buffer[PLUGINSD_LINE_MAX + 1];
 
-    while (likely(!parser_next(parser))) {
-        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  NULL)))
+    while (likely(!parser_next(parser, buffer, PLUGINSD_LINE_MAX))) {
+        if (unlikely(!service_running(SERVICE_COLLECTORS) || parser_action(parser,  buffer)))
             break;
     }
 
@@ -1724,4 +1868,134 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, FILE *fp_plugi
         cd->serial_failures++;
 
     return count;
+}
+
+static void pluginsd_keywords_init_internal(PARSER *parser, PLUGINSD_KEYWORDS types, void (*add_func)(PARSER *parser, char *keyword, keyword_function func)) {
+
+    if (types & PARSER_INIT_PLUGINSD) {
+        add_func(parser, PLUGINSD_KEYWORD_FLUSH, pluginsd_flush);
+        add_func(parser, PLUGINSD_KEYWORD_DISABLE, pluginsd_disable);
+
+        add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE, pluginsd_host_define);
+        add_func(parser, PLUGINSD_KEYWORD_HOST_DEFINE_END, pluginsd_host_define_end);
+        add_func(parser, PLUGINSD_KEYWORD_HOST_LABEL, pluginsd_host_labels);
+        add_func(parser, PLUGINSD_KEYWORD_HOST, pluginsd_host);
+    }
+
+    if (types & (PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING)) {
+        // plugins.d plugins and streaming
+        add_func(parser, PLUGINSD_KEYWORD_CHART, pluginsd_chart);
+        add_func(parser, PLUGINSD_KEYWORD_DIMENSION, pluginsd_dimension);
+        add_func(parser, PLUGINSD_KEYWORD_VARIABLE, pluginsd_variable);
+        add_func(parser, PLUGINSD_KEYWORD_LABEL, pluginsd_label);
+        add_func(parser, PLUGINSD_KEYWORD_OVERWRITE, pluginsd_overwrite);
+        add_func(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT, pluginsd_clabel_commit);
+        add_func(parser, PLUGINSD_KEYWORD_CLABEL, pluginsd_clabel);
+        add_func(parser, PLUGINSD_KEYWORD_FUNCTION, pluginsd_function);
+        add_func(parser, PLUGINSD_KEYWORD_FUNCTION_RESULT_BEGIN, pluginsd_function_result_begin);
+
+        add_func(parser, PLUGINSD_KEYWORD_BEGIN, pluginsd_begin);
+        add_func(parser, PLUGINSD_KEYWORD_SET, pluginsd_set);
+        add_func(parser, PLUGINSD_KEYWORD_END, pluginsd_end);
+
+        inflight_functions_init(parser);
+    }
+
+    if (types & PARSER_INIT_STREAMING) {
+        add_func(parser, PLUGINSD_KEYWORD_CHART_DEFINITION_END, pluginsd_chart_definition_end);
+
+        // replication
+        add_func(parser, PLUGINSD_KEYWORD_REPLAY_BEGIN, pluginsd_replay_begin);
+        add_func(parser, PLUGINSD_KEYWORD_REPLAY_SET, pluginsd_replay_set);
+        add_func(parser, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE, pluginsd_replay_rrddim_collection_state);
+        add_func(parser, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE, pluginsd_replay_rrdset_collection_state);
+        add_func(parser, PLUGINSD_KEYWORD_REPLAY_END, pluginsd_replay_end);
+
+        // streaming metrics v2
+        add_func(parser, PLUGINSD_KEYWORD_BEGIN_V2, pluginsd_begin_v2);
+        add_func(parser, PLUGINSD_KEYWORD_SET_V2, pluginsd_set_v2);
+        add_func(parser, PLUGINSD_KEYWORD_END_V2, pluginsd_end_v2);
+    }
+}
+
+void pluginsd_keywords_init(PARSER *parser, PLUGINSD_KEYWORDS types) {
+    pluginsd_keywords_init_internal(parser, types, parser_add_keyword);
+}
+
+struct pluginsd_user_unittest {
+    size_t size;
+    const char **hashtable;
+    uint32_t (*hash)(const char *s);
+    size_t collisions;
+};
+
+void pluginsd_keyword_collision_check(PARSER *parser, char *keyword, keyword_function func __maybe_unused) {
+    struct pluginsd_user_unittest *u = parser->user;
+
+    uint32_t hash = u->hash(keyword);
+    uint32_t slot = hash % u->size;
+
+    if(u->hashtable[slot])
+        u->collisions++;
+
+    u->hashtable[slot] = keyword;
+}
+
+static struct {
+    const char *name;
+    uint32_t (*hash)(const char *s);
+    size_t slots_needed;
+} hashers[] = {
+    { .name = "djb2_hash32(s)",            djb2_hash32, .slots_needed = 0, },
+    { .name = "fnv1_hash32(s)",            fnv1_hash32, .slots_needed = 0, },
+    { .name = "fnv1a_hash32(s)",           fnv1a_hash32, .slots_needed = 0, },
+    { .name = "larson_hash32(s)",          larson_hash32, .slots_needed = 0, },
+    { .name = "pluginsd_parser_hash32(s)", pluginsd_parser_hash32, .slots_needed = 0, },
+
+    // terminator
+    { .name = NULL, NULL, .slots_needed = 0, },
+};
+
+int pluginsd_parser_unittest(void) {
+    PARSER *p;
+    size_t slots_to_check = 1000;
+    size_t i, h;
+
+    // check for hashtable collisions
+    for(h = 0; hashers[h].name ;h++) {
+        hashers[h].slots_needed = slots_to_check * 1000000;
+
+        for (i = 10; i < slots_to_check; i++) {
+            struct pluginsd_user_unittest user = {
+                    .hash = hashers[h].hash,
+                    .size = i,
+                    .hashtable = callocz(i, sizeof(const char *)),
+                    .collisions = 0,
+            };
+
+            p = parser_init(&user, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+            pluginsd_keywords_init_internal(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING,
+                                            pluginsd_keyword_collision_check);
+            parser_destroy(p);
+
+            freez(user.hashtable);
+
+            if (!user.collisions) {
+                hashers[h].slots_needed = i;
+                break;
+            }
+        }
+    }
+
+    for(h = 0; hashers[h].name ;h++) {
+        if(hashers[h].slots_needed > 1000)
+            info("PARSER: hash function '%s' cannot be used without collisions under %zu slots", hashers[h].name, slots_to_check);
+        else
+            info("PARSER: hash function '%s' needs PARSER_KEYWORDS_HASHTABLE_SIZE (in parser.h) set to %zu", hashers[h].name, hashers[h].slots_needed);
+    }
+
+    p = parser_init(NULL, NULL, NULL, -1, PARSER_INPUT_SPLIT, NULL);
+    pluginsd_keywords_init(p, PARSER_INIT_PLUGINSD | PARSER_INIT_STREAMING);
+    parser_destroy(p);
+    return 0;
 }

@@ -38,6 +38,11 @@
 #define PLUGINSD_KEYWORD_SET_V2                 "SET2"
 #define PLUGINSD_KEYWORD_END_V2                 "END2"
 
+#define PLUGINSD_KEYWORD_HOST_DEFINE            "HOST_DEFINE"
+#define PLUGINSD_KEYWORD_HOST_DEFINE_END        "HOST_DEFINE_END"
+#define PLUGINSD_KEYWORD_HOST_LABEL             "HOST_LABEL"
+#define PLUGINSD_KEYWORD_HOST                   "HOST"
+
 #define PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT 10 // seconds
 
 #define PLUGINSD_LINE_MAX_SSL_READ 512
@@ -60,6 +65,7 @@ struct plugind {
     size_t serial_failures;             // the number of times the plugin started
                                         // without collecting values
 
+    RRDHOST *host;                      // the host the plugin collects data for
     int update_every;                   // the plugin default data collection frequency
 
     struct {
@@ -71,7 +77,8 @@ struct plugind {
     } unsafe;
 
     time_t started_t;
-    uint32_t capabilities;              // follows the same principles as streaming capabilities
+
+    struct plugind *prev;
     struct plugind *next;
 };
 

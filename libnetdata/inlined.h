@@ -21,25 +21,118 @@ typedef uint64_t kernel_uint_t;
 // for faster execution, allow the compiler to inline
 // these functions that are called thousands of times per second
 
-static inline uint32_t simple_hash(const char *name) {
+static inline uint32_t djb2_hash32(const char* name) {
     unsigned char *s = (unsigned char *) name;
-    uint32_t hval = 0x811c9dc5;
-    while (*s) {
-        hval *= 16777619;
-        hval ^= (uint32_t) *s++;
-    }
-    return hval;
+    uint32_t hash = 5381;
+    while (*s)
+        hash = ((hash << 5) + hash) + (uint32_t) *s++; // hash * 33 + char
+    return hash;
 }
 
-static inline uint32_t simple_uhash(const char *name) {
+static inline uint32_t pluginsd_parser_hash32(const char *name) {
     unsigned char *s = (unsigned char *) name;
-    uint32_t hval = 0x811c9dc5, c;
+    uint32_t hash = 0;
+    while (*s) {
+        hash <<= 5;
+        hash += *s++ - ' ';
+    }
+    return hash;
+}
+
+// https://stackoverflow.com/a/107657
+static inline uint32_t larson_hash32(const char *name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 0;
+    while (*s)
+        hash = hash * 101 + (uint32_t) *s++;
+    return hash;
+}
+
+// http://isthe.com/chongo/tech/comp/fnv/
+static inline uint32_t fnv1_hash32(const char *name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 0x811c9dc5;
+    while (*s) {
+        hash *= 0x01000193; // 16777619
+        hash ^= (uint32_t) *s++;
+    }
+    return hash;
+}
+
+// http://isthe.com/chongo/tech/comp/fnv/
+static inline uint32_t fnv1a_hash32(const char *name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 0x811c9dc5;
+    while (*s) {
+        hash ^= (uint32_t) *s++;
+        hash *= 0x01000193; // 16777619
+    }
+    return hash;
+}
+
+static inline uint32_t fnv1a_uhash32(const char *name) {
+    unsigned char *s = (unsigned char *) name;
+    uint32_t hash = 0x811c9dc5, c;
     while ((c = *s++)) {
         if (unlikely(c >= 'A' && c <= 'Z')) c += 'a' - 'A';
-        hval *= 16777619;
-        hval ^= c;
+        hash ^= c;
+        hash *= 0x01000193; // 16777619
     }
-    return hval;
+    return hash;
+}
+
+#define simple_hash(s) fnv1a_hash32(s)
+#define simple_uhash(s) fnv1a_uhash32(s)
+
+static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
+    size_t total = 0;
+
+    total += (ptr & 0xff) >> 0;
+    total += (ptr & 0xff00) >> 8;
+    total += (ptr & 0xff0000) >> 16;
+    total += (ptr & 0xff000000) >> 24;
+
+    if(sizeof(Word_t) > 4) {
+        total += (ptr & 0xff00000000) >> 32;
+        total += (ptr & 0xff0000000000) >> 40;
+        total += (ptr & 0xff000000000000) >> 48;
+        total += (ptr & 0xff00000000000000) >> 56;
+    }
+
+    return (total % modulo);
+}
+
+static uint32_t murmur32(uint32_t k) __attribute__((const));
+static inline uint32_t murmur32(uint32_t k) {
+    k ^= k >> 16;
+    k *= 0x85ebca6b;
+    k ^= k >> 13;
+    k *= 0xc2b2ae35;
+    k ^= k >> 16;
+
+    return k;
+}
+
+static uint64_t murmur64(uint64_t k) __attribute__((const));
+static inline uint64_t murmur64(uint64_t k) {
+    k ^= k >> 33;
+    k *= 0xff51afd7ed558ccdUL;
+    k ^= k >> 33;
+    k *= 0xc4ceb9fe1a85ec53UL;
+    k ^= k >> 33;
+
+    return k;
+}
+
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
+static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
+#ifdef ENV64BIT
+    uint64_t hash = murmur64(ptr);
+    return hash % modulo;
+#else
+    uint32_t hash = murmur32(ptr);
+    return hash % modulo;
+#endif
 }
 
 static inline int str2i(const char *s) {

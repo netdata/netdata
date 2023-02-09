@@ -465,6 +465,9 @@ static inline ARAL_PAGE *aral_acquire_a_free_slot(ARAL *ar TRACE_ALLOCATIONS_FUN
 }
 
 void *aral_mallocz_internal(ARAL *ar TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+#ifdef FSANITIZE_ADDRESS
+    return mallocz(ar->config.requested_element_size);
+#endif
 
     ARAL_PAGE *page = aral_acquire_a_free_slot(ar TRACE_ALLOCATIONS_FUNCTION_CALL_PARAMS);
 
@@ -614,6 +617,11 @@ static inline void aral_move_page_with_free_list___aral_lock_needed(ARAL *ar, AR
 }
 
 void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {
+#ifdef FSANITIZE_ADDRESS
+    freez(ptr);
+    return;
+#endif
+
     if(unlikely(!ptr)) return;
 
     // get the page pointer
