@@ -1,6 +1,9 @@
 meta:
-  id: netdata_journalfile_v2
+  id: journalfile_v2`'ifdef(`VIRT_MEMBERS',`_virtmemb')
   endian: le
+  application: netdata
+  file-extension: njfv2
+  license: GPL-3.0-or-later
 
 seq:
   - id: journal_v2_header
@@ -19,11 +22,13 @@ seq:
   - id: metric_trailer
     type: journal_v2_block_trailer
   - id: page_blocs
-    type: jounral_v2_page_blocs
+    type: journal_v2_page_block
+    repeat: expr
+    repeat-expr: _root.journal_v2_header.metric_count
+  - id: padding
     size: _root._io.size - _root._io.pos - 4
   - id: journal_file_trailer
     type: journal_v2_block_trailer
-
 
 types:
   journal_v2_metric_list:
@@ -38,11 +43,13 @@ types:
         type: u4
       - id: delta_end_s
         type: u4
-    instances:
+ifdef(`VIRT_MEMBERS',
+`    instances:
       page_block:
         type: journal_v2_page_block
         io: _root._io
         pos: page_offset
+')dnl
   journal_v2_page_hdr:
     seq:
       - id: crc
@@ -69,11 +76,13 @@ types:
         type: u1
       - id: reserved
         type: u1
-    instances:
+ifdef(`VIRT_MEMBERS',
+`    instances:
       extent:
         io: _root._io
         type: journal_v2_extent_list
         pos: _root.journal_v2_header.extent_offset + (extent_idx * 16)
+')dnl
   journal_v2_header:
     seq:
       - id: magic
@@ -106,11 +115,13 @@ types:
         type: u4
       - id: data
         type: u8
-    instances:
+ifdef(`VIRT_MEMBERS',
+`    instances:
       trailer:
         io: _root._io
         type: journal_v2_block_trailer
         pos: _root._io.size - 4
+')dnl
   journal_v2_block_trailer:
     seq:
       - id: checksum
@@ -137,8 +148,3 @@ types:
         repeat-expr: hdr.entries
       - id: block_trailer
         type: journal_v2_block_trailer
-  jounral_v2_page_blocs:
-    seq:
-      - id: blocs
-        type: journal_v2_page_block
-        repeat: eos
