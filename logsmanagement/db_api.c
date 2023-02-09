@@ -902,7 +902,7 @@ return_error:
 }
 
 /**
- * @brief Search database
+ * @brief Search database for logs
  * @details This function searches the database for any results matching the
  * query parameters. If any results are found, it will decompress the text
  * of each returned row and add it to the results buffer, up to a maximum
@@ -1015,6 +1015,13 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
 #define TMP_VIEW_QUERY_BODY_2  "'." LOGS_TABLE " INNER JOIN (VALUES("
 #define TMP_VIEW_QUERY_BODY_3  ")) ORDER BY Timestamp) "
 #define TMP_VIEW_QUERY_POSTFIX "ORDER BY Timestamp;" 
+/**
+ * @brief Search multiple databases for logs
+ * @details Same as db_search() function, but it can search multiple DBs
+ * as these are defined in the p_file_infos[] array. See db_search() for more
+ * information.
+ * @todo This function should be refactored and combined with db_search().
+ */
 void db_search_compound(logs_query_params_t *const p_query_params, struct File_info *const p_file_infos[]) {
     int rc = 0;
     int pfi_off = 0;
