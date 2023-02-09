@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: GPL-3.0-or-latergit clean
 
 # -----------------------------------------------------------------------------
 
@@ -30,7 +30,15 @@ set -euo pipefail
 
 fetch() {
   local dir="${1}" url="${2}" sha256="${3}" key="${4}"
-  local tar="${dir}.tar.gz"
+  case ${2} in
+    *.tar.gz)
+      local tar="${dir}.tar.gz";;
+    *.tar.bz2)
+      local tar="${dir}.tar.bz2";;
+    *)
+      echo "ERROR: unsupported file format"
+      exit 1;;
+  esac
   local cache="${NETDATA_SOURCE_PATH}/artifacts/cache/${BUILDARCH}/${key}"
 
   if [ -d "${NETDATA_MAKESELF_PATH}/tmp/${dir}" ]; then
@@ -58,10 +66,19 @@ fetch() {
         echo >&2 "expected: ${sha256}, got $(sha256sum "${NETDATA_MAKESELF_PATH}/tmp/${tar}")"
         exit 1
     fi
-    set -e
 
+    set -e
     cd "${NETDATA_MAKESELF_PATH}/tmp"
-    run tar -zxpf "${tar}"
+
+    case ${2} in
+      *.tar.gz)
+        run tar -zxpf "${tar}";;
+      *.tar.bz2)
+        run tar -xjf "${tar}";;
+      *)
+        echo "ERROR: unsupported file format"
+        exit 1;;
+    esac
     cd -
 
     CACHE_HIT=0
