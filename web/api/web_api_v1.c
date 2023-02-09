@@ -1276,6 +1276,16 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_STRING("container", (host->system_info->container) ? host->system_info->container : "", j)
     JSON_ADD_STRING("container_detection", (host->system_info->container_detection) ? host->system_info->container_detection : "", j)
 
+    // the keys should be there but be nil if we don't know instead of variable key list
+    // but I keep it like this to keep backwards compatibility
+    // in future
+    if (host->system_info->cloud_provider_type)
+        JSON_ADD_STRING("cloud_provider_type", host->system_info->cloud_provider_type, j)
+    if (host->system_info->cloud_instance_type)
+        JSON_ADD_STRING("cloud_instance_type", host->system_info->cloud_instance_type, j)
+    if (host->system_info->cloud_instance_region)
+        JSON_ADD_STRING("cloud_instance_region", host->system_info->cloud_instance_region, j)
+
     json_object_object_add(j, "host_labels", rrdlabels_to_json(host->rrdlabels));
 
     json_object_object_add(j, "collectors", chartcollectors_json(host));
