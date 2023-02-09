@@ -183,50 +183,33 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
         json_object_object_add(obj, name, tmp);                                                                        \
     }
 
-json_object *chart_labels_json(RRDSET *st)
-{
-    struct label_index *labels = &st->state->labels;
-    json_object *tmp, *j = json_object_new_object();
-
-    netdata_rwlock_rdlock(&labels->labels_rwlock);
-    for (struct label *label = labels->head; label; label = label->next)
-        JSON_ADD_STRING(label->key, label->value, j)
-    netdata_rwlock_unlock(&labels->labels_rwlock);
-    return j;
-}
-
 extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *memory_used, int skip_volatile)
 {
     json_object *j = json_object_new_object();
     json_object *tmp;
 
-    rrdset_rdlock(st);
+    time_t first_entry_t = rrdset_first_entry_s(st);
+    time_t last_entry_t  = rrdset_last_entry_s(st);
 
-    time_t first_entry_t = rrdset_first_entry_t_nolock(st);
-    time_t last_entry_t  = rrdset_last_entry_t_nolock(st);
+    JSON_ADD_STRING("id", rrdset_id(st), j)
+    JSON_ADD_STRING("name", rrdset_name(st), j)
+    JSON_ADD_STRING("type", rrdset_parts_type(st), j)
+    JSON_ADD_STRING("family", rrdset_family(st), j)
+    JSON_ADD_STRING("context", rrdset_context(st), j)
 
-    JSON_ADD_STRING("id", st->id, j)
-    JSON_ADD_STRING("name", st->name, j)
-    JSON_ADD_STRING("type", st->type, j)
-    JSON_ADD_STRING("family", st->family, j)
-    JSON_ADD_STRING("context", st->context, j)
-
-    BUFFER *buf = buffer_create(1024);
-    buffer_sprintf(buf, "%s (%s)", st->title, st->name);
+    BUFFER *buf = buffer_create(1024, NULL);
+    buffer_sprintf(buf, "%s (%s)", rrdset_title(st), rrdset_name(st));
     JSON_ADD_STRING("title", buffer_tostring(buf), j)
 
     JSON_ADD_INT64("priority", st->priority, j)
 
-    JSON_ADD_STRING("plugin", st->plugin_name ? st->plugin_name : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
-    JSON_ADD_STRING("module", st->module_name ? st->module_name : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
+    JSON_ADD_STRING("plugin", rrdset_plugin_name(st) ? rrdset_plugin_name(st) : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
+    JSON_ADD_STRING("module", rrdset_module_name(st) ? rrdset_module_name(st) : "", j) // "" (empty string) instead of json null to keep API compat with legacy impl.
 
-    tmp = json_object_new_boolean(rrdset_flag_check(st, RRDSET_FLAG_ENABLED));
-    json_object_object_add(j, "enabled", tmp);
-
-    JSON_ADD_STRING("units", st->units, j)
+    JSON_ADD_STRING("units", rrdset_units(st), j)
 
     buffer_flush(buf);
-    buffer_sprintf(buf, "/api/v1/data?chart=%s", st->name);
+    buffer_sprintf(buf, "/api/v1/data?chart=%s", rrdset_name(st));
     tmp = json_object_new_string(buffer_tostring(buf));
     json_object_object_add(j, "data_url", tmp);
 
@@ -244,20 +227,24 @@ extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *me
 
     json_object *obj = json_object_new_object();
     RRDDIM *rd;
-    if (memory_used) *memory_used += st->memsize;
-    rrddim_foreach_read(rd, st) {
-        if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
 
-        if (memory_used) *memory_used += rd->memsize;
+    unsigned long memory = sizeof(RRDSET);
+
+    rrddim_foreach_read(rd, st) {
+        if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) continue;
+
+        memory += sizeof(RRDDIM) + rd->memsize;
         if (dimensions_count) (*dimensions_count)++;
 
         // to keep API same with legacy implementation
         // which also creates dictionary with fixed one item
         // funny but... (maybe /api/v2 in future :) )
         json_object *tmp_obj = json_object_new_object();
-        JSON_ADD_STRING("name", rd->name, tmp_obj);
-        json_object_object_add(obj, rd->id, tmp_obj);
+        JSON_ADD_STRING("name", rrddim_name(rd), tmp_obj);
+        json_object_object_add(obj, rrddim_id(rd), tmp_obj);
     }
+    rrddim_foreach_done(rd);
+    if (memory_used) *memory_used += memory;
     json_object_object_add(j, "dimensions", obj);
 
     buffer_flush(buf);
@@ -284,20 +271,21 @@ extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *me
     if (likely(!skip_volatile)) {
         obj = json_object_new_object();
         RRDCALC *rc;
-        for (rc = st->alarms; rc; rc = rc->rrdset_next) {
+        netdata_rwlock_rdlock(&st->alerts.rwlock);
+        DOUBLE_LINKED_LIST_FOREACH_FORWARD(st->alerts.base, rc, prev, next) {
             json_object *tmp_obj = json_object_new_object();
             JSON_ADD_INT("id", rc->id, tmp_obj)
             JSON_ADD_STRING("status", rrdcalc_status2string(rc->status), tmp_obj);
-            JSON_ADD_STRING("units", rc->units, tmp_obj)
+            JSON_ADD_STRING("units", rrdcalc_units(rc), tmp_obj)
             JSON_ADD_INT("update_every", rc->update_every, tmp_obj)
         }
+        netdata_rwlock_unlock(&st->alerts.rwlock);
         json_object_object_add(j, "alarms", obj);
     }
 
-    tmp = chart_labels_json(st);
+    tmp = rrdlabels_to_json(st->rrdlabels);
     json_object_object_add(j, "chart_labels", tmp);
 
-    rrdset_unlock(st);
     buffer_free(buf);
     return j;
 }

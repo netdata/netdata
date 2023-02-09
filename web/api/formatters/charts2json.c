@@ -171,11 +171,11 @@ json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
     if(unlikely(!custom_dashboard_info_js_filename))
         custom_dashboard_info_js_filename = config_get(CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
 
-    JSON_ADD_STRING("hostname", host->hostname, j)
-    JSON_ADD_STRING("version", host->program_version, j)
+    JSON_ADD_STRING("hostname", rrdhost_hostname(host), j)
+    JSON_ADD_STRING("version", rrdhost_program_version(host), j)
     JSON_ADD_STRING("release_channel", get_release_channel(), j)
-    JSON_ADD_STRING("os", host->os, j)
-    JSON_ADD_STRING("timezone", host->timezone, j)
+    JSON_ADD_STRING("os", rrdhost_os(host), j)
+    JSON_ADD_STRING("timezone", rrdhost_timezone(host), j)
     tmp = json_object_new_int(host->rrd_update_every);
     json_object_object_add(j, "update_every", tmp);
     tmp = json_object_new_int(host->rrd_history_entries);
@@ -183,30 +183,30 @@ json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
     JSON_ADD_STRING("memory_mode", rrd_memory_mode_name(host->rrd_memory_mode), j)
     JSON_ADD_STRING("custom_info", custom_dashboard_info_js_filename, j)
 
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             tmp = rrdset_json(st, &dimensions, &memory, skip_volatile);
-            json_object_object_add(j, st->id, tmp);
+            json_object_object_add(j, rrdset_id(st), tmp);
             charts++;
         }
     }
+    rrdset_foreach_done(st);
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(rc->rrdset)
             alarms++;
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     JSON_ADD_INT("charts_count", charts, j)
     JSON_ADD_INT("dimensions_count", dimensions, j)
     JSON_ADD_INT("alarms_count", alarms, j)
     JSON_ADD_INT("rrd_memory_bytes", memory, j)
-    JSON_ADD_INT("hosts_count", rrd_hosts_available, j)
+    JSON_ADD_INT("hosts_count", rrdhost_hosts_available(), j)
 
     json_object *host_array = json_object_new_array();
-    if (rrd_hosts_available > 1) {
+    if (rrdhost_hosts_available() > 1) {
         rrd_rdlock();
         RRDHOST *h;
         rrdhost_foreach_read(h) {
@@ -214,14 +214,14 @@ json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
                 // another json object with single item :/
                 // we must keep it like this to keep API same
                 json_object *tmp_obj = json_object_new_object();
-                JSON_ADD_STRING("hostname", h->hostname, tmp_obj);
+                JSON_ADD_STRING("hostname", rrdhost_hostname(h), tmp_obj);
                 json_object_array_add(host_array, tmp_obj);
             }
         }
         rrd_unlock();
     } else {
         json_object *tmp_obj = json_object_new_object();
-        JSON_ADD_STRING("hostname", host->hostname, tmp_obj)
+        JSON_ADD_STRING("hostname", rrdhost_hostname(host), tmp_obj)
         json_object_array_add(host_array, tmp_obj);
     }
 
@@ -284,7 +284,8 @@ void chartcollectors2json(RRDHOST *host, BUFFER *wb) {
 }
 
 #else /* !ENABLE_JSONC */
-static int collector_dict_walker(void *dict_entry, void *ctx)
+
+static int collector_dict_walker(const DICTIONARY_ITEM *item __maybe_unused, void *dict_entry, void *ctx)
 {
     json_object *array = ctx;
     json_object *obj = json_object_new_object();
@@ -303,26 +304,25 @@ static int collector_dict_walker(void *dict_entry, void *ctx)
 
 json_object *chartcollectors_json(RRDHOST *host) {
     json_object *array = json_object_new_array();
-    DICTIONARY *dict = dictionary_create(DICTIONARY_FLAG_SINGLE_THREADED);
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
     RRDSET *st;
     char name[500];
 
     time_t now = now_realtime_sec();
-    rrdhost_rdlock(host);
     rrdset_foreach_read(st, host) {
         if (rrdset_is_available_for_viewers(st)) {
             struct collector col = {
-                    .plugin = st->plugin_name ? st->plugin_name : "",
-                    .module = st->module_name ? st->module_name : ""
+                    .plugin = rrdset_plugin_name(st),
+                    .module = rrdset_module_name(st)
             };
             sprintf(name, "%s:%s", col.plugin, col.module);
             dictionary_set(dict, name, &col, sizeof(struct collector));
-            st->last_accessed_time = now;
+            st->last_accessed_time_s = now;
         }
     }
-    rrdhost_unlock(host);
+    rrdset_foreach_done(st);
 
-    dictionary_get_all(dict, collector_dict_walker, array);
+    dictionary_walkthrough_read(dict, collector_dict_walker, array);
     dictionary_destroy(dict);
     return array;
 }
