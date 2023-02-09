@@ -1288,6 +1288,8 @@ json_object *generate_info_json(RRDHOST *host)
 
     json_object_object_add(j, "host_labels", rrdlabels_to_json(host->rrdlabels));
 
+    json_object_object_add(j, "functions", rrdhost_functions_json(host));
+
     json_object_object_add(j, "collectors", chartcollectors_json(host));
 
 #ifdef DISABLE_CLOUD
@@ -1771,9 +1773,14 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
     wb->contenttype = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
+#ifdef ENABLE_JSONC
+    json_object *json = rrdhost_functions_json(host);
+    buffer_strcat(wb, json_object_to_json_string(json));
+#else
     buffer_strcat(wb, "{\n");
     host_functions2json(host, wb, 1, "\"", "\"");
     buffer_strcat(wb, "}");
+#endif
 
     return HTTP_RESP_OK;
 }
