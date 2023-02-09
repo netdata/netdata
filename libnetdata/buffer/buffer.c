@@ -698,6 +698,14 @@ void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE v
     wb->json.stack[wb->json.depth].count++;
 }
 
+void buffer_json_anonymous_object_close(BUFFER *wb) {
+    ;
+}
+
+void buffer_json_array_close(BUFFER *wb) {
+    ;
+}
+
 void buffer_json_finalize(BUFFER *wb) {
     while(wb->json.depth > 0) {
         switch(wb->json.stack[wb->json.depth].type) {
