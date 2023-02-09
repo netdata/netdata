@@ -418,10 +418,7 @@ static PARSER_RC pluginsd_host(char **words, size_t num_words, void *user) {
 
     char *guid = get_word(words, num_words, 1);
 
-    if(unlikely(!guid || !*guid))
-        return PLUGINSD_DISABLE_PLUGIN(user, PLUGINSD_KEYWORD_HOST, "missing parameters");
-
-    if(strcmp(guid, "localhost") == 0) {
+    if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
         u->host = localhost;
         return PARSER_RC_OK;
     }
