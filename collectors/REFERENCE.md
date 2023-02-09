@@ -1,6 +1,10 @@
 <!--
 title: "Collectors configuration reference"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/REFERENCE.md"
+sidebar_label: "Collectors configuration"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup"
 -->
 
 # Collectors configuration reference
@@ -19,7 +23,7 @@ independent processes in a variety of programming languages based on their purpo
 MySQL database, among many others.
 
 For most users, enabling individual collectors for the application/service you're interested in is far more important
-than knowing which plugin it uses. See our [collectors list](/collectors/COLLECTORS.md) to see whether your favorite app/service has
+than knowing which plugin it uses. See our [collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) to see whether your favorite app/service has
 a collector, and then read the documentation for that specific collector to figure out how to enable it.
 
 There are three types of plugins:
@@ -31,7 +35,7 @@ There are three types of plugins:
     independent processes. They communicate with the daemon via pipes.
 -   **Plugin orchestrators**, which are external plugins that instead support a number of **modules**. Modules are a
     type of collector. We have a few plugin orchestrators available for those who want to develop their own collectors,
-    but focus most of our efforts on the [Go plugin](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin/).
+    but focus most of our efforts on the [Go plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md).
 
 ## Enable, configure, and disable modules
 
@@ -57,7 +61,7 @@ sudo su -s /bin/bash netdata
 The next step is based on the collector's orchestrator. You can figure out which orchestrator the collector uses by 
 
 uses either
-by viewing the [collectors list](COLLECTORS.md) and referencing the _configuration file_ field. For example, if that
+by viewing the [collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) and referencing the _configuration file_ field. For example, if that
 field contains `go.d`, that collector uses the Go orchestrator.
 
 ```bash
@@ -104,7 +108,7 @@ This section features a list of Netdata's plugins, with a boolean setting to ena
 By default, most plugins are enabled, so you don't need to enable them explicitly to use their collectors. To enable or
 disable any specific plugin, remove the comment (`#`) and change the boolean setting to `yes` or `no`.
 
-All **external plugins** are managed by [plugins.d](plugins.d/README.md), which provides additional management options.
+All **external plugins** are managed by [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md), which provides additional management options.
 
 ## Internal plugins
 
@@ -161,9 +165,10 @@ through this, is to examine what other similar plugins do.
 
 ## External Plugins
 
-**External plugins** use the API and are managed by [plugins.d](plugins.d/README.md).
+**External plugins** use the API and are managed 
+by [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
 
 ## Write a custom collector
 
-You can add custom collectors by following the [external plugins documentation](/collectors/plugins.d/README.md).
+You can add custom collectors by following the [external plugins documentation](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
 

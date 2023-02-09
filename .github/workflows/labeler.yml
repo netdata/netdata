@@ -4,7 +4,7 @@ name: Pull Request Labeler
 on:
   pull_request_target: null
 concurrency:
-  group: pr-label-${{ github.ref }}
+  group: pr-label-${{ github.repository_id }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 jobs:
   labeler:

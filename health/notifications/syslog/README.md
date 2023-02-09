@@ -1,6 +1,11 @@
 <!--
 title: "Syslog"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/syslog/README.md
+sidebar_label: "Syslog"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/syslog/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Syslog

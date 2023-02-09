@@ -1,7 +1,11 @@
 <!--
 title: "Step 7. Netdata's dashboard in depth"
+sidebar_label: "Step 7. Netdata's dashboard in depth"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-07.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 7. Netdata's dashboard in depth
@@ -9,15 +13,18 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step
 Welcome to the seventh step of the Netdata guide!
 
 This step of the guide aims to get you more familiar with the features of the dashboard not previously mentioned in
-[step 2](/docs/guides/step-by-step/step-02.md).
+[step 2](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-02.md).
 
 ## What you'll learn in this step
 
 In this step of the Netdata guide, you'll learn how to:
 
--   [Change the dashboard's settings](#change-the-dashboards-settings)
--   [Check if there's an update to Netdata](#check-if-theres-an-update-to-netdata)
--   [Export and import a snapshot](#export-and-import-a-snapshot)
+- [Step 7. Netdata's dashboard in depth](#step-7-netdatas-dashboard-in-depth)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Change the dashboard's settings](#change-the-dashboards-settings)
+  - [Check if there's an update to Netdata](#check-if-theres-an-update-to-netdata)
+  - [Export and import a snapshot](#export-and-import-a-snapshot)
+  - [What's next?](#whats-next)
 
 Let's get started!
 
@@ -53,9 +60,9 @@ You can always check if there is an update available from the **Update** area of
 
 If an update is available, you'll see a modal similar to the one above.
 
-When you use the [automatic one-line installer script](/packaging/installer/README.md) attempt to update every day. If
-you choose to update it manually, there are [several well-documented methods](/packaging/installer/UPDATE.md) to achieve
-that. However, it is best practice for you to first go over the [changelog](/CHANGELOG.md).
+When you use the [automatic one-line installer script](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) attempt to update every day. If
+you choose to update it manually, there are [several well-documented methods](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to achieve
+that. However, it is best practice for you to first go over the [changelog](https://github.com/netdata/netdata/blob/master/CHANGELOG.md).
 
 ## Export and import a snapshot
 

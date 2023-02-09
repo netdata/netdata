@@ -1,6 +1,10 @@
 <!--
 title: "standard deviation (`stddev`)"
+sidebar_label: "standard deviation (`stddev`)"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/queries/stddev/README.md
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web/Api/Queries"
 -->
 
 # standard deviation (`stddev`)

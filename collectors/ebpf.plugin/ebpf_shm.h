@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_SHM "shm"
 
-#define NETDATA_SHM_SLEEP_MS 850000ULL
-
 // charts
 #define NETDATA_SHM_GLOBAL_CHART "shared_memory_calls"
 #define NETDATA_SHMGET_CHART "shmget_call"

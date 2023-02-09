@@ -130,7 +130,7 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
         points_read++;
 
-        if (unlikely(storage_point_is_empty(sp))) {
+        if (unlikely(storage_point_is_gap(sp))) {
             // not collected
             continue;
         }

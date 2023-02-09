@@ -1,6 +1,10 @@
 <!--
 title: "Linux machine sensors monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md"
+sidebar_label: "lm-sensors"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Devices"
 -->
 
 # Linux machine sensors monitoring with Netdata
@@ -27,7 +31,7 @@ One chart for every sensor chip found and each of the above will be created.
 ## Enable the collector
 
 The `sensors` collector is disabled by default. To enable it, edit the `charts.d.conf` file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -44,7 +48,7 @@ sensors=force
 ## Configuration
 
 Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

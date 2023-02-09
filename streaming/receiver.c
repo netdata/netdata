@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "parser/parser.h"
 
 // IMPORTANT: to add workers, you have to edit WORKER_PARSER_FIRST_JOB accordingly
 #define WORKER_RECEIVER_JOB_BYTES_READ (WORKER_PARSER_FIRST_JOB - 1)
@@ -330,18 +329,23 @@ static void streaming_parser_thread_cleanup(void *ptr) {
     parser_destroy(parser);
 }
 
+bool plugin_is_enabled(struct plugind *cd);
+
 static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, int fd, void *ssl) {
     size_t result;
 
     PARSER_USER_OBJECT user = {
-        .enabled = cd->enabled,
+        .enabled = plugin_is_enabled(cd),
         .host = rpt->host,
         .opaque = rpt,
         .cd = cd,
         .trust_durations = 1
     };
 
-    PARSER *parser = parser_init(rpt->host, &user, NULL, NULL, fd, PARSER_INPUT_SPLIT, ssl);
+    PARSER *parser = parser_init(&user, NULL, NULL, fd,
+                                 PARSER_INPUT_SPLIT, ssl);
+
+    pluginsd_keywords_init(parser, PARSER_INIT_STREAMING);
 
     rrd_collector_started();
 
@@ -414,7 +418,7 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
     }
 
 done:
-    result = user.count;
+    result = user.data_collections_count;
 
     // free parser with the pop function
     netdata_thread_cleanup_pop(1);
@@ -721,15 +725,13 @@ static int rrdpush_receive(struct receiver_state *rpt)
 
 
     struct plugind cd = {
-            .enabled = 1,
             .update_every = default_rrd_update_every,
-            .pid = 0,
-            .serial_failures = 0,
-            .successful_collections = 0,
-            .obsolete = 0,
+            .unsafe = {
+                    .spinlock = NETDATA_SPINLOCK_INITIALIZER,
+                    .running = true,
+                    .enabled = true,
+            },
             .started_t = now_realtime_sec(),
-            .next = NULL,
-            .capabilities = 0,
     };
 
     // put the client IP and port into the buffers used by plugins.d
@@ -799,8 +801,6 @@ static int rrdpush_receive(struct receiver_state *rpt)
     }
 
     rrdpush_receive_log_status(rpt, "ready to receive data", "CONNECTED");
-
-    cd.capabilities = rpt->capabilities;
 
 #ifdef ENABLE_ACLK
     // in case we have cloud connection we inform cloud

@@ -61,8 +61,12 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_UPDATE_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+        sql_create_health_log_table(host);
+        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) ae->updated_by_id);
@@ -103,8 +107,6 @@ void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae) {
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to finalize the prepared statement for updating health log.", rrdhost_hostname(host));
-
-    return;
 }
 
 /* Health related SQL queries
@@ -134,8 +136,12 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
 
     rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
-        return;
+        sql_create_health_log_table(host);
+        rc = sqlite3_prepare_v2(db_meta, command, -1, &res, 0);
+        if (unlikely(rc != SQLITE_OK)) {
+            error_report("HEALTH [%s]: Failed to prepare statement for SQL_INSERT_HEALTH_LOG", rrdhost_hostname(host));
+            return;
+        }
     }
 
     rc = sqlite3_bind_text(res, 1, rrdhost_hostname(host), -1, SQLITE_STATIC);
@@ -342,8 +348,6 @@ void sql_health_alarm_log_insert(RRDHOST *host, ALARM_ENTRY *ae) {
     failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [%s]: Failed to finalize the prepared statement for inserting to health log.", rrdhost_hostname(host));
-
-    return;
 }
 
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
@@ -537,8 +541,6 @@ void sql_inject_removed_status(char *uuid_str, uint32_t alarm_id, uint32_t alarm
 failed:
     if (unlikely(sqlite3_finalize(res) != SQLITE_OK))
         error_report("HEALTH [N/A]: Failed to finalize the prepared statement for injecting removed event.");
-    return;
-
 }
 
 #define SQL_SELECT_MAX_UNIQUE_ID(guid) "SELECT MAX(unique_id) from health_log_%s", guid

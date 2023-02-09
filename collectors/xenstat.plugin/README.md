@@ -1,6 +1,10 @@
 <!--
 title: "xenstat.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/xenstat.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/xenstat.plugin/README.md"
+sidebar_label: "xenstat.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Virtualized environments/Virtualize hosts"
 -->
 
 # xenstat.plugin

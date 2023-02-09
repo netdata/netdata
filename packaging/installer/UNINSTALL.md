@@ -1,14 +1,18 @@
 <!--
 title: "Uninstall Netdata"
 description: "If you are no longer interested in using the Netdata Agent, use the self-contained uninstaller to remove all traces of binaries and configuration files."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/UNINSTALL.md"
+sidebar_label: "Uninstall Netdata"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Uninstall Netdata
 
 > ⚠️ If you're having trouble updating Netdata, moving from one installation method to another, or generally having
 > issues with your Netdata Agent installation, consider our [**reinstall Netdata**
-> doc](/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
+> doc](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md) instead of removing the Netdata Agent entirely.
 
 The recommended method to uninstall Netdata on a system is to use our kickstart installer script with the `--uninstall` option like so:
 

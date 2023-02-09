@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdpush.h"
-#include "parser/parser.h"
 
 #define WORKER_SENDER_JOB_CONNECT                    0
 #define WORKER_SENDER_JOB_PIPE_READ                  1
@@ -103,6 +102,14 @@ void sender_commit(struct sender_state *s, BUFFER *wb) {
         return;
 
     netdata_mutex_lock(&s->mutex);
+
+//    FILE *fp = fopen("/tmp/stream.txt", "a");
+//    fprintf(fp,
+//            "\n--- SEND BEGIN: %s ----\n"
+//            "%s"
+//            "--- SEND END ----------------------------------------\n"
+//            , rrdhost_hostname(s->host), src);
+//    fclose(fp);
 
     if(unlikely(s->buffer->max_size < (src_len + 1) * SENDER_BUFFER_ADAPT_TO_TIMES_MAX_SIZE)) {
         info("STREAM %s [send to %s]: max buffer size of %zu is too small for a data message of size %zu. Increasing the max buffer size to %d times the max data message size.",
@@ -929,7 +936,7 @@ void execute_commands(struct sender_state *s) {
         // internal_error(true, "STREAM %s [send to %s] received command over connection: %s", rrdhost_hostname(s->host), s->connected_to, start);
 
         char *words[PLUGINSD_MAX_WORDS] = { NULL };
-        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS, NULL, NULL, 0);
+        size_t num_words = pluginsd_split_words(start, words, PLUGINSD_MAX_WORDS);
 
         const char *keyword = get_word(words, num_words, 0);
 

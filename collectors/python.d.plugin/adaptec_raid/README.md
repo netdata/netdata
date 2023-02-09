@@ -1,7 +1,10 @@
 <!--
 title: "Adaptec RAID controller monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/adaptec_raid/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/adaptec_raid/README.md"
 sidebar_label: "Adaptec RAID"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Hardware"
 -->
 
 # Adaptec RAID controller monitoring with Netdata
@@ -52,7 +55,7 @@ systemctl restart netdata.service
 ## Enable the collector
 
 The `adaptec_raid` collector is disabled by default. To enable it, use `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`, to edit the `python.d.conf`
 file.
 
 ```bash
@@ -61,12 +64,12 @@ sudo ./edit-config python.d.conf
 ```
 
 Change the value of the `adaptec_raid` setting to `yes`. Save the file and restart the Netdata Agent with `sudo
-systemctl restart netdata`, or the [appropriate method](/docs/configure/start-stop-restart.md) for your system.
+systemctl restart netdata`, or the [appropriate method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
 ## Configuration
 
 Edit the `python.d/adaptec_raid.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

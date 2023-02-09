@@ -6,11 +6,11 @@
 
 #define FREE_MEM_THRESHOLD 10000 // number of unused chunks that trigger memory freeing
 
-#define COMMON_IPFW_ERROR() error("DISABLED: ipfw.packets chart"); \
-                            error("DISABLED: ipfw.bytes chart"); \
-                            error("DISABLED: ipfw.dyn_active chart"); \
-                            error("DISABLED: ipfw.dyn_expired chart"); \
-                            error("DISABLED: ipfw.mem chart");
+#define COMMON_IPFW_ERROR() collector_error("DISABLED: ipfw.packets chart"); \
+                            collector_error("DISABLED: ipfw.bytes chart"); \
+                            collector_error("DISABLED: ipfw.dyn_active chart"); \
+                            collector_error("DISABLED: ipfw.dyn_expired chart"); \
+                            collector_error("DISABLED: ipfw.mem chart");
 
 // --------------------------------------------------------------------------------------------------------------------
 // ipfw
@@ -83,8 +83,8 @@ int do_ipfw(int update_every, usec_t dt) {
         if (unlikely(ipfw_socket == -1))
             ipfw_socket = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
         if (unlikely(ipfw_socket == -1)) {
-            error("FREEBSD: can't get socket for ipfw configuration");
-            error("FREEBSD: run netdata as root to get access to ipfw data");
+            collector_error("FREEBSD: can't get socket for ipfw configuration");
+            collector_error("FREEBSD: run netdata as root to get access to ipfw data");
             COMMON_IPFW_ERROR();
             return 1;
         }
@@ -100,7 +100,7 @@ int do_ipfw(int update_every, usec_t dt) {
         error = getsockopt(ipfw_socket, IPPROTO_IP, IP_FW3, op3, optlen);
         if (error)
             if (errno != ENOMEM) {
-                error("FREEBSD: ipfw socket reading error");
+                collector_error("FREEBSD: ipfw socket reading error");
                 COMMON_IPFW_ERROR();
                 return 1;
             }
@@ -113,7 +113,7 @@ int do_ipfw(int update_every, usec_t dt) {
             op3->opcode = IP_FW_XGET;
             error = getsockopt(ipfw_socket, IPPROTO_IP, IP_FW3, op3, optlen);
             if (error) {
-                error("FREEBSD: ipfw socket reading error");
+                collector_error("FREEBSD: ipfw socket reading error");
                 COMMON_IPFW_ERROR();
                 return 1;
             }
@@ -352,7 +352,7 @@ int do_ipfw(int update_every, usec_t dt) {
 
     return 0;
 #else
-    error("FREEBSD: ipfw charts supported for FreeBSD 11.0 and newer releases only");
+    collector_error("FREEBSD: ipfw charts supported for FreeBSD 11.0 and newer releases only");
     COMMON_IPFW_ERROR();
     return 1;
 #endif

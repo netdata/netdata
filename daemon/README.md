@@ -1,7 +1,11 @@
 <!--
 title: "Netdata daemon"
-date: 2020-04-29
-custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
+date: "2020-04-29"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/daemon/README.md"
+sidebar_label: "Netdata daemon"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Configuration"
 -->
 
 # Netdata daemon
@@ -11,7 +15,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/daemon/README.md
 -   You can start Netdata by executing it with `/usr/sbin/netdata` (the installer will also start it).
 
 -   You can stop Netdata by killing it with `killall netdata`. You can stop and start Netdata at any point. When
-    exiting, the [database engine](/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
+    exiting, the [database engine](https://github.com/netdata/netdata/blob/master/database/engine/README.md) saves metrics to `/var/cache/netdata/dbengine/` so that
     it can continue when started again.
 
 Access to the web site, for all graphs, is by default on port `19999`, so go to:
@@ -202,29 +206,26 @@ The command line options of the Netdata 1.10.0 version are the following:
   - USR2                   Reload health configuration.
 ```
 
-You can send commands during runtime via [netdatacli](/cli/README.md).
+You can send commands during runtime via [netdatacli](https://github.com/netdata/netdata/blob/master/cli/README.md).
 
 ## Log files
 
-Netdata uses 3 log files:
+Netdata uses 4 log files:
 
 1.  `error.log`
-2.  `access.log`
-3.  `debug.log`
+2.  `collector.log`
+3.  `access.log`
+4.  `debug.log`
 
-Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log` and
-`access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled (Netdata needs to be compiled
-with debugging enabled).
+Any of them can be disabled by setting it to `/dev/null` or `none` in `netdata.conf`. By default `error.log`,
+`collector.log`, and `access.log` are enabled. `debug.log` is only enabled if debugging/tracing is also enabled
+(Netdata needs to be compiled with debugging enabled).
 
 Log files are stored in `/var/log/netdata/` by default.
 
 ### error.log
 
-The `error.log` is the `stderr` of the `netdata` daemon and all external plugins
-run by `netdata`.
-
-So if any process, in the Netdata process tree, writes anything to its standard error,
-it will appear in `error.log`.
+The `error.log` is the `stderr` of the `netdata` daemon .
 
 For most Netdata programs (including standard external plugins shipped by netdata), the following lines may appear:
 
@@ -238,6 +239,16 @@ So, when auto-detection of data collection fail, `ERROR` lines are logged and th
 program continues to run.
 
 When a Netdata program cannot run at all, a `FATAL` line is logged.
+
+### collector.log
+
+The `collector.log` is the `stderr` of all [collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
+ run by `netdata`.
+
+So if any process, in the Netdata process tree, writes anything to its standard error,
+it will appear in `collector.log`.
+
+Data stored inside this file follows pattern already described for `error.log`.
 
 ### access.log
 
@@ -361,7 +372,7 @@ all programs), edit `netdata.conf` and set:
   process nice level = -1
 ```
 
-then execute this to [restart Netdata](/docs/configure/start-stop-restart.md):
+then execute this to [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md):
 
 ```sh
 sudo systemctl restart netdata

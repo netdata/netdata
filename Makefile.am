@@ -23,7 +23,6 @@ CLEANFILES = \
 
 EXTRA_DIST = \
     .gitignore \
-    .csslintrc \
     .eslintignore \
     .eslintrc \
     .github/CODEOWNERS \
@@ -79,6 +78,7 @@ dist_noinst_DATA = \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
+    database/engine/journalfile_v2.ksy.in \
     $(NULL)
 
 # until integrated within build
@@ -107,7 +107,6 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    parser \
     spawn \
     $(NULL)
 
@@ -132,8 +131,8 @@ LIBNETDATA_FILES = \
     libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
     libnetdata/config/appconfig.c \
     libnetdata/config/appconfig.h \
-    libnetdata/arrayalloc/arrayalloc.c \
-    libnetdata/arrayalloc/arrayalloc.h \
+    libnetdata/aral/aral.c \
+    libnetdata/aral/aral.h \
     libnetdata/avl/avl.c \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
@@ -160,6 +159,8 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
+    libnetdata/parser/parser.c \
+    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -556,6 +557,20 @@ if ENABLE_DBENGINE
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
+    
+    RRD_PLUGIN_KSY_BUILTFILES = \
+        database/engine/journalfile_v2.ksy \
+        database/engine/journalfile_v2_virtmemb.ksy \
+        $(NULL)
+
+    BUILT_SOURCES += $(RRD_PLUGIN_KSY_BUILTFILES)
+    CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
+
+database/engine/journalfile_v2.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
+
+database/engine/journalfile_v2_virtmemb.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 -DVIRT_MEMBERS $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
 endif
 
 API_PLUGIN_FILES = \
@@ -663,11 +678,6 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
-PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
-    $(NULL)
-
 if ENABLE_ACLK
 ACLK_FILES = \
     aclk/aclk_util.c \
@@ -736,8 +746,6 @@ libmqttwebsockets_a_SOURCES = \
     mqtt_websockets/c-rbuf/src/ringbuffer.c \
     mqtt_websockets/c-rbuf/include/ringbuffer.h \
     mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
-    mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h \
     mqtt_websockets/c_rhash/src/c_rhash.c \
     mqtt_websockets/c_rhash/include/c_rhash.h \
     mqtt_websockets/c_rhash/src/c_rhash_internal.h
@@ -937,7 +945,6 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \

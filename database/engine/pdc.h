@@ -40,10 +40,10 @@ size_t epdl_cache_size(void);
 size_t deol_cache_size(void);
 size_t extent_buffer_cache_size(void);
 
-void pdc_cleanup1(void);
-void page_details_cleanup1(void);
-void epdl_cleanup1(void);
-void deol_cleanup1(void);
+void pdc_init(void);
+void page_details_init(void);
+void epdl_init(void);
+void deol_init(void);
 void extent_buffer_cleanup1(void);
 
 void epdl_cmd_dequeued(void *epdl_ptr);

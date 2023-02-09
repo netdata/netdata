@@ -11,8 +11,6 @@
 
 #define NETDATA_EBPF_PROC_PARTITIONS "/proc/partitions"
 
-#define NETDATA_LATENCY_DISK_SLEEP_MS 650000ULL
-
 // Process configuration name
 #define NETDATA_DISK_CONFIG_FILE "disk.conf"
 

@@ -1,7 +1,11 @@
 <!--
 title: "Manually build Netdata from source"
 description: "Package maintainers and power users may be interested in manually building Netdata from source without using any of our installation scripts."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/source.md"
+sidebar_label: "Manually build Netdata from source"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Manually build Netdata from source
@@ -9,7 +13,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/instal
 These instructions are for advanced users and distribution package
 maintainers. Unless this describes you, you almost certainly want
 to follow [our guide for manually installing Netdata from a git
-checkout](/packaging/installer/methods/manual.md) instead.
+checkout](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md) instead.
 
 ## Required dependencies
 

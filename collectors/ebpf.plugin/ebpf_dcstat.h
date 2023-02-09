@@ -28,8 +28,6 @@
 #define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
 #define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
-#define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
-
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,

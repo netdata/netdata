@@ -8,8 +8,6 @@
 
 #define NETDATA_DIRECTORY_VFS_CONFIG_FILE "vfs.conf"
 
-#define NETDATA_LATENCY_VFS_SLEEP_MS 750000ULL
-
 // Global chart name
 #define NETDATA_VFS_FILE_CLEAN_COUNT "vfs_deleted_objects"
 #define NETDATA_VFS_FILE_IO_COUNT "vfs_io"

@@ -183,7 +183,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         if(do_net == 1 && strcmp(type, "net") == 0) {
             if(words < 5) {
-                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 5);
+                collector_error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
@@ -198,7 +198,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
             if(words < 4) {
-                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
@@ -224,7 +224,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc2_warning) {
-                    error("Disabling /proc/net/rpc/nfs v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_error("Disabling /proc/net/rpc/nfs v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc2_warning = 1;
                 }
                 do_proc2 = 0;
@@ -245,7 +245,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc3_warning) {
-                    info("Disabling /proc/net/rpc/nfs v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfs v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc3_warning = 1;
                 }
                 do_proc3 = 0;
@@ -266,7 +266,7 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
             if(sum == 0ULL) {
                 if(!proc4_warning) {
-                    info("Disabling /proc/net/rpc/nfs v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfs v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
                 }
                 do_proc4 = 0;

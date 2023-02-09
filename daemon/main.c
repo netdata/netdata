@@ -72,10 +72,12 @@ SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t
         *PValue = sth;
 
         switch(thread_type) {
+            default:
             case SERVICE_THREAD_TYPE_NETDATA:
                 sth->netdata_thread = netdata_thread_self();
                 break;
 
+            case SERVICE_THREAD_TYPE_EVENT_LOOP:
             case SERVICE_THREAD_TYPE_LIBUV:
                 sth->uv_thread = uv_thread_self();
                 break;
@@ -197,10 +199,12 @@ static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
                 sth->cancelled = true;
 
                 switch(sth->type) {
+                    default:
                     case SERVICE_THREAD_TYPE_NETDATA:
                         netdata_thread_cancel(sth->netdata_thread);
                         break;
 
+                    case SERVICE_THREAD_TYPE_EVENT_LOOP:
                     case SERVICE_THREAD_TYPE_LIBUV:
                         break;
                 }
@@ -414,9 +418,10 @@ void netdata_cleanup_and_exit(int ret) {
 #endif
 
         // free the database
-        delta_shutdown_time("free rrdhost structures");
+        delta_shutdown_time("stop collection for all hosts");
 
-        rrdhost_free_all();
+        // rrdhost_free_all();
+        rrd_finalize_collection_for_all_hosts();
 
         delta_shutdown_time("stop metasync threads");
 
@@ -424,6 +429,25 @@ void netdata_cleanup_and_exit(int ret) {
 
 #ifdef ENABLE_DBENGINE
         if(dbengine_enabled) {
+            delta_shutdown_time("wait for dbengine collectors to finish");
+
+            size_t running = 1;
+            while(running) {
+                running = 0;
+                for (size_t tier = 0; tier < storage_tiers; tier++)
+                    running += rrdeng_collectors_running(multidb_ctx[tier]);
+
+                if(running)
+                    sleep_usec(100 * USEC_PER_MS);
+            }
+
+            delta_shutdown_time("wait for dbengine main cache to finish flushing");
+
+            while (pgc_hot_and_dirty_entries(main_cache)) {
+                pgc_flush_all_hot_and_dirty_pages(main_cache, PGC_SECTION_ALL);
+                sleep_usec(100 * USEC_PER_MS);
+            }
+
             delta_shutdown_time("stop dbengine tiers");
             for (size_t tier = 0; tier < storage_tiers; tier++)
                 rrdeng_exit(multidb_ctx[tier]);
@@ -807,6 +831,9 @@ static void log_init(void) {
 
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
     stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
@@ -1290,6 +1317,7 @@ void post_conf_load(char **user)
 int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
+int pluginsd_parser_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1297,6 +1325,8 @@ int main(int argc, char **argv) {
     usec_t started_ut = now_monotonic_usec();
     usec_t last_ut = started_ut;
     const char *prev_msg = NULL;
+    // Initialize stderror avoiding coredump when info() or error() is called
+    stderror = stderr;
 
     int i;
     int config_loaded = 0;
@@ -1407,6 +1437,9 @@ int main(int argc, char **argv) {
 
                         if(strcmp(optarg, "unittest") == 0) {
                             unittest_running = true;
+
+                            if (pluginsd_parser_unittest())
+                                return 1;
 
                             if (unit_test_static_threads())
                                 return 1;
@@ -1772,7 +1805,7 @@ int main(int argc, char **argv) {
 #endif
 
         // set libuv worker threads
-        libuv_worker_threads = get_system_cpus() * 2;
+        libuv_worker_threads = (int)get_netdata_cpus() * 2;
 
         if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
             libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
@@ -1836,6 +1869,8 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+
+        aral_judy_init();
 
         get_system_timezone();
 

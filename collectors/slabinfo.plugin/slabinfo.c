@@ -142,14 +142,14 @@ struct slabinfo *read_file_slabinfo() {
     if(unlikely(!ff)) {
         ff = procfile_reopen(ff, PLUGIN_SLABINFO_PROCFILE, " ,:" , PROCFILE_FLAG_DEFAULT);
         if(unlikely(!ff)) {
-            error("<- Cannot open file '%s", PLUGIN_SLABINFO_PROCFILE);
+            collector_error("<- Cannot open file '%s", PLUGIN_SLABINFO_PROCFILE);
             exit(1);
         }
     }
 
     ff = procfile_readall(ff);
     if(unlikely(!ff)) {
-        error("<- Cannot read file '%s'", PLUGIN_SLABINFO_PROCFILE);
+        collector_error("<- Cannot read file '%s'", PLUGIN_SLABINFO_PROCFILE);
         exit(0);
     }
 
@@ -336,6 +336,7 @@ void usage(void) {
 }
 
 int main(int argc, char **argv) {
+    stderror = stderr;
     clocks_init();
 
     program_name = argv[0];
@@ -350,7 +351,7 @@ int main(int argc, char **argv) {
             n = (int) str2l(argv[i]);
             if (n > 0) {
                 if (n >= UPDATE_EVERY_MAX) {
-                    error("Invalid interval value: %s", argv[i]);
+                    collector_error("Invalid interval value: %s", argv[i]);
                     exit(1);
                 }
                 freq = n;
@@ -383,7 +384,7 @@ int main(int argc, char **argv) {
     if(freq >= update_every)
         update_every = freq;
     else if(freq)
-        error("update frequency %d seconds is too small for slabinfo. Using %d.", freq, update_every);
+        collector_error("update frequency %d seconds is too small for slabinfo. Using %d.", freq, update_every);
 
 
     // Call the main function. Time drift to be added

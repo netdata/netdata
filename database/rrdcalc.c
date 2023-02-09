@@ -100,7 +100,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 
             if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
+                rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);
@@ -181,7 +181,7 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
     rc->rrdset = st;
 
     netdata_rwlock_wrlock(&st->alerts.rwlock);
-    DOUBLE_LINKED_LIST_APPEND_UNSAFE(st->alerts.base, rc, prev, next);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
     netdata_rwlock_unlock(&st->alerts.rwlock);
 
     if(rc->update_every < rc->rrdset->update_every) {
@@ -244,6 +244,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->units)
         rc->units = string_dup(st->units);
+
+    rrdvar_store_for_chart(host, st);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
 
@@ -328,7 +330,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
     if(!having_ll_wrlock)
         netdata_rwlock_wrlock(&st->alerts.rwlock);
 
-    DOUBLE_LINKED_LIST_REMOVE_UNSAFE(st->alerts.base, rc, prev, next);
+    DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
 
     if(!having_ll_wrlock)
         netdata_rwlock_unlock(&st->alerts.rwlock);
@@ -627,7 +629,8 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 
 void rrdcalc_rrdhost_index_init(RRDHOST *host) {
     if(!host->rrdcalc_root_index) {
-        host->rrdcalc_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE, &dictionary_stats_category_rrdhealth);
+        host->rrdcalc_root_index = dictionary_create_advanced(DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                                                              &dictionary_stats_category_rrdhealth, sizeof(RRDCALC));
 
         dictionary_register_insert_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_insert_callback, NULL);
         dictionary_register_conflict_callback(host->rrdcalc_root_index, rrdcalc_rrdhost_conflict_callback, NULL);

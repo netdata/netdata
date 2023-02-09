@@ -1,6 +1,10 @@
 <!--
 title: "Step 8. Build your first custom dashboard"
+sidebar_label: "Step 8. Build your first custom dashboard"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-08.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 8. Build your first custom dashboard
@@ -14,11 +18,19 @@ really flexible. 🤸
 
 In this step of the Netdata guide, you'll learn:
 
--   [Why you might want a custom dashboard](#why-should-i-create-a-custom-dashboard)
--   [How to create and prepare your `custom-dashboard.html` file](#create-and-prepare-your-custom-dashboardhtml-file)
--   [Where to add `dashboard.js` to your custom dashboard file](#add-dashboardjs-to-your-custom-dashboard-file)
--   [How to add basic styling](#add-some-basic-styling)
--   [How to add charts of different types, shapes, and sizes](#creating-your-dashboards-charts)
+- [Step 8. Build your first custom dashboard](#step-8-build-your-first-custom-dashboard)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Why should I create a custom dashboard?](#why-should-i-create-a-custom-dashboard)
+  - [Create and prepare your `custom-dashboard.html` file](#create-and-prepare-your-custom-dashboardhtml-file)
+  - [Add `dashboard.js` to your custom dashboard file](#add-dashboardjs-to-your-custom-dashboard-file)
+  - [Add some basic styling](#add-some-basic-styling)
+  - [Creating your dashboard's charts](#creating-your-dashboards-charts)
+    - [The chart unique ID (required)](#the-chart-unique-id-required)
+    - [Set chart duration](#set-chart-duration)
+    - [Set chart size](#set-chart-size)
+  - [Final touches](#final-touches)
+  - [The final `custom-dashboard.html`](#the-final-custom-dashboardhtml)
+  - [What's next?](#whats-next)
 
 Let's get on with it!
 
@@ -145,7 +157,7 @@ charts on a single page.
 ### The chart unique ID (required)
 
 You need to specify the unique ID of a chart to show it on your custom dashboard. If you forgot how to find the unique
-ID, head back over to [step 2](/docs/guides/step-by-step/step-02.md#understand-charts-dimensions-families-and-contexts)
+ID, head back over to [step 2](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-02.md#understand-charts-dimensions-families-and-contexts)
 for a re-introduction.
 
 You can then put this unique ID into a `<div>` element with the `data-netdata` attribute. Put this in the `<body>` of
@@ -385,11 +397,11 @@ In this guide, you learned the fundamentals of building a custom Netdata dashboa
 charts to your `custom-dashboard.html`, change the charts that are already there, and size them according to your needs.
 
 Of course, the custom dashboarding features covered here are just the beginning. Be sure to read up on our [custom
-dashboard documentation](/web/gui/custom/README.md) for details on how you can use other chart libraries, pull metrics
+dashboard documentation](https://github.com/netdata/netdata/blob/master/web/gui/custom/README.md) for details on how you can use other chart libraries, pull metrics
 from multiple Netdata agents, and choose which dimensions a given chart shows.
 
 Next, you'll learn how to store long-term historical metrics in Netdata!
 
-[Next: Long-term metrics storage &rarr;](/docs/guides/step-by-step/step-09.md)
+[Next: Long-term metrics storage &rarr;](https://github.com/netdata/netdata/blob/master/docs/guides/step-by-step/step-09.md)
 
 

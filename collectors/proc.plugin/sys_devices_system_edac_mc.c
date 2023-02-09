@@ -30,7 +30,7 @@ static void find_all_mc() {
 
     DIR *dir = opendir(dirname);
     if(unlikely(!dir)) {
-        error("Cannot read ECC memory errors directory '%s'", dirname);
+        collector_error("Cannot read ECC memory errors directory '%s'", dirname);
         return;
     }
 

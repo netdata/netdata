@@ -1,7 +1,10 @@
 <!--
 title: "CEPH monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ceph/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ceph/README.md"
 sidebar_label: "CEPH"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Storage"
 -->
 
 # CEPH monitoring with Netdata
@@ -28,7 +31,7 @@ Monitors the ceph cluster usage and consumption data of a server, and produces:
 ## Configuration
 
 Edit the `python.d/ceph.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

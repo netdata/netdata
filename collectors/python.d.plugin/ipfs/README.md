@@ -1,7 +1,10 @@
 <!--
 title: "IPFS monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ipfs/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/ipfs/README.md"
 sidebar_label: "IPFS"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Storage"
 -->
 
 # IPFS monitoring with Netdata
@@ -20,7 +23,7 @@ It produces the following charts:
 ## Configuration
 
 Edit the `python.d/ipfs.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

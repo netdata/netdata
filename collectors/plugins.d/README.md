@@ -1,6 +1,10 @@
 <!--
 title: "External plugins overview"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md"
+sidebar_label: "External plugins overview"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers"
 -->
 
 # External plugins overview
@@ -12,16 +16,18 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 |plugin|language|O/S|description|
 |:----:|:------:|:-:|:----------|
-|[apps.plugin](/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
-|[charts.d.plugin](/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
-|[cups.plugin](/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
-|[ioping.plugin](/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
-|[freeipmi.plugin](/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
-|[nfacct.plugin](/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
-|[xenstat.plugin](/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
-|[perf.plugin](/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
-|[python.d.plugin](/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
-|[slabinfo.plugin](/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
+|[apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
+|[charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
+|[cups.plugin](https://github.com/netdata/netdata/blob/master/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
+|[ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)|`C`|linux|monitors different metrics on environments using kernel internal functions.|
+|[go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md)|`GO`|all|collects metrics from the system, applications, or third-party APIs.|
+|[ioping.plugin](https://github.com/netdata/netdata/blob/master/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
+|[freeipmi.plugin](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
+|[nfacct.plugin](https://github.com/netdata/netdata/blob/master/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
+|[xenstat.plugin](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
+|[perf.plugin](https://github.com/netdata/netdata/blob/master/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
+|[python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
+|[slabinfo.plugin](https://github.com/netdata/netdata/blob/master/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
@@ -168,6 +174,83 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 #### DISABLE
 
 `DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
+
+#### HOST_DEFINE
+
+`HOST_DEFINE` defines a new (or updates an existing) virtual host.
+
+The template is:
+
+> HOST_DEFINE machine_guid hostname
+
+where:
+
+-   `machine_guid`
+
+    uniquely identifies the host, this is what will be needed to add charts to the host.
+
+-   `hostname`
+
+    is the hostname of the virtual host
+
+#### HOST_LABEL
+
+`HOST_LABEL` adds a key-value pair to the virtual host labels. It has to be given between `HOST_DEFINE` and `HOST_DEFINE_END`.
+
+The template is:
+
+> HOST_LABEL key value
+
+where:
+
+-   `key`
+
+    uniquely identifies the key of the label
+
+-   `value`
+
+    is the value associated with this key
+
+There are a few special keys that are used to define the system information of the monitored system:
+
+- `_cloud_provider_type`
+- `_cloud_instance_type`
+- `_cloud_instance_region`
+- `_os_name`
+- `_os_version`
+- `_kernel_version`
+- `_system_cores`
+- `_system_cpu_freq`
+- `_system_ram_total`
+- `_system_disk_space`
+- `_architecture`
+- `_virtualization`
+- `_container`
+- `_container_detection`
+- `_virt_detection`
+- `_is_k8s_node`
+- `_install_type`
+- `_prebuilt_arch`
+- `_prebuilt_dist`
+
+#### HOST_DEFINE_END
+
+`HOST_DEFINE_END` commits the host information, creating a new host entity, or updating an existing one with the same `machine_guid`.
+
+#### HOST 
+
+`HOST` switches data collection between hosts.
+
+The template is:
+
+> HOST machine_guid
+
+where:
+
+-   `machine_guid`
+
+    is the UUID of the host to switch to. After this command, every other command following it is assumed to be associated with this host.
+    Setting machine_guid to `localhost` switches data collection to the local host.
 
 #### CHART
 
@@ -502,12 +585,12 @@ or do not output the line at all.
 ## Modular Plugins
 
 1.  **python**, use `python.d.plugin`, there are many examples in the [python.d
-    directory](/collectors/python.d.plugin/README.md)
+    directory](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md)
 
     python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
 2.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d
-    directory](/collectors/charts.d.plugin/README.md)
+    directory](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)
 
     BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 

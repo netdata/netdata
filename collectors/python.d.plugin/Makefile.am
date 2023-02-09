@@ -65,14 +65,11 @@ include memcached/Makefile.inc
 include monit/Makefile.inc
 include nvidia_smi/Makefile.inc
 include nsd/Makefile.inc
-include ntpd/Makefile.inc
 include openldap/Makefile.inc
 include oracledb/Makefile.inc
 include pandas/Makefile.inc
 include postfix/Makefile.inc
-include proxysql/Makefile.inc
 include puppet/Makefile.inc
-include rabbitmq/Makefile.inc
 include rethinkdbs/Makefile.inc
 include retroshare/Makefile.inc
 include riakkv/Makefile.inc

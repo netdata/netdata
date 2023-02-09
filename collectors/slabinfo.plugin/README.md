@@ -1,6 +1,10 @@
 <!--
 title: "slabinfo.plugin"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/slabinfo.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/slabinfo.plugin/README.md"
+sidebar_label: "slabinfo.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/System metrics"
 -->
 
 # slabinfo.plugin

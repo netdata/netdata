@@ -1,7 +1,10 @@
 <!--
 title: "NSD monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nsd/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nsd/README.md"
 sidebar_label: "NSD"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/Networking"
 -->
 
 # NSD monitoring with Netdata

@@ -61,7 +61,7 @@ time_t rrdeng_load_align_to_optimal_before(struct storage_engine_query_handle *r
 void rrdeng_get_37_statistics(struct rrdengine_instance *ctx, unsigned long long *array);
 
 /* must call once before using anything */
-int rrdeng_init(struct rrdengine_instance **ctxp, char *dbfiles_path, unsigned page_cache_mb,
+int rrdeng_init(struct rrdengine_instance **ctxp, const char *dbfiles_path,
                        unsigned disk_space_mb, size_t tier);
 
 void rrdeng_readiness_wait(struct rrdengine_instance *ctx);
@@ -214,6 +214,8 @@ struct rrdeng_buffer_sizes {
     size_t epdl;
     size_t deol;
     size_t pd;
+    size_t pgc;
+    size_t mrg;
 #ifdef PDC_USE_JULYL
     size_t julyl;
 #endif
@@ -223,5 +225,7 @@ struct rrdeng_buffer_sizes rrdeng_get_buffer_sizes(void);
 struct rrdeng_cache_efficiency_stats rrdeng_get_cache_efficiency_stats(void);
 
 RRDENG_SIZE_STATS rrdeng_size_statistics(struct rrdengine_instance *ctx);
+size_t rrdeng_collectors_running(struct rrdengine_instance *ctx);
+bool rrdeng_is_legacy(STORAGE_INSTANCE *db_instance);
 
 #endif /* NETDATA_RRDENGINEAPI_H */

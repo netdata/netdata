@@ -167,12 +167,14 @@ void ml_cancel_anomaly_detection_threads(RRDHOST *RH) {
     }
 }
 
-void ml_chart_update_begin(RRDSET *RS) {
+bool ml_chart_update_begin(RRDSET *RS) {
     Chart *C = reinterpret_cast<Chart *>(RS->ml_chart);
     if (!C)
-        return;
+        return false;
 
     C->updateBegin();
+
+    return true;
 }
 
 void ml_chart_update_end(RRDSET *RS) {

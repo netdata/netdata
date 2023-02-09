@@ -108,21 +108,44 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
 {
     buffer_need_bytes(wb, 50);
 
+    switch(uvalue) {
+        case 0:
+            buffer_fast_strcat(wb, "0", 1);
+            return;
+
+        case 1:
+            buffer_fast_strcat(wb, "1", 1);
+            return;
+
+        case 5:
+            buffer_fast_strcat(wb, "5", 1);
+            return;
+
+        case 10:
+            buffer_fast_strcat(wb, "10", 2);
+            return;
+
+        default:
+            break;
+    }
+
     char *str = &wb->buffer[wb->len];
     char *wstr = str;
 
     switch (sizeof(void *)) {
-    case 4:
-        wstr = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(wstr, uvalue) :
-                                                            print_number_lu_r(wstr, uvalue);
-        break;
-    case 8:
-        do {
-            *wstr++ = (char) ('0' + (uvalue % 10));
-        } while (uvalue /= 10);
-        break;
-    default:
-        fatal("Netdata supports only 32-bit & 64-bit systems.");
+        case 8:
+            do {
+                *wstr++ = (char) ('0' + (uvalue % 10));
+            } while (uvalue /= 10);
+            break;
+
+        case 4:
+            wstr = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(wstr, uvalue) :
+                   print_number_lu_r(wstr, uvalue);
+            break;
+
+        default:
+            fatal("Netdata supports only 32-bit & 64-bit systems.");
     }
 
     // terminate it
@@ -132,8 +155,9 @@ void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
     char *begin = str, *end = wstr - 1, aux;
     while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
 
+    size_t len = wstr - str;
     // return the buffer length
-    wb->len += wstr - str;
+    wb->len += len;
 }
 
 void buffer_print_ll(BUFFER *wb, long long value)
@@ -167,7 +191,7 @@ static unsigned char bits03_to_hex[16] = {
     [15] = 'F'
 };
 
-void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
+inline void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
 {
     unsigned char buffer[sizeof(unsigned long long) * 2 + 2 + 1];   // 8 bytes * 2 + '0x' + '\0'
     unsigned char *e = &buffer[sizeof(unsigned long long) * 2 + 2];
@@ -196,7 +220,16 @@ void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
     buffer_fast_strcat(wb, (char *)p, e - p);
 }
 
-void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
+void buffer_print_ll_hex(BUFFER *wb, long long value) {
+    if(value < 0) {
+        buffer_fast_strcat(wb, "-", 1);
+        value = -value;
+    }
+
+    buffer_print_llu_hex(wb, value);
+}
+
+inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt)) return;
 
     buffer_need_bytes(wb, len + 1);
@@ -212,6 +245,27 @@ void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     // keep it NULL terminating
     // not counting it at wb->len
     wb->buffer[wb->len] = '\0';
+}
+
+void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
+    if(unlikely(flags == SN_EMPTY_SLOT)) {
+        buffer_fast_strcat(wb, "E", 1);
+        return;
+    }
+
+    size_t printed = 0;
+    if(likely(send_anomaly_bit && (flags & SN_FLAG_NOT_ANOMALOUS))) {
+        buffer_fast_strcat(wb, "A", 1);
+        printed++;
+    }
+
+    if(unlikely(flags & SN_FLAG_RESET)) {
+        buffer_fast_strcat(wb, "R", 1);
+        printed++;
+    }
+
+    if(!printed)
+        buffer_fast_strcat(wb, "''", 2);
 }
 
 void buffer_strcat(BUFFER *wb, const char *txt)
@@ -234,7 +288,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     wb->len = len;
     buffer_overflow_check(wb);
 
-    if(*txt) {
+    if(unlikely(*txt)) {
         debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
         len = strlen(txt);
         buffer_fast_strcat(wb, txt, len);
@@ -242,7 +296,7 @@ void buffer_strcat(BUFFER *wb, const char *txt)
     else {
         // terminate the string
         // without increasing the length
-        buffer_need_bytes(wb, (size_t)1);
+        buffer_need_bytes(wb, 1);
         wb->buffer[wb->len] = '\0';
     }
 }
@@ -361,7 +415,7 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
 
 void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value)
 {
-    buffer_need_bytes(wb, 50);
+    buffer_need_bytes(wb, 512);
 
     if(isnan(value) || isinf(value)) {
         buffer_strcat(wb, "null");

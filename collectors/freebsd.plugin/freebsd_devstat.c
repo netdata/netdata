@@ -116,7 +116,7 @@ static void disks_cleanup() {
     struct disk *dm = disks_root, *last = NULL;
     while(dm) {
         if (unlikely(!dm->updated)) {
-            // info("Removing disk '%s', linked after '%s'", dm->name, last?last->name:"ROOT");
+            // collector_info("Removing disk '%s', linked after '%s'", dm->name, last?last->name:"ROOT");
 
             if (disks_last_used == dm)
                 disks_last_used = last;
@@ -728,28 +728,28 @@ int do_kern_devstat(int update_every, usec_t dt) {
 
         if (unlikely(common_error)) {
             do_system_io = 0;
-            error("DISABLED: system.io chart");
+            collector_error("DISABLED: system.io chart");
             do_io = 0;
-            error("DISABLED: disk.* charts");
+            collector_error("DISABLED: disk.* charts");
             do_ops = 0;
-            error("DISABLED: disk_ops.* charts");
+            collector_error("DISABLED: disk_ops.* charts");
             do_qops = 0;
-            error("DISABLED: disk_qops.* charts");
+            collector_error("DISABLED: disk_qops.* charts");
             do_util = 0;
-            error("DISABLED: disk_util.* charts");
+            collector_error("DISABLED: disk_util.* charts");
             do_iotime = 0;
-            error("DISABLED: disk_iotime.* charts");
+            collector_error("DISABLED: disk_iotime.* charts");
             do_await = 0;
-            error("DISABLED: disk_await.* charts");
+            collector_error("DISABLED: disk_await.* charts");
             do_avagsz = 0;
-            error("DISABLED: disk_avgsz.* charts");
+            collector_error("DISABLED: disk_avgsz.* charts");
             do_svctm = 0;
-            error("DISABLED: disk_svctm.* charts");
-            error("DISABLED: kern.devstat module");
+            collector_error("DISABLED: disk_svctm.* charts");
+            collector_error("DISABLED: kern.devstat module");
             return 1;
         }
     } else {
-        error("DISABLED: kern.devstat module");
+        collector_error("DISABLED: kern.devstat module");
         return 1;
     }
 

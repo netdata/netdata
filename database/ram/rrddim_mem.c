@@ -410,8 +410,11 @@ void rrddim_query_finalize(struct storage_engine_query_handle *handle) {
 #ifdef NETDATA_INTERNAL_CHECKS
     struct mem_query_handle *h = (struct mem_query_handle*)handle->handle;
     struct mem_metric_handle *mh = (struct mem_metric_handle *)h->db_metric_handle;
-    if(!rrddim_query_is_finished(handle))
-        error("QUERY: query for chart '%s' dimension '%s' has been stopped unfinished", rrdset_id(mh->rd->rrdset), rrddim_name(mh->rd));
+
+    internal_error(!rrddim_query_is_finished(handle),
+                   "QUERY: query for chart '%s' dimension '%s' has been stopped unfinished",
+                   rrdset_id(mh->rd->rrdset), rrddim_name(mh->rd));
+
 #endif
     freez(handle->handle);
     __atomic_sub_fetch(&rrddim_db_memory_size, sizeof(struct mem_query_handle), __ATOMIC_RELAXED);

@@ -19,8 +19,6 @@
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
 #define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
 
-#define NETDATA_LATENCY_CACHESTAT_SLEEP_MS 600000ULL
-
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 

@@ -1,7 +1,11 @@
 <!--
 title: "Online change point detection with Netdata"
 description: "Use ML-driven change point detection to narrow your focus and shorten root cause analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/changefinder/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/changefinder/README.md"
+sidebar_label: "changefinder"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References/Collectors references/QoS"
 -->
 
 # Online changepoint detection with Netdata
@@ -93,7 +97,7 @@ leave the `changefinder.conf` file alone to begin with. Then you can return to i
 a bit more once the collector is running for a while and you have a feeling for its performance on your node._
 
 Edit the `python.d/changefinder.conf` configuration file using `edit-config` from the your
-agent's [config directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
+agent's [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

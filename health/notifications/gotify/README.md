@@ -3,6 +3,10 @@ title: "Send notifications to Gotify"
 description: "Send alerts to your Gotify instance when an alert gets triggered in Netdata."
 sidebar_label: "Gotify"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/gotify/README.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Send notifications to Gotify
@@ -21,7 +25,7 @@ You can generate a new token in the Gotify Web UI.
 To set up Gotify in Netdata: 
 
 1. Switch to your [config
-directory](/docs/configure/nodes.md) and edit the file `health_alarm_notify.conf` using the edit config script.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and edit the file `health_alarm_notify.conf` using the edit config script.
  
    ```bash
    ./edit-config health_alarm_notify.conf

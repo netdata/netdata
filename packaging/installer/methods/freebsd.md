@@ -2,6 +2,10 @@
 title: "Install Netdata on FreeBSD"
 description: "Install Netdata on FreeBSD to monitor the health and performance of bare metal or VMs with thousands of real-time, per-second metrics."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md
+sidebar_label: "Install Netdata on FreeBSD"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on FreeBSD
@@ -66,7 +70,7 @@ You can now access the Netdata dashboard by navigating to `http://NODE:19999`, r
 
 Starting with v1.30, Netdata collects anonymous usage information by default and sends it to a self hosted PostHog instance within the Netdata infrastructure. To read
 more about the information collected and how to opt-out, check the [anonymous statistics
-page](/docs/anonymous-statistics.md).
+page](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md).
 
 ## Updating the Agent on FreeBSD
 If you have not passed the `--auto-update` or `-u` parameter for the installer to enable automatic updating, repeat the last step to update Netdata whenever a new version becomes available. 

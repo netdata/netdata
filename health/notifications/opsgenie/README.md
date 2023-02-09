@@ -2,7 +2,11 @@
 title: "Send notifications to Opsgenie"
 description: "Send alerts to your Opsgenie incident response account any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "Opsgenie"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/opsgenie/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/opsgenie/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Setup/Notification/Agent"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Send notifications to Opsgenie
@@ -13,9 +17,9 @@ incidents.
 
 The first step is to create a [Netdata integration](https://docs.opsgenie.com/docs/api-integration) in the
 [Opsgenie](https://www.atlassian.com/software/opsgenie) dashboard. After this, you need to edit
-`health_alarm_notify.conf` on your system, by running the following from your [config
-directory](/docs/configure/nodes.md):
- 
+`health_alarm_notify.conf` on your system, by running the following from
+your [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md):
+
 ```bash
 ./edit-config health_alarm_notify.conf
 ```
@@ -56,7 +60,7 @@ message:
 2020-09-03 23:07:00: alarm-notify.sh: ERROR: failed to send opsgenie notification for: hades test.chart.test_alarm is CRITICAL, with HTTP error code 401.
 ```
 
-You can find more details about the Opsgenie error codes in their [response
-docs](https://docs.opsgenie.com/docs/response).
+You can find more details about the Opsgenie error codes in
+their [response docs](https://docs.opsgenie.com/docs/response).
 
 
