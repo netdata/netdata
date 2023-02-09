@@ -1135,8 +1135,7 @@ static inline json_object *generate_info_summary_alarm_statuses(RRDHOST *host)
 {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
     RRDCALC *rc;
-    rrdhost_rdlock(host);
-    for(rc = host->alarms; rc ; rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
             continue;
 
@@ -1151,7 +1150,7 @@ static inline json_object *generate_info_summary_alarm_statuses(RRDHOST *host)
                 alarm_normal++;
         }
     }
-    rrdhost_unlock(host);
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
     json_object *tmp;
     json_object *obj = json_object_new_object();
@@ -1175,7 +1174,7 @@ static inline void generate_info_mirrored_hosts(json_object *j)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED))
             continue;
 
-        tmp = json_object_new_string(host->hostname);
+        tmp = json_object_new_string(rrdhost_hostname(host));
         json_object_array_add(hosts, tmp);
 
         host_status = json_object_new_object();
@@ -1209,50 +1208,34 @@ static inline void generate_info_mirrored_hosts(json_object *j)
     json_object_object_add(j, "mirrored_hosts_status", host_statuses);
 }
 
-static inline json_object *host_labels_json(RRDHOST *host)
-{
-    json_object *tmp, *obj = json_object_new_object();
+extern void analytics_build_info(BUFFER *b);
 
-    rrdhost_rdlock(host);
-    netdata_rwlock_rdlock(&host->labels.labels_rwlock);
-    for (struct label *label = host->labels.head; label; label = label->next)
-        JSON_ADD_STRING(label->key, label->value, obj);
-    netdata_rwlock_unlock(&host->labels.labels_rwlock);
-    rrdhost_unlock(host);
-
-    return obj;
-}
-
-static void get_charts_dimensions_count(long int *charts, long int *dims)
+// TODO common source with analytics_metrics
+static uint32_t get_localhost_metric_count(void)
 {
     RRDSET *st;
-    RRDDIM *rd;
-    *charts = 0;
-    *dims = 0;
-    rrdset_foreach_read(st, localhost)
-    {
-        if (rrdset_is_available_for_viewers(st))
-            (*charts)++;
-
-        rrdset_rdlock(st);
-        rrddim_foreach_read(rd, st)
-        {
-            if (rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
-                continue;
-            (*dims)++;
+    uint32_t dimensions = 0;
+    rrdset_foreach_read(st, localhost) {
+        if (rrdset_is_available_for_viewers(st)) {
+            RRDDIM *rd;
+            rrddim_foreach_read(rd, st) {
+                if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
+                    continue;
+                dimensions++;
+            }
+            rrddim_foreach_done(rd);
         }
-        rrdset_unlock(st);
     }
+    rrdset_foreach_done(st);
+    return dimensions;
 }
-
-extern void analytics_build_info(BUFFER *b);
 
 json_object *generate_info_json(RRDHOST *host)
 {
     json_object *j = json_object_new_object();
     json_object *tmp;
 
-    JSON_ADD_STRING("version", host->program_version, j)
+    JSON_ADD_STRING("version", rrdhost_program_version(host), j)
     JSON_ADD_STRING("uid", host->machine_guid, j)
 
     generate_info_mirrored_hosts(j);
@@ -1293,7 +1276,7 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_STRING("container", (host->system_info->container) ? host->system_info->container : "", j)
     JSON_ADD_STRING("container_detection", (host->system_info->container_detection) ? host->system_info->container_detection : "", j)
 
-    json_object_object_add(j, "host_labels", host_labels_json(host));
+    json_object_object_add(j, "host_labels", rrdlabels_to_json(host->rrdlabels));
 
     json_object_object_add(j, "collectors", chartcollectors_json(host));
 
@@ -1317,7 +1300,7 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_BOOL("cloud-available", 0, j)
 #endif /* ENABLE_ALCK */
 
-    char *agent_id = is_agent_claimed();
+    char *agent_id = get_agent_claimid();
     JSON_ADD_BOOL("agent-claimed", (agent_id != NULL), j)
     freez(agent_id);
 
@@ -1337,13 +1320,13 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_STRING("multidb-disk-quota", analytics_data.netdata_config_multidb_disk_quota, j)
     JSON_ADD_STRING("page-cache-size", analytics_data.netdata_config_page_cache_size, j)
     JSON_ADD_BOOL("stream-enabled", default_rrdpush_enabled, j)
-    JSON_ADD_INT("hosts-available", rrd_hosts_available, j)
+    JSON_ADD_INT("hosts-available", rrdhost_hosts_available(), j)
 #ifdef ENABLE_HTTPS
     JSON_ADD_BOOL("https-enabled", 1, j)
 #else
     JSON_ADD_BOOL("https-enabled", 0, j)
 #endif
-    BUFFER *bi = buffer_create(1000);
+    BUFFER *bi = buffer_create(1000, NULL);
     analytics_build_info(bi);
     JSON_ADD_STRING("buildinfo", buffer_tostring(bi), j);
     buffer_free(bi);
@@ -1368,10 +1351,15 @@ json_object *generate_info_json(RRDHOST *host)
         json_object_object_add(j, "dashboard-used", NULL);
     }
 
-    long int charts, dims;
-    get_charts_dimensions_count(&charts, &dims);
-    JSON_ADD_INT("charts-count", charts, j)
-    JSON_ADD_INT("metrics-count", dims, j)
+    RRDSET *st;
+    long int chart_count = 0;
+
+    rrdset_foreach_read(st, localhost)
+        if(rrdset_is_available_for_viewers(st)) chart_count++;
+    rrdset_foreach_done(st);
+
+    JSON_ADD_INT("charts-count", chart_count, j)
+    JSON_ADD_INT("metrics-count", get_localhost_metric_count(), j)
 
     return j;
 }
