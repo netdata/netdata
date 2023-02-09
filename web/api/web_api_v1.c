@@ -1689,7 +1689,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
 
     fn_off = cn_off = 0;
 
-    query_params.results_buff = buffer_create(query_params.quota);
+    query_params.results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_api);
     
     buffer_strcat(w->response.data, "{\n");
     buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", QUERY_VERSION);

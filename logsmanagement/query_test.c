@@ -35,7 +35,7 @@ static void pipe_read_cb(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf
         query_params[i].keyword = strtok(NULL, ",");
         size_t buff_size = (size_t)strtoll(strtok(NULL, ","), &pEnd, 10);
         // debug(D_LOGS_MANAG, "size_of_buff in pipe_read_cb(): %zd\n", buff_size);
-        query_params[i].results_buff = buffer_create(buff_size);
+        query_params[i].results_buff = buffer_create(buff_size, NULL);
 
 
         int rc = uv_thread_create(&test_execute_query_thread_id[i], test_execute_query_thread, &query_params[i]);
@@ -142,7 +142,7 @@ void test_execute_query_thread(void *args) {
 
         // Simulate real query which would do buffer_create() and buffer_free() everytime 
         buffer_free(query_params.results_buff); 
-        query_params.results_buff = buffer_create(results_size_max);
+        query_params.results_buff = buffer_create(results_size_max, NULL);
         query_params.start_timestamp = query_params.end_timestamp + 1;
         query_params.end_timestamp = final_timestamp;
     }

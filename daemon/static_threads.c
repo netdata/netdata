@@ -169,11 +169,7 @@ const struct netdata_static_thread static_threads_common[] = {
     },
 
     {
-<<<<<<< HEAD
         .name = "REPLAY[1]",
-=======
-        .name = "REPLICATION",
->>>>>>> bd9f1f131 (Squash all previous logs management commits to one)
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,

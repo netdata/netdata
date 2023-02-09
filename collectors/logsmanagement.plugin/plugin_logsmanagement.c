@@ -150,7 +150,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         .ignore_case = 0,
         .sanitize_keyword = 0,
         .data_format = LOGS_QUERY_DATA_FORMAT_JSON_ARRAY,
-        .results_buff = buffer_create(query_params.quota),
+        .results_buff = buffer_create(query_params.quota, &netdata_buffers_statistics.buffers_functions),
         .keyword_matches = 0
     };
 
