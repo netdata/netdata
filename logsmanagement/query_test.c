@@ -171,8 +171,8 @@ void test_execute_query_thread(void *args) {
     const msec_t end_time = now_realtime_msec();
     debug(D_LOGS_MANAG, "==============================\n"
                         "Stress test queries for '%s' completed with success!\n"
-                        "Total duration: %" PRIu64 "ms to retrieve and compare %" PRId64 "KB.\n"
-                        "Query execution total duration: %" PRIu64 "ms\n"
+                        "Total duration: %llums to retrieve and compare %" PRId64 "KB.\n"
+                        "Query execution total duration: %llums\n"
                         "==============================",
           query_params.filename[0], end_time - start_time, file_offset / 1000, query_total_time);
 

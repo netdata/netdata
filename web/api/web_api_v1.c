@@ -1693,12 +1693,12 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     
     buffer_strcat(w->response.data, "{\n");
     buffer_sprintf(w->response.data, "\t\"api_version\": %s,\n", QUERY_VERSION);
-    buffer_sprintf(w->response.data, "\t\"requested_from\": %" PRIu64 ",\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"requested_until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested_from\": %llu,\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"requested_until\": %llu,\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"requested_keyword\": \"%s\",\n", query_params.keyword ? query_params.keyword : "");
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp 
-    buffer_sprintf(w->response.data, "\t\"actual_from\": %" PRIu64 ",\n", query_params.start_timestamp);
-    buffer_sprintf(w->response.data, "\t\"actual_until\": %" PRIu64 ",\n", query_params.end_timestamp);
+    buffer_sprintf(w->response.data, "\t\"actual_from\": %llu,\n", query_params.start_timestamp);
+    buffer_sprintf(w->response.data, "\t\"actual_until\": %llu,\n", query_params.end_timestamp);
     buffer_sprintf(w->response.data, "\t\"quota\": %zu,\n", query_params.quota);
     buffer_sprintf(w->response.data, "\t\"requested_filename\":[\n");
     while(query_params.filename[fn_off]) buffer_sprintf(w->response.data, "\t\t\"%s\",\n", query_params.filename[fn_off++]);
@@ -1715,7 +1715,7 @@ inline int web_client_api_request_v1_logsmanagement(RRDHOST *host, struct web_cl
     while(query_params.results_buff->len - res_off > 0){
         memcpy(&res_hdr, &query_params.results_buff->buffer[res_off], sizeof(res_hdr));
         
-        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%" PRIu64 ",\n" , res_hdr.timestamp);
+        buffer_sprintf(w->response.data, "\t\t[\n\t\t\t%llu,\n" , res_hdr.timestamp);
 
         if(likely(query_params.data_format == LOGS_QUERY_DATA_FORMAT_JSON_ARRAY)) buffer_strcat(w->response.data, "\t\t\t[\n\t");
 

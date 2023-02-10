@@ -276,8 +276,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
                     "   \"update_every\": %d,\n"
                     "   \"logs_management_meta\": {\n"
                     "      \"api_version\": %s,\n"
-                    "      \"requested_from\": %" PRIu64 ",\n"
-                    "      \"requested_until\": %" PRIu64 ",\n"
+                    "      \"requested_from\": %llu,\n"
+                    "      \"requested_until\": %llu,\n"
                     "      \"requested_keyword\": \"%s\",\n",
                     status,
                     update_every,
@@ -288,8 +288,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
     );
      
     buffer_sprintf( dest_wb,
-                    "      \"actual_from\": %" PRIu64 ",\n"
-                    "      \"actual_until\": %" PRIu64 ",\n"
+                    "      \"actual_from\": %llu,\n"
+                    "      \"actual_until\": %llu,\n"
                     "      \"quota\": %zu,\n"
                     "      \"requested_filename\": [\n",
                     query_params.start_timestamp,
@@ -350,7 +350,7 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         
         buffer_sprintf( dest_wb, 
                         "      [\n"
-                        "         %" PRIu64 ",\n", 
+                        "         %llu,\n", 
                         res_hdr.timestamp
         );
 
