@@ -6,6 +6,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/insta
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Getting started"
+sidebar_position: "1"
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'

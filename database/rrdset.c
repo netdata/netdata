@@ -1981,8 +1981,8 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
     internal_error(true, "RRDSET '%s' switching update every from %d to %d",
                    rrdset_id(st), (int)st->update_every, (int)update_every_s);
 
-    time_t prev_update_every_s = st->update_every;
-    st->update_every = update_every_s;
+    time_t prev_update_every_s = (time_t) st->update_every;
+    st->update_every = (int) update_every_s;
 
     // switch update every to the storage engine
     RRDDIM *rd;
@@ -1992,7 +1992,7 @@ time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
                 rd->tiers[tier].collect_ops->change_collection_frequency(rd->tiers[tier].db_collection_handle, (int)(st->rrdhost->db[tier].tier_grouping * st->update_every));
         }
 
-        assert(rd->update_every == prev_update_every_s &&
+        assert(rd->update_every == (int) prev_update_every_s &&
                "chart's update every differs from the update every of its dimensions");
         rd->update_every = st->update_every;
     }

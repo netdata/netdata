@@ -1,12 +1,11 @@
 <!--
 title: "Contribute to the documentation"
-sidebar_label: "to Documentation"
+sidebar_label: "Contribute to the documentation"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/guidelines.md"
-sidebar_position: "10000"
+sidebar_position: "10"
 learn_status: "Published"
 learn_topic_type: "Custom"
 learn_rel_path: "Contribute"
-learn_docs_purpose: "TBD"
 -->
 
 import Tabs from '@theme/Tabs'; import TabItem from '@theme/TabItem';
