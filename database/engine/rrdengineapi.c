@@ -871,6 +871,7 @@ STORAGE_POINT rrdeng_load_metric_next(struct storage_engine_query_handle *rrddim
         // We need to get a new page
 
         if (!rrdeng_load_page_next(rrddim_handle, false)) {
+            handle->now_s = rrddim_handle->end_time_s;
             storage_point_empty(sp, handle->now_s - handle->dt_s, handle->now_s);
             goto prepare_for_next_iteration;
         }
