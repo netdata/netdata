@@ -1316,8 +1316,15 @@ json_object *generate_info_json(RRDHOST *host)
         JSON_ADD_BOOL("aclk-available", 0, j)
 
     JSON_ADD_STRING("memory-mode", rrd_memory_mode_name(default_rrd_memory_mode), j)
-    JSON_ADD_STRING("multidb-disk-quota", analytics_data.netdata_config_multidb_disk_quota, j)
-    JSON_ADD_STRING("page-cache-size", analytics_data.netdata_config_page_cache_size, j)
+
+#ifdef ENABLE_DBENGINE
+    JSON_ADD_INT("multidb-disk-quota", default_multidb_disk_quota_mb, j)
+    JSON_ADD_INT("page-cache-size", default_rrdeng_page_cache_mb, j)
+#else
+    json_object_object_add(j, "multidb-disk-quota", NULL);
+    json_object_object_add(j, "page-cache-size", NULL);
+#endif
+
     JSON_ADD_BOOL("stream-enabled", default_rrdpush_enabled, j)
     JSON_ADD_INT("hosts-available", rrdhost_hosts_available(), j)
 #ifdef ENABLE_HTTPS
