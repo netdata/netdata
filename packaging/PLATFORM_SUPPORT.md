@@ -1,6 +1,6 @@
 <!--
 title: "Netdata platform support policy"
-sidebar_label: "Supported platforms"
+sidebar_label: "Installation"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
 learn_status: "Published"
 sidebar_position: "1"
@@ -9,7 +9,11 @@ learn_rel_path: "Installation"
 learn_docs_purpose: "Present all the supported platform in the Netdata solution"
 -->
 
-# Netdata platform support policy
+This section contains detailed information on every supported installation method and system. 
+A quick guide for the most common use cases is available at [Install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
+
+
+## Netdata platform support policy
 
 Netdata defines three tiers of official support:
 
@@ -45,9 +49,9 @@ The following table shows a general outline of the various support tiers and cat
 - ‘Native Packages’: Whether we provide native packages for the system package manager for the platform.
 - ‘Static Build Support’: How well our static builds are expected to work on the platform.
 
-## Currently supported platforms
+### Currently supported platforms
 
-### Core
+#### Core
 
 Platforms in the core support tier are our top priority. They are covered rigorously in our CI, usually
 include official binary packages, and any platform-specific bugs receive a high priority. From the perspective
@@ -78,7 +82,7 @@ to work on these platforms with minimal user effort.
 | Ubuntu                   | 20.04          | x86\_64, ARMv7, AArch64                |                                                                                                                                                    |
 | Ubuntu                   | 18.04          | x86\_64, i386, ARMv7, AArch64          |                                                                                                                                                    |
 
-### Intermediate
+#### Intermediate
 
 Platforms in the intermediate support tier are those which Netdata wants to support, but cannot justify core level
 support for. They are also covered in CI, but not as rigorously as the core tier. They may or may not include
@@ -95,7 +99,7 @@ with minimal user effort.
 | Arch Linux    | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
 | Manjaro Linux | Latest  | No                       | We officially recommend the community packages available for Arch Linux |
 
-### Community
+#### Community
 
 Platforms in the community support tier are those which are primarily supported by community contributors. They may
 receive some support from Netdata, but are only a best-effort affair. When a community member makes a contribution
@@ -117,7 +121,7 @@ platforms, but may require some extra effort from users.
 | macOS        | 10.15      | No                       | Requires Homebrew for dependencies.                                                                       |
 | openSUSE     | Tumbleweed | No                       |                                                                                                           |
 
-## Third-party supported platforms
+### Third-party supported platforms
 
 Some platform maintainers actively support Netdata on their platforms even though we do not provide official
 support. Third-party supported platforms may work, but the experience of using Netdata on such platforms is not
@@ -131,7 +135,7 @@ Currently, we know of the following platforms having some degree of third-party 
 - Rockstor: Rockstor provides support for a Netdata add-on for their NAS platform. The Rockstor community and
   developers are the primary source for support on their platform.
 
-## Previously supported platforms
+### Previously supported platforms
 
 As platforms become end of life upstream, Netdata will stop officially supporting them. We will not actively break
 things on these platforms, but we will also not make any effort to ensure that things keep working on them either.
@@ -161,7 +165,7 @@ This is a list of platforms that we have supported in the recent past but no lon
 | Ubuntu       | 21.10     | EOL as of 2022-07-31 |
 | Ubuntu       | 21.04     | EOL as of 2022-01-01 |
 
-## Static builds
+### Static builds
 
 The Netdata team provides static builds of Netdata for Linux systems with a selection of common CPU
 architectures. These static builds are largely self-contained, only requiring a a POSIX-compliant shell on the target
@@ -176,9 +180,9 @@ We currently provide static builds for the following CPU architectures:
 - AArch64
 - POWER8+
 
-## Platform-specific support considerations
+### Platform-specific support considerations
 
-### IPMI
+#### IPMI
 
 Our IPMI collector is based on FreeIPMI. Due to upstream limitations in FreeIPMI, we are unable to support our
 IPMI collector on POWER-based hardware.
