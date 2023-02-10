@@ -174,14 +174,16 @@ json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
     JSON_ADD_STRING("memory_mode", rrd_memory_mode_name(host->rrd_memory_mode), j)
     JSON_ADD_STRING("custom_info", custom_dashboard_info_js_filename, j)
 
+    json_object *charts_json = json_object_new_object();
     rrdset_foreach_read(st, host) {
         if ((!show_archived && rrdset_is_available_for_viewers(st)) || (show_archived && rrdset_is_archived(st))) {
             tmp = rrdset_json(st, &dimensions, &memory, skip_volatile);
-            json_object_object_add(j, rrdset_id(st), tmp);
+            json_object_object_add(charts_json, rrdset_id(st), tmp);
             charts++;
         }
     }
     rrdset_foreach_done(st);
+    json_object_object_add(j, "charts", charts_json);
 
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
