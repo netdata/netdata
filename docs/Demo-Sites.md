@@ -6,7 +6,7 @@ sidebar_label: "Live demos"
 learn_status: "Published"
 learn_topic_type: "Getting started"
 learn_rel_path: "Getting started"
-sidebar_position: "300"
+sidebar_position: "90"
 -->
 
 # Demo sites
