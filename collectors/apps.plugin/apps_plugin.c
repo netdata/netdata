@@ -4322,14 +4322,14 @@ static void apps_plugin_function_processes_help(const char *transaction) {
     unsigned long long _tmp = (value);                                                                          \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
     buffer_fast_strcat(wb, ",", 1);                                                                             \
-    buffer_print_llu(wb, _tmp);                                                                                 \
+    buffer_print_uint64(wb, _tmp);                                                                              \
 } while(0)
 
 #define add_value_field_ndd_with_max(wb, key, value) do {                                                       \
     NETDATA_DOUBLE _tmp = (value);                                                                              \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
     buffer_fast_strcat(wb, ",", 1);                                                                             \
-    buffer_rrd_value(wb, _tmp);                                                                                 \
+    buffer_print_netdata_double(wb, _tmp);                                                                      \
 } while(0)
 
 static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
@@ -4502,43 +4502,46 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
         // pid
-        buffer_print_llu(wb, p->pid);
+        buffer_print_uint64(wb, p->pid);
 
         // cmd
         buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->comm);
+        buffer_json_strcat(wb, p->comm);
         buffer_fast_strcat(wb, "\"", 1);
 
 #ifdef NETDATA_DEV_MODE
         // cmdline
         buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
+        buffer_json_strcat(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
         buffer_fast_strcat(wb, "\"", 1);
 #endif
 
         // ppid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->ppid);
+        buffer_fast_strcat(wb, ",", 1);
+        buffer_print_uint64(wb, p->ppid);
 
         // category
         buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->target ? p->target->name : "-");
+        buffer_json_strcat(wb, p->target ? p->target->name : "-");
         buffer_fast_strcat(wb, "\"", 1);
 
         // user
         buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->user_target ? p->user_target->name : "-");
+        buffer_json_strcat(wb, p->user_target ? p->user_target->name : "-");
         buffer_fast_strcat(wb, "\"", 1);
 
         // uid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->uid);
+        buffer_fast_strcat(wb, ",", 1);
+        buffer_print_uint64(wb, p->uid);
 
         // group
         buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->group_target ? p->group_target->name : "-");
+        buffer_json_strcat(wb, p->group_target ? p->group_target->name : "-");
         buffer_fast_strcat(wb, "\"", 1);
 
         // gid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->gid);
+        buffer_fast_strcat(wb, ",", 1);
+        buffer_print_uint64(wb, p->gid);
 
         // CPU utilization %
         add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime) / cpu_divisor);

@@ -103,11 +103,11 @@ void health_alarm_entry2json_nolock(BUFFER *wb, ALARM_ENTRY *ae, RRDHOST *host) 
     }
 
     buffer_strcat(wb, "\t\t\"value\":");
-    buffer_rrd_value(wb, ae->new_value);
+    buffer_print_netdata_double(wb, ae->new_value);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\"old_value\":");
-    buffer_rrd_value(wb, ae->old_value);
+    buffer_print_netdata_double(wb, ae->old_value);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t}");
@@ -152,7 +152,7 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
                    , (unsigned long)rc->id);
 
     buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_rrd_value(wb, rc->value);
+    buffer_print_netdata_double(wb, rc->value);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"last_updated\":");
@@ -283,15 +283,15 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     }
 
     buffer_strcat(wb, "\t\t\t\"green\":");
-    buffer_rrd_value(wb, rc->green);
+    buffer_print_netdata_double(wb, rc->green);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"red\":");
-    buffer_rrd_value(wb, rc->red);
+    buffer_print_netdata_double(wb, rc->red);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_rrd_value(wb, rc->value);
+    buffer_print_netdata_double(wb, rc->value);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t\t}");

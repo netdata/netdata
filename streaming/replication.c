@@ -220,21 +220,23 @@ void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
                 buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
                 buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
                 buffer_fast_strcat(wb, "' ", 2);
-                buffer_print_llu(wb, (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec);
+                buffer_print_uint64(wb, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
+                                        (usec_t) rd->last_collected_time.tv_usec);
                 buffer_fast_strcat(wb, " ", 1);
-                buffer_print_ll(wb, rd->last_collected_value);
+                buffer_print_int64(wb, rd->last_collected_value);
                 buffer_fast_strcat(wb, " ", 1);
-                buffer_rrd_value(wb, rd->last_calculated_value);
+                buffer_print_netdata_double(wb, rd->last_calculated_value);
                 buffer_fast_strcat(wb, " ", 1);
-                buffer_rrd_value(wb, rd->last_stored_value);
+                buffer_print_netdata_double(wb, rd->last_stored_value);
                 buffer_fast_strcat(wb, "\n", 1);
             }
     rrddim_foreach_done(rd);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
-    buffer_print_llu(wb, (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec);
+    buffer_print_uint64(wb, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC +
+                            (usec_t) st->last_collected_time.tv_usec);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec);
+    buffer_print_uint64(wb, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
     buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -435,11 +437,11 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             last_end_time_in_buffer = min_end_time;
 
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
-            buffer_print_llu(wb, min_start_time);
+            buffer_print_uint64(wb, min_start_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_llu(wb, min_end_time);
+            buffer_print_uint64(wb, min_end_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_llu(wb, wall_clock_time);
+            buffer_print_uint64(wb, wall_clock_time);
             buffer_fast_strcat(wb, "\n", 1);
 
             // output the replay values for this time
@@ -455,7 +457,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
-                    buffer_rrd_value(wb, d->sp.sum);
+                    buffer_print_netdata_double(wb, d->sp.sum);
                     buffer_fast_strcat(wb, " ", 1);
                     buffer_print_sn_flags(wb, d->sp.flags, q->query.send_anomaly_bit);
                     buffer_fast_strcat(wb, "\n", 1);
@@ -617,17 +619,17 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // last end time of the data we sent
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
-    buffer_print_ll(wb, st->update_every);
+    buffer_print_int64(wb, st->update_every);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, db_first_entry);
+    buffer_print_uint64(wb, db_first_entry);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, db_last_entry);
+    buffer_print_uint64(wb, db_last_entry);
     buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
-    buffer_print_llu(wb, after);
+    buffer_print_uint64(wb, after);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, before);
+    buffer_print_uint64(wb, before);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, wall_clock_time);
+    buffer_print_uint64(wb, wall_clock_time);
     buffer_fast_strcat(wb, "\n", 1);
 
 //    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",

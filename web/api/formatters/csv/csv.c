@@ -74,7 +74,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
             // print the timestamp of the line
-            buffer_rrd_value(wb, (NETDATA_DOUBLE)now);
+            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) now);
             // in ms
             if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
         }
@@ -134,7 +134,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                     if(n > r->max) r->max = n;
                 }
 
-                buffer_rrd_value(wb, n);
+                buffer_print_netdata_double(wb, n);
             }
         }
 

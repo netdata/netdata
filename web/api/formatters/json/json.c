@@ -202,7 +202,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_rrd_value(wb, (NETDATA_DOUBLE)r->t[i]);
+            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
 
             // in ms
             if(unlikely(options & RRDR_OPTION_MILLISECONDS))
@@ -271,7 +271,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                     if(n > r->max) r->max = n;
                 }
 
-                buffer_rrd_value(wb, n);
+                buffer_print_netdata_double(wb, n);
             }
 
             buffer_fast_strcat(wb, post_value, post_value_len);

@@ -196,7 +196,7 @@ int print_netdata_double(char *str, NETDATA_DOUBLE value) {
     }
     else
         // convert the integral part to string (reversed)
-        istre = print_number_llu_r_smart(integral_str, integral_int);
+        istre = print_uint64_reversed(integral_str, integral_int);
 
     // copy reversed the integral string
     istre--;
@@ -207,7 +207,7 @@ int print_netdata_double(char *str, NETDATA_DOUBLE value) {
         *wstr++ = '.';
 
         // convert the fractional part to string (reversed)
-        char *fstre = print_number_llu_r_smart(fractional_str, fractional_int);
+        char *fstre = print_uint64_reversed(fractional_str, fractional_int);
 
         // prepend zeros to reach 7 digits length
         int decimal = 7;

@@ -29,7 +29,6 @@ static inline void _buffer_overflow_check(BUFFER *b, const char *file, const cha
     }
 }
 
-
 void buffer_reset(BUFFER *wb)
 {
     buffer_flush(wb);
@@ -52,8 +51,7 @@ const char *buffer_tostring(BUFFER *wb)
     return(wb->buffer);
 }
 
-void buffer_char_replace(BUFFER *wb, char from, char to)
-{
+void buffer_char_replace(BUFFER *wb, char from, char to) {
     char *s = wb->buffer, *end = &wb->buffer[wb->len];
 
     while(s != end) {
@@ -62,196 +60,6 @@ void buffer_char_replace(BUFFER *wb, char from, char to)
     }
 
     buffer_overflow_check(wb);
-}
-
-// This trick seems to give an 80% speed increase in 32bit systems
-// print_number_llu_r() will just print the digits up to the
-// point the remaining value fits in 32 bits, and then calls
-// print_number_lu_r() to print the rest with 32 bit arithmetic.
-
-inline char *print_number_lu_r(char *str, unsigned long uvalue) {
-    char *wstr = str;
-
-    // print each digit
-    do *wstr++ = (char)('0' + (uvalue % 10)); while(uvalue /= 10);
-    return wstr;
-}
-
-inline char *print_number_llu_r(char *str, unsigned long long uvalue) {
-    char *wstr = str;
-
-    // print each digit
-    do *wstr++ = (char)('0' + (uvalue % 10)); while((uvalue /= 10) && uvalue > (unsigned long long)0xffffffff);
-    if(uvalue) return print_number_lu_r(wstr, uvalue);
-    return wstr;
-}
-
-inline char *print_number_llu_r_smart(char *str, unsigned long long uvalue) {
-    switch (sizeof(void *)) {
-    case 4:
-        str = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(str, uvalue) :
-                                                           print_number_lu_r(str, uvalue);
-        break;
-    case 8:
-        do {
-            *str++ = (char) ('0' + (uvalue % 10));
-        } while (uvalue /= 10);
-        break;
-    default:
-        fatal("Netdata supports only 32-bit & 64-bit systems.");
-    }
-
-    return str;
-}
-
-void buffer_print_llu(BUFFER *wb, unsigned long long uvalue)
-{
-    buffer_need_bytes(wb, 50);
-
-    switch(uvalue) {
-        case 0:
-            buffer_fast_strcat(wb, "0", 1);
-            return;
-
-        case 1:
-            buffer_fast_strcat(wb, "1", 1);
-            return;
-
-        case 5:
-            buffer_fast_strcat(wb, "5", 1);
-            return;
-
-        case 10:
-            buffer_fast_strcat(wb, "10", 2);
-            return;
-
-        default:
-            break;
-    }
-
-    char *str = &wb->buffer[wb->len];
-    char *wstr = str;
-
-    switch (sizeof(void *)) {
-        case 8:
-            do {
-                *wstr++ = (char) ('0' + (uvalue % 10));
-            } while (uvalue /= 10);
-            break;
-
-        case 4:
-            wstr = (uvalue > (unsigned long long) 0xffffffff) ? print_number_llu_r(wstr, uvalue) :
-                   print_number_lu_r(wstr, uvalue);
-            break;
-
-        default:
-            fatal("Netdata supports only 32-bit & 64-bit systems.");
-    }
-
-    // terminate it
-    *wstr = '\0';
-
-    // reverse it
-    char *begin = str, *end = wstr - 1, aux;
-    while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
-
-    size_t len = wstr - str;
-    // return the buffer length
-    wb->len += len;
-}
-
-void buffer_print_ll(BUFFER *wb, long long value)
-{
-    buffer_need_bytes(wb, 50);
-
-    if(value < 0) {
-        buffer_fast_strcat(wb, "-", 1);
-        value = -value;
-    }
-
-    buffer_print_llu(wb, value);
-}
-
-static unsigned char bits03_to_hex[16] = {
-    [0] = '0',
-    [1] = '1',
-    [2] = '2',
-    [3] = '3',
-    [4] = '4',
-    [5] = '5',
-    [6] = '6',
-    [7] = '7',
-    [8] = '8',
-    [9] = '9',
-    [10] = 'A',
-    [11] = 'B',
-    [12] = 'C',
-    [13] = 'D',
-    [14] = 'E',
-    [15] = 'F'
-};
-
-inline void buffer_print_llu_hex(BUFFER *wb, unsigned long long value)
-{
-    unsigned char buffer[sizeof(unsigned long long) * 2 + 2 + 1];   // 8 bytes * 2 + '0x' + '\0'
-    unsigned char *e = &buffer[sizeof(unsigned long long) * 2 + 2];
-    unsigned char *p = e;
-
-    *p-- = '\0';
-    *p-- = bits03_to_hex[value & 0xF];
-    value >>= 4;
-    if(value) {
-        *p-- = bits03_to_hex[value & 0xF];
-        value >>= 4;
-
-        while(value) {
-            *p-- = bits03_to_hex[value & 0xF];
-            value >>= 4;
-
-            if(value) {
-                *p-- = bits03_to_hex[value & 0xF];
-                value >>= 4;
-            }
-        }
-    }
-    *p-- = 'x';
-    *p   = '0';
-
-    buffer_fast_strcat(wb, (char *)p, e - p);
-}
-
-void buffer_print_ll_hex(BUFFER *wb, long long value) {
-    if(value < 0) {
-        buffer_fast_strcat(wb, "-", 1);
-        value = -value;
-    }
-
-    buffer_print_llu_hex(wb, value);
-}
-
-inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
-    if(unlikely(!txt || !*txt || !len)) return;
-
-    buffer_need_bytes(wb, len + 1);
-
-    const char *t = txt;
-    char *s = &wb->buffer[wb->len];
-    const char *end = &txt[len];
-
-    while(t != end
-#ifdef NETDATA_INTERNAL_CHECKS
-    && *t
-#endif
-    )
-        *s++ = *t++;
-
-    internal_fatal(t != end && !*t, "BUFFER: invalid string length given to %s(). Given %zu, but actual is %zu", __FUNCTION__, len, strlen(txt));
-
-    wb->len += len;
-
-    // keep it NULL terminating
-    // not counting it at wb->len
-    wb->buffer[wb->len] = '\0';
 }
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
@@ -273,64 +81,6 @@ void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit) {
 
     if(!printed)
         buffer_fast_strcat(wb, "''", 2);
-}
-
-void buffer_strcat(BUFFER *wb, const char *txt)
-{
-    // buffer_sprintf(wb, "%s", txt);
-
-    if(unlikely(!txt || !*txt)) return;
-
-    buffer_need_bytes(wb, 1);
-
-    char *s = &wb->buffer[wb->len], *start, *end = &wb->buffer[wb->size];
-    size_t len = wb->len;
-
-    start = s;
-    while(*txt && s != end)
-        *s++ = *txt++;
-
-    len += s - start;
-
-    wb->len = len;
-    buffer_overflow_check(wb);
-
-    if(unlikely(*txt)) {
-        debug(D_WEB_BUFFER, "strcat(): increasing web_buffer at position %zu, size = %zu\n", wb->len, wb->size);
-        len = strlen(txt);
-        buffer_fast_strcat(wb, txt, len);
-    }
-    else {
-        // terminate the string
-        // without increasing the length
-        buffer_need_bytes(wb, 1);
-        wb->buffer[wb->len] = '\0';
-    }
-}
-
-void buffer_strcat_jsonescape(BUFFER *wb, const char *txt)
-{
-    while(*txt) {
-        switch(*txt) {
-            case '\\':
-                buffer_need_bytes(wb, 2);
-                wb->buffer[wb->len++] = '\\';
-                wb->buffer[wb->len++] = '\\';
-                break;
-            case '"':
-                buffer_need_bytes(wb, 2);
-                wb->buffer[wb->len++] = '\\';
-                wb->buffer[wb->len++] = '"';
-                break;
-            default: {
-                buffer_need_bytes(wb, 1);
-                wb->buffer[wb->len++] = *txt;
-            }
-        }
-        txt++;
-    }
-
-    buffer_overflow_check(wb);
 }
 
 void buffer_strcat_htmlescape(BUFFER *wb, const char *txt)
@@ -417,25 +167,6 @@ void buffer_sprintf(BUFFER *wb, const char *fmt, ...)
     wb->len += wrote;
 
     // the buffer is \0 terminated by vsnprintf
-}
-
-
-void buffer_rrd_value(BUFFER *wb, NETDATA_DOUBLE value)
-{
-    buffer_need_bytes(wb, 512);
-
-    if(isnan(value) || isinf(value)) {
-        buffer_strcat(wb, "null");
-        return;
-    }
-    else
-        wb->len += print_netdata_double(&wb->buffer[wb->len], value);
-
-    // terminate it
-    buffer_need_bytes(wb, 1);
-    wb->buffer[wb->len] = '\0';
-
-    buffer_overflow_check(wb);
 }
 
 // generate a javascript date, the fastest possible way...
@@ -595,222 +326,25 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
 
 // ----------------------------------------------------------------------------
 
-static char json_spacing[BUFFER_JSON_MAX_DEPTH + 1] = "                                 ";
-
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote) {
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
     wb->json.depth = 0;
     wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_ANONYMOUS_OBJECT;
+    wb->json.stack[wb->json.depth].type = BUFFER_JSON_OBJECT;
 
     buffer_fast_strcat(wb, "{", 1);
-}
-
-static inline void buffer_json_check_membership(BUFFER *wb) {
-    switch(wb->json.stack[wb->json.depth].type) {
-        case BUFFER_JSON_ANONYMOUS_OBJECT:
-        case BUFFER_JSON_MEMBER_OBJECT:
-        case BUFFER_JSON_MEMBER_ARRAY:
-            break;
-
-        default:
-            internal_fatal(true, "BUFFER: membership check failed");
-            break;
-    }
-}
-
-static inline void buffer_json_add_comma_newline_spacing(BUFFER *wb) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",\n", 2);
-    else
-        buffer_fast_strcat(wb, "\n", 1);
-
-    buffer_fast_strcat(wb, json_spacing, wb->json.depth + 1);
-}
-
-static inline void buffer_json_add_key(BUFFER *wb, const char *key) {
-    buffer_strcat(wb, wb->json.key_quote);
-    buffer_strcat_jsonescape(wb, key);
-    buffer_strcat(wb, wb->json.key_quote);
-}
-
-static inline void buffer_json_add_string_value(BUFFER *wb, const char *value) {
-    if(value) {
-        buffer_strcat(wb, wb->json.value_quote);
-        buffer_strcat_jsonescape(wb, value);
-        buffer_strcat(wb, wb->json.value_quote);
-    }
-    else
-        buffer_fast_strcat(wb, "null", 4);
-}
-
-void buffer_json_member_add_object(BUFFER *wb, const char *key) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":{", 2);
-    wb->json.stack[wb->json.depth].count++;
-
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_MEMBER_OBJECT;
-}
-
-void buffer_json_object_close(BUFFER *wb) {
-    internal_fatal(wb->json.depth < 0, "nothing is open to close it");
-    internal_fatal(wb->json.stack[wb->json.depth].type != BUFFER_JSON_MEMBER_OBJECT &&
-                           wb->json.stack[wb->json.depth].type != BUFFER_JSON_ANONYMOUS_OBJECT,
-                           "A member object is expected");
-    buffer_fast_strcat(wb, "\n", 1);
-    buffer_fast_strcat(wb, json_spacing, wb->json.depth);
-    buffer_fast_strcat(wb, "}", 1);
-    wb->json.depth--;
-}
-
-void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    buffer_json_add_string_value(wb, value);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_member_add_array(BUFFER *wb, const char *key) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":[", 2);
-    wb->json.stack[wb->json.depth].count++;
-
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_MEMBER_ARRAY;
-}
-
-void buffer_json_add_array_item_array(BUFFER *wb) {
-    buffer_json_check_membership(wb);
-
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
-
-    buffer_fast_strcat(wb, "[", 1);
-    wb->json.stack[wb->json.depth].count++;
-
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_MEMBER_ARRAY;
-}
-
-void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
-    buffer_json_check_membership(wb);
-
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
-
-    buffer_json_add_string_value(wb, value);
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value) {
-    buffer_json_check_membership(wb);
-
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
-
-    buffer_rrd_value(wb, value);
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value) {
-    buffer_json_check_membership(wb);
-
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
-
-    buffer_print_llu(wb, value);
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_add_array_item_object(BUFFER *wb) {
-    buffer_json_check_membership(wb);
-
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
-
-    buffer_fast_strcat(wb, "{", 1);
-    wb->json.stack[wb->json.depth].count++;
-
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_MEMBER_OBJECT;
-}
-
-void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t value) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    buffer_print_llu(wb, value);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_member_add_uint64(BUFFER *wb, const char *key, uint64_t value) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    buffer_print_llu(wb, value);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t value) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    buffer_print_ll(wb, value);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value) {
-    buffer_json_check_membership(wb);
-
-    buffer_json_add_comma_newline_spacing(wb);
-    buffer_json_add_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    buffer_rrd_value(wb, value);
-
-    wb->json.stack[wb->json.depth].count++;
-}
-
-void buffer_json_array_close(BUFFER *wb) {
-    internal_fatal(wb->json.depth < 0, "nothing is open to close it");
-    buffer_fast_strcat(wb, "]", 1);
-    wb->json.depth--;
 }
 
 void buffer_json_finalize(BUFFER *wb) {
     while(wb->json.depth >= 0) {
         switch(wb->json.stack[wb->json.depth].type) {
-            case BUFFER_JSON_ANONYMOUS_OBJECT:
-            case BUFFER_JSON_MEMBER_OBJECT:
+            case BUFFER_JSON_OBJECT:
                 buffer_json_object_close(wb);
                 break;
 
-            case BUFFER_JSON_MEMBER_ARRAY:
+            case BUFFER_JSON_ARRAY:
                 buffer_json_array_close(wb);
                 break;
 
@@ -840,9 +374,31 @@ int buffer_unittest(void) {
     int errors = 0;
     BUFFER *wb = buffer_create(0, NULL);
 
+    buffer_print_uint64_hex(wb, 1676071986);
+    errors += buffer_expect(wb, "0x63E6D432");
+
+    buffer_flush(wb);
+
+    buffer_print_int64_hex(wb, -1676071986);
+    errors += buffer_expect(wb, "-0x63E6D432");
+
+    buffer_flush(wb);
+
+    {
+        char buf[1024 + 1];
+        for(size_t i = 0; i < 1024 ;i++)
+            buf[i] = (char)(i % 26) + 'A';
+        buf[8192] = '\0';
+
+        buffer_strcat(wb, buf);
+        errors += buffer_expect(wb, buf);
+    }
+
+    buffer_flush(wb);
+
     buffer_json_initialize(wb, "\"", "\"");
     buffer_json_finalize(wb);
-    buffer_expect(wb, "{\n}");
+    errors += buffer_expect(wb, "{\n}");
 
     buffer_flush(wb);
 
@@ -852,7 +408,7 @@ int buffer_unittest(void) {
     buffer_json_member_add_object(wb, "object1");
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_finalize(wb);
-    buffer_expect(wb, "{\n \"hello\":\"world\",\n \"alpha\":\"this: \\\" is a double quote\",\n \"object1\":{\n  \"hello\":\"world\"\n }\n}");
+    errors += buffer_expect(wb, "{\n \"hello\":\"world\",\n \"alpha\":\"this: \\\" is a double quote\",\n \"object1\":{\n  \"hello\":\"world\"\n }\n}");
 
     return errors;
 }
