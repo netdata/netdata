@@ -58,7 +58,7 @@ To achieve this you will need to:
 * Select the new subscription with the change that you want
 
 > ⚠️
-> * On a move to Community, cancellation of an active subscription, please note that you will have all your notification methods configurations active for a period of 24 hours.
+> * On a move to Community (cancellation of an active subscription), please note that you will have all your notification methods configurations active for a period of 24 hours.
 >   After that, any of those that won't available on your space's plan at that time will be automatically disabled. You can always re-enable them once you move to the proper paid plan.
 > * Any credit given to you will be available to use on future paid subscriptions with us. It will be available until the the **end of the following year**.
 
