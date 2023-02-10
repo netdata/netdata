@@ -707,6 +707,52 @@ int rrd_call_function_async(RRDHOST *host, BUFFER *wb, int timeout, const char *
     return code;
 }
 
+
+#ifdef ENABLE_JSONC
+json_object *functions_json(DICTIONARY *functions) {
+    json_object *json_vec = json_object_new_object();
+
+    struct rrd_collector_function *fnc;
+
+    dfe_start_read(functions, fnc) {
+        if(!fnc->collector->running) continue;
+
+        json_object *tmp, *jfnc = json_object_new_object();
+
+        tmp = json_object_new_string(string2str(fnc->help));
+        json_object_object_add(jfnc, "help", tmp);
+
+        tmp = json_object_new_int(fnc->timeout);
+        json_object_object_add(jfnc, "timeout", tmp);
+
+        // this is again done to keep backward compatibility but is otherwise terrible
+        // this should be an ARRAY
+        char buf[strlen("LOCAL ")+strlen("GLOBAL ")+1];
+        sprintf(buf, "%s%s", (fnc->options & RRD_FUNCTION_LOCAL)?"LOCAL ":"", (fnc->options & RRD_FUNCTION_GLOBAL)?"GLOBAL ":"");
+        tmp = json_object_new_string(buf);
+        json_object_object_add(jfnc, "options", tmp);
+
+        json_object_object_add(json_vec, fnc_dfe.name, jfnc);
+    }
+    dfe_done(fnc);
+
+    return json_vec;
+}
+
+json_object *rrdhost_functions_json(RRDHOST *host) {
+    if(!host || !host->functions) return NULL;
+
+    return functions_json(host->functions);
+}
+
+json_object *chart_functions_json(RRDSET *st) {
+    if(!st || !st->functions_view) return json_object_new_object();
+
+    return functions_json(st->functions_view);
+}
+
+#else
+
 static void functions2json(DICTIONARY *functions, BUFFER *wb, const char *ident, const char *kq, const char *sq) {
     struct rrd_collector_function *t;
     dfe_start_read(functions, t) {
@@ -738,42 +784,6 @@ void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, cons
     functions2json(st->functions_view, wb, ident, kq, sq);
 }
 
-
-#ifdef ENABLE_JSONC
-json_object *rrdhost_functions_json(RRDHOST *host) {
-    if(!host || !host->functions) return NULL;
-
-    DICTIONARY *functions = host->functions;
-    json_object *json_vec = json_object_new_object();
-
-    struct rrd_collector_function *fnc;
-
-    dfe_start_read(functions, fnc) {
-        if(!fnc->collector->running) continue;
-
-        json_object *tmp, *jfnc = json_object_new_object();
-
-        tmp = json_object_new_string(string2str(fnc->help));
-        json_object_object_add(jfnc, "help", tmp);
-
-        tmp = json_object_new_int(fnc->timeout);
-        json_object_object_add(jfnc, "timeout", tmp);
-
-        // this is again done to keep backward compatibility but is otherwise terrible
-        // this should be an ARRAY
-        char buf[strlen("LOCAL ")+strlen("GLOBAL ")+1];
-        sprintf(buf, "%s%s", (fnc->options & RRD_FUNCTION_LOCAL)?"LOCAL ":"", (fnc->options & RRD_FUNCTION_GLOBAL)?"GLOBAL ":"");
-        tmp = json_object_new_string(buf);
-        json_object_object_add(jfnc, "options", tmp);
-
-        json_object_object_add(json_vec, fnc_dfe.name, jfnc);
-    }
-    dfe_done(fnc);
-
-    return json_vec;
-}
-
-#else
 void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq) {
     if(!host || !host->functions) return;
 

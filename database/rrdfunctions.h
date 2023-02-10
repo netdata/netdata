@@ -27,6 +27,7 @@ void rrd_functions_expose_rrdpush(RRDSET *st, BUFFER *wb);
 void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, const char *sq);
 #ifdef ENABLE_JSONC
 json_object *rrdhost_functions_json(RRDHOST *host);
+json_object *chart_functions_json(RRDSET *st);
 #endif
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst);
 void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq);

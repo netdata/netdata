@@ -270,6 +270,9 @@ extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *me
     tmp = rrdlabels_to_json(st->rrdlabels);
     json_object_object_add(j, "chart_labels", tmp);
 
+    tmp = chart_functions_json(st);
+    json_object_object_add(j, "functions", tmp);
+
     buffer_free(buf);
     return j;
 }
