@@ -1,14 +1,16 @@
 <!--
-title: "Infrastructure monitoring with Netdata"
-description: "Build a robust, infinitely scalable infrastructure monitoring solution with Netdata. Any number of nodes and every available metric."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/quickstart/infrastructure.md
-sidebar_label: "Infrastructure monitoring with Netdata"
+title: "Monitor your infrastructure"
+description: "Real-time infrastructure monitoring with Netdata Cloud. View key metrics, insightful charts, and active alarms from all your nodes."
+custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md"
+sidebar_label: "Monitor your infrastructure"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Possible old, not wanted documents"
+learn_topic_type: "Concepts"
+learn_rel_path: "Getting Started"
+sidebar_position: "50"
 -->
 
-# Infrastructure monitoring with Netdata
+import { Grid, Box, BoxList, BoxListItem } from '@site/src/components/Grid/'
+import { RiExternalLinkLine } from 'react-icons/ri'
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
 nodes running the Netdata Agent. A node is any system in your infrastructure that you want to monitor, whether it's a
@@ -28,14 +30,8 @@ In this quickstart guide, you'll learn the basics of using Netdata Cloud to moni
 composite charts, and alarm viewing. You'll then learn about the most critical ways to configure the Agent on each of
 your nodes to maximize the value you get from Netdata.
 
-This quickstart assumes you've installed the Netdata Agent on more than one node in your infrastructure, and connected
-those nodes to your Space in Netdata Cloud. If you haven't yet, see the [Netdata
-Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx) docs for details on signing up for Netdata Cloud, installation, and
-connection process.
-
-> If you want to monitor a Kubernetes cluster with Netdata, see our [k8s installation
-> doc](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md) for setup details, and then read our guide, [_Monitor a Kubernetes
-> cluster with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/kubernetes-k8s-netdata.md).
+This quickstart assumes you've [installed Netdata](https://github.com/netdata/netdata/edit/master/packaging/installer/README.md)
+on more than one node in your infrastructure, and connected those nodes to your Space in Netdata Cloud. 
 
 ## Set up your Netdata Cloud experience
 
@@ -155,34 +151,47 @@ In addition, find detailed information about which [system](https://github.com/n
 [container](https://github.com/netdata/netdata/blob/master/docs/collect/container-metrics.md), and [application](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md) metrics you can
 collect from across your infrastructure with Netdata.
 
-## What's next?
+## Netdata Cloud features
 
-Netdata has many features that help you monitor the health of your nodes and troubleshoot complex performance problems.
-Once you have a handle on configuration and are collecting all the right metrics, try out some of Netdata's other
-infrastructure-focused features:
-
--   [See an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md) using Netdata Cloud's composite
-    charts and real-time visualizations.
--   [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) from any number of nodes and metrics in Netdata Cloud.
-
-To change how the Netdata Agent runs on each node, dig in to configuration files:
-
--   [Change how long nodes in your infrastructure retain metrics](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md) based on how
-    many metrics each node collects, your preferred retention period, and the resources you want to dedicate toward
-    long-term metrics retention.
--   [Create new alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md), or tweak some of the pre-configured alarms, to stay on top
-    of anomalies.
--   [Enable notifications](https://github.com/netdata/netdata/blob/master/docs/monitor/enable-notifications.md) to Slack, PagerDuty, email, and 30+ other services.
--   [Export metrics](https://github.com/netdata/netdata/blob/master/docs/export/external-databases.md) to an external time-series database to use Netdata alongside
-    other monitoring and troubleshooting tools.
-
-### Related reference documentation
-
--   [Netdata Cloud · Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
--   [Netdata Cloud · War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
--   [Netdata Cloud · Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
--   [Netdata Cloud · Sign in or sign up with email, Google, or
-    GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)
--   [Netdata Cloud · Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
-
-
+<Grid columns="2">
+  <Box
+    title="Spaces and War Rooms">
+    <BoxList>
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md" title="Spaces" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md" title="War Rooms" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Dashboards">
+    <BoxList>
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md" title="Overview" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md" title="Nodes view" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md" title="Kubernetes" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md" title="Create new dashboards" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Alerts and notifications">
+    <BoxList>
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx" title="View active alerts" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx" title="Alerts Smartboard" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx" title="Alert notifications" />
+    </BoxList>
+  </Box>
+  <Box
+    title="Troubleshooting with Netdata Cloud">
+    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md" title="Metric Correlations" />
+    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx" title="Anomaly Advisor" />
+    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md" title="Events Feed" />
+  </Box>
+  <Box
+    title="Management and settings">
+    <BoxList>
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx" title="Sign in with email, Google, or GitHub" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md" title="Invite your team" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md" title="Choose your Netdata Cloud theme" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md" title="Role-Based Access" />
+      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md" title="Paid Plans" />
+    </BoxList>
+  </Box>
+</Grid>
