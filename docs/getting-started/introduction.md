@@ -1,6 +1,6 @@
 <!--
 title: "Introduction"
-sidebar_label: "Getting started"
+sidebar_label: "Introduction"
 custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/getting-started/introduction.md"
 learn_status: "Published"
 sidebar_position: "1"
