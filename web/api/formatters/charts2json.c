@@ -2,6 +2,8 @@
 
 #include "charts2json.h"
 
+#include "../helpers/jsonc_helpers.h"
+
 // generate JSON for the /api/v1/charts API call
 
 const char* get_release_channel() {
@@ -147,17 +149,6 @@ void charts2json(RRDHOST *host, BUFFER *wb, int skip_volatile, int show_archived
 #endif
 
 #ifdef ENABLE_JSONC
-#define JSON_ADD_STRING(name, str, obj)                                                                                \
-    {                                                                                                                  \
-        tmp = json_object_new_string(str);                                                                             \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-#define JSON_ADD_INT(name, val, obj)                                                                                   \
-    {                                                                                                                  \
-        tmp = json_object_new_int(val);                                                                                \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
 json_object *charts_json(RRDHOST *host, int skip_volatile, int show_archived)
 {
     static char *custom_dashboard_info_js_filename = NULL;

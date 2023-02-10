@@ -629,6 +629,7 @@ API_PLUGIN_FILES = \
     web/api/health/health_cmdapi.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
+    web/api/jsonc_helpers.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \

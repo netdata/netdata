@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "web_api_v1.h"
+#include "helpers/jsonc_helpers.h"
 
 char *api_secret;
 
@@ -1113,24 +1114,6 @@ inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
 
 extern int aclk_connected;
 #ifdef ENABLE_JSONC
-#define JSON_ADD_STRING(name, str, obj)                                                                                \
-    {                                                                                                                  \
-        tmp = json_object_new_string(str);                                                                             \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
-#define JSON_ADD_INT(name, val, obj)                                                                                   \
-    {                                                                                                                  \
-        tmp = json_object_new_int(val);                                                                                \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
-#define JSON_ADD_BOOL(name, val, obj)                                                                                  \
-    {                                                                                                                  \
-        tmp = json_object_new_boolean(val);                                                                            \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
 static inline json_object *generate_info_summary_alarm_statuses(RRDHOST *host)
 {
     int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;

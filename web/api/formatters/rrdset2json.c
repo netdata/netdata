@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "rrdset2json.h"
+#include "../helpers/jsonc_helpers.h"
 
 #ifdef ENABLE_JSONC
 #ifdef ACLK_LEGACY
@@ -166,23 +167,6 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
 
 
 #ifdef ENABLE_JSONC
-#define JSON_ADD_STRING(name, str, obj)                                                                                \
-    {                                                                                                                  \
-        tmp = json_object_new_string(str);                                                                             \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-#define JSON_ADD_INT64(name, val, obj)                                                                                 \
-    {                                                                                                                  \
-        tmp = json_object_new_int64(val);                                                                              \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
-#define JSON_ADD_INT(name, val, obj)                                                                                   \
-    {                                                                                                                  \
-        tmp = json_object_new_int(val);                                                                                \
-        json_object_object_add(obj, name, tmp);                                                                        \
-    }
-
 extern json_object *rrdset_json(RRDSET *st, size_t *dimensions_count, size_t *memory_used, int skip_volatile)
 {
     json_object *j = json_object_new_object();
