@@ -412,10 +412,10 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
         metric->latest_time_s_clean = last_time_s;
 
         if(likely(update_every_s))
-            metric->latest_update_every_s = update_every_s;
+            metric->latest_update_every_s = (uint32_t) update_every_s;
     }
     else if(unlikely(!metric->latest_update_every_s && update_every_s))
-        metric->latest_update_every_s = update_every_s;
+        metric->latest_update_every_s = (uint32_t) update_every_s;
 
     metric_has_retention_unsafe(mrg, metric);
     netdata_spinlock_unlock(&metric->spinlock);
@@ -578,7 +578,7 @@ bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t
         return false;
 
     netdata_spinlock_lock(&metric->spinlock);
-    metric->latest_update_every_s = update_every_s;
+    metric->latest_update_every_s = (uint32_t) update_every_s;
     netdata_spinlock_unlock(&metric->spinlock);
 
     return true;
@@ -590,7 +590,7 @@ bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metr
 
     netdata_spinlock_lock(&metric->spinlock);
     if(!metric->latest_update_every_s)
-        metric->latest_update_every_s = update_every_s;
+        metric->latest_update_every_s = (uint32_t) update_every_s;
     netdata_spinlock_unlock(&metric->spinlock);
 
     return true;

@@ -310,7 +310,7 @@ static size_t get_page_list_from_pgc(PGC *cache, METRIC *metric, struct rrdengin
             pd->first_time_s = page_start_time_s;
             pd->last_time_s = page_end_time_s;
             pd->page_length = page_length;
-            pd->update_every_s = page_update_every_s;
+            pd->update_every_s = (uint32_t) page_update_every_s;
             pd->page = (open_cache_mode) ? NULL : page;
             pd->status |= tags;
 
@@ -581,7 +581,7 @@ static size_t get_page_list_from_journal_v2(struct rrdengine_instance *ctx, METR
                         .metric_id = metric_id,
                         .start_time_s = page_first_time_s,
                         .end_time_s = page_last_time_s,
-                        .update_every_s = page_update_every_s,
+                        .update_every_s = (uint32_t) page_update_every_s,
                         .data = datafile,
                         .size = 0,
                         .custom_data = (uint8_t *) &ei,
@@ -635,7 +635,7 @@ void add_page_details_from_journal_v2(PGC_PAGE *page, void *JudyL_pptr) {
     pd->last_time_s = pgc_page_end_time_s(page);
     pd->datafile.ptr = datafile;
     pd->page_length = ei->page_length;
-    pd->update_every_s = pgc_page_update_every_s(page);
+    pd->update_every_s = (uint32_t) pgc_page_update_every_s(page);
     pd->metric_id = metric_id;
     pd->status |= PDC_PAGE_DISK_PENDING | PDC_PAGE_SOURCE_JOURNAL_V2 | PDC_PAGE_DATAFILE_ACQUIRED;
 }
@@ -924,7 +924,8 @@ struct pgc_page *pg_cache_lookup_next(
         else {
             if (unlikely(page_update_every_s <= 0 || page_update_every_s > 86400)) {
                 __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_invalid_update_every_fixed, 1, __ATOMIC_RELAXED);
-                pd->update_every_s = page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
+                page_update_every_s = pgc_page_fix_update_every(page, last_update_every_s);
+                pd->update_every_s = (uint32_t) page_update_every_s;
             }
 
             size_t entries_by_size = page_entries_by_size(page_length, CTX_POINT_SIZE_BYTES(ctx));
@@ -1009,7 +1010,7 @@ void pgc_open_add_hot_page(Word_t section, Word_t metric_id, time_t start_time_s
             .metric_id = metric_id,
             .start_time_s = start_time_s,
             .end_time_s =  end_time_s,
-            .update_every_s = update_every_s,
+            .update_every_s = (uint32_t) update_every_s,
             .size = 0,
             .data = datafile,
             .custom_data = (uint8_t *) &ext_io_data,
