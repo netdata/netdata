@@ -854,6 +854,7 @@ set(API_PLUGIN_FILES
         web/api/formatters/rrdset2json.c
         web/api/formatters/rrdset2json.h
         web/api/health/health_cmdapi.c
+        web/api/helpers/jsonc_helpers.h
         )
 
 set(STREAMING_PLUGIN_FILES
