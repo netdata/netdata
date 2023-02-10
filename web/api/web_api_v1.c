@@ -1367,6 +1367,15 @@ json_object *generate_info_json(RRDHOST *host)
     JSON_ADD_INT("charts-count", chart_count, j)
     JSON_ADD_INT("metrics-count", get_localhost_metric_count(), j)
 
+#ifdef ENABLE_ML
+    char *ml_info = ml_get_host_info(host);
+
+    json_object *ml = json_tokener_parse(ml_info);
+    json_object_object_add(j, "ml-info", ml);
+
+    freez(ml_info);
+#endif
+
     return j;
 }
 
