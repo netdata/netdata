@@ -6,6 +6,7 @@ sidebar_label: "Install Netdata with Docker"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
+sidebar_position: 40
 -->
 
 import Tabs from '@theme/Tabs';
