@@ -4,7 +4,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/url/R
 sidebar_label: "URL"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Developers/libnetdata libraries"
+learn_rel_path: "Developers/libnetdata"
 -->
 
 # URL

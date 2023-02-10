@@ -6,6 +6,7 @@ sidebar_label: "Install Netdata with kickstart.sh"
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
+sidebar_position: 10
 -->
 
 import { OneLineInstallWget, OneLineInstallCurl } from '@site/src/components/OneLineInstall/'

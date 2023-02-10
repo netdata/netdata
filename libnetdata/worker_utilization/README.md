@@ -4,7 +4,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/libnetdata/worke
 sidebar_label: "Worker Utilization"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Developers/libnetdata libraries"
+learn_rel_path: "Developers/libnetdata"
 -->
 
 # Worker Utilization

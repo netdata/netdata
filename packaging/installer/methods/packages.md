@@ -6,6 +6,7 @@ sidebar_label: "Install Netdata using native DEB/RPM packages."
 learn_status: "Published"
 learn_topic_type: "Tasks"
 learn_rel_path: "Installation"
+sidebar_position: 20
 -->
 
 # Installing Netdata using native DEB or RPM packages.
