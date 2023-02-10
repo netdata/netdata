@@ -598,8 +598,8 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
 static char json_spacing[BUFFER_JSON_MAX_DEPTH + 1] = "                                 ";
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote) {
-    wb->json.key_quote = key_quote;
-    wb->json.value_quote = value_quote;
+    strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
+    strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
     wb->json.depth = 0;
     wb->json.stack[wb->json.depth].count = 0;

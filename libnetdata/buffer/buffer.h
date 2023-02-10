@@ -21,6 +21,8 @@ typedef struct web_buffer_json_node {
     uint32_t count:24;
 } BUFFER_JSON_NODE;
 
+#define BUFFER_QUOTE_MAX_SIZE 7
+
 typedef struct web_buffer {
     size_t size;        	// allocation size of buffer, in bytes
     size_t len;     		// current data length in buffer, in bytes
@@ -32,8 +34,8 @@ typedef struct web_buffer {
     size_t *statistics;
 
     struct {
-        const char *key_quote;
-        const char *value_quote;
+        char key_quote[BUFFER_QUOTE_MAX_SIZE + 1];
+        char value_quote[BUFFER_QUOTE_MAX_SIZE + 1];
         int depth;
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
