@@ -82,6 +82,8 @@ void analytics_gather_mutable_meta_data(void);
 void analytics_report_oom_score(long long int score);
 void get_system_timezone(void);
 
+uint32_t get_localhost_metric_count(void);
+
 extern struct analytics_data analytics_data;
 
 #endif //NETDATA_ANALYTICS_H

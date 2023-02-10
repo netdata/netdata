@@ -1193,26 +1193,6 @@ static inline void generate_info_mirrored_hosts(json_object *j)
 
 extern void analytics_build_info(BUFFER *b);
 
-// TODO common source with analytics_metrics
-static uint32_t get_localhost_metric_count(void)
-{
-    RRDSET *st;
-    uint32_t dimensions = 0;
-    rrdset_foreach_read(st, localhost) {
-        if (rrdset_is_available_for_viewers(st)) {
-            RRDDIM *rd;
-            rrddim_foreach_read(rd, st) {
-                if (rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN) || rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE))
-                    continue;
-                dimensions++;
-            }
-            rrddim_foreach_done(rd);
-        }
-    }
-    rrdset_foreach_done(st);
-    return dimensions;
-}
-
 json_object *generate_info_json(RRDHOST *host)
 {
     json_object *j = json_object_new_object();

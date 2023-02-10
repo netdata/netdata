@@ -409,10 +409,10 @@ void analytics_charts(void)
     }
 }
 
-void analytics_metrics(void)
+uint32_t get_localhost_metric_count(void)
 {
     RRDSET *st;
-    long int dimensions = 0;
+    uint32_t dimensions = 0;
     rrdset_foreach_read(st, localhost) {
         if (rrdset_is_available_for_viewers(st)) {
             RRDDIM *rd;
@@ -425,12 +425,14 @@ void analytics_metrics(void)
         }
     }
     rrdset_foreach_done(st);
+    return dimensions;
+}
 
-    {
-        char b[7];
-        snprintfz(b, 6, "%ld", dimensions);
-        analytics_set_data(&analytics_data.netdata_metrics_count, b);
-    }
+void analytics_metrics(void)
+{
+    char b[7];
+    snprintfz(b, 6, "%"PRIu32, get_localhost_metric_count());
+    analytics_set_data(&analytics_data.netdata_metrics_count, b);
 }
 
 void analytics_alarms(void)
