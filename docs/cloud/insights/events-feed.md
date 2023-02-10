@@ -27,18 +27,15 @@ At a high-level view, these are the domains from which the Events feed will prov
 
 | **Event name** | **Description** |  **Example** |
 | :-- | :-- | :-- |
-| Node Became Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` is on **live** state |
-| Node Became Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` is on **stale** state |
-| Node Became Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` is on **offline** state |
-| Node Created | The node is created but it is still `Unseen` on Cloud, didn't establish a successful connection yet.| Node `ip-xyz.ec2.internal` is on **unseen** state |
+| Node Became Live | The node is collecting and streaming metrics to Cloud.| Node `netdata-k8s-state-xyz` was **live** |
+| Node Became Stale | The node is offline and not streaming metrics to Cloud. It can show historical data from a parent node. | Node `ip-xyz.ec2.internal` was **stale** |
+| Node Became Offline | The node is offline, not streaming metrics to Cloud and not available in any parent node.| Node `ip-xyz.ec2.internal` was **offline** |
+| Node Created | The node is created but it is still `Unseen` on Cloud, didn't establish a successful connection yet.| Node `ip-xyz.ec2.internal` was **created** |
 | Node Removed |The node was removed from the Space, for example by using the `Delete` action on the node. This is a soft delete in that the node gets marked as deleted, but retains the association with this space. If it becomes live again, it will be restored (see `Node Restored` below) and reappear in this space as before. | Node `ip-xyz.ec2.internal` was **deleted (soft)** |
 | Node Restored | The node was restored. See `Node Removed` above. | Node `ip-xyz.ec2.internal` was **restored** |
 | Node Deleted | The node was deleted from the Space. This is a hard delete and no information on the node is retained. | Node `ip-xyz.ec2.internal` was **deleted (hard)** |
-| Agent Claimed | The Agent was successfully registered to Cloud. Until the Agent connects, its availability will show as `Unseen`.<br/>These events can only be seen on _All nodes_ War Room. | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` was claimed. |
 | Agent Connected | The agent connected to the Cloud MQTT server (Agent-Cloud Link established).<br/>These events can only be seen on _All nodes_ War Room. | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has connected to Cloud. |
 | Agent Disconnected | The agent disconnected from the Cloud MQTT server (Agent-Cloud Link severed).<br/>These events can only be seen on _All nodes_ War Room. | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has disconnected from Cloud: **Connection Timeout**. |
-| Agent Authenticated | The agent successfully authenticated itself to Cloud.<br/>These events can only be seen on _All nodes_ War Room. | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has successfully authenticated. |
-| Agent Authentication Failed | The agent failed to authenticate itself to Cloud.<br/>These events can only be seen on _All nodes_ War Room. | Agent with claim ID `7d87bqs9-cv42-4823-8sd4-3614548850c7` has failed to authenticate. |
 | Space Statistics | Daily snapshot of space node statistics.<br/>These events can only be seen on _All nodes_ War Room. | Space statistics. Nodes: **22 live**, **21 stale**, **18 removed**, **61 total**. |
 
 
