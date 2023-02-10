@@ -7,50 +7,50 @@ void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb) {
     rrdset2json(st, wb, NULL, NULL, 0);
 }
 
-void rrdr_buffer_print_format(BUFFER *wb, uint32_t format)  {
+const char *rrdr_format_to_string(uint32_t format)  {
     switch(format) {
         case DATASOURCE_JSON:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JSON);
+            return DATASOURCE_FORMAT_JSON;
             break;
 
         case DATASOURCE_DATATABLE_JSON:
-            buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSON);
+            return DATASOURCE_FORMAT_DATATABLE_JSON;
             break;
 
         case DATASOURCE_DATATABLE_JSONP:
-            buffer_strcat(wb, DATASOURCE_FORMAT_DATATABLE_JSONP);
+            return DATASOURCE_FORMAT_DATATABLE_JSONP;
             break;
 
         case DATASOURCE_JSONP:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JSONP);
+            return DATASOURCE_FORMAT_JSONP;
             break;
 
         case DATASOURCE_SSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_SSV);
+            return DATASOURCE_FORMAT_SSV;
             break;
 
         case DATASOURCE_CSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_CSV);
+            return DATASOURCE_FORMAT_CSV;
             break;
 
         case DATASOURCE_TSV:
-            buffer_strcat(wb, DATASOURCE_FORMAT_TSV);
+            return DATASOURCE_FORMAT_TSV;
             break;
 
         case DATASOURCE_HTML:
-            buffer_strcat(wb, DATASOURCE_FORMAT_HTML);
+            return DATASOURCE_FORMAT_HTML;
             break;
 
         case DATASOURCE_JS_ARRAY:
-            buffer_strcat(wb, DATASOURCE_FORMAT_JS_ARRAY);
+            return DATASOURCE_FORMAT_JS_ARRAY;
             break;
 
         case DATASOURCE_SSV_COMMA:
-            buffer_strcat(wb, DATASOURCE_FORMAT_SSV_COMMA);
+            return DATASOURCE_FORMAT_SSV_COMMA;
             break;
 
         default:
-            buffer_strcat(wb, "unknown");
+            return "unknown";
             break;
     }
 }

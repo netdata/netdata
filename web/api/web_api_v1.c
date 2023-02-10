@@ -202,6 +202,22 @@ void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS o
     }
 }
 
+void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
+    buffer_json_member_add_array(wb, key);
+
+    RRDR_OPTIONS used = 0; // to prevent adding duplicates
+    for(int i = 0; api_v1_data_options[i].name ; i++) {
+        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
+            const char *name = api_v1_data_options[i].name;
+            used |= api_v1_data_options[i].value;
+
+            buffer_json_add_array_item_string(wb, name);
+        }
+    }
+
+    buffer_json_array_close(wb);
+}
+
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
     char *write = buf;
     char *end = &buf[size - 1];

@@ -53,7 +53,7 @@ typedef enum {
 #define DATASOURCE_FORMAT_CSV_MARKDOWN "markdown"
 
 void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
-void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
+const char *rrdr_format_to_string(uint32_t format);
 
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 

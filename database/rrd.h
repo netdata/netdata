@@ -279,6 +279,7 @@ void rrdlabels_destroy(DICTIONARY *labels_dict);
 void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
+void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key);
 void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
 void rrdlabels_flush(DICTIONARY *labels_dict);
 

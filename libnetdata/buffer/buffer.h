@@ -13,7 +13,7 @@ typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_EMPTY,
     BUFFER_JSON_ANONYMOUS_OBJECT,
     BUFFER_JSON_MEMBER_OBJECT,
-    BUFFER_JSON_ARRAY,
+    BUFFER_JSON_MEMBER_ARRAY,
 } BUFFER_JSON_NODE_TYPE;
 
 typedef struct web_buffer_json_node {
@@ -113,11 +113,20 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
 
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote);
 void buffer_json_finalize(BUFFER *wb);
-void buffer_json_member_object_open(BUFFER *wb, const char *key);
-void buffer_json_member_object_close(BUFFER *wb);
+void buffer_json_member_add_object(BUFFER *wb, const char *key);
+void buffer_json_object_close(BUFFER *wb);
 void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value);
-void buffer_json_member_add_uint64_t(BUFFER *wb, const char *key, uint64_t value);
-void buffer_json_member_add_int64_t(BUFFER *wb, const char *key, int64_t value);
+void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t value);
+void buffer_json_member_add_uint64(BUFFER *wb, const char *key, uint64_t value);
+void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t value);
 void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value);
+
+void buffer_json_member_add_array(BUFFER *wb, const char *key);
+void buffer_json_add_array_item_string(BUFFER *wb, const char *value);
+void buffer_json_add_array_item_double(BUFFER *wb, NETDATA_DOUBLE value);
+void buffer_json_add_array_item_uint64(BUFFER *wb, uint64_t value);
+void buffer_json_add_array_item_array(BUFFER *wb);
+void buffer_json_add_array_item_object(BUFFER *wb);
+void buffer_json_array_close(BUFFER *wb);
 
 #endif /* NETDATA_WEB_BUFFER_H */

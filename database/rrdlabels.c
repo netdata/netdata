@@ -651,6 +651,20 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
     dictionary_acquired_item_release(labels, acquired_item);
 }
 
+void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key) {
+    if(!labels) return;
+
+    const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
+    RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
+
+    if(lb && lb->label_value)
+        buffer_json_add_array_item_string(wb, string2str(lb->label_value));
+    else
+        buffer_json_add_array_item_string(wb, NULL);
+
+    dictionary_acquired_item_release(labels, acquired_item);
+}
+
 // ----------------------------------------------------------------------------
 // rrdlabels_get_value_to_char_or_null()
 
