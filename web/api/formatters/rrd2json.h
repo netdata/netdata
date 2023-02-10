@@ -82,4 +82,11 @@ int rrdset2value_api_v1(
         , STORAGE_PRIORITY priority
 );
 
+static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
+    if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
+    if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
+    if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+    return true;
+}
+
 #endif /* NETDATA_RRD2JSON_H */

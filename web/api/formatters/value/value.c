@@ -37,9 +37,8 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 
     // for each dimension
     for (c = 0; c < used; c++) {
-        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
         NETDATA_DOUBLE n = cn[c];
 
