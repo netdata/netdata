@@ -3,9 +3,9 @@ title: "Netdata platform support policy"
 sidebar_label: "Supported platforms"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/PLATFORM_SUPPORT.md"
 learn_status: "Published"
-sidebar_position: "30"
-learn_topic_type: "Getting started"
-learn_rel_path: "Getting started"
+sidebar_position: "1"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 learn_docs_purpose: "Present all the supported platform in the Netdata solution"
 -->
 
