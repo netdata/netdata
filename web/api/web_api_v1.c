@@ -1326,6 +1326,14 @@ json_object *generate_info_json(RRDHOST *host)
 #endif
 
     JSON_ADD_BOOL("stream-enabled", default_rrdpush_enabled, j)
+
+#ifdef ENABLE_COMPRESSION
+    if(host->sender){
+        JSON_ADD_BOOL("stream-compression", stream_has_capability(host->sender, STREAM_CAP_COMPRESSION), j)
+    }else
+#endif
+        json_object_object_add(j, "stream-compression", NULL);
+
     JSON_ADD_INT("hosts-available", rrdhost_hosts_available(), j)
 #ifdef ENABLE_HTTPS
     JSON_ADD_BOOL("https-enabled", 1, j)
