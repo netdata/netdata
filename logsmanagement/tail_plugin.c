@@ -217,7 +217,7 @@ static void read_file_cb(uv_fs_t *req) {
     Circ_buff_t *buff = p_file_info->circ_buff;
 
     if (likely(req->result > 0)) {
-        buff->in->timestamp = get_unix_time_ms();
+        buff->in->timestamp = now_realtime_msec();
         m_assert(TEST_MS_TIMESTAMP_VALID(buff->in->timestamp), "buff->in->timestamp is invalid"); // Timestamp within valid range up to 2050
         buff->in->text_size = (size_t) req->result;
 

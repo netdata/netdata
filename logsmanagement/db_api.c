@@ -940,7 +940,7 @@ void db_search(logs_query_params_t *const p_query_params, struct File_info *cons
         Circ_buff_item_t temp_msg = {0};
 
         /* Retrieve metadata from DB */
-        temp_msg.timestamp = (uint64_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 0);
+        temp_msg.timestamp = (msec_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 0);
         temp_msg.text_compressed_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 1);
         temp_msg.text_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 2);
         int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 3);
@@ -1100,7 +1100,7 @@ void db_search_compound(logs_query_params_t *const p_query_params, struct File_i
         Circ_buff_item_t temp_msg = {0};
 
         /* Retrieve metadata from DB */
-        temp_msg.timestamp = (uint64_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 0);
+        temp_msg.timestamp = (msec_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 0);
         temp_msg.text_compressed_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 1);
         temp_msg.text_size = (size_t)sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 2);
         int64_t blob_offset = (int64_t) sqlite3_column_int64(stmt_retrieve_log_msg_metadata, 3);

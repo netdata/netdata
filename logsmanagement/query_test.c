@@ -90,7 +90,7 @@ void test_execute_query_thread(void *args) {
     uv_buf_t uv_buf;
     int64_t file_offset = 0;
     size_t results_size_max = query_params.results_buff->size;
-    uint64_t final_timestamp = query_params.end_timestamp;
+    msec_t final_timestamp = query_params.end_timestamp;
 
     uv_loop_t thread_loop;
     uv_loop_init(&thread_loop);
@@ -108,12 +108,12 @@ void test_execute_query_thread(void *args) {
     uv_fs_req_cleanup(&open_req);
 
     // Run queries and compare results with log file data
-    const uint64_t start_time = get_unix_time_ms();
-    uint64_t query_start_time, query_total_time = 0;
+    const msec_t start_time = now_realtime_msec();
+    msec_t query_start_time, query_total_time = 0;
     while (1) {
-        query_start_time = get_unix_time_ms();
+        query_start_time = now_realtime_msec();
         (void) execute_logs_manag_query(&query_params);
-        query_total_time += (get_unix_time_ms() - query_start_time);
+        query_total_time += (now_realtime_msec() - query_start_time);
         if (query_params.results_buff->len == 0)
             break;
 
@@ -168,7 +168,7 @@ void test_execute_query_thread(void *args) {
     uv_fs_req_cleanup(&stat_req);
 #endif
 
-    const uint64_t end_time = get_unix_time_ms();
+    const msec_t end_time = now_realtime_msec();
     debug(D_LOGS_MANAG, "==============================\n"
                         "Stress test queries for '%s' completed with success!\n"
                         "Total duration: %" PRIu64 "ms to retrieve and compare %" PRId64 "KB.\n"

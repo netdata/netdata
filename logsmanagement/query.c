@@ -129,7 +129,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     }
 
 #if MEASURE_QUERY_TIME
-    const uint64_t start_time = get_unix_time_ms();
+    const msec_t start_time = now_realtime_msec();
 #endif // MEASURE_QUERY_TIME
 
     /* Search DB(s) first */
@@ -137,7 +137,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     else db_search_compound(p_query_params, p_file_infos);
 
 #if MEASURE_QUERY_TIME
-    const uint64_t db_search_time = get_unix_time_ms();
+    const msec_t db_search_time = now_realtime_msec();
 #endif // MEASURE_QUERY_TIME
 
     /* Search circular buffer ONLY IF the results len is less than the originally requested max size!
@@ -158,7 +158,7 @@ LOGS_QUERY_RESULT_TYPE execute_logs_manag_query(logs_query_params_t *p_query_par
     }
 
 #if MEASURE_QUERY_TIME
-    const uint64_t end_time = get_unix_time_ms();
+    const msec_t end_time = now_realtime_msec();
     debug(D_LOGS_MANAG, "It took %" PRId64 "ms to execute query (%" PRId64 "ms DB search, %" 
           PRId64 "ms circ buffer search), retrieving %zuKB.\n",
           (int64_t)end_time - start_time, (int64_t)db_search_time - start_time, 

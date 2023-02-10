@@ -84,19 +84,6 @@ typedef enum { LOGS_MANAG_ERROR,
 extern uv_loop_t *main_loop; 
 
 /**
- * @brief Get unix time in milliseconds
- * @return Unix time in milliseconds
- * @todo Replace gettimeofday() with uv_gettimeofday()
- */
-static inline uint64_t get_unix_time_ms() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    uint64_t s1 = (uint64_t)(tv.tv_sec) * 1000;
-    uint64_t s2 = (uint64_t)(tv.tv_usec) / 1000;
-    return s1 + s2;
-}
-
-/**
  * @brief Extract file_basename from full file path
  * @param path String containing the full path.
  * @return Pointer to the file_basename string

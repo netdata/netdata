@@ -246,8 +246,8 @@ static int logsmanagement_function_execute_cb(  BUFFER *dest_wb, int timeout,
         }
     }
 
-    const uint64_t  req_start_timestamp = query_params.start_timestamp,
-                    req_end_timestamp = query_params.end_timestamp;
+    const msec_t req_start_timestamp = query_params.start_timestamp,
+                 req_end_timestamp = query_params.end_timestamp;
     struct rusage start, end;
     getrusage(RUSAGE_THREAD, &start);
     LOGS_QUERY_RESULT_TYPE err_code = execute_logs_manag_query(&query_params); // WARNING! query changes start_timestamp and end_timestamp

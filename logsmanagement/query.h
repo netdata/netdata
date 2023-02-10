@@ -71,8 +71,8 @@ typedef enum logs_query_data_format {
  * @warning results_buff->size argument must be <= MAX_LOG_MSG_SIZE.
  */
 typedef struct logs_query_params {
-    uint64_t start_timestamp;
-    uint64_t end_timestamp;
+    msec_t start_timestamp;
+    msec_t end_timestamp;
     size_t quota;
     char *chart_name[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
     char *filename[LOGS_MANAG_MAX_COMPOUND_QUERY_SOURCES];
@@ -85,7 +85,7 @@ typedef struct logs_query_params {
 } logs_query_params_t;
 
 typedef struct logs_query_res_hdr {
-    uint64_t timestamp;
+    msec_t timestamp;
     size_t text_size;
     int matches;
 } logs_query_res_hdr_t;

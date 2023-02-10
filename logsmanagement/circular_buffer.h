@@ -24,7 +24,7 @@ typedef enum {
 
 typedef struct Circ_buff_item {
     circ_buff_item_status_t status;				/**< Denotes if item is unprocessed, in processing or processed **/
-    uint64_t timestamp;							/**< Epoch datetime of when data was collected **/
+    msec_t timestamp;							/**< Epoch datetime of when data was collected **/
     char *data;									/**< Base of buffer to store both uncompressed and compressed logs **/
     size_t text_size;							/**< Size of uncompressed logs **/
     char *text_compressed;						/**< Pointer offset within *data that points to start of compressed logs **/

@@ -154,8 +154,8 @@ static char *ssl_ciphers[] = {
 
 // TODO: Include query.h instead of copy-pasting
 typedef struct db_query_params {
-    uint64_t start_timestamp;
-    uint64_t end_timestamp;
+    msec_t start_timestamp;
+    msec_t end_timestamp;
     char *filename;
     char *keyword;
     char *results;
@@ -173,22 +173,9 @@ size_t get_local_time(char *buf, size_t max_buf_size){
 #endif
 }
 
-/**
- * @brief Get unix time in milliseconds
- * @return Unix time in milliseconds
- * @todo Include helper.h instead of redefinition of function here 
- */
-static inline uint64_t get_unix_time_ms() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    uint64_t s1 = (uint64_t)(tv.tv_sec) * 1000;
-    uint64_t s2 = (uint64_t)(tv.tv_usec) / 1000;
-    return s1 + s2;
-}
-
 static void produce_logs(void *arg) {
-    uint64_t runtime;
-    uint64_t start_time = get_unix_time_ms();
+    msec_t runtime;
+    msec_t start_time = now_realtime_msec();
     int log_no = *((int *)arg);
     int rc = 0;
     long int msgs_written = 0;
@@ -267,7 +254,7 @@ static void produce_logs(void *arg) {
 #endif
     }
 
-    runtime = get_unix_time_ms() - start_time - DELAY_OPEN_TO_WRITE_SEC * MS_IN_S;
+    runtime = now_realtime_msec() - start_time - DELAY_OPEN_TO_WRITE_SEC * MS_IN_S;
     fprintf(stderr, "[STRESS_TEST] It took %" PRIu64 "ms to write %" PRId64 " log records in %s (%" PRId64 "k msgs/s))\n. ",
             runtime, msgs_written, log_filename, msgs_written / runtime);
 }
