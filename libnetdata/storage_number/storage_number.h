@@ -24,6 +24,7 @@ typedef long double NETDATA_DOUBLE;
 #define copysignndd(x, y) copysignl(x, y)
 #define modfndd(x, y) modfl(x, y)
 #define fabsndd(x) fabsl(x)
+#define floorndd(x) floorl(x)
 
 #else // NETDATA_WITH_LONG_DOUBLE
 
@@ -43,6 +44,7 @@ typedef double NETDATA_DOUBLE;
 #define copysignndd(x, y) copysign(x, y)
 #define modfndd(x, y) modf(x, y)
 #define fabsndd(x) fabs(x)
+#define floorndd(x) floor(x)
 
 #endif // NETDATA_WITH_LONG_DOUBLE
 
@@ -103,8 +105,6 @@ typedef enum {
 
 storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) __attribute__((const));
 static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) __attribute__((const));
-
-int print_netdata_double(char *str, NETDATA_DOUBLE value);
 
 //                                                          sign       div/mul      <--- multiplier / divider --->     10/100       RESET      EXISTS     VALUE
 #define STORAGE_NUMBER_POSITIVE_MAX_RAW (storage_number)( (0 << 31) | (1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (0 << 25) | (1 << 24) | 0x00ffffff )

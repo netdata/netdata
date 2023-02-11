@@ -275,6 +275,58 @@ static inline void char_array_reverse(char *from, char *to) {
     while (end > begin) aux = *end, *end-- = *begin, *begin++ = aux;
 }
 
+static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
+    char *s = dst;
+
+    if(unlikely(value < 0)) {
+        *s++ = '-';
+        value = -value;
+    }
+
+    char *d = s;
+
+    NETDATA_DOUBLE integral_d, fractional_d;
+    fractional_d = modfndd(value, &integral_d);
+
+    // handle too big integral parts, that cannot be represented in 64-bit integers
+    // this introduces an error - for example:
+    // 18446744073709551616.0 is printed as 18446744073709552640 (the last 4 digits differ)
+    // due to the way the double numbers store the values, when we divide by 10
+    while(integral_d >= (NETDATA_DOUBLE)UINT64_MAX) {
+        NETDATA_DOUBLE t = floorndd(integral_d / 10.0);
+        *d++ = (char)('0' + (integral_d - (t * 10.0)));
+        integral_d = t;
+    }
+
+    // get the integral and the fractional parts as 64-bit integers
+    uint64_t integral = (uint64_t)integral_d;
+    uint64_t fractional = (uint64_t)llrintndd(fractional_d * 10000000.0);
+    if(fractional >= 10000000ULL) {
+        integral++;
+        fractional -= 10000000ULL;
+    }
+
+    // convert the integral part to string (reversed)
+    d = print_uint64_reversed(d, integral);
+    char_array_reverse(s, d - 1);      // copy reversed the integral string
+
+    if(likely(fractional != 0)) {
+        *d++ = '.'; // add the dot
+
+        // convert the fractional part to string (reversed)
+        d = print_uint64_reversed(s = d, fractional);
+
+        while(d - s < 7) *d++ = '0';            // prepend zeros to reach 7 digits length
+        char_array_reverse(s, d - 1);   // copy reversed the fractional string
+
+        // remove trailing zeros from the fractional part
+        while(*(d - 1) == '0') d--;
+    }
+
+    *d = '\0';
+    return (int)(d - dst);
+}
+
 static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, 50);
 
