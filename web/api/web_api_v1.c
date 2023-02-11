@@ -186,22 +186,6 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     return ret;
 }
 
-void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
-    RRDR_OPTIONS used = 0; // to prevent adding duplicates
-    int added = 0;
-    for(int i = 0; api_v1_data_options[i].name ; i++) {
-        if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
-            const char *name = api_v1_data_options[i].name;
-            used |= api_v1_data_options[i].value;
-
-            if(added) buffer_strcat(wb, ",");
-            buffer_strcat(wb, name);
-
-            added++;
-        }
-    }
-}
-
 void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
     buffer_json_member_add_array(wb, key);
 
