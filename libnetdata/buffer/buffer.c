@@ -389,7 +389,7 @@ int buffer_unittest(void) {
         char buf[1024 + 1];
         for(size_t i = 0; i < 1024 ;i++)
             buf[i] = (char)(i % 26) + 'A';
-        buf[8192] = '\0';
+        buf[1024] = '\0';
 
         buffer_strcat(wb, buf);
         errors += buffer_expect(wb, buf);
