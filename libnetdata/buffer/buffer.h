@@ -94,6 +94,10 @@ static inline void _buffer_overflow_check(BUFFER *b) {
 static inline void buffer_flush(BUFFER *wb) {
     wb->len = 0;
 
+    wb->json.depth = 0;
+    wb->json.stack[0].type = 0;
+    wb->json.stack[0].count = 0;
+
     if(wb->buffer)
         wb->buffer[0] = '\0';
 }
