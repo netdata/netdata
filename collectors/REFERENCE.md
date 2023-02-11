@@ -17,8 +17,8 @@ necessary configuration options and prerequisites for that collector. In most ca
 without any configuration, or you just fulfil those prerequisites and [configure the collector](#configure-a-collector).
 
 If the application you are interested in monitoring is not listed in our integrations, 
-look at our [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blobl/master/modules/prometheus/README.md) 
-or [write a custom collector in Go](https://github.com/netdata/go.d.plugin/edit/master/docs/how-to-write-a-module.md).
+look at our [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md) 
+or [write a custom collector in Go](https://github.com/netdata/go.d.plugin/blob/master/docs/how-to-write-a-module.md).
 
 If we do support your collector but the charts described in the documentation don't appear on your dashboard, the reason will 
 be one of the following:
@@ -93,7 +93,7 @@ metrics, will automatically enable data collection for the application in questi
 
 When Netdata starts up, each collector searches for exposed metrics on the default endpoint established by that service
 or application's standard installation procedure. For example, 
-the [Nginxcollector](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md) searches at
+the [Nginx collector](https://github.com/netdata/go.d.plugin/blob/master/modules/nginx/README.md) searches at
 `http://127.0.0.1/stub_status` for exposed metrics in the correct format. If an Nginx web server is running and exposes
 metrics on that endpoint, the collector begins gathering them.
 
