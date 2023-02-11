@@ -14,17 +14,15 @@ When Netdata starts, and with zero configuration, it auto-detects thousands of d
 per-second metrics.
 
 Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
-when you [install Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
+when you [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
 All collectors are **installed by default** with every installation of Netdata. You do not need to install
 collectors manually to collect metrics from new sources. See our 
 [list of supported collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
 
-Upon startup, Netdata will **auto-detect** any application or service that has a
-[collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md), as long as both the collector
+Upon startup, Netdata will **auto-detect** any application or service that has a collector, as long as both the collector
 and the app/service are configured correctly. If you don't see charts for your application, see
 our [collectors' configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md).
-
 
 ## How Netdata's metrics collectors work
 
