@@ -1,9 +1,9 @@
 <!--
 title: "Alarms"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/alarms/README.md"
-sidebar_label: "alarms"
-learn_status: "Unpublished"
-learn_topic_type: "References"
+sidebar_label: "Alarms"
+learn_status: "Published"
+learn_rel_path: "References/Collectors references"
 -->
 
 # Alarms - graphing Netdata alarm states over time
