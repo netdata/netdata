@@ -75,7 +75,29 @@ typedef struct web_buffer {
 #define buffer_strlen(wb) ((wb)->len)
 const char *buffer_tostring(BUFFER *wb);
 
-#define buffer_flush(wb) wb->buffer[(wb)->len = 0] = '\0'
+#define BUFFER_OVERFLOW_EOF "EOF"
+
+#ifdef NETDATA_INTERNAL_CHECKS
+#define buffer_overflow_check(b) _buffer_overflow_check(b)
+#else
+#define buffer_overflow_check(b)
+#endif
+
+static inline void _buffer_overflow_check(BUFFER *b) {
+    assert(b->len <= b->size &&
+                   "BUFFER: length is above buffer size.");
+
+    assert(!(b->buffer && (b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF) != 0)) &&
+                   "BUFFER: detected overflow.");
+}
+
+static inline void buffer_flush(BUFFER *wb) {
+    wb->len = 0;
+
+    if(wb->buffer)
+        wb->buffer[0] = '\0';
+}
+
 void buffer_reset(BUFFER *wb);
 
 void buffer_date(BUFFER *wb, int year, int month, int day, int hours, int minutes, int seconds);
@@ -138,6 +160,8 @@ static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
 
     wb->len += len;
     wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_strcat(BUFFER *wb, const char *txt) {
@@ -158,6 +182,8 @@ static inline void buffer_strcat(BUFFER *wb, const char *txt) {
 
     buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
@@ -182,6 +208,8 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
 
     buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
 }
 
 // This trick seems to give an 80% speed increase in 32bit systems
@@ -249,6 +277,8 @@ static inline void buffer_print_uint64(BUFFER *wb, uint64_t value) {
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
@@ -260,6 +290,8 @@ static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
     }
 
     buffer_print_uint64(wb, (uint64_t)value);
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
@@ -272,6 +304,8 @@ static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
@@ -283,6 +317,8 @@ static inline void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     }
 
     buffer_print_uint64_hex(wb, (uint64_t)value);
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
@@ -298,6 +334,8 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
     // terminate it
     buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {
@@ -313,6 +351,8 @@ static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {
 
     *d = '\0';
     wb->len += spaces * 4;
+
+    buffer_overflow_check(wb);
 }
 
 static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {

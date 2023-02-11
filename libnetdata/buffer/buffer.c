@@ -2,35 +2,13 @@
 
 #include "../libnetdata.h"
 
-#define BUFFER_OVERFLOW_EOF "EOF"
-
 static inline void buffer_overflow_init(BUFFER *b)
 {
     b->buffer[b->size] = '\0';
     strcpy(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF);
 }
 
-#ifdef NETDATA_INTERNAL_CHECKS
-#define buffer_overflow_check(b) _buffer_overflow_check(b, __FILE__, __FUNCTION__, __LINE__)
-#else
-#define buffer_overflow_check(b)
-#endif
-
-static inline void _buffer_overflow_check(BUFFER *b, const char *file, const char *function, const unsigned long line)
-{
-    if(b->len > b->size) {
-        error("BUFFER: length %zu is above size %zu, at line %lu, at function %s() of file '%s'.", b->len, b->size, line, function, file);
-        b->len = b->size;
-    }
-
-    if(b->buffer[b->size] != '\0' || strcmp(&b->buffer[b->size + 1], BUFFER_OVERFLOW_EOF) != 0) {
-        error("BUFFER: detected overflow at line %lu, at function %s() of file '%s'.", line, function, file);
-        buffer_overflow_init(b);
-    }
-}
-
-void buffer_reset(BUFFER *wb)
-{
+void buffer_reset(BUFFER *wb) {
     buffer_flush(wb);
 
     wb->contenttype = CT_TEXT_PLAIN;
