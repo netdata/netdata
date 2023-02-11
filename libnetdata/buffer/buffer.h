@@ -10,8 +10,9 @@
 #define BUFFER_JSON_MAX_DEPTH 32
 
 typedef enum __attribute__ ((__packed__)) {
-    BUFFER_JSON_OBJECT = 1,
-    BUFFER_JSON_ARRAY = 2,
+    BUFFER_JSON_EMPTY = 0,
+    BUFFER_JSON_OBJECT,
+    BUFFER_JSON_ARRAY,
 } BUFFER_JSON_NODE_TYPE;
 
 typedef struct web_buffer_json_node {
@@ -21,14 +22,19 @@ typedef struct web_buffer_json_node {
 
 #define BUFFER_QUOTE_MAX_SIZE 7
 
+typedef enum __attribute__ ((__packed__)) {
+    WB_CONTENT_CACHEABLE = (1 << 0),
+    WB_CONTENT_NO_CACHEABLE = (1 << 1),
+} BUFFER_OPTIONS;
+
 typedef struct web_buffer {
-    size_t size;        	// allocation size of buffer, in bytes
-    size_t len;     		// current data length in buffer, in bytes
-    char *buffer;   		// the buffer itself
-    uint8_t contenttype;	// the content type of the data in the buffer
-    uint8_t options;		// options related to the content
-    time_t date;    		// the timestamp this content has been generated
-    time_t expires;			// the timestamp this content expires
+    size_t size;            // allocation size of buffer, in bytes
+    size_t len;             // current data length in buffer, in bytes
+    char *buffer;           // the buffer itself
+    uint8_t contenttype;    // the content type of the data in the buffer
+    BUFFER_OPTIONS options; // options related to the content
+    time_t date;            // the timestamp this content has been generated
+    time_t expires;         // the timestamp this content expires
     size_t *statistics;
 
     struct {
@@ -38,10 +44,6 @@ typedef struct web_buffer {
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
-
-// options
-#define WB_CONTENT_CACHEABLE            1
-#define WB_CONTENT_NO_CACHEABLE         2
 
 // content-types
 #define CT_APPLICATION_JSON             1
@@ -97,7 +99,7 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
         buffer_increase(buffer, needed_free_size + 1);
 }
 
-void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote);
+void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth, bool add_anonymous_object);
 void buffer_json_finalize(BUFFER *wb);
 
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
@@ -286,14 +288,18 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
 }
 
 static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {
-    buffer_need_bytes(wb, spaces + 1);
+    buffer_need_bytes(wb, spaces * 4 + 1);
 
     char *d = &wb->buffer[wb->len];
-    for(size_t i = 0; i < spaces; i++)
+    for(size_t i = 0; i < spaces; i++) {
         *d++ = ' ';
+        *d++ = ' ';
+        *d++ = ' ';
+        *d++ = ' ';
+    }
 
     *d = '\0';
-    wb->len += spaces;
+    wb->len += spaces * 4;
 }
 
 static inline void buffer_print_json_comma_newline_spacing(BUFFER *wb) {
@@ -348,6 +354,15 @@ static inline void buffer_json_member_add_string(BUFFER *wb, const char *key, co
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
     buffer_json_add_string_value(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_boolean(BUFFER *wb, const char *key, bool value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    buffer_strcat(wb, value?"true":"false");
 
     wb->json.stack[wb->json.depth].count++;
 }

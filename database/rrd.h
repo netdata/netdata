@@ -293,6 +293,7 @@ void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
 bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
 bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
 int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb);
 
 void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
 void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);

@@ -973,6 +973,14 @@ int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each,
     return dictionary_walkthrough_read(labels, label_to_buffer_callback, (void *)&tmp);
 }
 
+void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb) {
+    RRDLABEL *lb;
+    dfe_start_read(labels, lb) {
+        buffer_json_member_add_string(wb, lb_dfe.name, string2str(lb->label_value));
+    }
+    dfe_done(lb);
+}
+
 void rrdset_update_rrdlabels(RRDSET *st, DICTIONARY *new_rrdlabels) {
     if(!st->rrdlabels)
         st->rrdlabels = rrdlabels_create();

@@ -332,7 +332,7 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS 
         sq[0] = '"';
     }
 
-    buffer_json_initialize(wb, kq, sq);
+    buffer_json_initialize(wb, kq, sq, 0, true);
 
     buffer_json_member_add_uint64(wb, "api", 1);
     buffer_json_member_add_string(wb, "id", qt->id);

@@ -326,15 +326,16 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
 
 // ----------------------------------------------------------------------------
 
-void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote) {
+void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth, bool add_anonymous_object) {
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.depth = 0;
+    wb->json.depth = depth;
     wb->json.stack[wb->json.depth].count = 0;
     wb->json.stack[wb->json.depth].type = BUFFER_JSON_OBJECT;
 
-    buffer_fast_strcat(wb, "{", 1);
+    if(add_anonymous_object)
+        buffer_fast_strcat(wb, "{", 1);
 }
 
 void buffer_json_finalize(BUFFER *wb) {
@@ -396,13 +397,13 @@ int buffer_unittest(void) {
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"");
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
     buffer_json_finalize(wb);
     errors += buffer_expect(wb, "{\n}");
 
     buffer_flush(wb);
 
-    buffer_json_initialize(wb, "\"", "\"");
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_member_add_string(wb, "alpha", "this: \" is a double quote");
     buffer_json_member_add_object(wb, "object1");
