@@ -901,7 +901,7 @@ PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *u
     }
     else {
         if(format && *format)
-            pf->destination_wb->contenttype = functions_format_to_content_type(format);
+            pf->destination_wb->content_type = functions_format_to_content_type(format);
 
         pf->code = code;
 

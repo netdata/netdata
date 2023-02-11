@@ -496,7 +496,7 @@ static void rrd_function_call_wait_free(struct rrd_function_call_wait *tmp) {
 
 struct {
     const char *format;
-    uint8_t content_type;
+    HTTP_CONTENT_TYPE content_type;
 } function_formats[] = {
     { .format = "application/json", CT_APPLICATION_JSON },
     { .format = "text/plain",       CT_TEXT_PLAIN },
@@ -523,7 +523,7 @@ uint8_t functions_format_to_content_type(const char *format) {
     return CT_TEXT_PLAIN;
 }
 
-const char *functions_content_type_to_format(uint8_t content_type) {
+const char *functions_content_type_to_format(HTTP_CONTENT_TYPE content_type) {
     for (int i = 0; function_formats[i].format; i++)
         if (function_formats[i].content_type == content_type)
             return function_formats[i].format;
@@ -537,7 +537,7 @@ int rrd_call_function_error(BUFFER *wb, const char *msg, int code) {
 
     buffer_flush(wb);
     buffer_sprintf(wb, "{\"status\":%d,\"error_message\":\"%s\"}", code, buffer);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     return code;
 }
@@ -632,7 +632,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
 
         bool we_should_free = true;
         BUFFER *temp_wb  = buffer_create(PLUGINSD_LINE_MAX + 1, &netdata_buffers_statistics.buffers_functions); // we need it because we may give up on it
-        temp_wb->contenttype = wb->contenttype;
+        temp_wb->content_type = wb->content_type;
         code = rdcf->function(temp_wb, timeout, key, rdcf->collector_data, rrd_call_function_signal_when_ready, tmp);
         if (code == HTTP_RESP_OK) {
             netdata_mutex_lock(&tmp->mutex);
@@ -647,7 +647,7 @@ int rrd_call_function_and_wait(RRDHOST *host, BUFFER *wb, int timeout, const cha
             if (tmp->data_are_ready) {
                 // we have a response
                 buffer_fast_strcat(wb, buffer_tostring(temp_wb), buffer_strlen(temp_wb));
-                wb->contenttype = temp_wb->contenttype;
+                wb->content_type = temp_wb->content_type;
                 wb->expires = temp_wb->expires;
 
                 if(wb->expires)

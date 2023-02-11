@@ -11,7 +11,7 @@ static inline void buffer_overflow_init(BUFFER *b)
 void buffer_reset(BUFFER *wb) {
     buffer_flush(wb);
 
-    wb->contenttype = CT_TEXT_PLAIN;
+    wb->content_type = CT_TEXT_PLAIN;
     wb->options = 0;
     wb->date = 0;
     wb->expires = 0;
@@ -252,7 +252,7 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
     b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
     b->buffer[0] = '\0';
     b->size = size;
-    b->contenttype = CT_TEXT_PLAIN;
+    b->content_type = CT_TEXT_PLAIN;
     b->statistics = statistics;
     buffer_overflow_init(b);
     buffer_overflow_check(b);

@@ -27,11 +27,37 @@ typedef enum __attribute__ ((__packed__)) {
     WB_CONTENT_NO_CACHEABLE = (1 << 1),
 } BUFFER_OPTIONS;
 
+typedef enum __attribute__ ((__packed__)) {
+    CT_NONE = 0,
+    CT_APPLICATION_JSON,
+    CT_TEXT_PLAIN,
+    CT_TEXT_HTML,
+    CT_APPLICATION_X_JAVASCRIPT,
+    CT_TEXT_CSS,
+    CT_TEXT_XML,
+    CT_APPLICATION_XML,
+    CT_TEXT_XSL,
+    CT_APPLICATION_OCTET_STREAM,
+    CT_APPLICATION_X_FONT_TRUETYPE,
+    CT_APPLICATION_X_FONT_OPENTYPE,
+    CT_APPLICATION_FONT_WOFF,
+    CT_APPLICATION_FONT_WOFF2,
+    CT_APPLICATION_VND_MS_FONTOBJ,
+    CT_IMAGE_SVG_XML,
+    CT_IMAGE_PNG,
+    CT_IMAGE_JPG,
+    CT_IMAGE_GIF,
+    CT_IMAGE_XICON,
+    CT_IMAGE_ICNS,
+    CT_IMAGE_BMP,
+    CT_PROMETHEUS,
+} HTTP_CONTENT_TYPE;
+
 typedef struct web_buffer {
     size_t size;            // allocation size of buffer, in bytes
     size_t len;             // current data length in buffer, in bytes
     char *buffer;           // the buffer itself
-    uint8_t contenttype;    // the content type of the data in the buffer
+    HTTP_CONTENT_TYPE content_type;    // the content type of the data in the buffer
     BUFFER_OPTIONS options; // options related to the content
     time_t date;            // the timestamp this content has been generated
     time_t expires;         // the timestamp this content expires
@@ -44,30 +70,6 @@ typedef struct web_buffer {
         BUFFER_JSON_NODE stack[BUFFER_JSON_MAX_DEPTH];
     } json;
 } BUFFER;
-
-// content-types
-#define CT_APPLICATION_JSON             1
-#define CT_TEXT_PLAIN                   2
-#define CT_TEXT_HTML                    3
-#define CT_APPLICATION_X_JAVASCRIPT     4
-#define CT_TEXT_CSS                     5
-#define CT_TEXT_XML                     6
-#define CT_APPLICATION_XML              7
-#define CT_TEXT_XSL                     8
-#define CT_APPLICATION_OCTET_STREAM     9
-#define CT_APPLICATION_X_FONT_TRUETYPE  10
-#define CT_APPLICATION_X_FONT_OPENTYPE  11
-#define CT_APPLICATION_FONT_WOFF        12
-#define CT_APPLICATION_FONT_WOFF2       13
-#define CT_APPLICATION_VND_MS_FONTOBJ   14
-#define CT_IMAGE_SVG_XML                15
-#define CT_IMAGE_PNG                    16
-#define CT_IMAGE_JPG                    17
-#define CT_IMAGE_GIF                    18
-#define CT_IMAGE_XICON                  19
-#define CT_IMAGE_ICNS                   20
-#define CT_IMAGE_BMP                    21
-#define CT_PROMETHEUS                   22
 
 #define buffer_cacheable(wb)    do { (wb)->options |= WB_CONTENT_CACHEABLE;    if((wb)->options & WB_CONTENT_NO_CACHEABLE) (wb)->options &= ~WB_CONTENT_NO_CACHEABLE; } while(0)
 #define buffer_no_cacheable(wb) do { (wb)->options |= WB_CONTENT_NO_CACHEABLE; if((wb)->options & WB_CONTENT_CACHEABLE)    (wb)->options &= ~WB_CONTENT_CACHEABLE;  (wb)->expires = 0; } while(0)
@@ -95,7 +97,7 @@ static inline void buffer_flush(BUFFER *wb) {
     wb->len = 0;
 
     wb->json.depth = 0;
-    wb->json.stack[0].type = 0;
+    wb->json.stack[0].type = BUFFER_JSON_EMPTY;
     wb->json.stack[0].count = 0;
 
     if(wb->buffer)

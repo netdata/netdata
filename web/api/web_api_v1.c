@@ -268,7 +268,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
@@ -278,7 +278,7 @@ inline int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_cli
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarms_values2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
@@ -321,7 +321,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     health_aggregate_alarms(host, w->response.data, contexts, status);
 
     buffer_sprintf(w->response.data, "]\n");
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(w->response.data);
 
     buffer_free(contexts);
@@ -345,7 +345,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     }
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
@@ -388,7 +388,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         goto cleanup;
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     st->last_accessed_time_s = now_realtime_sec();
     callback(st, w->response.data);
     return HTTP_RESP_OK;
@@ -486,7 +486,7 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         buffer_free(dimensions);
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     int ret = rrdcontext_to_json(host, w->response.data, after, before, options, context, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
 
     simple_pattern_free(chart_label_key_pattern);
@@ -542,7 +542,7 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         buffer_free(dimensions);
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     int ret = rrdcontexts_to_json(host, w->response.data, after, before, options, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
 
     simple_pattern_free(chart_label_key_pattern);
@@ -556,7 +556,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     (void)url;
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 0);
     return HTTP_RESP_OK;
 }
@@ -1306,7 +1306,7 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_strcat(wb, s);
     buffer_no_cacheable(wb);
 
@@ -1326,7 +1326,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_strcat(wb, s);
     buffer_no_cacheable(wb);
 
@@ -1340,7 +1340,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
 
     web_client_api_request_v1_info_fill_buffer(host, wb);
 
@@ -1360,7 +1360,7 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     buffer_strcat(wb, str);
     freez(str);
 
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
@@ -1432,7 +1432,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
 
     SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
 
@@ -1475,7 +1475,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
     return rrd_call_function_and_wait(host, wb, timeout, function);
@@ -1487,7 +1487,7 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
     buffer_strcat(wb, "{\n");
@@ -1576,7 +1576,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
         return HTTP_RESP_NOT_FOUND;
     }
 
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
     for(size_t tier = 0; tier < storage_tiers ;tier++) {

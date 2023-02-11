@@ -901,7 +901,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
         pluginsd_function_result_begin_to_buffer(wb
                                                  , string2str(tmp->transaction)
                                                  , code
-                                                 , functions_content_type_to_format(func_wb->contenttype)
+                                                 , functions_content_type_to_format(func_wb->content_type)
                                                  , func_wb->expires);
 
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));
