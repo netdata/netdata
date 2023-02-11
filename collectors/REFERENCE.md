@@ -9,8 +9,6 @@ learn_rel_path: "Setup"
 
 # Collectors configuration reference
 
-
-
 The list of supported collectors can be found in [the documentation](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md), 
 and on [our website](https://www.netdata.cloud/integrations). The documentation of each collector provides all the 
 necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated 
@@ -23,10 +21,12 @@ or [write a custom collector in Go](https://github.com/netdata/go.d.plugin/blob/
 If we do support your collector but the charts described in the documentation don't appear on your dashboard, the reason will 
 be one of the following:
 
-- The entire data collection plugin is disabled by default. Read how to [enable and disable plugins](#enable-and-disable-plugins)
-- The data collection plugin is enabled, but a specific data collection module is disabled. Read how to
-[enable and disable a specific collection module](#enable-and-disable-a-specific-collection-module). 
-- Autodetection failed. Read how to [configure](#configure-a-collector) and [troubleshoot](#troubleshoot-a-collector) a collector.
+  - The entire data collection plugin is disabled by default. Read how to [enable and disable plugins](#enable-and-disable-plugins)
+
+  - The data collection plugin is enabled, but a specific data collection module is disabled. Read how to
+    [enable and disable a specific collection module](#enable-and-disable-a-specific-collection-module). 
+
+  - Autodetection failed. Read how to [configure](#configure-a-collector) and [troubleshoot](#troubleshoot-a-collector) a collector.
 
 ## Enable and disable plugins
 
@@ -145,9 +145,5 @@ The next step is based on the collector's orchestrator.
 ```
 
 The output from the relevant command will provide valuable troubleshooting information. If you can't figure out how to
-enable the collector using the details from this output, feel free to [create an issue on our
-GitHub](https://github.com/netdata/netdata/issues/new?assignees=&labels=bug%2Cneeds+triage&template=BUG_REPORT.yml) to get some
-help from our collectors experts.
-
-
-
+enable the collector using the details from this output, feel free to [join our Discord server](https://discord.com/invite/mPZ6WZKKG2), 
+to get help from our experts.

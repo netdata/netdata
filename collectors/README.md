@@ -45,22 +45,28 @@ specifics of what a given collector does.
 ## Collector architecture and terminology
 
 -   **Collectors** are the processes/programs that actually gather metrics from various sources. 
+
 -   **Plugins** help manage all the independent data collection processes in a variety of programming languages, based on 
     their purpose  and performance requirements. There are three types of plugins:
+
     -   **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
         They are written in `C`, and run as threads within the Netdata daemon.
+
     -   **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
         Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
         independent processes. They communicate with the daemon via pipes. All external plugins are managed by
         [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md), which provides additional management options.
+
 -   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
     The Go orchestrator is in active development.
+
     -   [go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md): An orchestrator for data
         collection modules written in `go`.
+
     -   [python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md): 
         An orchestrator for data collection modules written in `python` v2/v3.
+
     -   [charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md): 
         An orchestrator for data collection modules written in`bash` v4+.
+
 -   **Modules** are the individual programs controlled by an orchestrator to collect data from a specific application, or type of endpoint.
-
-
