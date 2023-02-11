@@ -6,11 +6,21 @@
 
 **Merged pull requests:**
 
+- More learn reorg/reordering [\#14505](https://github.com/netdata/netdata/pull/14505) ([cakrit](https://github.com/cakrit))
+- Revert changes to platform support policy [\#14504](https://github.com/netdata/netdata/pull/14504) ([cakrit](https://github.com/cakrit))
+- Top level learn changes [\#14503](https://github.com/netdata/netdata/pull/14503) ([cakrit](https://github.com/cakrit))
+- Update Demo-Sites.md [\#14501](https://github.com/netdata/netdata/pull/14501) ([cakrit](https://github.com/cakrit))
+- Reorganize contents of Getting Started [\#14499](https://github.com/netdata/netdata/pull/14499) ([cakrit](https://github.com/cakrit))
+- Correct title of contribute to doccumentation [\#14498](https://github.com/netdata/netdata/pull/14498) ([cakrit](https://github.com/cakrit))
+- Delete getting-started-overview.md [\#14497](https://github.com/netdata/netdata/pull/14497) ([Ancairon](https://github.com/Ancairon))
+- Category overview pages [\#14495](https://github.com/netdata/netdata/pull/14495) ([Ancairon](https://github.com/Ancairon))
 - Fix crash when child connects [\#14492](https://github.com/netdata/netdata/pull/14492) ([stelfrag](https://github.com/stelfrag))
+- Plans docs [\#14491](https://github.com/netdata/netdata/pull/14491) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Try making it landing page of getting started directly [\#14489](https://github.com/netdata/netdata/pull/14489) ([cakrit](https://github.com/cakrit))
 - Update Demo-Sites.md [\#14488](https://github.com/netdata/netdata/pull/14488) ([Ancairon](https://github.com/Ancairon))
 - Make the introduction a category link [\#14485](https://github.com/netdata/netdata/pull/14485) ([Ancairon](https://github.com/Ancairon))
 - Update AD title [\#14484](https://github.com/netdata/netdata/pull/14484) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix coverity issues [\#14480](https://github.com/netdata/netdata/pull/14480) ([stelfrag](https://github.com/stelfrag))
 - Remove obsolete or redundant docs [\#14476](https://github.com/netdata/netdata/pull/14476) ([cakrit](https://github.com/cakrit))
 - Incorporate interoperability and fix edit link [\#14475](https://github.com/netdata/netdata/pull/14475) ([cakrit](https://github.com/cakrit))
 - Upgrade demo sites to the getting started section [\#14474](https://github.com/netdata/netdata/pull/14474) ([cakrit](https://github.com/cakrit))
@@ -47,6 +57,7 @@
 - Delete docs/cloud/get-started.mdx [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
 - Update the "Kubernetes visualizations" doc [\#14347](https://github.com/netdata/netdata/pull/14347) ([Ancairon](https://github.com/Ancairon))
 - Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
+- Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
 
@@ -367,13 +378,6 @@
 - Update step-09 for dbmode update.md [\#13864](https://github.com/netdata/netdata/pull/13864) ([DShreve2](https://github.com/DShreve2))
 - add ACLK access to ml\_info \(fix anomalies tab in cloud\) [\#13863](https://github.com/netdata/netdata/pull/13863) ([underhood](https://github.com/underhood))
 - bump go.d.plugin to v0.41.0 [\#13861](https://github.com/netdata/netdata/pull/13861) ([ilyam8](https://github.com/ilyam8))
-- app to api netdata cloud [\#13856](https://github.com/netdata/netdata/pull/13856) ([underhood](https://github.com/underhood))
-- Use llvm's ar and ranlib when compiling with clang [\#13854](https://github.com/netdata/netdata/pull/13854) ([MrZammler](https://github.com/MrZammler))
-- fix typo [\#13853](https://github.com/netdata/netdata/pull/13853) ([andrewm4894](https://github.com/andrewm4894))
-- Retry reading carrier, duplex, and speed files periodically [\#13850](https://github.com/netdata/netdata/pull/13850) ([vlvkobal](https://github.com/vlvkobal))
-- Properly guard commands when installing services for offline service managers. [\#13848](https://github.com/netdata/netdata/pull/13848) ([Ferroin](https://github.com/Ferroin))
-- fix tiers update frequency [\#13844](https://github.com/netdata/netdata/pull/13844) ([ktsaou](https://github.com/ktsaou))
-- Fix service installation on FreeBSD. [\#13842](https://github.com/netdata/netdata/pull/13842) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
