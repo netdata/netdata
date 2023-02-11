@@ -54,6 +54,9 @@ typedef enum __attribute__ ((__packed__)) storage_priority {
     STORAGE_PRIORITY_LOW,
     STORAGE_PRIORITY_BEST_EFFORT,
 
+    // synchronous query, not to be dispatched to workers or queued
+    STORAGE_PRIORITY_SYNCHRONOUS,
+
     STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE,
 } STORAGE_PRIORITY;
 

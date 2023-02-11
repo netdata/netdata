@@ -741,10 +741,10 @@ void rrdeng_load_metric_init(STORAGE_METRIC_HANDLE *db_metric_handle,
     handle = rrdeng_query_handle_get();
     register_query_handle(handle);
 
-    if(unlikely(priority < STORAGE_PRIORITY_HIGH))
+    if (unlikely(priority < STORAGE_PRIORITY_HIGH))
         priority = STORAGE_PRIORITY_HIGH;
-    else if(unlikely(priority > STORAGE_PRIORITY_BEST_EFFORT))
-        priority = STORAGE_PRIORITY_BEST_EFFORT;
+    else if (unlikely(priority >= STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE))
+        priority = STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE - 1;
 
     handle->ctx = ctx;
     handle->metric = metric;

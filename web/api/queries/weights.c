@@ -489,7 +489,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
             .time_group_options = group_options,
             .tier = tier,
             .query_source = QUERY_SOURCE_API_WEIGHTS,
-            .priority = STORAGE_PRIORITY_NORMAL,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS,
     };
 
     RRDR *r = rrd2rrdr(owa, query_target_create(&qtr));
@@ -613,7 +613,7 @@ static void rrdset_metric_correlations_volume(
 
     QUERY_VALUE baseline_average = rrdmetric2value(host, rca, ria, rma, baseline_after, baseline_before,
                                                    options, group_method, group_options, tier, 0,
-                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                   QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&baseline_average, stats);
 
     if(!netdata_double_isnumber(baseline_average.value)) {
@@ -623,7 +623,7 @@ static void rrdset_metric_correlations_volume(
 
     QUERY_VALUE highlight_average = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, group_method, group_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&highlight_average, stats);
 
     if(!netdata_double_isnumber(highlight_average.value))
@@ -638,7 +638,7 @@ static void rrdset_metric_correlations_volume(
     snprintfz(highlight_countif_options, 50, "%s" NETDATA_DOUBLE_FORMAT, highlight_average.value < baseline_average.value ? "<" : ">", baseline_average.value);
     QUERY_VALUE highlight_countif = rrdmetric2value(host, rca, ria, rma, after, before,
                                                     options, RRDR_GROUPING_COUNTIF, highlight_countif_options, tier, 0,
-                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                                    QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
     merge_query_value_to_stats(&highlight_countif, stats);
 
     if(!netdata_double_isnumber(highlight_countif.value)) {
@@ -681,7 +681,7 @@ static void rrdset_weights_anomaly_rate(
 
     QUERY_VALUE qv = rrdmetric2value(host, rca, ria, rma, after, before,
                                      options, group_method, group_options, tier, 0,
-                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_NORMAL);
+                                     QUERY_SOURCE_API_WEIGHTS, STORAGE_PRIORITY_SYNCHRONOUS);
 
     merge_query_value_to_stats(&qv, stats);
 
