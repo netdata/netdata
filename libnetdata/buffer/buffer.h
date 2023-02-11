@@ -102,6 +102,19 @@ static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
 void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value_quote, int depth, bool add_anonymous_object);
 void buffer_json_finalize(BUFFER *wb);
 
+static inline void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
+#ifdef NETDATA_INTERNAL_CHECKS
+    assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
+#endif
+    wb->json.depth++;
+    wb->json.stack[wb->json.depth].count = 0;
+    wb->json.stack[wb->json.depth].type = type;
+}
+
+static inline void _buffer_json_depth_pop(BUFFER *wb) {
+    wb->json.depth--;
+}
+
 static inline void buffer_fast_strcat(BUFFER *wb, const char *txt, size_t len) {
     if(unlikely(!txt || !*txt || !len)) return;
 
@@ -333,20 +346,18 @@ static inline void buffer_json_member_add_object(BUFFER *wb, const char *key) {
     buffer_fast_strcat(wb, ":{", 2);
     wb->json.stack[wb->json.depth].count++;
 
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_OBJECT;
+    _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 }
 
 static inline void buffer_json_object_close(BUFFER *wb) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    assert(wb->json.depth >= 0 && "nothing is open to close it");
-    assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_OBJECT && "a json is not open to close it");
+    assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
+    assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_OBJECT && "BUFFER JSON: an object is not open to close it");
 #endif
     buffer_fast_strcat(wb, "\n", 1);
     buffer_print_spaces(wb, wb->json.depth);
     buffer_fast_strcat(wb, "}", 1);
-    wb->json.depth--;
+    _buffer_json_depth_pop(wb);
 }
 
 static inline void buffer_json_member_add_string(BUFFER *wb, const char *key, const char *value) {
@@ -373,9 +384,7 @@ static inline void buffer_json_member_add_array(BUFFER *wb, const char *key) {
     buffer_fast_strcat(wb, ":[", 2);
     wb->json.stack[wb->json.depth].count++;
 
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_ARRAY;
+    _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
 }
 
 static inline void buffer_json_add_array_item_array(BUFFER *wb) {
@@ -385,9 +394,7 @@ static inline void buffer_json_add_array_item_array(BUFFER *wb) {
     buffer_fast_strcat(wb, "[", 1);
     wb->json.stack[wb->json.depth].count++;
 
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_ARRAY;
+    _buffer_json_depth_push(wb, BUFFER_JSON_ARRAY);
 }
 
 static inline void buffer_json_add_array_item_string(BUFFER *wb, const char *value) {
@@ -421,9 +428,7 @@ static inline void buffer_json_add_array_item_object(BUFFER *wb) {
     buffer_fast_strcat(wb, "{", 1);
     wb->json.stack[wb->json.depth].count++;
 
-    wb->json.depth++;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_OBJECT;
+    _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 }
 
 static inline void buffer_json_member_add_time_t(BUFFER *wb, const char *key, time_t value) {
@@ -464,10 +469,11 @@ static inline void buffer_json_member_add_double(BUFFER *wb, const char *key, NE
 
 static inline void buffer_json_array_close(BUFFER *wb) {
 #ifdef NETDATA_INTERNAL_CHECKS
-    assert(wb->json.depth >= 0 && "nothing is open to close it");
+    assert(wb->json.depth >= 0 && "BUFFER JSON: nothing is open to close it");
+    assert(wb->json.stack[wb->json.depth].type == BUFFER_JSON_ARRAY && "BUFFER JSON: an array is not open to close it");
 #endif
     buffer_fast_strcat(wb, "]", 1);
-    wb->json.depth--;
+    _buffer_json_depth_pop(wb);
 }
 
 #endif /* NETDATA_WEB_BUFFER_H */

@@ -175,7 +175,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
 
             if(charts) {
                 buffer_json_object_close(wb); // dimensions
-                buffer_json_object_close(wb); // chart
+                buffer_json_object_close(wb); // chart:id
             }
 
             buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
@@ -191,7 +191,7 @@ static size_t registered_results_to_json_charts(DICTIONARY *results, BUFFER *wb,
     // close dimensions and chart
     if (total_dimensions) {
         buffer_json_object_close(wb); // dimensions
-        buffer_json_object_close(wb); // chart
+        buffer_json_object_close(wb); // chart:id
     }
 
     buffer_json_object_close(wb);
@@ -229,7 +229,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             if(contexts) {
                 buffer_json_object_close(wb); // dimensions
                 buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
-                buffer_json_object_close(wb); // instance
+                buffer_json_object_close(wb); // chart:id
+                buffer_json_object_close(wb); // charts
                 buffer_json_member_add_double(wb, "weight", contexts_total_weight / (double) context_dims);
                 buffer_json_object_close(wb); // context
             }
@@ -251,7 +252,7 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
             if(charts) {
                 buffer_json_object_close(wb); // dimensions
                 buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
-                buffer_json_object_close(wb); // instance
+                buffer_json_object_close(wb); // chart:id
             }
 
             buffer_json_member_add_object(wb, rrdinstance_acquired_id(t->ria));
@@ -275,7 +276,8 @@ static size_t registered_results_to_json_contexts(DICTIONARY *results, BUFFER *w
     if (total_dimensions) {
         buffer_json_object_close(wb); // dimensions
         buffer_json_member_add_double(wb, "weight", charts_total_weight / (double) chart_dims);
-        buffer_json_object_close(wb); // instance
+        buffer_json_object_close(wb); // chart:id
+        buffer_json_object_close(wb); // charts
         buffer_json_member_add_double(wb, "weight", contexts_total_weight / (double) context_dims);
         buffer_json_object_close(wb); // context
     }

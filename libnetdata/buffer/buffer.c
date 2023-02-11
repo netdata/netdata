@@ -330,9 +330,8 @@ void buffer_json_initialize(BUFFER *wb, const char *key_quote, const char *value
     strncpyz(wb->json.key_quote, key_quote, BUFFER_QUOTE_MAX_SIZE);
     strncpyz(wb->json.value_quote,  value_quote, BUFFER_QUOTE_MAX_SIZE);
 
-    wb->json.depth = depth;
-    wb->json.stack[wb->json.depth].count = 0;
-    wb->json.stack[wb->json.depth].type = BUFFER_JSON_OBJECT;
+    wb->json.depth = depth - 1;
+    _buffer_json_depth_push(wb, BUFFER_JSON_OBJECT);
 
     if(add_anonymous_object)
         buffer_fast_strcat(wb, "{", 1);
