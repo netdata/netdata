@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Samba"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitoring/Apps"
+learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
 # Samba monitoring with Netdata
