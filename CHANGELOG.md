@@ -9,6 +9,7 @@
 - More learn reorg/reordering [\#14505](https://github.com/netdata/netdata/pull/14505) ([cakrit](https://github.com/cakrit))
 - Revert changes to platform support policy [\#14504](https://github.com/netdata/netdata/pull/14504) ([cakrit](https://github.com/cakrit))
 - Top level learn changes [\#14503](https://github.com/netdata/netdata/pull/14503) ([cakrit](https://github.com/cakrit))
+- Fix broken links in collectors/COLLECTORS.md [\#14502](https://github.com/netdata/netdata/pull/14502) ([Ancairon](https://github.com/Ancairon))
 - Update Demo-Sites.md [\#14501](https://github.com/netdata/netdata/pull/14501) ([cakrit](https://github.com/cakrit))
 - Reorganize contents of Getting Started [\#14499](https://github.com/netdata/netdata/pull/14499) ([cakrit](https://github.com/cakrit))
 - Correct title of contribute to doccumentation [\#14498](https://github.com/netdata/netdata/pull/14498) ([cakrit](https://github.com/cakrit))
