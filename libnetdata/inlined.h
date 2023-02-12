@@ -135,6 +135,117 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 #endif
 }
 
+static inline NETDATA_DOUBLE parse_double_digits(const char *s, int *digits) {
+    int d = 0;
+
+#ifdef ENV32BIT
+    uint32_t ni = 0;
+    while (*s >= '0' && *s <= '9' && d < 9) {
+        ni = (ni * 10) + (*s++ - '0');
+        d++;
+    }
+#else
+    uint64_t ni = 0;
+    while (*s >= '0' && *s <= '9' && d < 19) {
+        ni = (ni * 10) + (*s++ - '0');
+        d++;
+    }
+#endif
+
+    NETDATA_DOUBLE n = (NETDATA_DOUBLE)ni;
+    while (*s >= '0' && *s <= '9') {
+        n = (n * 10.0) + (*s++ - '0');
+        d++;
+    }
+
+    *digits = d;
+    return n;
+}
+
+static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
+    NETDATA_DOUBLE sign = 1.0;
+    NETDATA_DOUBLE result = 0.0;
+    int integral_digits = 0;
+
+    NETDATA_DOUBLE fractional = 0.0;
+    int fractional_digits = 0;
+
+    NETDATA_DOUBLE exponent = 0.0;
+    int exponent_digits = 0;
+
+    switch(*s) {
+        case '-':
+            s++;
+            sign = -1.0;
+            break;
+
+        case '+':
+            s++;
+            break;
+
+        case 'n':
+            if(s[1] == 'a' && s[2] == 'n') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            break;
+
+        case 'i':
+            if(s[1] == 'n' && s[2] == 'f') {
+                if(endptr) *endptr = (char *)&s[3];
+                return INFINITY;
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    result = parse_double_digits(s, &integral_digits);
+    s += integral_digits;
+
+    if(unlikely(*s == '.')) {
+        s++;
+        fractional = parse_double_digits(s, &fractional_digits);
+        s += fractional_digits;
+    }
+
+    if (unlikely(*s == 'e' || *s == 'E')) {
+        s++;
+        int exponent_sign = 1;
+        if (*s == '-') {
+            exponent_sign = -1;
+            s++;
+        }
+        else if(*s == '+')
+            s++;
+
+        exponent = parse_double_digits(s, &exponent_digits);
+        s += exponent_digits;
+
+        if (unlikely(!exponent_digits)) {
+            // string has 'e' or 'E' but no exponent digits
+            return 0.0;
+        }
+        exponent *= exponent_sign;
+    }
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
+    if (unlikely(fractional_digits))
+        result += fractional / powndd(10.0, fractional_digits);
+
+    if (unlikely(exponent_digits))
+        result *= powndd(10.0, exponent);
+
+    return sign * result;
+}
+
 static inline int str2i(const char *s) {
     int n = 0;
     char c, negative = (char)(*s == '-');
