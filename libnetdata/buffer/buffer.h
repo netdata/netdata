@@ -280,27 +280,29 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
 
     if(unlikely(value < 0)) {
         *s++ = '-';
-        value = -value;
+        value = fabsndd(value);
     }
 
-    if(unlikely(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10))) {
-        // we can't speed up this and we are going to lose precision
-        // so, let printf() to the magic
-        snprintf(s, 512, "%.0f", value);
-        return (int)strlen(dst);
+    uint64_t fractional_precision = 10000000ULL; // fractional part 7 digits
+    int exponent = 0;
+    if(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10)) {
+        // the number is too big to print using 64bit numbers
+        // so, let's convert it to exponential notation
+        exponent = (int)(floorndd(log10ndd(value)));
+        value /= powndd(10, exponent);
+        fractional_precision = 100000000000000000ULL; // fractional part 18 digits
     }
 
     char *d = s;
-
     NETDATA_DOUBLE integral_d, fractional_d;
     fractional_d = modfndd(value, &integral_d);
 
     // get the integral and the fractional parts as 64-bit integers
     uint64_t integral = (uint64_t)integral_d;
-    uint64_t fractional = (uint64_t)llrintndd(fractional_d * 10000000.0);
-    if(fractional >= 10000000ULL) {
+    uint64_t fractional = (uint64_t)llrintndd(fractional_d * (NETDATA_DOUBLE)fractional_precision);
+    if(unlikely(fractional >= fractional_precision)) {
         integral++;
-        fractional -= 10000000ULL;
+        fractional -= fractional_precision;
     }
 
     // convert the integral part to string (reversed)
@@ -318,6 +320,13 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
 
         // remove trailing zeros from the fractional part
         while(*(d - 1) == '0') d--;
+    }
+
+    if(unlikely(exponent)) {
+        *d++ = 'e';
+        *d++ = '+';
+        d = print_uint32_reversed(s = d, exponent);
+        char_array_reverse(s, d - 1);
     }
 
     *d = '\0';
@@ -377,7 +386,7 @@ static inline void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
 }
 
 static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value) {
-    buffer_need_bytes(wb, 512);
+    buffer_need_bytes(wb, 512 + 2);
 
     if(isnan(value) || isinf(value)) {
         buffer_strcat(wb, "null");

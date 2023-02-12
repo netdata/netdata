@@ -79,23 +79,24 @@ static int check_number_printing(void) {
             { .n = 123.0000000923456789, .correct = "123.0000001" },
             { .n = 4294967295.123456789, .correct = "4294967295.123457" },
             { .n = 8294967295.123456789, .correct = "8294967295.123457" },
-            { .n = 9223372036854775808.123456789, .correct = "9223372036854775808" },
-            { .n = 18446744073709541376.0, .correct = "18446744073709541376"},
-            { .n = 18446744073709551616.0, .correct = "18446744073709551616" },
-            { .n = 12318446744073710600192.0, .correct = "12318446744073710600192" },
-            { .n = 1677721499999999885312.0, .correct = "1677721499999999885312" },
-            { .n = -1677721499999999885312.0, .correct = "-1677721499999999885312" },
-            { .n = -1.677721499999999885312e40, .correct = "-16777214999999999755473329633000941420544" },
+            { .n = 9.2233720368547676e+18, .correct = "9.2233720368547676e+18" },
+            { .n = 18446744073709541376.0, .correct = "1.84467440737095424e+19" },
+            { .n = 18446744073709551616.0, .correct = "1.84467440737095504e+19" },
+            { .n = 12318446744073710600192.0, .correct = "1.231844674407371e+22" },
+            { .n = 1677721499999999885312.0, .correct = "1.67772149999999984e+21" },
+            { .n = -1677721499999999885312.0, .correct = "-1.67772149999999984e+21" },
+            //{ .n = -1.677721499999999885312e40, .correct = "-1.67772149999999984e+40" },
+            { .n = -16777214999999997337621690403742592008192.0, .correct = "-1.67772149999999968e+40" },
             { .n = 9999.9999999, .correct = "9999.9999999" },
             { .n = -9999.9999999, .correct = "-9999.9999999" },
             { .n = 0, .correct = NULL },
     };
 
-    char netdata[50], system[50];
+    char netdata[512 + 2], system[512 + 2];
     int i, failed = 0;
     for(i = 0; values[i].correct ; i++) {
         print_netdata_double(netdata, values[i].n);
-        snprintfz(system, 49, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
+        snprintfz(system, 512, "%0.12" NETDATA_DOUBLE_MODIFIER, (NETDATA_DOUBLE)values[i].n);
 
         int ok = 1;
         if(strcmp(netdata, values[i].correct) != 0) {
@@ -109,8 +110,9 @@ static int check_number_printing(void) {
         if(parsed_system != parsed_netdata)
             failed++;
 
-        fprintf(stderr, "'%s' (system) printed as '%s' (netdata): PRINT %s, "
+        fprintf(stderr, "[%d]. '%s' (system) printed as '%s' (netdata): PRINT %s, "
                         "PARSED %0.12" NETDATA_DOUBLE_MODIFIER " (system), %0.12" NETDATA_DOUBLE_MODIFIER " (netdata): %s\n",
+                        i,
                         system, netdata, ok?"OK":"FAILED",
                         parsed_system, parsed_netdata,
                         parsed_netdata == parsed_system ? "OK" : "FAILED");
@@ -430,6 +432,20 @@ int unit_test_str2ld() {
             ".1",
             "1.2e-10",
             "18446744073709551616.0",
+            "18446744073709551616123456789123456789123456789123456789123456789123456789123456789.0",
+            "1.8446744073709551616123456789123456789123456789123456789123456789123456789123456789e+300",
+            "9.",
+            "9.e2",
+            "1.2e",
+            "1.2e+",
+            "1.2e-",
+            "1.2e0",
+            "1.2e-0",
+            "1.2e+0",
+            "-1.2e+1",
+            "-1.2e-1",
+            "1.2e1",
+            "1.2e400",
             "hello",
             "1wrong",
             "nan",
@@ -464,7 +480,8 @@ int unit_test_str2ld() {
         }
 
         if(e_mine != e_sys) {
-            fprintf(stderr, "Value '%s' is parsed correctly, but endptr is not right\n", values[i]);
+            fprintf(stderr, "Value '%s' is parsed correctly, but endptr is not right (netdata returned %d, but system returned %d)\n",
+                    values[i], (int)(e_mine - values[i]), (int)(e_sys - values[i]));
             return -1;
         }
 

@@ -137,15 +137,20 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 
 static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *digits) {
     const char *s = src;
+    NETDATA_DOUBLE n = 0.0;
 
-    // this works for both 32-bit and 64-bit systems
-    unsigned long ni = 0;
-    while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10))
-        ni = (ni * 10) + (*s++ - '0');
+    while(*s >= '0' && *s <= '9') {
 
-    NETDATA_DOUBLE n = (NETDATA_DOUBLE)ni;
-    while (*s >= '0' && *s <= '9')
-        n = (n * 10.0) + (*s++ - '0');
+        // this works for both 32-bit and 64-bit systems
+        unsigned long ni = 0;
+        unsigned exponent = 0;
+        while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
+            ni = (ni * 10) + (*s++ - '0');
+            exponent++;
+        }
+
+        n = n * powndd(10.0, exponent) + (NETDATA_DOUBLE)ni;
+    }
 
     *digits = (int)(s - src);
     return n;
@@ -197,12 +202,6 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     }
 
     result = _str2ndd_parse_double_digits(s, &integral_digits);
-
-    if(unlikely(integral_digits > 19))
-        // we can't speed up this, and we are going to lose precision
-        // so, let the system function do the job
-        return strtondd(src, endptr);
-
     s += integral_digits;
 
     if(unlikely(*s == '.')) {
@@ -212,7 +211,9 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     }
 
     if (unlikely(*s == 'e' || *s == 'E')) {
+        const char *e_ptr = s;
         s++;
+
         int exponent_sign = 1;
         if (*s == '-') {
             exponent_sign = -1;
@@ -222,23 +223,24 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
             s++;
 
         exponent = _str2ndd_parse_double_digits(s, &exponent_digits);
-        s += exponent_digits;
-
-        if (unlikely(!exponent_digits)) {
-            // string has 'e' or 'E' but no exponent digits
-            return 0.0;
+        if(unlikely(!exponent_digits)) {
+            exponent = 0;
+            s = e_ptr;
         }
-        exponent *= exponent_sign;
+        else {
+            s += exponent_digits;
+            exponent *= exponent_sign;
+        }
     }
 
     if(unlikely(endptr))
         *endptr = (char *)s;
 
-    if (unlikely(fractional_digits))
-        result += fractional / powndd(10.0, fractional_digits);
-
     if (unlikely(exponent_digits))
         result *= powndd(10.0, exponent);
+
+    if (unlikely(fractional_digits))
+        result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
 
     return sign * result;
 }

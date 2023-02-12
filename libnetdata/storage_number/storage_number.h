@@ -13,6 +13,7 @@ typedef long double NETDATA_DOUBLE;
 #define NETDATA_DOUBLE_FORMAT_ZERO "%0.0Lf"
 #define NETDATA_DOUBLE_FORMAT_AUTO "%Lf"
 #define NETDATA_DOUBLE_MODIFIER "Lf"
+#define NETDATA_DOUBLE_FORMAT_G "%0.19Le"
 
 #define NETDATA_DOUBLE_MAX LDBL_MAX
 
@@ -25,6 +26,8 @@ typedef long double NETDATA_DOUBLE;
 #define modfndd(x, y) modfl(x, y)
 #define fabsndd(x) fabsl(x)
 #define floorndd(x) floorl(x)
+#define ceilndd(x) ceill(x)
+#define log10ndd(x) log10l(x)
 
 #else // NETDATA_WITH_LONG_DOUBLE
 
@@ -33,6 +36,7 @@ typedef double NETDATA_DOUBLE;
 #define NETDATA_DOUBLE_FORMAT_ZERO "%0.0f"
 #define NETDATA_DOUBLE_FORMAT_AUTO "%f"
 #define NETDATA_DOUBLE_MODIFIER "f"
+#define NETDATA_DOUBLE_FORMAT_G "%0.19e"
 
 #define NETDATA_DOUBLE_MAX DBL_MAX
 
@@ -45,6 +49,8 @@ typedef double NETDATA_DOUBLE;
 #define modfndd(x, y) modf(x, y)
 #define fabsndd(x) fabs(x)
 #define floorndd(x) floor(x)
+#define ceilndd(x) ceil(x)
+#define log10ndd(x) log10(x)
 
 #endif // NETDATA_WITH_LONG_DOUBLE
 
