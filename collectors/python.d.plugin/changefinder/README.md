@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "changefinder"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/QoS"
+learn_rel_path: "Integrations/Monitoring/QoS"
 -->
 
 # Online changepoint detection with Netdata
