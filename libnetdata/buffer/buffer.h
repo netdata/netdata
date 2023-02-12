@@ -283,20 +283,17 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
         value = -value;
     }
 
+    if(unlikely(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10))) {
+        // we can't speed up this and we are going to lose precision
+        // so, let printf() to the magic
+        snprintf(s, 512, "%.0f", value);
+        return (int)strlen(dst);
+    }
+
     char *d = s;
 
     NETDATA_DOUBLE integral_d, fractional_d;
     fractional_d = modfndd(value, &integral_d);
-
-    // handle too big integral parts, that cannot be represented in 64-bit integers
-    // this introduces an error - for example:
-    // 18446744073709551616.0 is printed as 18446744073709552640 (the last 4 digits differ)
-    // due to the way the double numbers store the values, when we divide by 10
-    while(integral_d >= (NETDATA_DOUBLE)UINT64_MAX) {
-        NETDATA_DOUBLE t = floorndd(integral_d / 10.0);
-        *d++ = (char)('0' + (integral_d - (t * 10.0)));
-        integral_d = t;
-    }
 
     // get the integral and the fractional parts as 64-bit integers
     uint64_t integral = (uint64_t)integral_d;

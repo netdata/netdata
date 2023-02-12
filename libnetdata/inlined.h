@@ -135,27 +135,25 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 #endif
 }
 
-static inline NETDATA_DOUBLE parse_double_digits(const char *s, int *digits) {
-    int d = 0;
+static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *digits) {
+    const char *s = src;
 
     // this works for both 32-bit and 64-bit systems
     unsigned long ni = 0;
-    while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
+    while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10))
         ni = (ni * 10) + (*s++ - '0');
-        d++;
-    }
 
     NETDATA_DOUBLE n = (NETDATA_DOUBLE)ni;
-    while (*s >= '0' && *s <= '9') {
+    while (*s >= '0' && *s <= '9')
         n = (n * 10.0) + (*s++ - '0');
-        d++;
-    }
 
-    *digits = d;
+    *digits = (int)(s - src);
     return n;
 }
 
-static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
+static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
+    const char *s = src;
+
     NETDATA_DOUBLE sign = 1.0;
     NETDATA_DOUBLE result = 0.0;
     int integral_digits = 0;
@@ -198,12 +196,18 @@ static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
             break;
     }
 
-    result = parse_double_digits(s, &integral_digits);
+    result = _str2ndd_parse_double_digits(s, &integral_digits);
+
+    if(unlikely(integral_digits > 19))
+        // we can't speed up this, and we are going to lose precision
+        // so, let the system function do the job
+        return strtondd(src, endptr);
+
     s += integral_digits;
 
     if(unlikely(*s == '.')) {
         s++;
-        fractional = parse_double_digits(s, &fractional_digits);
+        fractional = _str2ndd_parse_double_digits(s, &fractional_digits);
         s += fractional_digits;
     }
 
@@ -217,7 +221,7 @@ static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
         else if(*s == '+')
             s++;
 
-        exponent = parse_double_digits(s, &exponent_digits);
+        exponent = _str2ndd_parse_double_digits(s, &exponent_digits);
         s += exponent_digits;
 
         if (unlikely(!exponent_digits)) {

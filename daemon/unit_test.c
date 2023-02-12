@@ -81,7 +81,11 @@ static int check_number_printing(void) {
             { .n = 8294967295.123456789, .correct = "8294967295.123457" },
             { .n = 9223372036854775808.123456789, .correct = "9223372036854775808" },
             { .n = 18446744073709541376.0, .correct = "18446744073709541376"},
-            { .n = 18446744073709551616.0, .correct = "18446744073709552640" }, // yes, this is wrong, but the best we can get
+            { .n = 18446744073709551616.0, .correct = "18446744073709551616" },
+            { .n = 12318446744073710600192.0, .correct = "12318446744073710600192" },
+            { .n = 1677721499999999885312.0, .correct = "1677721499999999885312" },
+            { .n = -1677721499999999885312.0, .correct = "-1677721499999999885312" },
+            { .n = -1.677721499999999885312e40, .correct = "-16777214999999999755473329633000941420544" },
             { .n = 9999.9999999, .correct = "9999.9999999" },
             { .n = -9999.9999999, .correct = "-9999.9999999" },
             { .n = 0, .correct = NULL },
@@ -99,7 +103,17 @@ static int check_number_printing(void) {
             failed++;
         }
 
-        fprintf(stderr, "'%s' (system) printed as '%s' (netdata): %s\n", system, netdata, ok?"OK":"FAILED");
+        NETDATA_DOUBLE parsed_netdata = str2ndd(netdata, NULL);
+        NETDATA_DOUBLE parsed_system = strtondd(netdata, NULL);
+
+        if(parsed_system != parsed_netdata)
+            failed++;
+
+        fprintf(stderr, "'%s' (system) printed as '%s' (netdata): PRINT %s, "
+                        "PARSED %0.12" NETDATA_DOUBLE_MODIFIER " (system), %0.12" NETDATA_DOUBLE_MODIFIER " (netdata): %s\n",
+                        system, netdata, ok?"OK":"FAILED",
+                        parsed_system, parsed_netdata,
+                        parsed_netdata == parsed_system ? "OK" : "FAILED");
     }
 
     if(failed) return 1;
