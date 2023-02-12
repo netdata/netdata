@@ -1,6 +1,10 @@
 <!--
 title: "SSV formatter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/ssv/README.md
+sidebar_label: "SSV formatter"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web/Api/Formatters"
 -->
 
 # SSV formatter

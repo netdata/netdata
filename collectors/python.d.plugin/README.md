@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "python.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Developers/Collectors"
+learn_rel_path: "Developers/External plugins"
 -->
 
 # python.d.plugin
@@ -230,9 +230,6 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 ### UrlService
 
 _Examples: `apache`, `nginx`, `tomcat`_
-
-_Multiple Endpoints (urls) Examples: [`rabbitmq`](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rabbitmq/README.md) (simpler).
-
 
 _Variables from config file_: `url`, `user`, `pass`.
 

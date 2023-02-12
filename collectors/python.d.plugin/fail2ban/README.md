@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Fail2ban"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Apps"
+learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
 # Fail2ban monitoring with Netdata

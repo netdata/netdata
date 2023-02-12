@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Beanstalk"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Message brokers"
+learn_rel_path: "Integrations/Monitor/Message brokers"
 -->
 
 # Beanstalk monitoring with Netdata

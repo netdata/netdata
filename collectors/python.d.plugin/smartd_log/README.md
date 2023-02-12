@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "S.M.A.R.T. attributes"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Devices"
+learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
 # Storage devices monitoring with Netdata

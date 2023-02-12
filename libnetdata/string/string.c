@@ -300,14 +300,18 @@ void string_freez(STRING *string) {
     string_stats_atomic_increment(releases);
 }
 
-size_t string_strlen(STRING *string) {
+inline size_t string_strlen(STRING *string) {
     if(unlikely(!string)) return 0;
     return string->length - 1;
 }
 
-const char *string2str(STRING *string) {
+inline const char *string2str(STRING *string) {
     if(unlikely(!string)) return "";
     return string->str;
+}
+
+int string_strcmp(STRING *string, const char *s) {
+    return strcmp(string2str(string), s);
 }
 
 STRING *string_2way_merge(STRING *a, STRING *b) {

@@ -100,7 +100,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
             label_val[i - RRDCALC_VAR_LABEL_LEN - 1] = '\0';
 
             if(likely(rc->rrdset && rc->rrdset->rrdlabels)) {
-                rrdlabels_get_value_to_char_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
+                rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
                     freez(temp);
@@ -244,6 +244,8 @@ static void rrdcalc_link_to_rrdset(RRDSET *st, RRDCALC *rc) {
 
     if(!rc->units)
         rc->units = string_dup(st->units);
+
+    rrdvar_store_for_chart(host, st);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
 

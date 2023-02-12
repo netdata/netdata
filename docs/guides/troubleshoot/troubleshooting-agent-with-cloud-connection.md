@@ -1,7 +1,11 @@
 <!--
 title: "Troubleshoot Agent-Cloud connectivity issues"
+sidebar_label: "Troubleshoot Agent-Cloud connectivity issues"
 description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Troubleshoot"
 -->
 
 # Troubleshoot Agent-Cloud connectivity issues
@@ -13,9 +17,13 @@ We identified some scenarios that might cause this delay and possible actions yo
 
 The most common explanation for the delay usually falls into one of the following three categories:
 
-- [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
-- [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
-- [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
+- [Troubleshoot Agent-Cloud connectivity issues](#troubleshoot-agent-cloud-connectivity-issues)
+  - [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
+    - [The kickstart script auto-claimed the Agent but there was no error message displayed](#the-kickstart-script-auto-claimed-the-agent-but-there-was-no-error-message-displayed)
+  - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
+  - [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
+    - [Verify that your IP is whitelisted from Netdata Cloud](#verify-that-your-ip-is-whitelisted-from-netdata-cloud)
+    - [Make sure that your node has internet connectivity and can resolve network domains](#make-sure-that-your-node-has-internet-connectivity-and-can-resolve-network-domains)
 
 ## The claiming process of the kickstart script was unsuccessful
 

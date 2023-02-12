@@ -1419,7 +1419,7 @@ static void *metadata_unittest_threads(void)
             unittest_queue_metadata,
             &tu);
     }
-    uv_async_send(&metasync_worker.async);
+    (void) uv_async_send(&metasync_worker.async);
     sleep_usec(seconds_to_run * USEC_PER_SEC);
 
     __atomic_store_n(&tu.join, 1, __ATOMIC_RELAXED);

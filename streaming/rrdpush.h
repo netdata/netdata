@@ -41,6 +41,7 @@ typedef enum {
     STREAM_CAP_FUNCTIONS        = (1 << 11), // plugin functions supported
     STREAM_CAP_REPLICATION      = (1 << 12), // replication supported
     STREAM_CAP_BINARY           = (1 << 13), // streaming supports binary data
+    STREAM_CAP_INTERPOLATED     = (1 << 14), // streaming supports interpolated streaming of values
 
     STREAM_CAP_INVALID          = (1 << 30), // used as an invalid value for capabilities when this is set
     // this must be signed int, so don't use the last bit
@@ -56,7 +57,8 @@ typedef enum {
 #define STREAM_OUR_CAPABILITIES ( \
     STREAM_CAP_V1 | STREAM_CAP_V2 | STREAM_CAP_VN | STREAM_CAP_VCAPS |  \
     STREAM_CAP_HLABELS | STREAM_CAP_CLAIM | STREAM_CAP_CLABELS | \
-    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION | STREAM_CAP_BINARY )
+    STREAM_HAS_COMPRESSION | STREAM_CAP_FUNCTIONS | STREAM_CAP_REPLICATION | STREAM_CAP_BINARY | \
+    STREAM_CAP_INTERPOLATED)
 
 #define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
 
@@ -303,7 +305,21 @@ void sender_commit(struct sender_state *s, BUFFER *wb);
 int rrdpush_init();
 bool rrdpush_receiver_needs_dbengine();
 int configured_as_parent();
-void rrdset_done_push(RRDSET *st);
+
+typedef struct rrdset_stream_buffer {
+    bool v2;
+    bool begin_v2_added;
+    time_t wall_clock_time;
+    uint64_t rrdset_flags; // RRDSET_FLAGS
+    time_t last_point_end_time_s;
+    BUFFER *wb;
+} RRDSET_STREAM_BUFFER;
+
+RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock_time);
+void rrdset_push_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st);
+void rrdset_push_metrics_finished(RRDSET_STREAM_BUFFER *rsb, RRDSET *st);
+void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_end_time_ut, NETDATA_DOUBLE n, SN_FLAGS flags);
+
 bool rrdset_push_chart_definition_now(RRDSET *st);
 void *rrdpush_sender_thread(void *ptr);
 void rrdpush_send_host_labels(RRDHOST *host);

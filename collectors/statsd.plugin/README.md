@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/stat
 sidebar_label: "statsd.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Apm"
+learn_rel_path: "Integrations/Monitor/Apm"
 -->
 
 StatsD is a system to collect data from any application. Applications send metrics to it, usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.

@@ -1,6 +1,10 @@
 <!--
 title: "Step 5. Health monitoring alarms and notifications"
+sidebar_label: "Step 5. Health monitoring alarms and notifications"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-05.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 5. Health monitoring alarms and notifications
@@ -20,9 +24,15 @@ Luckily, Netdata's alarm and notification system are incredibly adaptable to you
 
 We'll talk about Netdata's default configuration, and then you'll learn how to do the following:
 
--   [Tune Netdata's pre-configured alarms](#tune-netdatas-pre-configured-alarms)
--   [Write your first health entity](#write-your-first-health-entity)
--   [Enable Netdata's notification systems](#enable-netdatas-notification-systems)
+- [Step 5. Health monitoring alarms and notifications](#step-5-health-monitoring-alarms-and-notifications)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Tune Netdata's pre-configured alarms](#tune-netdatas-pre-configured-alarms)
+    - [Silence an individual alarm](#silence-an-individual-alarm)
+  - [Write your first health entity](#write-your-first-health-entity)
+  - [Enable Netdata's notification systems](#enable-netdatas-notification-systems)
+    - [Email notifications](#email-notifications)
+  - [Enable Slack notifications](#enable-slack-notifications)
+  - [What's next?](#whats-next)
 
 ## Tune Netdata's pre-configured alarms
 

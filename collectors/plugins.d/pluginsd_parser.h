@@ -3,7 +3,12 @@
 #ifndef NETDATA_PLUGINSD_PARSER_H
 #define NETDATA_PLUGINSD_PARSER_H
 
-#include "parser/parser.h"
+#include "daemon/common.h"
+
+typedef enum __attribute__ ((__packed__)) {
+    PARSER_INIT_PLUGINSD        = (1 << 1),
+    PARSER_INIT_STREAMING       = (1 << 2),
+} PLUGINSD_KEYWORDS;
 
 typedef struct parser_user_object {
     PARSER  *parser;
@@ -14,13 +19,18 @@ typedef struct parser_user_object {
     int trust_durations;
     DICTIONARY *new_host_labels;
     DICTIONARY *chart_rrdlabels_linked_temporarily;
-    size_t count;
+    size_t data_collections_count;
     int enabled;
-    uint8_t st_exists;
-    uint8_t host_exists;
-    void *private; // the user can set this for private use
 
     struct {
+        bool parsing_host;
+        uuid_t machine_guid;
+        char machine_guid_str[UUID_STR_LEN];
+        STRING *hostname;
+        DICTIONARY *rrdlabels;
+    } host_define;
+
+    struct parser_user_object_replay {
         time_t start_time;
         time_t end_time;
 
@@ -31,9 +41,20 @@ typedef struct parser_user_object {
 
         bool rset_enabled;
     } replay;
+
+    struct parser_user_object_v2 {
+        bool locked_data_collection;
+        RRDSET_STREAM_BUFFER stream_buffer;
+        time_t update_every;
+        time_t end_time;
+        time_t wall_clock_time;
+        bool ml_locked;
+    } v2;
 } PARSER_USER_OBJECT;
 
 PARSER_RC pluginsd_function(char **words, size_t num_words, void *user);
 PARSER_RC pluginsd_function_result_begin(char **words, size_t num_words, void *user);
 void inflight_functions_init(PARSER *parser);
+void pluginsd_keywords_init(PARSER *parser, PLUGINSD_KEYWORDS types);
+
 #endif //NETDATA_PLUGINSD_PARSER_H

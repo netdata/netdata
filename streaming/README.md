@@ -1,8 +1,12 @@
----
+<!--
 title: "Streaming and replication"
 description: "Replicate and mirror Netdata's metrics through real-time streaming from child to parent nodes. Then combine, correlate, and export."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/streaming/README.md
----
+sidebar_label: "Streaming and replication"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "References"
+-->
 
 
 Each Netdata node is able to replicate/mirror its database to another Netdata node, by streaming the collected

@@ -279,7 +279,7 @@ void rrdlabels_destroy(DICTIONARY *labels_dict);
 void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
-void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key);
+void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
 void rrdlabels_flush(DICTIONARY *labels_dict);
 
 void rrdlabels_unmark_all(DICTIONARY *labels);
@@ -702,6 +702,13 @@ struct rrdset {
         RRDCALC *base;                              // double linked list of RRDCALC related to this RRDSET
     } alerts;
 
+    struct {
+        size_t pos;
+        size_t size;
+        size_t used;
+        RRDDIM_ACQUIRED **rda;
+    } pluginsd;
+
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     struct {
         bool log_next_data_collection;
@@ -953,6 +960,8 @@ struct rrdhost_system_info {
     char *prebuilt_dist;
     int mc_version;
 };
+
+struct rrdhost_system_info *rrdhost_labels_to_system_info(DICTIONARY *labels);
 
 struct rrdhost {
     char machine_guid[GUID_LEN + 1];                // the unique ID of this host

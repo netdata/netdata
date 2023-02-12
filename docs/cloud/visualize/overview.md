@@ -1,4 +1,4 @@
----
+<!--
 title: "Home, Overview and Single Node view"
 description: >-
     "The Home tab automatically presents relevant information of your War Room, the Overview uses composite
@@ -8,7 +8,7 @@ sidebar_label: "Home, Overview and Single Node view"
 learn_status: "Published"
 learn_topic_type: "Concepts"
 learn_rel_path: "Operations/Visualizations"
----
+-->
 
 ## Home
 

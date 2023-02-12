@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/tc.p
 sidebar_label: "tc.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Networking"
+learn_rel_path: "Integrations/Monitor/Networking"
 -->
 
 # tc.plugin

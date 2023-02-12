@@ -61,6 +61,14 @@ static struct workers_globals {
 
 static __thread struct worker *worker = NULL; // the current thread worker
 
+static inline usec_t worker_now_monotonic_usec(void) {
+#ifdef NETDATA_WITHOUT_WORKERS_LATENCY
+    return 0;
+#else
+    return now_monotonic_usec();
+#endif
+}
+
 size_t workers_allocated_memory(void) {
     netdata_spinlock_lock(&workers_globals.spinlock);
     size_t memory = workers_globals.memory;
@@ -77,7 +85,7 @@ void worker_register(const char *name) {
     worker->tag = strdupz(netdata_thread_tag());
     worker->workname = strdupz(name);
 
-    usec_t now = now_monotonic_usec();
+    usec_t now = worker_now_monotonic_usec();
     worker->statistics_last_checkpoint = now;
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
@@ -181,14 +189,14 @@ static inline void worker_is_idle_with_time(usec_t now) {
 void worker_is_idle(void) {
     if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
 
-    worker_is_idle_with_time(now_monotonic_usec());
+    worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
 void worker_is_busy(size_t job_id) {
     if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
         return;
 
-    usec_t now = now_monotonic_usec();
+    usec_t now = worker_now_monotonic_usec();
 
     if(worker->last_action == WORKER_BUSY)
         worker_is_idle_with_time(now);
@@ -260,7 +268,7 @@ void workers_foreach(const char *name, void (*callback)(
 
     struct worker *p;
     DOUBLE_LINKED_LIST_FOREACH_FORWARD(workname->base, p, prev, next) {
-        usec_t now = now_monotonic_usec();
+        usec_t now = worker_now_monotonic_usec();
 
         // find per job type statistics
         STRING *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];

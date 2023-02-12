@@ -654,7 +654,7 @@ void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const
 // ----------------------------------------------------------------------------
 // rrdlabels_get_value_to_char_or_null()
 
-void rrdlabels_get_value_to_char_or_null(DICTIONARY *labels, char **value, const char *key) {
+void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key) {
     const DICTIONARY_ITEM *acquired_item = dictionary_get_and_acquire_item(labels, key);
     RRDLABEL *lb = dictionary_acquired_item_value(acquired_item);
 

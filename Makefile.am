@@ -78,6 +78,7 @@ dist_noinst_DATA = \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
+    database/engine/journalfile_v2.ksy.in \
     $(NULL)
 
 # until integrated within build
@@ -106,7 +107,6 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    parser \
     spawn \
     $(NULL)
 
@@ -159,6 +159,8 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
+    libnetdata/parser/parser.c \
+    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -555,6 +557,20 @@ if ENABLE_DBENGINE
         database/engine/pdc.c \
         database/engine/pdc.h \
         $(NULL)
+    
+    RRD_PLUGIN_KSY_BUILTFILES = \
+        database/engine/journalfile_v2.ksy \
+        database/engine/journalfile_v2_virtmemb.ksy \
+        $(NULL)
+
+    BUILT_SOURCES += $(RRD_PLUGIN_KSY_BUILTFILES)
+    CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
+
+database/engine/journalfile_v2.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
+
+database/engine/journalfile_v2_virtmemb.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 -DVIRT_MEMBERS $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
 endif
 
 API_PLUGIN_FILES = \
@@ -660,11 +676,6 @@ WEB_PLUGIN_FILES = \
 CLAIM_FILES = \
     claim/claim.c \
     claim/claim.h \
-    $(NULL)
-
-PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
     $(NULL)
 
 if ENABLE_ACLK
@@ -934,7 +945,6 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \

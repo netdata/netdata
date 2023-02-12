@@ -485,8 +485,8 @@ void bitmap256_set_bit(BITMAP256 *ptr, uint8_t idx, bool value);
 int config_isspace(char c);
 int pluginsd_space(char c);
 
-size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover);
-size_t pluginsd_split_words(char *str, char **words, size_t max_words, char *recover_string, char **recover_location, int max_recover);
+size_t quoted_strings_splitter(char *str, char **words, size_t max_words, int (*custom_isspace)(char));
+size_t pluginsd_split_words(char *str, char **words, size_t max_words);
 
 static inline char *get_word(char **words, size_t num_words, size_t index) {
     if (index >= num_words)
@@ -547,6 +547,7 @@ extern char *netdata_configured_host_prefix;
 #include "libnetdata/aral/aral.h"
 #include "onewayalloc/onewayalloc.h"
 #include "worker_utilization/worker_utilization.h"
+#include "parser/parser.h"
 
 // BEWARE: Outside of the C code this also exists in alarm-notify.sh
 #define DEFAULT_CLOUD_BASE_URL "https://api.netdata.cloud"
@@ -609,57 +610,59 @@ static inline PPvoid_t JudyLLastThenPrev(Pcvoid_t PArray, Word_t * PIndex, bool 
     return JudyLPrev(PArray, PIndex, PJE0);
 }
 
-static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
-    size_t total = 0;
+typedef enum {
+    TIMING_STEP_INTERNAL = 0,
 
-    total += (ptr & 0xff) >> 0;
-    total += (ptr & 0xff00) >> 8;
-    total += (ptr & 0xff0000) >> 16;
-    total += (ptr & 0xff000000) >> 24;
+    TIMING_STEP_BEGIN2_PREPARE,
+    TIMING_STEP_BEGIN2_FIND_CHART,
+    TIMING_STEP_BEGIN2_PARSE,
+    TIMING_STEP_BEGIN2_ML,
+    TIMING_STEP_BEGIN2_PROPAGATE,
+    TIMING_STEP_BEGIN2_STORE,
 
-    if(sizeof(Word_t) > 4) {
-        total += (ptr & 0xff00000000) >> 32;
-        total += (ptr & 0xff0000000000) >> 40;
-        total += (ptr & 0xff000000000000) >> 48;
-        total += (ptr & 0xff00000000000000) >> 56;
-    }
+    TIMING_STEP_SET2_PREPARE,
+    TIMING_STEP_SET2_LOOKUP_DIMENSION,
+    TIMING_STEP_SET2_PARSE,
+    TIMING_STEP_SET2_ML,
+    TIMING_STEP_SET2_PROPAGATE,
+    TIMING_STEP_RRDSET_STORE_METRIC,
+    TIMING_STEP_DBENGINE_FIRST_CHECK,
+    TIMING_STEP_DBENGINE_CHECK_DATA,
+    TIMING_STEP_DBENGINE_PACK,
+    TIMING_STEP_DBENGINE_PAGE_FIN,
+    TIMING_STEP_DBENGINE_MRG_UPDATE,
+    TIMING_STEP_DBENGINE_PAGE_ALLOC,
+    TIMING_STEP_DBENGINE_CREATE_NEW_PAGE,
+    TIMING_STEP_DBENGINE_FLUSH_PAGE,
+    TIMING_STEP_SET2_STORE,
 
-    return (total % modulo);
-}
+    TIMING_STEP_END2_PREPARE,
+    TIMING_STEP_END2_PUSH_V1,
+    TIMING_STEP_END2_ML,
+    TIMING_STEP_END2_RRDSET,
+    TIMING_STEP_END2_PROPAGATE,
+    TIMING_STEP_END2_STORE,
 
-static uint32_t murmur32(uint32_t h) __attribute__((const));
-static inline uint32_t murmur32(uint32_t h) {
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
+    // terminator
+    TIMING_STEP_MAX,
+} TIMING_STEP;
 
-    return h;
-}
+typedef enum {
+    TIMING_ACTION_INIT,
+    TIMING_ACTION_STEP,
+    TIMING_ACTION_FINISH,
+} TIMING_ACTION;
 
-static uint64_t murmur64(uint64_t h) __attribute__((const));
-static inline uint64_t murmur64(uint64_t k) {
-    k ^= k >> 33;
-    k *= 0xff51afd7ed558ccdUL;
-    k ^= k >> 33;
-    k *= 0xc4ceb9fe1a85ec53UL;
-    k ^= k >> 33;
-
-    return k;
-}
-
-static inline size_t indexing_partition(Word_t ptr, Word_t modulo) __attribute__((const));
-static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
-    if(sizeof(Word_t) == 8) {
-        uint64_t hash = murmur64(ptr);
-        return hash % modulo;
-    }
-    else {
-        uint32_t hash = murmur32(ptr);
-        return hash % modulo;
-    }
-}
+#ifdef NETDATA_TIMING_REPORT
+#define timing_init() timing_action(TIMING_ACTION_INIT, TIMING_STEP_INTERNAL)
+#define timing_step(step) timing_action(TIMING_ACTION_STEP, step)
+#define timing_report() timing_action(TIMING_ACTION_FINISH, TIMING_STEP_INTERNAL)
+#else
+#define timing_init() debug_dummy()
+#define timing_step(step) debug_dummy()
+#define timing_report() debug_dummy()
+#endif
+void timing_action(TIMING_ACTION action, TIMING_STEP step);
 
 # ifdef __cplusplus
 }

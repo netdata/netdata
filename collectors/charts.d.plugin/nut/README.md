@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "UPS/PDU"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Remotes/Devices"
+learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
 # UPS/PDU monitoring with Netdata

@@ -2501,7 +2501,7 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         if (rrd_flag_check(rm, RRD_FLAG_HIDDEN)
             || (rm->rrddim && rrddim_option_check(rm->rrddim, RRDDIM_OPTION_HIDDEN))) {
             options |= RRDR_DIMENSION_HIDDEN;
-            options &= ~RRDR_DIMENSION_SELECTED;
+            options &= ~RRDR_DIMENSION_QUERIED;
         }
 
         if (qt->query.pattern) {
@@ -2512,13 +2512,13 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
              || (qtl->match_names && simple_pattern_matches(qt->query.pattern, string2str(rm->name)))
                     ) {
                 // it matches the pattern
-                options |= (RRDR_DIMENSION_SELECTED | RRDR_DIMENSION_NONZERO);
+                options |= (RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO);
                 options &= ~RRDR_DIMENSION_HIDDEN;
             }
             else {
                 // it does not match the pattern
                 options |= RRDR_DIMENSION_HIDDEN;
-                options &= ~RRDR_DIMENSION_SELECTED;
+                options &= ~RRDR_DIMENSION_QUERIED;
             }
         }
         else {
@@ -2526,10 +2526,10 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             // so this is a selected dimension
             // if it is not hidden
             if(!(options & RRDR_DIMENSION_HIDDEN))
-                options |= RRDR_DIMENSION_SELECTED;
+                options |= RRDR_DIMENSION_QUERIED;
         }
 
-        if((options & RRDR_DIMENSION_HIDDEN) && (options & RRDR_DIMENSION_SELECTED))
+        if((options & RRDR_DIMENSION_HIDDEN) && (options & RRDR_DIMENSION_QUERIED))
             options &= ~RRDR_DIMENSION_HIDDEN;
 
         if(!(options & RRDR_DIMENSION_HIDDEN) || (qt->request.options & RRDR_OPTION_PERCENTAGE)) {

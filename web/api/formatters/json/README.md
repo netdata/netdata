@@ -1,6 +1,10 @@
 <!--
 title: "JSON formatter"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/web/api/formatters/json/README.md
+sidebar_label: "JSON formatter"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/Web/Api/Formatters"
 -->
 
 # JSON formatter

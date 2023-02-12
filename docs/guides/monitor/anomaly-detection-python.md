@@ -1,11 +1,15 @@
 <!--
 title: "Detect anomalies in systems and applications"
+sidebar_label: "Detect anomalies in systems and applications"
 description: "Detect anomalies in any system, container, or application in your infrastructure with machine learning and the open-source Netdata Agent."
 image: /img/seo/guides/monitor/anomaly-detection.png
 author: "Joel Hans"
 author_title: "Editorial Director, Technical & Educational Resources"
 author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/anomaly-detection-python.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 # Detect anomalies in systems and applications

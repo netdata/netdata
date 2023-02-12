@@ -1743,6 +1743,7 @@ AC_CONFIG_FILES([
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
+    libnetdata/parser/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
     libnetdata/simple_pattern/Makefile
@@ -1791,7 +1792,6 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     claim/Makefile
     spawn/Makefile
-    parser/Makefile
 ])
 
 AC_OUTPUT

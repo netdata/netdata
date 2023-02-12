@@ -1,6 +1,10 @@
 <!--
 title: "Use dimension templates to create dynamic alarms"
+sidebar_label: "Use dimension templates to create dynamic alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/dimension-templates.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 # Use dimension templates to create dynamic alarms

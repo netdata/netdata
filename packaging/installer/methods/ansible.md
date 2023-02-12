@@ -1,8 +1,8 @@
 <!--
-title: Deploy Netdata with Ansible
+title: "Deploy Netdata with Ansible"
 description: "Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code."
 image: /img/seo/guides/deploy/ansible.png
-custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/deploy/ansible.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md
 sidebar_label: "Install Netdata with Ansible"
 learn_status: "Published"
 learn_topic_type: "Tasks"
@@ -36,7 +36,7 @@ Idempotency means you can run an Ansible playbook against your nodes any number 
 operate. When you deploy Netdata with Ansible, you're also deploying _monitoring as code_.
 
 In this guide, we'll walk through the process of using an [Ansible
-playbook](https://github.com/netdata/community/tree/main/netdata-agent-deployment/ansible-quickstart) to automatically
+playbook](https://github.com/netdata/community/tree/main/configuration-management/ansible-quickstart/) to automatically
 deploy the Netdata Agent to any number of distributed nodes, manage the configuration of each node, and connect them to
 your Netdata Cloud account. You'll go from some unmonitored nodes to a infrastructure monitoring solution in a matter of
 minutes.

@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "charts.d.plugin"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Developers/Collectors"
+learn_rel_path: "Developers/External plugins"
 -->
 
 # charts.d.plugin

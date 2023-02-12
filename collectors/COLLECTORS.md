@@ -2,10 +2,9 @@
 title: "Supported collectors list"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "Supported collectors list"
+sidebar_label: "Monitor"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "References/Collectors"
+learn_rel_path: "Integrations/Monitor"
 -->
 
 # Supported collectors list
@@ -24,7 +23,7 @@ cases, _Netdata always prioritizes the Go version_, and we highly recommend you 
 experience.
 
 If you want to use a Python version of a collector, you need to
-explicitly [disable the Go version](https://github.com/netdata/netdata/blob/masterhttps://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
+explicitly [disable the Go version](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
 and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
 accompanying configuration file.
 
@@ -193,7 +192,7 @@ configure any of these collectors according to your setup and infrastructure.
   operations, and more.
 - [kube-proxy](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubeproxy/README.md): Collect
   metrics, such as syncing proxy rules and REST client requests, from one or more instances of `kube-proxy`.
-- [Service discovery](https://github.com/netdata/agent-service-discovery/README.md): Find what services are running on a
+- [Service discovery](https://github.com/netdata/agent-service-discovery/blob/master/README.md): Find what services are running on a
   cluster's pods, converts that into configuration files, and exports them so they can be monitored by Netdata.
 
 ### Logs
@@ -222,11 +221,8 @@ configure any of these collectors according to your setup and infrastructure.
   usage, jobs rates, commands, and more.
 - [Pulsar](https://github.com/netdata/go.d.plugin/blob/master/modules/pulsar/README.md): Collect summary,
   namespaces, and topics performance statistics.
-- [RabbitMQ (Go)](https://github.com/netdata/go.d.plugin/blob/master/modules/rabbitmq/README.md): Collect message
+- [RabbitMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/rabbitmq/README.md): Collect message
   broker overview, system and per virtual host metrics.
-- [RabbitMQ (Python)](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/rabbitmq/README.md):
-  Collect message broker global and per virtual
-  host metrics.
 - [VerneMQ](https://github.com/netdata/go.d.plugin/blob/master/modules/vernemq/README.md): Monitor MQTT broker
   health and performance metrics. It collects all available info for both MQTTv3 and v5 communication
 
@@ -276,7 +272,7 @@ configure any of these collectors according to your setup and infrastructure.
   API.
 - [PowerDNS Authoritative Server](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md):
   Monitor one or more instances of the nameserver software to collect questions, events, and latency metrics.
-- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md_recursor):
+- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md#recursor):
   Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
 - [RetroShare](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/retroshare/README.md): Monitor
   application bandwidth, peers, and DHT

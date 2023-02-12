@@ -1,6 +1,10 @@
 <!--
 title: "Stop notifications for individual alarms"
+sidebar_label: "Stop notifications for individual alarms"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/stop-notifications-alarms.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Monitor"
 -->
 
 # Stop notifications for individual alarms
