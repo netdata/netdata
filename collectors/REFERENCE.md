@@ -21,12 +21,12 @@ or [write a custom collector in Go](https://github.com/netdata/go.d.plugin/blob/
 If we do support your collector but the charts described in the documentation don't appear on your dashboard, the reason will 
 be one of the following:
 
-  - The entire data collection plugin is disabled by default. Read how to [enable and disable plugins](#enable-and-disable-plugins)
+-   The entire data collection plugin is disabled by default. Read how to [enable and disable plugins](#enable-and-disable-plugins)
 
-  - The data collection plugin is enabled, but a specific data collection module is disabled. Read how to
+-   The data collection plugin is enabled, but a specific data collection module is disabled. Read how to
     [enable and disable a specific collection module](#enable-and-disable-a-specific-collection-module). 
 
-  - Autodetection failed. Read how to [configure](#configure-a-collector) and [troubleshoot](#troubleshoot-a-collector) a collector.
+-   Autodetection failed. Read how to [configure](#configure-a-collector) and [troubleshoot](#troubleshoot-a-collector) a collector.
 
 ## Enable and disable plugins
 
