@@ -529,7 +529,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #endif
 
     // reset our capabilities to default
-    s->capabilities = STREAM_OUR_CAPABILITIES;
+    s->capabilities = stream_our_capabilities();
 
 #ifdef  ENABLE_COMPRESSION
     // If we don't want compression, remove it from our capabilities

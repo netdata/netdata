@@ -13,6 +13,7 @@ int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
 
 int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+bool ieee754_doubles = false;
 
 struct netdata_static_thread *static_threads;
 
@@ -1808,6 +1809,8 @@ int main(int argc, char **argv) {
         // mallopt(M_MXFAST, 0);
 #endif
 #endif
+
+        ieee754_doubles = is_system_ieee754_double();
 
         // set libuv worker threads
         libuv_worker_threads = (int)get_netdata_cpus() * 2;

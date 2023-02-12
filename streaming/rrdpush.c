@@ -68,6 +68,23 @@ static void load_stream_conf() {
     freez(filename);
 }
 
+STREAM_CAPABILITIES stream_our_capabilities() {
+    return  STREAM_CAP_V1               |
+            STREAM_CAP_V2               |
+            STREAM_CAP_VN               |
+            STREAM_CAP_VCAPS            |
+            STREAM_CAP_HLABELS          |
+            STREAM_CAP_CLAIM            |
+            STREAM_CAP_CLABELS          |
+            STREAM_CAP_FUNCTIONS        |
+            STREAM_CAP_REPLICATION      |
+            STREAM_CAP_BINARY           |
+            STREAM_CAP_INTERPOLATED     |
+            STREAM_HAS_COMPRESSION      |
+            (ieee754_doubles ? STREAM_CAP_IEEE754 : 0) |
+            0;
+}
+
 bool rrdpush_receiver_needs_dbengine() {
     struct section *co;
 
@@ -418,8 +435,12 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
 
     if((NETDATA_DOUBLE)rd->last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
-    else
-        buffer_print_netdata_double(wb, n);
+    else {
+        if(rsb->ieee754)
+            buffer_print_netdata_double_hex(wb, n);
+        else
+            buffer_print_netdata_double(wb, n);
+    }
 
     buffer_fast_strcat(wb, " ", 1);
     buffer_print_sn_flags(wb, flags, true);
@@ -484,6 +505,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
     return (RRDSET_STREAM_BUFFER) {
+        .ieee754 = stream_has_capability(host->sender, STREAM_CAP_IEEE754),
         .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
         .rrdset_flags = rrdset_flags,
         .wb = sender_start(host->sender),
@@ -1148,6 +1170,7 @@ static void stream_capabilities_to_string(BUFFER *wb, STREAM_CAPABILITIES caps) 
     if(caps & STREAM_CAP_REPLICATION) buffer_strcat(wb, "REPLICATION ");
     if(caps & STREAM_CAP_BINARY) buffer_strcat(wb, "BINARY ");
     if(caps & STREAM_CAP_INTERPOLATED) buffer_strcat(wb, "INTERPOLATED ");
+    if(caps & STREAM_CAP_IEEE754) buffer_strcat(wb, "IEEE754 ");
 }
 
 void log_receiver_capabilities(struct receiver_state *rpt) {
@@ -1189,7 +1212,7 @@ STREAM_CAPABILITIES convert_stream_version_to_capabilities(int32_t version) {
     if(caps & STREAM_CAP_V2)
         caps &= ~(STREAM_CAP_V1);
 
-    return caps & STREAM_OUR_CAPABILITIES;
+    return caps & stream_our_capabilities();
 }
 
 int32_t stream_capabilities_to_vn(uint32_t caps) {

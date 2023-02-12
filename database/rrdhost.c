@@ -1071,7 +1071,7 @@ static void rrdhost_streaming_sender_structures_init(RRDHOST *host)
 
     host->sender->host = host;
     host->sender->buffer = cbuffer_new(CBUFFER_INITIAL_SIZE, 1024 * 1024, &netdata_buffers_statistics.cbuffers_streaming);
-    host->sender->capabilities = STREAM_OUR_CAPABILITIES;
+    host->sender->capabilities = stream_our_capabilities();
 
     host->sender->rrdpush_sender_pipe[PIPE_READ] = -1;
     host->sender->rrdpush_sender_pipe[PIPE_WRITE] = -1;

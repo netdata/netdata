@@ -424,6 +424,8 @@ int unit_test_storage() {
 }
 
 int unit_test_str2ld() {
+    is_system_ieee754_double();
+
     char *values[] = {
             "1.2345678",
             "-35.6",

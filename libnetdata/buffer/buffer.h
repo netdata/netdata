@@ -373,7 +373,7 @@ static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
 }
 
 static inline void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
-    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
+    buffer_need_bytes(wb, 2);
 
     if(value < 0) {
         buffer_fast_strcat(wb, "-", 1);
@@ -398,6 +398,21 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
     // terminate it
     buffer_need_bytes(wb, 1);
     wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
+    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
+
+    uint64_t *ptr = (uint64_t *)(&value);
+    buffer_fast_strcat(wb, "2x", 2);
+
+    char *s = &wb->buffer[wb->len];
+    char *d = print_uint64_hex_reversed(s, *ptr);
+    char_array_reverse(s, d - 1);
+    *d = '\0';
+    wb->len += d - s;
 
     buffer_overflow_check(wb);
 }

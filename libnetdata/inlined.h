@@ -135,116 +135,6 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 #endif
 }
 
-static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *digits) {
-    const char *s = src;
-    NETDATA_DOUBLE n = 0.0;
-
-    while(*s >= '0' && *s <= '9') {
-
-        // this works for both 32-bit and 64-bit systems
-        unsigned long ni = 0;
-        unsigned exponent = 0;
-        while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
-            ni = (ni * 10) + (*s++ - '0');
-            exponent++;
-        }
-
-        n = n * powndd(10.0, exponent) + (NETDATA_DOUBLE)ni;
-    }
-
-    *digits = (int)(s - src);
-    return n;
-}
-
-static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
-    const char *s = src;
-
-    NETDATA_DOUBLE sign = 1.0;
-    NETDATA_DOUBLE result = 0.0;
-    int integral_digits = 0;
-
-    NETDATA_DOUBLE fractional = 0.0;
-    int fractional_digits = 0;
-
-    NETDATA_DOUBLE exponent = 0.0;
-    int exponent_digits = 0;
-
-    switch(*s) {
-        case '-':
-            s++;
-            sign = -1.0;
-            break;
-
-        case '+':
-            s++;
-            break;
-
-        case 'n':
-            if(s[1] == 'a' && s[2] == 'n') {
-                if(endptr) *endptr = (char *)&s[3];
-                return NAN;
-            }
-            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
-                if(endptr) *endptr = (char *)&s[3];
-                return NAN;
-            }
-            break;
-
-        case 'i':
-            if(s[1] == 'n' && s[2] == 'f') {
-                if(endptr) *endptr = (char *)&s[3];
-                return INFINITY;
-            }
-            break;
-
-        default:
-            break;
-    }
-
-    result = _str2ndd_parse_double_digits(s, &integral_digits);
-    s += integral_digits;
-
-    if(unlikely(*s == '.')) {
-        s++;
-        fractional = _str2ndd_parse_double_digits(s, &fractional_digits);
-        s += fractional_digits;
-    }
-
-    if (unlikely(*s == 'e' || *s == 'E')) {
-        const char *e_ptr = s;
-        s++;
-
-        int exponent_sign = 1;
-        if (*s == '-') {
-            exponent_sign = -1;
-            s++;
-        }
-        else if(*s == '+')
-            s++;
-
-        exponent = _str2ndd_parse_double_digits(s, &exponent_digits);
-        if(unlikely(!exponent_digits)) {
-            exponent = 0;
-            s = e_ptr;
-        }
-        else {
-            s += exponent_digits;
-            exponent *= exponent_sign;
-        }
-    }
-
-    if(unlikely(endptr))
-        *endptr = (char *)s;
-
-    if (unlikely(exponent_digits))
-        result *= powndd(10.0, exponent);
-
-    if (unlikely(fractional_digits))
-        result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
-
-    return sign * result;
-}
-
 static inline unsigned int str2u(const char *s) {
     unsigned int n = 0;
 
@@ -332,22 +222,27 @@ static inline long long str2ll(const char *s, char **endptr) {
     }
 }
 
-static inline unsigned long long str2ull_hex_or_dec(const char *s) {
-    unsigned long long n = 0;
+static inline uint64_t str2uint64_hex(const char *s, char **endptr) {
+    uint64_t n = 0;
 
-    if(likely(s[0] == '0' && s[1] == 'x')) {
-        s += 2; // skip 0x
+    while((*s >= '0' && *s <= '9') || (*s >= 'A' && *s <= 'F')) {
+        n = n << 4;
 
-        while((*s >= '0' && *s <= '9') || (*s >= 'A' && *s <= 'F')) {
-            n = n << 4;
-
-            if (*s <= '9')
-                n += *s++ - '0';
-            else
-                n += *s++ - 'A' + 10;
-        }
-        return n;
+        if (*s <= '9')
+            n += *s++ - '0';
+        else
+            n += *s++ - 'A' + 10;
     }
+
+    if(endptr)
+        *endptr = (char *)s;
+
+    return n;
+}
+
+static inline unsigned long long str2ull_hex_or_dec(const char *s) {
+    if(likely(s[0] == '0' && s[1] == 'x'))
+        return str2uint64_hex(s + 2, NULL);
     else
         return str2uint64_t(s, NULL);
 }
@@ -357,6 +252,123 @@ static inline long long str2ll_hex_or_dec(const char *s) {
         return -(long long)str2ull_hex_or_dec(&s[1]);
     else
         return (long long)str2ull_hex_or_dec(s);
+}
+
+static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *digits) {
+    const char *s = src;
+    NETDATA_DOUBLE n = 0.0;
+
+    while(*s >= '0' && *s <= '9') {
+
+        // this works for both 32-bit and 64-bit systems
+        unsigned long ni = 0;
+        unsigned exponent = 0;
+        while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
+            ni = (ni * 10) + (*s++ - '0');
+            exponent++;
+        }
+
+        n = n * powndd(10.0, exponent) + (NETDATA_DOUBLE)ni;
+    }
+
+    *digits = (int)(s - src);
+    return n;
+}
+
+static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
+    const char *s = src;
+
+    if(s[0] == '2' && s[1] == 'x') {
+        // double parsing from hex
+        uint64_t n = str2uint64_hex(s + 2, endptr);
+        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *)(&n);
+        return *ptr;
+    }
+
+    NETDATA_DOUBLE sign = 1.0;
+    NETDATA_DOUBLE result;
+    int integral_digits = 0;
+
+    NETDATA_DOUBLE fractional = 0.0;
+    int fractional_digits = 0;
+
+    NETDATA_DOUBLE exponent = 0.0;
+    int exponent_digits = 0;
+
+    switch(*s) {
+        case '-':
+            s++;
+            sign = -1.0;
+            break;
+
+        case '+':
+            s++;
+            break;
+
+        case 'n':
+            if(s[1] == 'a' && s[2] == 'n') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            break;
+
+        case 'i':
+            if(s[1] == 'n' && s[2] == 'f') {
+                if(endptr) *endptr = (char *)&s[3];
+                return INFINITY;
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    result = _str2ndd_parse_double_digits(s, &integral_digits);
+    s += integral_digits;
+
+    if(unlikely(*s == '.')) {
+        s++;
+        fractional = _str2ndd_parse_double_digits(s, &fractional_digits);
+        s += fractional_digits;
+    }
+
+    if (unlikely(*s == 'e' || *s == 'E')) {
+        const char *e_ptr = s;
+        s++;
+
+        int exponent_sign = 1;
+        if (*s == '-') {
+            exponent_sign = -1;
+            s++;
+        }
+        else if(*s == '+')
+            s++;
+
+        exponent = _str2ndd_parse_double_digits(s, &exponent_digits);
+        if(unlikely(!exponent_digits)) {
+            exponent = 0;
+            s = e_ptr;
+        }
+        else {
+            s += exponent_digits;
+            exponent *= exponent_sign;
+        }
+    }
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
+    if (unlikely(exponent_digits))
+        result *= powndd(10.0, exponent);
+
+    if (unlikely(fractional_digits))
+        result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
+
+    return sign * result;
 }
 
 static inline char *strncpyz(char *dst, const char *src, size_t n) {

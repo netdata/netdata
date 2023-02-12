@@ -170,6 +170,7 @@ extern time_t rrdset_free_obsolete_time_s;
 #endif
 
 extern int libuv_worker_threads;
+extern bool ieee754_doubles;
 
 #define RRD_ID_LENGTH_MAX 200
 
