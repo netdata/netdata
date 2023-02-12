@@ -9,7 +9,7 @@ learn_rel_path: "Concepts"
 learn_docs_purpose: "Explanation of Netdata roles and permissions linked to them"
 -->
 
-Netdata Cloud already provides a role-based-access mechanism, that allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
+Netdata Cloud's role-based-access mechanism allows you to control what functionalities in the app users can access. Each user can be assigned only one role, which fully specifies all the capabilities they are afforded.
 
 #### What roles are available?
 
