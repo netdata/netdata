@@ -5,8 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_url: "Anomalies"
 sidebar_label: "anomalies"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Misc"
+learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
 # Anomaly detection with Netdata

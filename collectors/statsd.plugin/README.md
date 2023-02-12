@@ -1,29 +1,38 @@
 <!--
-title: "statsd.plugin"
+title: "StatsD"
 description: "The Netdata Agent is a fully-featured StatsD server that collects metrics from any custom application and visualizes them in real-time."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md"
-sidebar_label: "statsd.plugin"
+sidebar_label: "StatsD"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "Integrations/Monitor/Apm"
+learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
-StatsD is a system to collect data from any application. Applications send metrics to it, usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
+[StatsD](https://github.com/statsd/statsd) is a system to collect data from any application. Applications send metrics to it, 
+usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on 
+them and push them to backend time-series databases.
 
-If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
+If you want to learn more about the StatsD protocol, we have written a 
+[blog post](https://blog.netdata.cloud/introduction-to-statsd/) about it!
 
 
-Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
+Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize 
+them on its dashboards and store them in it's database for long-term retention.
 
-Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both TCP and UDP packets at the same time. 
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is 
+configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports 
+both TCP and UDP packets at the same time. 
 
 Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. 
 
-Netdata statsd is fast. It can collect several millions of metrics per second on modern hardware, using just 1 CPU core. The implementation uses two threads: one thread collects metrics, another thread updates the charts from the collected data.
+Netdata statsd is fast. It can collect several millions of metrics per second on modern hardware, using 
+just 1 CPU core. The implementation uses two threads: one thread collects metrics, another thread updates 
+the charts from the collected data.
 
 ## Available StatsD synthetic application charts
 
-Netdata ships with a few synthetic chart definitions to automatically present application metrics into a more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange statsd metrics into a more meaningful way.
+Netdata ships with a few synthetic chart definitions to automatically present application metrics into a 
+more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange 
+statsd metrics into a more meaningful way.
 
 On synthetic charts, we can have alarms as with any metric and chart.
 
@@ -38,13 +47,16 @@ On synthetic charts, we can have alarms as with any metric and chart.
 
 ## Metrics supported by Netdata
 
-Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. All StatsD client libraries can be used with Netdata too.
+Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. 
+All StatsD client libraries can be used with Netdata too.
 
 - **Gauges**
 
-     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the latest value collected and the number of times it was updated (events).
+     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the 
+     latest value collected and the number of times it was updated (events).
 
-     The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
+     The application may increment or decrement a previous value, by setting the first character of the value to 
+     `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
      [Sampling rate](#sampling-rates) is supported.
      [Tags](#tags) are supported for changing chart units, family and dimension name.
