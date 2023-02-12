@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Varnish Cache"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Webapps"
+learn_rel_path: "Integrations/Monitor/Webapps"
 -->
 
 # Varnish Cache monitoring with Netdata

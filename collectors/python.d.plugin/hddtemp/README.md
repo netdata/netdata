@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Hard drive temperature"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Hardware"
+learn_rel_path: "Integrations/Monitor/Hardware"
 -->
 
 # Hard drive temperature monitoring with Netdata

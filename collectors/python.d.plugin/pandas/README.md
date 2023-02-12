@@ -4,7 +4,7 @@ title: "Pandas Netdata Collector"
 sidebar_label: "Pandas Netdata Collector"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references"
+learn_rel_path: "Integrations/Monitoring"
 -->
 
 # Pandas Netdata Collector

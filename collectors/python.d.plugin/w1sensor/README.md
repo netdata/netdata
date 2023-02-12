@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "1-Wire sensors"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Remotes/Devices"
+learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
 # 1-Wire Sensors monitoring with Netdata

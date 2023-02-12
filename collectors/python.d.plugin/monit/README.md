@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/pyth
 sidebar_label: "Monit"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Storage"
+learn_rel_path: "Integrations/Monitor/Storage"
 -->
 
 # Monit monitoring with Netdata

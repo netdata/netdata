@@ -1,11 +1,10 @@
 <!--
-title: "Collecting metrics"
+title: "Collectors"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/README.md"
 id: "collectors-ref"
-sidebar_label: "Plugins Reference"
+sidebar_label: "Collectors"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "References/Collectors"
+learn_rel_path: "Concepts"
 -->
 
 # Collecting metrics
