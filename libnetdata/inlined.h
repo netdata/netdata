@@ -278,7 +278,7 @@ static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *
 static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     const char *s = src;
 
-    if(s[0] == '2' && s[1] == 'x') {
+    if(s[0] == IEEE754_DOUBLE_PREFIX[0] && s[1] == IEEE754_DOUBLE_PREFIX[1]) {
         // double parsing from hex
         uint64_t n = str2uint64_hex(s + 2, endptr);
         NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *)(&n);

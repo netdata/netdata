@@ -14,15 +14,13 @@ bool is_system_ieee754_double(void) {
         };
     } tests[] = {
             { /* reserved for subnormal */      .i = 0x0000000000000001 },
-            { /* reserved for min value */      .i = 0x000FFFFF80000000 },
-            { /* reserved for max value */      .i = 0x3FFFFFFF00000000 },
             { .original = 1.25,                 .i = 0x3FF4000000000000 },
             { .original = 1.0,                  .i = 0x3FF0000000000000 },
             { .original = 2.0,                  .i = 0x4000000000000000 },
             { .original = 4.0,                  .i = 0x4010000000000000 },
             { .original = 8.8,                  .i = 0x402199999999999A },
-            { .original = 16.16,                 .i = 0x403028F5C28F5C29 },
-            { .original = 32.32,                 .i = 0x404028F5C28F5C29 },
+            { .original = 16.16,                .i = 0x403028F5C28F5C29 },
+            { .original = 32.32,                .i = 0x404028F5C28F5C29 },
             { .original = 64.64,                .i = 0x405028F5C28F5C29 },
             { .original = 128.128,              .i = 0x406004189374BC6A },
             { .original = 32768.32768,          .i = 0x40E0000A7C5AC472 },
@@ -50,17 +48,6 @@ bool is_system_ieee754_double(void) {
 
     // subnormal value
     tests[0].original = pow(2, -1074);
-
-    // Check the precision and exponent range
-    int significand_bits = 52;
-    int exponent_bits = 11;
-    int exponent_bias = 1023;
-    //int sign_bit = 63;
-    int exponent_min = 1 - exponent_bias;
-    int exponent_max = (1 << (exponent_bits - 1)) - 1 - exponent_bias;
-    int significand_mask = (1 << significand_bits) - 1;
-    tests[2].original = pow(2, exponent_max) * (1 + (double)significand_mask / (1 << significand_bits));
-    tests[1].original = pow(2, exponent_min - 1) * (1 + (double)significand_mask / (1 << significand_bits));
 
     size_t errors = 0;
     size_t elements = sizeof(tests) / sizeof(tests[0]);

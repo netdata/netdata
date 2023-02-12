@@ -164,6 +164,7 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     return sign * unpack_storage_number_lut10x[(factor * 16) + (exp * 8) + mul] * n;
 }
 
+#define IEEE754_DOUBLE_PREFIX "0d"
 bool is_system_ieee754_double(void);
 
 #endif /* NETDATA_STORAGE_NUMBER_H */

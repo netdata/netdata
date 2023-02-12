@@ -1162,13 +1162,13 @@ PARSER_RC pluginsd_replay_begin(char **words, size_t num_words, void *user) {
     pluginsd_set_chart_from_parent(user, st, PLUGINSD_KEYWORD_REPLAY_BEGIN);
 
     if(start_time_str && end_time_str) {
-        time_t start_time = (time_t)str2ul(start_time_str);
-        time_t end_time = (time_t)str2ul(end_time_str);
+        time_t start_time = (time_t)str2ull_hex_or_dec(start_time_str);
+        time_t end_time = (time_t)str2ull_hex_or_dec(end_time_str);
 
         time_t wall_clock_time = 0, tolerance;
         bool wall_clock_comes_from_child; (void)wall_clock_comes_from_child;
         if(child_now_str) {
-            wall_clock_time = (time_t)str2ul(child_now_str);
+            wall_clock_time = (time_t)str2ull_hex_or_dec(child_now_str);
             tolerance = st->update_every + 1;
             wall_clock_comes_from_child = true;
         }
@@ -1314,7 +1314,7 @@ PARSER_RC pluginsd_replay_set(char **words, size_t num_words, void *user)
         RRDDIM_FLAGS rd_flags = rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE | RRDDIM_FLAG_ARCHIVED);
 
         if(!(rd_flags & RRDDIM_FLAG_ARCHIVED)) {
-            NETDATA_DOUBLE value = strtondd(value_str, NULL);
+            NETDATA_DOUBLE value = str2ndd(value_str, NULL);
             SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
 
             if (!netdata_double_isnumber(value) || (flags == SN_EMPTY_SLOT)) {
@@ -1358,13 +1358,13 @@ PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, size_t num_words
     if(!rd) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     usec_t dim_last_collected_ut = (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec;
-    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str, NULL) : 0;
+    usec_t last_collected_ut = last_collected_ut_str ? str2ull_hex_or_dec(last_collected_ut_str) : 0;
     if(last_collected_ut > dim_last_collected_ut) {
         rd->last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
         rd->last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
     }
 
-    rd->last_collected_value = last_collected_value_str ? str2ll(last_collected_value_str, NULL) : 0;
+    rd->last_collected_value = last_collected_value_str ? str2ll_hex_or_dec(last_collected_value_str) : 0;
     rd->last_calculated_value = last_calculated_value_str ? str2ndd(last_calculated_value_str, NULL) : 0;
     rd->last_stored_value = last_stored_value_str ? str2ndd(last_stored_value_str, NULL) : 0.0;
 
@@ -1386,14 +1386,14 @@ PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, size_t num_words
     if(!st) return PLUGINSD_DISABLE_PLUGIN(user, NULL, NULL);
 
     usec_t chart_last_collected_ut = (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec;
-    usec_t last_collected_ut = last_collected_ut_str ? str2ull(last_collected_ut_str, NULL) : 0;
+    usec_t last_collected_ut = last_collected_ut_str ? str2ull_hex_or_dec(last_collected_ut_str) : 0;
     if(last_collected_ut > chart_last_collected_ut) {
         st->last_collected_time.tv_sec = (time_t)(last_collected_ut / USEC_PER_SEC);
         st->last_collected_time.tv_usec = (last_collected_ut % USEC_PER_SEC);
     }
 
     usec_t chart_last_updated_ut = (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec;
-    usec_t last_updated_ut = last_updated_ut_str ? str2ull(last_updated_ut_str, NULL) : 0;
+    usec_t last_updated_ut = last_updated_ut_str ? str2ull_hex_or_dec(last_updated_ut_str) : 0;
     if(last_updated_ut > chart_last_updated_ut) {
         st->last_updated.tv_sec = (time_t)(last_updated_ut / USEC_PER_SEC);
         st->last_updated.tv_usec = (last_updated_ut % USEC_PER_SEC);
@@ -1420,16 +1420,16 @@ PARSER_RC pluginsd_replay_end(char **words, size_t num_words, void *user)
     const char *last_entry_requested_txt = get_word(words, num_words, 6);
     const char *child_world_time_txt = get_word(words, num_words, 7); // optional
 
-    time_t update_every_child = (time_t)str2ul(update_every_child_txt);
-    time_t first_entry_child = (time_t)str2ul(first_entry_child_txt);
-    time_t last_entry_child = (time_t)str2ul(last_entry_child_txt);
+    time_t update_every_child = (time_t)str2ull_hex_or_dec(update_every_child_txt);
+    time_t first_entry_child = (time_t)str2ull_hex_or_dec(first_entry_child_txt);
+    time_t last_entry_child = (time_t)str2ull_hex_or_dec(last_entry_child_txt);
 
     bool start_streaming = (strcmp(start_streaming_txt, "true") == 0);
-    time_t first_entry_requested = (time_t)str2ul(first_entry_requested_txt);
-    time_t last_entry_requested = (time_t)str2ul(last_entry_requested_txt);
+    time_t first_entry_requested = (time_t)str2ull_hex_or_dec(first_entry_requested_txt);
+    time_t last_entry_requested = (time_t)str2ull_hex_or_dec(last_entry_requested_txt);
 
     // the optional child world time
-    time_t child_world_time = (child_world_time_txt && *child_world_time_txt) ? (time_t)str2ul(child_world_time_txt) : now_realtime_sec();
+    time_t child_world_time = (child_world_time_txt && *child_world_time_txt) ? (time_t)str2ull_hex_or_dec(child_world_time_txt) : now_realtime_sec();
 
     PARSER_USER_OBJECT *user_object = user;
 

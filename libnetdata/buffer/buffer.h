@@ -389,7 +389,7 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
     buffer_need_bytes(wb, 512 + 2);
 
     if(isnan(value) || isinf(value)) {
-        buffer_strcat(wb, "null");
+        buffer_fast_strcat(wb, "null", 4);
         return;
     }
     else
@@ -405,8 +405,8 @@ static inline void buffer_print_netdata_double(BUFFER *wb, NETDATA_DOUBLE value)
 static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE value) {
     buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
 
-    uint64_t *ptr = (uint64_t *)(&value);
-    buffer_fast_strcat(wb, "2x", 2);
+    uint64_t *ptr = (uint64_t *) (&value);
+    buffer_fast_strcat(wb, IEEE754_DOUBLE_PREFIX, sizeof(IEEE754_DOUBLE_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
     char *d = print_uint64_hex_reversed(s, *ptr);

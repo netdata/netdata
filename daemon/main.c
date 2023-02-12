@@ -1810,8 +1810,6 @@ int main(int argc, char **argv) {
 #endif
 #endif
 
-        ieee754_doubles = is_system_ieee754_double();
-
         // set libuv worker threads
         libuv_worker_threads = (int)get_netdata_cpus() * 2;
 
@@ -1877,6 +1875,8 @@ int main(int argc, char **argv) {
 
         // initialize the log files
         open_all_log_files();
+
+        ieee754_doubles = is_system_ieee754_double();
 
         aral_judy_init();
 
