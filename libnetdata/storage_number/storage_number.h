@@ -159,16 +159,18 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
 }
 
 static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
-    int negative = 0;
-    const char *start = s;
-    unsigned long long integer_part = 0;
-    unsigned long decimal_part = 0;
-    size_t decimal_digits = 0;
+    NETDATA_DOUBLE sign = 1.0;
+    NETDATA_DOUBLE result = 0.0;
+    NETDATA_DOUBLE fractional = 0.0;
+    int fractional_digits = 0;
+
+    NETDATA_DOUBLE exponent = 0.0;
+    int exponent_digits = 0;
 
     switch(*s) {
         case '-':
             s++;
-            negative = 1;
+            sign = -1.0;
             break;
 
         case '+':
@@ -197,40 +199,50 @@ static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
             break;
     }
 
-    while (*s >= '0' && *s <= '9') {
-        integer_part = (integer_part * 10) + (*s - '0');
-        s++;
-    }
+    while (*s >= '0' && *s <= '9')
+        result = (result * 10.0) + (*s++ - '0');
 
     if(unlikely(*s == '.')) {
-        decimal_part = 0;
         s++;
 
         while (*s >= '0' && *s <= '9') {
-            decimal_part = (decimal_part * 10) + (*s - '0');
-            s++;
-            decimal_digits++;
+            fractional = (fractional * 10.0) + (*s++ - '0');
+            fractional_digits++;
         }
     }
 
-    if(unlikely(*s == 'e' || *s == 'E'))
-        return strtondd(start, endptr);
+    if (unlikely(*s == 'e' || *s == 'E')) {
+        s++;
+        int exponent_sign = 1;
+        if (*s == '-') {
+            exponent_sign = -1;
+            s++;
+        }
+        else if(*s == '+')
+            s++;
+
+        while (*s >= '0' && *s <= '9') {
+            exponent = exponent * 10.0 + (*s++ - '0');
+            exponent_digits++;
+        }
+
+        if (exponent_digits == 0) {
+            // string has 'e' or 'E' but no exponent digits
+            return 0.0;
+        }
+        exponent *= exponent_sign;
+    }
 
     if(unlikely(endptr))
         *endptr = (char *)s;
 
-    if(unlikely(negative)) {
-        if(unlikely(decimal_digits))
-            return -((NETDATA_DOUBLE)integer_part + (NETDATA_DOUBLE)decimal_part / powndd(10.0, decimal_digits));
-        else
-            return -((NETDATA_DOUBLE)integer_part);
-    }
-    else {
-        if(unlikely(decimal_digits))
-            return (NETDATA_DOUBLE)integer_part + (NETDATA_DOUBLE)decimal_part / powndd(10.0, decimal_digits);
-        else
-            return (NETDATA_DOUBLE)integer_part;
-    }
+    if (fractional_digits)
+        result += fractional / powndd(10.0, fractional_digits);
+
+    if (exponent_digits)
+        result *= powndd(10.0, exponent);
+
+    return sign * result;
 }
 
 #endif /* NETDATA_STORAGE_NUMBER_H */
