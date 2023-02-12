@@ -7,15 +7,15 @@
 
 #ifdef KERNEL_32BIT
 typedef uint32_t kernel_uint_t;
-#define str2kernel_uint_t(string) str2uint32_t(string)
+#define str2kernel_uint_t(string) str2uint32_t(string, NULL)
 #define KERNEL_UINT_FORMAT "%u"
 #else
 typedef uint64_t kernel_uint_t;
-#define str2kernel_uint_t(string) str2uint64_t(string)
+#define str2kernel_uint_t(string) str2uint64_t(string, NULL)
 #define KERNEL_UINT_FORMAT "%" PRIu64
 #endif
 
-#define str2pid_t(string) str2uint32_t(string)
+#define str2pid_t(string) str2uint32_t(string, NULL)
 
 
 // for faster execution, allow the compiler to inline
@@ -138,19 +138,12 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 static inline NETDATA_DOUBLE parse_double_digits(const char *s, int *digits) {
     int d = 0;
 
-#ifdef ENV32BIT
-    uint32_t ni = 0;
-    while (*s >= '0' && *s <= '9' && d < 9) {
+    // this works for both 32-bit and 64-bit systems
+    unsigned long ni = 0;
+    while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
         ni = (ni * 10) + (*s++ - '0');
         d++;
     }
-#else
-    uint64_t ni = 0;
-    while (*s >= '0' && *s <= '9' && d < 19) {
-        ni = (ni * 10) + (*s++ - '0');
-        d++;
-    }
-#endif
 
     NETDATA_DOUBLE n = (NETDATA_DOUBLE)ni;
     while (*s >= '0' && *s <= '9') {
@@ -246,84 +239,91 @@ static inline NETDATA_DOUBLE str2ndd(const char *s, char **endptr) {
     return sign * result;
 }
 
+static inline unsigned int str2u(const char *s) {
+    unsigned int n = 0;
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    return n;
+}
+
 static inline int str2i(const char *s) {
-    int n = 0;
-    char c, negative = (char)(*s == '-');
-    const char *e = s + 30; // max number of character to iterate
-
-    for(c = (char)((negative)?*(++s):*s); c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+    if(unlikely(*s == '-')) {
+        s++;
+        return -(int) str2u(s);
     }
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (int) str2u(s);
+    }
+}
 
-    if(unlikely(negative))
-        return -n;
+static inline unsigned long str2ul(const char *s) {
+    unsigned long n = 0;
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
 
     return n;
 }
 
 static inline long str2l(const char *s) {
-    long n = 0;
-    char c, negative = (*s == '-');
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+    if(unlikely(*s == '-')) {
+        s++;
+        return -(long) str2ul(s);
     }
-
-    if(unlikely(negative))
-        return -n;
-
-    return n;
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (long) str2ul(s);
+    }
 }
 
-static inline uint32_t str2uint32_t(const char *s) {
+static inline uint32_t str2uint32_t(const char *s, char **endptr) {
     uint32_t n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
     return n;
 }
 
-static inline uint64_t str2uint64_t(const char *s) {
+static inline uint64_t str2uint64_t(const char *s, char **endptr) {
     uint64_t n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
+#ifdef ENV32BIT
+    unsigned long n32 = 0;
+    while (*s >= '0' && *s <= '9' && n32 < (ULONG_MAX / 10))
+        n32 = n32 * 10 + (*s++ - '0');
+
+    n = n32;
+#endif
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
     return n;
 }
 
-static inline unsigned long str2ul(const char *s) {
-    unsigned long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
-    return n;
+static inline unsigned long long int str2ull(const char *s, char **endptr) {
+    return str2uint64_t(s, endptr);
 }
 
-static inline unsigned long long str2ull(const char *s) {
-    unsigned long long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+static inline long long str2ll(const char *s, char **endptr) {
+    if(unlikely(*s == '-')) {
+        s++;
+        return -(long long) str2uint64_t(s, endptr);
     }
-    return n;
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (long long) str2uint64_t(s, endptr);
+    }
 }
 
 static inline unsigned long long str2ull_hex_or_dec(const char *s) {
@@ -347,7 +347,7 @@ static inline unsigned long long str2ull_hex_or_dec(const char *s) {
         return n;
     }
     else
-        return str2ull(s);
+        return str2ull(s, NULL);
 }
 
 static inline long long str2ll_hex_or_dec(const char *s) {
@@ -355,34 +355,6 @@ static inline long long str2ll_hex_or_dec(const char *s) {
         return -(long long)str2ull_hex_or_dec(&s[1]);
     else
         return (long long)str2ull_hex_or_dec(s);
-}
-
-static inline long long str2ll(const char *s, char **endptr) {
-    int negative = 0;
-
-    if(unlikely(*s == '-')) {
-        s++;
-        negative = 1;
-    }
-    else if(unlikely(*s == '+'))
-        s++;
-
-    long long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
-
-    if(unlikely(endptr))
-        *endptr = (char *)s;
-
-    if(unlikely(negative))
-        return -n;
-    else
-        return n;
 }
 
 static inline char *strncpyz(char *dst, const char *src, size_t n) {
@@ -483,7 +455,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     }
 
     buffer[30] = '\0';
-    *result = str2ull(buffer);
+    *result = str2ull(buffer, NULL);
     return 0;
 }
 

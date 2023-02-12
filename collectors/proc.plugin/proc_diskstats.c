@@ -993,35 +993,35 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // # of reads completed # of writes completed
         // This is the total number of reads or writes completed successfully.
-        reads           = str2ull(procfile_lineword(ff, l, 3));  // rd_ios
-        writes          = str2ull(procfile_lineword(ff, l, 7));  // wr_ios
+        reads           = str2ull(procfile_lineword(ff, l, 3), NULL);  // rd_ios
+        writes          = str2ull(procfile_lineword(ff, l, 7), NULL);  // wr_ios
 
         // # of reads merged # of writes merged
         // Reads and writes which are adjacent to each other may be merged for
         // efficiency.  Thus two 4K reads may become one 8K read before it is
         // ultimately handed to the disk, and so it will be counted (and queued)
-        mreads          = str2ull(procfile_lineword(ff, l, 4));  // rd_merges_or_rd_sec
-        mwrites         = str2ull(procfile_lineword(ff, l, 8));  // wr_merges
+        mreads          = str2ull(procfile_lineword(ff, l, 4), NULL);  // rd_merges_or_rd_sec
+        mwrites         = str2ull(procfile_lineword(ff, l, 8), NULL);  // wr_merges
 
         // # of sectors read # of sectors written
         // This is the total number of sectors read or written successfully.
-        readsectors     = str2ull(procfile_lineword(ff, l, 5));  // rd_sec_or_wr_ios
-        writesectors    = str2ull(procfile_lineword(ff, l, 9));  // wr_sec
+        readsectors     = str2ull(procfile_lineword(ff, l, 5), NULL);  // rd_sec_or_wr_ios
+        writesectors    = str2ull(procfile_lineword(ff, l, 9), NULL);  // wr_sec
 
         // # of milliseconds spent reading # of milliseconds spent writing
         // This is the total number of milliseconds spent by all reads or writes (as
         // measured from __make_request() to end_that_request_last()).
-        readms          = str2ull(procfile_lineword(ff, l, 6));  // rd_ticks_or_wr_sec
-        writems         = str2ull(procfile_lineword(ff, l, 10)); // wr_ticks
+        readms          = str2ull(procfile_lineword(ff, l, 6), NULL);  // rd_ticks_or_wr_sec
+        writems         = str2ull(procfile_lineword(ff, l, 10), NULL); // wr_ticks
 
         // # of I/Os currently in progress
         // The only field that should go to zero. Incremented as requests are
         // given to appropriate struct request_queue and decremented as they finish.
-        queued_ios      = str2ull(procfile_lineword(ff, l, 11)); // ios_pgr
+        queued_ios      = str2ull(procfile_lineword(ff, l, 11), NULL); // ios_pgr
 
         // # of milliseconds spent doing I/Os
         // This field increases so long as field queued_ios is nonzero.
-        busy_ms         = str2ull(procfile_lineword(ff, l, 12)); // tot_ticks
+        busy_ms         = str2ull(procfile_lineword(ff, l, 12), NULL); // tot_ticks
 
         // weighted # of milliseconds spent doing I/Os
         // This field is incremented at each I/O start, I/O completion, I/O
@@ -1029,27 +1029,27 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // (field queued_ios) times the number of milliseconds spent doing I/O since the
         // last update of this field.  This can provide an easy measure of both
         // I/O completion time and the backlog that may be accumulating.
-        backlog_ms      = str2ull(procfile_lineword(ff, l, 13)); // rq_ticks
+        backlog_ms      = str2ull(procfile_lineword(ff, l, 13), NULL); // rq_ticks
 
         if (unlikely(words > 13)) {
             do_dc_stats = 1;
 
             // # of discards completed
             // This is the total number of discards completed successfully.
-            discards       = str2ull(procfile_lineword(ff, l, 14)); // dc_ios
+            discards       = str2ull(procfile_lineword(ff, l, 14), NULL); // dc_ios
 
             // # of discards merged
             // See the description of mreads/mwrites
-            mdiscards      = str2ull(procfile_lineword(ff, l, 15)); // dc_merges
+            mdiscards      = str2ull(procfile_lineword(ff, l, 15), NULL); // dc_merges
 
             // # of sectors discarded
             // This is the total number of sectors discarded successfully.
-            discardsectors = str2ull(procfile_lineword(ff, l, 16)); // dc_sec
+            discardsectors = str2ull(procfile_lineword(ff, l, 16), NULL); // dc_sec
 
             // # of milliseconds spent discarding
             // This is the total number of milliseconds spent by all discards (as
             // measured from __make_request() to end_that_request_last()).
-            discardms      = str2ull(procfile_lineword(ff, l, 17)); // dc_ticks
+            discardms      = str2ull(procfile_lineword(ff, l, 17), NULL); // dc_ticks
         }
 
         if (unlikely(words > 17)) {
@@ -1059,10 +1059,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             // These values increment when an flush I/O request completes.
             // Block layer combines flush requests and executes at most one at a time.
             // This counts flush requests executed by disk. Not tracked for partitions.
-            flushes        = str2ull(procfile_lineword(ff, l, 18)); // fl_ios
+            flushes        = str2ull(procfile_lineword(ff, l, 18), NULL); // fl_ios
 
             // total wait time for flush requests
-            flushms        = str2ull(procfile_lineword(ff, l, 19)); // fl_ticks
+            flushms        = str2ull(procfile_lineword(ff, l, 19), NULL); // fl_ticks
         }
 
         // --------------------------------------------------------------------------

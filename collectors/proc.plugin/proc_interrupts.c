@@ -120,7 +120,7 @@ int do_proc_interrupts(int update_every, usec_t dt) {
         int c;
         for(c = 0; c < cpus ;c++) {
             if(likely((c + 1) < (int)words))
-                irr->cpu[c].value = str2ull(procfile_lineword(ff, l, (uint32_t)(c + 1)));
+                irr->cpu[c].value = str2ull(procfile_lineword(ff, l, (uint32_t) (c + 1)), NULL);
             else
                 irr->cpu[c].value = 0;
 

@@ -638,9 +638,9 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         struct user_or_group_id *user_or_group_id = callocz(1, sizeof(struct user_or_group_id));
 
         if(ids->type == USER_ID)
-            user_or_group_id->id.uid = (uid_t)str2ull(id_string);
+            user_or_group_id->id.uid = (uid_t) str2ull(id_string, NULL);
         else
-            user_or_group_id->id.gid = (uid_t)str2ull(id_string);
+            user_or_group_id->id.gid = (uid_t) str2ull(id_string, NULL);
 
         user_or_group_id->name = strdupz(name);
         user_or_group_id->updated = 1;
@@ -1452,7 +1452,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(stat, p->cstime,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
-    p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
+    p->num_threads      = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
     p->collected_starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
     p->uptime           = (global_uptime > p->collected_starttime)?(global_uptime - p->collected_starttime):0;
@@ -4234,7 +4234,7 @@ static void get_MemTotal(void) {
     for(line = 0; line < lines ;line++) {
         size_t words = procfile_linewords(ff, line);
         if(words == 3 && strcmp(procfile_lineword(ff, line, 0), "MemTotal") == 0 && strcmp(procfile_lineword(ff, line, 2), "kB") == 0) {
-            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1));
+            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1), NULL);
             if(n) MemTotal = n;
             break;
         }

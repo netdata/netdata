@@ -68,19 +68,19 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
 
     ff_pages_shared = procfile_readall(ff_pages_shared);
     if(unlikely(!ff_pages_shared)) return 0; // we return 0, so that we will retry to open it next time
-    pages_shared = str2ull(procfile_lineword(ff_pages_shared, 0, 0));
+    pages_shared = str2ull(procfile_lineword(ff_pages_shared, 0, 0), NULL);
 
     ff_pages_sharing = procfile_readall(ff_pages_sharing);
     if(unlikely(!ff_pages_sharing)) return 0; // we return 0, so that we will retry to open it next time
-    pages_sharing = str2ull(procfile_lineword(ff_pages_sharing, 0, 0));
+    pages_sharing = str2ull(procfile_lineword(ff_pages_sharing, 0, 0), NULL);
 
     ff_pages_unshared = procfile_readall(ff_pages_unshared);
     if(unlikely(!ff_pages_unshared)) return 0; // we return 0, so that we will retry to open it next time
-    pages_unshared = str2ull(procfile_lineword(ff_pages_unshared, 0, 0));
+    pages_unshared = str2ull(procfile_lineword(ff_pages_unshared, 0, 0), NULL);
 
     ff_pages_volatile = procfile_readall(ff_pages_volatile);
     if(unlikely(!ff_pages_volatile)) return 0; // we return 0, so that we will retry to open it next time
-    pages_volatile = str2ull(procfile_lineword(ff_pages_volatile, 0, 0));
+    pages_volatile = str2ull(procfile_lineword(ff_pages_volatile, 0, 0), NULL);
 
     //ff_pages_to_scan = procfile_readall(ff_pages_to_scan);
     //if(unlikely(!ff_pages_to_scan)) return 0; // we return 0, so that we will retry to open it next time

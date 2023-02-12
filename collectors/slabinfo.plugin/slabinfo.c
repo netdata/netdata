@@ -171,19 +171,19 @@ struct slabinfo *read_file_slabinfo() {
         char *name = procfile_lineword(ff, l, 0);
         struct slabinfo *s = get_slabstruct(name);
 
-        s->active_objs    = str2uint64_t(procfile_lineword(ff, l, 1));
-        s->num_objs       = str2uint64_t(procfile_lineword(ff, l, 2));
-        s->obj_size       = str2uint64_t(procfile_lineword(ff, l, 3));
-        s->obj_per_slab   = str2uint64_t(procfile_lineword(ff, l, 4));
-        s->pages_per_slab = str2uint64_t(procfile_lineword(ff, l, 5));
+        s->active_objs    = str2uint64_t(procfile_lineword(ff, l, 1), NULL);
+        s->num_objs       = str2uint64_t(procfile_lineword(ff, l, 2), NULL);
+        s->obj_size       = str2uint64_t(procfile_lineword(ff, l, 3), NULL);
+        s->obj_per_slab   = str2uint64_t(procfile_lineword(ff, l, 4), NULL);
+        s->pages_per_slab = str2uint64_t(procfile_lineword(ff, l, 5), NULL);
 
-        s->tune_limit     = str2uint64_t(procfile_lineword(ff, l, 7));
-        s->tune_batchcnt  = str2uint64_t(procfile_lineword(ff, l, 8));
-        s->tune_shared_factor = str2uint64_t(procfile_lineword(ff, l, 9));
+        s->tune_limit     = str2uint64_t(procfile_lineword(ff, l, 7), NULL);
+        s->tune_batchcnt  = str2uint64_t(procfile_lineword(ff, l, 8), NULL);
+        s->tune_shared_factor = str2uint64_t(procfile_lineword(ff, l, 9), NULL);
 
-        s->data_active_slabs = str2uint64_t(procfile_lineword(ff, l, 11));
-        s->data_num_slabs    = str2uint64_t(procfile_lineword(ff, l, 12));
-        s->data_shared_avail = str2uint64_t(procfile_lineword(ff, l, 13));
+        s->data_active_slabs = str2uint64_t(procfile_lineword(ff, l, 11), NULL);
+        s->data_num_slabs    = str2uint64_t(procfile_lineword(ff, l, 12), NULL);
+        s->data_shared_avail = str2uint64_t(procfile_lineword(ff, l, 13), NULL);
 
         uint32_t memperslab = s->pages_per_slab * slab_pagesize;
         // Internal fragmentation: loss per slab, due to objects not being a multiple of pagesize

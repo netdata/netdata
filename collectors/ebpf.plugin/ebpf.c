@@ -2088,7 +2088,7 @@ static pid_t ebpf_read_previous_pid(char *filename)
             length = 63;
 
         buffer[length] = '\0';
-        old_pid = (pid_t)str2uint32_t(buffer);
+        old_pid = (pid_t) str2uint32_t(buffer, NULL);
     }
     fclose(fp);
 

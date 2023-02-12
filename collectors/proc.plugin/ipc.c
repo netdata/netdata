@@ -212,7 +212,7 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
         // find the id in the linked list or create a new structure
         int found = 0;
 
-        unsigned long long id = str2ull(procfile_lineword(ff, l, 1));
+        unsigned long long id = str2ull(procfile_lineword(ff, l, 1), NULL);
         for(msq = *message_queue_root; msq ; msq = msq->next) {
             if(unlikely(id == msq->id)) {
                 found = 1;
@@ -227,8 +227,8 @@ int ipc_msq_get_info(char *msg_filename, struct message_queue **message_queue_ro
             msq->id = id;
         }
 
-        msq->messages = str2ull(procfile_lineword(ff, l, 4));
-        msq->bytes    = str2ull(procfile_lineword(ff, l, 3));
+        msq->messages = str2ull(procfile_lineword(ff, l, 4), NULL);
+        msq->bytes    = str2ull(procfile_lineword(ff, l, 3), NULL);
         msq->found    = 1;
     }
 
@@ -268,7 +268,7 @@ int ipc_shm_get_info(char *shm_filename, struct shm_stats *shm) {
         }
 
         shm->segments++;
-        shm->bytes += str2ull(procfile_lineword(ff, l, 3));
+        shm->bytes += str2ull(procfile_lineword(ff, l, 3), NULL);
     }
 
     return 0;
