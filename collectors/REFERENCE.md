@@ -14,9 +14,9 @@ and on [our website](https://www.netdata.cloud/integrations). The documentation 
 necessary configuration options and prerequisites for that collector. In most cases, either the charts are automatically generated 
 without any configuration, or you just fulfil those prerequisites and [configure the collector](#configure-a-collector).
 
-If the application you are interested in monitoring is not listed in our integrations, 
-look at our [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md) 
-or [write a custom collector in Go](https://github.com/netdata/go.d.plugin/blob/master/docs/how-to-write-a-module.md).
+If the application you are interested in monitoring is not listed in our integrations, the collectors list includes 
+the available options to 
+[add your application to Netdata](https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md#add-your-application-to-netdata).
 
 If we do support your collector but the charts described in the documentation don't appear on your dashboard, the reason will 
 be one of the following:

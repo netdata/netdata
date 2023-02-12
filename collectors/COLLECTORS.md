@@ -27,17 +27,30 @@ explicitly [disable the Go version](https://github.com/netdata/netdata/blob/mast
 and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
 accompanying configuration file.
 
+## Add your application to Netdata
+
 If you don't see the app/service you'd like to monitor in this list:
+
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our 
+  [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
+
+- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, 
+  see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
+
+- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our 
+  [generic structured data (Pandas) collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md),
 
 - Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
   discussions about that collector—we may be looking for assistance from users such as yourself!
+
 - If you don't see the collector there, you can make
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
+
 - If you have basic software development skills, you can add your own plugin
   in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
-Supported Collectors List:
+## Available Collectors
 
 - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
