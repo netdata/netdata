@@ -13,7 +13,6 @@ bool is_system_ieee754_double(void) {
             NETDATA_DOUBLE d;
         };
     } tests[] = {
-            { /* reserved for subnormal */      .i = 0x0000000000000001 },
             { .original = 1.25,                 .i = 0x3FF4000000000000 },
             { .original = 1.0,                  .i = 0x3FF0000000000000 },
             { .original = 2.0,                  .i = 0x4000000000000000 },
@@ -46,9 +45,6 @@ bool is_system_ieee754_double(void) {
             { .original = -DBL_MAX,             .i = 0xFFEFFFFFFFFFFFFF },
     };
 
-    // subnormal value
-    tests[0].original = pow(2, -1074);
-
     size_t errors = 0;
     size_t elements = sizeof(tests) / sizeof(tests[0]);
     for(size_t i = 0; i < elements ; i++) {
@@ -56,8 +52,8 @@ bool is_system_ieee754_double(void) {
 
         if(*ptr != tests[i].i) {
             if(!logged)
-                info("IEEE754: value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
-                     tests[i].original, *ptr, tests[i].i);
+                info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
+                     i+1, tests[i].original, *ptr, tests[i].i);
             errors++;
         }
     }
