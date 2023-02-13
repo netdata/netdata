@@ -609,6 +609,12 @@ netdataDashboard.menu = {
         info: undefined
     },
 
+    'netframework': {
+        title: '.NET Framework',
+        icon: '<i class="fas fa-laptop-code"></i>',
+        info: undefined
+    },
+
     'perf': {
         title: 'Perf Counters',
         icon: '<i class="fas fa-tachometer-alt"></i>',
@@ -4503,6 +4509,100 @@ netdataDashboard.context = {
 
     'ad.dra_replication_sync_requests': {
         info: 'The number of directory synchronizations that are queued for this server but not yet processed.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Exception)
+
+    'netframework.clrexception_thrown': {
+        info: 'The exceptions include both .NET exceptions and unmanaged exceptions that are converted into .NET exceptions.'
+    },
+
+    'netframework.clrexception_filters': {
+        info: 'An exception filter evaluates regardless of whether an exception is handled.'
+    },
+
+    'netframework.clrexception_finallys': {
+        info: 'The metric counts only the finally blocks executed for an exception; finally blocks on normal code paths are not counted by this counter.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Interop)
+
+    'netframework.clrinterop_com_callable_wrappers': {
+        info: 'A COM callable wrappers (CCW) is a proxy for a managed object being referenced from an unmanaged COM client.'
+    },
+
+    'netframework.clrinterop_interop_stubs_created': {
+        info: 'The Stubs are responsible for marshaling arguments and return values from managed to unmanaged code, and vice versa, during a COM interop call or a platform invoke call.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: JIT)
+
+    'netframework.clrjit_methods': {
+        info: 'The metric does not include pre-JIT-compiled methods.'
+    },
+
+    'netframework.clrjit_time': {
+        info: 'The metric is updated at the end of every JIT compilation phase. A JIT compilation phase occurs when a method and its dependencies are compiled.'
+    },
+
+    'netframework.clrjit_standard_failures': {
+        info: 'The failure can occur if the MSIL cannot be verified or if there is an internal error in the JIT compiler.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Loading)
+
+    'netframework.clrloading_loader_heap_size': {
+        info: 'The memory committed by the class loader across all application domains is the physical space reserved in the disk paging file.'
+    },
+
+    'netframework.clrloading_assemblies_loaded': {
+        info: 'If the assembly is loaded as domain-neutral from multiple application domains, the metric is incremented only once.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Locks and Threads)
+
+    'netframework.clrlocksandthreads_recognized_threads': {
+        info: 'Displays the total number of threads that have been recognized by the runtime since the application started. These threads are associated with a corresponding managed thread object. The runtime does not create these threads, but they have run inside the runtime at least once.'
+    },
+
+    // ------------------------------------------------------------------------
+    // WMI (NET Framework: Memory)
+
+    'netframework.clrmemory_heap_size': {
+        info: 'The metric shows maximum bytes that can be allocated, but it does not indicate the current number of bytes allocated.'
+    },
+
+    'netframework.clrmemory_promoted': {
+        info: 'Memory is promoted when it survives a garbage collection.'
+    },
+
+    'netframework.clrmemory_number_gc_handles': {
+        info: 'Garbage collection handles are handles to resources external to the common language runtime and the managed environment.'
+    },
+
+    'netframework.clrmemory_induced_gc': {
+        info: 'The metric is updated when an explicit call to GC.Collect happens.'
+    },
+
+    'netframework.clrmemory_number_sink_blocks_in_use': {
+        info: 'Synchronization blocks are per-object data structures allocated for storing synchronization information. They hold weak references to managed objects and must be scanned by the garbage collector.'
+    },
+
+    'netframework.clrmemory_committed': {
+        info: 'Committed memory is the physical memory for which space has been reserved in the disk paging file.'
+    },
+
+    'netframework.clrmemory_reserved': {
+        info: 'Reserved memory is the virtual memory space reserved for the application when no disk or main memory pages have been used.'
+    },
+
+    'netframework.clrmemory_gc_time': {
+        info: 'Displays the percentage of time that was spent performing a garbage collection in the last sample.'
     },
 
     // ------------------------------------------------------------------------
