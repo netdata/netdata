@@ -303,8 +303,7 @@ button to initiate your pull request (PR).
 Jump down to our instructions on [PRs](#making-a-pull-request) for your next steps.
 
 **Note**: If you wish to contribute documentation that is more tailored from your specific infrastructure
-monitoring/troubleshooting experience, please consider submitting a blog post about your experience. Check
-the [README](https://github.com/netdata/blog/blob/master/README.md) in our blog repo! Any blog submissions that have
+monitoring/troubleshooting experience, please consider submitting a blog post about your experience. Check out our [blog](https://github.com/netdata/blog#readme) repo! Any blog submissions that have
 widespread or universal application will be integrated into our permanent documentation.
 
 ### Edit locally
