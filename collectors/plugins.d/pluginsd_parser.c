@@ -1658,7 +1658,7 @@ PARSER_RC pluginsd_set_v2(char **words, size_t num_words, void *user) {
     if(*value_str == '#')
         value = (NETDATA_DOUBLE)collected_value;
     else
-        value = strtondd(value_str, NULL);
+        value = str2ndd(value_str, NULL);
 
     SN_FLAGS flags = pluginsd_parse_storage_number_flags(flags_str);
 
