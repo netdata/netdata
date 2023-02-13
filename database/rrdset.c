@@ -1879,7 +1879,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
             , has_reset_value
     );
 
-after_second_database_work:
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
         rd = rda->rd;
         if(unlikely(!rd)) continue;
