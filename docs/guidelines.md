@@ -765,7 +765,3 @@ TODO: Update this section after implemeting a _docker-compose_ for builting and 
 
 The Netdata team aggregates and publishes all documentation at [learn.netdata.cloud](/) using
 [Docusaurus](https://v2.docusaurus.io/) over at the [`netdata/learn` repository](https://github.com/netdata/learn).
-
-## Netdata-specific terms
-
-Consult the [Netdata Glossary](https://github.com/netdata/netdata/blob/master/docs/glossary.md) Netdata specific terms 
