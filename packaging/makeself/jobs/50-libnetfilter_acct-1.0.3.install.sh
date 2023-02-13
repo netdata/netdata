@@ -13,7 +13,7 @@ version="1.0.3"
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
 
 export CFLAGS="-I/usr/include/libmnl -pipe"
-export LDFLAGS="-static -L/usr/lib/libmnl"
+export LDFLAGS="-static -L/usr/lib -lmnl"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig/libmnl.pc"
 
