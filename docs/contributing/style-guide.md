@@ -482,7 +482,7 @@ The following tables describe the standard spelling, capitalization, and usage o
 | Term                        | Definition                                                                                                                                                                                                                      |
 |-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | **filesystem**              | Use instead of _file system_.                                                                                                                                                                                                   |
-| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find [immediate value](https://github.com/netdata/netdata/blob/master/docs/overview/why-netdata.md#simple-to-deploy). |
+| **preconfigured**           | The concept that many of Netdata's features come with sane defaults that users don't need to configure to find immediate value. |
 | **real time**/**real-time** | Use _real time_ as a noun phrase, most often with _in_: _Netdata collects metrics in real time_. Use _real-time_ as an adjective: _Netdata collects real-time metrics from hundreds of supported applications and services.     |
 
 
