@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/xens
 sidebar_label: "xenstat.plugin"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Virtualized environments/Virtualize hosts"
+learn_rel_path: "Integrations/Monitor/Virtualized environments/Virtualize hosts"
 -->
 
 # xenstat.plugin

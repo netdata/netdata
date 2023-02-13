@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/ebpf
 sidebar_label: "Kernel traces/metrics (eBPF)"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/System metrics"
+learn_rel_path: "Integrations/Monitor/System metrics"
 -->
 
 # eBPF monitoring with Netdata

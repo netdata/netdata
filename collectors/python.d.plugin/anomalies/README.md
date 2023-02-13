@@ -4,9 +4,8 @@ description: "Use ML-driven anomaly detection to narrow your focus to only affec
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/anomalies/README.md"
 sidebar_url: "Anomalies"
 sidebar_label: "anomalies"
-learn_status: "Unpublished"
-learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Misc"
+learn_status: "Published"
+learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
 # Anomaly detection with Netdata

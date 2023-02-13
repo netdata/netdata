@@ -2,10 +2,9 @@
 title: "Supported collectors list"
 description: "Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/COLLECTORS.md"
-sidebar_label: "Supported collectors list"
+sidebar_label: "Monitor"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "References/Collectors"
+learn_rel_path: "Integrations/Monitor"
 -->
 
 # Supported collectors list
@@ -24,21 +23,34 @@ cases, _Netdata always prioritizes the Go version_, and we highly recommend you 
 experience.
 
 If you want to use a Python version of a collector, you need to
-explicitly [disable the Go version](https://github.com/netdata/netdata/blob/masterhttps://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
+explicitly [disable the Go version](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
 and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
 accompanying configuration file.
 
+## Add your application to Netdata
+
 If you don't see the app/service you'd like to monitor in this list:
+
+- If your application has a Prometheus endpoint, Netdata can monitor it! Look at our 
+  [generic Prometheus collector](https://github.com/netdata/go.d.plugin/blob/master/modules/prometheus/README.md).
+
+- If your application is instrumented to expose [StatsD](https://blog.netdata.cloud/introduction-to-statsd/) metrics, 
+  see our [generic StatsD collector](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md).
+
+- If you have data in CSV, JSON, XML or other popular formats, you may be able to use our 
+  [generic structured data (Pandas) collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/pandas/README.md),
 
 - Check out our [GitHub issues](https://github.com/netdata/netdata/issues). Use the search bar to look for previous
   discussions about that collector—we may be looking for assistance from users such as yourself!
+
 - If you don't see the collector there, you can make
   a [feature request](https://github.com/netdata/netdata/issues/new/choose) on GitHub.
+
 - If you have basic software development skills, you can add your own plugin
   in [Go](https://learn.netdata.cloud/docs/agent/collectors/go.d.plugin#how-to-develop-a-collector)
   or [Python](https://github.com/netdata/netdata/blob/master/docs/guides/python-collector.md)
 
-Supported Collectors List:
+## Available Collectors
 
 - [Service and application collectors](#service-and-application-collectors)
     - [Generic](#generic)
@@ -193,7 +205,7 @@ configure any of these collectors according to your setup and infrastructure.
   operations, and more.
 - [kube-proxy](https://github.com/netdata/go.d.plugin/blob/master/modules/k8s_kubeproxy/README.md): Collect
   metrics, such as syncing proxy rules and REST client requests, from one or more instances of `kube-proxy`.
-- [Service discovery](https://github.com/netdata/agent-service-discovery/README.md): Find what services are running on a
+- [Service discovery](https://github.com/netdata/agent-service-discovery/blob/master/README.md): Find what services are running on a
   cluster's pods, converts that into configuration files, and exports them so they can be monitored by Netdata.
 
 ### Logs
@@ -273,7 +285,7 @@ configure any of these collectors according to your setup and infrastructure.
   API.
 - [PowerDNS Authoritative Server](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md):
   Monitor one or more instances of the nameserver software to collect questions, events, and latency metrics.
-- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md_recursor):
+- [PowerDNS Recursor](https://github.com/netdata/go.d.plugin/blob/master/modules/powerdns/README.md#recursor):
   Gather incoming/outgoing questions, drops, timeouts, and cache usage from any number of DNS recursor instances.
 - [RetroShare](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/retroshare/README.md): Monitor
   application bandwidth, peers, and DHT

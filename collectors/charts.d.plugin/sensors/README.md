@@ -4,7 +4,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/char
 sidebar_label: "lm-sensors"
 learn_status: "Published"
 learn_topic_type: "References"
-learn_rel_path: "References/Collectors references/Devices"
+learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
 # Linux machine sensors monitoring with Netdata
