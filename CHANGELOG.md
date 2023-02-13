@@ -6,11 +6,16 @@
 
 **Merged pull requests:**
 
+- Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
+- Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
+- Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
+- Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
 - More learn reorg/reordering [\#14505](https://github.com/netdata/netdata/pull/14505) ([cakrit](https://github.com/cakrit))
 - Revert changes to platform support policy [\#14504](https://github.com/netdata/netdata/pull/14504) ([cakrit](https://github.com/cakrit))
 - Top level learn changes [\#14503](https://github.com/netdata/netdata/pull/14503) ([cakrit](https://github.com/cakrit))
 - Fix broken links in collectors/COLLECTORS.md [\#14502](https://github.com/netdata/netdata/pull/14502) ([Ancairon](https://github.com/Ancairon))
 - Update Demo-Sites.md [\#14501](https://github.com/netdata/netdata/pull/14501) ([cakrit](https://github.com/cakrit))
+- Member role on roles permissions docs [\#14500](https://github.com/netdata/netdata/pull/14500) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Reorganize contents of Getting Started [\#14499](https://github.com/netdata/netdata/pull/14499) ([cakrit](https://github.com/cakrit))
 - Correct title of contribute to doccumentation [\#14498](https://github.com/netdata/netdata/pull/14498) ([cakrit](https://github.com/cakrit))
 - Delete getting-started-overview.md [\#14497](https://github.com/netdata/netdata/pull/14497) ([Ancairon](https://github.com/Ancairon))
@@ -375,10 +380,6 @@
 - Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
 - Store hidden status when creating / updating dimension metadata [\#13869](https://github.com/netdata/netdata/pull/13869) ([stelfrag](https://github.com/stelfrag))
 - Find the chart and dimension UUID from the context [\#13868](https://github.com/netdata/netdata/pull/13868) ([stelfrag](https://github.com/stelfrag))
-- fix\(cgroup.plugin\): handle qemu-1- prefix when extracting virsh domain [\#13866](https://github.com/netdata/netdata/pull/13866) ([ilyam8](https://github.com/ilyam8))
-- Update step-09 for dbmode update.md [\#13864](https://github.com/netdata/netdata/pull/13864) ([DShreve2](https://github.com/DShreve2))
-- add ACLK access to ml\_info \(fix anomalies tab in cloud\) [\#13863](https://github.com/netdata/netdata/pull/13863) ([underhood](https://github.com/underhood))
-- bump go.d.plugin to v0.41.0 [\#13861](https://github.com/netdata/netdata/pull/13861) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
