@@ -83,15 +83,15 @@ include:
 
   - &debian
     distro: debian
-    version: "11"
-    base_image: debian:bullseye
+    version: "12"
+    base_image: debian:bookworm
     env_prep: |
       apt-get update
     jsonc_removal: |
       apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
-      repo_distro: debian/bullseye
+      repo_distro: debian/bookworm
       arches:
         - i386
         - amd64
@@ -99,6 +99,14 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *debian
+    version: "11"
+    base_image: debian:bullseye
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bullseye
+    test:
+      ebpf-core: false
   - <<: *debian
     version: "10"
     base_image: debian:buster
