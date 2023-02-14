@@ -26,14 +26,7 @@ being able to join any room. We also aligned the offered roles to the target aud
 
 #### What happens to the previous Member role?
 
-We don't want to disrupt your current access rights. Users that currently have the legacy Member role, will not lose their access, or permissions. The impact is:
-* Any new users you invite on the COMMUNITY plan, must be Administrators
-* The role Member is deprecated and won’t be selectable in any of the plans
-* Current Members will not be able to invite other users to the space, since they would only be able to invite Members which is deprecated
-
-Summary:
-* If you don’t upgrade, keep your space on Community plan: You don’t need to do anything with your existing users, they will not notice a difference.
-* If you do upgrade, move to one of the paid plans: We suggest you reassign your existing Members to one of the new roles, depending on their needs.
+We will maintain a Legacy Community plan for existing users, which will continue to provide access to the Member role.
 
 #### Which functionalities are available for each role?
 
