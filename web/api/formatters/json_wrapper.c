@@ -209,7 +209,7 @@ static inline void jsonwrap_functions(BUFFER *wb, const char *key, RRDR *r) {
 static inline long jsonwrap_chart_labels_filter(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
     const long query_used = qt->query.used;
-    long c, i;
+    long c, i = 0;
 
     buffer_json_member_add_object(wb, key);
 
