@@ -95,7 +95,7 @@ metrics on application resource utilization:
     update every = 5
 ```
 
-To [configure an individual collector](https://github.com/netdata/netdata/blob/fix-broken-links/collectors/REFERENCE.md#configure-a-collector), open its specific configuration file with
+To [configure an individual collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#configure-a-collector), open its specific configuration file with
 `edit-config` and look for the `update_every` setting. For example, to reduce the frequency of the `nginx` collector,
 run `sudo ./edit-config go.d/nginx.conf`:
 
