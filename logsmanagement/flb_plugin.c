@@ -21,7 +21,8 @@
 
 extern uv_loop_t *main_loop; 
 
-/* Following structs are the same as defined in fluent-bit/flb_lib.h and fluent-bit/flb_time.h */
+/* Following structs are the same as defined in fluent-bit/flb_lib.h and 
+ * fluent-bit/flb_time.h, but need to be redefined due to use of dlsym().  */
 
 struct flb_time {
     struct timespec tm;
@@ -242,7 +243,7 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
     circ_buff_insert(buff);
 
     /* Extract systemd, syslog and docker events metrics */
-    if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
+    if(p_file_info->log_type == FLB_KMSG || p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
         p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
@@ -294,7 +295,14 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     msgpack_unpacked result;
     size_t off = 0; 
     struct flb_time tmp_time;
-    msgpack_object *x;   
+    msgpack_object *x;
+
+    /* FLB_KMSG case */
+    char *subsystem = NULL;
+    size_t subsystem_size = 0;
+    char *device = NULL;
+    size_t device_size = 0;
+    /* FLB_KMSG case end */
 
     /* FLB_SYSTEMD or FLB_SYSLOG case */
     char syslog_prival[4] = "";
@@ -392,6 +400,61 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                     }
                     /* FLB_GENERIC, FLB_WEB_LOG and FLB_SERIAL case end */
 
+                    /* FLB_KMSG case */
+                    if(p_file_info->log_type == FLB_KMSG){
+                        if(!new_tmp_text_size){
+                            /* set new_tmp_text_size to previous size of buffer, do only once */
+                            new_tmp_text_size = buff->in->text_size; 
+                        }
+                        if(!strncmp(p->key.via.str.ptr, LOG_REC_KEY, (size_t) p->key.via.str.size)){
+                            message = (char *) p->val.via.str.ptr;
+                            message_size = p->val.via.str.size;
+
+                            m_assert(message, "message is NULL");
+                            m_assert(message_size, "message_size is 0");
+
+                            char *c;
+                            size_t bytes_remain = message_size;
+
+                            // see https://www.kernel.org/doc/Documentation/ABI/testing/dev-kmsg
+                            if((c = memchr(message, '\n', message_size))){
+                                /* Extract log message */
+                                message_size = c - message;
+                                bytes_remain -= message_size;
+
+                                error("msg init:%.*s sz:%zu br:%zu", (int) message_size, message, message_size, bytes_remain);
+
+                                /* Extract machine-readable info for charts, 
+                                 * such as subsystem and device. */
+                                while(bytes_remain){
+                                    size_t sz = 0;
+                                    while(--bytes_remain && c[++sz] != '\n');
+                                    if(bytes_remain) --sz;
+                                    c++; // skip new line and space chars
+                                    error("msg:%.*s", sz, c);
+                                    const char  subsys_str[] = " SUBSYSTEM=",
+                                                device_str[] = " DEVICE=";
+                                    const size_t    subsys_str_len = sizeof(subsys_str) - 1,
+                                                    device_str_sz = sizeof(device_str) - 1;
+                                    if(!strncmp(c, subsys_str, subsys_str_len)){
+                                        error("msg subsys:%.*s", (int) (sz - subsys_str_len), &c[subsys_str_len]);
+                                    }
+                                    else if (!strncmp(c, " DEVICE=", device_str_sz)){
+                                        error("msg device:%.*s", (int) (sz - device_str_sz), &c[device_str_sz]);
+                                    }
+                                    c = &c[sz];
+                                }
+                            }
+
+                            new_tmp_text_size += message_size + 1; // +1 for '\n'
+                        }
+                        else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
+                            p_file_info->flb_tmp_systemd_metrics.sever[p->val.via.u64]++;
+                        }
+                        ++p;
+                        continue;
+                    } /* FLB_KMSG case end */
+
                     /* FLB_SYSTEMD or FLB_SYSLOG case */
                     if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
                         if(!new_tmp_text_size){
@@ -467,8 +530,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                         }
                         ++p;
                         continue;
-                    }
-                    /* FLB_SYSTEMD or FLB_SYSLOG case end */
+                    } /* FLB_SYSTEMD or FLB_SYSLOG case end */
 
                     /* FLB_DOCKER_EV case */
                     if(p_file_info->log_type == FLB_DOCKER_EV){ 
@@ -577,8 +639,35 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
             }
         } 
     }
+
+    // Below, we extract metrics and reconstruct the log record
+
+    /* FLB_KMSG case */
+    if(p_file_info->log_type == FLB_KMSG){
+
+        /* Parse number of log lines */
+        p_file_info->flb_tmp_systemd_metrics.num_lines++;
+
+        error("newsz:%zu", new_tmp_text_size);
+
+        /* Metrics extracted, now prepare circular buffer for write */
+        // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.
+        if(unlikely(!circ_buff_prepare_write(buff, new_tmp_text_size))) goto skip_collect_and_drop_logs;
+
+        size_t tmp_item_off = buff->in->text_size;
+
+        if(likely(message)){
+            memcpy(&buff->in->data[tmp_item_off], message, message_size);
+            tmp_item_off += message_size;  
+        }
+
+        buff->in->data[tmp_item_off++] = '\n';
+        m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
+        buff->in->text_size = new_tmp_text_size;
+
+    } /* FLB_KMSG case end */
     
-    /* FLB_SYSTEMD or FLB_SYSLOG case - extract metrics and reconstruct log message */
+    /* FLB_SYSTEMD or FLB_SYSLOG case */
     if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
 
         /* Parse number of log lines */
@@ -723,11 +812,10 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
-    }
-    /* FLB_SYSTEMD or FLB_SYSLOG case end */
-
+    } /* FLB_SYSTEMD or FLB_SYSLOG case end */
+    
     /* FLB_DOCKER_EV case */
-    if(p_file_info->log_type == FLB_DOCKER_EV){
+    else if(p_file_info->log_type == FLB_DOCKER_EV){ 
 
         /* Extract docker events metrics */
         p_file_info->flb_tmp_docker_ev_metrics.num_lines++;
@@ -859,8 +947,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
         buff->in->data[tmp_item_off++] = '\n';
         m_assert(tmp_item_off == new_tmp_text_size, "tmp_item_off should be == new_tmp_text_size");
         buff->in->text_size = new_tmp_text_size;
-    }
-    /* FLB_DOCKER_EV case end */
+    } /* FLB_DOCKER_EV case end */
 
 skip_collect_and_drop_logs:
     /* Following code is equivalent to msgpack_unpacked_destroy(&result) due 
@@ -940,6 +1027,28 @@ int flb_add_input(struct File_info *const p_file_info){
                 "Inotify_Watcher", "true", 
 #endif
                 NULL) != 0) return FLB_INPUT_SET_ERROR;
+
+            /* Set up output */
+            callback->cb = flb_write_to_buff_cb;
+            callback->data = p_file_info;
+            p_file_info->flb_output = flb_output(ctx, "lib", callback);
+            if(p_file_info->flb_output < 0 ) return FLB_OUTPUT_ERROR;
+            if(flb_output_set(ctx, p_file_info->flb_output, 
+                "Match", tag_s,
+                NULL) != 0) return FLB_OUTPUT_SET_ERROR;
+
+            break;
+        }
+        case FLB_KMSG: {
+            debug(D_LOGS_MANAG, "Setting up FLB_KMSG collector");
+        
+            /* Set up kmsg input */
+            p_file_info->flb_input = flb_input(ctx, "kmsg", NULL);
+            if(p_file_info->flb_input < 0 ) return FLB_INPUT_ERROR;
+            if(flb_input_set(ctx, p_file_info->flb_input, 
+                "Tag", tag_s,
+                NULL) != 0) return FLB_INPUT_SET_ERROR;
+            
 
             /* Set up output */
             callback->cb = flb_write_to_buff_cb;

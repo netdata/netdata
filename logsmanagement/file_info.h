@@ -14,8 +14,8 @@
 
 // Cool trick --> http://userpage.fu-berlin.de/~ram/pub/pub_jf47ht81Ht/c_preprocessor_applications_en
 #define LOG_SRC_TYPES   LST(GENERIC)LST(WEB_LOG)LST(FLB_GENERIC) \
-                        LST(FLB_WEB_LOG)LST(FLB_SYSTEMD)LST(FLB_DOCKER_EV) \
-                        LST(FLB_SYSLOG)LST(FLB_SERIAL)
+                        LST(FLB_WEB_LOG)LST(FLB_KMSG)LST(FLB_SYSTEMD) \
+                        LST(FLB_DOCKER_EV)LST(FLB_SYSLOG)LST(FLB_SERIAL)
 #define LST(x) x,
 enum log_source_t {LOG_SRC_TYPES};
 #undef LST

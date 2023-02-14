@@ -16,6 +16,7 @@ void flb_stop_and_cleanup(void);
 void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle);
 int flb_add_input(struct File_info *const p_file_info);
 
+#define KMSG_DEFAULT_PATH "kmsg_default"
 #define SYSTEMD_DEFAULT_PATH "systemd_default"
 #define DOCKER_EV_DEFAULT_PATH "/var/run/docker.sock"
 

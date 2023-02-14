@@ -68,6 +68,7 @@ static void p_file_info_destroy(struct File_info *p_file_info){
                 freez(p_file_info->parser_metrics->web_log);
                 break;
             }
+            case FLB_KMSG:
             case FLB_SYSTEMD: 
             case FLB_SYSLOG: {
                 freez(p_file_info->parser_metrics->systemd);
@@ -180,7 +181,8 @@ static void logs_management_init(struct section *config_section){
 
     /* -------------------------------------------------------------------------
      * Check log source type.
-     * TODO: There can be only one log_type = FLB_SYSTEMD, catch this edge case.
+     * TODO: There can be only one log_type = FLB_KMSG and only one FLB_SYSTEMD, 
+     * catch this edge case.
      * ------------------------------------------------------------------------- */
     char *type = appconfig_get(&log_management_config, config_section->name, "log type", "flb_generic");
     if(!type || !*type) p_file_info->log_type = FLB_GENERIC; // Default
@@ -188,6 +190,7 @@ static void logs_management_init(struct section *config_section){
         if(!strcmp(type, "flb_generic")) p_file_info->log_type = FLB_GENERIC;
         else if (!strcmp(type, "web_log")) p_file_info->log_type = WEB_LOG;
         else if (!strcmp(type, "flb_web_log")) p_file_info->log_type = FLB_WEB_LOG;
+        else if (!strcmp(type, "flb_kmsg")) p_file_info->log_type = FLB_KMSG;
         else if (!strcmp(type, "flb_systemd")) p_file_info->log_type = FLB_SYSTEMD;
         else if (!strcmp(type, "flb_docker_events")) p_file_info->log_type = FLB_DOCKER_EV;
         else if (!strcmp(type, "flb_syslog")) p_file_info->log_type = FLB_SYSLOG;
@@ -268,6 +271,9 @@ static void logs_management_init(struct section *config_section){
                         return p_file_info_destroy(p_file_info);
                     } else p_file_info->filename = strdupz(nginx_access_path_default[i]);
                 }
+                break;
+            case FLB_KMSG:
+                p_file_info->filename = strdupz(KMSG_DEFAULT_PATH);
                 break;
             case FLB_SYSTEMD:
                 p_file_info->filename = strdupz(SYSTEMD_DEFAULT_PATH);
@@ -436,7 +442,9 @@ static void logs_management_init(struct section *config_section){
             }
         }
     }
-    else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
+    else if(p_file_info->log_type == FLB_KMSG || 
+            p_file_info->log_type == FLB_SYSTEMD || 
+            p_file_info->log_type == FLB_SYSLOG){
         if(p_file_info->log_type == FLB_SYSLOG){
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
 
@@ -518,6 +526,7 @@ static void logs_management_init(struct section *config_section){
             p_file_info->parser_metrics->web_log = callocz(1, sizeof(Web_log_metrics_t));
             break;
         }
+        case FLB_KMSG:
         case FLB_SYSTEMD: 
         case FLB_SYSLOG: {
             p_file_info->parser_metrics->systemd = callocz(1, sizeof(Systemd_metrics_t));
@@ -673,6 +682,7 @@ static void logs_management_init(struct section *config_section){
         }
         case FLB_GENERIC:
         case FLB_WEB_LOG:
+        case FLB_KMSG:
         case FLB_SYSTEMD:
         case FLB_DOCKER_EV: 
         case FLB_SYSLOG: 
