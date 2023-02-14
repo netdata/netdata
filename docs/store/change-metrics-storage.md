@@ -78,7 +78,7 @@ DBENGINE memory is related to the number of metrics concurrently being collected
 on disk in relation with the queries running, and the number of metrics for which retention is maintained.
 
 The precise analysis of how much memory will be used is described in 
-[dbengine memory requirements](https://github.com/netdata/netdata/blob/master/database/engine/README.md#memory-requirements)
+[dbengine memory requirements](https://github.com/netdata/netdata/blob/master/database/engine/README.md#memory-requirements).
 
 The quick rule of thumb for a high level estimation is
 
