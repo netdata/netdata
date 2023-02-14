@@ -294,13 +294,15 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
     }
 
     uint64_t fractional_precision = 10000000ULL; // fractional part 7 digits
+    int fractional_wanted_digits = 7;
     int exponent = 0;
-    if(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10)) {
+    if(unlikely(value >= (NETDATA_DOUBLE)(UINT64_MAX / 10))) {
         // the number is too big to print using 64bit numbers
         // so, let's convert it to exponential notation
         exponent = (int)(floorndd(log10ndd(value)));
         value /= powndd(10, exponent);
-        fractional_precision = 100000000000000000ULL; // fractional part 18 digits
+        fractional_precision = 100000000000000000ULL; // fractional part 17 digits
+        fractional_wanted_digits = 17;
     }
 
     char *d = s;
@@ -325,14 +327,14 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
         // convert the fractional part to string (reversed)
         d = print_uint64_reversed(s = d, fractional);
 
-        while(d - s < 7) *d++ = '0';            // prepend zeros to reach 7 digits length
+        while(d - s < fractional_wanted_digits) *d++ = '0'; // prepend zeros to reach precision
         char_array_reverse(s, d - 1);   // copy reversed the fractional string
 
         // remove trailing zeros from the fractional part
         while(*(d - 1) == '0') d--;
     }
 
-    if(unlikely(exponent)) {
+    if(unlikely(exponent != 0)) {
         *d++ = 'e';
         *d++ = '+';
         d = print_uint32_reversed(s = d, exponent);
