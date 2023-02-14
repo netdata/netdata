@@ -378,7 +378,20 @@ static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
         return *ptr;
     }
 
-    return str2ndd(src, endptr);
+    double sign = 1.0;
+
+    if(*src == '-') {
+        sign = -1.0;
+        src++;
+    }
+
+    if(unlikely(*src == IEEE754_UINT64_B64_PREFIX[0]))
+        return (NETDATA_DOUBLE) str2uint64_base64(src + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, endptr) * sign;
+
+    if(unlikely(*src == HEX_PREFIX[0] && src[1] == HEX_PREFIX[1]))
+        return (NETDATA_DOUBLE) str2uint64_hex(src + sizeof(HEX_PREFIX) - 1, endptr) * sign;
+
+    return str2ndd(src, endptr) * sign;
 }
 
 static inline char *strncpyz(char *dst, const char *src, size_t n) {

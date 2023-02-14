@@ -301,8 +301,11 @@ static inline int print_netdata_double(char *dst, NETDATA_DOUBLE value) {
         // so, let's convert it to exponential notation
         exponent = (int)(floorndd(log10ndd(value)));
         value /= powndd(10, exponent);
-        fractional_precision = 100000000000000000ULL; // fractional part 17 digits
-        fractional_wanted_digits = 17;
+
+        // the max precision we can support is 18 digits
+        // (UINT64_MAX is 20, but the first is 1)
+        fractional_precision = 1000000000000000000ULL; // fractional part 18 digits
+        fractional_wanted_digits = 18;
     }
 
     char *d = s;
