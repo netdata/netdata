@@ -1,6 +1,7 @@
 <!--
 title: "Export and visualize Netdata metrics in Graphite"
 sidebar_label: "Export and visualize Netdata metrics in Graphite"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/guides/export/export-netdata-metrics-graphite.md"
 description: "Use Netdata to collect and export thousands of metrics to Graphite for long-term storage or further analysis."
 image: /img/seo/guides/export/export-netdata-metrics-graphite.png
 learn_status: "Published"
@@ -164,8 +165,7 @@ exporting charts to your Graphite dashboard!
 ### Add exporting charts to Netdata Cloud
 
 You can also show these exporting engine metrics on Netdata Cloud. If you don't have an account already, 
-go [sign in](https://app.netdata.cloud) and get started for free. If you need some help along the way, read 
-the [get started with Cloud guide](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.mdx).
+go [sign in](https://app.netdata.cloud) and get started for free.
 
 Add more metrics to a War Room's Nodes view by clicking on the **Add metric** button, then typing `exporting` into the
 context field. Choose the exporting contexts you want to add, then click **Add**. You'll see these charts alongside any

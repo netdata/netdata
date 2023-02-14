@@ -14,9 +14,7 @@ You can securely connect a Netdata Agent, running on a distributed node, to Netd
 administrator creates a **claiming token**, which is used to add an Agent to their Space via the [Agent-Cloud link
 (ACLK)](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
-Are you just starting out with Netdata Cloud? See our [get started with
-Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx) guide for a walkthrough of the process and simplified
-instructions.
+Are you just getting started with Netdata Cloud? You can find simplified instructions in the [Install Netdata documentation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#get-started)
 
 When connecting an agent (also referred to as a node) to Netdata Cloud, you must complete a verification process that proves you have some level of authorization to manage the node itself. This verification is a security feature that helps prevent unauthorized users from seeing the data on your node.
 
@@ -32,7 +30,7 @@ identity of the Netdata Agent when it connects to the Cloud. While the data does
 from Agents to the browser, we do not store or log it.
 
 You can connect a node during the Netdata Cloud onboarding process, or after you created a Space by clicking on **Connect
-Nodes** in the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx#manage-spaces).
+Nodes** in the [Spaces management area](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md#manage-spaces).
 
 There are two important notes regarding connecting nodes:
 
@@ -373,7 +371,7 @@ If you run the kickstart script and get the following error `Existing install ap
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx#install-on-linux-with-one-line-installer).
+script](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer).
 
 #### kickstart: Failed to write new machine GUID
 
@@ -393,7 +391,7 @@ if you installed Netdata to `/opt/netdata`, use `/opt/netdata/bin/netdata-claim.
 
 If you are using an unsupported package, such as a third-party `.deb`/`.rpm` package provided by your distribution,
 please remove that package and reinstall using our [recommended kickstart
-script](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx#install-on-linux-with-one-line-installer).
+script](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer).
 
 #### Connecting on older distributions (Ubuntu 14.04, Debian 8, CentOS 6)
 
@@ -510,7 +508,7 @@ tool, and details about the files found in `cloud.d`.
 
 ### The `cloud.conf` file
 
-This section defines how and whether your Agent connects to [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx)
+This section defines how and whether your Agent connects to Netdata Cloud
 using the [ACLK](https://github.com/netdata/netdata/blob/master/aclk/README.md).
 
 | setting        | default                   | info                                                                                                                                   |

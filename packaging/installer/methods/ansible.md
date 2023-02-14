@@ -11,7 +11,7 @@ learn_rel_path: "Installation"
 
 # Deploy Netdata with Ansible
 
-Netdata's [one-line kickstart](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) is zero-configuration, highly adaptable, and compatible with tons
+Netdata's [one-line kickstart](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md#install-on-linux-with-one-line-installer) is zero-configuration, highly adaptable, and compatible with tons
 of different operating systems and Linux distributions. You can use it on bare metal, VMs, containers, and everything
 in-between.
 
@@ -166,7 +166,7 @@ want to do with Netdata, so use those categories to dive in.
 
 Some of the best places to start:
 
--   [Enable or configure a collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md)
+-   [Collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/README.md)
 -   [Supported collectors list](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md)
 -   [See an overview of your infrastructure](https://github.com/netdata/netdata/blob/master/docs/visualize/overview-infrastructure.md)
 -   [Interact with dashboards and charts](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md)

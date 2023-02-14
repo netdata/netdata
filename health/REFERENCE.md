@@ -14,8 +14,7 @@ Welcome to the health configuration reference.
 This guide contains information about editing health configuration files to tweak existing alarms or create new health
 entities that are customized to the needs of your infrastructure.
 
-To learn the basics of locating and editing health configuration files, see the [health
-quickstart](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md).
+To learn the basics of locating and editing health configuration files, see the [Configure health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) documentation.
 
 ## Health configuration files
 

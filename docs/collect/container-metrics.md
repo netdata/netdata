@@ -55,8 +55,7 @@ metrics](https://github.com/netdata/go.d.plugin/blob/master/modules/mysql/README
 
 ### Collect metrics from applications running in Docker containers
 
-You could use this technique to monitor an entire infrastructure of Docker containers. The same [enable and
-configure](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) procedures apply whether an application runs on the host system or inside
+You could use this technique to monitor an entire infrastructure of Docker containers. The same [enable and configure](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) procedures apply whether an application runs on the host system or inside
 a container. You may need to configure the target endpoint if it's not the application's default.
 
 Netdata can even [run in a Docker container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md) itself, and then collect metrics about the

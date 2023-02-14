@@ -39,7 +39,7 @@ server](https://user-images.githubusercontent.com/1153921/103586700-da5b0a00-4ea
 
 ## Prerequisites
 
-- A node running the Netdata Agent. If you don't yet have that, [get Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx).
+- A node running the Netdata Agent. If you don't yet have that, [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 - A Netdata Cloud account. [Sign up](https://app.netdata.cloud) if you don't have one already.
 - Familiarity with configuring the Netdata Agent with [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 - _Optional_: An Nginx web server running on the same node to follow the example configuration steps.

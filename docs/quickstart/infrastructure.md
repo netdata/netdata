@@ -143,9 +143,7 @@ Netdata has [300+ pre-installed collectors](https://github.com/netdata/netdata/b
 configuration. Collectors search each of your nodes in default locations and ports to find running applications and
 gather as many metrics as they can without you having to configure them individually.
 
-Most collectors work without configuration, but you should read up on [how collectors
-work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) and [how to enable/configure](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) them so
-that you can see metrics from those applications in Netdata Cloud.
+Most collectors work without configuration, should you want more info, you can read more on [how Netdata's metrics collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md) and the [Collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) documentation.
 
 In addition, find detailed information about which [system](https://github.com/netdata/netdata/blob/master/docs/collect/system-metrics.md),
 [container](https://github.com/netdata/netdata/blob/master/docs/collect/container-metrics.md), and [application](https://github.com/netdata/netdata/blob/master/docs/collect/application-metrics.md) metrics you can

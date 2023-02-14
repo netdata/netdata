@@ -14,16 +14,16 @@ real-time, interactive charts. The following list includes collectors for both e
 internal system metrics.
 
 Learn more
-about [how collectors work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md), and
+about [how collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md), and
 then learn how to [enable or
-configure](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) any of the below collectors using the same process.
+configure](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) any of the below collectors using the same process.
 
 Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these
 cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best
 experience.
 
 If you want to use a Python version of a collector, you need to
-explicitly [disable the Go version](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md),
+explicitly [disable the Go version](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module),
 and enable the Python version. Netdata then skips the Go version and attempts to load the Python version and its
 accompanying configuration file.
 

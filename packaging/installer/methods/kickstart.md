@@ -164,11 +164,8 @@ If the script is valid, this command will return `OK, VALID`.
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) or
-[infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
+When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
-Or, skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
-
-Read through Netdata's [documentation](https://learn.netdata.cloud/), which is structured based on actions and
+Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
