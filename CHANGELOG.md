@@ -2,7 +2,7 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v1.38.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.38.1...HEAD)
 
 **Merged pull requests:**
 
@@ -53,6 +53,7 @@
 - Typos in in notification docs [\#14440](https://github.com/netdata/netdata/pull/14440) ([iorvd](https://github.com/iorvd))
 - Streaming interpolated values [\#14431](https://github.com/netdata/netdata/pull/14431) ([ktsaou](https://github.com/ktsaou))
 - Fix compiler error when CLOSE\_RANGE\_CLOEXEC is missing [\#14430](https://github.com/netdata/netdata/pull/14430) ([Dim-P](https://github.com/Dim-P))
+- Add .NET info [\#14429](https://github.com/netdata/netdata/pull/14429) ([thiagoftsm](https://github.com/thiagoftsm))
 - Minor fix, convert metadata of the learn to hidden sections [\#14427](https://github.com/netdata/netdata/pull/14427) ([tkatsoulas](https://github.com/tkatsoulas))
 - kickstart.sh: Fix `--release-channel` as `--nightly-channel` options [\#14424](https://github.com/netdata/netdata/pull/14424) ([vobruba-martin](https://github.com/vobruba-martin))
 - add @andrewm4894 as docs/ codeowner [\#14398](https://github.com/netdata/netdata/pull/14398) ([andrewm4894](https://github.com/andrewm4894))
@@ -66,6 +67,10 @@
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Update the "Install Netdata with kickstart.sh" doc [\#14338](https://github.com/netdata/netdata/pull/14338) ([Ancairon](https://github.com/Ancairon))
 - Indicate what root privileges are needed for in kickstart.sh. [\#14314](https://github.com/netdata/netdata/pull/14314) ([Ferroin](https://github.com/Ferroin))
+
+## [v1.38.1](https://github.com/netdata/netdata/tree/v1.38.1) (2023-02-13)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v1.38.0...v1.38.1)
 
 ## [v1.38.0](https://github.com/netdata/netdata/tree/v1.38.0) (2023-02-06)
 
@@ -378,8 +383,6 @@
 - bump go.d.plugin v0.41.1 [\#13874](https://github.com/netdata/netdata/pull/13874) ([ilyam8](https://github.com/ilyam8))
 - Replication of metrics \(gaps filling\) during streaming [\#13873](https://github.com/netdata/netdata/pull/13873) ([vkalintiris](https://github.com/vkalintiris))
 - Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
-- Store hidden status when creating / updating dimension metadata [\#13869](https://github.com/netdata/netdata/pull/13869) ([stelfrag](https://github.com/stelfrag))
-- Find the chart and dimension UUID from the context [\#13868](https://github.com/netdata/netdata/pull/13868) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 

@@ -1543,9 +1543,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         // calculate the proper last_collected_time, using usec_since_last_update
         last_collect_ut = rrdset_update_last_collected_time(st);
     }
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE)) {
-        goto after_first_database_work;
-    }
 
     // if this set has not been updated in the past
     // we fake the last_update time to be = now - usec_since_last_update
@@ -1608,7 +1605,6 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         }
     }
 
-after_first_database_work:
     st->counter_done++;
 
     if(stream_buffer.wb && !stream_buffer.v2)
@@ -1669,9 +1665,6 @@ after_first_database_work:
     }
     rrddim_foreach_done(rd);
     rda_slots = dimensions;
-
-    if (unlikely(st->rrd_memory_mode == RRD_MEMORY_MODE_NONE))
-        goto after_second_database_work;
 
     rrdset_debug(st, "last_collect_ut = %0.3" NETDATA_DOUBLE_MODIFIER " (last collection time)", (NETDATA_DOUBLE)last_collect_ut/USEC_PER_SEC);
     rrdset_debug(st, "now_collect_ut  = %0.3" NETDATA_DOUBLE_MODIFIER " (current collection time)", (NETDATA_DOUBLE)now_collect_ut/USEC_PER_SEC);
@@ -1886,7 +1879,6 @@ after_first_database_work:
             , has_reset_value
     );
 
-after_second_database_work:
     for(dim_id = 0, rda = rda_base ; dim_id < rda_slots ; ++dim_id, ++rda) {
         rd = rda->rd;
         if(unlikely(!rd)) continue;
