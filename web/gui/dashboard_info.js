@@ -573,8 +573,8 @@ netdataDashboard.menu = {
         info: 'Xen domain resource utilization metrics. Netdata reads this information using <b>xenstat</b> library which gives access to the resource usage information (CPU, memory, disk I/O, network) for a virtual machine.'
     },
 
-    'wmi': {
-        title: 'wmi',
+    'windows': {
+        title: 'Windows',
         icon: '<i class="fas fa-server"></i>',
         info: undefined
     },
@@ -4437,7 +4437,7 @@ netdataDashboard.context = {
     // ------------------------------------------------------------------------
     // Windows (Service)
 
-    'wmi.service_status': {
+    'windows.service_status': {
         info: 'The current <a href="https://learn.microsoft.com/en-us/windows/win32/services/service-status-transitions" target="_blank">status</a> of the service.'
     },
 
