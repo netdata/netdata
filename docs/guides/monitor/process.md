@@ -38,11 +38,7 @@ With Netdata's process monitoring, you can:
 
 ## Prerequisites
 
-- One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md). If you
-  need more time to understand Netdata before
-  following this guide, see
-  the [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) or
-  [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) monitoring quickstarts.
+- One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
 - A general understanding of how
   to [configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md)
   using `edit-config`.

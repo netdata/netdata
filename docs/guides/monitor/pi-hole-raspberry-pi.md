@@ -154,7 +154,7 @@ Most importantly, you can always install additional services and instantly colle
 
 -   [Optimize performance](https://github.com/netdata/netdata/blob/master/docs/guides/configure/performance.md) using tweaks developed for IoT devices.
 -   [Stream Raspberry Pi metrics](https://github.com/netdata/netdata/blob/master/streaming/README.md) to a parent host for easy access or longer-term storage.
--   [Tweak alarms](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md) for either Pi-hole or the health of your Raspberry Pi.
+-   [Tweak alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md) for either Pi-hole or the health of your Raspberry Pi.
 -   [Export metrics to external databases](https://github.com/netdata/netdata/blob/master/exporting/README.md) with the exporting engine.
 
 Or, head over to [our guides](https://learn.netdata.cloud/guides/) for even more experiments and insights into

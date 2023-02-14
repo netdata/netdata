@@ -49,8 +49,7 @@ features, new collectors for more applications, and improved UI, so will Cloud.
 
 ## Get started with Netdata Cloud
 
-Signing in, onboarding, and connecting your first nodes only takes a few minutes, and we have a [Get started with
-Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx) guide to help you walk through every step.
+Signing in, onboarding, and connecting your first nodes only takes a few minutes, and we have a [Monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) section to help you walk through every step.
 
 Or, if you're feeling confident, dive right in.
 

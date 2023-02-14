@@ -73,8 +73,7 @@ To silence this alarm, change `sysadmin` to `silent`.
  to: silent
 ```
 
-Use one of the available [methods](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#reload-health-configuration) to reload your health configuration 
- and ensure you get no more notifications about that alarm**.
+Use one of the available [methods](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md#reload-health-configuration) to reload your health configuration and ensure you get no more notifications about that alarm.
 
 You can add `to: silent` to any alarm you'd rather not bother you with notifications.
 
