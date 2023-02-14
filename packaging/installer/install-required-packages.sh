@@ -1376,6 +1376,7 @@ validate_tree_freebsd() {
   echo >&2 " > Checking for gmake ..."
   if ! pkg query %n-%v | grep -q gmake; then
     if prompt "gmake is required to build on FreeBSD and is not installed. Shall I install it?"; then
+      # shellcheck disable=2086
       run ${sudo} pkg install ${opts} gmake
     fi
   fi
@@ -1425,13 +1426,16 @@ validate_tree_centos() {
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} dnf config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} dnf ${opts} install 'dnf-command(config-manager)'
       fi
     fi
 
     echo >&2 " > Checking for CRB ..."
+    # shellcheck disable=2086
     if ! run dnf ${sudo} repolist | grep CRB; then
       if prompt "CRB not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} dnf ${opts} config-manager --set-enabled crb
       fi
     fi
@@ -1439,24 +1443,29 @@ validate_tree_centos() {
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi
     fi
 
     echo >&2 " > Checking for PowerTools ..."
+    # shellcheck disable=2086
     if ! run yum ${sudo} repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} config-manager --set-enabled powertools
       fi
     fi
 
     echo >&2 " > Updating libarchive ..."
+    # shellcheck disable=2086
     run ${sudo} yum ${opts} install libarchive
 
   elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
     echo >&2 " > Checking for EPEL ..."
     if ! rpm -qa | grep epel-release > /dev/null; then
       if prompt "EPEL not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install epel-release
       fi
     fi
@@ -1465,6 +1474,7 @@ validate_tree_centos() {
     echo >&2 " > Checking for Okay ..."
     if ! rpm -qa | grep okay > /dev/null; then
       if prompt "okay not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm
       fi
     fi
@@ -1627,7 +1637,7 @@ install_equo() {
 PACMAN_DB_SYNCED=0
 validate_install_pacman() {
 
-  if [ ${PACMAN_DB_SYNCED} -eq 0 ]; then
+  if [ "${PACMAN_DB_SYNCED}" -eq 0 ]; then
     echo >&2 " > Running pacman -Sy to sync the database"
     local x
     x=$(pacman -Sy)

@@ -400,7 +400,7 @@ get_group(){
   if command -v getent > /dev/null 2>&1; then
     getent group "${1:-""}"
   else
-    cat /etc/group | grep "^${1}:" 
+    grep "^${1}:" /etc/group
   fi
 }
 
@@ -589,7 +589,7 @@ install_netdata_service() {
         echo >&2 "Note: To explicitly enable netdata automatic start, set 'netdata_enable' to 'YES' in /etc/rc.conf"
         echo >&2 ""
 
-        return ${myret}
+        return "${myret}"
 
       elif issystemd; then
         # systemd is running on this system
