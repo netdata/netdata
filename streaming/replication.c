@@ -310,7 +310,8 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
     struct storage_engine_query_ops *ops = q->ops;
     time_t wall_clock_time = q->wall_clock_time;
 
-    size_t points_read = q->points_read, points_generated = q->points_generated;
+    bool finished_with_gap = false;
+    size_t points_read = 0, points_generated = 0;
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
     time_t actual_after = 0, actual_before = 0;
@@ -469,9 +470,16 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
         else if(unlikely(min_end_time < now))
             // the query does not progress
             break;
-        else
+        else {
             // we have gap - all points are in the future
             now = min_start_time;
+
+            if(min_start_time > before && !points_generated) {
+                before = q->query.before = min_start_time - 1;
+                finished_with_gap = true;
+                break;
+            }
+        }
     }
 
 #ifdef NETDATA_LOG_REPLICATION_REQUESTS
@@ -492,10 +500,9 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                        (unsigned long long)after, (unsigned long long)before);
 #endif // NETDATA_LOG_REPLICATION_REQUESTS
 
-    q->points_read = points_read;
-    q->points_generated = points_generated;
+    q->points_read += points_read;
+    q->points_generated += points_generated;
 
-    bool finished_with_gap = false;
     if(last_end_time_in_buffer < before - q->st->update_every)
         finished_with_gap = true;
 
