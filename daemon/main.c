@@ -1527,6 +1527,14 @@ int main(int argc, char **argv) {
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            registry_init();
+                            if(rrd_init("dbengine-dataset", NULL, true)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             generate_dbengine_dataset(history_seconds);
                             return 0;
                         }
