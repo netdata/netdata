@@ -14,7 +14,7 @@ real-time, interactive charts. The following list includes collectors for both e
 internal system metrics.
 
 Learn more
-about [how collectors work](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md), and
+about [how collectors work](https://github.com/netdata/netdata/blob/master/collectors/README.md), and
 then learn how to [enable or
 configure](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#enable-and-disable-a-specific-collection-module) any of the below collectors using the same process.
 
