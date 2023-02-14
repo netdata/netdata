@@ -403,6 +403,8 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     if(!rsb->wb || !rsb->v2 || !netdata_double_isnumber(n) || !does_storage_number_exist(flags))
         return;
 
+    NUMBER_ENCODING integer_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_HEX;
+    NUMBER_ENCODING doubles_encoding = stream_has_capability(rsb, STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     BUFFER *wb = rsb->wb;
     time_t point_end_time_s = (time_t)(point_end_time_ut / USEC_PER_SEC);
     if(unlikely(rsb->last_point_end_time_s != point_end_time_s)) {
@@ -413,14 +415,14 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
         buffer_fast_strcat(wb, PLUGINSD_KEYWORD_BEGIN_V2 " '", sizeof(PLUGINSD_KEYWORD_BEGIN_V2) - 1 + 2);
         buffer_fast_strcat(wb, rrdset_id(rd->rrdset), string_strlen(rd->rrdset->id));
         buffer_fast_strcat(wb, "' ", 2);
-        buffer_print_uint64_hex(wb, rd->rrdset->update_every);
+        buffer_print_uint64_encoded(wb, integer_encoding, rd->rrdset->update_every);
         buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, point_end_time_s);
+        buffer_print_uint64_encoded(wb, integer_encoding, point_end_time_s);
         buffer_fast_strcat(wb, " ", 1);
         if(point_end_time_s == rsb->wall_clock_time)
             buffer_fast_strcat(wb, "#", 1);
         else
-            buffer_print_uint64_hex(wb, rsb->wall_clock_time);
+            buffer_print_uint64_encoded(wb, integer_encoding, rsb->wall_clock_time);
         buffer_fast_strcat(wb, "\n", 1);
 
         rsb->last_point_end_time_s = point_end_time_s;
@@ -430,17 +432,13 @@ void rrddim_push_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t point_
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET_V2 " '", sizeof(PLUGINSD_KEYWORD_SET_V2) - 1 + 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_int64_hex(wb, rd->last_collected_value);
+    buffer_print_int64_encoded(wb, integer_encoding, rd->last_collected_value);
     buffer_fast_strcat(wb, " ", 1);
 
     if((NETDATA_DOUBLE)rd->last_collected_value == n)
         buffer_fast_strcat(wb, "#", 1);
-    else {
-        if(rsb->ieee754)
-            buffer_print_netdata_double_hex(wb, n);
-        else
-            buffer_print_netdata_double(wb, n);
-    }
+    else
+        buffer_print_netdata_double_encoded(wb, doubles_encoding, n);
 
     buffer_fast_strcat(wb, " ", 1);
     buffer_print_sn_flags(wb, flags, true);
@@ -505,7 +503,7 @@ RRDSET_STREAM_BUFFER rrdset_push_metric_initialize(RRDSET *st, time_t wall_clock
         return (RRDSET_STREAM_BUFFER) { .wb = NULL, };
 
     return (RRDSET_STREAM_BUFFER) {
-        .ieee754 = stream_has_capability(host->sender, STREAM_CAP_IEEE754),
+        .capabilities = host->sender->capabilities,
         .v2 = stream_has_capability(host->sender, STREAM_CAP_INTERPOLATED),
         .rrdset_flags = rrdset_flags,
         .wb = sender_start(host->sender),

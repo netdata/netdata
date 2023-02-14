@@ -334,13 +334,33 @@ void buffer_json_finalize(BUFFER *wb) {
 }
 
 // ----------------------------------------------------------------------------
+
+const char hex_digits[16] = "0123456789ABCDEF";
+const char base64_digits[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+unsigned char hex_value_from_ascii[256];
+unsigned char base64_value_from_ascii[256];
+
+__attribute__((constructor)) void initialize_ascii_maps(void) {
+    for(size_t i = 0 ; i < 256 ; i++) {
+        hex_value_from_ascii[i] = 255;
+        base64_value_from_ascii[i] = 255;
+    }
+
+    for(size_t i = 0; i < 16 ; i++)
+        hex_value_from_ascii[(int)hex_digits[i]] = i;
+
+    for(size_t i = 0; i < 64 ; i++)
+        base64_value_from_ascii[(int)base64_digits[i]] = i;
+}
+
+// ----------------------------------------------------------------------------
 // unit test
 
 static int buffer_expect(BUFFER *wb, const char *expected) {
     const char *generated = buffer_tostring(wb);
 
     if(strcmp(generated, expected) != 0) {
-        error("BUFFER: json mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
+        error("BUFFER: mismatch.\nGenerated:\n%s\nExpected:\n%s\n",
               generated, expected);
         return 1;
     }
@@ -348,17 +368,103 @@ static int buffer_expect(BUFFER *wb, const char *expected) {
     return 0;
 }
 
+static int buffer_uint64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value, const char *expected) {
+    int errors = 0;
+    buffer_flush(wb);
+    buffer_print_uint64_encoded(wb, encoding, value);
+
+    if(expected)
+        errors += buffer_expect(wb, expected);
+
+    uint64_t v = str2ull_encoded(buffer_tostring(wb));
+    if(v != value) {
+        error("BUFFER: string '%s' does resolves to %llu, expected %llu",
+              buffer_tostring(wb), (unsigned long long)v, (unsigned long long)value);
+        errors++;
+    }
+    buffer_flush(wb);
+    return errors;
+}
+
+static int buffer_int64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value, const char *expected) {
+    int errors = 0;
+    buffer_flush(wb);
+    buffer_print_int64_encoded(wb, encoding, value);
+
+    if(expected)
+        errors += buffer_expect(wb, expected);
+
+    int64_t v = str2ll_encoded(buffer_tostring(wb));
+    if(v != value) {
+        error("BUFFER: string '%s' does resolves to %lld, expected %lld",
+              buffer_tostring(wb), (long long)v, (long long)value);
+        errors++;
+    }
+    buffer_flush(wb);
+    return errors;
+}
+
+static int buffer_double_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value, const char *expected) {
+    int errors = 0;
+    buffer_flush(wb);
+    buffer_print_netdata_double_encoded(wb, encoding, value);
+
+    if(expected)
+        errors += buffer_expect(wb, expected);
+
+    NETDATA_DOUBLE v = str2ndd_encoded(buffer_tostring(wb), NULL);
+    if(v != value) {
+        error("BUFFER: string '%s' does resolves to %.12f, expected %.12f",
+              buffer_tostring(wb), v, value);
+        errors++;
+    }
+    buffer_flush(wb);
+    return errors;
+}
+
 int buffer_unittest(void) {
     int errors = 0;
     BUFFER *wb = buffer_create(0, NULL);
 
-    buffer_print_uint64_hex(wb, 1676071986);
-    errors += buffer_expect(wb, "0x63E6D432");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 0, "0");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_HEX, 0, "0x0");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_BASE64, 0, "#A");
 
-    buffer_flush(wb);
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 1676071986, "1676071986");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_HEX, 1676071986, "0x63E6D432");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_BASE64, 1676071986, "#Bj5tQy");
 
-    buffer_print_int64_hex(wb, -1676071986);
-    errors += buffer_expect(wb, "-0x63E6D432");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 18446744073709551615ULL, "18446744073709551615");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_HEX, 18446744073709551615ULL, "0xFFFFFFFFFFFFFFFF");
+    buffer_uint64_roundtrip(wb, NUMBER_ENCODING_BASE64, 18446744073709551615ULL, "#P//////////");
+
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 0, "0");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, 0, "0x0");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, 0, "#A");
+
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, -1676071986, "-1676071986");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, -1676071986, "-0x63E6D432");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, -1676071986, "-#Bj5tQy");
+
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, (int64_t)-9223372036854775807ULL, "-9223372036854775807");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, (int64_t)-9223372036854775807ULL, "-0x7FFFFFFFFFFFFFFF");
+    buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, (int64_t)-9223372036854775807ULL, "-#H//////////");
+
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 0, "0");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 0, "%0");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 0, "@A");
+
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 1.5, "1.5");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 1.5, "%3FF8000000000000");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 1.5, "@D/4AAAAAAAA");
+
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 1.23e+14, "123000000000000");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 1.23e+14, "%42DBF78AD3AC0000");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 1.23e+14, "@ELb94rTrAAA");
+
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 9.12345678901234567890123456789e+45, "9.12345678901234614e+45");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 9.12345678901234567890123456789e+45, "%497991C25C9E4309");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 9.12345678901234567890123456789e+45, "@El5kcJcnkMJ");
 
     buffer_flush(wb);
 
@@ -386,7 +492,7 @@ int buffer_unittest(void) {
     buffer_json_member_add_object(wb, "object1");
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_finalize(wb);
-    errors += buffer_expect(wb, "{\n \"hello\":\"world\",\n \"alpha\":\"this: \\\" is a double quote\",\n \"object1\":{\n  \"hello\":\"world\"\n }\n}");
+    errors += buffer_expect(wb, "{\n    \"hello\":\"world\",\n    \"alpha\":\"this: \\\" is a double quote\",\n    \"object1\":{\n        \"hello\":\"world\"\n    }\n}");
 
     return errors;
 }

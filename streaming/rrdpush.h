@@ -57,7 +57,7 @@ typedef enum {
 
 STREAM_CAPABILITIES stream_our_capabilities();
 
-#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)))
+#define stream_has_capability(rpt, capability) ((rpt) && ((rpt)->capabilities & (capability)) == (capability))
 
 // ----------------------------------------------------------------------------
 // stream handshake
@@ -304,7 +304,7 @@ bool rrdpush_receiver_needs_dbengine();
 int configured_as_parent();
 
 typedef struct rrdset_stream_buffer {
-    bool ieee754;
+    STREAM_CAPABILITIES capabilities;
     bool v2;
     bool begin_v2_added;
     time_t wall_clock_time;

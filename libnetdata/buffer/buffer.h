@@ -9,6 +9,11 @@
 
 #define BUFFER_JSON_MAX_DEPTH 32
 
+extern const char hex_digits[16];
+extern const char base64_digits[64];
+extern unsigned char hex_value_from_ascii[256];
+extern unsigned char base64_value_from_ascii[256];
+
 typedef enum __attribute__ ((__packed__)) {
     BUFFER_JSON_EMPTY = 0,
     BUFFER_JSON_OBJECT,
@@ -253,20 +258,25 @@ static inline char *print_uint32_hex_reversed(char *dst, uint32_t value) {
 }
 
 static inline char *print_uint64_hex_reversed(char *dst, uint64_t value) {
-    static const char *digits = "0123456789ABCDEF";
 #ifdef ENV32BIT
     if(value <= (uint64_t)0xffffffff)
         return print_uint32_hex_reversed(dst, value);
 
     char *d = dst;
-    do *d++ = digits[value & 0xf]; while((value >>= 4) && value > (uint64_t)0xffffffff);
+    do *d++ = hex_digits[value & 0xf]; while((value >>= 4) && value > (uint64_t)0xffffffff);
     if(value) return print_uint32_hex_reversed(d, value);
     return d;
 #else
     char *d = dst;
-    do *d++ = digits[value & 0xf]; while((value >>= 4));
+    do *d++ = hex_digits[value & 0xf]; while((value >>= 4));
     return d;
 #endif
+}
+
+static inline char *print_uint64_base64_reversed(char *dst, uint64_t value) {
+    char *d = dst;
+    do *d++ = base64_digits[value & 63]; while ((value >>= 6));
+    return d;
 }
 
 static inline void char_array_reverse(char *from, char *to) {
@@ -361,10 +371,24 @@ static inline void buffer_print_int64(BUFFER *wb, int64_t value) {
 static inline void buffer_print_uint64_hex(BUFFER *wb, uint64_t value) {
     buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1);
 
-    buffer_fast_strcat(wb, "0x", 2);
+    buffer_fast_strcat(wb, HEX_PREFIX, sizeof(HEX_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
     char *d = print_uint64_hex_reversed(s, value);
+    char_array_reverse(s, d - 1);
+    *d = '\0';
+    wb->len += d - s;
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
+    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1);
+
+    buffer_fast_strcat(wb, IEEE754_UINT64_B64_PREFIX, sizeof(IEEE754_UINT64_B64_PREFIX) - 1);
+
+    char *s = &wb->buffer[wb->len];
+    char *d = print_uint64_base64_reversed(s, value);
     char_array_reverse(s, d - 1);
     *d = '\0';
     wb->len += d - s;
@@ -381,6 +405,19 @@ static inline void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     }
 
     buffer_print_uint64_hex(wb, (uint64_t)value);
+
+    buffer_overflow_check(wb);
+}
+
+static inline void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
+    buffer_need_bytes(wb, 2);
+
+    if(value < 0) {
+        buffer_fast_strcat(wb, "-", 1);
+        value = -value;
+    }
+
+    buffer_print_uint64_base64(wb, (uint64_t)value);
 
     buffer_overflow_check(wb);
 }
@@ -406,7 +443,7 @@ static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE va
     buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
 
     uint64_t *ptr = (uint64_t *) (&value);
-    buffer_fast_strcat(wb, IEEE754_DOUBLE_PREFIX, sizeof(IEEE754_DOUBLE_PREFIX) - 1);
+    buffer_fast_strcat(wb, IEEE754_DOUBLE_HEX_PREFIX, sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1);
 
     char *s = &wb->buffer[wb->len];
     char *d = print_uint64_hex_reversed(s, *ptr);
@@ -415,6 +452,57 @@ static inline void buffer_print_netdata_double_hex(BUFFER *wb, NETDATA_DOUBLE va
     wb->len += d - s;
 
     buffer_overflow_check(wb);
+}
+
+static inline void buffer_print_netdata_double_base64(BUFFER *wb, NETDATA_DOUBLE value) {
+    buffer_need_bytes(wb, sizeof(uint64_t) * 2 + 2 + 1 + 1);
+
+    uint64_t *ptr = (uint64_t *) (&value);
+    buffer_fast_strcat(wb, IEEE754_DOUBLE_B64_PREFIX, sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1);
+
+    char *s = &wb->buffer[wb->len];
+    char *d = print_uint64_base64_reversed(s, *ptr);
+    char_array_reverse(s, d - 1);
+    *d = '\0';
+    wb->len += d - s;
+
+    buffer_overflow_check(wb);
+}
+
+typedef enum {
+    NUMBER_ENCODING_DECIMAL,
+    NUMBER_ENCODING_HEX,
+    NUMBER_ENCODING_BASE64,
+} NUMBER_ENCODING;
+
+static inline void buffer_print_int64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, int64_t value) {
+    if(encoding == NUMBER_ENCODING_BASE64)
+        return buffer_print_int64_base64(wb, value);
+
+    if(encoding == NUMBER_ENCODING_HEX)
+        return buffer_print_int64_hex(wb, value);
+
+    return buffer_print_int64(wb, value);
+}
+
+static inline void buffer_print_uint64_encoded(BUFFER *wb, NUMBER_ENCODING encoding, uint64_t value) {
+    if(encoding == NUMBER_ENCODING_BASE64)
+        return buffer_print_uint64_base64(wb, value);
+
+    if(encoding == NUMBER_ENCODING_HEX)
+        return buffer_print_uint64_hex(wb, value);
+
+    return buffer_print_uint64(wb, value);
+}
+
+static inline void buffer_print_netdata_double_encoded(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value) {
+    if(encoding == NUMBER_ENCODING_BASE64)
+        return buffer_print_netdata_double_base64(wb, value);
+
+    if(encoding == NUMBER_ENCODING_HEX)
+        return buffer_print_netdata_double_hex(wb, value);
+
+    return buffer_print_netdata_double(wb, value);
 }
 
 static inline void buffer_print_spaces(BUFFER *wb, size_t spaces) {

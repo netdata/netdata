@@ -1320,6 +1320,7 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
 int pluginsd_parser_unittest(void);
+int buffer_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
@@ -1449,6 +1450,8 @@ int main(int argc, char **argv) {
                                 return 1;
                             if (unit_test_str2ld())
                                 return 1;
+                            if (buffer_unittest())
+                                return 1;
                             if (unit_test_bitmap256())
                                 return 1;
                             // No call to load the config file on this code-path
@@ -1485,15 +1488,6 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "escapetest") == 0) {
                             return command_argument_sanitization_tests();
                         }
-#ifdef ENABLE_DBENGINE
-                        else if(strcmp(optarg, "mctest") == 0) {
-                            unittest_running = true;
-                            return mc_unittest();
-                        }
-                        else if(strcmp(optarg, "ctxtest") == 0) {
-                            unittest_running = true;
-                            return ctx_unittest();
-                        }
                         else if(strcmp(optarg, "dicttest") == 0) {
                             unittest_running = true;
                             return dictionary_unittest(10000);
@@ -1510,6 +1504,19 @@ int main(int argc, char **argv) {
                             unittest_running = true;
                             return rrdlabels_unittest();
                         }
+                        else if(strcmp(optarg, "buffertest") == 0) {
+                            unittest_running = true;
+                            return buffer_unittest();
+                        }
+#ifdef ENABLE_DBENGINE
+                        else if(strcmp(optarg, "mctest") == 0) {
+                            unittest_running = true;
+                            return mc_unittest();
+                        }
+                        else if(strcmp(optarg, "ctxtest") == 0) {
+                            unittest_running = true;
+                            return ctx_unittest();
+                        }
                         else if(strcmp(optarg, "metatest") == 0) {
                             unittest_running = true;
                             return metadata_unittest();
@@ -1525,10 +1532,6 @@ int main(int argc, char **argv) {
                         else if(strcmp(optarg, "julytest") == 0) {
                             unittest_running = true;
                             return julytest();
-                        }
-                        else if(strcmp(optarg, "buffertest") == 0) {
-                            unittest_running = true;
-                            return buffer_unittest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);

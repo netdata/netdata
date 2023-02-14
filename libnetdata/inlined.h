@@ -84,24 +84,6 @@ static inline uint32_t fnv1a_uhash32(const char *name) {
 #define simple_hash(s) fnv1a_hash32(s)
 #define simple_uhash(s) fnv1a_uhash32(s)
 
-static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
-    size_t total = 0;
-
-    total += (ptr & 0xff) >> 0;
-    total += (ptr & 0xff00) >> 8;
-    total += (ptr & 0xff0000) >> 16;
-    total += (ptr & 0xff000000) >> 24;
-
-    if(sizeof(Word_t) > 4) {
-        total += (ptr & 0xff00000000) >> 32;
-        total += (ptr & 0xff0000000000) >> 40;
-        total += (ptr & 0xff000000000000) >> 48;
-        total += (ptr & 0xff00000000000000) >> 56;
-    }
-
-    return (total % modulo);
-}
-
 static uint32_t murmur32(uint32_t k) __attribute__((const));
 static inline uint32_t murmur32(uint32_t k) {
     k ^= k >> 16;
@@ -222,39 +204,39 @@ static inline long long str2ll(const char *s, char **endptr) {
     }
 }
 
-static inline uint64_t str2uint64_hex(const char *s, char **endptr) {
-    uint64_t n = 0;
+static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
+    uint64_t num = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char c;
 
-    while((*s >= '0' && *s <= '9') || (*s >= 'A' && *s <= 'F')) {
-        n = n << 4;
-
-        if (*s <= '9')
-            n += *s++ - '0';
-        else
-            n += *s++ - 'A' + 10;
+    while ((c = hex_value_from_ascii[*s]) != 255) {
+        num = (num << 4) | c;
+        s++;
     }
 
     if(endptr)
         *endptr = (char *)s;
 
-    return n;
+    return num;
 }
 
-static inline unsigned long long str2ull_hex_or_dec(const char *s) {
-    if(likely(s[0] == '0' && s[1] == 'x'))
-        return str2uint64_hex(s + 2, NULL);
-    else
-        return str2uint64_t(s, NULL);
+static inline uint64_t str2uint64_base64(const char *src, char **endptr) {
+    uint64_t num = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char c;
+
+    while ((c = base64_value_from_ascii[*s]) != 255) {
+        num = (num << 6) | c;
+        s++;
+    }
+
+    if(endptr)
+        *endptr = (char *)s;
+
+    return num;
 }
 
-static inline long long str2ll_hex_or_dec(const char *s) {
-    if(*s == '-')
-        return -(long long)str2ull_hex_or_dec(&s[1]);
-    else
-        return (long long)str2ull_hex_or_dec(s);
-}
-
-static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *digits) {
+static inline NETDATA_DOUBLE str2ndd_parse_double_decimal_digits_internal(const char *src, int *digits) {
     const char *s = src;
     NETDATA_DOUBLE n = 0.0;
 
@@ -277,13 +259,6 @@ static inline NETDATA_DOUBLE _str2ndd_parse_double_digits(const char *src, int *
 
 static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
     const char *s = src;
-
-    if(s[0] == IEEE754_DOUBLE_PREFIX[0] && s[1] == IEEE754_DOUBLE_PREFIX[1]) {
-        // double parsing from hex
-        uint64_t n = str2uint64_hex(s + 2, endptr);
-        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *)(&n);
-        return *ptr;
-    }
 
     NETDATA_DOUBLE sign = 1.0;
     NETDATA_DOUBLE result;
@@ -327,12 +302,12 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
             break;
     }
 
-    result = _str2ndd_parse_double_digits(s, &integral_digits);
+    result = str2ndd_parse_double_decimal_digits_internal(s, &integral_digits);
     s += integral_digits;
 
     if(unlikely(*s == '.')) {
         s++;
-        fractional = _str2ndd_parse_double_digits(s, &fractional_digits);
+        fractional = str2ndd_parse_double_decimal_digits_internal(s, &fractional_digits);
         s += fractional_digits;
     }
 
@@ -348,7 +323,7 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
         else if(*s == '+')
             s++;
 
-        exponent = _str2ndd_parse_double_digits(s, &exponent_digits);
+        exponent = str2ndd_parse_double_decimal_digits_internal(s, &exponent_digits);
         if(unlikely(!exponent_digits)) {
             exponent = 0;
             s = e_ptr;
@@ -369,6 +344,41 @@ static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
         result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
 
     return sign * result;
+}
+
+static inline unsigned long long str2ull_encoded(const char *s) {
+    if(*s == IEEE754_UINT64_B64_PREFIX[0])
+        return str2uint64_base64(s + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, NULL);
+
+    if(s[0] == HEX_PREFIX[0] && s[1] == HEX_PREFIX[1])
+        return str2uint64_hex(s + 2, NULL);
+
+    return str2uint64_t(s, NULL);
+}
+
+static inline long long str2ll_encoded(const char *s) {
+    if(*s == '-')
+        return -(long long) str2ull_encoded(&s[1]);
+    else
+        return (long long) str2ull_encoded(s);
+}
+
+static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
+    if (*src == IEEE754_DOUBLE_B64_PREFIX[0]) {
+        // double parsing from base64
+        uint64_t n = str2uint64_base64(src + sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1, endptr);
+        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
+        return *ptr;
+    }
+
+    if (*src == IEEE754_DOUBLE_HEX_PREFIX[0]) {
+        // double parsing from hex
+        uint64_t n = str2uint64_hex(src + sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1, endptr);
+        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
+        return *ptr;
+    }
+
+    return str2ndd(src, endptr);
 }
 
 static inline char *strncpyz(char *dst, const char *src, size_t n) {

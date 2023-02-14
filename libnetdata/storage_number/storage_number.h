@@ -164,7 +164,12 @@ static inline NETDATA_DOUBLE unpack_storage_number(storage_number value) {
     return sign * unpack_storage_number_lut10x[(factor * 16) + (exp * 8) + mul] * n;
 }
 
-#define IEEE754_DOUBLE_PREFIX "0d"
+// all these prefixes should use characters that are not allowed in the numbers they represent
+#define HEX_PREFIX "0x"               // we check 2 characters when parsing
+#define IEEE754_UINT64_B64_PREFIX "#" // we check the 1st character during parsing
+#define IEEE754_DOUBLE_B64_PREFIX "@" // we check the 1st character during parsing
+#define IEEE754_DOUBLE_HEX_PREFIX "%" // we check the 1st character during parsing
+
 bool is_system_ieee754_double(void);
 
 #endif /* NETDATA_STORAGE_NUMBER_H */

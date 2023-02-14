@@ -213,6 +213,7 @@ static struct replication_query *replication_query_prepare(
 }
 
 static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STREAM_CAPABILITIES capabilities) {
+    NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
                 if (!rd->exposed) continue;
@@ -221,40 +222,22 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
                                    sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
                 buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
                 buffer_fast_strcat(wb, "' ", 2);
-                if (capabilities & STREAM_CAP_IEEE754) {
-                    buffer_print_uint64_hex(wb, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
-                                                (usec_t) rd->last_collected_time.tv_usec);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_int64_hex(wb, rd->last_collected_value);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_netdata_double_hex(wb, rd->last_calculated_value);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_netdata_double_hex(wb, rd->last_stored_value);
-                } else {
-                    buffer_print_uint64(wb, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
+                buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
                                             (usec_t) rd->last_collected_time.tv_usec);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_int64(wb, rd->last_collected_value);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_netdata_double(wb, rd->last_calculated_value);
-                    buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_netdata_double(wb, rd->last_stored_value);
-                }
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+                buffer_fast_strcat(wb, " ", 1);
+                buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
                 buffer_fast_strcat(wb, "\n", 1);
             }
     rrddim_foreach_done(rd);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
-    if (capabilities & STREAM_CAP_IEEE754) {
-        buffer_print_uint64_hex(wb, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
-    }
-    else {
-        buffer_print_uint64(wb, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64(wb, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
-    }
+    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
     buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -324,6 +307,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
 static bool replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     replication_query_align_to_optimal_before(q);
 
+    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
@@ -455,21 +439,11 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             last_end_time_in_buffer = min_end_time;
 
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
-
-            if(q->query.capabilities & STREAM_CAP_IEEE754) {
-                buffer_print_uint64_hex(wb, min_start_time);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_uint64_hex(wb, min_end_time);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_uint64_hex(wb, wall_clock_time);
-            }
-            else {
-                buffer_print_uint64(wb, min_start_time);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_uint64(wb, min_end_time);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_uint64(wb, wall_clock_time);
-            }
+            buffer_print_uint64_encoded(wb, encoding, min_start_time);
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, encoding, min_end_time);
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
             buffer_fast_strcat(wb, "\n", 1);
 
             // output the replay values for this time
@@ -485,12 +459,7 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
-
-                    if(q->query.capabilities & STREAM_CAP_IEEE754)
-                        buffer_print_netdata_double_hex(wb, d->sp.sum);
-                    else
-                        buffer_print_netdata_double(wb, d->sp.sum);
-
+                    buffer_print_netdata_double_encoded(wb, encoding, d->sp.sum);
                     buffer_fast_strcat(wb, " ", 1);
                     buffer_print_sn_flags(wb, d->sp.flags, q->query.capabilities & STREAM_CAP_INTERPOLATED);
                     buffer_fast_strcat(wb, "\n", 1);
@@ -614,6 +583,7 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
 bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size) {
+    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
@@ -639,7 +609,6 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     time_t after = q->request.after;
     time_t before = q->query.before;
     bool enable_streaming = q->query.enable_streaming;
-    STREAM_CAPABILITIES capabilities = q->query.capabilities;
 
     replication_query_finalize(wb, q, q->query.execute);
     q = NULL; // IMPORTANT: q is invalid now
@@ -653,56 +622,20 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // last end time of the data we sent
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
-    if(capabilities & STREAM_CAP_IEEE754) {
-        buffer_print_int64_hex(wb, st->update_every);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, db_first_entry);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, db_last_entry);
+    buffer_print_int64_encoded(wb, encoding, st->update_every);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, db_first_entry);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, db_last_entry);
 
-        buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
+    buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
 
-        buffer_print_uint64_hex(wb, after);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, before);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64_hex(wb, wall_clock_time);
-        buffer_fast_strcat(wb, "\n", 1);
-    }
-    else {
-        buffer_print_int64(wb, st->update_every);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64(wb, db_first_entry);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64(wb, db_last_entry);
-
-        buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
-
-        buffer_print_uint64(wb, after);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64(wb, before);
-        buffer_fast_strcat(wb, " ", 1);
-        buffer_print_uint64(wb, wall_clock_time);
-        buffer_fast_strcat(wb, "\n", 1);
-    }
-
-//    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",
-//
-//                   // current chart update every
-//                   (int)st->update_every
-//
-//                   // child first db time, child end db time
-//                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
-//
-//                   // start streaming boolean
-//                   , enable_streaming ? "true" : "false"
-//
-//                   // after requested, before requested ('before' can be altered by the child when the request had enable_streaming true)
-//                   , (unsigned long long)after, (unsigned long long)before
-//
-//                   // child world clock time
-//                   , (unsigned long long)wall_clock_time
-//                   );
+    buffer_print_uint64_encoded(wb, encoding, after);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, before);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+    buffer_fast_strcat(wb, "\n", 1);
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
