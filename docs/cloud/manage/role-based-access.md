@@ -24,6 +24,17 @@ being able to join any room. We also aligned the offered roles to the target aud
 | **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: |
 | **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: |
 
+#### What happens to the previous Member role?
+
+We don't want to disrupt your current access rights. Users that currently have the legacy Member role, will not lose their access, or permissions. The impact is:
+* Any new users you invite on the COMMUNITY plan, must be Administrators
+* The role Member is deprecated and won’t be selectable in any of the plans
+* Current Members will not be able to invite other users to the space, since they would only be able to invite Members which is deprecated
+
+Summary:
+* If you don’t upgrade, keep your space on Community plan: You don’t need to do anything with your existing users, they will not notice a difference.
+* If you do upgrade, move to one of the paid plans: We suggest you reassign your existing Members to one of the new roles, depending on their needs.
+
 #### Which functionalities are available for each role?
 
 In more detail, you can find on the following tables which functionalities are available for each role on each domain.
