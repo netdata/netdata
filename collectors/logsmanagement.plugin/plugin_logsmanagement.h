@@ -14,6 +14,7 @@ struct Chart_meta;
 
 #include "plugin_logsmanagement_generic.h"
 #include "plugin_logsmanagement_web_log.h"
+#include "plugin_logsmanagement_kernel.h"
 #include "plugin_logsmanagement_systemd.h"
 #include "plugin_logsmanagement_docker_ev.h"
 
@@ -31,10 +32,11 @@ struct Chart_meta {
     long base_prio;
 
     union {
-        chart_data_generic_t *chart_data_generic;
-        chart_data_web_log_t *chart_data_web_log;
-        chart_data_systemd_t *chart_data_systemd;
-        chart_data_docker_ev_t *chart_data_docker_ev;
+        chart_data_generic_t    *chart_data_generic;
+        chart_data_web_log_t    *chart_data_web_log;
+        chart_data_kernel_t     *chart_data_kernel;
+        chart_data_systemd_t    *chart_data_systemd;
+        chart_data_docker_ev_t  *chart_data_docker_ev;
     };
 
     Chart_data_cus_t **chart_data_cus_arr;

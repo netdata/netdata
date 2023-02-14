@@ -90,4 +90,3 @@ void docker_ev_chart_update(struct File_info *p_file_info, struct Chart_meta *ch
         rrdset_done(chart_data->st_dock_ev_type);
     }
 }
-

@@ -68,7 +68,10 @@ static void p_file_info_destroy(struct File_info *p_file_info){
                 freez(p_file_info->parser_metrics->web_log);
                 break;
             }
-            case FLB_KMSG:
+            case FLB_KMSG: {
+                freez(p_file_info->parser_metrics->kernel);
+                break;
+            }
             case FLB_SYSTEMD: 
             case FLB_SYSLOG: {
                 freez(p_file_info->parser_metrics->systemd);
@@ -442,9 +445,12 @@ static void logs_management_init(struct section *config_section){
             }
         }
     }
-    else if(p_file_info->log_type == FLB_KMSG || 
-            p_file_info->log_type == FLB_SYSTEMD || 
-            p_file_info->log_type == FLB_SYSLOG){
+    else if(p_file_info->log_type == FLB_KMSG){
+        if(appconfig_get_boolean(&log_management_config, config_section->name, "severity chart", 0)) {
+            p_file_info->parser_config->chart_config |= CHART_SYSLOG_SEVER;
+        }
+    }
+    else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG){
         if(p_file_info->log_type == FLB_SYSLOG){
             Syslog_parser_config_t *syslog_config = (Syslog_parser_config_t *) callocz(1, sizeof(Syslog_parser_config_t));
 
@@ -526,7 +532,10 @@ static void logs_management_init(struct section *config_section){
             p_file_info->parser_metrics->web_log = callocz(1, sizeof(Web_log_metrics_t));
             break;
         }
-        case FLB_KMSG:
+        case FLB_KMSG: {
+            p_file_info->parser_metrics->kernel = callocz(1, sizeof(Kernel_metrics_t));
+            break;
+        }
         case FLB_SYSTEMD: 
         case FLB_SYSLOG: {
             p_file_info->parser_metrics->systemd = callocz(1, sizeof(Systemd_metrics_t));

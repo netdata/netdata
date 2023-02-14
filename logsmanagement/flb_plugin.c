@@ -242,8 +242,19 @@ void flb_tmp_buff_cpy_timer_cb(uv_timer_t *handle) {
 
     circ_buff_insert(buff);
 
-    /* Extract systemd, syslog and docker events metrics */
-    if(p_file_info->log_type == FLB_KMSG || p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
+    /* Extract kernel logs, systemd, syslog and docker events metrics */
+    if(p_file_info->log_type == FLB_KMSG){
+        uv_mutex_lock(p_file_info->parser_metrics_mut);
+        p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_kernel_metrics.num_lines;
+        p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_kernel_metrics.num_lines;
+        p_file_info->flb_tmp_kernel_metrics.num_lines = 0;
+        for(int i = 0; i < SYSLOG_SEVER_ARR_SIZE; i++){
+            p_file_info->parser_metrics->kernel->sever[i] = p_file_info->flb_tmp_kernel_metrics.sever[i];
+            p_file_info->flb_tmp_kernel_metrics.sever[i] = 0;
+        }
+        uv_mutex_unlock(p_file_info->parser_metrics_mut);
+    }
+    else if(p_file_info->log_type == FLB_SYSTEMD || p_file_info->log_type == FLB_SYSLOG) {
         uv_mutex_lock(p_file_info->parser_metrics_mut);
         p_file_info->parser_metrics->num_lines_total += p_file_info->flb_tmp_systemd_metrics.num_lines;
         p_file_info->parser_metrics->num_lines_rate = p_file_info->flb_tmp_systemd_metrics.num_lines;
@@ -449,7 +460,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
                             new_tmp_text_size += message_size + 1; // +1 for '\n'
                         }
                         else if(!strncmp(p->key.via.str.ptr, "priority", (size_t) p->key.via.str.size)){
-                            p_file_info->flb_tmp_systemd_metrics.sever[p->val.via.u64]++;
+                            p_file_info->flb_tmp_kernel_metrics.sever[p->val.via.u64]++;
                         }
                         ++p;
                         continue;
@@ -646,9 +657,7 @@ static int flb_write_to_buff_cb(void *record, size_t size, void *data){
     if(p_file_info->log_type == FLB_KMSG){
 
         /* Parse number of log lines */
-        p_file_info->flb_tmp_systemd_metrics.num_lines++;
-
-        error("newsz:%zu", new_tmp_text_size);
+        p_file_info->flb_tmp_kernel_metrics.num_lines++;
 
         /* Metrics extracted, now prepare circular buffer for write */
         // TODO: Fix: Metrics will still be collected if circ_buff_prepare_write() returns 0.

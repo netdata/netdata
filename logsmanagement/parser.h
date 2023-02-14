@@ -204,6 +204,19 @@ int parse_web_log_buf(  char *text, size_t text_size,
 /* -------------------------------------------------------------------------- */
 
 #define SYSLOG_SEVER_ARR_SIZE 9         /**< Number of severity levels plus 1 for 'unknown' **/
+
+typedef struct kernel_metrics{
+    unsigned int num_lines;				            /**< Number of parsed lines **/
+    unsigned int sever[SYSLOG_SEVER_ARR_SIZE];      /**< Syslog severity, 0-7 plus 1 space for 'unknown' **/
+} Kernel_metrics_t;
+
+/* -------------------------------------------------------------------------- */
+
+
+/* -------------------------------------------------------------------------- */
+/*                        Systemd and Syslog metrics                          */
+/* -------------------------------------------------------------------------- */
+
 #define SYSLOG_FACIL_ARR_SIZE 25        /**< Number of facility levels plus 1 for 'unknown' **/
 #define SYSLOG_PRIOR_ARR_SIZE 193       /**< Number of priority values plus 1 for 'unknown' **/
 
@@ -317,6 +330,7 @@ struct log_parser_metrics{
     unsigned long long num_lines_rate;  /**< Number of new lines parsed. */
     union {
         Web_log_metrics_t *web_log;
+        Kernel_metrics_t *kernel;
         Systemd_metrics_t *systemd;
         Docker_ev_metrics_t *docker_ev;
     };	

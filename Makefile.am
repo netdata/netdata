@@ -282,6 +282,8 @@ LOGSMANAGEMENT_PLUGIN_FILES = \
     collectors/logsmanagement.plugin/plugin_logsmanagement_docker_ev.h \
     collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.c \
     collectors/logsmanagement.plugin/plugin_logsmanagement_systemd.h \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.c \
+    collectors/logsmanagement.plugin/plugin_logsmanagement_kernel.h \
     collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.c \
     collectors/logsmanagement.plugin/plugin_logsmanagement_web_log.h \
     collectors/logsmanagement.plugin/plugin_logsmanagement_generic.c \
