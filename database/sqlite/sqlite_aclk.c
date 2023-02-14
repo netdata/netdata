@@ -43,54 +43,6 @@ void sanity_check(void) {
 //    aclk_database_enq_cmd(wc, &cmd);
 //}
 
-static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
-{
-    debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
-    struct aclk_database_cmd cmd;
-    memset(&cmd, 0, sizeof(cmd));
-    cmd.opcode = ACLK_DATABASE_DELETE_HOST;
-    cmd.param[0] = strdupz((char *) argv[0]);
-    aclk_database_enq_cmd_noblock(&cmd);
-    return 0;
-}
-
-#define SQL_SELECT_ACLK_ACTIVE_LIST "SELECT REPLACE(SUBSTR(name,19),'_','-') FROM sqlite_schema " \
-        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table');"
-
-static void sql_check_aclk_table_list(void)
-{
-    char *err_msg = NULL;
-    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
-    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, NULL, &err_msg);
-    if (rc != SQLITE_OK) {
-        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
-        sqlite3_free(err_msg);
-    }
-}
-
-static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
-{
-    char sql[512];
-    snprintf(sql,511, "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
-                        "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
-    if (unlikely(db_execute(sql)))
-        error_report("Failed to clean stale ACLK alert entries");
-    return 0;
-}
-
-#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table');"
-
-static void sql_maint_aclk_sync_database_all(void)
-{
-    char *err_msg = NULL;
-    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
-    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ALERT_LIST, sql_maint_aclk_sync_database, NULL, &err_msg);
-    if (rc != SQLITE_OK) {
-        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
-        sqlite3_free(err_msg);
-    }
-}
-
 #define SQL_SELECT_HOST_BY_UUID  "SELECT host_id FROM host WHERE host_id = @host_id;"
 
 static int is_host_available(uuid_t *host_id)
@@ -297,7 +249,7 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         , (const char *) argv[IDX_OS]
         , (const char *) argv[IDX_TIMEZONE]
         , (const char *) argv[IDX_ABBREV_TIMEZONE]
-        , argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0
+        , (int32_t) (argv[IDX_UTC_OFFSET] ? str2uint32_t(argv[IDX_UTC_OFFSET], NULL) : 0)
         , (const char *) argv[IDX_TAGS]
         , (const char *) (argv[IDX_PROGRAM_NAME] ? argv[IDX_PROGRAM_NAME] : "unknown")
         , (const char *) (argv[IDX_PROGRAM_VERSION] ? argv[IDX_PROGRAM_VERSION] : "unknown")
@@ -328,6 +280,55 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
 }
 
 #ifdef ENABLE_ACLK
+static int sql_check_aclk_table(void *data __maybe_unused, int argc __maybe_unused, char **argv __maybe_unused, char **column __maybe_unused)
+{
+    debug(D_ACLK_SYNC,"Scheduling aclk sync table check for node %s", (char *) argv[0]);
+    struct aclk_database_cmd cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.opcode = ACLK_DATABASE_DELETE_HOST;
+    cmd.param[0] = strdupz((char *) argv[0]);
+    aclk_database_enq_cmd_noblock(&cmd);
+    return 0;
+}
+
+#define SQL_SELECT_ACLK_ACTIVE_LIST "SELECT REPLACE(SUBSTR(name,19),'_','-') FROM sqlite_schema " \
+        "WHERE name LIKE 'aclk_chart_latest_%' AND type IN ('table');"
+
+static void sql_check_aclk_table_list(void)
+{
+    char *err_msg = NULL;
+    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
+    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ACTIVE_LIST, sql_check_aclk_table, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+}
+
+static int sql_maint_aclk_sync_database(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
+{
+    char sql[512];
+    snprintf(sql,511, "DELETE FROM aclk_alert_%s WHERE date_submitted IS NOT NULL AND "
+                       "CAST(date_cloud_ack AS INT) < unixepoch()-%d;", (char *) argv[0], ACLK_DELETE_ACK_ALERTS_INTERNAL);
+    if (unlikely(db_execute(sql)))
+        error_report("Failed to clean stale ACLK alert entries");
+    return 0;
+}
+
+
+#define SQL_SELECT_ACLK_ALERT_LIST "SELECT SUBSTR(name,12) FROM sqlite_schema WHERE name LIKE 'aclk_alert_%' AND type IN ('table');"
+
+static void sql_maint_aclk_sync_database_all(void)
+{
+    char *err_msg = NULL;
+    debug(D_ACLK_SYNC,"Cleaning tables for nodes that do not exist");
+    int rc = sqlite3_exec_monitored(db_meta, SQL_SELECT_ACLK_ALERT_LIST, sql_maint_aclk_sync_database, NULL, &err_msg);
+    if (rc != SQLITE_OK) {
+        error_report("Query failed when trying to check for obsolete ACLK sync tables, %s", err_msg);
+        sqlite3_free(err_msg);
+    }
+}
+
 static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_unused, char **argv, char **column __maybe_unused)
 {
     char uuid_str[GUID_LEN + 1];
@@ -340,7 +341,6 @@ static int aclk_config_parameters(void *data __maybe_unused, int argc __maybe_un
     sql_create_aclk_table(host, (uuid_t *) argv[0], (uuid_t *) argv[1]);
     return 0;
 }
-#endif
 
 static void async_cb(uv_async_t *handle)
 {
@@ -354,8 +354,6 @@ static void timer_cb(uv_timer_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
-
-#ifdef ENABLE_ACLK
 
     struct aclk_sync_config_s *config = handle->data;
     struct aclk_database_cmd cmd;
@@ -375,7 +373,6 @@ static void timer_cb(uv_timer_t *handle)
 
         aclk_check_node_info_and_collectors();
     }
-#endif
 }
 
 static void aclk_synchronization(void *arg __maybe_unused)
@@ -481,6 +478,17 @@ static void aclk_synchronization(void *arg __maybe_unused)
     info("ACLK SYNC: Shutting down ACLK synchronization event loop");
 }
 
+static void aclk_synchronization_init(void)
+{
+    aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
+    aclk_sync_config.queue_size = 0;
+    fatal_assert(0 == uv_cond_init(&aclk_sync_config.cmd_cond));
+    fatal_assert(0 == uv_mutex_init(&aclk_sync_config.cmd_mutex));
+
+    fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
+}
+#endif
+
 // -------------------------------------------------------------
 
 void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __maybe_unused, uuid_t *node_id __maybe_unused)
@@ -527,18 +535,6 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     wc->node_info_send = 1;
 #endif
 }
-
-#ifdef ENABLE_ACLK
-static void aclk_synchronization_init(void)
-{
-    aclk_sync_config.cmd_queue.head = aclk_sync_config.cmd_queue.tail = 0;
-    aclk_sync_config.queue_size = 0;
-    fatal_assert(0 == uv_cond_init(&aclk_sync_config.cmd_cond));
-    fatal_assert(0 == uv_mutex_init(&aclk_sync_config.cmd_mutex));
-
-    fatal_assert(0 == uv_thread_create(&aclk_sync_config.thread, aclk_synchronization, &aclk_sync_config));
-}
-#endif
 
 void sql_aclk_sync_init(void)
 {
