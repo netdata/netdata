@@ -79,7 +79,7 @@ the `warn` and `crit` lines to the values of your choosing. For example:
 ```
 
 You _can_ restart Netdata with `sudo systemctl restart netdata`, to enable your tune, but you can also reload _only_ the
-health monitoring component using one of the available [methods](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#reload-health-configuration).
+health monitoring component using one of the available [methods](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md#reload-health-configuration).
 
 You can also tune any other aspect of the default alarms. To better understand how each line in a health entity works,
 read our [health documentation](https://github.com/netdata/netdata/blob/master/health/README.md).

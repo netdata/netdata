@@ -14,7 +14,7 @@ learn_rel_path: "Guides"
 
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) to fetch metrics from hundreds of system,
+The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to fetch metrics from hundreds of system,
 container, and service endpoints. While the Netdata team and community has built [powerful
 collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for most system, container, and service/application endpoints, there are plenty
 of custom applications that can't be monitored by default.
@@ -33,7 +33,7 @@ covered here, or use the included examples for collecting and organizing either 
 ## What you need to get started
 
 - A physical or virtual Linux system, which we'll call a _node_.
-- A working installation of the free and open-source [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) monitoring agent.
+- A working installation of the free and open-source [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
 
 ## Jobs and elements of a Python collector
 

@@ -62,7 +62,7 @@ To follow this tutorial, you need:
 ## Install the Netdata Agent
 
 If you don't have the free, open-source Netdata monitoring agent installed on your node yet, get started with a [single
-kickstart command](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx):
+kickstart command](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md):
 
 <OneLineInstallWget/>
 
@@ -242,7 +242,7 @@ source of issues faster with [Metric Correlations](https://github.com/netdata/ne
 
 ### Related reference documentation
 
-- [Netdata Agent · Get started](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx)
+- [Netdata Agent · Get started](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
 - [Netdata Agent · Apache data collector](https://github.com/netdata/go.d.plugin/blob/master/modules/apache/README.md)
 - [Netdata Agent · Web log collector](https://github.com/netdata/go.d.plugin/blob/master/modules/weblog/README.md)
 - [Netdata Agent · MySQL data collector](https://github.com/netdata/go.d.plugin/blob/master/modules/mysql/README.md)
