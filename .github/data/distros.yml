@@ -84,6 +84,7 @@ include:
   - &debian
     distro: debian
     version: "11"
+    base_image: debian:bullseye
     env_prep: |
       apt-get update
     jsonc_removal: |
@@ -100,6 +101,7 @@ include:
       ebpf-core: true
   - <<: *debian
     version: "10"
+    base_image: debian:buster
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
@@ -130,7 +132,7 @@ include:
   - &opensuse
     distro: opensuse
     version: "15.4"
-    base_image: opensuse/leap
+    base_image: opensuse/leap:15.4
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
