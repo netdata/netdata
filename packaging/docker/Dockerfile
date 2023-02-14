@@ -114,7 +114,7 @@ RUN chown -R root:root \
 ENV NETDATA_LISTENER_PORT 19999
 EXPOSE $NETDATA_LISTENER_PORT
 
-ENV NETDATA_EXTRA_APK_PACKAGES="apcupsd libvirt-daemon lm-sensors msmtp netcat-openbsd"
+ENV NETDATA_EXTRA_APK_PACKAGES=""
 
 ENTRYPOINT ["/usr/sbin/run.sh"]
 
