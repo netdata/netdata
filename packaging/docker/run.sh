@@ -70,15 +70,13 @@ fi
 if [ -n "${NETDATA_EXTRA_APK_PACKAGES}" ]; then
   echo "Fetching APK repository metadata."
   if ! apk update; then
-    NETDATA_FAILED_APK_UPDATE=1
     echo "Failed to fetch APK repository metadata."
-  fi
-fi
-
-if [ -n "${NETDATA_EXTRA_APK_PACKAES}" ] && [ -z "${NETDATA_FAILED_APK_UPDATE}" ]; then
-  echo "Installing supplementary packages."
-  if ! apk add --no-cache --no-interactive "${NETDATA_EXTRA_APK_PACKAGES}"; then
-    echo "Failed to install supplementary packages."
+  else
+    echo "Installing supplementary packages."
+    # shellcheck disable=SC2086
+    if ! apk add --no-cache ${NETDATA_EXTRA_APK_PACKAGES}; then
+      echo "Failed to install supplementary packages."
+    fi
   fi
 fi
 
