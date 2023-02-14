@@ -83,11 +83,10 @@ seconds, respectively.
 
 Every collector and plugin has its own `update every` setting, which you can also change in the `go.d.conf`,
 `python.d.conf`, or `charts.d.conf` files, or in individual collector configuration files. If the `update
-every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [enable
-or configure a collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) doc for details.
+every` for an individual collector is less than the global, the Netdata Agent uses the global setting. See the [collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) for details.
 
 To reduce the frequency of an [internal
-plugin/collector](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md#collector-architecture-and-terminology), open `netdata.conf` and
+plugin/collector](https://github.com/netdata/netdata/blob/master/collectors/README.md#collector-architecture-and-terminology), open `netdata.conf` and
 find the appropriate section. For example, to reduce the frequency of the `apps` plugin, which collects and visualizes
 metrics on application resource utilization:
 
@@ -96,7 +95,7 @@ metrics on application resource utilization:
     update every = 5
 ```
 
-To [configure an individual collector](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md), open its specific configuration file with
+To [configure an individual collector](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md#configure-a-collector), open its specific configuration file with
 `edit-config` and look for the `update_every` setting. For example, to reduce the frequency of the `nginx` collector,
 run `sudo ./edit-config go.d/nginx.conf`:
 

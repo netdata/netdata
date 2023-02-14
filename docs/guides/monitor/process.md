@@ -38,11 +38,7 @@ With Netdata's process monitoring, you can:
 
 ## Prerequisites
 
-- One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx). If you
-  need more time to understand Netdata before
-  following this guide, see
-  the [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) or
-  [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) monitoring quickstarts.
+- One or more Linux nodes running [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
 - A general understanding of how
   to [configure the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md)
   using `edit-config`.
@@ -286,7 +282,7 @@ a [supported collector](https://github.com/netdata/netdata/blob/master/collector
 set
 that up if it wasn't autodetected. With both process utilization and application-specific metrics, you should have every
 piece of data needed to discover the root cause of an incident. See
-our [collector setup](https://github.com/netdata/netdata/blob/master/docs/collect/enable-configure.md) doc for details.
+the [collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) documentation for details.
 
 [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) in Netdata
 Cloud using charts from `apps.plugin`,

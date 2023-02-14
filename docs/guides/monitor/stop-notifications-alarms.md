@@ -37,8 +37,7 @@ In the `source` row, you see that this chart is getting its configuration from
 `4@/usr/lib/netdata/conf.d/health.d/cpu.conf`. The relevant part of begins at `health.d`: `health.d/cpu.conf`. That's
 the file you need to edit if you want to silence this alarm.
 
-For more information about editing or referencing health configuration files on your system, see the [health
-quickstart](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#edit-health-configuration-files).
+For more information about editing or referencing health configuration files on your system, see the [Configure health alarms](https://github.com/netdata/netdata/blob/master/docs/monitor/configure-alarms.md#edit-health-configuration-files) and the [Health configuration reference](https://github.com/netdata/netdata/blob/master/health/REFERENCE.md) sections of our documentation.
 
 ## Edit the file to enable silencing
 
@@ -74,8 +73,7 @@ To silence this alarm, change `sysadmin` to `silent`.
  to: silent
 ```
 
-Use one of the available [methods](https://github.com/netdata/netdata/blob/master/health/QUICKSTART.md#reload-health-configuration) to reload your health configuration 
- and ensure you get no more notifications about that alarm**.
+Use one of the available [methods](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md#reload-health-configuration) to reload your health configuration and ensure you get no more notifications about that alarm.
 
 You can add `to: silent` to any alarm you'd rather not bother you with notifications.
 

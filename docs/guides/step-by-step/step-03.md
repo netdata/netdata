@@ -18,7 +18,7 @@ You might be thinking, "So, now I have to remember all these IP addresses, and t
 manually, to move from one system to another? Maybe I should just make a bunch of bookmarks. What's a few more tabs
 on top of the hundred I have already?"
 
-We get it. That's why we built [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx), which connects many distributed
+We get it. That's why we built [Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), which connects many distributed
 agents for a seamless experience when monitoring an entire infrastructure of Netdata-monitored nodes.
 
 ![Animated GIF of Netdata
@@ -37,8 +37,7 @@ In this step of the Netdata guide, we'll talk about the following:
 
 ## Why use Netdata Cloud?
 
-Our [Cloud documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx) does a good job (we think!) of explaining why Cloud
-gives you a ton of value at no cost:
+Our documentation on [monitoring your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) does a good job (we think!) of explaining why Cloud gives you a ton of value at no cost:
 
 > Netdata Cloud gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can run all your
 > distributed Agents in headless mode _and_ access the real-time metrics and insightful charts from their dashboards.
@@ -50,8 +49,7 @@ features, new collectors for more applications, and improved UI, so will Cloud.
 
 ## Get started with Netdata Cloud
 
-Signing in, onboarding, and connecting your first nodes only takes a few minutes, and we have a [Get started with
-Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/cloud.mdx) guide to help you walk through every step.
+Signing in, onboarding, and connecting your first nodes only takes a few minutes, and we have a [Monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) section to help you walk through every step.
 
 Or, if you're feeling confident, dive right in.
 

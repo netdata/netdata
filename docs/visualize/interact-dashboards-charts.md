@@ -17,14 +17,15 @@ You can find Netdata's dashboards in two places: locally served at `http://NODE:
 Netdata Cloud. While you access these dashboards differently, they have similar interfaces, identical charts and
 metrics, and you interact with both of them the same way.
 
-> If you're not sure which option is best for you, see our [single-node](https://github.com/netdata/netdata/blob/master/docs/quickstart/single-node.md) and
-> [infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md) quickstart guides.
+> 📑 Note 
+> 
+> For a quickstart on how to get started, check the [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) documentation.
 
 Netdata dashboards are single, scrollable pages with many charts stacked on top of one another. As you scroll up or
 down, charts appearing in your browser's viewport automatically load and update every second.
 
 The dashboard is broken up into multiple **sections**, such as **System Overview**, **CPU**, **Disk**, which are
-automatically generated based on which [collectors](https://github.com/netdata/netdata/blob/master/docs/collect/how-collectors-work.md) begin collecting metrics when
+automatically generated based on which [collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) begin collecting metrics when
 Netdata starts up. Sections also appear in the right-hand **menu**, along with submenus based on the contexts and
 families Netdata creates for your node.
 

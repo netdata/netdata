@@ -62,13 +62,13 @@ To manage user specific notification settings, you will need the following:
 - A Cloud account
 - Have access to, at least, a space
 
-Note: If an administrator has disabled a Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification method this will override any user specific setting.
+Note: If an administrator has disabled a Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx#service-level) notification method this will override any user specific setting.
 
 #### Steps
 
 1. Click on the **User notification settings** shortcut on top of the help button
 1. You are presented with:
-   - The Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md#service-level) notification methods you can manage
+   - The Personal [service level](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx#service-level) notification methods you can manage
    - The list spaces and rooms inside those where you have access to
    - If you're an administrator, Manager or Troubleshooter you'll also see the Rooms from a space you don't have access to on **All Rooms** tab and you can activate notifications for them by joining the room
 1. On this modal you will be able to:
@@ -83,6 +83,6 @@ Note: If an administrator has disabled a Personal [service level](https://github
 - [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
 - [Alerts Configuration](https://github.com/netdata/netdata/blob/master/health/README.md)
 - [Add webhook notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-webhook-notification-configuration.md)
-- [Add Discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification-configuration.md)
+- [Add Discord notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-discord-notification.md)
 - [Add Slack notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-slack-notification-configuration.md)
 - [Add PagerDuty notification configuration](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/add-pagerduty-notification-configuration.md)

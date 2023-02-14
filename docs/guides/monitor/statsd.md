@@ -34,7 +34,7 @@ Now, let's see the above process in detail.
 
 ## Prerequisites
 
-- A node with the [Netdata](https://github.com/netdata/netdata/blob/master/docs/get-started.mdx) installed.
+- A node with the [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) installed.
 - An application to instrument. For this guide, that will be [k6](https://k6.io/docs/getting-started/installation).
 
 ## Understanding the metrics
