@@ -685,8 +685,7 @@ static inline void buffer_json_member_add_array(BUFFER *wb, const char *key) {
 }
 
 static inline void buffer_json_add_array_item_array(BUFFER *wb) {
-    if(wb->json.stack[wb->json.depth].count)
-        buffer_fast_strcat(wb, ",", 1);
+    buffer_print_json_comma_newline_spacing(wb);
 
     buffer_fast_strcat(wb, "[", 1);
     wb->json.stack[wb->json.depth].count++;
