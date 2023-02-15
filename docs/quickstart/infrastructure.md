@@ -193,3 +193,26 @@ collect from across your infrastructure with Netdata.
     </BoxList>
   </Box>
 </Grid>
+
+- Spaces and War Rooms
+  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
+  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+- Dashboards
+  - [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
+  - [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
+  - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+  - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
+- Alerts and notifications
+  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx)
+  - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+- Troubleshooting with Netdata Cloud
+  - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
+  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
+  - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
+- Management and settings
+  - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)
+  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
+  - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)
+  - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
+  - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
