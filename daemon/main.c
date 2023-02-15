@@ -1320,7 +1320,6 @@ int pgc_unittest(void);
 int mrg_unittest(void);
 int julytest(void);
 int pluginsd_parser_unittest(void);
-int buffer_unittest(void);
 
 int main(int argc, char **argv) {
     // initialize the system clocks
