@@ -463,7 +463,7 @@ int buffer_unittest(void) {
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 1.23e+14, "%42DBF78AD3AC0000");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 1.23e+14, "@ELb94rTrAAA");
 
-    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 9.12345678901234567890123456789e+45, "9.12345678901234614e+45");
+    buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 9.12345678901234567890123456789e+45, "9.123456789012346128e+45");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 9.12345678901234567890123456789e+45, "%497991C25C9E4309");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_BASE64, 9.12345678901234567890123456789e+45, "@El5kcJcnkMJ");
 
@@ -483,7 +483,7 @@ int buffer_unittest(void) {
 
     buffer_json_initialize(wb, "\"", "\"", 0, true);
     buffer_json_finalize(wb);
-    errors += buffer_expect(wb, "{\n}");
+    errors += buffer_expect(wb, "{\n}\n");
 
     buffer_flush(wb);
 
@@ -493,7 +493,7 @@ int buffer_unittest(void) {
     buffer_json_member_add_object(wb, "object1");
     buffer_json_member_add_string(wb, "hello", "world");
     buffer_json_finalize(wb);
-    errors += buffer_expect(wb, "{\n    \"hello\":\"world\",\n    \"alpha\":\"this: \\\" is a double quote\",\n    \"object1\":{\n        \"hello\":\"world\"\n    }\n}");
+    errors += buffer_expect(wb, "{\n    \"hello\":\"world\",\n    \"alpha\":\"this: \\\" is a double quote\",\n    \"object1\":{\n        \"hello\":\"world\"\n    }\n}\n");
 
     return errors;
 }
