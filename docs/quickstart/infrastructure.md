@@ -9,7 +9,7 @@ learn_rel_path: "Getting Started"
 sidebar_position: "50"
 -->
 
-import { Grid, Box, BoxList, BoxListItem } from '@site/src/components/Grid/'
+import { Grid, Box, BoxList, BoxListItemRegexLink } from '@site/src/components/Grid/'
 import { RiExternalLinkLine } from 'react-icons/ri'
 
 [Netdata Cloud](https://app.netdata.cloud) provides scalable infrastructure monitoring for any number of distributed
@@ -155,41 +155,64 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Spaces and War Rooms">
     <BoxList>
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md" title="Spaces" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md" title="War Rooms" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)" title="Spaces" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)" title="War Rooms" />
     </BoxList>
   </Box>
   <Box
     title="Dashboards">
     <BoxList>
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md" title="Overview" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md" title="Nodes view" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md" title="Kubernetes" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md" title="Create new dashboards" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)" title="Overview" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)" title="Nodes view" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)" title="Kubernetes" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)" title="Create new dashboards" />
     </BoxList>
   </Box>
   <Box
     title="Alerts and notifications">
     <BoxList>
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx" title="View active alerts" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx" title="Alerts Smartboard" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx" title="Alert notifications" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)" title="View active alerts" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx)" title="Alerts Smartboard" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)" title="Alert notifications" />
     </BoxList>
   </Box>
   <Box
     title="Troubleshooting with Netdata Cloud">
-    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md" title="Metric Correlations" />
-    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx" title="Anomaly Advisor" />
-    <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md" title="Events Feed" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)" title="Metric Correlations" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)" title="Anomaly Advisor" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)" title="Events Feed" />
   </Box>
   <Box
     title="Management and settings">
     <BoxList>
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx" title="Sign in with email, Google, or GitHub" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md" title="Invite your team" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md" title="Choose your Netdata Cloud theme" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md" title="Role-Based Access" />
-      <BoxListItem to="https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md" title="Paid Plans" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)" title="Sign in with email, Google, or GitHub" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)" title="Invite your team" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)" title="Choose your Netdata Cloud theme" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)" title="Role-Based Access" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)" title="Paid Plans" />
     </BoxList>
   </Box>
 </Grid>
+
+- Spaces and War Rooms
+  - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
+  - [War Rooms](https://github.com/netdata/netdata/blob/master/docs/cloud/war-rooms.md)
+- Dashboards
+  - [Overview](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/overview.md)
+  - [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md)
+  - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
+  - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
+- Alerts and notifications
+  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
+  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx)
+  - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+- Troubleshooting with Netdata Cloud
+  - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
+  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
+  - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
+- Management and settings
+  - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)
+  - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
+  - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)
+  - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
+  - [Paid Plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/plans.md)
