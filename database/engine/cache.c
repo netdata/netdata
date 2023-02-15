@@ -1189,6 +1189,9 @@ premature_exit:
 }
 
 static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
+    internal_fatal(entry->start_time_s < 0 || entry->end_time_s < 0,
+                   "DBENGINE CACHE: timestamps are negative");
+
     __atomic_add_fetch(&cache->stats.workers_add, 1, __ATOMIC_RELAXED);
 
     size_t partition = pgc_indexing_partition(cache, entry->metric_id);
@@ -1198,6 +1201,12 @@ static PGC_PAGE *page_add(PGC *cache, PGC_ENTRY *entry, bool *added) {
 #endif
     PGC_PAGE *page;
     size_t spins = 0;
+
+    if(unlikely(entry->start_time_s < 0))
+        entry->start_time_s = 0;
+
+    if(unlikely(entry->end_time_s < 0))
+        entry->end_time_s = 0;
 
     do {
         if(++spins > 1)
