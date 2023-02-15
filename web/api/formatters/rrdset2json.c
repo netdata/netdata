@@ -96,9 +96,9 @@ void rrdset2json(RRDSET *st, BUFFER *wb, size_t *dimensions_count, size_t *memor
             buffer_strcat(wb, ",\n\t\t\t\t\"");
         else
             buffer_strcat(wb, "\t\t\t\t\"");
-                buffer_json_strcat(wb, rrddim_id(rd));
+        buffer_json_strcat(wb, rrddim_id(rd));
         buffer_strcat(wb, "\": { \"name\": \"");
-                buffer_json_strcat(wb, rrddim_name(rd));
+        buffer_json_strcat(wb, rrddim_name(rd));
         buffer_strcat(wb, "\" }");
 
         dimensions++;
