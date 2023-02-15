@@ -50,7 +50,7 @@ bool is_system_ieee754_double(void) {
     for(size_t i = 0; i < elements ; i++) {
         uint64_t *ptr = (uint64_t *)&tests[i].original;
 
-        if(*ptr != tests[i].i) {
+        if(*ptr != tests[i].i && (tests[i].original == tests[i].d || (isnan(tests[i].original) && isnan(tests[i].d)))) {
             if(!logged)
                 info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
                      i+1, tests[i].original, *ptr, tests[i].i);

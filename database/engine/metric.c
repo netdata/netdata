@@ -105,7 +105,7 @@ static inline size_t uuid_partition(MRG *mrg __maybe_unused, uuid_t *uuid) {
 }
 
 static inline bool metric_has_retention_unsafe(MRG *mrg __maybe_unused, METRIC *metric) {
-    bool has_retention = (metric->first_time_s || metric->latest_time_s_clean || metric->latest_time_s_hot);
+    bool has_retention = (metric->first_time_s > 0 || metric->latest_time_s_clean > 0 || metric->latest_time_s_hot > 0);
 
     if(has_retention && !(metric->flags & METRIC_FLAG_HAS_RETENTION)) {
         metric->flags |= METRIC_FLAG_HAS_RETENTION;
@@ -210,8 +210,8 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     METRIC *metric = allocation;
     uuid_copy(metric->uuid, entry->uuid);
     metric->section = entry->section;
-    metric->first_time_s = entry->first_time_s;
-    metric->latest_time_s_clean = entry->last_time_s;
+    metric->first_time_s = MAX(0, entry->first_time_s);
+    metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
     metric->writer = 0;
@@ -388,6 +388,11 @@ Word_t mrg_metric_section(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
+    internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
+
+    if(unlikely(first_time_s < 0))
+        return false;
+
     netdata_spinlock_lock(&metric->spinlock);
     metric->first_time_s = first_time_s;
     metric_has_retention_unsafe(mrg, metric);
@@ -397,11 +402,24 @@ bool mrg_metric_set_first_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t
 }
 
 void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s, time_t last_time_s, time_t update_every_s) {
-
+    internal_fatal(first_time_s < 0 || last_time_s < 0 || update_every_s < 0,
+                   "DBENGINE METRIC: timestamp is negative");
     internal_fatal(first_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric first time is in the future");
     internal_fatal(last_time_s > max_acceptable_collected_time(),
                    "DBENGINE METRIC: metric last time is in the future");
+
+    if(unlikely(first_time_s < 0))
+        first_time_s = 0;
+
+    if(unlikely(last_time_s < 0))
+        last_time_s = 0;
+
+    if(unlikely(update_every_s < 0))
+        update_every_s = 0;
+
+    if(unlikely(!first_time_s && !last_time_s && !update_every_s))
+        return;
 
     netdata_spinlock_lock(&metric->spinlock);
 
@@ -422,6 +440,8 @@ void mrg_metric_expand_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t
 }
 
 bool mrg_metric_set_first_time_s_if_bigger(MRG *mrg __maybe_unused, METRIC *metric, time_t first_time_s) {
+    internal_fatal(first_time_s < 0, "DBENGINE METRIC: timestamp is negative");
+
     bool ret = false;
 
     netdata_spinlock_lock(&metric->spinlock);
@@ -474,6 +494,11 @@ void mrg_metric_get_retention(MRG *mrg __maybe_unused, METRIC *metric, time_t *f
 }
 
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
+
+    if(unlikely(latest_time_s < 0))
+        return false;
+
     netdata_spinlock_lock(&metric->spinlock);
 
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
@@ -486,9 +511,6 @@ bool mrg_metric_set_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
 
     if(unlikely(!metric->first_time_s))
         metric->first_time_s = latest_time_s;
-
-//    if(unlikely(metric->first_time_s > latest_time_s))
-//        metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
     netdata_spinlock_unlock(&metric->spinlock);
@@ -517,7 +539,7 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
             page_first_time_s = pgc_page_start_time_s(page);
             page_end_time_s = pgc_page_end_time_s(page);
 
-            if ((is_hot || is_dirty) && page_first_time_s < min_first_time_s)
+            if ((is_hot || is_dirty) && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
 
             if (is_dirty && page_end_time_s > max_end_time_s)
@@ -548,17 +570,19 @@ bool mrg_metric_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    internal_fatal(latest_time_s < 0, "DBENGINE METRIC: timestamp is negative");
+
 //    internal_fatal(latest_time_s > max_acceptable_collected_time(),
 //                   "DBENGINE METRIC: metric latest time is in the future");
+
+    if(unlikely(latest_time_s < 0))
+        return false;
 
     netdata_spinlock_lock(&metric->spinlock);
     metric->latest_time_s_hot = latest_time_s;
 
     if(unlikely(!metric->first_time_s))
         metric->first_time_s = latest_time_s;
-
-//    if(unlikely(metric->first_time_s > latest_time_s))
-//        metric->first_time_s = latest_time_s;
 
     metric_has_retention_unsafe(mrg, metric);
     netdata_spinlock_unlock(&metric->spinlock);
@@ -574,7 +598,9 @@ time_t mrg_metric_get_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
 }
 
 bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
-    if(!update_every_s)
+    internal_fatal(update_every_s < 0, "DBENGINE METRIC: timestamp is negative");
+
+    if(update_every_s <= 0)
         return false;
 
     netdata_spinlock_lock(&metric->spinlock);
@@ -585,7 +611,9 @@ bool mrg_metric_set_update_every(MRG *mrg __maybe_unused, METRIC *metric, time_t
 }
 
 bool mrg_metric_set_update_every_s_if_zero(MRG *mrg __maybe_unused, METRIC *metric, time_t update_every_s) {
-    if(!update_every_s)
+    internal_fatal(update_every_s < 0, "DBENGINE METRIC: timestamp is negative");
+
+    if(update_every_s <= 0)
         return false;
 
     netdata_spinlock_lock(&metric->spinlock);

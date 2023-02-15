@@ -731,7 +731,7 @@ static inline void buffer_json_member_add_time_t(BUFFER *wb, const char *key, ti
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
-    buffer_print_uint64(wb, value);
+    buffer_print_int64(wb, value);
 
     wb->json.stack[wb->json.depth].count++;
 }
