@@ -44,8 +44,8 @@ Explore our [general advanced installation options and troubleshooting](#advance
 #### Agent user interface
 
 To access the UI provided by the locally installed agent, open a browser and navigate to `http://NODE:19999`, replacing `NODE` with either `localhost` or
-the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.mdx), or dive directly into the many ways
-to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx).
+the hostname/IP address of the remote node. You can also read more about [how the agent dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md), or dive directly into the many ways
+to [interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md).
 
 #### Configuration
 

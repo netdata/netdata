@@ -68,7 +68,7 @@
 - add note about not needing to have room id [\#14390](https://github.com/netdata/netdata/pull/14390) ([andrewm4894](https://github.com/andrewm4894))
 - update the "Install Netdata with Docker" doc [\#14385](https://github.com/netdata/netdata/pull/14385) ([Ancairon](https://github.com/Ancairon))
 - generates dual ksy for njfv2 + fix for padding after page blocks [\#14383](https://github.com/netdata/netdata/pull/14383) ([underhood](https://github.com/underhood))
-- Delete docs/cloud/get-started.mdx [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
+- Delete docs/cloud/get-started.md [\#14382](https://github.com/netdata/netdata/pull/14382) ([Ancairon](https://github.com/Ancairon))
 - Update the "Kubernetes visualizations" doc [\#14347](https://github.com/netdata/netdata/pull/14347) ([Ancairon](https://github.com/Ancairon))
 - Update the "Deploy Kubernetes monitoring with Netdata" doc [\#14345](https://github.com/netdata/netdata/pull/14345) ([Ancairon](https://github.com/Ancairon))
 - Events docs [\#14341](https://github.com/netdata/netdata/pull/14341) ([hugovalente-pm](https://github.com/hugovalente-pm))

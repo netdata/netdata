@@ -29,7 +29,7 @@ this is not an option in your case always verify the current domain resolution (
 :::
 
 For a guide to connecting a node using the ACLK, plus additional troubleshooting and reference information, read our [get
-started with Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.mdx) guide or the full [connect to Cloud
+started with Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/get-started.md) guide or the full [connect to Cloud
 documentation](https://github.com/netdata/netdata/blob/master/claim/README.md).
 
 ## Data privacy
@@ -41,7 +41,7 @@ The data passes through our systems, but it isn't stored.
 
 However, to be able to offer the stunning visualizations and advanced functionality of Netdata Cloud, it does store a limited number of _metadata_.
 
-Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy.mdx) in the documentation.
+Read more about [Data privacy in the Netdata Cloud](https://github.com/netdata/netdata/blob/master/docs/cloud/data-privacy.md) in the documentation.
 
 
 ## Enable and configure the ACLK

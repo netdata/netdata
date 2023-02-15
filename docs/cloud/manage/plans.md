@@ -97,13 +97,13 @@ The plan on your space will determine what type of notifications methods will be
 * **Pro** - Email, Discord and webhook
 * **Business** - Unlimited, this includes Slack, PagerDuty, etc.
 
-For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx).
+For mode details check the documentation under [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md).
 
 ### Related Topics
 
 #### **Related Concepts**
 - [Spaces](https://github.com/netdata/netdata/blob/master/docs/cloud/spaces.md)
-- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+- [Alert Notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - [Events feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 - [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)
 

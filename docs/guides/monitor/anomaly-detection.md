@@ -38,7 +38,7 @@ This guide will explain how to get started using these ML based anomaly detectio
 
 ## Anomaly Advisor
 
-The [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx) is the flagship anomaly detection feature within Netdata. In the "Anomalies" tab of Netdata you will see an overall "Anomaly Rate" chart that aggregates node level anomaly rate for all nodes in a space. The aim of this chart is to make it easy to quickly spot periods of time where the overall "[node anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#node-anomaly-rate)" is elevated in some unusual way and for what node or nodes this relates to.
+The [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md) is the flagship anomaly detection feature within Netdata. In the "Anomalies" tab of Netdata you will see an overall "Anomaly Rate" chart that aggregates node level anomaly rate for all nodes in a space. The aim of this chart is to make it easy to quickly spot periods of time where the overall "[node anomaly rate](https://github.com/netdata/netdata/blob/master/ml/README.md#node-anomaly-rate)" is elevated in some unusual way and for what node or nodes this relates to.
 
 ![image](https://user-images.githubusercontent.com/2178292/175928290-490dd8b9-9c55-4724-927e-e145cb1cc837.png)
 
@@ -70,7 +70,7 @@ You can see some example ML based alert configurations below:
 Check out the resources below to learn more about how Netdata is approaching ML:
 
 - [Agent ML documentation](https://github.com/netdata/netdata/blob/master/ml/README.md).
-- [Anomaly Advisor documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx).
+- [Anomaly Advisor documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md).
 - [Metric Correlations documentation](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md).
 - Anomaly Advisor [launch blog post](https://www.netdata.cloud/blog/introducing-anomaly-advisor-unsupervised-anomaly-detection-in-netdata/).
 - Netdata Approach to ML [blog post](https://www.netdata.cloud/blog/our-approach-to-machine-learning/).

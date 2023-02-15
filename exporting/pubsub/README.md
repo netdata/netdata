@@ -4,9 +4,7 @@ description: "Export Netdata metrics to the Google Cloud Pub/Sub Service for lon
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/pubsub/README.md"
 sidebar_label: "Google Cloud Pub/Sub Service"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Setup/Exporting connectors"
-learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Export metrics to Google Cloud Pub/Sub Service
