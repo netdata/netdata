@@ -6,10 +6,16 @@
 
 **Merged pull requests:**
 
+- Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
+- Update role-based-access.md [\#14528](https://github.com/netdata/netdata/pull/14528) ([cakrit](https://github.com/cakrit))
+- added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
+- Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
 - Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
 - Learn integrations category changes [\#14510](https://github.com/netdata/netdata/pull/14510) ([cakrit](https://github.com/cakrit))
 - Move collectors under Integrations/Monitoring [\#14509](https://github.com/netdata/netdata/pull/14509) ([cakrit](https://github.com/cakrit))
 - Guides and collectors reorg and cleanup part 1 [\#14507](https://github.com/netdata/netdata/pull/14507) ([cakrit](https://github.com/cakrit))
+- replicating gaps [\#14506](https://github.com/netdata/netdata/pull/14506) ([ktsaou](https://github.com/ktsaou))
 - More learn reorg/reordering [\#14505](https://github.com/netdata/netdata/pull/14505) ([cakrit](https://github.com/cakrit))
 - Revert changes to platform support policy [\#14504](https://github.com/netdata/netdata/pull/14504) ([cakrit](https://github.com/cakrit))
 - Top level learn changes [\#14503](https://github.com/netdata/netdata/pull/14503) ([cakrit](https://github.com/cakrit))
@@ -43,6 +49,7 @@
 - Add mention of cloud in next steps UI etc [\#14459](https://github.com/netdata/netdata/pull/14459) ([cakrit](https://github.com/cakrit))
 - Fix links and add to learn [\#14458](https://github.com/netdata/netdata/pull/14458) ([cakrit](https://github.com/cakrit))
 - Add export for people running their own registry [\#14457](https://github.com/netdata/netdata/pull/14457) ([cakrit](https://github.com/cakrit))
+- Prevent crash when running '-W createdataset' [\#14455](https://github.com/netdata/netdata/pull/14455) ([MrZammler](https://github.com/MrZammler))
 - remove deprecated python.d collectors announced in v1.38.0 [\#14454](https://github.com/netdata/netdata/pull/14454) ([ilyam8](https://github.com/ilyam8))
 - Update static build dependencies [\#14450](https://github.com/netdata/netdata/pull/14450) ([tkatsoulas](https://github.com/tkatsoulas))
 - do not report dimensions that failed to be queried [\#14447](https://github.com/netdata/netdata/pull/14447) ([ktsaou](https://github.com/ktsaou))
@@ -270,7 +277,6 @@
 - Switch nightlies to GitHub releases. [\#14020](https://github.com/netdata/netdata/pull/14020) ([Ferroin](https://github.com/Ferroin))
 - Wmi descriptions [\#14001](https://github.com/netdata/netdata/pull/14001) ([thiagoftsm](https://github.com/thiagoftsm))
 - Introduce the new Structure of the documentation [\#13915](https://github.com/netdata/netdata/pull/13915) ([Ancairon](https://github.com/Ancairon))
-- Finish renaming the `--install` option to `--install-prefix`. [\#13881](https://github.com/netdata/netdata/pull/13881) ([Ferroin](https://github.com/Ferroin))
 
 ## [v1.37.1](https://github.com/netdata/netdata/tree/v1.37.1) (2022-12-05)
 
@@ -375,14 +381,6 @@
 - filtering out charts in context queries, includes them in full\_xxx variables [\#13886](https://github.com/netdata/netdata/pull/13886) ([ktsaou](https://github.com/ktsaou))
 - New journal disk based indexing for agent memory reduction [\#13885](https://github.com/netdata/netdata/pull/13885) ([stelfrag](https://github.com/stelfrag))
 - Fix systemd chart update \(eBPF\) [\#13884](https://github.com/netdata/netdata/pull/13884) ([thiagoftsm](https://github.com/thiagoftsm))
-- apps.plugin function processes cosmetic changes [\#13880](https://github.com/netdata/netdata/pull/13880) ([ktsaou](https://github.com/ktsaou))
-- allow single chart to be filtered in context queries [\#13879](https://github.com/netdata/netdata/pull/13879) ([ktsaou](https://github.com/ktsaou))
-- Add description for TCP WMI [\#13878](https://github.com/netdata/netdata/pull/13878) ([thiagoftsm](https://github.com/thiagoftsm))
-- Use print macros [\#13876](https://github.com/netdata/netdata/pull/13876) ([MrZammler](https://github.com/MrZammler))
-- Suppress ML and dlib ABI warnings [\#13875](https://github.com/netdata/netdata/pull/13875) ([Dim-P](https://github.com/Dim-P))
-- bump go.d.plugin v0.41.1 [\#13874](https://github.com/netdata/netdata/pull/13874) ([ilyam8](https://github.com/ilyam8))
-- Replication of metrics \(gaps filling\) during streaming [\#13873](https://github.com/netdata/netdata/pull/13873) ([vkalintiris](https://github.com/vkalintiris))
-- Don't create a REMOVED alert event after a REMOVED. [\#13871](https://github.com/netdata/netdata/pull/13871) ([MrZammler](https://github.com/MrZammler))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
