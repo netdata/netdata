@@ -16,7 +16,7 @@ Netdata Cloud's role-based-access mechanism allows you to control what functiona
 With the advent of the paid plans we revamped the roles to cover needs expressed by Netdata users, like providing more limited access to their customers, or
 being able to join any room. We also aligned the offered roles to the target audience of each plan. The end result is the following:
 
-| **Role** | **Community** | **Pro** | **Business** | **Legacy Community** |
+| **Role** | **Community** | **Pro** | **Business** | **Early Bird** |
 | :-- | :--: | :--: | :--: | :--: |
 | **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: | - |
@@ -27,7 +27,7 @@ being able to join any room. We also aligned the offered roles to the target aud
 
 #### What happens to the previous Member role?
 
-We will maintain a Legacy Community plan for existing users, which will continue to provide access to the Member role.
+We will maintain a Early Bird plan for existing users, which will continue to provide access to the Member role.
 
 #### Which functionalities are available for each role?
 
@@ -57,13 +57,14 @@ In more detail, you can find on the following tables which functionalities are a
 | :-- | :--: | :--: | :--: | :--: | :--: | :--: | :-- |
 | See all Users in Space | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark: | |
 | Invite new User to Space | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark:  | You can't invite a user with a role you don't have permissions to appoint to (see below) |
+| Delete Pending Invitation to Space | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark:  | |
 | Delete User from Space | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | You can't delete a user if he has a role you don't have permissions to appoint to (see below) |
 | Appoint Administrators | :heavy_check_mark: | - | - | - | - | - | |
 | Appoint Billing user | :heavy_check_mark: | - | - | - | - | - | |
 | Appoint Managers | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
 | Appoint Troubleshooters | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
 | Appoint Observer | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
-| Appoint Member | :heavy_check_mark: | - | - | - | - | :heavy_check_mark: | Only available on Legacy Community plans |
+| Appoint Member | :heavy_check_mark: | - | - | - | - | :heavy_check_mark: | Only available on Early Bird plans |
 | See all Users in a Room | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | - | :heavy_check_mark: | |
 | Invite existing user to Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | :heavy_check_mark: | User already invited to the Space |
 | Remove user from Room | :heavy_check_mark: | :heavy_check_mark: | - | - | - | - | |
