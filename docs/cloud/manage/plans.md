@@ -14,10 +14,10 @@ At Netdata, we believe in providing free and unrestricted access to high-quality
 We also provide paid subscriptions that designed to provide additional features and capabilities for businesses that need tighter and customizable integration of the free monitoring solution to their processes. These are divided into three different plans: **Pro**, **Business**, and **Enterprise**. Each plan will offers a different set of features and capabilities to meet the needs of businesses of different sizes and with different monitoring requirements.
 
 :::note
-To not disrupt current users space's access rights we will be keeping their current plan as the **Legacy Community** plan. The reason for this is to allow users to 
+To not disrupt current users space's access rights we will be keeping their current plan as the **Early Bird** plan. The reason for this is to allow users to 
 keep using the legacy **Member** role with the exact same permissions as it has currently.
 
-When you moving to another plan starting from the **Legacy Community** plan users won't be able to return to it. The _standard_ **Community** plan will be there but this doesn't allow
+When you moving to another plan starting from the **Early Bird** plan users won't be able to return to it. The **Community** free plan will be there but this doesn't allow
 you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md#what-roles-are-available) documentation.
 :::
 
@@ -76,7 +76,7 @@ To achieve this you will need to:
 
 Depending on the plan associated to your space you will have different roles available:
 
-| **Role** | **Community** | **Pro** | **Business** | **Legacy Community** |
+| **Role** | **Community** | **Pro** | **Business** | **Early Bird** |
 | :-- | :--: | :--: | :--: | :--: |
 | **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: | - | 
