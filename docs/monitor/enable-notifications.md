@@ -29,7 +29,7 @@ response process.
 ## Netdata Cloud
 
 Netdata Cloud's [centralized alert
-notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx) is a zero-configuration way to
+notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md) is a zero-configuration way to
 get notified when an anomaly or incident strikes any node or application in your infrastructure. The advantage of using
 centralized alert notifications from Netdata Cloud is that you don't have to worry about configuring each node in your
 infrastructure.
@@ -44,7 +44,7 @@ choose what types of notifications to receive from each War Room.
 ![Enabling and configuring alert notifications in Netdata
 Cloud](https://user-images.githubusercontent.com/1153921/101936280-93c50900-3b9d-11eb-9ba0-d6927fa872b7.gif)
 
-See the [centralized alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+See the [centralized alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 reference doc for further details about what information is conveyed in an email notification, flood protection, and
 more.
 

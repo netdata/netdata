@@ -203,7 +203,7 @@ entering the name and clicking **New Dashboard**.
 
 You can interact with composite charts as you would with other Netdata charts. You can use the controls beneath each
 chart to pan, zoom, or resize the chart, or use various combinations of the keyboard and mouse. See
-the [chart interaction doc](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx) for
+the [chart interaction doc](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md) for
 details.
 
 ## Menu
@@ -230,7 +230,7 @@ chart. The utility bar should show that there are 8 charts from 2 nodes contribu
 
 This action applies to disks, network devices, and other metric types that involve multiple instances of a piece of
 hardware or software. The Overview currently does not display metrics from filesystems. Read more about [families and
-instances](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.mdx)
+instances](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
 
 ## Persistence of composite chart settings
 
@@ -244,7 +244,7 @@ For another way to view an infrastructure from a high level, see
 the [Nodes view](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/nodes.md).
 
 If you need a refresher on how Netdata's charts work, see our doc 
-on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx).
+on [interacting with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md).
 
 Or, get more granular with configuring how you monitor your infrastructure 
 by [building new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md).

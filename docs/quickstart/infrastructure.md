@@ -66,7 +66,7 @@ To [invite new users](https://github.com/netdata/netdata/blob/master/docs/cloud/
 Space management Area. Choose which War Rooms to add this user to, then click **Send**.
 
 If your team members have trouble signing in, direct them to the [Netdata Cloud sign
-in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx) doc.
+in](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md) doc.
 
 ### See an overview of your infrastructure
 
@@ -171,21 +171,21 @@ collect from across your infrastructure with Netdata.
   <Box
     title="Alerts and notifications">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)" title="View active alerts" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx)" title="Alerts Smartboard" />
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)" title="Alert notifications" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)" title="View active alerts" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)" title="Alerts Smartboard" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)" title="Alert notifications" />
     </BoxList>
   </Box>
   <Box
     title="Troubleshooting with Netdata Cloud">
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)" title="Metric Correlations" />
-    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)" title="Anomaly Advisor" />
+    <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)" title="Anomaly Advisor" />
     <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)" title="Events Feed" />
   </Box>
   <Box
     title="Management and settings">
     <BoxList>
-      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)" title="Sign in with email, Google, or GitHub" />
+      <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)" title="Sign in with email, Google, or GitHub" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)" title="Invite your team" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)" title="Choose your Netdata Cloud theme" />
       <BoxListItemRegexLink to="[](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)" title="Role-Based Access" />
@@ -203,15 +203,15 @@ collect from across your infrastructure with Netdata.
   - [Kubernetes](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/kubernetes.md)
   - [Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/cloud/visualize/dashboards.md)
 - Alerts and notifications
-  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx)
-  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.mdx)
-  - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.mdx)
+  - [View active alerts](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md)
+  - [Alerts Smartboard](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/smartboard.md)
+  - [Alert notifications](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/notifications.md)
 - Troubleshooting with Netdata Cloud
   - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.mdx)
+  - [Anomaly Advisor](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/anomaly-advisor.md)
   - [Events Feed](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/events-feed.md)
 - Management and settings
-  - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.mdx)
+  - [Sign in with email, Google, or GitHub](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/sign-in.md)
   - [Invite your team](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/invite-your-team.md)
   - [Choose your Netdata Cloud theme](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/themes.md)
   - [Role-Based Access](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md)

@@ -50,4 +50,4 @@ for finding the disk and RAM you need to store metrics for a certain period of t
 ## What's next?
 
 Now that you know how to view your nodes at a glance, learn how to [track active
-alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.mdx) with the Alerts Smartboard.
+alarms](https://github.com/netdata/netdata/blob/master/docs/cloud/alerts-notifications/view-active-alerts.md) with the Alerts Smartboard.

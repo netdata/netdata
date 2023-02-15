@@ -55,7 +55,7 @@ With a quick glance you have immediate information available at your disposal:
 ## Play, Pause and Reset
 
 Your charts are controlled using the
-available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.mdx#time-controls).
+available [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls).
 Besides these, when interacting with the chart you can also activate these controls by:
 
 - hovering over any chart to temporarily pause it - this momentarily switches time control to Pause, so that you can
@@ -84,7 +84,7 @@ from the chart title to a chart action bar.
 The elements that you can find on this top bar are:
 
 - Netdata icon: this indicates that data is continuously being updated, this happens
-  if [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.mdx#time-controls)
+  if [Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md#time-controls)
   are in Play or Force Play mode
 - Chart status icon: indicates the status of the chart. Possible values are: Loading, Timeout, Error or No data
 - Chart title: on the chart title you can see the title together with the metric being displayed, as well as the unit of
@@ -205,18 +205,18 @@ double-click the same icon.
 ## What's next?
 
 We recommend you read up on the differences
-between [chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.mdx)
+between [chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
 to strengthen your understanding of how Netdata organizes its dashboards. Another valuable way to interact with charts
 is to use
-the [date and time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.mdx),
+the [date and time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md),
 which helps you visualize specific moments of historical metrics.
 
 ### Further reading & related information
 
 - Dashboard
-    - [How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.mdx)
-    - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.mdx)
-    - [Date and Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.mdx)
-    - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.mdx)
+    - [How the dashboard works](https://github.com/netdata/netdata/blob/master/docs/dashboard/how-dashboard-works.md)
+    - [Chart dimensions, contexts, and families](https://github.com/netdata/netdata/blob/master/docs/dashboard/dimensions-contexts-families.md)
+    - [Date and Time controls](https://github.com/netdata/netdata/blob/master/docs/dashboard/visualization-date-and-time-controls.md)
+    - [Customize the standard dashboard](https://github.com/netdata/netdata/blob/master/docs/dashboard/customize.md)
     - [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-    - [Netdata Agent - Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.mdx)
+    - [Netdata Agent - Interact with charts](https://github.com/netdata/netdata/blob/master/docs/dashboard/interact-charts.md)
