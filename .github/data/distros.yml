@@ -45,7 +45,6 @@ include:
   - &alma
     distro: almalinux
     version: "9"
-    base_image: almalinux
     jsonc_removal: |
       dnf remove -y json-c-devel
     packages: &alma_packages
