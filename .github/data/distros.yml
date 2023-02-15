@@ -83,14 +83,15 @@ include:
 
   - &debian
     distro: debian
-    version: "11"
+    version: "12"
+    base_image: debian:bookworm
     env_prep: |
       apt-get update
     jsonc_removal: |
       apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
-      repo_distro: debian/bullseye
+      repo_distro: debian/bookworm
       arches:
         - i386
         - amd64
@@ -99,7 +100,16 @@ include:
     test:
       ebpf-core: true
   - <<: *debian
+    version: "11"
+    base_image: debian:bullseye
+    packages:
+      <<: *debian_packages
+      repo_distro: debian/bullseye
+    test:
+      ebpf-core: false
+  - <<: *debian
     version: "10"
+    base_image: debian:buster
     packages:
       <<: *debian_packages
       repo_distro: debian/buster
@@ -130,7 +140,7 @@ include:
   - &opensuse
     distro: opensuse
     version: "15.4"
-    base_image: opensuse/leap
+    base_image: opensuse/leap:15.4
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
