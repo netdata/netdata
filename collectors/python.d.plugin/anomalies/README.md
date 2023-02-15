@@ -83,7 +83,7 @@ sudo ./edit-config python.d/anomalies.conf
 The default configuration should look something like this. Here you can see each parameter (with sane defaults) and some information about each one and what it does.
 
 ```conf
-# ----------------------------------------------------------------------
+# -
 # JOBS (data collection sources)
 
 # Pull data from local Netdata node.

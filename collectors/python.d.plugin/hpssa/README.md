@@ -84,3 +84,23 @@ ssacli_path: /usr/sbin/ssacli
 Save the file and restart the Netdata Agent with `sudo systemctl restart netdata`, or the [appropriate
 method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system.
 
+### Troubleshooting
+
+To troubleshoot issues with the `hpssa` module, run the `python.d.plugin` with the debug option enabled. The 
+output will give you the output of the data collection job or error messages on why the collector isn't working.
+
+First, navigate to your plugins directory, usually they are located under `/usr/libexec/netdata/plugins.d/`. If that's 
+not the case on your system, open `netdata.conf` and look for the setting `plugins directory`. Once you're in the 
+plugin's directory, switch to the `netdata` user.
+
+```bash
+cd /usr/libexec/netdata/plugins.d/
+sudo su -s /bin/bash netdata
+```
+
+Now you can manually run the `hpssa` module in debug mode:
+
+```bash
+./python.d.plugin hpssa debug trace
+```
+
