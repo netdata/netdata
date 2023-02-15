@@ -692,8 +692,9 @@ VALIDATED_PAGE_DESCRIPTOR validate_page(
         vd.page_length > RRDENG_BLOCK_SIZE                      ||
         vd.start_time_s > vd.end_time_s                         ||
         (now_s && vd.end_time_s > now_s)                        ||
-        vd.start_time_s == 0                                    ||
-        vd.end_time_s == 0                                      ||
+        vd.start_time_s <= 0                                    ||
+        vd.end_time_s <= 0                                      ||
+        vd.update_every_s < 0                                   ||
         (vd.start_time_s == vd.end_time_s && vd.entries > 1)    ||
         (vd.update_every_s == 0 && vd.entries > 1)
         )

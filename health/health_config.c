@@ -260,7 +260,7 @@ static SIMPLE_PATTERN *health_pattern_from_foreach(const char *s) {
 
 static inline int health_parse_db_lookup(
         size_t line, const char *filename, char *string,
-        RRDR_GROUPING *group_method, int *after, int *before, int *every,
+        RRDR_TIME_GROUPING *group_method, int *after, int *before, int *every,
         RRDCALC_OPTIONS *options, STRING **dimensions, STRING **foreachdim
 ) {
     debug(D_HEALTH, "Health configuration parsing database lookup %zu@%s: %s", line, filename, string);
@@ -286,7 +286,7 @@ static inline int health_parse_db_lookup(
         return 0;
     }
 
-    if((*group_method = web_client_api_request_v1_data_group(key, RRDR_GROUPING_UNDEFINED)) == RRDR_GROUPING_UNDEFINED) {
+    if((*group_method = time_grouping_parse(key, RRDR_GROUPING_UNDEFINED)) == RRDR_GROUPING_UNDEFINED) {
         error("Health configuration at line %zu of file '%s': invalid group method '%s'",
                 line, filename, key);
         return 0;
@@ -773,7 +773,7 @@ static int health_readfile(const char *filename, void *data) {
                     if (rc->dimensions)
                         alert_cfg->p_db_lookup_dimensions = string_dup(rc->dimensions);
                     if (rc->group)
-                        alert_cfg->p_db_lookup_method = string_strdupz(group_method2string(rc->group));
+                        alert_cfg->p_db_lookup_method = string_strdupz(time_grouping_method2string(rc->group));
                     alert_cfg->p_db_lookup_options = rc->options;
                     alert_cfg->p_db_lookup_after = rc->after;
                     alert_cfg->p_db_lookup_before = rc->before;
@@ -1037,7 +1037,7 @@ static int health_readfile(const char *filename, void *data) {
                         alert_cfg->p_db_lookup_dimensions = string_dup(rt->dimensions);
 
                     if (rt->group)
-                        alert_cfg->p_db_lookup_method = string_strdupz(group_method2string(rt->group));
+                        alert_cfg->p_db_lookup_method = string_strdupz(time_grouping_method2string(rt->group));
 
                     alert_cfg->p_db_lookup_options = rt->options;
                     alert_cfg->p_db_lookup_after = rt->after;

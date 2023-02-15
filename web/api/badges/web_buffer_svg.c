@@ -767,7 +767,7 @@ void buffer_svg(BUFFER *wb, const char *label,
     label_color_parsed = parse_color_argument(label_color, "555");
     value_color_parsed = parse_color_argument(value_color_buffer, "555");
 
-    wb->contenttype = CT_IMAGE_SVG_XML;
+    wb->content_type = CT_IMAGE_SVG_XML;
 
     total_width  = total_width * scale / 100.0;
     height       = height      * scale / 100.0;
@@ -923,7 +923,7 @@ int web_client_api_request_v1_badge(RRDHOST *host, struct web_client *w, char *u
         else if(!strcmp(name, "points")) points_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "options")) {
             options |= web_client_api_request_v1_data_options(value);

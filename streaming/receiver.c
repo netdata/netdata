@@ -339,7 +339,8 @@ static size_t streaming_parser(struct receiver_state *rpt, struct plugind *cd, i
         .host = rpt->host,
         .opaque = rpt,
         .cd = cd,
-        .trust_durations = 1
+        .trust_durations = 1,
+        .capabilities = rpt->capabilities,
     };
 
     PARSER *parser = parser_init(&user, NULL, NULL, fd,

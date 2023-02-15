@@ -88,7 +88,7 @@ struct replication_query {
         bool locked_data_collection;
         bool execute;
         bool interrupted;
-        bool send_anomaly_bit;
+        STREAM_CAPABILITIES capabilities;
     } query;
 
     time_t wall_clock_time;
@@ -114,7 +114,7 @@ static struct replication_query *replication_query_prepare(
         time_t query_before,
         bool query_enable_streaming,
         time_t wall_clock_time,
-        bool send_anomaly_bit
+        STREAM_CAPABILITIES capabilities
 ) {
     size_t dimensions = rrdset_number_of_dimensions(st);
     struct replication_query *q = callocz(1, sizeof(struct replication_query) + dimensions * sizeof(struct replication_dimension));
@@ -133,7 +133,7 @@ static struct replication_query *replication_query_prepare(
     q->query.after = query_after;
     q->query.before = query_before;
     q->query.enable_streaming = query_enable_streaming;
-    q->query.send_anomaly_bit = send_anomaly_bit;
+    q->query.capabilities = capabilities;
 
     q->wall_clock_time = wall_clock_time;
 
@@ -212,29 +212,32 @@ static struct replication_query *replication_query_prepare(
     return q;
 }
 
-void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st) {
+static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STREAM_CAPABILITIES capabilities) {
+    NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
-    rrddim_foreach_read(rd, st) {
-                if(!rd->exposed) continue;
+    rrddim_foreach_read(rd, st){
+        if (!rd->exposed) continue;
 
-                buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
-                buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
-                buffer_fast_strcat(wb, "' ", 2);
-                buffer_print_llu(wb, (usec_t)rd->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)rd->last_collected_time.tv_usec);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_ll(wb, rd->last_collected_value);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_rrd_value(wb, rd->last_calculated_value);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_rrd_value(wb, rd->last_stored_value);
-                buffer_fast_strcat(wb, "\n", 1);
-            }
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
+                           sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
+        buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+        buffer_fast_strcat(wb, "' ", 2);
+        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
+                                    (usec_t) rd->last_collected_time.tv_usec);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
+        buffer_fast_strcat(wb, "\n", 1);
+    }
     rrddim_foreach_done(rd);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
-    buffer_print_llu(wb, (usec_t)st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t)st->last_collected_time.tv_usec);
+    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_collected_time.tv_sec * USEC_PER_SEC + (usec_t) st->last_collected_time.tv_usec);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, (usec_t)st->last_updated.tv_sec * USEC_PER_SEC + (usec_t)st->last_updated.tv_usec);
+    buffer_print_uint64_encoded(wb, encoding, (usec_t) st->last_updated.tv_sec * USEC_PER_SEC + (usec_t) st->last_updated.tv_usec);
     buffer_fast_strcat(wb, "\n", 1);
 }
 
@@ -242,7 +245,7 @@ static void replication_query_finalize(BUFFER *wb, struct replication_query *q, 
     size_t dimensions = q->dimensions;
 
     if(wb && q->query.enable_streaming)
-        replication_send_chart_collection_state(wb, q->st);
+        replication_send_chart_collection_state(wb, q->st, q->query.capabilities);
 
     if(q->query.locked_data_collection) {
         netdata_spinlock_unlock(&q->st->data_collection_lock);
@@ -304,6 +307,7 @@ static void replication_query_align_to_optimal_before(struct replication_query *
 static bool replication_query_execute(BUFFER *wb, struct replication_query *q, size_t max_msg_size) {
     replication_query_align_to_optimal_before(q);
 
+    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     time_t after = q->query.after;
     time_t before = q->query.before;
     size_t dimensions = q->dimensions;
@@ -436,11 +440,11 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             last_end_time_in_buffer = min_end_time;
 
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN " '' ", sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1 + 4);
-            buffer_print_llu(wb, min_start_time);
+            buffer_print_uint64_encoded(wb, encoding, min_start_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_llu(wb, min_end_time);
+            buffer_print_uint64_encoded(wb, encoding, min_end_time);
             buffer_fast_strcat(wb, " ", 1);
-            buffer_print_llu(wb, wall_clock_time);
+            buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
             buffer_fast_strcat(wb, "\n", 1);
 
             // output the replay values for this time
@@ -456,9 +460,9 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
                     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_SET " \"", sizeof(PLUGINSD_KEYWORD_REPLAY_SET) - 1 + 2);
                     buffer_fast_strcat(wb, rrddim_id(d->rd), string_strlen(d->rd->id));
                     buffer_fast_strcat(wb, "\" ", 2);
-                    buffer_rrd_value(wb, d->sp.sum);
+                    buffer_print_netdata_double_encoded(wb, encoding, d->sp.sum);
                     buffer_fast_strcat(wb, " ", 1);
-                    buffer_print_sn_flags(wb, d->sp.flags, q->query.send_anomaly_bit);
+                    buffer_print_sn_flags(wb, d->sp.flags, q->query.capabilities & STREAM_CAP_INTERPOLATED);
                     buffer_fast_strcat(wb, "\n", 1);
 
                     points_generated++;
@@ -514,7 +518,7 @@ static struct replication_query *replication_response_prepare(
         bool requested_enable_streaming,
         time_t requested_after,
         time_t requested_before,
-        bool send_anomaly_bit
+        STREAM_CAPABILITIES capabilities
         ) {
     time_t wall_clock_time = now_realtime_sec();
 
@@ -576,7 +580,7 @@ static struct replication_query *replication_response_prepare(
             db_first_entry, db_last_entry,
             requested_after, requested_before, requested_enable_streaming,
             query_after, query_before, query_enable_streaming,
-            wall_clock_time, send_anomaly_bit);
+            wall_clock_time, capabilities);
 }
 
 void replication_response_cancel_and_finalize(struct replication_query *q) {
@@ -586,6 +590,7 @@ void replication_response_cancel_and_finalize(struct replication_query *q) {
 static bool sender_is_still_connected_for_this_request(struct replication_request *rq);
 
 bool replication_response_execute_and_finalize(struct replication_query *q, size_t max_msg_size) {
+    NUMBER_ENCODING encoding = (q->query.capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     struct replication_request *rq = q->rq;
     RRDSET *st = q->st;
     RRDHOST *host = st->rrdhost;
@@ -624,36 +629,20 @@ bool replication_response_execute_and_finalize(struct replication_query *q, size
     // last end time of the data we sent
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
-    buffer_print_ll(wb, st->update_every);
+    buffer_print_int64_encoded(wb, encoding, st->update_every);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, db_first_entry);
+    buffer_print_uint64_encoded(wb, encoding, db_first_entry);
     buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, db_last_entry);
-    buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
-    buffer_print_llu(wb, after);
-    buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, before);
-    buffer_fast_strcat(wb, " ", 1);
-    buffer_print_llu(wb, wall_clock_time);
-    buffer_fast_strcat(wb, "\n", 1);
+    buffer_print_uint64_encoded(wb, encoding, db_last_entry);
 
-//    buffer_sprintf(wb, PLUGINSD_KEYWORD_REPLAY_END " %d %llu %llu %s %llu %llu %llu\n",
-//
-//                   // current chart update every
-//                   (int)st->update_every
-//
-//                   // child first db time, child end db time
-//                   , (unsigned long long)db_first_entry, (unsigned long long)db_last_entry
-//
-//                   // start streaming boolean
-//                   , enable_streaming ? "true" : "false"
-//
-//                   // after requested, before requested ('before' can be altered by the child when the request had enable_streaming true)
-//                   , (unsigned long long)after, (unsigned long long)before
-//
-//                   // child world clock time
-//                   , (unsigned long long)wall_clock_time
-//                   );
+    buffer_fast_strcat(wb, enable_streaming ? " true  " : " false ", 7);
+
+    buffer_print_uint64_encoded(wb, encoding, after);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, before);
+    buffer_fast_strcat(wb, " ", 1);
+    buffer_print_uint64_encoded(wb, encoding, wall_clock_time);
+    buffer_fast_strcat(wb, "\n", 1);
 
     worker_is_busy(WORKER_JOB_BUFFER_COMMIT);
     sender_commit(host->sender, wb);
@@ -1428,7 +1417,7 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
                 rq->start_streaming,
                 rq->after,
                 rq->before,
-                stream_has_capability(rq->sender, STREAM_CAP_INTERPOLATED));
+                rq->sender->capabilities);
     }
 
     if(likely(workers))
@@ -1712,7 +1701,7 @@ static int replication_execute_next_pending_request(bool cancel) {
                         rq->start_streaming,
                         rq->after,
                         rq->before,
-                        stream_has_capability(rq->sender, STREAM_CAP_INTERPOLATED));
+                        rq->sender->capabilities);
             }
 
             rq->executed = false;

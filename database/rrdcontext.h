@@ -172,6 +172,7 @@ typedef struct query_metric {
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 
 typedef struct query_target_request {
+    // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
     RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)
     RRDINSTANCE_ACQUIRED *ria;          // the instance to be queried (can be NULL)
@@ -183,18 +184,31 @@ typedef struct query_target_request {
     const char *dimensions;             // dimensions simple pattern
     const char *chart_label_key;        // select only the chart having this label key
     const char *charts_labels_filter;   // select only the charts having this combo of label key:value
+
     time_t after;                       // the requested timeframe
     time_t before;                      // the requested timeframe
-    size_t points;                      // the requested number of points
-    time_t timeout;                     // the timeout of the query in seconds
+    size_t points;                      // the requested number of points to be returned
+
     uint32_t format;                    // DATASOURCE_FORMAT
     RRDR_OPTIONS options;
-    RRDR_GROUPING group_method;
-    const char *group_options;
-    time_t resampling_time;
+    time_t timeout;                     // the timeout of the query in seconds
+
     size_t tier;
     QUERY_SOURCE query_source;
     STORAGE_PRIORITY priority;
+
+    // resampling metric values across time
+    time_t resampling_time;
+
+    // grouping metric values across time
+    RRDR_TIME_GROUPING time_group_method;
+    const char *time_group_options;
+
+    // group by across multiple time-series
+    RRDR_GROUP_BY group_by;
+    const char *group_by_key;
+    RRDR_GROUP_BY_FUNCTION group_by_function;
+
 } QUERY_TARGET_REQUEST;
 
 typedef struct query_target {
@@ -212,7 +226,7 @@ typedef struct query_target {
         time_t query_granularity;
         size_t points;                        // the number of points the query will return (maybe different from the request)
         size_t group;
-        RRDR_GROUPING group_method;
+        RRDR_TIME_GROUPING group_method;
         const char *group_options;
         size_t resampling_group;
         NETDATA_DOUBLE resampling_divisor;

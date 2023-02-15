@@ -11,9 +11,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
     // print the csv header
     for(c = 0, i = 0; c < used ; c++) {
-        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
         if(!i) {
             buffer_strcat(wb, startline);
@@ -32,9 +31,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
     if(format == DATASOURCE_CSV_MARKDOWN) {
         // print the --- line after header
         for(c = 0, i = 0; c < used ;c++) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
 
             if(!i) {
                 buffer_strcat(wb, startline);
@@ -76,7 +74,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         if((options & RRDR_OPTION_SECONDS) || (options & RRDR_OPTION_MILLISECONDS)) {
             // print the timestamp of the line
-            buffer_rrd_value(wb, (NETDATA_DOUBLE)now);
+            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) now);
             // in ms
             if(options & RRDR_OPTION_MILLISECONDS) buffer_strcat(wb, "000");
         }
@@ -107,9 +105,8 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
 
         // for each dimension
         for(c = 0; c < used ;c++) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
 
             buffer_strcat(wb, separator);
 
@@ -137,7 +134,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                     if(n > r->max) r->max = n;
                 }
 
-                buffer_rrd_value(wb, n);
+                buffer_print_netdata_double(wb, n);
             }
         }
 

@@ -638,9 +638,9 @@ int read_user_or_group_ids(struct user_or_group_ids *ids, struct timespec *last_
         struct user_or_group_id *user_or_group_id = callocz(1, sizeof(struct user_or_group_id));
 
         if(ids->type == USER_ID)
-            user_or_group_id->id.uid = (uid_t)str2ull(id_string);
+            user_or_group_id->id.uid = (uid_t) str2ull(id_string, NULL);
         else
-            user_or_group_id->id.gid = (uid_t)str2ull(id_string);
+            user_or_group_id->id.gid = (uid_t) str2ull(id_string, NULL);
 
         user_or_group_id->name = strdupz(name);
         user_or_group_id->updated = 1;
@@ -1452,7 +1452,7 @@ static inline int read_proc_pid_stat(struct pid_stat *p, void *ptr) {
     pid_incremental_rate(stat, p->cstime,  str2kernel_uint_t(procfile_lineword(ff, 0, 16)));
     // p->priority      = str2kernel_uint_t(procfile_lineword(ff, 0, 17));
     // p->nice          = str2kernel_uint_t(procfile_lineword(ff, 0, 18));
-    p->num_threads      = (int32_t)str2uint32_t(procfile_lineword(ff, 0, 19));
+    p->num_threads      = (int32_t) str2uint32_t(procfile_lineword(ff, 0, 19), NULL);
     // p->itrealvalue   = str2kernel_uint_t(procfile_lineword(ff, 0, 20));
     p->collected_starttime        = str2kernel_uint_t(procfile_lineword(ff, 0, 21)) / system_hz;
     p->uptime           = (global_uptime > p->collected_starttime)?(global_uptime - p->collected_starttime):0;
@@ -4234,7 +4234,7 @@ static void get_MemTotal(void) {
     for(line = 0; line < lines ;line++) {
         size_t words = procfile_linewords(ff, line);
         if(words == 3 && strcmp(procfile_lineword(ff, line, 0), "MemTotal") == 0 && strcmp(procfile_lineword(ff, line, 2), "kB") == 0) {
-            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1));
+            kernel_uint_t n = str2ull(procfile_lineword(ff, line, 1), NULL);
             if(n) MemTotal = n;
             break;
         }
@@ -4289,47 +4289,41 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 }
 
 #define add_table_field(wb, key, name, visible, type, visualization, transform, decimal_points, units, max, sort, sortable, sticky, unique_key, pointer_to, summary, range) do { \
-    if(fields_added) buffer_strcat(wb, ",");                                                                    \
-    buffer_sprintf(wb, "\n      \"%s\": {", key);                                                               \
-    buffer_sprintf(wb, "\n         \"index\":%d,", fields_added);                                               \
-    buffer_sprintf(wb, "\n         \"unique_key\":%s,", (unique_key)?"true":"false");                           \
-    buffer_sprintf(wb, "\n         \"name\":\"%s\",", name);                                                    \
-    buffer_sprintf(wb, "\n         \"visible\":%s,", (visible)?"true":"false");                                 \
-    buffer_sprintf(wb, "\n         \"type\":\"%s\",", type);                                                    \
-    if(units)                                                                                                   \
-       buffer_sprintf(wb, "\n         \"units\":\"%s\",", (char*)(units));                                      \
-    buffer_sprintf(wb, "\n         \"visualization\":\"%s\",", visualization);                                  \
-    buffer_sprintf(wb, "\n         \"value_options\":{");                                                       \
-    if(units)                                                                                                   \
-       buffer_sprintf(wb, "\n           \"units\":\"%s\",", (char*)(units));                                    \
-    buffer_sprintf(wb, "\n           \"transform\":\"%s\",", transform);                                        \
-    buffer_sprintf(wb, "\n           \"decimal_points\":%d", decimal_points);                                   \
-    buffer_sprintf(wb, "\n         },");                                                                        \
+    buffer_json_member_add_object(wb, key);                                                                     \
+    buffer_json_member_add_uint64(wb, "index", fields_added);                                                   \
+    buffer_json_member_add_boolean(wb, "unique_key", unique_key);                                               \
+    buffer_json_member_add_string(wb, "name", name);                                                            \
+    buffer_json_member_add_boolean(wb, "visible", visible);                                                     \
+    buffer_json_member_add_string(wb, "type", type);                                                            \
+    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
+    buffer_json_member_add_string(wb, "visualization", visualization);                                          \
+    buffer_json_member_add_object(wb, "value_options");                                                         \
+    buffer_json_member_add_string_or_omit(wb, "units", (char*)(units));                                         \
+    buffer_json_member_add_string(wb, "transform", transform);                                                  \
+    buffer_json_member_add_uint64(wb, "decimal_points", decimal_points);                                        \
+    buffer_json_object_close(wb);                                                                               \
     if(!isnan((NETDATA_DOUBLE)(max)))                                                                           \
-       buffer_sprintf(wb, "\n         \"max\":%f,", (NETDATA_DOUBLE)(max));                                     \
-    if(pointer_to)                                                                                              \
-        buffer_sprintf(wb, "\n         \"pointer_to\":\"%s\",", (char *)(pointer_to));                          \
-    buffer_sprintf(wb, "\n         \"sort\":\"%s\",", sort);                                                    \
-    buffer_sprintf(wb, "\n         \"sortable\":%s,", (sortable)?"true":"false");                               \
-    buffer_sprintf(wb, "\n         \"sticky\":%s,", (sticky)?"true":"false");                                   \
-    buffer_sprintf(wb, "\n         \"summary\":\"%s\",", summary);                                              \
-    buffer_sprintf(wb, "\n         \"filter\":\"%s\"", (range)?"range":"multiselect");                          \
-    buffer_sprintf(wb, "\n      }");                                                                            \
+       buffer_json_member_add_double(wb, "max", (NETDATA_DOUBLE)(max));                                         \
+    buffer_json_member_add_string_or_omit(wb, "pointer_to", (char *)(pointer_to));                              \
+    buffer_json_member_add_string(wb, "sort", sort);                                                            \
+    buffer_json_member_add_boolean(wb, "sortable", sortable);                                                   \
+    buffer_json_member_add_boolean(wb, "sticky", sticky);                                                       \
+    buffer_json_member_add_string(wb, "summary", summary);                                                      \
+    buffer_json_member_add_string(wb, "filter", (range)?"range":"multiselect");                                 \
+    buffer_json_object_close(wb);                                                                               \
     fields_added++;                                                                                             \
 } while(0)
 
 #define add_value_field_llu_with_max(wb, key, value) do {                                                       \
     unsigned long long _tmp = (value);                                                                          \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
-    buffer_fast_strcat(wb, ",", 1);                                                                             \
-    buffer_print_llu(wb, _tmp);                                                                                 \
+    buffer_json_add_array_item_uint64(wb, _tmp);                                                                \
 } while(0)
 
 #define add_value_field_ndd_with_max(wb, key, value) do {                                                       \
     NETDATA_DOUBLE _tmp = (value);                                                                              \
     key ## _max = (rows == 0) ? (_tmp) : MAX(key ## _max, _tmp);                                                \
-    buffer_fast_strcat(wb, ",", 1);                                                                             \
-    buffer_rrd_value(wb, _tmp);                                                                                 \
+    buffer_json_add_array_item_double(wb, _tmp);                                                                \
 } while(0)
 
 static void apps_plugin_function_processes(const char *transaction, char *function __maybe_unused, char *line_buffer __maybe_unused, int line_max __maybe_unused, int timeout __maybe_unused) {
@@ -4406,18 +4400,12 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
     unsigned int io_divisor = 1024 * RATES_DETAIL;
 
     BUFFER *wb = buffer_create(PLUGINSD_LINE_MAX, NULL);
-    buffer_sprintf(wb,
-                   "{"
-                   "\n   \"status\":%d"
-                   ",\n   \"type\":\"table\""
-                   ",\n   \"update_every\":%d"
-                   ",\n   \"help\":\"%s\""
-                   ",\n   \"data\":["
-                   "\n"
-            , HTTP_RESP_OK
-            , update_every
-            , APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION
-    );
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", update_every);
+    buffer_json_member_add_string(wb, "help", APPS_PLUGIN_PROCESSES_FUNCTION_DESCRIPTION);
+    buffer_json_member_add_array(wb, "data");
 
     NETDATA_DOUBLE
               UserCPU_max = 0.0
@@ -4493,52 +4481,41 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         if(filter_gid && p->gid != gid)
             continue;
 
-        if(rows) buffer_fast_strcat(wb, ",\n", 2);
         rows++;
 
-        buffer_strcat(wb, "      [");
+        buffer_json_add_array_item_array(wb);
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE FIELDS!
 
         // pid
-        buffer_print_llu(wb, p->pid);
+        buffer_json_add_array_item_uint64(wb, p->pid);
 
         // cmd
-        buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->comm);
-        buffer_fast_strcat(wb, "\"", 1);
+        buffer_json_add_array_item_string(wb, p->comm);
 
 #ifdef NETDATA_DEV_MODE
         // cmdline
-        buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
-        buffer_fast_strcat(wb, "\"", 1);
+        buffer_json_add_array_item_string(wb, (p->cmdline && *p->cmdline) ? p->cmdline : p->comm);
 #endif
 
         // ppid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->ppid);
+        buffer_json_add_array_item_uint64(wb, p->ppid);
 
         // category
-        buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->target ? p->target->name : "-");
-        buffer_fast_strcat(wb, "\"", 1);
+        buffer_json_add_array_item_string(wb, p->target ? p->target->name : "-");
 
         // user
-        buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->user_target ? p->user_target->name : "-");
-        buffer_fast_strcat(wb, "\"", 1);
+        buffer_json_add_array_item_string(wb, p->user_target ? p->user_target->name : "-");
 
         // uid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->uid);
+        buffer_json_add_array_item_uint64(wb, p->uid);
 
         // group
-        buffer_fast_strcat(wb, ",\"", 2);
-        buffer_strcat_jsonescape(wb, p->group_target ? p->group_target->name : "-");
-        buffer_fast_strcat(wb, "\"", 1);
+        buffer_json_add_array_item_string(wb, p->group_target ? p->group_target->name : "-");
 
         // gid
-        buffer_fast_strcat(wb, ",", 1); buffer_print_llu(wb, p->gid);
+        buffer_json_add_array_item_uint64(wb, p->gid);
 
         // CPU utilization %
         add_value_field_ndd_with_max(wb, CPU, (NETDATA_DOUBLE)(p->utime + p->stime + p->gtime + p->cutime + p->cstime + p->cgtime) / cpu_divisor);
@@ -4599,17 +4576,14 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_value_field_llu_with_max(wb, Threads, p->num_threads);
         add_value_field_llu_with_max(wb, Uptime, p->uptime);
 
-        buffer_fast_strcat(wb, "]", 1);
-
-        fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
-        buffer_flush(wb);
+        buffer_json_array_close(wb);
     }
+
+    buffer_json_array_close(wb);
+    buffer_json_member_add_object(wb, "columns");
 
     {
         int fields_added = 0;
-
-        buffer_flush(wb);
-        buffer_sprintf(wb, "\n   ],\n   \"columns\": {");
 
         // IMPORTANT!
         // THE ORDER SHOULD BE THE SAME WITH THE VALUES!
@@ -4684,118 +4658,271 @@ static void apps_plugin_function_processes(const char *transaction, char *functi
         add_table_field(wb, "Processes", "Processes", true, "bar-with-integer", "bar", "number", 0, "processes", Processes_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Threads", "Threads", true, "bar-with-integer", "bar", "number", 0, "threads", Threads_max, "descending", true, false, false, NULL, "sum", true);
         add_table_field(wb, "Uptime", "Uptime in seconds", true, "duration", "bar", "duration", 2, "seconds", Uptime_max, "descending", true, false, false, NULL, "max", true);
-
-        buffer_strcat(
-                wb,
-                ""
-                "\n   },"
-                "\n   \"default_sort_column\": \"CPU\","
-                "\n   \"charts\": {"
-                "\n      \"CPU\": {"
-                "\n         \"name\":\"CPU Utilization\","
-                "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"UserCPU\", \"SysCPU\", \"GuestCPU\", \"CUserCPU\", \"CSysCPU\", \"CGuestCPU\" ]"
-                "\n      },"
-                "\n      \"Memory\": {"
-                "\n         \"name\":\"Memory\","
-                "\n         \"type\":\"stacked-bar\","
-                "\n         \"columns\": [ \"Virtual\", \"Resident\", \"Shared\", \"Swap\" ]"
-                "\n      },"
-        );
-
-        if(MemTotal)
-            buffer_strcat(
-                    wb,
-                    ""
-                    "\n      \"MemoryPercent\": {"
-                    "\n         \"name\":\"Memory Percentage\","
-                    "\n         \"type\":\"stacked-bar\","
-                    "\n         \"columns\": [ \"Memory\" ]"
-                    "\n      },"
-            );
-
-        buffer_strcat(
-                wb, ""
-                    #ifndef __FreeBSD__
-                    "\n      \"Reads\": {"
-                                       "\n         \"name\":\"I/O Reads\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"LReads\", \"PReads\" ]"
-                                       "\n      },"
-                                       "\n      \"Writes\": {"
-                                       "\n         \"name\":\"I/O Writes\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"LWrites\", \"PWrites\" ]"
-                                       "\n      },"
-                                       "\n      \"LogicalIO\": {"
-                                       "\n         \"name\":\"Logical I/O\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"LReads\", \"LWrites\" ]"
-                                       "\n      },"
-                    #endif
-                    "\n      \"PhysicalIO\": {"
-                                       "\n         \"name\":\"Physical I/O\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"PReads\", \"PWrites\" ]"
-                                       "\n      },"
-                                       "\n      \"IOCalls\": {"
-                                       "\n         \"name\":\"I/O Calls\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"RCalls\", \"WCalls\" ]"
-                                       "\n      },"
-                                       "\n      \"MinFlt\": {"
-                                       "\n         \"name\":\"Minor Page Faults\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"MinFlt\", \"CMinFlt\" ]"
-                                       "\n      },"
-                                       "\n      \"MajFlt\": {"
-                                       "\n         \"name\":\"Major Page Faults\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"MajFlt\", \"CMajFlt\" ]"
-                                       "\n      },"
-                                       "\n      \"Threads\": {"
-                                       "\n         \"name\":\"Threads\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"Threads\" ]"
-                                       "\n      },"
-                                       "\n      \"Processes\": {"
-                                       "\n         \"name\":\"Processes\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"Processes\" ]"
-                                       "\n      },"
-                                       "\n      \"FDs\": {"
-                                       "\n         \"name\":\"File Descriptors\","
-                                       "\n         \"type\":\"stacked-bar\","
-                                       "\n         \"columns\": [ \"Files\", \"Pipes\", \"Sockets\", \"iNotiFDs\", \"EventFDs\", \"TimerFDs\", \"SigFDs\", \"EvPollFDs\", \"OtherFDs\" ]"
-                                       "\n      }"
-                                       "\n   },"
-                                       "\n   \"group_by\": {"
-                                       "\n     \"pid\": {"
-                                       "\n         \"name\":\"Process Tree by PID\","
-                                       "\n         \"columns\":[ \"PPID\" ]"
-                                       "\n     },"
-                                       "\n     \"category\": {"
-                                       "\n         \"name\":\"Process Tree by Category\","
-                                       "\n         \"columns\":[ \"Category\", \"PPID\" ]"
-                                       "\n     },"
-                                       "\n     \"user\": {"
-                                       "\n         \"name\":\"Process Tree by User\","
-                                       "\n         \"columns\":[ \"User\", \"PPID\" ]"
-                                       "\n     },"
-                                       "\n     \"group\": {"
-                                       "\n         \"name\":\"Process Tree by Group\","
-                                       "\n         \"columns\":[ \"Group\", \"PPID\" ]"
-                                       "\n     }"
-                                       "\n   }"
-        );
-
-        fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
     }
+    buffer_json_object_close(wb);
 
+    buffer_json_member_add_string(wb, "default_sort_column", "CPU");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        // CPU chart
+        buffer_json_member_add_object(wb, "CPU");
+        {
+            buffer_json_member_add_string(wb, "name", "CPU Utilization");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "UserCPU");
+                buffer_json_add_array_item_string(wb, "SysCPU");
+                buffer_json_add_array_item_string(wb, "GuestCPU");
+                buffer_json_add_array_item_string(wb, "CUserCPU");
+                buffer_json_add_array_item_string(wb, "CSysCPU");
+                buffer_json_add_array_item_string(wb, "CGuestCPU");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Memory chart
+        buffer_json_member_add_object(wb, "Memory");
+        {
+            buffer_json_member_add_string(wb, "name", "Memory");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Virtual");
+                buffer_json_add_array_item_string(wb, "Resident");
+                buffer_json_add_array_item_string(wb, "Shared");
+                buffer_json_add_array_item_string(wb, "Swap");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        if(MemTotal) {
+            // Memory chart
+            buffer_json_member_add_object(wb, "MemoryPercent");
+            {
+                buffer_json_member_add_string(wb, "name", "Memory Percentage");
+                buffer_json_member_add_string(wb, "type", "stacked-bar");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    buffer_json_add_array_item_string(wb, "Memory");
+                }
+                buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+
+#ifndef __FreeBSD__
+        // I/O Reads chart
+        buffer_json_member_add_object(wb, "Reads");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Reads");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "LReads");
+                buffer_json_add_array_item_string(wb, "PReads");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // I/O Writes chart
+        buffer_json_member_add_object(wb, "Writes");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Writes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "LWrites");
+                buffer_json_add_array_item_string(wb, "PWrites");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Logical I/O chart
+        buffer_json_member_add_object(wb, "LogicalIO");
+        {
+            buffer_json_member_add_string(wb, "name", "Logical I/O");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "LReads");
+                buffer_json_add_array_item_string(wb, "LWrites");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+#endif
+
+        // Physical I/O chart
+        buffer_json_member_add_object(wb, "PhysicalIO");
+        {
+            buffer_json_member_add_string(wb, "name", "Physical I/O");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PReads");
+                buffer_json_add_array_item_string(wb, "PWrites");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // I/O Calls chart
+        buffer_json_member_add_object(wb, "IOCalls");
+        {
+            buffer_json_member_add_string(wb, "name", "I/O Calls");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "RCalls");
+                buffer_json_add_array_item_string(wb, "WCalls");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Minor Page Faults chart
+        buffer_json_member_add_object(wb, "MinFlt");
+        {
+            buffer_json_member_add_string(wb, "name", "Minor Page Faults");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "MinFlt");
+                buffer_json_add_array_item_string(wb, "CMinFlt");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Major Page Faults chart
+        buffer_json_member_add_object(wb, "MajFlt");
+        {
+            buffer_json_member_add_string(wb, "name", "Major Page Faults");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "MajFlt");
+                buffer_json_add_array_item_string(wb, "CMajFlt");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Threads chart
+        buffer_json_member_add_object(wb, "Threads");
+        {
+            buffer_json_member_add_string(wb, "name", "Threads");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Threads");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // Processes chart
+        buffer_json_member_add_object(wb, "Processes");
+        {
+            buffer_json_member_add_string(wb, "name", "Processes");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Processes");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // FDs chart
+        buffer_json_member_add_object(wb, "FDs");
+        {
+            buffer_json_member_add_string(wb, "name", "File Descriptors");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Files");
+                buffer_json_add_array_item_string(wb, "Pipes");
+                buffer_json_add_array_item_string(wb, "Sockets");
+                buffer_json_add_array_item_string(wb, "iNotiFDs");
+                buffer_json_add_array_item_string(wb, "EventFDs");
+                buffer_json_add_array_item_string(wb, "TimerFDs");
+                buffer_json_add_array_item_string(wb, "SigFDs");
+                buffer_json_add_array_item_string(wb, "EvPollFDs");
+                buffer_json_add_array_item_string(wb, "OtherFDs");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        // group by PID
+        buffer_json_member_add_object(wb, "PID");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by PID");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Category
+        buffer_json_member_add_object(wb, "Category");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Category");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Category");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by User
+        buffer_json_member_add_object(wb, "User");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by User");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "User");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        // group by Group
+        buffer_json_member_add_object(wb, "Group");
+        {
+            buffer_json_member_add_string(wb, "name", "Process Tree by Group");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Group");
+                buffer_json_add_array_item_string(wb, "PPID");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+
+    buffer_json_member_add_time_t(wb, "expires", expires);
+    buffer_json_finalize(wb);
+
+    fwrite(buffer_tostring(wb), buffer_strlen(wb), 1, stdout);
     buffer_free(wb);
-
-    fprintf(stdout, ",\n   \"expires\":%lld", (long long)expires);
-    fprintf(stdout, "\n}");
 
     pluginsd_function_result_end_to_stdout();
 }

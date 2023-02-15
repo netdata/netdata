@@ -7,15 +7,15 @@
 
 #ifdef KERNEL_32BIT
 typedef uint32_t kernel_uint_t;
-#define str2kernel_uint_t(string) str2uint32_t(string)
+#define str2kernel_uint_t(string) str2uint32_t(string, NULL)
 #define KERNEL_UINT_FORMAT "%u"
 #else
 typedef uint64_t kernel_uint_t;
-#define str2kernel_uint_t(string) str2uint64_t(string)
+#define str2kernel_uint_t(string) str2uint64_t(string, NULL)
 #define KERNEL_UINT_FORMAT "%" PRIu64
 #endif
 
-#define str2pid_t(string) str2uint32_t(string)
+#define str2pid_t(string) str2uint32_t(string, NULL)
 
 
 // for faster execution, allow the compiler to inline
@@ -84,24 +84,6 @@ static inline uint32_t fnv1a_uhash32(const char *name) {
 #define simple_hash(s) fnv1a_hash32(s)
 #define simple_uhash(s) fnv1a_uhash32(s)
 
-static inline size_t indexing_partition_old(Word_t ptr, Word_t modulo) {
-    size_t total = 0;
-
-    total += (ptr & 0xff) >> 0;
-    total += (ptr & 0xff00) >> 8;
-    total += (ptr & 0xff0000) >> 16;
-    total += (ptr & 0xff000000) >> 24;
-
-    if(sizeof(Word_t) > 4) {
-        total += (ptr & 0xff00000000) >> 32;
-        total += (ptr & 0xff0000000000) >> 40;
-        total += (ptr & 0xff000000000000) >> 48;
-        total += (ptr & 0xff00000000000000) >> 56;
-    }
-
-    return (total % modulo);
-}
-
 static uint32_t murmur32(uint32_t k) __attribute__((const));
 static inline uint32_t murmur32(uint32_t k) {
     k ^= k >> 16;
@@ -135,143 +117,281 @@ static inline size_t indexing_partition(Word_t ptr, Word_t modulo) {
 #endif
 }
 
+static inline unsigned int str2u(const char *s) {
+    unsigned int n = 0;
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    return n;
+}
+
 static inline int str2i(const char *s) {
-    int n = 0;
-    char c, negative = (char)(*s == '-');
-    const char *e = s + 30; // max number of character to iterate
-
-    for(c = (char)((negative)?*(++s):*s); c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+    if(unlikely(*s == '-')) {
+        s++;
+        return -(int) str2u(s);
     }
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (int) str2u(s);
+    }
+}
 
-    if(unlikely(negative))
-        return -n;
+static inline unsigned long str2ul(const char *s) {
+    unsigned long n = 0;
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
 
     return n;
 }
 
 static inline long str2l(const char *s) {
-    long n = 0;
-    char c, negative = (*s == '-');
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = (negative)?*(++s):*s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+    if(unlikely(*s == '-')) {
+        s++;
+        return -(long) str2ul(s);
     }
-
-    if(unlikely(negative))
-        return -n;
-
-    return n;
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (long) str2ul(s);
+    }
 }
 
-static inline uint32_t str2uint32_t(const char *s) {
+static inline uint32_t str2uint32_t(const char *s, char **endptr) {
     uint32_t n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
     return n;
 }
 
-static inline uint64_t str2uint64_t(const char *s) {
+static inline uint64_t str2uint64_t(const char *s, char **endptr) {
     uint64_t n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
 
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
+#ifdef ENV32BIT
+    unsigned long n32 = 0;
+    while (*s >= '0' && *s <= '9' && n32 < (ULONG_MAX / 10))
+        n32 = n32 * 10 + (*s++ - '0');
+
+    n = n32;
+#endif
+
+    while(*s >= '0' && *s <= '9')
+        n = n * 10 + (*s++ - '0');
+
+    if(unlikely(endptr))
+        *endptr = (char *)s;
+
     return n;
 }
 
-static inline unsigned long str2ul(const char *s) {
-    unsigned long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
-    return n;
-}
-
-static inline unsigned long long str2ull(const char *s) {
-    unsigned long long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
-
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
-    }
-    return n;
-}
-
-static inline unsigned long long str2ull_hex_or_dec(const char *s) {
-    unsigned long long n = 0;
-    char c;
-
-    if(likely(s[0] == '0' && s[1] == 'x')) {
-        const char *e = &s[sizeof(unsigned long long) * 2 + 2 + 1]; // max number of character to iterate: 8 bytes * 2 + '0x' + '\0'
-
-        // skip 0x
-        s += 2;
-
-        for (c = *s; ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F')) && s < e; c = *(++s)) {
-            n = n << 4;
-
-            if (c <= '9')
-                n += c - '0';
-            else
-                n += c - 'A' + 10;
-        }
-        return n;
-    }
-    else
-        return str2ull(s);
-}
-
-static inline long long str2ll_hex_or_dec(const char *s) {
-    if(*s == '-')
-        return -(long long)str2ull_hex_or_dec(&s[1]);
-    else
-        return (long long)str2ull_hex_or_dec(s);
+static inline unsigned long long int str2ull(const char *s, char **endptr) {
+    return str2uint64_t(s, endptr);
 }
 
 static inline long long str2ll(const char *s, char **endptr) {
-    int negative = 0;
-
     if(unlikely(*s == '-')) {
         s++;
-        negative = 1;
+        return -(long long) str2uint64_t(s, endptr);
     }
-    else if(unlikely(*s == '+'))
+    else {
+        if(unlikely(*s == '+')) s++;
+        return (long long) str2uint64_t(s, endptr);
+    }
+}
+
+static inline uint64_t str2uint64_hex(const char *src, char **endptr) {
+    uint64_t num = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char c;
+
+    while ((c = hex_value_from_ascii[*s]) != 255) {
+        num = (num << 4) | c;
+        s++;
+    }
+
+    if(endptr)
+        *endptr = (char *)s;
+
+    return num;
+}
+
+static inline uint64_t str2uint64_base64(const char *src, char **endptr) {
+    uint64_t num = 0;
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char c;
+
+    while ((c = base64_value_from_ascii[*s]) != 255) {
+        num = (num << 6) | c;
+        s++;
+    }
+
+    if(endptr)
+        *endptr = (char *)s;
+
+    return num;
+}
+
+static inline NETDATA_DOUBLE str2ndd_parse_double_decimal_digits_internal(const char *src, int *digits) {
+    const char *s = src;
+    NETDATA_DOUBLE n = 0.0;
+
+    while(*s >= '0' && *s <= '9') {
+
+        // this works for both 32-bit and 64-bit systems
+        unsigned long ni = 0;
+        unsigned exponent = 0;
+        while (*s >= '0' && *s <= '9' && ni < (ULONG_MAX / 10)) {
+            ni = (ni * 10) + (*s++ - '0');
+            exponent++;
+        }
+
+        n = n * powndd(10.0, exponent) + (NETDATA_DOUBLE)ni;
+    }
+
+    *digits = (int)(s - src);
+    return n;
+}
+
+static inline NETDATA_DOUBLE str2ndd(const char *src, char **endptr) {
+    const char *s = src;
+
+    NETDATA_DOUBLE sign = 1.0;
+    NETDATA_DOUBLE result;
+    int integral_digits = 0;
+
+    NETDATA_DOUBLE fractional = 0.0;
+    int fractional_digits = 0;
+
+    NETDATA_DOUBLE exponent = 0.0;
+    int exponent_digits = 0;
+
+    switch(*s) {
+        case '-':
+            s++;
+            sign = -1.0;
+            break;
+
+        case '+':
+            s++;
+            break;
+
+        case 'n':
+            if(s[1] == 'a' && s[2] == 'n') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            if(s[1] == 'u' && s[2] == 'l' && s[3] == 'l') {
+                if(endptr) *endptr = (char *)&s[3];
+                return NAN;
+            }
+            break;
+
+        case 'i':
+            if(s[1] == 'n' && s[2] == 'f') {
+                if(endptr) *endptr = (char *)&s[3];
+                return INFINITY;
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    result = str2ndd_parse_double_decimal_digits_internal(s, &integral_digits);
+    s += integral_digits;
+
+    if(unlikely(*s == '.')) {
+        s++;
+        fractional = str2ndd_parse_double_decimal_digits_internal(s, &fractional_digits);
+        s += fractional_digits;
+    }
+
+    if (unlikely(*s == 'e' || *s == 'E')) {
+        const char *e_ptr = s;
         s++;
 
-    long long n = 0;
-    char c;
-    const char *e = &s[30]; // max number of character to iterate
+        int exponent_sign = 1;
+        if (*s == '-') {
+            exponent_sign = -1;
+            s++;
+        }
+        else if(*s == '+')
+            s++;
 
-    for(c = *s; c >= '0' && c <= '9' && s < e ; c = *(++s)) {
-        n *= 10;
-        n += c - '0';
+        exponent = str2ndd_parse_double_decimal_digits_internal(s, &exponent_digits);
+        if(unlikely(!exponent_digits)) {
+            exponent = 0;
+            s = e_ptr;
+        }
+        else {
+            s += exponent_digits;
+            exponent *= exponent_sign;
+        }
     }
 
     if(unlikely(endptr))
         *endptr = (char *)s;
 
-    if(unlikely(negative))
-        return -n;
+    if (unlikely(exponent_digits))
+        result *= powndd(10.0, exponent);
+
+    if (unlikely(fractional_digits))
+        result += fractional / powndd(10.0, fractional_digits) * (exponent_digits ? powndd(10.0, exponent) : 1.0);
+
+    return sign * result;
+}
+
+static inline unsigned long long str2ull_encoded(const char *s) {
+    if(*s == IEEE754_UINT64_B64_PREFIX[0])
+        return str2uint64_base64(s + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, NULL);
+
+    if(s[0] == HEX_PREFIX[0] && s[1] == HEX_PREFIX[1])
+        return str2uint64_hex(s + 2, NULL);
+
+    return str2uint64_t(s, NULL);
+}
+
+static inline long long str2ll_encoded(const char *s) {
+    if(*s == '-')
+        return -(long long) str2ull_encoded(&s[1]);
     else
-        return n;
+        return (long long) str2ull_encoded(s);
+}
+
+static inline NETDATA_DOUBLE str2ndd_encoded(const char *src, char **endptr) {
+    if (*src == IEEE754_DOUBLE_B64_PREFIX[0]) {
+        // double parsing from base64
+        uint64_t n = str2uint64_base64(src + sizeof(IEEE754_DOUBLE_B64_PREFIX) - 1, endptr);
+        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
+        return *ptr;
+    }
+
+    if (*src == IEEE754_DOUBLE_HEX_PREFIX[0]) {
+        // double parsing from hex
+        uint64_t n = str2uint64_hex(src + sizeof(IEEE754_DOUBLE_HEX_PREFIX) - 1, endptr);
+        NETDATA_DOUBLE *ptr = (NETDATA_DOUBLE *) (&n);
+        return *ptr;
+    }
+
+    double sign = 1.0;
+
+    if(*src == '-') {
+        sign = -1.0;
+        src++;
+    }
+
+    if(unlikely(*src == IEEE754_UINT64_B64_PREFIX[0]))
+        return (NETDATA_DOUBLE) str2uint64_base64(src + sizeof(IEEE754_UINT64_B64_PREFIX) - 1, endptr) * sign;
+
+    if(unlikely(*src == HEX_PREFIX[0] && src[1] == HEX_PREFIX[1]))
+        return (NETDATA_DOUBLE) str2uint64_hex(src + sizeof(HEX_PREFIX) - 1, endptr) * sign;
+
+    return str2ndd(src, endptr) * sign;
 }
 
 static inline char *strncpyz(char *dst, const char *src, size_t n) {
@@ -372,7 +492,7 @@ static inline int read_single_number_file(const char *filename, unsigned long lo
     }
 
     buffer[30] = '\0';
-    *result = str2ull(buffer);
+    *result = str2ull(buffer, NULL);
     return 0;
 }
 

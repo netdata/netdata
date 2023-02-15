@@ -785,10 +785,10 @@ void rrdeng_prep_query(PDC *pdc) {
     if (pages_to_load && pdc->page_list_JudyL) {
         pdc_acquire(pdc); // we get 1 for the 1st worker in the chain: do_read_page_list_work()
         usec_t start_ut = now_monotonic_usec();
-//        if(likely(priority == STORAGE_PRIORITY_BEST_EFFORT))
-//            dbengine_load_page_list_directly(ctx, handle->pdc);
-//        else
-        pdc_route_asynchronously(pdc->ctx, pdc);
+        if(likely(pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+            pdc_route_synchronously(pdc->ctx, pdc);
+        else
+            pdc_route_asynchronously(pdc->ctx, pdc);
         __atomic_add_fetch(&rrdeng_cache_efficiency_stats.prep_time_to_route, now_monotonic_usec() - start_ut, __ATOMIC_RELAXED);
     }
     else
@@ -827,7 +827,11 @@ void pg_cache_preload(struct rrdeng_query_handle *handle) {
 
     if(ctx_is_available_for_queries(handle->ctx)) {
         handle->pdc->refcount++; // we get 1 for the query thread and 1 for the prep thread
-        rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
+
+        if(unlikely(handle->pdc->priority == STORAGE_PRIORITY_SYNCHRONOUS))
+            rrdeng_prep_query(handle->pdc);
+        else
+            rrdeng_enq_cmd(handle->ctx, RRDENG_OPCODE_QUERY, handle->pdc, NULL, handle->priority, NULL, NULL);
     }
     else {
         completion_mark_complete(&handle->pdc->prep_completion);

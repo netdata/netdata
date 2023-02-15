@@ -263,7 +263,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                     }
                     else {
                         buffer[r] = '\0';
-                        ps->capacity->value = str2ull(buffer);
+                        ps->capacity->value = str2ull(buffer, NULL);
 
                         if(unlikely(!keep_fds_open)) {
                             close(ps->capacity->fd);
@@ -307,7 +307,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                                 break;
                             }
                             buffer[r] = '\0';
-                            pd->value = str2ull(buffer);
+                            pd->value = str2ull(buffer, NULL);
 
                             if(unlikely(!keep_fds_open)) {
                                 close(pd->fd);

@@ -37,9 +37,8 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 
     // for each dimension
     for (c = 0; c < used; c++) {
-        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-        if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
         NETDATA_DOUBLE n = cn[c];
 
@@ -107,7 +106,7 @@ inline NETDATA_DOUBLE rrdr2value(RRDR *r, long i, RRDR_OPTIONS options, int *all
 QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             struct rrdcontext_acquired *rca, struct rrdinstance_acquired *ria, struct rrdmetric_acquired *rma,
                             time_t after, time_t before,
-                            RRDR_OPTIONS options, RRDR_GROUPING group_method, const char *group_options,
+                            RRDR_OPTIONS options, RRDR_TIME_GROUPING group_method, const char *group_options,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
@@ -119,8 +118,8 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
             .before = before,
             .points = 1,
             .options = options,
-            .group_method = group_method,
-            .group_options = group_options,
+            .time_group_method = group_method,
+            .time_group_options = group_options,
             .tier = tier,
             .timeout = timeout,
             .query_source = query_source,

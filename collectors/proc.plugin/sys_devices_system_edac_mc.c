@@ -97,7 +97,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                 if(unlikely(!m->ce_ff || procfile_lines(m->ce_ff) < 1 || procfile_linewords(m->ce_ff, 0) < 1))
                     continue;
 
-                m->ce_count = str2ull(procfile_lineword(m->ce_ff, 0, 0));
+                m->ce_count = str2ull(procfile_lineword(m->ce_ff, 0, 0), NULL);
                 ce_sum += m->ce_count;
                 m->ce_updated = 1;
             }
@@ -119,7 +119,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                 if(unlikely(!m->ue_ff || procfile_lines(m->ue_ff) < 1 || procfile_linewords(m->ue_ff, 0) < 1))
                     continue;
 
-                m->ue_count = str2ull(procfile_lineword(m->ue_ff, 0, 0));
+                m->ue_count = str2ull(procfile_lineword(m->ue_ff, 0, 0), NULL);
                 ue_sum += m->ue_count;
                 m->ue_updated = 1;
             }

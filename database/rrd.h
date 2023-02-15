@@ -54,6 +54,9 @@ typedef enum __attribute__ ((__packed__)) storage_priority {
     STORAGE_PRIORITY_LOW,
     STORAGE_PRIORITY_BEST_EFFORT,
 
+    // synchronous query, not to be dispatched to workers or queued
+    STORAGE_PRIORITY_SYNCHRONOUS,
+
     STORAGE_PRIORITY_INTERNAL_MAX_DONT_USE,
 } STORAGE_PRIORITY;
 
@@ -167,6 +170,7 @@ extern time_t rrdset_free_obsolete_time_s;
 #endif
 
 extern int libuv_worker_threads;
+extern bool ieee754_doubles;
 
 #define RRD_ID_LENGTH_MAX 200
 
@@ -279,6 +283,7 @@ void rrdlabels_destroy(DICTIONARY *labels_dict);
 void rrdlabels_add(DICTIONARY *dict, const char *name, const char *value, RRDLABEL_SRC ls);
 void rrdlabels_add_pair(DICTIONARY *dict, const char *string, RRDLABEL_SRC ls);
 void rrdlabels_get_value_to_buffer_or_null(DICTIONARY *labels, BUFFER *wb, const char *key, const char *quote, const char *null);
+void rrdlabels_value_to_buffer_array_item_or_null(DICTIONARY *labels, BUFFER *wb, const char *key);
 void rrdlabels_get_value_strdup_or_null(DICTIONARY *labels, char **value, const char *key);
 void rrdlabels_flush(DICTIONARY *labels_dict);
 
@@ -292,6 +297,7 @@ void rrdlabels_log_to_buffer(DICTIONARY *labels, BUFFER *wb);
 bool rrdlabels_match_simple_pattern(DICTIONARY *labels, const char *simple_pattern_txt);
 bool rrdlabels_match_simple_pattern_parsed(DICTIONARY *labels, SIMPLE_PATTERN *pattern, char equal);
 int rrdlabels_to_buffer(DICTIONARY *labels, BUFFER *wb, const char *before_each, const char *equal, const char *quote, const char *between_them, bool (*filter_callback)(const char *name, const char *value, RRDLABEL_SRC ls, void *data), void *filter_data, void (*name_sanitizer)(char *dst, const char *src, size_t dst_size), void (*value_sanitizer)(char *dst, const char *src, size_t dst_size));
+void rrdlabels_to_buffer_json_members(DICTIONARY *labels, BUFFER *wb);
 
 void rrdlabels_migrate_to_these(DICTIONARY *dst, DICTIONARY *src);
 void rrdlabels_copy(DICTIONARY *dst, DICTIONARY *src);

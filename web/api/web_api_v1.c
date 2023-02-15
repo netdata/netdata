@@ -92,7 +92,7 @@ void web_client_api_v1_init(void) {
     for(i = 0; api_v1_data_google_formats[i].name ; i++)
         api_v1_data_google_formats[i].hash = simple_hash(api_v1_data_google_formats[i].name);
 
-    web_client_api_v1_init_grouping();
+    time_grouping_init();
 
 	uuid_t uuid;
 
@@ -186,20 +186,20 @@ inline RRDR_OPTIONS web_client_api_request_v1_data_options(char *o) {
     return ret;
 }
 
-void web_client_api_request_v1_data_options_to_buffer(BUFFER *wb, RRDR_OPTIONS options) {
+void web_client_api_request_v1_data_options_to_buffer_json_array(BUFFER *wb, const char *key, RRDR_OPTIONS options) {
+    buffer_json_member_add_array(wb, key);
+
     RRDR_OPTIONS used = 0; // to prevent adding duplicates
-    int added = 0;
     for(int i = 0; api_v1_data_options[i].name ; i++) {
         if (unlikely((api_v1_data_options[i].value & options) && !(api_v1_data_options[i].value & used))) {
             const char *name = api_v1_data_options[i].name;
             used |= api_v1_data_options[i].value;
 
-            if(added) buffer_strcat(wb, ",");
-            buffer_strcat(wb, name);
-
-            added++;
+            buffer_json_add_array_item_string(wb, name);
         }
     }
+
+    buffer_json_array_close(wb);
 }
 
 void web_client_api_request_v1_data_options_to_string(char *buf, size_t size, RRDR_OPTIONS options) {
@@ -268,7 +268,7 @@ inline int web_client_api_request_v1_alarms(RRDHOST *host, struct web_client *w,
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarms2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
@@ -278,7 +278,7 @@ inline int web_client_api_request_v1_alarms_values(RRDHOST *host, struct web_cli
     int all = web_client_api_request_v1_alarms_select(url);
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarms_values2json(host, w->response.data, all);
     buffer_no_cacheable(w->response.data);
     return HTTP_RESP_OK;
@@ -321,7 +321,7 @@ inline int web_client_api_request_v1_alarm_count(RRDHOST *host, struct web_clien
     health_aggregate_alarms(host, w->response.data, contexts, status);
 
     buffer_sprintf(w->response.data, "]\n");
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(w->response.data);
 
     buffer_free(contexts);
@@ -345,7 +345,7 @@ inline int web_client_api_request_v1_alarm_log(RRDHOST *host, struct web_client 
     }
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     health_alarm_log2json(host, w->response.data, after, chart);
     return HTTP_RESP_OK;
 }
@@ -388,7 +388,7 @@ inline int web_client_api_request_single_chart(RRDHOST *host, struct web_client 
         goto cleanup;
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     st->last_accessed_time_s = now_realtime_sec();
     callback(st, w->response.data);
     return HTTP_RESP_OK;
@@ -486,7 +486,7 @@ static int web_client_api_request_v1_context(RRDHOST *host, struct web_client *w
         buffer_free(dimensions);
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     int ret = rrdcontext_to_json(host, w->response.data, after, before, options, context, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
 
     simple_pattern_free(chart_label_key_pattern);
@@ -542,7 +542,7 @@ static int web_client_api_request_v1_contexts(RRDHOST *host, struct web_client *
         buffer_free(dimensions);
     }
 
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     int ret = rrdcontexts_to_json(host, w->response.data, after, before, options, chart_label_key_pattern, chart_labels_filter_pattern, chart_dimensions_pattern);
 
     simple_pattern_free(chart_label_key_pattern);
@@ -556,7 +556,7 @@ inline int web_client_api_request_v1_charts(RRDHOST *host, struct web_client *w,
     (void)url;
 
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     charts2json(host, w->response.data, 0, 0);
     return HTTP_RESP_OK;
 }
@@ -604,7 +604,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
     char *chart_labels_filter = NULL;
     char *group_options = NULL;
     size_t tier = 0;
-    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = 0;
 
@@ -638,7 +638,7 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
         else if(!strcmp(name, "gtime")) group_time_str = value;
         else if(!strcmp(name, "group_options")) group_options = value;
         else if(!strcmp(name, "group")) {
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         }
         else if(!strcmp(name, "format")) {
             format = web_client_api_request_v1_data_format(value);
@@ -734,8 +734,8 @@ inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, c
             .points = points,
             .format = format,
             .options = options,
-            .group_method = group,
-            .group_options = group_options,
+            .time_group_method = group,
+            .time_group_options = group_options,
             .resampling_time = group_time,
             .tier = tier,
             .chart_label_key = chart_label_key,
@@ -1014,7 +1014,9 @@ inline int web_client_api_request_v1_registry(RRDHOST *host, struct web_client *
 }
 
 static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host, BUFFER *wb) {
-    int alarm_normal = 0, alarm_warn = 0, alarm_crit = 0;
+    buffer_json_member_add_object(wb, "alarms");
+
+    size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
@@ -1022,274 +1024,204 @@ static inline void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST
 
         switch(rc->status) {
             case RRDCALC_STATUS_WARNING:
-                alarm_warn++;
+                warning++;
                 break;
             case RRDCALC_STATUS_CRITICAL:
-                alarm_crit++;
+                critical++;
                 break;
             default:
-                alarm_normal++;
+                normal++;
         }
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
-    buffer_sprintf(wb, "\t\t\"normal\": %d,\n", alarm_normal);
-    buffer_sprintf(wb, "\t\t\"warning\": %d,\n", alarm_warn);
-    buffer_sprintf(wb, "\t\t\"critical\": %d\n", alarm_crit);
+
+    buffer_json_member_add_uint64(wb, "normal", normal);
+    buffer_json_member_add_uint64(wb, "warning", warning);
+    buffer_json_member_add_uint64(wb, "critical", critical);
+
+    buffer_json_object_close(wb);
 }
 
 static inline void web_client_api_request_v1_info_mirrored_hosts(BUFFER *wb) {
     RRDHOST *host;
-    int count = 0;
 
-    buffer_strcat(wb, "\t\"mirrored_hosts\": [\n");
     rrd_rdlock();
-    rrdhost_foreach_read(host) {
-        if (count > 0)
-            buffer_strcat(wb, ",\n");
 
-        buffer_sprintf(wb, "\t\t\"%s\"", rrdhost_hostname(host));
-        count++;
-    }
-
-    buffer_strcat(wb, "\n\t],\n\t\"mirrored_hosts_status\": [\n");
-    count = 0;
+    buffer_json_member_add_array(wb, "mirrored_hosts");
     rrdhost_foreach_read(host)
-    {
-        if (count > 0)
-            buffer_strcat(wb, ",\n");
+        buffer_json_add_array_item_string(wb, rrdhost_hostname(host));
+    buffer_json_array_close(wb);
 
-        buffer_sprintf(
-            wb, "\t\t{ \"guid\": \"%s\", \"hostname\": \"%s\", \"reachable\": %s, \"hops\": %d"
-            , host->machine_guid
-            , rrdhost_hostname(host)
-            , (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)) ? "true" : "false"
-            , host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1
-            );
+    buffer_json_member_add_array(wb, "mirrored_hosts_status");
+    rrdhost_foreach_read(host) {
+        buffer_json_add_array_item_object(wb);
 
+        buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+        buffer_json_member_add_uint64(wb, "hops", host->system_info ? host->system_info->hops : (host == localhost) ? 0 : 1);
+        buffer_json_member_add_boolean(wb, "reachable", (host == localhost || !rrdhost_flag_check(host, RRDHOST_FLAG_ORPHAN)));
+
+        buffer_json_member_add_string(wb, "guid", host->machine_guid);
+        buffer_json_member_add_uuid(wb, "node_id", host->node_id);
         rrdhost_aclk_state_lock(host);
-        if (host->aclk_state.claimed_id)
-            buffer_sprintf(wb, ", \"claim_id\": \"%s\"", host->aclk_state.claimed_id);
-        else
-            buffer_strcat(wb, ", \"claim_id\": null");
+        buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id);
         rrdhost_aclk_state_unlock(host);
 
-        if (host->node_id) {
-            char node_id_str[GUID_LEN + 1];
-            uuid_unparse_lower(*host->node_id, node_id_str);
-            buffer_sprintf(wb, ", \"node_id\": \"%s\" }", node_id_str);
-        } else
-            buffer_strcat(wb, ", \"node_id\": null }");
-
-        count++;
+        buffer_json_object_close(wb);
     }
-    rrd_unlock();
+    buffer_json_array_close(wb);
 
-    buffer_strcat(wb, "\n\t],\n");
+    rrd_unlock();
 }
 
-inline void host_labels2json(RRDHOST *host, BUFFER *wb, size_t indentation) {
-    char tabs[11];
+static inline void host_labels2json(RRDHOST *host, BUFFER *wb) {
+    buffer_json_member_add_object(wb, "host_labels");
+    rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
+    buffer_json_object_close(wb);
+}
 
-    if (indentation > 10)
-        indentation = 10;
+static void host_collectors(RRDHOST *host, BUFFER *wb) {
+    buffer_json_member_add_array(wb, "collectors");
 
-    tabs[0] = '\0';
-    while (indentation) {
-        strcat(tabs, "\t");
-        indentation--;
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED|DICT_OPTION_DONT_OVERWRITE_VALUE);
+    RRDSET *st;
+    char name[500];
+
+    time_t now = now_realtime_sec();
+
+    rrdset_foreach_read(st, host) {
+        if (!rrdset_is_available_for_viewers(st))
+            continue;
+
+        sprintf(name, "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
+
+        bool old = 0;
+        bool *set = dictionary_set(dict, name, &old, sizeof(bool));
+        if(!*set) {
+            *set = true;
+            st->last_accessed_time_s = now;
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
+            buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
+            buffer_json_object_close(wb);
+        }
     }
+    rrdset_foreach_done(st);
+    dictionary_destroy(dict);
 
-    rrdlabels_to_buffer(host->rrdlabels, wb, tabs, ":", "\"", ",\n", NULL, NULL, NULL, NULL);
-    buffer_strcat(wb, "\n");
+    buffer_json_array_close(wb);
 }
 
 extern int aclk_connected;
-inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
-{
-    buffer_strcat(wb, "{\n");
-    buffer_sprintf(wb, "\t\"version\": \"%s\",\n", rrdhost_program_version(host));
-    buffer_sprintf(wb, "\t\"uid\": \"%s\",\n", host->machine_guid);
+inline int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb) {
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
 
+    buffer_json_member_add_string(wb, "version", rrdhost_program_version(host));
+    buffer_json_member_add_string(wb, "uid", host->machine_guid);
+
+    buffer_json_member_add_uint64(wb, "hosts-available", rrdhost_hosts_available());
     web_client_api_request_v1_info_mirrored_hosts(wb);
 
-    buffer_strcat(wb, "\t\"alarms\": {\n");
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb);
-    buffer_strcat(wb, "\t},\n");
 
-    buffer_sprintf(wb, "\t\"os_name\": \"%s\",\n", (host->system_info->host_os_name) ? host->system_info->host_os_name : "");
-    buffer_sprintf(wb, "\t\"os_id\": \"%s\",\n", (host->system_info->host_os_id) ? host->system_info->host_os_id : "");
-    buffer_sprintf(wb, "\t\"os_id_like\": \"%s\",\n", (host->system_info->host_os_id_like) ? host->system_info->host_os_id_like : "");
-    buffer_sprintf(wb, "\t\"os_version\": \"%s\",\n", (host->system_info->host_os_version) ? host->system_info->host_os_version : "");
-    buffer_sprintf(wb, "\t\"os_version_id\": \"%s\",\n", (host->system_info->host_os_version_id) ? host->system_info->host_os_version_id : "");
-    buffer_sprintf(wb, "\t\"os_detection\": \"%s\",\n", (host->system_info->host_os_detection) ? host->system_info->host_os_detection : "");
-    buffer_sprintf(wb, "\t\"cores_total\": \"%s\",\n", (host->system_info->host_cores) ? host->system_info->host_cores : "");
-    buffer_sprintf(wb, "\t\"total_disk_space\": \"%s\",\n", (host->system_info->host_disk_space) ? host->system_info->host_disk_space : "");
-    buffer_sprintf(wb, "\t\"cpu_freq\": \"%s\",\n", (host->system_info->host_cpu_freq) ? host->system_info->host_cpu_freq : "");
-    buffer_sprintf(wb, "\t\"ram_total\": \"%s\",\n", (host->system_info->host_ram_total) ? host->system_info->host_ram_total : "");
+    buffer_json_member_add_string_or_empty(wb, "os_name", host->system_info->host_os_name);
+    buffer_json_member_add_string_or_empty(wb, "os_id", host->system_info->host_os_id);
+    buffer_json_member_add_string_or_empty(wb, "os_id_like", host->system_info->host_os_id_like);
+    buffer_json_member_add_string_or_empty(wb, "os_version", host->system_info->host_os_version);
+    buffer_json_member_add_string_or_empty(wb, "os_version_id", host->system_info->host_os_version_id);
+    buffer_json_member_add_string_or_empty(wb, "os_detection", host->system_info->host_os_detection);
+    buffer_json_member_add_string_or_empty(wb, "cores_total", host->system_info->host_cores);
+    buffer_json_member_add_string_or_empty(wb, "total_disk_space", host->system_info->host_disk_space);
+    buffer_json_member_add_string_or_empty(wb, "cpu_freq", host->system_info->host_cpu_freq);
+    buffer_json_member_add_string_or_empty(wb, "ram_total", host->system_info->host_ram_total);
 
-    if (host->system_info->container_os_name)
-        buffer_sprintf(wb, "\t\"container_os_name\": \"%s\",\n", host->system_info->container_os_name);
-    if (host->system_info->container_os_id)
-        buffer_sprintf(wb, "\t\"container_os_id\": \"%s\",\n", host->system_info->container_os_id);
-    if (host->system_info->container_os_id_like)
-        buffer_sprintf(wb, "\t\"container_os_id_like\": \"%s\",\n", host->system_info->container_os_id_like);
-    if (host->system_info->container_os_version)
-        buffer_sprintf(wb, "\t\"container_os_version\": \"%s\",\n", host->system_info->container_os_version);
-    if (host->system_info->container_os_version_id)
-        buffer_sprintf(wb, "\t\"container_os_version_id\": \"%s\",\n", host->system_info->container_os_version_id);
-    if (host->system_info->container_os_detection)
-        buffer_sprintf(wb, "\t\"container_os_detection\": \"%s\",\n", host->system_info->container_os_detection);
-    if (host->system_info->is_k8s_node)
-        buffer_sprintf(wb, "\t\"is_k8s_node\": \"%s\",\n", host->system_info->is_k8s_node);
+    buffer_json_member_add_string_or_omit(wb, "container_os_name", host->system_info->container_os_name);
+    buffer_json_member_add_string_or_omit(wb, "container_os_id", host->system_info->container_os_id);
+    buffer_json_member_add_string_or_omit(wb, "container_os_id_like", host->system_info->container_os_id_like);
+    buffer_json_member_add_string_or_omit(wb, "container_os_version", host->system_info->container_os_version);
+    buffer_json_member_add_string_or_omit(wb, "container_os_version_id", host->system_info->container_os_version_id);
+    buffer_json_member_add_string_or_omit(wb, "container_os_detection", host->system_info->container_os_detection);
+    buffer_json_member_add_string_or_omit(wb, "is_k8s_node", host->system_info->is_k8s_node);
 
-    buffer_sprintf(wb, "\t\"kernel_name\": \"%s\",\n", (host->system_info->kernel_name) ? host->system_info->kernel_name : "");
-    buffer_sprintf(wb, "\t\"kernel_version\": \"%s\",\n", (host->system_info->kernel_version) ? host->system_info->kernel_version : "");
-    buffer_sprintf(wb, "\t\"architecture\": \"%s\",\n", (host->system_info->architecture) ? host->system_info->architecture : "");
-    buffer_sprintf(wb, "\t\"virtualization\": \"%s\",\n", (host->system_info->virtualization) ? host->system_info->virtualization : "");
-    buffer_sprintf(wb, "\t\"virt_detection\": \"%s\",\n", (host->system_info->virt_detection) ? host->system_info->virt_detection : "");
-    buffer_sprintf(wb, "\t\"container\": \"%s\",\n", (host->system_info->container) ? host->system_info->container : "");
-    buffer_sprintf(wb, "\t\"container_detection\": \"%s\",\n", (host->system_info->container_detection) ? host->system_info->container_detection : "");
+    buffer_json_member_add_string_or_empty(wb, "kernel_name", host->system_info->kernel_name);
+    buffer_json_member_add_string_or_empty(wb, "kernel_version", host->system_info->kernel_version);
+    buffer_json_member_add_string_or_empty(wb, "architecture", host->system_info->architecture);
+    buffer_json_member_add_string_or_empty(wb, "virtualization", host->system_info->virtualization);
+    buffer_json_member_add_string_or_empty(wb, "virt_detection", host->system_info->virt_detection);
+    buffer_json_member_add_string_or_empty(wb, "container", host->system_info->container);
+    buffer_json_member_add_string_or_empty(wb, "container_detection", host->system_info->container_detection);
 
-    if (host->system_info->cloud_provider_type)
-        buffer_sprintf(wb, "\t\"cloud_provider_type\": \"%s\",\n", host->system_info->cloud_provider_type);
-    if (host->system_info->cloud_instance_type)
-        buffer_sprintf(wb, "\t\"cloud_instance_type\": \"%s\",\n", host->system_info->cloud_instance_type);
-    if (host->system_info->cloud_instance_region)
-        buffer_sprintf(wb, "\t\"cloud_instance_region\": \"%s\",\n", host->system_info->cloud_instance_region);
+    buffer_json_member_add_string_or_omit(wb, "cloud_provider_type", host->system_info->cloud_provider_type);
+    buffer_json_member_add_string_or_omit(wb, "cloud_instance_type", host->system_info->cloud_instance_type);
+    buffer_json_member_add_string_or_omit(wb, "cloud_instance_region", host->system_info->cloud_instance_region);
 
-    buffer_strcat(wb, "\t\"host_labels\": {\n");
-    host_labels2json(host, wb, 2);
-    buffer_strcat(wb, "\t},\n");
-
-    buffer_strcat(wb, "\t\"functions\": {\n");
-    host_functions2json(host, wb, 2, "\"", "\"");
-    buffer_strcat(wb, "\t},\n");
-
-    buffer_strcat(wb, "\t\"collectors\": [");
-    chartcollectors2json(host, wb);
-    buffer_strcat(wb, "\n\t],\n");
+    host_labels2json(host, wb);
+    host_functions2json(host, wb);
+    host_collectors(host, wb);
 
 #ifdef DISABLE_CLOUD
-    buffer_strcat(wb, "\t\"cloud-enabled\": false,\n");
+    buffer_json_member_add_boolean(wb, "cloud-enabled", false);
 #else
-    buffer_sprintf(wb, "\t\"cloud-enabled\": %s,\n",
-                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", 1) ? "true" : "false");
+    buffer_json_member_add_boolean(wb, "cloud-enabled",
+                   appconfig_get_boolean(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", true));
 #endif
 
 #ifdef ENABLE_ACLK
-    buffer_strcat(wb, "\t\"cloud-available\": true,\n");
+    buffer_json_member_add_boolean(wb, "cloud-available", true);
 #else
-    buffer_strcat(wb, "\t\"cloud-available\": false,\n");
+    buffer_json_member_add_boolean(wb, "cloud-available", false);
 #endif
+
     char *agent_id = get_agent_claimid();
-    if (agent_id == NULL)
-        buffer_strcat(wb, "\t\"agent-claimed\": false,\n");
-    else {
-        buffer_strcat(wb, "\t\"agent-claimed\": true,\n");
-        freez(agent_id);
-    }
+    buffer_json_member_add_boolean(wb, "agent-claimed", agent_id != NULL);
+    freez(agent_id);
+
 #ifdef ENABLE_ACLK
-    if (aclk_connected) {
-        buffer_strcat(wb, "\t\"aclk-available\": true,\n");
-    }
-    else
+    buffer_json_member_add_boolean(wb, "aclk-available", aclk_connected);
+#else
+    buffer_json_member_add_boolean(wb, "aclk-available", false);
 #endif
-        buffer_strcat(wb, "\t\"aclk-available\": false,\n");     // Intentionally valid with/without #ifdef above
 
-    buffer_strcat(wb, "\t\"memory-mode\": ");
-    analytics_get_data(analytics_data.netdata_config_memory_mode, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"multidb-disk-quota\": ");
-    analytics_get_data(analytics_data.netdata_config_multidb_disk_quota, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"page-cache-size\": ");
-    analytics_get_data(analytics_data.netdata_config_page_cache_size, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"stream-enabled\": ");
-    analytics_get_data(analytics_data.netdata_config_stream_enabled, wb);
-    buffer_strcat(wb, ",\n");
+    buffer_json_member_add_string(wb, "memory-mode", rrd_memory_mode_name(host->rrd_memory_mode));
+    buffer_json_member_add_uint64(wb, "multidb-disk-quota", default_multidb_disk_quota_mb);
+    buffer_json_member_add_uint64(wb, "page-cache-size", default_rrdeng_page_cache_mb);
+    buffer_json_member_add_boolean(wb, "web-enabled", web_server_mode != WEB_SERVER_MODE_NONE);
+    buffer_json_member_add_boolean(wb, "stream-enabled", default_rrdpush_enabled);
 
 #ifdef  ENABLE_COMPRESSION
-    if(host->sender){
-        buffer_strcat(wb, "\t\"stream-compression\": ");
-        buffer_strcat(wb, stream_has_capability(host->sender, STREAM_CAP_COMPRESSION) ? "true" : "false");
-        buffer_strcat(wb, ",\n");
-    }else{
-        buffer_strcat(wb, "\t\"stream-compression\": null,\n");
-    }
+    buffer_json_member_add_boolean(wb, "stream-compression",
+                                   host->sender && stream_has_capability(host->sender, STREAM_CAP_COMPRESSION));
 #else
-    buffer_strcat(wb, "\t\"stream-compression\": null,\n");
-#endif  //ENABLE_COMPRESSION   
+    buffer_json_member_add_boolean(wb, "stream-compression", false);
+#endif  //ENABLE_COMPRESSION
 
-    buffer_strcat(wb, "\t\"hosts-available\": ");
-    analytics_get_data(analytics_data.netdata_config_hosts_available, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"https-enabled\": ");
-    analytics_get_data(analytics_data.netdata_config_https_enabled, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"buildinfo\": ");
-    analytics_get_data(analytics_data.netdata_buildinfo, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"release-channel\": ");
-    analytics_get_data(analytics_data.netdata_config_release_channel, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"web-enabled\": ");
-    analytics_get_data(analytics_data.netdata_config_web_enabled, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"notification-methods\": ");
-    analytics_get_data(analytics_data.netdata_notification_methods, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"exporting-enabled\": ");
-    analytics_get_data(analytics_data.netdata_config_exporting_enabled, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"exporting-connectors\": ");
-    analytics_get_data(analytics_data.netdata_exporting_connectors, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"allmetrics-prometheus-used\": ");
-    analytics_get_data(analytics_data.netdata_allmetrics_prometheus_used, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"allmetrics-shell-used\": ");
-    analytics_get_data(analytics_data.netdata_allmetrics_shell_used, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"allmetrics-json-used\": ");
-    analytics_get_data(analytics_data.netdata_allmetrics_json_used, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"dashboard-used\": ");
-    analytics_get_data(analytics_data.netdata_dashboard_used, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"charts-count\": ");
-    analytics_get_data(analytics_data.netdata_charts_count, wb);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\"metrics-count\": ");
-    analytics_get_data(analytics_data.netdata_metrics_count, wb);
-
-#if defined(ENABLE_ML)
-    buffer_strcat(wb, ",\n");
-    char *ml_info = ml_get_host_info(host);
-
-    buffer_strcat(wb, "\t\"ml-info\": ");
-    buffer_strcat(wb, ml_info);
-
-    freez(ml_info);
+#ifdef ENABLE_HTTPS
+    buffer_json_member_add_boolean(wb, "https-enabled", true);
+#else
+    buffer_json_member_add_boolean(wb, "https-enabled", false);
 #endif
 
-    buffer_strcat(wb, "\n}");
+    buffer_json_member_add_quoted_string(wb, "buildinfo", analytics_data.netdata_buildinfo);
+    buffer_json_member_add_quoted_string(wb, "release-channel", analytics_data.netdata_config_release_channel);
+    buffer_json_member_add_quoted_string(wb, "notification-methods", analytics_data.netdata_notification_methods);
+
+    buffer_json_member_add_boolean(wb, "exporting-enabled", analytics_data.exporting_enabled);
+    buffer_json_member_add_quoted_string(wb, "exporting-connectors", analytics_data.netdata_exporting_connectors);
+
+    buffer_json_member_add_uint64(wb, "allmetrics-prometheus-used", analytics_data.prometheus_hits);
+    buffer_json_member_add_uint64(wb, "allmetrics-shell-used", analytics_data.shell_hits);
+    buffer_json_member_add_uint64(wb, "allmetrics-json-used", analytics_data.json_hits);
+    buffer_json_member_add_uint64(wb, "dashboard-used", analytics_data.dashboard_hits);
+
+    buffer_json_member_add_uint64(wb, "charts-count", analytics_data.charts_count);
+    buffer_json_member_add_uint64(wb, "metrics-count", analytics_data.metrics_count);
+
+#if defined(ENABLE_ML)
+    buffer_json_member_add_object(wb, "ml-info");
+    ml_get_host_info(host, wb);
+    buffer_json_object_close(wb);
+#endif
+
+    buffer_json_finalize(wb);
     return 0;
 }
 
@@ -1306,7 +1238,7 @@ int web_client_api_request_v1_ml_info(RRDHOST *host, struct web_client *w, char 
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_strcat(wb, s);
     buffer_no_cacheable(wb);
 
@@ -1326,7 +1258,7 @@ int web_client_api_request_v1_ml_models(RRDHOST *host, struct web_client *w, cha
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_strcat(wb, s);
     buffer_no_cacheable(wb);
 
@@ -1340,7 +1272,7 @@ inline int web_client_api_request_v1_info(RRDHOST *host, struct web_client *w, c
     if (!netdata_ready) return HTTP_RESP_BACKEND_FETCH_FAILED;
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
 
     web_client_api_request_v1_info_fill_buffer(host, wb);
 
@@ -1360,7 +1292,7 @@ static int web_client_api_request_v1_aclk_state(RRDHOST *host, struct web_client
     buffer_strcat(wb, str);
     freez(str);
 
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     return HTTP_RESP_OK;
 }
@@ -1372,7 +1304,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
     long long baseline_after = 0, baseline_before = 0, after = 0, before = 0, points = 0;
     RRDR_OPTIONS options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO | RRDR_OPTION_NULL2ZERO;
     int options_count = 0;
-    RRDR_GROUPING group = RRDR_GROUPING_AVERAGE;
+    RRDR_TIME_GROUPING group = RRDR_GROUPING_AVERAGE;
     int timeout = 0;
     size_t tier = 0;
     const char *group_options = NULL, *contexts_str = NULL;
@@ -1407,7 +1339,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
             timeout = (int) strtoul(value, NULL, 0);
 
         else if(!strcmp(name, "group"))
-            group = web_client_api_request_v1_data_group(value, RRDR_GROUPING_AVERAGE);
+            group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
 
         else if(!strcmp(name, "options")) {
             if(!options_count) options = RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NULL2ZERO;
@@ -1432,7 +1364,7 @@ static int web_client_api_request_v1_weights_internal(RRDHOST *host, struct web_
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
 
     SIMPLE_PATTERN *contexts = (contexts_str) ? simple_pattern_create(contexts_str, ",|\t\r\n\f\v", SIMPLE_PATTERN_EXACT) : NULL;
 
@@ -1475,7 +1407,7 @@ int web_client_api_request_v1_function(RRDHOST *host, struct web_client *w, char
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
     return rrd_call_function_and_wait(host, wb, timeout, function);
@@ -1487,12 +1419,12 @@ int web_client_api_request_v1_functions(RRDHOST *host, struct web_client *w, cha
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
 
-    buffer_strcat(wb, "{\n");
-    host_functions2json(host, wb, 1, "\"", "\"");
-    buffer_strcat(wb, "}");
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    host_functions2json(host, wb);
+    buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
 }
@@ -1576,7 +1508,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
         return HTTP_RESP_NOT_FOUND;
     }
 
-    wb->contenttype = CT_APPLICATION_JSON;
+    wb->content_type = CT_APPLICATION_JSON;
     buffer_no_cacheable(wb);
     buffer_strcat(wb, "{");
     for(size_t tier = 0; tier < storage_tiers ;tier++) {

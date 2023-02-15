@@ -529,7 +529,7 @@ static bool rrdpush_sender_thread_connect_to_parent(RRDHOST *host, int default_p
 #endif
 
     // reset our capabilities to default
-    s->capabilities = STREAM_OUR_CAPABILITIES;
+    s->capabilities = stream_our_capabilities();
 
 #ifdef  ENABLE_COMPRESSION
     // If we don't want compression, remove it from our capabilities
@@ -901,7 +901,7 @@ void stream_execute_function_callback(BUFFER *func_wb, int code, void *data) {
         pluginsd_function_result_begin_to_buffer(wb
                                                  , string2str(tmp->transaction)
                                                  , code
-                                                 , functions_content_type_to_format(func_wb->contenttype)
+                                                 , functions_content_type_to_format(func_wb->content_type)
                                                  , func_wb->expires);
 
         buffer_fast_strcat(wb, buffer_tostring(func_wb), buffer_strlen(func_wb));

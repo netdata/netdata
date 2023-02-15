@@ -99,7 +99,8 @@ void Config::readMLConfig(void) {
     Cfg.DimensionAnomalyScoreThreshold = DimensionAnomalyScoreThreshold;
 
     Cfg.HostAnomalyRateThreshold = HostAnomalyRateThreshold;
-    Cfg.AnomalyDetectionGroupingMethod = web_client_api_request_v1_data_group(AnomalyDetectionGroupingMethod.c_str(), RRDR_GROUPING_AVERAGE);
+    Cfg.AnomalyDetectionGroupingMethod = time_grouping_parse(
+            AnomalyDetectionGroupingMethod.c_str(), RRDR_GROUPING_AVERAGE);
     Cfg.AnomalyDetectionQueryDuration = AnomalyDetectionQueryDuration;
 
     Cfg.HostsToSkip = config_get(ConfigSectionML, "hosts to skip from training", "!*");

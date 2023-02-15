@@ -63,13 +63,17 @@ struct analytics_data {
 
     size_t data_length;
 
-    uint8_t prometheus_hits;
-    uint8_t shell_hits;
-    uint8_t json_hits;
-    uint8_t dashboard_hits;
+    size_t prometheus_hits;
+    size_t shell_hits;
+    size_t json_hits;
+    size_t dashboard_hits;
+
+    size_t charts_count;
+    size_t metrics_count;
+
+    bool exporting_enabled;
 };
 
-void analytics_get_data(char *name, BUFFER *wb);
 void set_late_global_environment(void);
 void analytics_free_data(void);
 void set_global_environment(void);

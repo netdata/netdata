@@ -17,7 +17,7 @@ int do_proc_sys_kernel_random_entropy_avail(int update_every, usec_t dt) {
     ff = procfile_readall(ff);
     if(unlikely(!ff)) return 0; // we return 0, so that we will retry to open it next time
 
-    unsigned long long entropy = str2ull(procfile_lineword(ff, 0, 0));
+    unsigned long long entropy = str2ull(procfile_lineword(ff, 0, 0), NULL);
 
     static RRDSET *st = NULL;
     static RRDDIM *rd = NULL;

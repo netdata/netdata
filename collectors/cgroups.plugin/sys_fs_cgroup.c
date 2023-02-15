@@ -1089,10 +1089,10 @@ static inline void cgroup_read_cpuacct_stat(struct cpuacct_stat *cp) {
             uint32_t hash = simple_hash(s);
 
             if(unlikely(hash == user_hash && !strcmp(s, "user")))
-                cp->user = str2ull(procfile_lineword(ff, i, 1));
+                cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
 
             else if(unlikely(hash == system_hash && !strcmp(s, "system")))
-                cp->system = str2ull(procfile_lineword(ff, i, 1));
+                cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
 
         cp->updated = 1;
@@ -1138,11 +1138,11 @@ static inline void cgroup_read_cpuacct_cpu_stat(struct cpuacct_cpu_throttling *c
         uint32_t hash = simple_hash(s);
 
         if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
-            cp->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+            cp->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
-            cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+            cp->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == throttled_time_hash && !strcmp(s, "throttled_time"))) {
-            cp->throttled_time = str2ull(procfile_lineword(ff, i, 1));
+            cp->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL);
         }
     }
     cp->nr_throttled_perc =
@@ -1195,15 +1195,15 @@ static inline void cgroup2_read_cpuacct_cpu_stat(struct cpuacct_stat *cp, struct
         uint32_t hash = simple_hash(s);
 
         if (unlikely(hash == user_usec_hash && !strcmp(s, "user_usec"))) {
-            cp->user = str2ull(procfile_lineword(ff, i, 1));
+            cp->user = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == system_usec_hash && !strcmp(s, "system_usec"))) {
-            cp->system = str2ull(procfile_lineword(ff, i, 1));
+            cp->system = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_periods_hash && !strcmp(s, "nr_periods"))) {
-            cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1));
+            cpt->nr_periods = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == nr_throttled_hash && !strcmp(s, "nr_throttled"))) {
-            cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1));
+            cpt->nr_throttled = str2ull(procfile_lineword(ff, i, 1), NULL);
         } else if (unlikely(hash == throttled_usec_hash && !strcmp(s, "throttled_usec"))) {
-            cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1)) * 1000; // usec -> ns
+            cpt->throttled_time = str2ull(procfile_lineword(ff, i, 1), NULL) * 1000; // usec -> ns
         }
     }
     cpt->nr_throttled_perc =
@@ -1289,7 +1289,7 @@ static inline void cgroup_read_cpuacct_usage(struct cpuacct_usage *ca) {
 
         unsigned long long total = 0;
         for(i = 0; i < ca->cpus ;i++) {
-            unsigned long long n = str2ull(procfile_lineword(ff, 0, i));
+            unsigned long long n = str2ull(procfile_lineword(ff, 0, i), NULL);
             ca->cpu_percpu[i] = n;
             total += n;
         }
@@ -1346,10 +1346,10 @@ static inline void cgroup_read_blkio(struct blkio *io) {
             uint32_t hash = simple_hash(s);
 
             if(unlikely(hash == Read_hash && !strcmp(s, "Read")))
-                io->Read += str2ull(procfile_lineword(ff, i, 2));
+                io->Read += str2ull(procfile_lineword(ff, i, 2), NULL);
 
             else if(unlikely(hash == Write_hash && !strcmp(s, "Write")))
-                io->Write += str2ull(procfile_lineword(ff, i, 2));
+                io->Write += str2ull(procfile_lineword(ff, i, 2), NULL);
 
 /*
             else if(unlikely(hash == Sync_hash && !strcmp(s, "Sync")))
@@ -1409,8 +1409,8 @@ static inline void cgroup2_read_blkio(struct blkio *io, unsigned int word_offset
             io->Write = 0;
 
             for (i = 0; i < lines; i++) {
-                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset));
-                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset));
+                io->Read += str2ull(procfile_lineword(ff, i, 2 + word_offset), NULL);
+                io->Write += str2ull(procfile_lineword(ff, i, 4 + word_offset), NULL);
             }
 
             io->updated = 1;
@@ -1452,13 +1452,13 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
         res->some.share_time.value10 = strtod(procfile_lineword(ff, 0, 2), NULL);
         res->some.share_time.value60 = strtod(procfile_lineword(ff, 0, 4), NULL);
         res->some.share_time.value300 = strtod(procfile_lineword(ff, 0, 6), NULL);
-        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8)) / 1000; // us->ms
+        res->some.total_time.value_total = str2ull(procfile_lineword(ff, 0, 8), NULL) / 1000; // us->ms
 
         if (lines > 2) {
             res->full.share_time.value10 = strtod(procfile_lineword(ff, 1, 2), NULL);
             res->full.share_time.value60 = strtod(procfile_lineword(ff, 1, 4), NULL);
             res->full.share_time.value300 = strtod(procfile_lineword(ff, 1, 6), NULL);
-            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8)) / 1000; // us->ms
+            res->full.total_time.value_total = str2ull(procfile_lineword(ff, 1, 8), NULL) / 1000; // us->ms
         }
 
         res->updated = 1;
@@ -3566,14 +3566,14 @@ static inline void update_cpu_limits2(struct cgroup *cg) {
             return;
         }
 
-        cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1));
+        cg->cpu_cfs_period = str2ull(procfile_lineword(ff, 0, 1), NULL);
         cg->cpuset_cpus = get_system_cpus();
 
         char *s = "max\n\0";
         if(strcmp(s, procfile_lineword(ff, 0, 0)) == 0){
             cg->cpu_cfs_quota = cg->cpu_cfs_period * cg->cpuset_cpus;
         } else {
-            cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0));
+            cg->cpu_cfs_quota = str2ull(procfile_lineword(ff, 0, 0), NULL);
         }
         debug(D_CGROUP, "CPU limits values: %llu %llu %llu", cg->cpu_cfs_period, cg->cpuset_cpus, cg->cpu_cfs_quota);
         return;
@@ -3623,7 +3623,7 @@ static inline int update_memory_limits(char **filename, const RRDSETVAR_ACQUIRED
                     rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                     return 1;
                 }
-                *value = str2ull(buffer);
+                *value = str2ull(buffer, NULL);
                 rrdsetvar_custom_chart_variable_set(cg->st_mem_usage, *chart_var, (NETDATA_DOUBLE)(*value / (1024 * 1024)));
                 return 1;
             }
@@ -4111,7 +4111,7 @@ void update_cgroup_charts(int update_every) {
                     if(likely(ff))
                         ff = procfile_readall(ff);
                     if(likely(ff && procfile_lines(ff) && !strncmp(procfile_word(ff, 0), "MemTotal", 8)))
-                        ram_total = str2ull(procfile_word(ff, 1)) * 1024;
+                        ram_total = str2ull(procfile_word(ff, 1), NULL) * 1024;
                     else {
                         collector_error("Cannot read file %s. Will not update cgroup %s RAM limit anymore.", filename, cg->id);
                         freez(cg->filename_memory_limit);

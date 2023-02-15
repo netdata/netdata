@@ -2,6 +2,78 @@
 
 #include "../libnetdata.h"
 
+bool is_system_ieee754_double(void) {
+    static bool logged = false;
+
+    struct {
+        NETDATA_DOUBLE original;
+
+        union {
+            uint64_t i;
+            NETDATA_DOUBLE d;
+        };
+    } tests[] = {
+            { .original = 1.25,                 .i = 0x3FF4000000000000 },
+            { .original = 1.0,                  .i = 0x3FF0000000000000 },
+            { .original = 2.0,                  .i = 0x4000000000000000 },
+            { .original = 4.0,                  .i = 0x4010000000000000 },
+            { .original = 8.8,                  .i = 0x402199999999999A },
+            { .original = 16.16,                .i = 0x403028F5C28F5C29 },
+            { .original = 32.32,                .i = 0x404028F5C28F5C29 },
+            { .original = 64.64,                .i = 0x405028F5C28F5C29 },
+            { .original = 128.128,              .i = 0x406004189374BC6A },
+            { .original = 32768.32768,          .i = 0x40E0000A7C5AC472 },
+            { .original = 65536.65536,          .i = 0x40F0000A7C5AC472 },
+            { .original = -65536.65536,         .i = 0xC0F0000A7C5AC472 },
+            { .original = 65535.65535,          .i = 0x40EFFFF4F8A0902E },
+            { .original = -65535.65535,         .i = 0xC0EFFFF4F8A0902E },
+            { .original = 4.503599627e15,       .i = 0x432FFFFFFFF4B180 },
+            { .original = -4.503599627e15,      .i = 0xC32FFFFFFFF4B180 },
+            { .original = 1.25e25,              .i = 0x4524ADF4B7320335 },
+            { .original = 1.25e307,             .i = 0x7FB1CCF385EBC8A0 },
+            { .original = 1.25e-25,             .i = 0x3AC357C299A88EA7 },
+            { .original = 1.25e-100,            .i = 0x2B317F7D4ED8C33E },
+            { .original = NAN,                  .i = 0x7FF8000000000000 },
+            { .original = -INFINITY,            .i = 0xFFF0000000000000 },
+            { .original = INFINITY,             .i = 0x7FF0000000000000 },
+            { .original = 1.25e-132,            .i = 0x248C6463225AB7EC },
+            { .original = 0.0,                  .i = 0x0000000000000000 },
+            { .original = -0.0,                 .i = 0x8000000000000000 },
+            { .original = DBL_MIN,              .i = 0x0010000000000000 },
+            { .original = DBL_MAX,              .i = 0x7FEFFFFFFFFFFFFF },
+            { .original = -DBL_MIN,             .i = 0x8010000000000000 },
+            { .original = -DBL_MAX,             .i = 0xFFEFFFFFFFFFFFFF },
+    };
+
+    size_t errors = 0;
+    size_t elements = sizeof(tests) / sizeof(tests[0]);
+    for(size_t i = 0; i < elements ; i++) {
+        uint64_t *ptr = (uint64_t *)&tests[i].original;
+
+        if(*ptr != tests[i].i && (tests[i].original == tests[i].d || (isnan(tests[i].original) && isnan(tests[i].d)))) {
+            if(!logged)
+                info("IEEE754: test #%zu, value " NETDATA_DOUBLE_FORMAT_G " is represented in this system as %lX, but it was expected as %lX",
+                     i+1, tests[i].original, *ptr, tests[i].i);
+            errors++;
+        }
+    }
+
+    if(!errors && sizeof(NETDATA_DOUBLE) == sizeof(uint64_t)) {
+        if(!logged)
+            info("IEEE754: system is using IEEE754 DOUBLE PRECISION values");
+
+        logged = true;
+        return true;
+    }
+    else {
+        if(!logged)
+            info("IEEE754: system is NOT compatible with IEEE754 DOUBLE PRECISION values");
+
+        logged = true;
+        return false;
+    }
+}
+
 storage_number pack_storage_number(NETDATA_DOUBLE value, SN_FLAGS flags) {
     // bit 32 = sign 0:positive, 1:negative
     // bit 31 = 0:divide, 1:multiply
@@ -159,73 +231,3 @@ int print_netdata_double(char *str, NETDATA_DOUBLE value)
     return (int) ((wstr - str) + 2 + decimal );
 }
 */
-
-int print_netdata_double(char *str, NETDATA_DOUBLE value) {
-    // info("printing number " NETDATA_DOUBLE_FORMAT, value);
-    char integral_str[50], fractional_str[50];
-
-    char *wstr = str;
-
-    if(unlikely(value < 0)) {
-        *wstr++ = '-';
-        value = -value;
-    }
-
-    NETDATA_DOUBLE integral, fractional;
-
-#ifdef STORAGE_WITH_MATH
-    fractional = modfndd(value, &integral) * 10000000.0;
-#else
-    integral = (NETDATA_DOUBLE)((unsigned long long)(value * 10000000ULL) / 10000000ULL);
-    fractional = (NETDATA_DOUBLE)((unsigned long long)(value * 10000000ULL) % 10000000ULL);
-#endif
-
-    unsigned long long integral_int = (unsigned long long)integral;
-    unsigned long long fractional_int = (unsigned long long)llrintndd(fractional);
-    if(unlikely(fractional_int >= 10000000)) {
-        integral_int += 1;
-        fractional_int -= 10000000;
-    }
-
-    // info("integral " NETDATA_DOUBLE_FORMAT " (%llu), fractional " NETDATA_DOUBLE_FORMAT " (%llu)", integral, integral_int, fractional, fractional_int);
-
-    char *istre;
-    if(unlikely(integral_int == 0)) {
-        integral_str[0] = '0';
-        istre = &integral_str[1];
-    }
-    else
-        // convert the integral part to string (reversed)
-        istre = print_number_llu_r_smart(integral_str, integral_int);
-
-    // copy reversed the integral string
-    istre--;
-    while( istre >= integral_str ) *wstr++ = *istre--;
-
-    if(likely(fractional_int != 0)) {
-        // add a dot
-        *wstr++ = '.';
-
-        // convert the fractional part to string (reversed)
-        char *fstre = print_number_llu_r_smart(fractional_str, fractional_int);
-
-        // prepend zeros to reach 7 digits length
-        int decimal = 7;
-        int len = (int)(fstre - fractional_str);
-        while(len < decimal) {
-            *wstr++ = '0';
-            len++;
-        }
-
-        char *begin = fractional_str;
-        while(begin < fstre && *begin == '0') begin++;
-
-        // copy reversed the fractional string
-        fstre--;
-        while( fstre >= begin ) *wstr++ = *fstre--;
-    }
-
-    *wstr = '\0';
-    // info("printed number '%s'", str);
-    return (int)(wstr - str);
-}

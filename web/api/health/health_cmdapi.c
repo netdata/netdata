@@ -121,7 +121,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
 
     BUFFER *wb = w->response.data;
     buffer_flush(wb);
-    wb->contenttype = CT_TEXT_PLAIN;
+    wb->content_type = CT_TEXT_PLAIN;
 
     buffer_flush(w->response.data);
 
@@ -171,7 +171,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                         silencers->silencers = NULL;
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
                     } else if (!strcmp(value, HEALTH_CMDAPI_CMD_LIST)) {
-                        w->response.data->contenttype = CT_APPLICATION_JSON;
+                        w->response.data->content_type = CT_APPLICATION_JSON;
                         health_silencers2json(wb);
                         config_changed=0;
                     }

@@ -22,6 +22,8 @@ typedef struct parser_user_object {
     size_t data_collections_count;
     int enabled;
 
+    STREAM_CAPABILITIES capabilities; // receiver capabilities
+
     struct {
         bool parsing_host;
         uuid_t machine_guid;
@@ -44,7 +46,7 @@ typedef struct parser_user_object {
 
     struct parser_user_object_v2 {
         bool locked_data_collection;
-        RRDSET_STREAM_BUFFER stream_buffer;
+        RRDSET_STREAM_BUFFER stream_buffer; // sender capabilities in this
         time_t update_every;
         time_t end_time;
         time_t wall_clock_time;

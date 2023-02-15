@@ -426,41 +426,39 @@ static void rrdcontext_trigger_updates(RRDCONTEXT *rc, const char *function);
 // ----------------------------------------------------------------------------
 // visualizing flags
 
-static void rrd_flags_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
+static void rrd_flags_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
     if(flags & RRD_FLAG_QUEUED_FOR_HUB)
-        buffer_strcat(wb, "QUEUED ");
+        buffer_json_add_array_item_string(wb, "QUEUED");
 
     if(flags & RRD_FLAG_DELETED)
-        buffer_strcat(wb, "DELETED ");
+        buffer_json_add_array_item_string(wb, "DELETED");
 
     if(flags & RRD_FLAG_COLLECTED)
-        buffer_strcat(wb, "COLLECTED ");
+        buffer_json_add_array_item_string(wb, "COLLECTED");
 
     if(flags & RRD_FLAG_UPDATED)
-        buffer_strcat(wb, "UPDATED ");
+        buffer_json_add_array_item_string(wb, "UPDATED");
 
     if(flags & RRD_FLAG_ARCHIVED)
-        buffer_strcat(wb, "ARCHIVED ");
+        buffer_json_add_array_item_string(wb, "ARCHIVED");
 
     if(flags & RRD_FLAG_OWN_LABELS)
-        buffer_strcat(wb, "OWN_LABELS ");
+        buffer_json_add_array_item_string(wb, "OWN_LABELS");
 
     if(flags & RRD_FLAG_LIVE_RETENTION)
-        buffer_strcat(wb, "LIVE_RETENTION ");
+        buffer_json_add_array_item_string(wb, "LIVE_RETENTION");
 
     if(flags & RRD_FLAG_HIDDEN)
-        buffer_strcat(wb, "HIDDEN ");
+        buffer_json_add_array_item_string(wb, "HIDDEN");
 
     if(flags & RRD_FLAG_QUEUED_FOR_PP)
-        buffer_strcat(wb, "PENDING_UPDATES ");
+        buffer_json_add_array_item_string(wb, "PENDING_UPDATES");
 }
 
-static void rrd_reasons_to_buffer(RRD_FLAGS flags, BUFFER *wb) {
+static void rrd_reasons_to_buffer_json_array_items(RRD_FLAGS flags, BUFFER *wb) {
     for(int i = 0, added = 0; rrdcontext_reasons[i].name ; i++) {
         if (flags & rrdcontext_reasons[i].flag) {
-            if (added)
-                buffer_strcat(wb, ", ");
-            buffer_strcat(wb, rrdcontext_reasons[i].name);
+            buffer_json_add_array_item_string(wb, rrdcontext_reasons[i].name);
             added++;
         }
     }
@@ -1769,51 +1767,39 @@ static inline int rrdmetric_to_json_callback(const DICTIONARY_ITEM *item, void *
         return 0;
 
     if(t->written) {
-        buffer_strcat(wb, ",\n");
         t->combined_first_time_s = MIN(t->combined_first_time_s, rm->first_time_s);
         t->combined_last_time_s = MAX(t->combined_last_time_s, rm->last_time_s);
         t->combined_flags |= rrd_flags_get(rm);
     }
     else {
-        buffer_strcat(wb, "\n");
         t->combined_first_time_s = rm->first_time_s;
         t->combined_last_time_s = rm->last_time_s;
         t->combined_flags = rrd_flags_get(rm);
     }
 
-    buffer_sprintf(wb, "\t\t\t\t\t\t\"%s\": {", id);
+    buffer_json_member_add_object(wb, id);
 
     if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
         char uuid[UUID_STR_LEN];
         uuid_unparse(rm->uuid, uuid);
-        buffer_sprintf(wb, "\n\t\t\t\t\t\t\t\"uuid\":\"%s\",", uuid);
+        buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_sprintf(wb,
-                   "\n\t\t\t\t\t\t\t\"name\":\"%s\""
-                   ",\n\t\t\t\t\t\t\t\"first_time_t\":%lld"
-                   ",\n\t\t\t\t\t\t\t\"last_time_t\":%lld"
-                   ",\n\t\t\t\t\t\t\t\"collected\":%s"
-                   , string2str(rm->name)
-                   , (long long)rm->first_time_s
-                   , rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s
-                   , rrd_flag_is_collected(rm) ? "true" : "false"
-                   );
+    buffer_json_member_add_string(wb, "name", string2str(rm->name));
+    buffer_json_member_add_time_t(wb, "first_time_t", rm->first_time_s);
+    buffer_json_member_add_time_t(wb, "last_time_t", rrd_flag_is_collected(rm) ? (long long)t->now : (long long)rm->last_time_s);
+    buffer_json_member_add_boolean(wb, "collected", rrd_flag_is_collected(rm));
 
-    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
-        buffer_sprintf(wb,
-                       ",\n\t\t\t\t\t\t\t\"deleted\":%s"
-                       , rrd_flag_is_deleted(rm) ? "true" : "false"
-        );
-    }
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
+        buffer_json_member_add_boolean(wb, "deleted", rrd_flag_is_deleted(rm));
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
-        buffer_strcat(wb, ",\n\t\t\t\t\t\t\t\"flags\":\"");
-        rrd_flags_to_buffer(rrd_flags_get(rm), wb);
-        buffer_strcat(wb, "\"");
+        buffer_json_member_add_array(wb, "flags");
+        rrd_flags_to_buffer_json_array_items(rrd_flags_get(rm), wb);
+        buffer_json_array_close(wb);
     }
 
-    buffer_strcat(wb, "\n\t\t\t\t\t\t}");
+    buffer_json_object_close(wb);
     t->written++;
     return 1;
 }
@@ -1852,6 +1838,7 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     if(options & RRDCONTEXT_OPTION_SHOW_METRICS || t_parent->chart_dimensions) {
 
         wb_metrics = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
+        buffer_json_initialize(wb_metrics, "\"", "\"", wb->json.depth + 2, false);
 
         struct rrdcontext_to_json t_metrics = {
             .wb = wb_metrics,
@@ -1877,79 +1864,60 @@ static inline int rrdinstance_to_json_callback(const DICTIONARY_ITEM *item, void
     }
 
     if(t_parent->written) {
-        buffer_strcat(wb, ",\n");
         t_parent->combined_first_time_s = MIN(t_parent->combined_first_time_s, first_time_s);
         t_parent->combined_last_time_s = MAX(t_parent->combined_last_time_s, last_time_s);
         t_parent->combined_flags |= flags;
     }
     else {
-        buffer_strcat(wb, "\n");
         t_parent->combined_first_time_s = first_time_s;
         t_parent->combined_last_time_s = last_time_s;
         t_parent->combined_flags = flags;
     }
 
-    buffer_sprintf(wb, "\t\t\t\t\"%s\": {", id);
+    buffer_json_member_add_object(wb, id);
 
     if(options & RRDCONTEXT_OPTION_SHOW_UUIDS) {
         char uuid[UUID_STR_LEN];
         uuid_unparse(ri->uuid, uuid);
-        buffer_sprintf(wb,"\n\t\t\t\t\t\"uuid\":\"%s\",", uuid);
+        buffer_json_member_add_string(wb, "uuid", uuid);
     }
 
-    buffer_sprintf(wb,
-                   "\n\t\t\t\t\t\"name\":\"%s\""
-                   ",\n\t\t\t\t\t\"context\":\"%s\""
-                   ",\n\t\t\t\t\t\"title\":\"%s\""
-                   ",\n\t\t\t\t\t\"units\":\"%s\""
-                   ",\n\t\t\t\t\t\"family\":\"%s\""
-                   ",\n\t\t\t\t\t\"chart_type\":\"%s\""
-                   ",\n\t\t\t\t\t\"priority\":%u"
-                   ",\n\t\t\t\t\t\"update_every\":%ld"
-                   ",\n\t\t\t\t\t\"first_time_t\":%lld"
-                   ",\n\t\t\t\t\t\"last_time_t\":%lld"
-                   ",\n\t\t\t\t\t\"collected\":%s"
-                   , string2str(ri->name)
-                   , string2str(ri->rc->id)
-                   , string2str(ri->title)
-                   , string2str(ri->units)
-                   , string2str(ri->family)
-                   , rrdset_type_name(ri->chart_type)
-                   , ri->priority
-                   , ri->update_every_s
-                   , (long long)first_time_s
-                   , (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s
-                   , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
-    );
+    buffer_json_member_add_string(wb, "name", string2str(ri->name));
+    buffer_json_member_add_string(wb, "context", string2str(ri->rc->id));
+    buffer_json_member_add_string(wb, "title", string2str(ri->title));
+    buffer_json_member_add_string(wb, "units", string2str(ri->units));
+    buffer_json_member_add_string(wb, "family", string2str(ri->family));
+    buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(ri->chart_type));
+    buffer_json_member_add_uint64(wb, "priority", ri->priority);
+    buffer_json_member_add_time_t(wb, "update_every", ri->update_every_s);
+    buffer_json_member_add_time_t(wb, "first_time_t", first_time_s);
+    buffer_json_member_add_time_t(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s);
+    buffer_json_member_add_boolean(wb, "collected", flags & RRD_FLAG_COLLECTED);
 
-    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
-        buffer_sprintf(wb,
-                       ",\n\t\t\t\t\t\"deleted\":%s"
-                       , rrd_flag_is_deleted(ri) ? "true" : "false"
-        );
-    }
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
+        buffer_json_member_add_boolean(wb, "deleted", rrd_flag_is_deleted(ri));
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
-        buffer_strcat(wb, ",\n\t\t\t\t\t\"flags\":\"");
-        rrd_flags_to_buffer(rrd_flags_get(ri), wb);
-        buffer_strcat(wb, "\"");
+        buffer_json_member_add_array(wb, "flags");
+        rrd_flags_to_buffer_json_array_items(rrd_flags_get(ri), wb);
+        buffer_json_array_close(wb);
     }
 
     if(options & RRDCONTEXT_OPTION_SHOW_LABELS && ri->rrdlabels && dictionary_entries(ri->rrdlabels)) {
-        buffer_sprintf(wb, ",\n\t\t\t\t\t\"labels\": {\n");
-        rrdlabels_to_buffer(ri->rrdlabels, wb, "\t\t\t\t\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
-        buffer_strcat(wb, "\n\t\t\t\t\t}");
+        buffer_json_member_add_object(wb, "labels");
+        rrdlabels_to_buffer_json_members(ri->rrdlabels, wb);
+        buffer_json_object_close(wb);
     }
 
     if(wb_metrics) {
-        buffer_sprintf(wb, ",\n\t\t\t\t\t\"dimensions\": {");
+        buffer_json_member_add_object(wb, "dimensions");
         buffer_fast_strcat(wb, buffer_tostring(wb_metrics), buffer_strlen(wb_metrics));
-        buffer_strcat(wb, "\n\t\t\t\t\t}");
+        buffer_json_object_close(wb);
 
         buffer_free(wb_metrics);
     }
 
-    buffer_strcat(wb, "\n\t\t\t\t}");
+    buffer_json_object_close(wb);
     t_parent->written++;
     return 1;
 }
@@ -1990,6 +1958,7 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
         || t_parent->chart_dimensions) {
 
         wb_instances = buffer_create(4096, &netdata_buffers_statistics.buffers_api);
+        buffer_json_initialize(wb_instances, "\"", "\"", wb->json.depth + 2, false);
 
         struct rrdcontext_to_json t_instances = {
             .wb = wb_instances,
@@ -2014,95 +1983,63 @@ static inline int rrdcontext_to_json_callback(const DICTIONARY_ITEM *item, void 
         flags = t_instances.combined_flags;
     }
 
-    if(t_parent->written)
-        buffer_strcat(wb, ",\n");
-    else
-        buffer_strcat(wb, "\n");
-
-    if(options & RRDCONTEXT_OPTION_SKIP_ID)
-        buffer_sprintf(wb, "\t\t\{");
-    else
-        buffer_sprintf(wb, "\t\t\"%s\": {", id);
+    if(!(options & RRDCONTEXT_OPTION_SKIP_ID))
+        buffer_json_member_add_object(wb, id);
 
     rrdcontext_lock(rc);
 
-    buffer_sprintf(wb,
-                   "\n\t\t\t\"title\":\"%s\""
-                   ",\n\t\t\t\"units\":\"%s\""
-                   ",\n\t\t\t\"family\":\"%s\""
-                   ",\n\t\t\t\"chart_type\":\"%s\""
-                   ",\n\t\t\t\"priority\":%u"
-                   ",\n\t\t\t\"first_time_t\":%lld"
-                   ",\n\t\t\t\"last_time_t\":%lld"
-                   ",\n\t\t\t\"collected\":%s"
-                   , string2str(rc->title)
-                   , string2str(rc->units)
-                   , string2str(rc->family)
-                   , rrdset_type_name(rc->chart_type)
-                   , rc->priority
-                   , (long long)first_time_s
-                   , (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s
-                   , (flags & RRD_FLAG_COLLECTED) ? "true" : "false"
-                   );
+    buffer_json_member_add_string(wb, "title", string2str(rc->title));
+    buffer_json_member_add_string(wb, "units", string2str(rc->units));
+    buffer_json_member_add_string(wb, "family", string2str(rc->family));
+    buffer_json_member_add_string(wb, "chart_type", rrdset_type_name(rc->chart_type));
+    buffer_json_member_add_uint64(wb, "priority", rc->priority);
+    buffer_json_member_add_time_t(wb, "first_time_t", first_time_s);
+    buffer_json_member_add_time_t(wb, "last_time_t", (flags & RRD_FLAG_COLLECTED) ? (long long)t_parent->now : (long long)last_time_s);
+    buffer_json_member_add_boolean(wb, "collected", (flags & RRD_FLAG_COLLECTED));
 
-    if(options & RRDCONTEXT_OPTION_SHOW_DELETED) {
-        buffer_sprintf(wb,
-                       ",\n\t\t\t\"deleted\":%s"
-                       , rrd_flag_is_deleted(rc) ? "true" : "false"
-        );
-    }
+    if(options & RRDCONTEXT_OPTION_SHOW_DELETED)
+        buffer_json_member_add_boolean(wb, "deleted", rrd_flag_is_deleted(rc));
 
     if(options & RRDCONTEXT_OPTION_SHOW_FLAGS) {
-        buffer_strcat(wb, ",\n\t\t\t\"flags\":\"");
-        rrd_flags_to_buffer(rrd_flags_get(rc), wb);
-        buffer_strcat(wb, "\"");
+        buffer_json_member_add_array(wb, "flags");
+        rrd_flags_to_buffer_json_array_items(rrd_flags_get(rc), wb);
+        buffer_json_array_close(wb);
     }
 
     if(options & RRDCONTEXT_OPTION_SHOW_QUEUED) {
-        buffer_strcat(wb, ",\n\t\t\t\"queued_reasons\":\"");
-        rrd_reasons_to_buffer(rc->queue.queued_flags, wb);
-        buffer_strcat(wb, "\"");
+        buffer_json_member_add_array(wb, "queued_reasons");
+        rrd_reasons_to_buffer_json_array_items(rc->queue.queued_flags, wb);
+        buffer_json_array_close(wb);
 
-        buffer_sprintf(wb,
-                       ",\n\t\t\t\"last_queued\":%llu"
-                       ",\n\t\t\t\"scheduled_dispatch\":%llu"
-                       ",\n\t\t\t\"last_dequeued\":%llu"
-                       ",\n\t\t\t\"dispatches\":%zu"
-                       ",\n\t\t\t\"hub_version\":%"PRIu64""
-                       ",\n\t\t\t\"version\":%"PRIu64""
-                       , rc->queue.queued_ut / USEC_PER_SEC
-                       , rc->queue.scheduled_dispatch_ut / USEC_PER_SEC
-                       , rc->queue.dequeued_ut / USEC_PER_SEC
-                       , rc->queue.dispatches
-                       , rc->hub.version
-                       , rc->version
-                       );
+        buffer_json_member_add_time_t(wb, "last_queued", (time_t)(rc->queue.queued_ut / USEC_PER_SEC));
+        buffer_json_member_add_time_t(wb, "scheduled_dispatch", (time_t)(rc->queue.scheduled_dispatch_ut / USEC_PER_SEC));
+        buffer_json_member_add_time_t(wb, "last_dequeued", (time_t)(rc->queue.dequeued_ut / USEC_PER_SEC));
+        buffer_json_member_add_uint64(wb, "dispatches", rc->queue.dispatches);
+        buffer_json_member_add_uint64(wb, "hub_version", rc->hub.version);
+        buffer_json_member_add_uint64(wb, "version", rc->version);
 
-        buffer_strcat(wb, ",\n\t\t\t\"pp_reasons\":\"");
-        rrd_reasons_to_buffer(rc->pp.queued_flags, wb);
-        buffer_strcat(wb, "\"");
+        buffer_json_member_add_array(wb, "pp_reasons");
+        rrd_reasons_to_buffer_json_array_items(rc->pp.queued_flags, wb);
+        buffer_json_array_close(wb);
 
-        buffer_sprintf(wb,
-                       ",\n\t\t\t\"pp_last_queued\":%llu"
-                       ",\n\t\t\t\"pp_last_dequeued\":%llu"
-                       ",\n\t\t\t\"pp_executed\":%zu"
-                       , rc->pp.queued_ut / USEC_PER_SEC
-                       , rc->pp.dequeued_ut / USEC_PER_SEC
-                       , rc->pp.executions
-        );
+        buffer_json_member_add_time_t(wb, "pp_last_queued", (time_t)(rc->pp.queued_ut / USEC_PER_SEC));
+        buffer_json_member_add_time_t(wb, "pp_last_dequeued", (time_t)(rc->pp.dequeued_ut / USEC_PER_SEC));
+        buffer_json_member_add_uint64(wb, "pp_executed", rc->pp.executions);
     }
 
     rrdcontext_unlock(rc);
 
     if(wb_instances) {
-        buffer_sprintf(wb, ",\n\t\t\t\"charts\": {");
+        buffer_json_member_add_object(wb, "charts");
         buffer_fast_strcat(wb, buffer_tostring(wb_instances), buffer_strlen(wb_instances));
-        buffer_strcat(wb, "\n\t\t\t}");
+        buffer_json_object_close(wb);
 
         buffer_free(wb_instances);
     }
 
-    buffer_strcat(wb, "\n\t\t}");
+    if(!(options & RRDCONTEXT_OPTION_SKIP_ID))
+        buffer_json_object_close(wb);
+
     t_parent->written++;
     return 1;
 }
@@ -2121,6 +2058,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
     if(after != 0 && before != 0)
         rrdr_relative_window_to_absolute(&after, &before);
 
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
     struct rrdcontext_to_json t_contexts = {
         .wb = wb,
         .options = options|RRDCONTEXT_OPTION_SKIP_ID,
@@ -2133,6 +2071,7 @@ int rrdcontext_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, R
         .now = now_realtime_sec(),
     };
     rrdcontext_to_json_callback((DICTIONARY_ITEM *)rca, rc, &t_contexts);
+    buffer_json_finalize(wb);
 
     rrdcontext_release(rca);
 
@@ -2156,24 +2095,19 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
     if(after != 0 && before != 0)
         rrdr_relative_window_to_absolute(&after, &before);
 
-    buffer_sprintf(wb, "{\n"
-                          "\t\"hostname\": \"%s\""
-                       ",\n\t\"machine_guid\": \"%s\""
-                       ",\n\t\"node_id\": \"%s\""
-                       ",\n\t\"claim_id\": \"%s\""
-                   , rrdhost_hostname(host)
-                   , host->machine_guid
-                   , node_uuid
-                   , host->aclk_state.claimed_id ? host->aclk_state.claimed_id : ""
-                   );
+    buffer_json_initialize(wb, "\"", "\"", 0, true);
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_string(wb, "machine_guid", host->machine_guid);
+    buffer_json_member_add_string(wb, "node_id", node_uuid);
+    buffer_json_member_add_string(wb, "claim_id", host->aclk_state.claimed_id ? host->aclk_state.claimed_id : "");
 
     if(options & RRDCONTEXT_OPTION_SHOW_LABELS) {
-        buffer_sprintf(wb, ",\n\t\"host_labels\": {\n");
-        rrdlabels_to_buffer(host->rrdlabels, wb, "\t\t", ":", "\"", ",\n", NULL, NULL, NULL, NULL);
-        buffer_strcat(wb, "\n\t}");
+        buffer_json_member_add_object(wb, "host_labels");
+        rrdlabels_to_buffer_json_members(host->rrdlabels, wb);
+        buffer_json_object_close(wb);
     }
 
-    buffer_sprintf(wb, ",\n\t\"contexts\": {");
+    buffer_json_member_add_object(wb, "contexts");
     struct rrdcontext_to_json t_contexts = {
         .wb = wb,
         .options = options,
@@ -2186,9 +2120,9 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
         .now = now_realtime_sec(),
     };
     dictionary_walkthrough_read((DICTIONARY *)host->rrdctx, rrdcontext_to_json_callback, &t_contexts);
+    buffer_json_object_close(wb);
 
-    // close contexts, close main
-    buffer_strcat(wb, "\n\t}\n}");
+    buffer_json_finalize(wb);
 
     return HTTP_RESP_OK;
 }
@@ -2209,7 +2143,7 @@ static void metric_entry_delete_callback(const DICTIONARY_ITEM *item __maybe_unu
     rrdmetric_release(t->rma);
 }
 static bool metric_entry_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value __maybe_unused, void *data __maybe_unused) {
-    fatal("RRDCONTEXT: %s() detected a conflict on a metric pointer!", __FUNCTION__);
+    internal_fatal("RRDCONTEXT: %s() detected a conflict on a metric pointer!", __FUNCTION__);
     return false;
 }
 
@@ -2768,8 +2702,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , (long long)qt->request.after
                   , (long long)qt->request.before
                   , qt->request.points
-                  , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                  , qt->request.group_options?qt->request.group_options:""
+                  , time_grouping_tostring(qt->request.time_group_method)
+                  , qt->request.time_group_options ? qt->request.time_group_options : ""
                   , options_buffer
                   , resampling_buffer
                   , tier_buffer
@@ -2783,8 +2717,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , (long long)qt->request.after
                 , (long long)qt->request.before
                 , qt->request.points
-                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                , qt->request.group_options?qt->request.group_options:""
+                , time_grouping_tostring(qt->request.time_group_method)
+                , qt->request.time_group_options ? qt->request.time_group_options : ""
                 , options_buffer
                 , resampling_buffer
                 , tier_buffer
@@ -2798,8 +2732,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , (long long)qt->request.after
                 , (long long)qt->request.before
                 , qt->request.points
-                , web_client_api_request_v1_data_group_to_string(qt->request.group_method)
-                , qt->request.group_options?qt->request.group_options:""
+                , time_grouping_tostring(qt->request.time_group_method)
+                , qt->request.time_group_options ? qt->request.time_group_options : ""
                 , options_buffer
                 , resampling_buffer
                 , tier_buffer
