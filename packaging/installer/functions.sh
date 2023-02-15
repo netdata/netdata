@@ -95,10 +95,19 @@ progress() {
   echo >&2 " --- ${TPUT_DIM}${TPUT_BOLD}${*}${TPUT_RESET} --- "
 }
 
+check_for_curl() {
+  if [ -z "${curl}" ]; then
+    curl="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+  fi
+}
+
 get() {
   url="${1}"
-  if command -v curl > /dev/null 2>&1; then
-    curl -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"
+
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    "${curl}" -q -o - -sSL --connect-timeout 10 --retry 3 "${url}"
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}"
   else
@@ -112,8 +121,10 @@ download_file() {
   name="${3}"
   opt="${4}"
 
-  if command -v curl > /dev/null 2>&1; then
-    run curl -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    run "${curl}" -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}"
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}"
   else
@@ -873,8 +884,10 @@ create_netdata_conf() {
     export http_proxy=
     export https_proxy=
 
-    if command -v curl 1> /dev/null 2>&1; then
-      run curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${path}.new"
+    check_for_curl
+
+    if [ -n "${curl}" ]; then
+      run "${curl}" -sSL --connect-timeout 10 --retry 3 "${url}" > "${path}.new"
     elif command -v wget 1> /dev/null 2>&1; then
       run wget -T 15 -O - "${url}" > "${path}.new"
     fi

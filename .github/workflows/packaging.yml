@@ -170,7 +170,7 @@ jobs:
           retry_wait_seconds: 30
           timeout_seconds: 900
           command: |
-            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Build Packages
         id: build
@@ -191,7 +191,7 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} \
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }} \
                      /netdata/.github/scripts/pkg-test.sh
       - name: SSH setup
         id: ssh-setup
