@@ -107,28 +107,56 @@ troubleshooting with Netdata.
 <InstallRegexLink>
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)"
-    os="Run with Docker" 
+    os="Run with Docker"
     svg="docker" />
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kubernetes.md)"
-    os="Deploy on Kubernetes" 
+    os="Deploy on Kubernetes"
     svg="kubernetes" />
    <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/macos.md)"
-    os="Install on macOS" 
+    os="Install on macOS"
     svg="macos" />
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)"
-    os="Linux from Git" 
+    os="Linux from Git"
     svg="linux" />
   <InstallBoxRegexLink
     to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)"
     os="Linux from source"
     svg="linux" />
   <InstallBoxRegexLink
-    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)" 
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)"
     os="Linux for offline nodes"
     svg="linux" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md)"
+    os="Deploy on Ansible"
+    svg="ansible" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/cloud-providers.md)"
+    os="Deploy on cloud providers"
+    svg="cloud" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/freebsd.md)"
+    os="Install on FreeBSD"
+    svg="freebsd" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/freenas.md)"
+    os="Install on FreeNAS"
+    svg="freenas" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)"
+    os="Install with native packages"  
+    svg="package" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/pfsense.md)"
+    os="Install on pfSense"
+    svg="pfsense" />
+  <InstallBoxRegexLink
+    to="[](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/synology.md)"
+    os="Install on Synology"
+    svg="synology" />
 </InstallRegexLink>
 
 - [Run with Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md)
@@ -137,6 +165,13 @@ troubleshooting with Netdata.
 - [Linux from Git](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md)
 - [Linux from source](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/source.md)
 - [Linux for offline nodes](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md)
+- [Deploy on Ansible](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/ansible.md)
+- [Deploy on cloud providers](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/cloud-providers.md)
+- [Install on FreeBSD](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/freebsd.md)
+- [Install on FreeNAS](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/freenas.md)
+- [Install with native packages](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/packages.md)
+- [Install on pfSense](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/pfsense.md)
+- [Install on Synology](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/synology.md)
 
 ## Advanced installation options and troubleshooting
 
