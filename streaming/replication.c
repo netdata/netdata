@@ -216,22 +216,22 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
     NUMBER_ENCODING encoding = (capabilities & STREAM_CAP_IEEE754) ? NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
     RRDDIM *rd;
     rrddim_foreach_read(rd, st){
-                if (!rd->exposed) continue;
+        if (!rd->exposed) continue;
 
-                buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
-                                   sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
-                buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
-                buffer_fast_strcat(wb, "' ", 2);
-                buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
-                                            (usec_t) rd->last_collected_time.tv_usec);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
-                buffer_fast_strcat(wb, " ", 1);
-                buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
-                buffer_fast_strcat(wb, "\n", 1);
-            }
+        buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE " '",
+                           sizeof(PLUGINSD_KEYWORD_REPLAY_RRDDIM_STATE) - 1 + 2);
+        buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
+        buffer_fast_strcat(wb, "' ", 2);
+        buffer_print_uint64_encoded(wb, encoding, (usec_t) rd->last_collected_time.tv_sec * USEC_PER_SEC +
+                                    (usec_t) rd->last_collected_time.tv_usec);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_int64_encoded(wb, encoding, rd->last_collected_value);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->last_calculated_value);
+        buffer_fast_strcat(wb, " ", 1);
+        buffer_print_netdata_double_encoded(wb, encoding, rd->last_stored_value);
+        buffer_fast_strcat(wb, "\n", 1);
+    }
     rrddim_foreach_done(rd);
 
     buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE " ", sizeof(PLUGINSD_KEYWORD_REPLAY_RRDSET_STATE) - 1 + 1);
