@@ -331,6 +331,7 @@ void buffer_json_finalize(BUFFER *wb) {
                 break;
         }
     }
+    buffer_fast_strcat(wb, "\n", 1);
 }
 
 // ----------------------------------------------------------------------------

@@ -738,14 +738,29 @@ void chart_functions2json(RRDSET *st, BUFFER *wb, int tabs, const char *kq, cons
     functions2json(st->functions_view, wb, ident, kq, sq);
 }
 
-void host_functions2json(RRDHOST *host, BUFFER *wb, int tabs, const char *kq, const char *sq) {
+void host_functions2json(RRDHOST *host, BUFFER *wb) {
     if(!host || !host->functions) return;
 
-    char ident[tabs + 1];
-    ident[tabs] = '\0';
-    while(tabs) ident[--tabs] = '\t';
+    buffer_json_member_add_object(wb, "functions");
 
-    functions2json(host->functions, wb, ident, kq, sq);
+    struct rrd_collector_function *t;
+    dfe_start_read(host->functions, t) {
+                if(!t->collector->running) continue;
+
+                buffer_json_member_add_object(wb, t_dfe.name);
+                buffer_json_member_add_string(wb, "help", string2str(t->help));
+                buffer_json_member_add_int64(wb, "timeout", t->timeout);
+                buffer_json_member_add_array(wb, "options");
+                if(t->options & RRD_FUNCTION_GLOBAL)
+                    buffer_json_add_array_item_string(wb, "GLOBAL");
+                if(t->options & RRD_FUNCTION_LOCAL)
+                    buffer_json_add_array_item_string(wb, "LOCAL");
+                buffer_json_array_close(wb);
+                buffer_json_object_close(wb);
+            }
+    dfe_done(t);
+
+    buffer_json_object_close(wb);
 }
 
 void chart_functions_to_dict(DICTIONARY *rrdset_functions_view, DICTIONARY *dst) {

@@ -223,6 +223,40 @@ static inline void buffer_json_strcat(BUFFER *wb, const char *txt) {
     buffer_overflow_check(wb);
 }
 
+static inline void buffer_json_quoted_strcat(BUFFER *wb, const char *txt) {
+    if(unlikely(!txt || !*txt)) return;
+
+    if(*txt == '"')
+        txt++;
+
+    const char *t = txt;
+    while(*t) {
+        buffer_need_bytes(wb, 100);
+        char *s = &wb->buffer[wb->len];
+        char *d = s;
+        const char *e = &wb->buffer[wb->size - 1]; // remove 1 to make room for the escape character
+
+        while(*t && d < e) {
+            if(unlikely(*t == '"' && !t[1])) {
+                t++;
+                continue;
+            }
+
+            if(unlikely(*t == '\\' || *t == '"'))
+                *d++ = '\\';
+
+            *d++ = *t++;
+        }
+
+        wb->len += d - s;
+    }
+
+    buffer_need_bytes(wb, 1);
+    wb->buffer[wb->len] = '\0';
+
+    buffer_overflow_check(wb);
+}
+
 // This trick seems to give an 80% speed increase in 32bit systems
 // print_number_llu_r() will just print the digits up to the
 // point the remaining value fits in 32 bits, and then calls
@@ -552,6 +586,16 @@ static inline void buffer_json_add_string_value(BUFFER *wb, const char *value) {
         buffer_fast_strcat(wb, "null", 4);
 }
 
+static inline void buffer_json_add_quoted_string_value(BUFFER *wb, const char *value) {
+    if(value) {
+        buffer_strcat(wb, wb->json.value_quote);
+        buffer_json_quoted_strcat(wb, value);
+        buffer_strcat(wb, wb->json.value_quote);
+    }
+    else
+        buffer_fast_strcat(wb, "null", 4);
+}
+
 static inline void buffer_json_member_add_object(BUFFER *wb, const char *key) {
     buffer_print_json_comma_newline_spacing(wb);
     buffer_print_json_key(wb, key);
@@ -577,6 +621,47 @@ static inline void buffer_json_member_add_string(BUFFER *wb, const char *key, co
     buffer_print_json_key(wb, key);
     buffer_fast_strcat(wb, ":", 1);
     buffer_json_add_string_value(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_string_or_omit(BUFFER *wb, const char *key, const char *value) {
+    if(value && *value)
+        buffer_json_member_add_string(wb, key, value);
+}
+
+static inline void buffer_json_member_add_string_or_empty(BUFFER *wb, const char *key, const char *value) {
+    if(!value)
+        value = "";
+
+    buffer_json_member_add_string(wb, key, value);
+}
+
+static inline void buffer_json_member_add_quoted_string(BUFFER *wb, const char *key, const char *value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+
+    if(!value || strcmp(value, "null") == 0)
+        buffer_fast_strcat(wb, "null", 4);
+    else
+        buffer_json_add_quoted_string_value(wb, value);
+
+    wb->json.stack[wb->json.depth].count++;
+}
+
+static inline void buffer_json_member_add_uuid(BUFFER *wb, const char *key, uuid_t *value) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+
+    if(value) {
+        char uuid[GUID_LEN + 1];
+        uuid_unparse_lower(*value, uuid);
+        buffer_json_add_string_value(wb, uuid);
+    }
+    else
+        buffer_json_add_string_value(wb, NULL);
 
     wb->json.stack[wb->json.depth].count++;
 }
