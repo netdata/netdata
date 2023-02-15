@@ -1089,22 +1089,22 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
     time_t now = now_realtime_sec();
 
     rrdset_foreach_read(st, host) {
-                if (!rrdset_is_available_for_viewers(st))
-                    continue;
+        if (!rrdset_is_available_for_viewers(st))
+            continue;
 
-                sprintf(name, "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
+        sprintf(name, "%s:%s", rrdset_plugin_name(st), rrdset_module_name(st));
 
-                bool old = 0;
-                bool *set = dictionary_set(dict, name, &old, sizeof(bool));
-                if(!*set) {
-                    *set = true;
-                    st->last_accessed_time_s = now;
-                    buffer_json_add_array_item_object(wb);
-                    buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
-                    buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
-                    buffer_json_object_close(wb);
-                }
-            }
+        bool old = 0;
+        bool *set = dictionary_set(dict, name, &old, sizeof(bool));
+        if(!*set) {
+            *set = true;
+            st->last_accessed_time_s = now;
+            buffer_json_add_array_item_object(wb);
+            buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
+            buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
+            buffer_json_object_close(wb);
+        }
+    }
     rrdset_foreach_done(st);
     dictionary_destroy(dict);
 
