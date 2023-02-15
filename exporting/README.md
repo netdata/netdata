@@ -1,11 +1,10 @@
 <!--
 title: "Exporting reference"
 description: "With the exporting engine, you can archive your Netdata metrics to multiple external databases for long-term storage or further analysis."
-sidebar_label: "Exporting reference"
+sidebar_label: "Export"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/README.md"
 learn_status: "Published"
-learn_topic_type: "References"
-learn_rel_path: "References/Configuration"
+learn_rel_path: "Integrations/Export"
 learn_doc_purpose: "Explain the exporting engine options and all of our the exporting connectors options"
 -->
 
