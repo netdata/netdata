@@ -78,6 +78,8 @@ else
   INTERACTIVE=1
 fi
 
+CURL="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+
 # ======================================================================
 # Shared messages used in multiple places throughout the script.
 
@@ -299,8 +301,8 @@ telemetry_event() {
 EOF
 )"
 
-  if command -v curl > /dev/null 2>&1; then
-    curl --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
+  if [ -n "${CURL}" ]; then
+    "${CURL}" --silent -o /dev/null -X POST --max-time 2 --header "Content-Type: application/json" -d "${REQ_BODY}" "${TELEMETRY_URL}" > /dev/null
   elif command -v wget > /dev/null 2>&1; then
     if wget --help 2>&1 | grep BusyBox > /dev/null 2>&1; then
       # BusyBox-compatible version of wget, there is no --no-check-certificate option
@@ -581,8 +583,8 @@ check_for_remote_file() {
 
   if echo "${url}" | grep -Eq "^file:///"; then
     [ -e "${url#file://}" ] || return 1
-  elif command -v curl > /dev/null 2>&1; then
-    curl --output /dev/null --silent --head --fail "${url}" || return 1
+  elif [ -n "${CURL}" ]; then
+    "${CURL}" --output /dev/null --silent --head --fail "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     wget -S --spider "${url}" 2>&1 | grep -q 'HTTP/1.1 200 OK' || return 1
   else
@@ -596,8 +598,8 @@ download() {
 
   if echo "${url}" | grep -Eq "^file:///"; then
     run cp "${url#file://}" "${dest}" || return 1
-  elif command -v curl > /dev/null 2>&1; then
-    run curl --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
+  elif [ -n "${CURL}" ]; then
+    run "${CURL}" --fail -q -sSL --connect-timeout 10 --retry 3 --output "${dest}" "${url}" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run wget -T 15 -O "${dest}" "${url}" || return 1
   else
@@ -608,8 +610,8 @@ download() {
 get_redirect() {
   url="${1}"
 
-  if command -v curl > /dev/null 2>&1; then
-    run sh -c "curl ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
+  if [ -n "${CURL}" ]; then
+    run sh -c "${CURL} ${url} -s -L -I -o /dev/null -w '%{url_effective}' | grep -o '[^/]*$'" || return 1
   elif command -v wget > /dev/null 2>&1; then
     run sh -c "wget -S -O /dev/null ${url} 2>&1 | grep -m 1 Location | grep -o '[^/]*$'" || return 1
   else
