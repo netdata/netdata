@@ -155,6 +155,21 @@ static int chart_label_store_to_sql_callback(const char *name, const char *value
     return 1;
 }
 
+static void clean_old_chart_labels(RRDSET *st)
+{
+    char sql[512];
+    time_t first_time_s = rrdset_first_entry_s(st);
+
+    if (unlikely(!first_time_s))
+        snprintfz(sql, 511,"DELETE FROM chart_label WHERE chart_id = @chart_id;", first_time_s);
+    else
+        snprintfz(sql, 511,"DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;", first_time_s);
+
+    int rc = exec_statement_with_uuid(sql, &st->chart_uuid);
+    if (unlikely(rc))
+        error_report("METADATA: 'host:%s' Failed to clean old labels for chart %s", rrdhost_hostname(st->rrdhost), rrdset_name(st));
+}
+
 static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t *query_counter)
 {
     size_t old_version = st->rrdlabels_last_saved_version;
@@ -171,6 +186,8 @@ static int check_and_update_chart_labels(RRDSET *st, BUFFER *work_buffer, size_t
         st->rrdlabels_last_saved_version = new_version;
         (*query_counter)++;
     }
+
+    clean_old_chart_labels(st);
     return rc;
 }
 
