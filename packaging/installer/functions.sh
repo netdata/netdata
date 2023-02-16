@@ -848,7 +848,7 @@ install_netdata_logrotate() {
   if [ "${UID}" -eq 0 ]; then
     if [ -d /etc/logrotate.d ]; then
       if [ ! -f /etc/logrotate.d/netdata ]; then
-        run cp system/netdata.logrotate /etc/logrotate.d/netdata
+        run cp system/logrotate/netdata /etc/logrotate.d/netdata
       fi
 
       if [ -f /etc/logrotate.d/netdata ]; then
