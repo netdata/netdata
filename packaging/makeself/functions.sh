@@ -61,16 +61,7 @@ fetch() {
 
     set -e
     cd "${NETDATA_MAKESELF_PATH}/tmp"
-
-    case ${2} in
-      *.tar.gz)
-        run tar -zxpf "${tar}";;
-      *.tar.bz2)
-        run tar -xjf "${tar}";;
-      *)
-        echo "ERROR: unsupported file format"
-        exit 1;;
-    esac
+    run tar -axpf "${tar}"
     cd -
 
     CACHE_HIT=0
