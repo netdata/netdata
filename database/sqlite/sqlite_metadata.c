@@ -161,7 +161,7 @@ static void clean_old_chart_labels(RRDSET *st)
     time_t first_time_s = rrdset_first_entry_s(st);
 
     if (unlikely(!first_time_s))
-        snprintfz(sql, 511,"DELETE FROM chart_label WHERE chart_id = @chart_id;", first_time_s);
+        snprintfz(sql, 511,"DELETE FROM chart_label WHERE chart_id = @chart_id;");
     else
         snprintfz(sql, 511,"DELETE FROM chart_label WHERE date_created < %ld AND chart_id = @chart_id;", first_time_s);
 
