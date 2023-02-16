@@ -294,6 +294,7 @@ static int web_server_rcv_callback(POLLINFO *pi, short int *events) {
     int fd = pi->fd;
 
     web_client_disable_wait_receive(w);
+    web_client_disable_wait_send(w);
 
     ssize_t bytes;
     bytes = web_client_receive(w);
