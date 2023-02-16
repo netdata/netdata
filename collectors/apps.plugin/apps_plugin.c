@@ -5165,4 +5165,5 @@ int main(int argc, char **argv) {
 
         debug_log("done Loop No %zu", global_iterations_counter);
     }
+    netdata_mutex_unlock(&mutex);
 }
