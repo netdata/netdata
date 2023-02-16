@@ -8,32 +8,58 @@ author_title: "University of Patras"
 author_img: "/img/authors/panagiotis-papaioannou.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/python-collector.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides"
+learn_rel_path: "Developers/External plugins/python.d.plugin"
 -->
 
 # Develop a custom data collector in Python
 
-The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to fetch metrics from hundreds of system,
-container, and service endpoints. While the Netdata team and community has built [powerful
-collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for most system, container, and service/application endpoints, there are plenty
-of custom applications that can't be monitored by default.
-
-## Problem
-
-You have a custom application or infrastructure that you need to monitor, but no open-source monitoring tool offers a
-prebuilt method for collecting your required metric data.
-
-## Solution
+The Netdata Agent uses [data collectors](https://github.com/netdata/netdata/blob/master/collectors/README.md) to 
+fetch metrics from hundreds of system, container, and service endpoints. While the Netdata team and community has built 
+[powerful collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md) for most system, container, 
+and service/application endpoints, some custom applications can't be monitored by default.
 
 In this tutorial, you'll learn how to leverage the [Python programming language](https://www.python.org/) to build a
 custom data collector for the Netdata Agent. Follow along with your own dataset, using the techniques and best practices
 covered here, or use the included examples for collecting and organizing either random or weather data.
 
+If you're comfortable with Golang, consider instead writing a module for the [go.d.plugin](https://github.com/netdata/go.d.plugin).
+Golang is more performant, easier to maintain, and simpler for users since it doesn't require a particular runtime on the node to
+execute. Python plugins require Python on the machine to be executed. Netdata uses Go as the platform of choice for
+production-grade collectors.
+
 ## What you need to get started
 
-- A physical or virtual Linux system, which we'll call a _node_.
-- A working installation of the free and open-source [Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
+  - A physical or virtual Linux system, which we'll call a _node_.
+  - A working [installation of Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
+
+### Quick start
+
+For a quick start, you can look at the 
+[example plugin](https://raw.githubusercontent.com/netdata/netdata/master/collectors/python.d.plugin/example/example.chart.py).
+
+**Note**: If you are working 'locally' on a new collector and would like to run it in an already installed and running
+Netdata (as opposed to having to install Netdata from source again with your new changes) you can copy over the relevant
+file to where Netdata expects it and then either `sudo systemctl restart netdata` to have it be picked up and used by
+Netdata or you can just run the updated collector in debug mode by following a process like below (this assumes you have
+[installed Netdata from a GitHub fork](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/manual.md) you
+have made to do your development on).
+
+```bash
+# clone your fork (done once at the start but shown here for clarity)
+#git clone --branch my-example-collector https://github.com/mygithubusername/netdata.git --depth=100 --recursive
+# go into your netdata source folder
+cd netdata
+# git pull your latest changes (assuming you built from a fork you are using to develop on)
+git pull
+# instead of running the installer we can just copy over the updated collector files
+#sudo ./netdata-installer.sh --dont-wait
+# copy over the file you have updated locally (pretending we are working on the 'example' collector)
+sudo cp collectors/python.d.plugin/example/example.chart.py /usr/libexec/netdata/python.d/
+# become user netdata
+sudo su -s /bin/bash netdata
+# run your updated collector in debug mode to see if it works without having to reinstall netdata
+/usr/libexec/netdata/plugins.d/python.d.plugin example debug trace nolock
+```
 
 ## Jobs and elements of a Python collector
 
@@ -53,6 +79,11 @@ The basic elements of a Netdata collector are:
 - `CHARTS{}`: A dictionary containing the details for the charts to be displayed.
 - `data{}`: A dictionary containing the values to be displayed.
 - `get_data()`: The basic function of the plugin which will return to Netdata the correct values.
+
+**Note**: All names are better explained in the 
+[External Plugins Documentation](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md).
+Parameters like `priority` and `update_every` mentioned in that documentation are handled by the `python.d.plugin`,
+not by each collection module. 
 
 Let's walk through these jobs and elements as independent elements first, then apply them to example Python code.
 
@@ -139,11 +170,18 @@ correct values.
 
 ## Framework classes 
 
-The `python.d` plugin has a number of framework classes that can be used to speed up the development of your python
-collector. Your class can inherit one of these framework classes, which have preconfigured methods.
+Every module needs to implement its own `Service` class. This class should inherit from one of the framework classes:
 
-For example, the snippet below is from the [RabbitMQ
-collector](https://github.com/netdata/netdata/blob/91f3268e9615edd393bd43de4ad8068111024cc9/collectors/python.d.plugin/rabbitmq/rabbitmq.chart.py#L273).
+-   `SimpleService`
+-   `UrlService`
+-   `SocketService`
+-   `LogService`
+-   `ExecutableService`
+
+Also it needs to invoke the parent class constructor in a specific way as well as assign global variables to class variables. 
+
+For example, the snippet below is from the 
+[RabbitMQ collector](https://github.com/netdata/netdata/blob/91f3268e9615edd393bd43de4ad8068111024cc9/collectors/python.d.plugin/rabbitmq/rabbitmq.chart.py#L273).
 This collector uses an HTTP endpoint and uses the `UrlService` framework class, which only needs to define an HTTP
 endpoint for data collection.
 
@@ -170,8 +208,7 @@ class Service(UrlService):
 
 In our use-case, we use the `SimpleService` framework, since there is no framework class that suits our needs.
 
-You can read more about the [framework classes](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#how-to-write-a-new-module) from
-the Netdata documentation.
+You can find below the [framework class reference](#framework-class-reference).
 
 ## An example collector using weather station data
 
@@ -199,6 +236,35 @@ CHARTS = {
 ```
 
 ## Parse the data to extract or create the actual data to be represented
+
+Every collector must implement `_get_data`. This method should grab raw data from `_get_raw_data`, 
+parse it, and return a dictionary where keys are unique dimension names, or `None` if no data is collected.
+
+For example:
+```py
+def _get_data(self):
+    try:
+        raw = self._get_raw_data().split(" ")
+        return {'active': int(raw[2])}
+    except (ValueError, AttributeError):
+        return None
+```
+
+In our weather data collector we declare `_get_data` as follows:
+
+```python
+    def get_data(self):
+        #The data dict is basically all the values to be represented
+        # The entries are in the format: { "dimension": value}
+        #And each "dimension" should belong to a chart.
+        data = dict()
+
+        self.populate_data()
+
+        data['current_temperature'] = self.weather_data["temp"]
+
+        return data
+```
 
 A standard practice would be to either get the data on JSON format or transform them to JSON format. We use a dictionary
 to give this format and issue random values to simulate received data.
@@ -465,26 +531,102 @@ variables and inform the user about the defaults. For example, take a look at th
 You can read more about the configuration file on the [`python.d.plugin`
 documentation](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md). 
 
-## What's next?
+You can find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
 
-Find the source code for the above examples on [GitHub](https://github.com/papajohn-uop/netdata). 
+## Pull Request Checklist for Python Plugins
 
-Now you are ready to start developing our Netdata python Collector and share it with the rest of the Netdata community.
+This is a generic checklist for submitting a new Python plugin for Netdata.  It is by no means comprehensive.
 
-- If you need help while developing your collector, join our [Netdata
-  Community](https://community.netdata.cloud/c/agent-development/9) to chat about it.
-- Follow the
-  [checklist](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md#pull-request-checklist-for-python-plugins)
-  to contribute the collector to the Netdata Agent [repository](https://github.com/netdata/netdata).
-- Check out the [example](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin/example) Python
-  collector, which is a minimal example collector you could also use as a starting point. Once comfortable with that,
-  then browse other [existing collectors](https://github.com/netdata/netdata/tree/master/collectors/python.d.plugin)
-  that might have similarities to what you want to do.  
-- If you're developing a proof of concept (PoC), consider migrating the collector in Golang
-  ([go.d.plugin](https://github.com/netdata/go.d.plugin)) once you validate its value in production. Golang is more
-  performant, easier to maintain, and simpler for users since it doesn't require a particular runtime on the node to
-  execute (Python plugins require Python on the machine to be executed). Netdata uses Go as the platform of choice for
-  production-grade collectors.
-- Celebrate! You have contributed to an open-source project with hundreds of thousands of users!
+At minimum, to be buildable and testable, the PR needs to include:
 
+-   The module itself, following proper naming conventions: `collectors/python.d.plugin/<module_dir>/<module_name>.chart.py`
+-   A README.md file for the plugin under `collectors/python.d.plugin/<module_dir>`. 
+-   The configuration file for the module: `collectors/python.d.plugin/<module_dir>/<module_name>.conf`. Python config files are in YAML format, and should include comments describing what options are present. The instructions are also needed in the configuration section of the README.md 
+-   A basic configuration for the plugin in the appropriate global config file: `collectors/python.d.plugin/python.d.conf`, which is also in YAML format.  Either add a line that reads `# <module_name>: yes` if the module is to be enabled by default, or one that reads `<module_name>: no` if it is to be disabled by default.
+-   A makefile for the plugin at `collectors/python.d.plugin/<module_dir>/Makefile.inc`.  Check an existing plugin for what this should look like.
+-   A line in `collectors/python.d.plugin/Makefile.am` including the above-mentioned makefile. Place it with the other plugin includes (please keep the includes sorted alphabetically).
+-   Optionally, chart information in `web/gui/dashboard_info.js`.  This generally involves specifying a name and icon for the section, and may include descriptions for the section or individual charts.
+-   Optionally, some default alarm configurations for your collector in `health/health.d/<module_name>.conf` and a line adding `<module_name>.conf` in `health/Makefile.am`.
 
+## Framework class reference
+
+Every framework class has some user-configurable variables which are specific to this particular class. Those variables should have default values initialized in the child class constructor.
+
+If module needs some additional user-configurable variable, it can be accessed from the `self.configuration` list and assigned in constructor or custom `check` method. Example:
+
+```py
+def __init__(self, configuration=None, name=None):
+    UrlService.__init__(self, configuration=configuration, name=name)
+    try:
+        self.baseurl = str(self.configuration['baseurl'])
+    except (KeyError, TypeError):
+        self.baseurl = "http://localhost:5001"
+```
+
+Classes implement `_get_raw_data` which should be used to grab raw data. This method usually returns a list of strings.
+
+### `SimpleService`
+
+This is last resort class, if a new module cannot be written by using other framework class this one can be used.
+
+Example: `ceph`, `sensors`
+
+It is the lowest-level class which implements most of module logic, like:
+
+-   threading
+-   handling run times
+-   chart formatting
+-   logging
+-   chart creation and updating
+
+### `LogService`
+
+Examples: `apache_cache`, `nginx_log`_
+
+Variable from config file: `log_path`.
+
+Object created from this class reads new lines from file specified in `log_path` variable. It will check if file exists and is readable. Also `_get_raw_data` returns list of strings where each string is one line from file specified in `log_path`.
+
+### `ExecutableService`
+
+Examples: `exim`, `postfix`_
+
+Variable from config file: `command`.
+
+This allows to execute a shell command in a secure way. It will check for invalid characters in `command` variable and won't proceed if there is one of:
+
+-   '&'
+-   '|'
+-   ';'
+-   '>'
+-   '\<'
+
+For additional security it uses python `subprocess.Popen` (without `shell=True` option) to execute command. Command can be specified with absolute or relative name. When using relative name, it will try to find `command` in `PATH` environment variable as well as in `/sbin` and `/usr/sbin`.
+
+`_get_raw_data` returns list of decoded lines returned by `command`.
+
+### UrlService
+
+Examples: `apache`, `nginx`, `tomcat`_
+
+Variables from config file: `url`, `user`, `pass`.
+
+If data is grabbed by accessing service via HTTP protocol, this class can be used. It can handle HTTP Basic Auth when specified with `user` and `pass` credentials.
+
+Please note that the config file can use different variables according to the specification of each module.
+
+`_get_raw_data` returns list of utf-8 decoded strings (lines).
+
+### SocketService
+
+Examples: `dovecot`, `redis`
+
+Variables from config file: `unix_socket`, `host`, `port`, `request`.
+
+Object will try execute `request` using either `unix_socket` or TCP/IP socket with combination of `host` and `port`. This can access unix sockets with SOCK_STREAM or SOCK_DGRAM protocols and TCP/IP sockets in version 4 and 6 with SOCK_STREAM setting.
+
+Sockets are accessed in non-blocking mode with 15 second timeout.
+
+After every execution of `_get_raw_data` socket is closed, to prevent this module needs to set `_keep_alive` variable to `True` and implement custom `_check_raw_data` method.
+
+`_check_raw_data` should take raw data and return `True` if all data is received otherwise it should return `False`. Also it should do it in fast and efficient way.
