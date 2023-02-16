@@ -44,7 +44,7 @@ abspath() {
       echo "$(cd "$(dirname "${1}")" && /usr/bin/env PWD= pwd -P)/$(basename "${1}")"
     else
       mkdir -p "${script_dir}/$(dirname "${1}")"
-      echo "${script_dir}/$(dirname "${1}")"
+      echo "${script_dir}/${1}"
     fi
   else
     echo "${script_dir}/${1}"
