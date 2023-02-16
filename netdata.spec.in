@@ -334,7 +334,7 @@ install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/n
 %else
 # install SYSV init stuff
 install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"
-install -m 755 system/netdata-init-d \
+install -m 755 system/initd/init.d/netdata \
         "${RPM_BUILD_ROOT}/etc/rc.d/init.d/netdata"
 %endif
 

@@ -3,13 +3,13 @@
 
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
-    netdata-openrc \
     netdata.logrotate \
-    netdata-init-d \
-    netdata-lsb \
-    netdata-freebsd \
-    netdata.plist \
     netdata.crontab \
+    freebsd/rc.d/netdata \
+    initd/init.d/netdata \
+    launchd/netdata.plist \
+    lsb/init.d/netdata \
+    openrc/init.d/netdata \
     systemd/netdata.service \
     systemd/netdata.service.v235 \
     systemd/netdata-updater.service \
@@ -26,13 +26,27 @@ dist_config_DATA = \
     .install-type \
     $(NULL)
 
+libsysfreebsddir=$(libsysdir)/freebsd
+libsysfreebsdrcddir=$(libsysfreebsddir)/rc.d
+libsysinitddir=$(libsysdir)/initd
+libsysinitdinitddir=$(libsysinitddir)/init.d
+libsyslaunchddir=$(libsysdir)/launchd
+libsyslsbdir=$(libsysdir)/lsb
+libsyslsbinitddir=$(libsyslsbdir)/init.d
+libsysopenrcdir=$(libsysdir)/openrc
+libsysopenrcinitddir=$(libsysopenrcdir)/init.d
 libsyssystemddir=$(libsysdir)/systemd
 
 # Explicitly install directories to avoid permission issues due to umask
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(configdir)
 	$(INSTALL) -d $(DESTDIR)$(libsysdir)
+	$(INSTALL) -d $(DESTDIR)$(libsysfreebsdrcddir)
+	$(INSTALL) -d $(DESTDIR)$(libsysinitdinitddir)
+	$(INSTALL) -d $(DESTDIR)$(libsyslaunchddir)
+	$(INSTALL) -d $(DESTDIR)$(libsyslsbinitddir)
 	$(INSTALL) -d $(DESTDIR)$(libsyssystemddir)
+	$(INSTALL) -d $(DESTDIR)$(libsysopenrcinitddir)
 
 libexecnetdatadir=$(libexecdir)/netdata
 nodist_libexecnetdata_SCRIPTS = \
@@ -40,13 +54,28 @@ nodist_libexecnetdata_SCRIPTS = \
     $(NULL)
 
 nodist_libsys_DATA = \
-    netdata-openrc \
     netdata.logrotate \
-    netdata-init-d \
-    netdata-lsb \
-    netdata-freebsd \
-    netdata.plist \
     netdata.crontab \
+    $(NULL)
+
+nodist_libsysfreebsdrcd_DATA = \
+    freebsd/rc.d/netdata \
+    $(NULL)
+
+nodist_libsysinitdinitd_DATA = \
+    initd/init.d/netdata \
+    $(NULL)
+
+nodist_libsyslaunchd_DATA = \
+    launchd/netdata.plist \
+    $(NULL)
+
+nodist_libsyslsbinitd_DATA = \
+    lsb/init.d/netdata \
+    $(NULL)
+
+nodist_libsysopenrcinitd_DATA = \
+    openrc/init.d/netdata \
     $(NULL)
 
 nodist_libsyssystemd_DATA = \
@@ -61,14 +90,14 @@ dist_libsyssystemd_DATA = \
 
 dist_noinst_DATA = \
     install-service.sh.in \
-    netdata-openrc.in \
     netdata.logrotate.in \
-    netdata-init-d.in \
-    netdata-lsb.in \
-    netdata-freebsd.in \
-    netdata.plist.in \
     netdata.conf \
     netdata.crontab.in \
+    freebsd/rc.d/netdata.in \
+    initd/init.d/netdata.in \
+    launchd/netdata.plist.in \
+    lsb/init.d/netdata.in \
+    openrc/init.d/netdata.in \
     systemd/netdata.service.in \
     systemd/netdata.service.v235.in \
     systemd/netdata-updater.service.in \

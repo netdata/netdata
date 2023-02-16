@@ -115,19 +115,19 @@ web/gui/version.txt
 /node_modules/
 /coverage/
 
-system/netdata-lsb
-system/netdata-openrc
-system/netdata-init-d
+system/install-service.sh
+system/netdata.crontab
 system/netdata.logrotate
+system/freebsd/rc.d/netdata
+system/initd/init.d/netdata
+system/launchd/netdata.plist
+system/lsb/init.d/netdata
+system/openrc/init.d/netdata
 system/systemd/netdata.service
 system/systemd/netdata.service.*
 system/systemd/netdata-updater.service
 !system/systemd/netdata.service.in
 !system/systemd/netdata.service.*.in
-system/netdata.plist
-system/netdata-freebsd
-system/netdata.crontab
-system/install-service.sh
 
 daemon/anonymous-statistics.sh
 daemon/get-kubernetes-labels.sh

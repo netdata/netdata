@@ -470,21 +470,21 @@ install_non_systemd_init() {
   if [ -d /etc/init.d ] && [ ! -f /etc/init.d/netdata ]; then
     if expr "${key}" : "^(gentoo|alpine).*"; then
       echo >&2 "Installing OpenRC init file..."
-      run cp system/netdata-openrc /etc/init.d/netdata &&
+      run cp system/openrc/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run rc-update add netdata default &&
         return 0
 
     elif expr "${key}" : "^devuan*" || [ "${key}" = "debian-7" ] || [ "${key}" = "ubuntu-12.04" ] || [ "${key}" = "ubuntu-14.04" ]; then
       echo >&2 "Installing LSB init file..."
-      run cp system/netdata-lsb /etc/init.d/netdata &&
+      run cp system/lsb/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run update-rc.d netdata defaults &&
         run update-rc.d netdata enable &&
         return 0
     elif expr "${key}" : "^(amzn-201[5678]|ol|CentOS release 6|Red Hat Enterprise Linux Server release 6|Scientific Linux CERN SLC release 6|CloudLinux Server release 6).*"; then
       echo >&2 "Installing init.d file..."
-      run cp system/netdata-init-d /etc/init.d/netdata &&
+      run cp system/initd/init.d/netdata /etc/init.d/netdata &&
         run chmod 755 /etc/init.d/netdata &&
         run chkconfig netdata on &&
         return 0
@@ -582,7 +582,7 @@ install_netdata_service() {
           echo >&2 "Installing MacOS X plist file..."
           # This is used by netdata-installer.sh
           # shellcheck disable=SC2034
-          run cp system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
+          run cp system/launchd/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist &&
             run launchctl load /Library/LaunchDaemons/com.github.netdata.plist &&
             NETDATA_START_CMD="launchctl start com.github.netdata" &&
             NETDATA_STOP_CMD="launchctl stop com.github.netdata"
@@ -592,7 +592,7 @@ install_netdata_service() {
       elif [ "${uname}" = "FreeBSD" ]; then
         # This is used by netdata-installer.sh
         # shellcheck disable=SC2034
-        run cp system/netdata-freebsd /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
+        run cp system/freebsd/rc.d/netdata /etc/rc.d/netdata && NETDATA_START_CMD="service netdata start" &&
           NETDATA_STOP_CMD="service netdata stop" &&
           NETDATA_INSTALLER_START_CMD="service netdata onestart" &&
           myret=$?
