@@ -330,7 +330,7 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_localstatedir}/lib/%{name}/registry"
 # Install netdata service
 %if %{with systemd}
 install -m 755 -d "${RPM_BUILD_ROOT}%{_unitdir}"
-install -m 644 -p system/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
+install -m 644 -p system/systemd/netdata.service "${RPM_BUILD_ROOT}%{_unitdir}/netdata.service"
 %else
 # install SYSV init stuff
 install -d "${RPM_BUILD_ROOT}/etc/rc.d/init.d"

@@ -33,7 +33,6 @@ run cp \
   system/netdata-lsb \
   system/netdata-openrc \
   system/netdata.logrotate \
-  system/netdata.service \
   "${NETDATA_INSTALL_PATH}/system/"
 
 # -----------------------------------------------------------------------------
