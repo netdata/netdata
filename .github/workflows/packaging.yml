@@ -3,9 +3,13 @@
 name: Packages
 on:
   pull_request:
+    types:
+      - opened
+      - reopened
+      - labeled
+      - synchronize
     branches:
       - master
-      - develop
   push:
     branches:
       - master
@@ -40,42 +44,15 @@ jobs:
           sudo apt-get update && sudo apt-get install -y python3-ruamel.yaml
       - name: Read build matrix
         id: set-matrix
-        shell: python3 {0}
         run: |
-          from ruamel.yaml import YAML
-          import json
-          import re
-          FULL_CI_REGEX = '/actions run full ci'
-          ALWAYS_RUN_ARCHES = ["amd64", "x86_64"]
-          PR_BODY = """${{ github.event.pull_request.body }}"""
-          yaml = YAML(typ='safe')
-          entries = list()
-          run_limited = False
-
-          with open('.github/data/distros.yml') as f:
-              data = yaml.load(f)
-
-          if "${{ github.event_name }}" == "pull_request" and re.search(FULL_CI_REGEX, PR_BODY, re.I) is None:
-              run_limited = True
-
-          for i, v in enumerate(data['include']):
-              if 'packages' in data['include'][i]:
-                  for arch in data['include'][i]['packages']['arches']:
-                      if arch in ALWAYS_RUN_ARCHES or not run_limited:
-                          entries.append({
-                              'distro': data['include'][i]['distro'],
-                              'version': data['include'][i]['version'],
-                              'repo_distro': data['include'][i]['packages']['repo_distro'],
-                              'format': data['include'][i]['packages']['type'],
-                              'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else data['include'][i]['distro'],
-                              'platform': data['platform_map'][arch],
-                              'arch': arch
-                          })
-
-          entries.sort(key=lambda k: (data['arch_order'].index(k['arch']), k['distro'], k['version']))
-          matrix = json.dumps({'include': entries}, sort_keys=True)
-          print('Generated Matrix: ' + matrix)
-          print('::set-output name=matrix::' + matrix)
+          if [ "${{ github.event_name }}" = "pull_request" ] && \
+             [ "${{ !contains(github.event.pull_request.labels.*.name, 'run-ci/packaging') }}" = "true" ]; then
+            matrix="$(.github/scripts/gen-matrix-packaging.py 1)"
+          else
+            matrix="$(.github/scripts/gen-matrix-packaging.py 0)"
+          fi
+          echo "Generated matrix: ${matrix}"
+          echo "matrix=${matrix}" >> "${GITHUB_OUTPUT}"
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
         env:
@@ -114,24 +91,24 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
               "release")
-                echo "::set-output name=repo::${REPO_PREFIX}"
-                echo "::set-output name=version::${{ github.event.inputs.version }}"
-                echo "::set-output name=retention::365"
+                echo "repo=${REPO_PREFIX}" >> "${GITHUB_OUTPUT}"
+                echo "version=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
+                echo "retention=365" >> "${GITHUB_OUTPUT}"
                 ;;
               "nightly")
-                echo "::set-output name=repo::${REPO_PREFIX}-edge"
-                echo "::set-output name=version::$(tr -d 'v' < packaging/version)"
-                echo "::set-output name=retention::30"
+                echo "repo=${REPO_PREFIX}-edge" >> "${GITHUB_OUTPUT}"
+                echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
+                echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
               *)
-                echo "::set-output name=repo::${REPO_PREFIX}-devel"
-                echo "::set-output name=version::0.${GITHUB_SHA}"
-                echo "::set-output name=retention::30"
+                echo "repo=${REPO_PREFIX}-devel" >> "${GITHUB_OUTPUT}"
+                echo "version=0.${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+                echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
             esac
           else
-            echo "::set-output name=version::$(cut -d'-' -f 1 packaging/version | tr -d 'v')"
-            echo "::set-output name=retention::0"
+            echo "version=$(cut -d'-' -f 1 packaging/version | tr -d 'v')" >> "${GITHUB_OUTPUT}"
+            echo "retention=0" >> "${GITHUB_OUTPUT}"
           fi
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@v2
@@ -183,7 +160,7 @@ jobs:
         id: docker-config
         shell: bash
         run: |
-          echo '{"cgroup-parent": "/actions_job", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
+          echo '{"cgroup-parent": "actions-job.slice", "experimental": true}' | sudo tee /etc/docker/daemon.json 2>/dev/null
           sudo service docker restart
       - name: Fetch images
         id: fetch-images
@@ -193,7 +170,7 @@ jobs:
           retry_wait_seconds: 30
           timeout_seconds: 900
           command: |
-            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}:${{ matrix.version }}
+            docker pull --platform ${{ matrix.platform }} ${{ matrix.base_image }}
             docker pull --platform ${{ matrix.platform }} netdata/package-builders:${{ matrix.distro }}${{ matrix.version }}
       - name: Build Packages
         id: build
@@ -214,7 +191,7 @@ jobs:
         run: |
           docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DISTRO=${{ matrix.distro }} \
                      -e VERSION=${{ needs.version-check.outputs.version }} -e DISTRO_VERSION=${{ matrix.version }} \
-                     --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }}:${{ matrix.version }} \
+                     --platform=${{ matrix.platform }} -v "$PWD":/netdata ${{ matrix.base_image }} \
                      /netdata/.github/scripts/pkg-test.sh
       - name: SSH setup
         id: ssh-setup

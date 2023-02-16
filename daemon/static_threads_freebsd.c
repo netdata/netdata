@@ -6,7 +6,7 @@ extern void *freebsd_main(void *ptr);
 
 const struct netdata_static_thread static_threads_freebsd[] = {
     {
-        .name = "PLUGIN[freebsd]",
+        .name = "P[freebsd]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "freebsd",
         .enabled = 1,

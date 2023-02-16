@@ -113,8 +113,7 @@ void power_supply_free(struct power_supply *ps) {
 }
 
 static void add_labels_to_power_supply(struct power_supply *ps, RRDSET *st) {
-    rrdlabels_add(st->state->chart_labels, "device", ps->name, RRDLABEL_SRC_AUTO);
-    rrdcalc_update_rrdlabels(st);
+    rrdlabels_add(st->rrdlabels, "device", ps->name, RRDLABEL_SRC_AUTO);
 }
 
 int do_sys_class_power_supply(int update_every, usec_t dt) {
@@ -138,7 +137,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
     DIR *dir = opendir(dirname);
     if(unlikely(!dir)) {
-        error("Cannot read directory '%s'", dirname);
+        collector_error("Cannot read directory '%s'", dirname);
         return 1;
     }
 
@@ -248,7 +247,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 if(unlikely(ps->capacity->fd == -1)) {
                     ps->capacity->fd = open(ps->capacity->filename, O_RDONLY, 0666);
                     if(unlikely(ps->capacity->fd == -1)) {
-                        error("Cannot open file '%s'", ps->capacity->filename);
+                        collector_error("Cannot open file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
                         ps = NULL;
                     }
@@ -258,20 +257,20 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                 {
                     ssize_t r = read(ps->capacity->fd, buffer, 30);
                     if(unlikely(r < 1)) {
-                        error("Cannot read file '%s'", ps->capacity->filename);
+                        collector_error("Cannot read file '%s'", ps->capacity->filename);
                         power_supply_free(ps);
                         ps = NULL;
                     }
                     else {
                         buffer[r] = '\0';
-                        ps->capacity->value = str2ull(buffer);
+                        ps->capacity->value = str2ull(buffer, NULL);
 
                         if(unlikely(!keep_fds_open)) {
                             close(ps->capacity->fd);
                             ps->capacity->fd = -1;
                         }
                         else if(unlikely(lseek(ps->capacity->fd, 0, SEEK_SET) == -1)) {
-                            error("Cannot seek in file '%s'", ps->capacity->filename);
+                            collector_error("Cannot seek in file '%s'", ps->capacity->filename);
                             close(ps->capacity->fd);
                             ps->capacity->fd = -1;
                         }
@@ -293,7 +292,7 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
                             if(unlikely(pd->fd == -1)) {
                                 pd->fd = open(pd->filename, O_RDONLY, 0666);
                                 if(unlikely(pd->fd == -1)) {
-                                    error("Cannot open file '%s'", pd->filename);
+                                    collector_error("Cannot open file '%s'", pd->filename);
                                     read_error = 1;
                                     power_supply_free(ps);
                                     break;
@@ -302,20 +301,20 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
                             ssize_t r = read(pd->fd, buffer, 30);
                             if(unlikely(r < 1)) {
-                                error("Cannot read file '%s'", pd->filename);
+                                collector_error("Cannot read file '%s'", pd->filename);
                                 read_error = 1;
                                 power_supply_free(ps);
                                 break;
                             }
                             buffer[r] = '\0';
-                            pd->value = str2ull(buffer);
+                            pd->value = str2ull(buffer, NULL);
 
                             if(unlikely(!keep_fds_open)) {
                                 close(pd->fd);
                                 pd->fd = -1;
                             }
                             else if(unlikely(lseek(pd->fd, 0, SEEK_SET) == -1)) {
-                                error("Cannot seek in file '%s'", pd->filename);
+                                collector_error("Cannot seek in file '%s'", pd->filename);
                                 close(pd->fd);
                                 pd->fd = -1;
                             }
@@ -366,8 +365,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
                 add_labels_to_power_supply(ps, ps->capacity->st);
             }
-            else
-                rrdset_next(ps->capacity->st);
 
             if(unlikely(!ps->capacity->rd)) ps->capacity->rd = rrddim_add(ps->capacity->st, "capacity", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
             rrddim_set_by_pointer(ps->capacity->st, ps->capacity->rd, ps->capacity->value);
@@ -399,8 +396,6 @@ int do_sys_class_power_supply(int update_every, usec_t dt) {
 
                 add_labels_to_power_supply(ps, pr->st);
             }
-            else
-                rrdset_next(pr->st);
 
             struct ps_property_dim *pd;
             for(pd = pr->property_dim_root; pd; pd = pd->next) {

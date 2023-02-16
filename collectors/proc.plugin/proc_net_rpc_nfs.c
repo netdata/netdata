@@ -183,14 +183,14 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         if(do_net == 1 && strcmp(type, "net") == 0) {
             if(words < 5) {
-                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 5);
+                collector_error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 5);
                 continue;
             }
 
-            net_count = str2ull(procfile_lineword(ff, l, 1));
-            net_udp_count = str2ull(procfile_lineword(ff, l, 2));
-            net_tcp_count = str2ull(procfile_lineword(ff, l, 3));
-            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4));
+            net_count = str2ull(procfile_lineword(ff, l, 1), NULL);
+            net_udp_count = str2ull(procfile_lineword(ff, l, 2), NULL);
+            net_tcp_count = str2ull(procfile_lineword(ff, l, 3), NULL);
+            net_tcp_connections = str2ull(procfile_lineword(ff, l, 4), NULL);
 
             unsigned long long sum = net_count + net_udp_count + net_tcp_count + net_tcp_connections;
             if(sum == 0ULL) do_net = -1;
@@ -198,13 +198,13 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         }
         else if(do_rpc == 1 && strcmp(type, "rpc") == 0) {
             if(words < 4) {
-                error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 6);
+                collector_error("%s line of /proc/net/rpc/nfs has %zu words, expected %d", type, words, 6);
                 continue;
             }
 
-            rpc_calls = str2ull(procfile_lineword(ff, l, 1));
-            rpc_retransmits = str2ull(procfile_lineword(ff, l, 2));
-            rpc_auth_refresh = str2ull(procfile_lineword(ff, l, 3));
+            rpc_calls = str2ull(procfile_lineword(ff, l, 1), NULL);
+            rpc_retransmits = str2ull(procfile_lineword(ff, l, 2), NULL);
+            rpc_auth_refresh = str2ull(procfile_lineword(ff, l, 3), NULL);
 
             unsigned long long sum = rpc_calls + rpc_retransmits + rpc_auth_refresh;
             if(sum == 0ULL) do_rpc = -1;
@@ -217,14 +217,14 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc2_values[i].name[0] ; i++, j++) {
-                nfs_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc2_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc2_values[i].present = 1;
                 sum += nfs_proc2_values[i].value;
             }
 
             if(sum == 0ULL) {
                 if(!proc2_warning) {
-                    error("Disabling /proc/net/rpc/nfs v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_error("Disabling /proc/net/rpc/nfs v2 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc2_warning = 1;
                 }
                 do_proc2 = 0;
@@ -238,14 +238,14 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc3_values[i].name[0] ; i++, j++) {
-                nfs_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc3_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc3_values[i].present = 1;
                 sum += nfs_proc3_values[i].value;
             }
 
             if(sum == 0ULL) {
                 if(!proc3_warning) {
-                    info("Disabling /proc/net/rpc/nfs v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfs v3 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc3_warning = 1;
                 }
                 do_proc3 = 0;
@@ -259,14 +259,14 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             unsigned long long sum = 0;
             unsigned int i, j;
             for(i = 0, j = 2; j < words && nfs_proc4_values[i].name[0] ; i++, j++) {
-                nfs_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j));
+                nfs_proc4_values[i].value = str2ull(procfile_lineword(ff, l, j), NULL);
                 nfs_proc4_values[i].present = 1;
                 sum += nfs_proc4_values[i].value;
             }
 
             if(sum == 0ULL) {
                 if(!proc4_warning) {
-                    info("Disabling /proc/net/rpc/nfs v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
+                    collector_info("Disabling /proc/net/rpc/nfs v4 procedure calls chart. It seems unused on this machine. It will be enabled automatically when found with data in it.");
                     proc4_warning = 1;
                 }
                 do_proc4 = 0;
@@ -274,8 +274,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             else do_proc4 = 2;
         }
     }
-
-    // --------------------------------------------------------------------
 
     if(do_net == 2) {
         static RRDSET *st = NULL;
@@ -303,7 +301,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             rd_udp = rrddim_add(st, "udp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_tcp = rrddim_add(st, "tcp", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         // ignore net_count, net_tcp_connections
         (void)net_count;
@@ -313,8 +310,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
         rrddim_set_by_pointer(st, rd_tcp, net_tcp_count);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_rpc == 2) {
         static RRDSET *st = NULL;
@@ -343,15 +338,12 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
             rd_retransmits  = rrddim_add(st, "retransmits",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_auth_refresh = rrddim_add(st, "auth_refresh", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_calls,        rpc_calls);
         rrddim_set_by_pointer(st, rd_retransmits,  rpc_retransmits);
         rrddim_set_by_pointer(st, rd_auth_refresh, rpc_auth_refresh);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc2 == 2) {
         static RRDSET *st = NULL;
@@ -371,7 +363,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc2_values[i].present ; i++) {
@@ -383,8 +374,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc3 == 2) {
         static RRDSET *st = NULL;
@@ -404,7 +393,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc3_values[i].present ; i++) {
@@ -416,8 +404,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
 
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_proc4 == 2) {
         static RRDSET *st = NULL;
@@ -437,7 +423,6 @@ int do_proc_net_rpc_nfs(int update_every, usec_t dt) {
                     , RRDSET_TYPE_STACKED
             );
         }
-        else rrdset_next(st);
 
         size_t i;
         for(i = 0; nfs_proc4_values[i].present ; i++) {

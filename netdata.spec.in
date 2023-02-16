@@ -40,7 +40,7 @@ AutoReqProv: yes
 #
 # Conditional build:
 %bcond_without  systemd  # systemd
-%bcond_with     netns    # build with netns support (cgroup-network)
+%bcond_without  netns    # build with netns support (cgroup-network)
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?suse_version} >= 1140
 %else
@@ -504,6 +504,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cgroup-network-helper.sh
 %endif
 
+# ebpf plugin
+%if 0%{?_have_ebpf}
+%attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/ebpf.plugin
+%endif
+
 # perf plugin
 # This should be CAP_PERFMON once RPM finally learns about it, but needs to be CAP_SYS_ADMIN for now.
 # %caps(cap_perfmon=ep) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/perf.plugin
@@ -516,7 +521,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 # go.d.plugin (the capability required for wireguard module)
-%caps(cap_net_admin=epi) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
+%caps(cap_net_admin,cap_net_raw=eip) %{_libexecdir}/%{name}/plugins.d/go.d.plugin
 
 # Enforce 0644 for files and 0755 for directories
 # for the netdata web directory

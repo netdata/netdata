@@ -77,10 +77,10 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
     time_t before = instance->before;
 
     // find the edges of the rrd database for this chart
-    time_t first_t = rd->tiers[0]->query_ops.oldest_time(rd->tiers[0]->db_metric_handle);
-    time_t last_t = rd->tiers[0]->query_ops.latest_time(rd->tiers[0]->db_metric_handle);
+    time_t first_t = rd->tiers[0].query_ops->oldest_time_s(rd->tiers[0].db_metric_handle);
+    time_t last_t = rd->tiers[0].query_ops->latest_time_s(rd->tiers[0].db_metric_handle);
     time_t update_every = st->update_every;
-    struct rrddim_query_handle handle;
+    struct storage_engine_query_handle handle;
 
     // step back a little, to make sure we have complete data collection
     // for all metrics
@@ -110,9 +110,9 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: aligned timeframe %lu to %lu is outside the chart's database range %lu to %lu",
-            host->hostname,
-            st->id,
-            rd->id,
+            rrdhost_hostname(host),
+            rrdset_id(st),
+            rrddim_id(rd),
             (unsigned long)after,
             (unsigned long)before,
             (unsigned long)first_t,
@@ -122,13 +122,15 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
 
     *last_timestamp = before;
 
+    size_t points_read = 0;
     size_t counter = 0;
     NETDATA_DOUBLE sum = 0;
 
-    for (rd->tiers[0]->query_ops.init(rd->tiers[0]->db_metric_handle, &handle, after, before, TIER_QUERY_FETCH_SUM); !rd->tiers[0]->query_ops.is_finished(&handle);) {
-        STORAGE_POINT sp = rd->tiers[0]->query_ops.next_metric(&handle);
+    for (rd->tiers[0].query_ops->init(rd->tiers[0].db_metric_handle, &handle, after, before, STORAGE_PRIORITY_LOW); !rd->tiers[0].query_ops->is_finished(&handle);) {
+        STORAGE_POINT sp = rd->tiers[0].query_ops->next_metric(&handle);
+        points_read++;
 
-        if (unlikely(storage_point_is_empty(sp))) {
+        if (unlikely(storage_point_is_gap(sp))) {
             // not collected
             continue;
         }
@@ -136,15 +138,16 @@ NETDATA_DOUBLE exporting_calculate_value_from_stored_data(
         sum += sp.sum;
         counter += sp.count;
     }
-    rd->tiers[0]->query_ops.finalize(&handle);
+    rd->tiers[0].query_ops->finalize(&handle);
+    global_statistics_exporters_query_completed(points_read);
 
     if (unlikely(!counter)) {
         debug(
             D_EXPORTING,
             "EXPORTING: %s.%s.%s: no values stored in database for range %lu to %lu",
-            host->hostname,
-            st->id,
-            rd->id,
+            rrdhost_hostname(host),
+            rrdset_id(st),
+            rrddim_id(rd),
             (unsigned long)after,
             (unsigned long)before);
         return NAN;
@@ -338,26 +341,22 @@ void prepare_buffers(struct engine *engine)
 
     rrd_rdlock();
     RRDHOST *host;
-    rrdhost_foreach_read(host)
-    {
-        rrdhost_rdlock(host);
+    rrdhost_foreach_read(host) {
         start_host_formatting(engine, host);
         RRDSET *st;
-        rrdset_foreach_read(st, host)
-        {
-            rrdset_rdlock(st);
+        rrdset_foreach_read(st, host) {
             start_chart_formatting(engine, st);
 
             RRDDIM *rd;
             rrddim_foreach_read(rd, st)
                 metric_formatting(engine, rd);
+            rrddim_foreach_done(rd);
 
             end_chart_formatting(engine, st);
-            rrdset_unlock(st);
         }
+        rrdset_foreach_done(st);
         variables_formatting(engine, host);
         end_host_formatting(engine, host);
-        rrdhost_unlock(host);
     }
     rrd_unlock();
     netdata_thread_enable_cancelability();
@@ -398,7 +397,7 @@ int simple_connector_end_batch(struct instance *instance)
     struct simple_connector_buffer *last_buffer = simple_connector_data->last_buffer;
 
     if (!last_buffer->buffer) {
-        last_buffer->buffer = buffer_create(0);
+        last_buffer->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
     }
 
     if (last_buffer->used) {
@@ -420,7 +419,7 @@ int simple_connector_end_batch(struct instance *instance)
     if (last_buffer->header)
         buffer_flush(last_buffer->header);
     else
-        last_buffer->header = buffer_create(0);
+        last_buffer->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
 
     if (instance->prepare_header)
         instance->prepare_header(instance);

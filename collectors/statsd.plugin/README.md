@@ -1,46 +1,62 @@
 <!--
-title: "statsd.plugin"
+title: "StatsD"
 description: "The Netdata Agent is a fully-featured StatsD server that collects metrics from any custom application and visualizes them in real-time."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/README.md"
+sidebar_label: "StatsD"
+learn_status: "Published"
+learn_rel_path: "Integrations/Monitor/Anything"
 -->
 
-StatsD is a system to collect data from any application. Applications send metrics to it, usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on them and push them to backend time-series databases.
+[StatsD](https://github.com/statsd/statsd) is a system to collect data from any application. Applications send metrics to it, 
+usually via non-blocking UDP communication, and StatsD servers collect these metrics, perform a few simple calculations on 
+them and push them to backend time-series databases.
 
-If you want to learn more about the StatsD protocol, we have written a [blog post](https://www.netdata.cloud/blog/introduction-to-statsd/) about it!
+If you want to learn more about the StatsD protocol, we have written a 
+[blog post](https://blog.netdata.cloud/introduction-to-statsd/) about it!
 
 
-Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize them on its dashboards and store them in it's database for long-term retention.
+Netdata is a fully featured statsd server. It can collect statsd formatted metrics, visualize 
+them on its dashboards and store them in it's database for long-term retention.
 
-Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports both TCP and UDP packets at the same time. 
+Netdata statsd is inside Netdata (an internal plugin, running inside the Netdata daemon), it is 
+configured via `netdata.conf` and by-default listens on standard statsd port 8125. Netdata supports 
+both TCP and UDP packets at the same time. 
 
 Since statsd is embedded in Netdata, it means you now have a statsd server embedded on all your servers. 
 
-Netdata statsd is fast. It can collect several millions of metrics per second on modern hardware, using just 1 CPU core. The implementation uses two threads: one thread collects metrics, another thread updates the charts from the collected data.
+Netdata statsd is fast. It can collect several millions of metrics per second on modern hardware, using 
+just 1 CPU core. The implementation uses two threads: one thread collects metrics, another thread updates 
+the charts from the collected data.
 
 ## Available StatsD synthetic application charts
 
-Netdata ships with a few synthetic chart definitions to automatically present application metrics into a more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange statsd metrics into a more meaningful way.
+Netdata ships with a few synthetic chart definitions to automatically present application metrics into a 
+more uniform way. These synthetic charts are configuration files (you can create your own) that re-arrange 
+statsd metrics into a more meaningful way.
 
 On synthetic charts, we can have alarms as with any metric and chart.
 
 - [K6 load testing tool](https://k6.io)
   - **Description:** k6 is a developer-centric, free and open-source load testing tool built for making performance testing a productive and enjoyable experience.
-  - [Documentation](/collectors/statsd.plugin/k6.md)
+  - [Documentation](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/k6.md)
   - [Configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/k6.conf)
 - [Asterisk](https://www.asterisk.org/)
   - **Description:** Asterisk is an Open Source PBX and telephony toolkit.
-  - [Documentation](/collectors/statsd.plugin/asterisk.md)
+  - [Documentation](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/asterisk.md)
   - [Configuration](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/asterisk.conf)
 
 ## Metrics supported by Netdata
 
-Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. All StatsD client libraries can be used with Netdata too.
+Netdata fully supports the StatsD protocol and also extends it to support more advanced Netdata specific use cases. 
+All StatsD client libraries can be used with Netdata too.
 
 - **Gauges**
 
-     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the latest value collected and the number of times it was updated (events).
+     The application sends `name:value|g`, where `value` is any **decimal/fractional** number, StatsD reports the 
+     latest value collected and the number of times it was updated (events).
 
-     The application may increment or decrement a previous value, by setting the first character of the value to `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
+     The application may increment or decrement a previous value, by setting the first character of the value to 
+     `+` or `-` (so, the only way to set a gauge to an absolute negative value, is to first set it to zero). 
 
      [Sampling rate](#sampling-rates) is supported.
      [Tags](#tags) are supported for changing chart units, family and dimension name.
@@ -202,7 +218,7 @@ Netdata can visualize StatsD collected metrics in 2 ways:
 
 ### Private metric charts
 
-Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
+Private charts are controlled with `create private charts for metrics matching = *`. This setting accepts a space-separated list of [simple patterns](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). Netdata will create private charts for all metrics **by default**.
 
 For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetric`, use:
 
@@ -210,7 +226,7 @@ For example, to render charts for all `myapp.*` metrics, except `myapp.*.badmetr
 create private charts for metrics matching = !myapp.*.badmetric myapp.*
 ```
 
-You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](/database/README.md).
+You can specify Netdata StatsD to have a different `memory mode` than the rest of the Netdata Agent. You can read more about `memory mode` in the [documentation](https://github.com/netdata/netdata/blob/master/database/README.md).
 
 The default behavior is to use the same settings as the rest of the Netdata Agent. If you wish to change them, edit the following settings:
 - `private charts memory mode`
@@ -289,7 +305,7 @@ Synthetic charts are organized in
 -   **charts for each application** aka family in Netdata Dashboard.
 -   **StatsD metrics for each chart** /aka charts and context Netdata Dashboard.
 
-> You can read more about how the Netdata Agent organizes information in the relevant [documentation](/web/README.md)
+> You can read more about how the Netdata Agent organizes information in the relevant [documentation](https://github.com/netdata/netdata/blob/master/web/README.md)
 
 For each application you need to create a `.conf` file in `/etc/netdata/statsd.d`.
 
@@ -326,7 +342,7 @@ Using the above configuration `myapp` should get its own section on the dashboar
 `[app]` starts a new application definition. The supported settings in this section are:
 
 -   `name` defines the name of the app.
--   `metrics` is a Netdata [simple pattern](/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
+-   `metrics` is a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md). This pattern should match all the possible StatsD metrics that will be participating in the application `myapp`.
 -   `private charts = yes|no`, enables or disables private charts for the metrics matched.
 -   `gaps when not collected = yes|no`, enables or disables gaps on the charts of the application in case that no metrics are collected.
 -   `memory mode` sets the memory mode for all charts of the application. The default is the global default for Netdata (not the global default for StatsD private charts). We suggest not to use this (we have commented it out in the example) and let your app use the global default for Netdata, which is our dbengine.
@@ -352,7 +368,7 @@ So, the format is this:
 dimension = [pattern] METRIC NAME TYPE MULTIPLIER DIVIDER OPTIONS
 ```
 
-`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
+`pattern` is a keyword. When set, `METRIC` is expected to be a Netdata [simple pattern](https://github.com/netdata/netdata/blob/master/libnetdata/simple_pattern/README.md) that will be used to match all the StatsD metrics to be added to the chart. So, `pattern` automatically matches any number of StatsD metrics, all of which will be added as separate chart dimensions.
 
 `TYPE`, `MULTIPLIER`, `DIVIDER` and `OPTIONS` are optional.
 

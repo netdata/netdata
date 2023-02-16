@@ -239,7 +239,7 @@ static int kernel_is_rejected()
     }
 
     fclose(kernel_reject_list);
-    freez(reject_string);
+    free(reject_string);
 
     return 0;
 }
@@ -301,6 +301,8 @@ static int ebpf_select_max_index(int is_rhf, uint32_t kver)
     if (is_rhf > 0) { // Is Red Hat family
         if (kver >= NETDATA_EBPF_KERNEL_5_14)
             return NETDATA_IDX_V5_14;
+        else if (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5) // For Oracle Linux
+            return NETDATA_IDX_V5_4;
         else if (kver >= NETDATA_EBPF_KERNEL_4_11)
             return NETDATA_IDX_V4_18;
     } else { // Kernels from kernel.org
@@ -469,7 +471,7 @@ void ebpf_update_pid_table(ebpf_local_maps_t *pid, ebpf_module_t *em)
  * @param em        the structure with information about how the module/thread is working.
  * @param map_name  the name of the file used to log.
  */
-void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name)
+void ebpf_update_map_size(struct bpf_map *map, ebpf_local_maps_t *lmap, ebpf_module_t *em, const char *map_name __maybe_unused)
 {
     uint32_t define_size = 0;
     uint32_t apps_type = NETDATA_EBPF_MAP_PID | NETDATA_EBPF_MAP_RESIZABLE;
@@ -696,6 +698,10 @@ struct bpf_link **ebpf_load_program(char *plugins_dir, ebpf_module_t *em, int kv
 
     ebpf_mount_name(lpath, 4095, plugins_dir, idx, em->thread_name, em->mode);
 
+    // When this function is called ebpf.plugin is using legacy code, so we should reset the variable
+    em->load &= ~ NETDATA_EBPF_LOAD_METHODS;
+    em->load |= EBPF_LOAD_LEGACY;
+
     *obj = bpf_object__open_file(lpath, NULL);
     if (libbpf_get_error(obj)) {
         error("Cannot open BPF object %s", lpath);
@@ -803,7 +809,7 @@ static void ebpf_select_mode_string(char *output, size_t len, netdata_run_mode_t
  *
  * Convert the string given as argument to value present in enum.
  *
- * @param str  value read from configuraion file.
+ * @param str  value read from configuration file.
  *
  * @return It returns the value to be used.
  */
@@ -895,7 +901,7 @@ netdata_ebpf_program_loaded_t ebpf_convert_core_type(char *str, netdata_run_mode
 /**
  * Adjust Thread Load
  *
- * Adjust thread configuraton according specified load.
+ * Adjust thread configuration according specified load.
  *
  * @param mod   the main structure that will be adjusted.
  * @param file  the btf file used with thread.
@@ -1027,14 +1033,19 @@ static void ebpf_update_target_with_conf(ebpf_module_t *em, netdata_ebpf_program
  *
  * @param btf_file a pointer to the loaded btf file.
  * @parma load     current value.
+ * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  *
  * @return it returns the new load mode.
  */
-static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load)
+static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netdata_ebpf_load_mode_t load,
+                                                      int kver, int is_rh)
 {
 #ifdef LIBBPF_MAJOR_VERSION
     if ((load & EBPF_LOAD_CORE) || (load & EBPF_LOAD_PLAY_DICE)) {
-        load = (!btf_file) ? EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
+        // Quick fix for Oracle linux 8.x
+        load = (!btf_file || (is_rh && (kver >= NETDATA_EBPF_KERNEL_5_4 && kver < NETDATA_EBPF_KERNEL_5_5))) ?
+               EBPF_LOAD_LEGACY : EBPF_LOAD_CORE;
     }
 #else
     load = EBPF_LOAD_LEGACY;
@@ -1049,10 +1060,12 @@ static netdata_ebpf_load_mode_t ebpf_select_load_mode(struct btf *btf_file, netd
  * Update configuration for a specific thread.
  *
  * @param modules   structure that will be updated
- * @oaram origin    specify the configuration file loaded
+ * @param origin    specify the configuration file loaded
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
  */
-void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file)
+void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_mode_t origin, struct btf *btf_file,
+                                     int kver, int is_rh)
 {
     char default_value[EBPF_MAX_MODE_LENGTH + 1];
     ebpf_select_mode_string(default_value, EBPF_MAX_MODE_LENGTH, modules->mode);
@@ -1074,7 +1087,7 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
     value = ebpf_convert_load_mode_to_string(modules->load & NETDATA_EBPF_LOAD_METHODS);
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_TYPE_FORMAT, value);
     netdata_ebpf_load_mode_t load = epbf_convert_string_to_load_mode(value);
-    load = ebpf_select_load_mode(btf_file, load);
+    load = ebpf_select_load_mode(btf_file, load, kver, is_rh);
     modules->load = origin | load;
 
     value = appconfig_get(modules->cfg, EBPF_GLOBAL_SECTION, EBPF_CFG_CORE_ATTACH, EBPF_CFG_ATTACH_TRAMPOLINE);
@@ -1096,8 +1109,10 @@ void ebpf_update_module_using_config(ebpf_module_t *modules, netdata_ebpf_load_m
  *
  * @param em       the module structure
  * @param btf_file a pointer to the loaded btf file.
+ * @param is_rhf is Red Hat family?
+ * @param kver   the kernel version
  */
-void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
+void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file, int kver, int is_rh)
 {
     char filename[FILENAME_MAX+1];
     netdata_ebpf_load_mode_t origin;
@@ -1109,13 +1124,13 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
             error("Cannot load the ebpf configuration file %s", em->config_file);
             return;
         }
-        // If user defined data globaly, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
+        // If user defined data globally, we will have here EBPF_LOADED_FROM_USER, we need to consider this, to avoid
         // forcing users to configure thread by thread.
         origin = (!(em->load & NETDATA_EBPF_LOAD_SOURCE)) ? EBPF_LOADED_FROM_STOCK : em->load & NETDATA_EBPF_LOAD_SOURCE;
     } else
         origin = EBPF_LOADED_FROM_USER;
 
-    ebpf_update_module_using_config(em, origin, btf_file);
+    ebpf_update_module_using_config(em, origin, btf_file, kver, is_rh);
 }
 
 /**
@@ -1124,7 +1139,7 @@ void ebpf_update_module(ebpf_module_t *em, struct btf *btf_file)
  * Apps and cgroup has internal cleanup that needs attaching tracers to release_task, to avoid overload the function
  * we will enable this integration by default, if and only if, we are running with trampolines.
  *
- * @param em   a poiter to the main thread structure.
+ * @param em   a pointer to the main thread structure.
  * @param mode is the mode used with different
  */
 void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mode)
@@ -1145,7 +1160,8 @@ void ebpf_adjust_apps_cgroup(ebpf_module_t *em, netdata_ebpf_program_loaded_t mo
  * Helper used to get address from /proc/kallsym
  *
  * @param fa address structure
- * @param fd file descriptor loaded inside kernel.
+ * @param fd file descriptor loaded inside kernel. If a negative value is given
+ *           the function will load address and it won't update hash table.
  */
 void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
 {
@@ -1167,11 +1183,15 @@ void ebpf_load_addresses(ebpf_addresses_t *fa, int fd)
         char *fcnt = procfile_lineword(ff, l, 2);
         uint32_t hash = simple_hash(fcnt);
         if (fa->hash == hash && !strcmp(fcnt, fa->function)) {
-            char addr[128];
-            snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
-            fa->addr = (unsigned long) strtoul(addr, NULL, 16);
-            uint32_t key = 0;
-            bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+            if (fd > 0) {
+                char addr[128];
+                snprintf(addr, 127, "0x%s", procfile_lineword(ff, l, 0));
+                fa->addr = (unsigned long) strtoul(addr, NULL, 16);
+                uint32_t key = 0;
+                bpf_map_update_elem(fd, &key, &fa->addr, BPF_ANY);
+            } else
+                fa->addr = 1;
+            break;
         }
     }
 

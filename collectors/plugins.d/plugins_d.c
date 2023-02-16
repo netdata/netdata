@@ -6,118 +6,7 @@
 char *plugin_directories[PLUGINSD_MAX_DIRECTORIES] = { NULL };
 struct plugind *pluginsd_root = NULL;
 
-inline int pluginsd_space(char c) {
-    switch(c) {
-    case ' ':
-    case '\t':
-    case '\r':
-    case '\n':
-    case '=':
-        return 1;
-
-    default:
-        return 0;
-    }
-}
-
-inline int config_isspace(char c)
-{
-    switch (c) {
-        case ' ':
-        case '\t':
-        case '\r':
-        case '\n':
-        case ',':
-            return 1;
-
-        default:
-            return 0;
-    }
-}
-
-// split a text into words, respecting quotes
-inline int quoted_strings_splitter(char *str, char **words, int max_words, int (*custom_isspace)(char), char *recover_input, char **recover_location, int max_recover)
-{
-    char *s = str, quote = 0;
-    int i = 0, rec = 0;
-    char *recover = recover_input;
-
-    // skip all white space
-    while (unlikely(custom_isspace(*s)))
-        s++;
-
-    // check for quote
-    if (unlikely(*s == '\'' || *s == '"')) {
-        quote = *s; // remember the quote
-        s++;        // skip the quote
-    }
-
-    // store the first word
-    words[i++] = s;
-
-    // while we have something
-    while (likely(*s)) {
-        // if it is escape
-        if (unlikely(*s == '\\' && s[1])) {
-            s += 2;
-            continue;
-        }
-
-        // if it is quote
-        else if (unlikely(*s == quote)) {
-            quote = 0;
-            if (recover && rec < max_recover) {
-                recover_location[rec++] = s;
-                *recover++ = *s;
-            }
-            *s = ' ';
-            continue;
-        }
-
-        // if it is a space
-        else if (unlikely(quote == 0 && custom_isspace(*s))) {
-            // terminate the word
-            if (recover && rec < max_recover) {
-                if (!rec || (rec && recover_location[rec-1] != s)) {
-                    recover_location[rec++] = s;
-                    *recover++ = *s;
-                }
-            }
-            *s++ = '\0';
-
-            // skip all white space
-            while (likely(custom_isspace(*s)))
-                s++;
-
-            // check for quote
-            if (unlikely(*s == '\'' || *s == '"')) {
-                quote = *s; // remember the quote
-                s++;        // skip the quote
-            }
-
-            // if we reached the end, stop
-            if (unlikely(!*s))
-                break;
-
-            // store the next word
-            if (likely(i < max_words))
-                words[i++] = s;
-            else
-                break;
-        }
-
-        // anything else
-        else
-            s++;
-    }
-
-    // terminate the words
-     memset(&words[i], 0, (max_words - i) * sizeof (char *));
-
-    return i;
-}
-
-inline int pluginsd_initialize_plugin_directories()
+inline size_t pluginsd_initialize_plugin_directories()
 {
     char plugins_dirs[(FILENAME_MAX * 2) + 1];
     static char *plugins_dir_list = NULL;
@@ -129,158 +18,189 @@ inline int pluginsd_initialize_plugin_directories()
     }
 
     // Parse it and store it to plugin directories
-    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace, NULL, NULL, 0);
+    return quoted_strings_splitter(plugins_dir_list, plugin_directories, PLUGINSD_MAX_DIRECTORIES, config_isspace);
 }
 
-inline int pluginsd_split_words(char *str, char **words, int max_words, char *recover_input, char **recover_location, int max_recover)
-{
-    return quoted_strings_splitter(str, words, max_words, pluginsd_space, recover_input, recover_location, max_recover);
+static inline void plugin_set_disabled(struct plugind *cd) {
+    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    cd->unsafe.enabled = false;
+    netdata_spinlock_unlock(&cd->unsafe.spinlock);
 }
 
+bool plugin_is_enabled(struct plugind *cd) {
+    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    bool ret = cd->unsafe.enabled;
+    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    return ret;
+}
+
+static inline void plugin_set_running(struct plugind *cd) {
+    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    cd->unsafe.running = true;
+    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+}
+
+static inline bool plugin_is_running(struct plugind *cd) {
+    netdata_spinlock_lock(&cd->unsafe.spinlock);
+    bool ret = cd->unsafe.running;
+    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+    return ret;
+}
 
 static void pluginsd_worker_thread_cleanup(void *arg)
 {
     struct plugind *cd = (struct plugind *)arg;
 
-    if (cd->enabled && !cd->obsolete) {
-        cd->obsolete = 1;
+    worker_unregister();
 
-        info("data collection thread exiting");
+    netdata_spinlock_lock(&cd->unsafe.spinlock);
 
-        if (cd->pid) {
-            siginfo_t info;
-            info("killing child process pid %d", cd->pid);
-            if (killpid(cd->pid) != -1) {
-                info("waiting for child process pid %d to exit...", cd->pid);
-                waitid(P_PID, (id_t)cd->pid, &info, WEXITED);
-            }
-            cd->pid = 0;
+    cd->unsafe.running = false;
+    cd->unsafe.thread = 0;
+
+    pid_t pid = cd->unsafe.pid;
+    cd->unsafe.pid = 0;
+
+    netdata_spinlock_unlock(&cd->unsafe.spinlock);
+
+    if (pid) {
+        siginfo_t info;
+        info("PLUGINSD: 'host:%s', killing data collection child process with pid %d",
+             rrdhost_hostname(cd->host), pid);
+
+        if (killpid(pid) != -1) {
+            info("PLUGINSD: 'host:%s', waiting for data collection child process pid %d to exit...",
+                 rrdhost_hostname(cd->host), pid);
+
+            waitid(P_PID, (id_t)pid, &info, WEXITED);
         }
     }
 }
 
 #define SERIAL_FAILURES_THRESHOLD 10
-static void pluginsd_worker_thread_handle_success(struct plugind *cd)
-{
+static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     if (likely(cd->successful_collections)) {
         sleep((unsigned int)cd->update_every);
         return;
     }
 
     if (likely(cd->serial_failures <= SERIAL_FAILURES_THRESHOLD)) {
-        info(
-            "'%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
-            cd->fullfilename, cd->pid,
-            cd->enabled ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
+        info("PLUGINSD: 'host:%s', '%s' (pid %d) does not generate useful output but it reports success (exits with 0). %s.",
+             rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid,
+             plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is now disabled.");
+
         sleep((unsigned int)(cd->update_every * 10));
         return;
     }
 
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        error(
-            "'%s' (pid %d) does not generate useful output, although it reports success (exits with 0)."
-            "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
-            cd->fullfilename, cd->pid, cd->serial_failures);
-        cd->enabled = 0;
+        error("PLUGINSD: 'host:'%s', '%s' (pid %d) does not generate useful output, "
+              "although it reports success (exits with 0)."
+              "We have tried to collect something %zu times - unsuccessfully. Disabling it.",
+              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, cd->serial_failures);
+        plugin_set_disabled(cd);
         return;
     }
-
-    return;
 }
 
-static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code)
-{
+static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
     if (worker_ret_code == -1) {
-        info("'%s' (pid %d) was killed with SIGTERM. Disabling it.", cd->fullfilename, cd->pid);
-        cd->enabled = 0;
+        info("PLUGINSD: 'host:%s', '%s' (pid %d) was killed with SIGTERM. Disabling it.",
+             rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid);
+        plugin_set_disabled(cd);
         return;
     }
 
     if (!cd->successful_collections) {
-        error(
-            "'%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.", cd->fullfilename,
-            cd->pid, worker_ret_code);
-        cd->enabled = 0;
+        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
+              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code);
+        plugin_set_disabled(cd);
         return;
     }
 
     if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-        error(
-            "'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections,
-            cd->enabled ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
+        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
+              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code, cd->successful_collections,
+              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
         sleep((unsigned int)(cd->update_every * 10));
         return;
     }
 
     if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        error(
-            "'%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
-            "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-            cd->fullfilename, cd->pid, worker_ret_code, cd->successful_collections, cd->serial_failures);
-        cd->enabled = 0;
+        error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
+              "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, worker_ret_code,
+              cd->successful_collections, cd->serial_failures);
+        plugin_set_disabled(cd);
         return;
     }
-
-    return;
 }
+
 #undef SERIAL_FAILURES_THRESHOLD
 
-void *pluginsd_worker_thread(void *arg)
-{
+static void *pluginsd_worker_thread(void *arg) {
     worker_register("PLUGINSD");
 
     netdata_thread_cleanup_push(pluginsd_worker_thread_cleanup, arg);
 
     struct plugind *cd = (struct plugind *)arg;
+    plugin_set_running(cd);
 
-    cd->obsolete = 0;
     size_t count = 0;
 
-    while (!netdata_exit) {
-        FILE *fp = mypopen(cd->cmd, &cd->pid);
-        if (unlikely(!fp)) {
-            error("Cannot popen(\"%s\", \"r\").", cd->cmd);
+    while (service_running(SERVICE_COLLECTORS)) {
+        FILE *fp_child_input = NULL;
+        FILE *fp_child_output = netdata_popen(cd->cmd, &cd->unsafe.pid, &fp_child_input);
+
+        if (unlikely(!fp_child_input || !fp_child_output)) {
+            error("PLUGINSD: 'host:%s', cannot popen(\"%s\", \"r\").", rrdhost_hostname(cd->host), cd->cmd);
             break;
         }
 
-        info("connected to '%s' running on pid %d", cd->fullfilename, cd->pid);
-        count = pluginsd_process(localhost, cd, fp, 0);
-        error("'%s' (pid %d) disconnected after %zu successful data collections (ENDs).", cd->fullfilename, cd->pid, count);
-        killpid(cd->pid);
+        info("PLUGINSD: 'host:%s' connected to '%s' running on pid %d",
+             rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid);
 
-        int worker_ret_code = mypclose(fp, cd->pid);
+        count = pluginsd_process(cd->host, cd, fp_child_input, fp_child_output, 0);
+
+        info("PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections (ENDs).",
+              rrdhost_hostname(cd->host), cd->fullfilename, cd->unsafe.pid, count);
+
+        killpid(cd->unsafe.pid);
+
+        int worker_ret_code = netdata_pclose(fp_child_input, fp_child_output, cd->unsafe.pid);
 
         if (likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
             pluginsd_worker_thread_handle_error(cd, worker_ret_code);
 
-        cd->pid = 0;
-        if (unlikely(!cd->enabled))
+        cd->unsafe.pid = 0;
+        if (unlikely(!plugin_is_enabled(cd)))
             break;
     }
-    worker_unregister();
 
     netdata_thread_cleanup_pop(1);
     return NULL;
 }
 
-static void pluginsd_main_cleanup(void *data)
-{
+static void pluginsd_main_cleanup(void *data) {
     struct netdata_static_thread *static_thread = (struct netdata_static_thread *)data;
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITING;
-    info("cleaning up...");
+    info("PLUGINSD: cleaning up...");
 
     struct plugind *cd;
     for (cd = pluginsd_root; cd; cd = cd->next) {
-        if (cd->enabled && !cd->obsolete) {
-            info("stopping plugin thread: %s", cd->id);
-            netdata_thread_cancel(cd->thread);
+        netdata_spinlock_lock(&cd->unsafe.spinlock);
+        if (cd->unsafe.enabled && cd->unsafe.running && cd->unsafe.thread != 0) {
+            info("PLUGINSD: 'host:%s', stopping plugin thread: %s",
+                 rrdhost_hostname(cd->host), cd->id);
+
+            netdata_thread_cancel(cd->unsafe.thread);
         }
+        netdata_spinlock_unlock(&cd->unsafe.spinlock);
     }
 
-    info("cleanup completed.");
+    info("PLUGINSD: cleanup completed.");
     static_thread->enabled = NETDATA_MAIN_THREAD_EXITED;
 
     worker_unregister();
@@ -302,12 +222,12 @@ void *pluginsd_main(void *ptr)
     // so that we don't log broken directories on each loop
     int directory_errors[PLUGINSD_MAX_DIRECTORIES] = { 0 };
 
-    while (!netdata_exit) {
+    while (service_running(SERVICE_COLLECTORS)) {
         int idx;
         const char *directory_name;
 
         for (idx = 0; idx < PLUGINSD_MAX_DIRECTORIES && (directory_name = plugin_directories[idx]); idx++) {
-            if (unlikely(netdata_exit))
+            if (unlikely(!service_running(SERVICE_COLLECTORS)))
                 break;
 
             errno = 0;
@@ -322,7 +242,7 @@ void *pluginsd_main(void *ptr)
 
             struct dirent *file = NULL;
             while (likely((file = readdir(dir)))) {
-                if (unlikely(netdata_exit))
+                if (unlikely(!service_running(SERVICE_COLLECTORS)))
                     break;
 
                 debug(D_PLUGINSD, "examining file '%s'", file->d_name);
@@ -353,7 +273,7 @@ void *pluginsd_main(void *ptr)
                     if (unlikely(strcmp(cd->filename, file->d_name) == 0))
                         break;
 
-                if (likely(cd && !cd->obsolete)) {
+                if (likely(cd && plugin_is_running(cd))) {
                     debug(D_PLUGINSD, "plugin '%s' is already running", cd->filename);
                     continue;
                 }
@@ -368,7 +288,10 @@ void *pluginsd_main(void *ptr)
                     strncpyz(cd->filename, file->d_name, FILENAME_MAX);
                     snprintfz(cd->fullfilename, FILENAME_MAX, "%s/%s", directory_name, cd->filename);
 
-                    cd->enabled = enabled;
+                    cd->host = localhost;
+                    cd->unsafe.enabled = enabled;
+                    cd->unsafe.running = false;
+
                     cd->update_every = (int)config_get_number(cd->id, "update every", localhost->rrd_update_every);
                     cd->started_t = now_realtime_sec();
 
@@ -378,19 +301,18 @@ void *pluginsd_main(void *ptr)
                         config_get(cd->id, "command options", def));
 
                     // link it
-                    if (likely(pluginsd_root))
-                        cd->next = pluginsd_root;
-                    pluginsd_root = cd;
+                    DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(pluginsd_root, cd, prev, next);
 
-                    // it is not currently running
-                    cd->obsolete = 1;
-
-                    if (cd->enabled) {
+                    if (plugin_is_enabled(cd)) {
                         char tag[NETDATA_THREAD_TAG_MAX + 1];
-                        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PLUGINSD[%s]", pluginname);
+                        snprintfz(tag, NETDATA_THREAD_TAG_MAX, "PD[%s]", pluginname);
+
                         // spawn a new thread for it
-                        netdata_thread_create(
-                            &cd->thread, tag, NETDATA_THREAD_OPTION_DEFAULT, pluginsd_worker_thread, cd);
+                        netdata_thread_create(&cd->unsafe.thread,
+                                              tag,
+                                              NETDATA_THREAD_OPTION_DEFAULT,
+                                              pluginsd_worker_thread,
+                                              cd);
                     }
                 }
             }

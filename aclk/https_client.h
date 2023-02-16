@@ -25,6 +25,8 @@ typedef struct {
 
     char *proxy_host;
     int proxy_port;
+    const char *proxy_username;
+    const char *proxy_password;
 } https_req_t;
 
 typedef struct {

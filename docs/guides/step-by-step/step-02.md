@@ -1,7 +1,11 @@
 <!--
 title: "Step 2. Get to know Netdata's dashboard"
+sidebar_label: "Step 2. Get to know Netdata's dashboard"
 date: 2020-05-04
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/step-by-step/step-02.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Step by step"
 -->
 
 # Step 2. Get to know Netdata's dashboard
@@ -11,18 +15,25 @@ working with the dashboard directly.
 
 This step-by-step guide assumes you've already installed Netdata on a system of yours. If you haven't yet, hop back over
 to ["step 0"](step-00.md#before-we-get-started) for information about our one-line installer script. Or, view the
-[installation docs](/packaging/installer/README.md) to learn more. Once you have Netdata installed, you can hop back
+[installation docs](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) to learn more. Once you have Netdata installed, you can hop back
 over here and dig in.
 
 ## What you'll learn in this step
 
 In this step of the Netdata guide, you'll learn how to:
 
--   [Visit and explore the dashboard](#visit-and-explore-the-dashboard)
--   [Explore available charts using menus](#explore-available-charts-using-menus)
--   [Read the descriptions accompanying charts](#read-the-descriptions-accompanying-charts)
--   [Interact with charts](#interact-with-charts)
--   [See raised alarms and the alarm log](#see-raised-alarms-and-the-alarm-log)
+- [Step 2. Get to know Netdata's dashboard](#step-2-get-to-know-netdatas-dashboard)
+  - [What you'll learn in this step](#what-youll-learn-in-this-step)
+  - [Visit and explore the dashboard](#visit-and-explore-the-dashboard)
+  - [Explore available charts using menus](#explore-available-charts-using-menus)
+  - [Read the descriptions accompanying charts](#read-the-descriptions-accompanying-charts)
+  - [Understand charts, dimensions, families, and contexts](#understand-charts-dimensions-families-and-contexts)
+  - [Interact with charts](#interact-with-charts)
+    - [Pan, zoom, highlight, and reset charts](#pan-zoom-highlight-and-reset-charts)
+    - [Show and hide dimensions](#show-and-hide-dimensions)
+    - [Resize charts](#resize-charts)
+  - [See raised alarms and the alarm log](#see-raised-alarms-and-the-alarm-log)
+  - [What's next?](#whats-next)
 
 Let's get started!
 
@@ -56,7 +67,7 @@ what it's collecting. If you run Netdata on many different systems using differe
 menus and submenus may look a little different for each one.
 
 To learn more about menus, see our documentation about [navigating the standard
-dashboard](/web/gui/README.md#metrics-menus).
+dashboard](https://github.com/netdata/netdata/blob/master/web/gui/README.md#metrics-menus).
 
 > ❗ By default, Netdata only creates and displays charts if the metrics are _not zero_. So, you may be missing some
 > charts, menus, and submenus if those charts have zero metrics. You can change this by changing the **Which dimensions
@@ -106,7 +117,7 @@ looking at its name or hovering over the chart's date.
 It's important to understand these differences, as Netdata uses charts, dimensions, families, and contexts to create
 health alarms and configure collectors. To read even more about the differences between all these elements of the
 dashboard, and how they affect other parts of Netdata, read our [dashboards
-documentation](/web/README.md#charts-contexts-families).
+documentation](https://github.com/netdata/netdata/blob/master/web/README.md#charts-contexts-families).
 
 ## Interact with charts
 
@@ -148,7 +159,7 @@ chart to its original height, double-click the same icon.
 ![Animated GIF of resizing a chart and resetting it to the default
 height](https://user-images.githubusercontent.com/1153921/80842459-7d41e280-8bb6-11ea-9488-1bc29f94d7f2.gif)
 
-To learn more about other options and chart interactivity, read our [dashboard documentation](/web/README.md).
+To learn more about other options and chart interactivity, read our [dashboard documentation](https://github.com/netdata/netdata/blob/master/web/README.md).
 
 ## See raised alarms and the alarm log
 

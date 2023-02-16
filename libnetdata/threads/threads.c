@@ -2,8 +2,7 @@
 
 #include "../libnetdata.h"
 
-static size_t default_stacksize = 0, wanted_stacksize = 0;
-static pthread_attr_t *attr = NULL;
+static pthread_attr_t *netdata_threads_attr = NULL;
 
 // ----------------------------------------------------------------------------
 // per thread data
@@ -29,26 +28,35 @@ const char *netdata_thread_tag(void) {
 // ----------------------------------------------------------------------------
 // compatibility library functions
 
+static __thread pid_t gettid_cached_tid = 0;
 pid_t gettid(void) {
+    pid_t tid = 0;
+
+    if(likely(gettid_cached_tid > 0))
+        return gettid_cached_tid;
+
 #ifdef __FreeBSD__
 
-    return (pid_t)pthread_getthreadid_np();
+    tid = (pid_t)pthread_getthreadid_np();
 
 #elif defined(__APPLE__)
 
     #if (defined __MAC_OS_X_VERSION_MIN_REQUIRED && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060)
         uint64_t curthreadid;
         pthread_threadid_np(NULL, &curthreadid);
-        return (pid_t)curthreadid;
+        tid = (pid_t)curthreadid;
     #else /* __MAC_OS_X_VERSION_MIN_REQUIRED */
-        return (pid_t)pthread_self;
+        tid = (pid_t)pthread_self;
     #endif /* __MAC_OS_X_VERSION_MIN_REQUIRED */
 
 #else /* __APPLE__*/
 
-    return (pid_t)syscall(SYS_gettid);
+    tid = (pid_t)syscall(SYS_gettid);
 
 #endif /* __FreeBSD__, __APPLE__*/
+
+    gettid_cached_tid = tid;
+    return tid;
 }
 
 // ----------------------------------------------------------------------------
@@ -60,42 +68,48 @@ size_t netdata_threads_init(void) {
     // --------------------------------------------------------------------
     // get the required stack size of the threads of netdata
 
-    attr = callocz(1, sizeof(pthread_attr_t));
-    i = pthread_attr_init(attr);
+    netdata_threads_attr = callocz(1, sizeof(pthread_attr_t));
+    i = pthread_attr_init(netdata_threads_attr);
     if(i != 0)
         fatal("pthread_attr_init() failed with code %d.", i);
 
-    i = pthread_attr_getstacksize(attr, &default_stacksize);
+    size_t stacksize = 0;
+    i = pthread_attr_getstacksize(netdata_threads_attr, &stacksize);
     if(i != 0)
         fatal("pthread_attr_getstacksize() failed with code %d.", i);
     else
-        debug(D_OPTIONS, "initial pthread stack size is %zu bytes", default_stacksize);
+        debug(D_OPTIONS, "initial pthread stack size is %zu bytes", stacksize);
 
-    return default_stacksize;
+    return stacksize;
 }
 
 // ----------------------------------------------------------------------------
 // late initialization
 
 void netdata_threads_init_after_fork(size_t stacksize) {
-    wanted_stacksize = stacksize;
     int i;
 
     // ------------------------------------------------------------------------
-    // set default pthread stack size
+    // set pthread stack size
 
-    if(attr && default_stacksize < wanted_stacksize && wanted_stacksize > 0) {
-        i = pthread_attr_setstacksize(attr, wanted_stacksize);
+    if(netdata_threads_attr && stacksize > (size_t)PTHREAD_STACK_MIN) {
+        i = pthread_attr_setstacksize(netdata_threads_attr, stacksize);
         if(i != 0)
-            fatal("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", wanted_stacksize, i);
+            error("pthread_attr_setstacksize() to %zu bytes, failed with code %d.", stacksize, i);
         else
-            debug(D_SYSTEM, "Successfully set pthread stacksize to %zu bytes", wanted_stacksize);
+            info("Set threads stack size to %zu bytes", stacksize);
     }
+    else
+        error("Invalid pthread stacksize %zu", stacksize);
 }
-
 
 // ----------------------------------------------------------------------------
 // netdata_thread_create
+
+void rrdset_thread_rda_free(void);
+void sender_thread_buffer_free(void);
+void query_target_free(void);
+void service_exits(void);
 
 static void thread_cleanup(void *ptr) {
     if(netdata_thread != ptr) {
@@ -105,6 +119,13 @@ static void thread_cleanup(void *ptr) {
 
     if(!(netdata_thread->options & NETDATA_THREAD_OPTION_DONT_LOG_CLEANUP))
         info("thread with task id %d finished", gettid());
+
+    sender_thread_buffer_free();
+    rrdset_thread_rda_free();
+    query_target_free();
+    thread_cache_destroy();
+    service_exits();
+    worker_unregister();
 
     freez((void *)netdata_thread->tag);
     netdata_thread->tag = NULL;
@@ -196,7 +217,7 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
     info->start_routine = start_routine;
     info->options = options;
 
-    int ret = pthread_create(thread, attr, thread_start, info);
+    int ret = pthread_create(thread, netdata_threads_attr, thread_start, info);
     if(ret != 0)
         error("failed to create new thread for %s. pthread_create() failed with code %d", tag, ret);
 
@@ -213,11 +234,18 @@ int netdata_thread_create(netdata_thread_t *thread, const char *tag, NETDATA_THR
 
 // ----------------------------------------------------------------------------
 // netdata_thread_cancel
-
+#ifdef NETDATA_INTERNAL_CHECKS
+int netdata_thread_cancel_with_trace(netdata_thread_t thread, int line, const char *file, const char *function) {
+#else
 int netdata_thread_cancel(netdata_thread_t thread) {
+#endif
     int ret = pthread_cancel(thread);
     if(ret != 0)
+#ifdef NETDATA_INTERNAL_CHECKS
+        error("cannot cancel thread. pthread_cancel() failed with code %d at %d@%s, function %s()", ret, line, file, function);
+#else
         error("cannot cancel thread. pthread_cancel() failed with code %d.", ret);
+#endif
 
     return ret;
 }

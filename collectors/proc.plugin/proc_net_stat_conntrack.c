@@ -12,7 +12,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
     static usec_t get_max_every = 10 * USEC_PER_SEC, usec_since_last_max = 0;
     static int read_full = 1;
     static char *nf_conntrack_filename, *nf_conntrack_count_filename, *nf_conntrack_max_filename;
-    static RRDVAR *rrdvar_max = NULL;
+    static const RRDVAR_ACQUIRED *rrdvar_max = NULL;
 
     unsigned long long aentries = 0, asearched = 0, afound = 0, anew = 0, ainvalid = 0, aignore = 0, adelete = 0, adelete_list = 0,
             ainsert = 0, ainsert_failed = 0, adrop = 0, aearly_drop = 0, aicmp_error = 0, aexpect_new = 0, aexpect_create = 0, aexpect_delete = 0, asearch_restart = 0;
@@ -50,7 +50,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         if(!do_sockets && !read_full)
             return 1;
 
-        rrdvar_max = rrdvar_custom_host_variable_create(localhost, "netfilter_conntrack_max");
+        rrdvar_max = rrdvar_custom_host_variable_add_and_acquire(localhost, "netfilter_conntrack_max");
     }
 
     if(likely(read_full)) {
@@ -69,7 +69,7 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
         for(l = 1; l < lines ;l++) {
             size_t words = procfile_linewords(ff, l);
             if(unlikely(words < 17)) {
-                if(unlikely(words)) error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
+                if(unlikely(words)) collector_error("Cannot read /proc/net/stat/nf_conntrack line. Expected 17 params, read %zu.", words);
                 continue;
             }
 
@@ -152,7 +152,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
 
             rd_connections = rrddim_add(st, "connections", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_connections, aentries);
         rrdset_done(st);
@@ -187,7 +186,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rd_ignore  = rrddim_add(st, "ignore",  NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_invalid = rrddim_add(st, "invalid", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_new,     anew);
         rrddim_set_by_pointer(st, rd_ignore,  aignore);
@@ -225,7 +223,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rd_deleted = rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_delete_list = rrddim_add(st, "delete_list", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inserted, ainsert);
         rrddim_set_by_pointer(st, rd_deleted, adelete);
@@ -262,7 +259,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rd_deleted = rrddim_add(st, "deleted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_new     = rrddim_add(st, "new",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_created, aexpect_create);
         rrddim_set_by_pointer(st, rd_deleted, aexpect_delete);
@@ -299,7 +295,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rd_restarted = rrddim_add(st, "restarted", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_found     = rrddim_add(st, "found",     NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_searched,  asearched);
         rrddim_set_by_pointer(st, rd_restarted, asearch_restart);
@@ -338,7 +333,6 @@ int do_proc_net_stat_conntrack(int update_every, usec_t dt) {
             rd_drop          = rrddim_add(st, "drop",          NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_early_drop    = rrddim_add(st, "early_drop",    NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_icmp_error,    aicmp_error);
         rrddim_set_by_pointer(st, rd_insert_failed, ainsert_failed);

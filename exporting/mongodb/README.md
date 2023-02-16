@@ -1,14 +1,17 @@
 <!--
 title: "Export metrics to MongoDB"
 description: "Archive your Agent's metrics to a MongoDB database for long-term storage, further analysis, or correlation with data from other sources."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/mongodb/README.md
-sidebar_label: MongoDB
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/mongodb/README.md"
+sidebar_label: "MongoDB"
+learn_status: "Published"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Export metrics to MongoDB
 
-You can use the MongoDB connector for the [exporting engine](/exporting/README.md) to archive your agent's metrics to a
-MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
+You can use the MongoDB connector for
+the [exporting engine](https://github.com/netdata/netdata/blob/master/exporting/README.md) to archive your agent's
+metrics to a MongoDB database for long-term storage, further analysis, or correlation with data from other sources.
 
 ## Prerequisites
 

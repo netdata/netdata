@@ -31,7 +31,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Test Build
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           load: true
           push: false
@@ -89,7 +89,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
       - name: Build
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: ${{ matrix.platforms }}
           load: false
@@ -129,9 +129,9 @@ jobs:
         id: tag
         run: |
           if echo ${{ github.event.inputs.version }} | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
-            echo "::set-output name=tag::v${{ github.event.inputs.version }}"
+            echo "tag=v${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
           else
-            echo "::set-output name=tag::${{ github.event.inputs.version }}"
+            echo "tag=${{ github.event.inputs.version }}" >> "${GITHUB_OUTPUT}"
           fi
 
   docker-publish:
@@ -151,13 +151,13 @@ jobs:
         id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '')" \
+          echo "tags=netdata/netdata:latest,netdata/netdata:stable,ghcr.io/netdata/netdata:latest,ghcr.io/netdata/netdata:stable,quay.io/netdata/netdata:latest,quay.io/netdata/netdata:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '')" \
               >> "${GITHUB_ENV}"
       - name: Determine which tags to use
         id: nightly-tags
         if: github.event.inputs.version == 'nightly'
         run: |
-          echo "tags=netdata/netdata:latest,netdata/netdata:edge" >> "${GITHUB_ENV}"
+          echo "tags=netdata/netdata:latest,netdata/netdata:edge,ghcr.io/netdata/netdata:latest,ghcr.io/netdata/netdata:edge,quay.io/netdata/netdata:latest,quay.io/netdata/netdata:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
         id: env
         if: github.repository == 'netdata/netdata'
@@ -169,15 +169,31 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2
       - name: Docker Hub Login
-        id: login
+        id: docker-hub-login
         if: github.repository == 'netdata/netdata'
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: GitHub Container Registry Login
+        id: ghcr-login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Quay.io Login
+        id: quay-login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}
@@ -199,7 +215,9 @@ jobs:
               Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.buildx.outcome }}
-              Authenticate against DockerHub: ${{ steps.login.outcome }}
+              Login to DockerHub: ${{ steps.docker-hub-login.outcome }}
+              Login to GHCR: ${{ steps.ghcr-login.outcome }}
+              Login to Quay: ${{ steps.quay-login.outcome }}
               Build and publish images: ${{ steps.build.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-
@@ -221,7 +239,7 @@ jobs:
 
   docker-dbg-publish:
     if: github.event_name == 'workflow_dispatch'
-    name: Docker Build and Publish (Debuging Image)
+    name: Docker Build and Publish (Debugging Image)
     needs:
       - docker-test
       - normalize-tag
@@ -236,13 +254,13 @@ jobs:
         id: release-tags
         if: github.event.inputs.version != 'nightly'
         run: |
-          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '-debug')" \
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:stable,ghcr.io/netdata/netdata-debug:latest,ghcr.io/netdata/netdata-debug:stable,quay.io/netdata/netdata-debug:latest,quay.io/netdata/netdata-debug:stable,$(.github/scripts/gen-docker-tags.py ${{ needs.normalize-tag.outputs.tag }} '-debug')" \
               >> "${GITHUB_ENV}"
       - name: Determine which tags to use
         id: nightly-tags
         if: github.event.inputs.version == 'nightly'
         run: |
-          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:edge" >> "${GITHUB_ENV}"
+          echo "tags=netdata/netdata-debug:latest,netdata/netdata-debug:edge,ghcr.io/netdata/netdata-debug:latest,ghcr.io/netdata/netdata-debug:edge,quay.io/netdata/netdata-debug:latest,quay.io/netdata/netdata-debug:edge" >> "${GITHUB_ENV}"
       - name: Mark image as official
         id: env
         if: github.repository == 'netdata/netdata'
@@ -254,15 +272,31 @@ jobs:
         id: buildx
         uses: docker/setup-buildx-action@v2
       - name: Docker Hub Login
-        id: login
+        id: docker-hub-login
         if: github.repository == 'netdata/netdata'
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: GitHub Container Registry Login
+        id: ghcr-login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Quay.io Login
+        id: quay-login
+        if: github.repository == 'netdata/netdata'
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
+          password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
       - name: Docker Build
         id: build
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           platforms: linux/amd64,linux/i386,linux/arm/v7,linux/arm64,linux/ppc64le
           push: ${{ github.repository == 'netdata/netdata' }}
@@ -280,13 +314,15 @@ jobs:
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
               ${{ github.repository }}: Failed to build or publish Docker debug images.
-              CHeckout: ${{ steps.checkout.outcome }}
+              Checkout: ${{ steps.checkout.outcome }}
               Generate release tags: ${{ steps.release-tags.outcome }}
               Generate nightly tags: ${{ steps.nightly-tags.outcome }}
               Setup environment: ${{ steps.env.outcome }}
               Setup QEMU: ${{ steps.qemu.outcome }}
               Setup buildx: ${{ steps.buildx.outcome }}
-              Authenticate against DockerHub: ${{ steps.login.outcome }}
+              Login to DockerHub: ${{ steps.docker-hub-login.outcome }}
+              Login to GHCR: ${{ steps.ghcr-login.outcome }}
+              Login to Quay: ${{ steps.quay-login.outcome }}
               Build and publish images: ${{ steps.build.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: >-

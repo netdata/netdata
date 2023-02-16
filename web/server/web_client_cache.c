@@ -9,9 +9,18 @@
 #ifdef ENABLE_HTTPS
 
 static void web_client_reuse_ssl(struct web_client *w) {
-    if (netdata_srv_ctx) {
+    if (netdata_ssl_srv_ctx) {
         if (w->ssl.conn) {
-            SSL_clear(w->ssl.conn);
+            SSL_SESSION *session = SSL_get_session(w->ssl.conn);
+            SSL *old = w->ssl.conn;
+            w->ssl.conn = SSL_new(netdata_ssl_srv_ctx);
+            if (session) {
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_111
+                if (SSL_SESSION_is_resumable(session))
+#endif
+                    SSL_set_session(w->ssl.conn, session);
+            }
+            SSL_free(old);
         }
     }
 }
@@ -48,7 +57,7 @@ static void web_client_free(struct web_client *w) {
     buffer_free(w->response.data);
     freez(w->user_agent);
 #ifdef ENABLE_HTTPS
-    if ((!web_client_check_unix(w)) && ( netdata_srv_ctx )) {
+    if ((!web_client_check_unix(w)) && (netdata_ssl_srv_ctx)) {
         if (w->ssl.conn) {
             SSL_free(w->ssl.conn);
             w->ssl.conn = NULL;
@@ -56,13 +65,15 @@ static void web_client_free(struct web_client *w) {
     }
 #endif
     freez(w);
+    __atomic_sub_fetch(&netdata_buffers_statistics.buffers_web, sizeof(struct web_client), __ATOMIC_RELAXED);
 }
 
 static struct web_client *web_client_alloc(void) {
     struct web_client *w = callocz(1, sizeof(struct web_client));
-    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE);
-    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
-    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE);
+    __atomic_add_fetch(&netdata_buffers_statistics.buffers_web, sizeof(struct web_client), __ATOMIC_RELAXED);
+    w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, &netdata_buffers_statistics.buffers_web);
+    w->response.header = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_web);
+    w->response.header_output = buffer_create(NETDATA_WEB_RESPONSE_HEADER_SIZE, &netdata_buffers_statistics.buffers_web);
     return w;
 }
 
@@ -209,7 +220,7 @@ struct web_client *web_client_get_from_cache_or_allocate() {
     web_clients_cache.used_count++;
 
     // initialize it
-    w->id = web_client_connected();
+    w->id = global_statistics_web_client_connected();
     w->mode = WEB_CLIENT_MODE_NORMAL;
 
     netdata_thread_enable_cancelability();
@@ -230,7 +241,7 @@ void web_client_release(struct web_client *w) {
 
     web_server_log_connection(w, "DISCONNECTED");
     web_client_request_done(w);
-    web_client_disconnected();
+    global_statistics_web_client_disconnected();
 
     netdata_thread_disable_cancelability();
 

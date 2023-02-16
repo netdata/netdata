@@ -1,8 +1,10 @@
 <!--
 title: "Export metrics to Prometheus remote write providers"
 description: "Send Netdata metrics to your choice of more than 20 external storage providers for long-term archiving and further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/prometheus/remote_write/README.md
-sidebar_label: Prometheus remote write
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/prometheus/remote_write/README.md"
+sidebar_label: "Prometheus remote write"
+learn_status: "Published"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Prometheus remote write exporting connector
@@ -15,7 +17,7 @@ than 20 external storage providers for long-term archiving and further analysis.
 To use the Prometheus remote write API with [storage
 providers](https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage), install
 [protobuf](https://developers.google.com/protocol-buffers/) and [snappy](https://github.com/google/snappy) libraries.
-Next, [reinstall Netdata](/packaging/installer/REINSTALL.md), which detects that the required libraries and utilities
+Next, [reinstall Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/REINSTALL.md), which detects that the required libraries and utilities
 are now available.
 
 ## Configuration

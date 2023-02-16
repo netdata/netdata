@@ -19,7 +19,7 @@ typedef struct {
     int64_t session_id;
 
     int32_t hops;
-    struct capability *capabilities;
+    const struct capability *capabilities;
 } node_instance_connection_t;
 
 char *generate_node_instance_connection(size_t *len, const node_instance_connection_t *data);

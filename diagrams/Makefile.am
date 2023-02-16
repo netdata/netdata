@@ -9,7 +9,6 @@ dist_noinst_DATA = \
     netdata-proxies-example.xml \
     netdata-overview.xml \
     data_structures/netdata_config.svg \
-    data_structures/README.md \
     data_structures/registry.svg \
     data_structures/rrd.svg \
     data_structures/web.svg \

@@ -47,7 +47,6 @@ typedef struct hardirq_ebpf_static_val {
  *****************************************************************/
 
 #define NETDATA_EBPF_MODULE_NAME_HARDIRQ "hardirq"
-#define NETDATA_HARDIRQ_SLEEP_MS 650000ULL
 #define NETDATA_HARDIRQ_CONFIG_FILE "hardirq.conf"
 
 typedef struct hardirq_val {
@@ -68,6 +67,6 @@ typedef struct hardirq_static_val {
 } hardirq_static_val_t;
 
 extern struct config hardirq_config;
-extern void *ebpf_hardirq_thread(void *ptr);
+void *ebpf_hardirq_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_HARDIRQ_H */

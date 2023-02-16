@@ -5,7 +5,7 @@ MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 SUBDIRS = \
     adaptive_resortable_list \
-    arrayalloc \
+    aral \
     avl \
     buffer \
     clocks \
@@ -15,16 +15,19 @@ SUBDIRS = \
     ebpf \
     eval \
     json \
+    july \
     health \
     locks \
     log \
     onewayalloc \
+    parser \
     popen \
     procfile \
     simple_pattern \
     socket \
     statistical \
     storage_number \
+    string \
     threads \
     url \
     worker_utilization \

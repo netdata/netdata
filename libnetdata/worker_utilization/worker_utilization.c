@@ -4,22 +4,26 @@
 #define WORKER_BUSY 'B'
 
 struct worker_job_type {
-    char name[WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH + 1];
+    STRING *name;
+    STRING *units;
 
     // statistics controlled variables
     size_t statistics_last_jobs_started;
     usec_t statistics_last_busy_time;
+    NETDATA_DOUBLE statistics_last_custom_value;
 
     // worker controlled variables
     volatile size_t worker_jobs_started;
     volatile usec_t worker_busy_time;
+
+    WORKER_METRIC_TYPE type;
+    NETDATA_DOUBLE custom_value;
 };
 
 struct worker {
     pid_t pid;
     const char *tag;
     const char *workname;
-    uint32_t workname_hash;
 
     // statistics controlled variables
     volatile usec_t statistics_last_checkpoint;
@@ -27,6 +31,7 @@ struct worker {
     usec_t statistics_last_busy_time;
 
     // the worker controlled variables
+    size_t worker_max_job_id;
     volatile size_t job_id;
     volatile size_t jobs_started;
     volatile usec_t busy_time;
@@ -36,60 +41,130 @@ struct worker {
     struct worker_job_type per_job_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
 
     struct worker *next;
+    struct worker *prev;
 };
 
-static netdata_mutex_t base_lock = NETDATA_MUTEX_INITIALIZER;
-static struct worker *base = NULL;
-static __thread struct worker *worker = NULL;
+struct workers_workname {                           // this is what we add to JudyHS
+    SPINLOCK spinlock;
+    struct worker *base;
+};
 
-void worker_register(const char *workname) {
+static struct workers_globals {
+    SPINLOCK spinlock;
+    Pvoid_t worknames_JudyHS;
+    size_t memory;
+
+} workers_globals = {                               // workers globals, the base of all worknames
+        .spinlock = NETDATA_SPINLOCK_INITIALIZER,   // a lock for the worknames index
+        .worknames_JudyHS = NULL,                   // the worknames index
+};
+
+static __thread struct worker *worker = NULL; // the current thread worker
+
+static inline usec_t worker_now_monotonic_usec(void) {
+#ifdef NETDATA_WITHOUT_WORKERS_LATENCY
+    return 0;
+#else
+    return now_monotonic_usec();
+#endif
+}
+
+size_t workers_allocated_memory(void) {
+    netdata_spinlock_lock(&workers_globals.spinlock);
+    size_t memory = workers_globals.memory;
+    netdata_spinlock_unlock(&workers_globals.spinlock);
+
+    return memory;
+}
+
+void worker_register(const char *name) {
     if(unlikely(worker)) return;
 
     worker = callocz(1, sizeof(struct worker));
     worker->pid = gettid();
     worker->tag = strdupz(netdata_thread_tag());
-    worker->workname = strdupz(workname);
-    worker->workname_hash = simple_hash(worker->workname);
+    worker->workname = strdupz(name);
 
-    usec_t now = now_realtime_usec();
+    usec_t now = worker_now_monotonic_usec();
     worker->statistics_last_checkpoint = now;
     worker->last_action_timestamp = now;
     worker->last_action = WORKER_IDLE;
 
-    netdata_mutex_lock(&base_lock);
-    worker->next = base;
-    base = worker;
-    netdata_mutex_unlock(&base_lock);
+    size_t name_size = strlen(name) + 1;
+    netdata_spinlock_lock(&workers_globals.spinlock);
+
+    workers_globals.memory += sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
+
+    Pvoid_t *PValue = JudyHSIns(&workers_globals.worknames_JudyHS, (void *)name, name_size, PJE0);
+
+    struct workers_workname *workname = *PValue;
+    if(!workname) {
+        workname = mallocz(sizeof(struct workers_workname));
+        netdata_spinlock_init(&workname->spinlock);
+        workname->base = NULL;
+        *PValue = workname;
+
+        workers_globals.memory += sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(name_size);
+    }
+
+    netdata_spinlock_lock(&workname->spinlock);
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(workname->base, worker, prev, next);
+    netdata_spinlock_unlock(&workname->spinlock);
+
+    netdata_spinlock_unlock(&workers_globals.spinlock);
 }
 
-void worker_register_job_name(size_t job_id, const char *name) {
+void worker_register_job_custom_metric(size_t job_id, const char *name, const char *units, WORKER_METRIC_TYPE type) {
     if(unlikely(!worker)) return;
 
     if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES)) {
         error("WORKER_UTILIZATION: job_id %zu is too big. Max is %zu", job_id, (size_t)(WORKER_UTILIZATION_MAX_JOB_TYPES - 1));
         return;
     }
-    if (*worker->per_job_type[job_id].name) {
-        error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring '%s'", worker->workname, job_id, worker->per_job_type[job_id].name, name);
+
+    if(job_id > worker->worker_max_job_id)
+        worker->worker_max_job_id = job_id;
+
+    if(worker->per_job_type[job_id].name) {
+        if(strcmp(string2str(worker->per_job_type[job_id].name), name) != 0 || worker->per_job_type[job_id].type != type || strcmp(string2str(worker->per_job_type[job_id].units), units) != 0)
+            error("WORKER_UTILIZATION: duplicate job registration: worker '%s' job id %zu is '%s', ignoring the later '%s'", worker->workname, job_id, string2str(worker->per_job_type[job_id].name), name);
         return;
     }
 
-    strncpy(worker->per_job_type[job_id].name, name, WORKER_UTILIZATION_MAX_JOB_NAME_LENGTH);
+    worker->per_job_type[job_id].name = string_strdupz(name);
+    worker->per_job_type[job_id].units = string_strdupz(units);
+    worker->per_job_type[job_id].type = type;
+}
+
+void worker_register_job_name(size_t job_id, const char *name) {
+    worker_register_job_custom_metric(job_id, name, "", WORKER_METRIC_IDLE_BUSY);
 }
 
 void worker_unregister(void) {
     if(unlikely(!worker)) return;
 
-    netdata_mutex_lock(&base_lock);
-    if(base == worker)
-        base = worker->next;
-    else {
-        struct worker *p;
-        for(p = base; p && p->next && p->next != worker ;p = p->next);
-        if(p && p->next == worker)
-            p->next = worker->next;
+    size_t workname_size = strlen(worker->workname) + 1;
+    netdata_spinlock_lock(&workers_globals.spinlock);
+    Pvoid_t *PValue = JudyHSGet(workers_globals.worknames_JudyHS, (void *)worker->workname, workname_size);
+    if(PValue) {
+        struct workers_workname *workname = *PValue;
+        netdata_spinlock_lock(&workname->spinlock);
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(workname->base, worker, prev, next);
+        netdata_spinlock_unlock(&workname->spinlock);
+
+        if(!workname->base) {
+            JudyHSDel(&workers_globals.worknames_JudyHS, (void *) worker->workname, workname_size, PJE0);
+            freez(workname);
+            workers_globals.memory -= sizeof(struct workers_workname) + JUDYHS_INDEX_SIZE_ESTIMATE(workname_size);
+        }
     }
-    netdata_mutex_unlock(&base_lock);
+    workers_globals.memory -= sizeof(struct worker) + strlen(worker->tag) + 1 + strlen(worker->workname) + 1;
+    netdata_spinlock_unlock(&workers_globals.spinlock);
+
+    for(int i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        string_freez(worker->per_job_type[i].name);
+        string_freez(worker->per_job_type[i].units);
+    }
 
     freez((void *)worker->tag);
     freez((void *)worker->workname);
@@ -112,18 +187,16 @@ static inline void worker_is_idle_with_time(usec_t now) {
 }
 
 void worker_is_idle(void) {
-    if(unlikely(!worker)) return;
-    if(unlikely(worker->last_action != WORKER_BUSY)) return;
+    if(unlikely(!worker || worker->last_action != WORKER_BUSY)) return;
 
-    worker_is_idle_with_time(now_realtime_usec());
+    worker_is_idle_with_time(worker_now_monotonic_usec());
 }
 
 void worker_is_busy(size_t job_id) {
-    if(unlikely(!worker)) return;
-    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
-        job_id = 0;
+    if(unlikely(!worker || job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        return;
 
-    usec_t now = now_realtime_usec();
+    usec_t now = worker_now_monotonic_usec();
 
     if(worker->last_action == WORKER_BUSY)
         worker_is_idle_with_time(now);
@@ -138,35 +211,121 @@ void worker_is_busy(size_t job_id) {
     worker->last_action = WORKER_BUSY;
 }
 
+void worker_set_metric(size_t job_id, NETDATA_DOUBLE value) {
+    if(unlikely(!worker)) return;
+    if(unlikely(job_id >= WORKER_UTILIZATION_MAX_JOB_TYPES))
+        return;
+
+    switch(worker->per_job_type[job_id].type) {
+        case WORKER_METRIC_INCREMENT:
+            worker->per_job_type[job_id].custom_value += value;
+            break;
+
+        case WORKER_METRIC_INCREMENTAL_TOTAL:
+        case WORKER_METRIC_ABSOLUTE:
+        default:
+            worker->per_job_type[job_id].custom_value = value;
+            break;
+    }
+}
 
 // statistics interface
 
-void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pid, const char *thread_tag, size_t utilization_usec, size_t duration_usec, size_t jobs_started, size_t is_running, const char **job_types_names, size_t *job_types_jobs_started, usec_t *job_types_busy_time), void *data) {
-    netdata_mutex_lock(&base_lock);
-    uint32_t hash = simple_hash(workname);
+void workers_foreach(const char *name, void (*callback)(
+                                               void *data
+                                               , pid_t pid
+                                               , const char *thread_tag
+                                               , size_t max_job_id
+                                               , size_t utilization_usec
+                                               , size_t duration_usec
+                                               , size_t jobs_started, size_t is_running
+                                               , STRING **job_types_names
+                                               , STRING **job_types_units
+                                               , WORKER_METRIC_TYPE *job_metric_types
+                                               , size_t *job_types_jobs_started
+                                               , usec_t *job_types_busy_time
+                                               , NETDATA_DOUBLE *job_custom_values
+                                               )
+                                               , void *data) {
+    netdata_spinlock_lock(&workers_globals.spinlock);
     usec_t busy_time, delta;
     size_t i, jobs_started, jobs_running;
 
-    struct worker *p;
-    for(p = base; p ; p = p->next) {
-        if(hash != p->workname_hash || strcmp(workname, p->workname)) continue;
+    size_t workname_size = strlen(name) + 1;
+    struct workers_workname *workname;
+    Pvoid_t *PValue = JudyHSGet(workers_globals.worknames_JudyHS, (void *)name, workname_size);
+    if(PValue) {
+        workname = *PValue;
+        netdata_spinlock_lock(&workname->spinlock);
+    }
+    else
+        workname = NULL;
 
-        usec_t now = now_realtime_usec();
+    netdata_spinlock_unlock(&workers_globals.spinlock);
+
+    if(!workname)
+        return;
+
+    struct worker *p;
+    DOUBLE_LINKED_LIST_FOREACH_FORWARD(workname->base, p, prev, next) {
+        usec_t now = worker_now_monotonic_usec();
 
         // find per job type statistics
-        const char *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        STRING *per_job_type_name[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        STRING *per_job_type_units[WORKER_UTILIZATION_MAX_JOB_TYPES];
+        WORKER_METRIC_TYPE per_job_metric_type[WORKER_UTILIZATION_MAX_JOB_TYPES];
         size_t per_job_type_jobs_started[WORKER_UTILIZATION_MAX_JOB_TYPES];
         usec_t per_job_type_busy_time[WORKER_UTILIZATION_MAX_JOB_TYPES];
-        for(i  = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES ;i++) {
+        NETDATA_DOUBLE per_job_custom_values[WORKER_UTILIZATION_MAX_JOB_TYPES];
+
+        size_t max_job_id = p->worker_max_job_id;
+        for(i  = 0; i <= max_job_id ;i++) {
             per_job_type_name[i] = p->per_job_type[i].name;
+            per_job_type_units[i] = p->per_job_type[i].units;
+            per_job_metric_type[i] = p->per_job_type[i].type;
 
-            size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
-            per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
-            p->per_job_type[i].statistics_last_jobs_started = tmp_jobs_started;
+            switch(p->per_job_type[i].type) {
+                default:
+                case WORKER_METRIC_EMPTY: {
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+                    per_job_custom_values[i] = NAN;
+                    break;
+                }
 
-            usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
-            per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
-            p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
+                case WORKER_METRIC_IDLE_BUSY: {
+                    size_t tmp_jobs_started = p->per_job_type[i].worker_jobs_started;
+                    per_job_type_jobs_started[i] = tmp_jobs_started - p->per_job_type[i].statistics_last_jobs_started;
+                    p->per_job_type[i].statistics_last_jobs_started = tmp_jobs_started;
+
+                    usec_t tmp_busy_time = p->per_job_type[i].worker_busy_time;
+                    per_job_type_busy_time[i] = tmp_busy_time - p->per_job_type[i].statistics_last_busy_time;
+                    p->per_job_type[i].statistics_last_busy_time = tmp_busy_time;
+
+                    per_job_custom_values[i] = NAN;
+                    break;
+                }
+
+                case WORKER_METRIC_ABSOLUTE: {
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+
+                    per_job_custom_values[i] = p->per_job_type[i].custom_value;
+                    break;
+                }
+
+                case WORKER_METRIC_INCREMENTAL_TOTAL:
+                case WORKER_METRIC_INCREMENT: {
+                    per_job_type_jobs_started[i] = 0;
+                    per_job_type_busy_time[i] = 0;
+
+                    NETDATA_DOUBLE tmp_custom_value = p->per_job_type[i].custom_value;
+                    per_job_custom_values[i] = tmp_custom_value - p->per_job_type[i].statistics_last_custom_value;
+                    p->per_job_type[i].statistics_last_custom_value = tmp_custom_value;
+
+                    break;
+                }
+            }
         }
 
         // get a copy of the worker variables
@@ -203,8 +362,22 @@ void workers_foreach(const char *workname, void (*callback)(void *data, pid_t pi
             jobs_running = 1;
         }
 
-        callback(data, p->pid, p->tag, busy_time, delta, jobs_started, jobs_running, per_job_type_name, per_job_type_jobs_started, per_job_type_busy_time);
+        callback(data
+                 , p->pid
+                 , p->tag
+                 , max_job_id
+                 , busy_time
+                 , delta
+                 , jobs_started
+                 , jobs_running
+                 , per_job_type_name
+                 , per_job_type_units
+                 , per_job_metric_type
+                 , per_job_type_jobs_started
+                 , per_job_type_busy_time
+                 , per_job_custom_values
+                 );
     }
 
-    netdata_mutex_unlock(&base_lock);
+    netdata_spinlock_unlock(&workname->spinlock);
 }

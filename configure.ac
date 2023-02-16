@@ -42,7 +42,17 @@ AC_PROG_CXX
 AC_PROG_INSTALL
 PKG_PROG_PKG_CONFIG
 AC_USE_SYSTEM_EXTENSIONS
-AC_PROG_RANLIB
+
+AC_LANG_PUSH([C])
+AX_COMPILER_VENDOR
+AC_LANG_POP([C])
+if test "$ax_cv_c_compiler_vendor" = "clang"; then
+  AC_CHECK_PROG([AR], [llvm-ar], [llvm-ar], [ar])
+  AC_CHECK_PROG([RANLIB], [llvm-ranlib], [llvm-ranlib], [ranlib])
+else
+  AC_CHECK_TOOL([RANLIB], [ranlib])
+  AC_CHECK_TOOL([AR], [ar])
+fi
 
 # -----------------------------------------------------------------------------
 # configurable options
@@ -198,10 +208,10 @@ AC_ARG_ENABLE(
     [enable_ml="detect"]
 )
 AC_ARG_ENABLE(
-    [ml_tests],
-    [AS_HELP_STRING([--enable-ml-tests], [Enable anomaly detection tests @<:@no@:>@])],
-    [enable_ml_tests="yes"],
-    [enable_ml_tests="no"]
+    [aclk_ssl_debug],
+    [AS_HELP_STRING([--enable-aclk-ssl-debug], [Enables possibility for SSL key logging @<:@default no@:>@])],
+    [aclk_ssl_debug="yes"],
+    [aclk_ssl_debug="no"]
 )
 
 # -----------------------------------------------------------------------------
@@ -241,6 +251,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt posix4])
 AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([sched_setscheduler sched_getscheduler sched_getparam sched_get_priority_min sched_get_priority_max getpriority setpriority nice])
 AC_CHECK_FUNCS([recvmmsg])
+AC_CHECK_FUNCS([close_range])
 
 AC_TYPE_INT8_T
 AC_TYPE_INT16_T
@@ -268,6 +279,8 @@ AC_CHECK_HEADERS_ONCE([sys/mount.h])
 if test "${enable_accept4}" != "no"; then
     AC_CHECK_FUNCS_ONCE(accept4)
 fi
+
+AC_CHECK_FUNCS_ONCE(malloc_usable_size)
 
 # -----------------------------------------------------------------------------
 # operating system detection
@@ -315,6 +328,10 @@ AM_CONDITIONAL([MACOS], [test "${build_target}" = "macos"])
 AM_CONDITIONAL([LINUX], [test "${build_target}" = "linux"])
 AC_MSG_RESULT([Host OS: ${build_target}])
 
+# -----------------------------------------------------------------------------
+# backtrace
+
+AC_SEARCH_LIBS([backtrace], [execinfo], [AC_DEFINE([HAVE_BACKTRACE], [1], [backtrace availability])])
 
 # -----------------------------------------------------------------------------
 # pthreads
@@ -498,7 +515,6 @@ if test "${enable_dbengine}" != "no" -a "${UV_LIBS}" -a "${LZ4_LIBS}" -a "${SSL_
     AC_DEFINE([ENABLE_DBENGINE], [1], [netdata dbengine usability])
     OPTIONAL_LZ4_CFLAGS="${LZ4_CFLAGS}"
     OPTIONAL_LZ4_LIBS="${LZ4_LIBS}"
-    OPTIONAL_JUDY_CFLAGS="${JUDY_CFLAGS}"
     OPTIONAL_SSL_CFLAGS="${SSL_CFLAGS}"
     OPTIONAL_SSL_LIBS="${SSL_LIBS}"
 else
@@ -698,6 +714,11 @@ if test "${with_bundled_protobuf}" != "no"; then
     fi
 fi
 
+AM_CONDITIONAL([MQTT_WSS_DEBUG], [test "${aclk_ssl_debug}" = "yes"])
+if test "${aclk_ssl_debug}" = "yes"; then
+    AC_DEFINE([MQTT_WSS_DEBUG], [1], [ACLK SSL allow debugging])
+fi
+
 if test "${with_bundled_protobuf}" != "yes"; then
 PKG_CHECK_MODULES(
     [PROTOBUF],
@@ -792,7 +813,7 @@ if test "$enable_cloud" != "no"; then
     if test "$can_enable_ng" = "yes"; then
         enable_aclk="yes"
         AC_DEFINE([ENABLE_ACLK], [1], [netdata ACLK])
-        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/mqtt_websockets/MQTT-C/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
+        OPTIONAL_ACLK_CFLAGS="-I \$(abs_top_srcdir)/mqtt_websockets/src/include -I \$(abs_top_srcdir)/mqtt_websockets/c-rbuf/include -I \$(abs_top_srcdir)/aclk/aclk-schemas"
         OPTIONAL_PROTOBUF_CFLAGS="${PROTOBUF_CFLAGS}"
         CXX11FLAG="-std=c++11"
         OPTIONAL_PROTOBUF_LIBS="${PROTOBUF_LIBS}"
@@ -1110,7 +1131,7 @@ fi
 
 # Check if submodules have not been fetched. Fail if ML was explicitly requested.
 AC_MSG_CHECKING([if git submodules are present for machine learning functionality])
-if test -f "ml/kmeans/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
+if test -f "ml/dlib/dlib/all/source.cpp" -a -f "ml/json/single_include/nlohmann/json.hpp"; then
     AC_MSG_RESULT([yes])
     have_ml_submodules="yes"
 else
@@ -1150,23 +1171,10 @@ fi
 AM_CONDITIONAL([ENABLE_ML], [test "${build_ml}" = "yes"])
 if test "${build_ml}" = "yes"; then
     AC_DEFINE([ENABLE_ML], [1], [anomaly detection usability])
-    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/kmeans/dlib"
+    OPTIONAL_ML_CFLAGS="-DDLIB_NO_GUI_SUPPORT -I \$(abs_top_srcdir)/ml/dlib"
     OPTIONAL_ML_LIBS=""
 fi
 
-# Decide if we should build ML tests.
-if test "${build_ml}" = "yes" -a "${enable_ml_tests}" = "yes" -a "${have_gtest}" = "yes"; then
-    build_ml_tests="yes"
-else
-    build_ml_tests="no"
-fi
-
-AM_CONDITIONAL([ENABLE_ML_TESTS], [test "${build_ml_tests}" = "yes"])
-if test "${build_ml_tests}" = "yes"; then
-    AC_DEFINE([ENABLE_ML_TESTS], [1], [anomaly detection tests])
-    OPTIONAL_ML_TESTS_CFLAGS="${OPTIONAL_GTEST_CFLAGS}"
-    OPTIONAL_ML_TESTS_LIBS="${OPTIONAL_GTEST_LIBS}"
-fi
 
 # -----------------------------------------------------------------------------
 # ebpf.plugin
@@ -1530,6 +1538,30 @@ AC_SUBST([OPTIONAL_ATOMIC_LIBS])
 
 AC_LANG_POP([C++])
 
+# -----------------------------------------------------------------------------
+
+AC_MSG_CHECKING(whether we can use dlsym)
+OLD_LIBS="${LIBS}"
+LIBS="-ldl"
+AC_LINK_IFELSE([AC_LANG_SOURCE([[
+  #include <dlfcn.h>
+  static void *(*libc_malloc)(size_t);
+  int main() {
+    libc_malloc = dlsym(RTLD_NEXT, "malloc");
+  }
+]])], CAN_USE_DLSYM=yes, CAN_USE_DLSYM=no)
+LIBS="${OLD_LIBS}"
+AC_MSG_RESULT($CAN_USE_DLSYM)
+
+if test "x$CAN_USE_DLSYM" = xyes; then
+    AC_DEFINE([HAVE_DLSYM], [1], [dlsym usability])
+    OPTIONAL_DL_LIBS="-ldl"
+fi
+AC_SUBST([OPTIONAL_DL_LIBS])
+
+# -----------------------------------------------------------------------------
+
+
 AC_DEFINE_UNQUOTED([NETDATA_USER], ["${with_user}"], [use this user to drop privileged])
 
 varlibdir="${localstatedir}/lib/netdata"
@@ -1541,6 +1573,8 @@ configdir="${sysconfdir}/netdata"
 libconfigdir="${libdir}/netdata/conf.d"
 logdir="${localstatedir}/log/netdata"
 pluginsdir="${libexecdir}/netdata/plugins.d"
+netdata_user="${with_user}"
+libsysdir="${libdir}/netdata/system"
 
 AC_SUBST([varlibdir])
 AC_SUBST([registrydir])
@@ -1552,13 +1586,15 @@ AC_SUBST([libconfigdir])
 AC_SUBST([logdir])
 AC_SUBST([pluginsdir])
 AC_SUBST([webdir])
+AC_SUBST([netdata_user])
+AC_SUBST([libsysdir])
 
 CFLAGS="${originalCFLAGS} ${OPTIONAL_LTO_CFLAGS} ${OPTIONAL_PROTOBUF_CFLAGS} ${OPTIONAL_MATH_CFLAGS} ${OPTIONAL_NFACCT_CFLAGS} \
     ${OPTIONAL_ZLIB_CFLAGS} ${OPTIONAL_UUID_CFLAGS} \
     ${OPTIONAL_LIBCAP_CFLAGS} ${OPTIONAL_IPMIMONITORING_CFLAGS} ${OPTIONAL_CUPS_CFLAGS} ${OPTIONAL_XENSTAT_FLAGS} \
     ${OPTIONAL_KINESIS_CFLAGS} ${OPTIONAL_PUBSUB_CFLAGS} ${OPTIONAL_PROMETHEUS_REMOTE_WRITE_CFLAGS} \
-    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${OPTIONAL_JUDY_CFLAGS} \
-    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_ML_TESTS_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
+    ${OPTIONAL_MONGOC_CFLAGS} ${LWS_CFLAGS} ${OPTIONAL_JSONC_STATIC_CFLAGS} ${OPTIONAL_BPF_CFLAGS} ${JUDY_CFLAGS} \
+    ${OPTIONAL_ACLK_CFLAGS} ${OPTIONAL_ML_CFLAGS} ${OPTIONAL_OS_DEP_CFLAGS}"
 
 CXXFLAGS="${CFLAGS} ${CXX11FLAG}"
 
@@ -1612,8 +1648,6 @@ AC_SUBST([OPTIONAL_GTEST_CFLAGS])
 AC_SUBST([OPTIONAL_GTEST_LIBS])
 AC_SUBST([OPTIONAL_ML_CFLAGS])
 AC_SUBST([OPTIONAL_ML_LIBS])
-AC_SUBST([OPTIONAL_ML_TESTS_CFLAGS])
-AC_SUBST([OPTIONAL_ML_TESTS_LIBS])
 
 # -----------------------------------------------------------------------------
 # Check if cmocka is available - needed for unit testing
@@ -1657,10 +1691,8 @@ AC_CONFIG_FILES([
     collectors/apps.plugin/Makefile
     collectors/cgroups.plugin/Makefile
     collectors/charts.d.plugin/Makefile
-    collectors/checks.plugin/Makefile
     collectors/diskspace.plugin/Makefile
     collectors/timex.plugin/Makefile
-    collectors/fping.plugin/Makefile
     collectors/ioping.plugin/Makefile
     collectors/freebsd.plugin/Makefile
     collectors/freeipmi.plugin/Makefile
@@ -1680,7 +1712,6 @@ AC_CONFIG_FILES([
     daemon/Makefile
     database/Makefile
     database/engine/Makefile
-    database/engine/metadata_log/Makefile
     database/ram/Makefile
     database/sqlite/Makefile
     diagrams/Makefile
@@ -1696,12 +1727,10 @@ AC_CONFIG_FILES([
     exporting/tests/Makefile
     health/Makefile
     health/notifications/Makefile
-    ml/Makefile
-    ml/kmeans/Makefile
     libnetdata/Makefile
     libnetdata/tests/Makefile
     libnetdata/adaptive_resortable_list/Makefile
-    libnetdata/arrayalloc/Makefile
+    libnetdata/aral/Makefile
     libnetdata/avl/Makefile
     libnetdata/buffer/Makefile
     libnetdata/clocks/Makefile
@@ -1710,14 +1739,17 @@ AC_CONFIG_FILES([
     libnetdata/dictionary/Makefile
     libnetdata/ebpf/Makefile
     libnetdata/eval/Makefile
+    libnetdata/july/Makefile
     libnetdata/locks/Makefile
     libnetdata/log/Makefile
     libnetdata/onewayalloc/Makefile
+    libnetdata/parser/Makefile
     libnetdata/popen/Makefile
     libnetdata/procfile/Makefile
     libnetdata/simple_pattern/Makefile
     libnetdata/socket/Makefile
     libnetdata/statistical/Makefile
+    libnetdata/string/Makefile
     libnetdata/storage_number/Makefile
     libnetdata/storage_number/tests/Makefile
     libnetdata/threads/Makefile
@@ -1760,7 +1792,6 @@ AC_CONFIG_FILES([
     web/server/static/Makefile
     claim/Makefile
     spawn/Makefile
-    parser/Makefile
 ])
 
 AC_OUTPUT

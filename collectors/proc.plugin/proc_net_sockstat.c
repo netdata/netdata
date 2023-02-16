@@ -27,14 +27,14 @@ static struct proc_net_sockstat {
 
 static int read_tcp_mem(void) {
     static char *filename = NULL;
-    static RRDVAR *tcp_mem_low_threshold = NULL,
+    static const RRDVAR_ACQUIRED *tcp_mem_low_threshold = NULL,
                   *tcp_mem_pressure_threshold = NULL,
                   *tcp_mem_high_threshold = NULL;
 
     if(unlikely(!tcp_mem_low_threshold)) {
-        tcp_mem_low_threshold      = rrdvar_custom_host_variable_create(localhost, "tcp_mem_low");
-        tcp_mem_pressure_threshold = rrdvar_custom_host_variable_create(localhost, "tcp_mem_pressure");
-        tcp_mem_high_threshold     = rrdvar_custom_host_variable_create(localhost, "tcp_mem_high");
+        tcp_mem_low_threshold      = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_low");
+        tcp_mem_pressure_threshold = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_pressure");
+        tcp_mem_high_threshold     = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_mem_high");
     }
 
     if(unlikely(!filename)) {
@@ -69,7 +69,7 @@ static int read_tcp_mem(void) {
 
 static kernel_uint_t read_tcp_max_orphans(void) {
     static char *filename = NULL;
-    static RRDVAR *tcp_max_orphans_var = NULL;
+    static const RRDVAR_ACQUIRED *tcp_max_orphans_var = NULL;
 
     if(unlikely(!filename)) {
         char buffer[FILENAME_MAX + 1];
@@ -81,7 +81,7 @@ static kernel_uint_t read_tcp_max_orphans(void) {
     if(read_single_number_file(filename, &tcp_max_orphans) == 0) {
 
         if(unlikely(!tcp_max_orphans_var))
-            tcp_max_orphans_var = rrdvar_custom_host_variable_create(localhost, "tcp_max_orphans");
+            tcp_max_orphans_var = rrdvar_custom_host_variable_add_and_acquire(localhost, "tcp_max_orphans");
 
         rrdvar_custom_host_variable_set(localhost, tcp_max_orphans_var, tcp_max_orphans);
         return  tcp_max_orphans;
@@ -244,7 +244,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_used = rrddim_add(st, "used", NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_used, (collected_number)sockstat_root.sockets_used);
         rrdset_done(st);
@@ -287,7 +286,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
             rd_timewait = rrddim_add(st, "timewait",  NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.tcp_inuse);
         rrddim_set_by_pointer(st, rd_orphan,   (collected_number)sockstat_root.tcp_orphan);
@@ -323,7 +321,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.tcp_mem);
         rrdset_done(st);
@@ -357,7 +354,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.udp_inuse);
         rrdset_done(st);
@@ -391,7 +387,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, sysconf(_SC_PAGESIZE), 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.udp_mem);
         rrdset_done(st);
@@ -425,7 +420,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.udplite_inuse);
         rrdset_done(st);
@@ -459,7 +453,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.raw_inuse);
         rrdset_done(st);
@@ -493,7 +486,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_inuse    = rrddim_add(st, "inuse",     NULL,   1, 1, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_inuse,    (collected_number)sockstat_root.frag_inuse);
         rrdset_done(st);
@@ -527,7 +519,6 @@ int do_proc_net_sockstat(int update_every, usec_t dt) {
 
             rd_mem = rrddim_add(st, "mem", NULL, 1, 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else rrdset_next(st);
 
         rrddim_set_by_pointer(st, rd_mem, (collected_number)sockstat_root.frag_memory);
         rrdset_done(st);

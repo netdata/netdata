@@ -1,7 +1,10 @@
 <!--
 title: "Access point monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/ap/README.md"
 sidebar_label: "Access points"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Remotes/Devices"
 -->
 
 # Access point monitoring with Netdata
@@ -83,7 +86,7 @@ Station 40:b8:37:5a:ed:5e (on wlan0)
 ## Configuration
 
 Edit the `charts.d/ap.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

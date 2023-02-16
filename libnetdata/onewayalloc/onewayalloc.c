@@ -14,6 +14,12 @@ typedef struct owa_page {
     struct owa_page *last;     // the last page on the list - we currently allocate on this
 } OWA_PAGE;
 
+static size_t onewayalloc_total_memory = 0;
+
+size_t onewayalloc_allocated_memory(void) {
+    return __atomic_load_n(&onewayalloc_total_memory, __ATOMIC_RELAXED);
+}
+
 // allocations need to be aligned to CPU register width
 // https://en.wikipedia.org/wiki/Data_structure_alignment
 static inline size_t natural_alignment(size_t size) {
@@ -60,6 +66,7 @@ static OWA_PAGE *onewayalloc_create_internal(OWA_PAGE *head, size_t size_hint) {
     // OWA_PAGE *page = (OWA_PAGE *)netdata_mmap(NULL, size, MAP_ANONYMOUS|MAP_PRIVATE, 0);
     // if(unlikely(!page)) fatal("Cannot allocate onewayalloc buffer of size %zu", size);
     OWA_PAGE *page = (OWA_PAGE *)mallocz(size);
+    __atomic_add_fetch(&onewayalloc_total_memory, size, __ATOMIC_RELAXED);
 
     page->size = size;
     page->offset = natural_alignment(sizeof(OWA_PAGE));
@@ -90,6 +97,10 @@ ONEWAYALLOC *onewayalloc_create(size_t size_hint) {
 }
 
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size) {
+#ifdef FSANITIZE_ADDRESS
+    return mallocz(size);
+#endif
+
     OWA_PAGE *head = (OWA_PAGE *)owa;
     OWA_PAGE *page = head->last;
 
@@ -135,6 +146,11 @@ void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
 }
 
 void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
+#ifdef FSANITIZE_ADDRESS
+    freez((void *)ptr);
+    return;
+#endif
+
 #ifdef NETDATA_INTERNAL_CHECKS
     // allow the caller to call us for a mallocz() allocation
     // so try to find it in our memory and if it is not there
@@ -183,11 +199,17 @@ void onewayalloc_destroy(ONEWAYALLOC *owa) {
     //     head->stats_mallocs_made, head->stats_mallocs_size,
     //     head->stats_pages, head->stats_pages_size);
 
+    size_t total_size = 0;
     OWA_PAGE *page = head;
     while(page) {
+        total_size += page->size;
+
         OWA_PAGE *p = page;
         page = page->next;
+
         // munmap(p, p->size);
         freez(p);
     }
+
+    __atomic_sub_fetch(&onewayalloc_total_memory, total_size, __ATOMIC_RELAXED);
 }

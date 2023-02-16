@@ -68,19 +68,19 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
 
     ff_pages_shared = procfile_readall(ff_pages_shared);
     if(unlikely(!ff_pages_shared)) return 0; // we return 0, so that we will retry to open it next time
-    pages_shared = str2ull(procfile_lineword(ff_pages_shared, 0, 0));
+    pages_shared = str2ull(procfile_lineword(ff_pages_shared, 0, 0), NULL);
 
     ff_pages_sharing = procfile_readall(ff_pages_sharing);
     if(unlikely(!ff_pages_sharing)) return 0; // we return 0, so that we will retry to open it next time
-    pages_sharing = str2ull(procfile_lineword(ff_pages_sharing, 0, 0));
+    pages_sharing = str2ull(procfile_lineword(ff_pages_sharing, 0, 0), NULL);
 
     ff_pages_unshared = procfile_readall(ff_pages_unshared);
     if(unlikely(!ff_pages_unshared)) return 0; // we return 0, so that we will retry to open it next time
-    pages_unshared = str2ull(procfile_lineword(ff_pages_unshared, 0, 0));
+    pages_unshared = str2ull(procfile_lineword(ff_pages_unshared, 0, 0), NULL);
 
     ff_pages_volatile = procfile_readall(ff_pages_volatile);
     if(unlikely(!ff_pages_volatile)) return 0; // we return 0, so that we will retry to open it next time
-    pages_volatile = str2ull(procfile_lineword(ff_pages_volatile, 0, 0));
+    pages_volatile = str2ull(procfile_lineword(ff_pages_volatile, 0, 0), NULL);
 
     //ff_pages_to_scan = procfile_readall(ff_pages_to_scan);
     //if(unlikely(!ff_pages_to_scan)) return 0; // we return 0, so that we will retry to open it next time
@@ -119,8 +119,6 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
             rd_volatile = rrddim_add(st_mem_ksm, "volatile", NULL,     -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             //rd_to_scan  = rrddim_add(st_mem_ksm, "to_scan", "to scan", -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_mem_ksm);
 
         rrddim_set_by_pointer(st_mem_ksm, rd_shared,   pages_shared   * page_size);
         rrddim_set_by_pointer(st_mem_ksm, rd_unshared, pages_unshared * page_size);
@@ -156,8 +154,6 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
             rd_savings = rrddim_add(st_mem_ksm_savings, "savings", NULL, -1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
             rd_offered = rrddim_add(st_mem_ksm_savings, "offered", NULL,  1, 1024 * 1024, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_mem_ksm_savings);
 
         rrddim_set_by_pointer(st_mem_ksm_savings, rd_savings, saved * page_size);
         rrddim_set_by_pointer(st_mem_ksm_savings, rd_offered, offered * page_size);
@@ -189,11 +185,8 @@ int do_sys_kernel_mm_ksm(int update_every, usec_t dt) {
 
             rd_savings = rrddim_add(st_mem_ksm_ratios, "savings", NULL, 1, 10000, RRD_ALGORITHM_ABSOLUTE);
         }
-        else
-            rrdset_next(st_mem_ksm_ratios);
 
         rrddim_set_by_pointer(st_mem_ksm_ratios, rd_savings, offered ? (saved * 1000000) / offered : 0);
-
         rrdset_done(st_mem_ksm_ratios);
     }
 

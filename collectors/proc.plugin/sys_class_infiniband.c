@@ -184,7 +184,7 @@ static struct ibport {
     RRDSET *st_hwpackets;
     RRDSET *st_hwerrors;
 
-    RRDSETVAR *stv_speed;
+    const RRDSETVAR_ACQUIRED *stv_speed;
 
     usec_t speed_last_collected_usec;
 
@@ -200,7 +200,7 @@ static struct ibport {
 #define GEN_DO_HWCOUNTER_READ(NAME, GRP, DESC, DIR, PORT, HW, ...)                                                     \
     if (HW->file_##NAME) {                                                                                             \
         if (read_single_number_file(HW->file_##NAME, (unsigned long long *)&HW->NAME)) {                               \
-            error("cannot read iface '%s' hwcounter '" #HW "'", PORT->name);                                           \
+            collector_error("cannot read iface '%s' hwcounter '" #HW "'", PORT->name);                                           \
             HW->file_##NAME = NULL;                                                                                    \
         }                                                                                                              \
     }
@@ -469,23 +469,22 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 snprintfz(buffer, FILENAME_MAX, "%s/%s/%s", ports_dirname, port_dent->d_name, "rate");
                 char buffer_rate[65];
                 if (read_file(buffer, buffer_rate, 64)) {
-                    error("Unable to read '%s'", buffer);
+                    collector_error("Unable to read '%s'", buffer);
                     p->width = 1;
                 } else {
                     char *buffer_width = strstr(buffer_rate, "(");
                     buffer_width++;
                     // str2ull will stop on first non-decimal value
-                    p->speed = str2ull(buffer_rate);
-                    p->width = str2ull(buffer_width);
+                    p->speed = str2ull(buffer_rate, NULL);
+                    p->width = str2ull(buffer_width, NULL);
                 }
 
                 if (!p->discovered)
-                    info(
-                        "Infiniband card %s port %s at speed %" PRIu64 " width %" PRIu64 "",
-                        dev_dent->d_name,
-                        port_dent->d_name,
-                        p->speed,
-                        p->width);
+                    collector_info("Infiniband card %s port %s at speed %" PRIu64 " width %" PRIu64 "",
+                                   dev_dent->d_name,
+                                   port_dent->d_name,
+                                   p->speed,
+                                   p->width);
 
                 p->discovered = 1;
             }
@@ -511,7 +510,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 #define GEN_DO_COUNTER_READ(NAME, GRP, DESC, DIR, PORT, ...)                                                           \
     if (PORT->file_##NAME) {                                                                                           \
         if (read_single_number_file(PORT->file_##NAME, (unsigned long long *)&PORT->NAME)) {                           \
-            error("cannot read iface '%s' counter '" #NAME "'", PORT->name);                                           \
+            collector_error("cannot read iface '%s' counter '" #NAME "'", PORT->name);                                           \
             PORT->file_##NAME = NULL;                                                                                  \
         }                                                                                                              \
     }
@@ -543,15 +542,14 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // x4 lanes multiplier as per Documentation/ABI/stable/sysfs-class-infiniband
                 FOREACH_COUNTER_BYTES(GEN_RRD_DIM_ADD_CUSTOM, port, 4 * 8 * port->width, 1024, RRD_ALGORITHM_INCREMENTAL)
 
-                port->stv_speed = rrdsetvar_custom_chart_variable_create(port->st_bytes, "link_speed");
-            } else
-                rrdset_next(port->st_bytes);
+                port->stv_speed = rrdsetvar_custom_chart_variable_add_and_acquire(port->st_bytes, "link_speed");
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_BYTES(GEN_RRD_DIM_SETP, port)
 
             // For link speed set only variable
-            rrdsetvar_custom_chart_variable_set(port->stv_speed, port->speed);
+            rrdsetvar_custom_chart_variable_set(port->st_bytes, port->stv_speed, port->speed);
 
             rrdset_done(port->st_bytes);
         }
@@ -578,8 +576,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Create Dimensions
                 rrdset_flag_set(port->st_packets, RRDSET_FLAG_DETAIL);
                 FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_ADD, port)
-            } else
-                rrdset_next(port->st_packets);
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_PACKETS(GEN_RRD_DIM_SETP, port)
@@ -608,8 +605,7 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
                 // Create Dimensions
                 rrdset_flag_set(port->st_errors, RRDSET_FLAG_DETAIL);
                 FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_ADD, port)
-            } else
-                rrdset_next(port->st_errors);
+            }
 
             // Link read values to dimensions
             FOREACH_COUNTER_ERRORS(GEN_RRD_DIM_SETP, port)
@@ -653,13 +649,12 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                     // Unknown vendor, should not happen
                     else {
-                        error(
+                        collector_error(
                             "Unmanaged vendor for '%s', do_hwerrors should have been set to no. Please report this bug",
                             port->name);
                         port->do_hwerrors = CONFIG_BOOLEAN_NO;
                     }
-                } else
-                    rrdset_next(port->st_hwerrors);
+                }
             }
 
             if (port->do_hwpackets != CONFIG_BOOLEAN_NO) {
@@ -690,13 +685,12 @@ int do_sys_class_infiniband(int update_every, usec_t dt)
 
                     // Unknown vendor, should not happen
                     else {
-                        error(
+                        collector_error(
                             "Unmanaged vendor for '%s', do_hwpackets should have been set to no. Please report this bug",
                             port->name);
                         port->do_hwpackets = CONFIG_BOOLEAN_NO;
                     }
-                } else
-                    rrdset_next(port->st_hwpackets);
+                }
             }
 
             // Update values to rrd (done by vendor-specific function)

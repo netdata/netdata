@@ -8,8 +8,6 @@
 
 #define NETDATA_EBPF_MOUNT_SYSCALL 2
 
-#define NETDATA_LATENCY_MOUNT_SLEEP_MS 700000ULL
-
 #define NETDATA_EBPF_MOUNT_CALLS "call"
 #define NETDATA_EBPF_MOUNT_ERRORS "error"
 #define NETDATA_EBPF_MOUNT_FAMILY "mount (eBPF)"
@@ -38,7 +36,7 @@ enum netdata_mount_syscalls {
 };
 
 extern struct config mount_config;
-extern void *ebpf_mount_thread(void *ptr);
+void *ebpf_mount_thread(void *ptr);
 extern netdata_ebpf_targets_t mount_targets[];
 
 #endif /* NETDATA_EBPF_MOUNT_H */

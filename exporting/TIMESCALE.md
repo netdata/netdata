@@ -1,8 +1,10 @@
 <!--
 title: "Writing metrics to TimescaleDB"
 description: "Send Netdata metrics to TimescaleDB for long-term archiving and further analysis."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/TIMESCALE.md
-sidebar_label: Writing metrics to TimescaleDB
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/TIMESCALE.md"
+sidebar_label: "Writing metrics to TimescaleDB"
+learn_status: "Published"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Writing metrics to TimescaleDB

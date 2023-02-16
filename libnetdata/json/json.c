@@ -90,7 +90,7 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
  */
 int json_callback_print(JSON_ENTRY *e)
 {
-    BUFFER *wb=buffer_create(300);
+    BUFFER *wb=buffer_create(300, NULL);
 
     buffer_sprintf(wb,"%s = ", e->name);
     char txt[50];
@@ -102,7 +102,7 @@ int json_callback_print(JSON_ENTRY *e)
 
         case JSON_ARRAY:
             e->callback_function = json_callback_print;
-            sprintf(txt,"ARRAY[%lu]", e->data.items);
+            sprintf(txt,"ARRAY[%lu]", (long unsigned int) e->data.items);
             buffer_strcat(wb, txt);
             break;
 
@@ -554,3 +554,4 @@ int json_test(char *str)
     return json_parse(str, NULL, json_callback_print);
 }
  */
+

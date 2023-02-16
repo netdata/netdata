@@ -7,7 +7,7 @@ After=network.target httpd.service squid.service nfs-server.service mysqld.servi
 
 [Service]
 Type=simple
-User=netdata
+User=@netdata_user_POST@
 Group=netdata
 RuntimeDirectory=netdata
 CacheDirectory=netdata
@@ -18,7 +18,7 @@ StateDirectoryMode=0755
 CacheDirectoryMode=0755
 LogsDirectoryMode=2750
 EnvironmentFile=-/etc/default/netdata
-ExecStart=/usr/sbin/netdata -D $EXTRA_OPTS
+ExecStart=@sbindir_POST@/netdata -D $EXTRA_OPTS
 
 # saving a big db on slow disks may need some time
 TimeoutStopSec=150

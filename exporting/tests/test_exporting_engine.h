@@ -4,6 +4,7 @@
 #define TEST_EXPORTING_ENGINE_H 1
 
 #include "libnetdata/libnetdata.h"
+#include "database/rrdvar.h"
 
 #include "exporting/exporting_engine.h"
 #include "exporting/graphite/graphite.h"
@@ -54,12 +55,9 @@ int __wrap_connect_to_one_of(
     size_t *reconnects_counter,
     char *connected_to,
     size_t connected_to_size);
-void __rrdhost_check_rdlock(RRDHOST *host, const char *file, const char *function, const unsigned long line);
-void __rrdset_check_rdlock(RRDSET *st, const char *file, const char *function, const unsigned long line);
-void __rrd_check_rdlock(const char *file, const char *function, const unsigned long line);
 time_t __mock_rrddim_query_oldest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
 time_t __mock_rrddim_query_latest_time(STORAGE_METRIC_HANDLE *db_metric_handle);
-void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time, TIER_QUERY_FETCH tier_query_fetch_type);
+void __mock_rrddim_query_init(STORAGE_METRIC_HANDLE *db_metric_handle, struct rrddim_query_handle *handle, time_t start_time, time_t end_time);
 int __mock_rrddim_query_is_finished(struct rrddim_query_handle *handle);
 STORAGE_POINT __mock_rrddim_query_next_metric(struct rrddim_query_handle *handle);
 void __mock_rrddim_query_finalize(struct rrddim_query_handle *handle);

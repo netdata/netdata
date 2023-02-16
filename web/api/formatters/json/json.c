@@ -5,15 +5,7 @@
 #define JSON_DATES_JS 1
 #define JSON_DATES_TIMESTAMP 2
 
-void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct context_param *context_param_list)
-{
-    RRDDIM *temp_rd = context_param_list ? context_param_list->rd : NULL;
-
-    int should_lock = (!context_param_list || !(context_param_list->flags & CONTEXT_FLAGS_ARCHIVE));
-
-    if (should_lock)
-        rrdset_check_rdlock(r->st);
-
+void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     //info("RRD2JSON(): %s: BEGIN", r->st->id);
     int row_annotations = 0, dates, dates_with_new = 0;
     char kq[2] = "",                        // key quote
@@ -50,7 +42,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         strcpy(post_value,         "}");
         strcpy(post_line,          "]}");
         snprintfz(data_begin, 100, "\n  ],\n    %srows%s:\n [\n", kq, kq);
-        strcpy(finish,             "\n]\n}");
+        strcpy(finish,             "\n  ]\n }");
 
         snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
         snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
@@ -77,9 +69,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             dates_with_new = 0;
         }
         if( options & RRDR_OPTION_OBJECTSROWS )
-            strcpy(pre_date, " { ");
+            strcpy(pre_date, "   {");
         else
-            strcpy(pre_date, " [ ");
+            strcpy(pre_date, "   [");
         strcpy(pre_label,  ",\"");
         strcpy(post_label, "\"");
         strcpy(pre_value,  ",");
@@ -87,10 +79,10 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             strcpy(post_line, "}");
         else
             strcpy(post_line, "]");
-        snprintfz(data_begin, 100, "],\n    %sdata%s:\n [\n", kq, kq);
-        strcpy(finish,             "\n]\n}");
+        snprintfz(data_begin, 100, "],\n  %sdata%s:[\n", kq, kq);
+        strcpy(finish,             "\n  ]\n }");
 
-        buffer_sprintf(wb, "{\n %slabels%s: [", kq, kq);
+        buffer_sprintf(wb, "{\n  %slabels%s:[", kq, kq);
         buffer_sprintf(wb, "%stime%s", sq, sq);
 
         if( options & RRDR_OPTION_OBJECTSROWS )
@@ -112,21 +104,21 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     // -------------------------------------------------------------------------
     // print the JSON header
 
+    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
-    RRDDIM *rd;
+    const long used = qt->query.used;
 
     // print the header lines
-    for(c = 0, i = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-        if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-        if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+    for(c = 0, i = 0; c < used ; c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, rd->name);
-//        buffer_strcat(wb, ".");
-//        buffer_strcat(wb, rd->rrdset->name);
+        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
+
     if(!i) {
         buffer_fast_strcat(wb, pre_label, pre_label_len);
         buffer_fast_strcat(wb, "no data", 7);
@@ -134,7 +126,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
     }
     size_t total_number_of_dimensions = i;
 
-    // print the begin of row data
+    // print the beginning of row data
     buffer_strcat(wb, data_begin);
 
     // if all dimensions are hidden, print a null
@@ -187,8 +179,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely(row_annotations)) {
                 // google supports one annotation per row
                 int annotation_found = 0;
-                for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd ;c++, rd = rd->next) {
-                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_SELECTED))) continue;
+                for(c = 0; c < used ; c++) {
+                    if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
 
                     if(unlikely(co[c] & RRDR_VALUE_RESET)) {
                         buffer_fast_strcat(wb, overflow_annotation, overflow_annotation_len);
@@ -210,7 +202,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_fast_strcat(wb, object_rows_time, object_rows_time_len);
 
-            buffer_rrd_value(wb, (NETDATA_DOUBLE)r->t[i]);
+            buffer_print_netdata_double(wb, (NETDATA_DOUBLE) r->t[i]);
 
             // in ms
             if(unlikely(options & RRDR_OPTION_MILLISECONDS))
@@ -222,7 +214,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         int set_min_max = 0;
         if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
             total = 0;
-            for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
+            for(c = 0; c < used ;c++) {
+                if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
+
                 NETDATA_DOUBLE n;
                 if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                     n = ar[c];
@@ -240,9 +234,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
         }
 
         // for each dimension
-        for(c = 0, rd = temp_rd?temp_rd:r->st->dimensions; rd && c < r->d ;c++, rd = rd->next) {
-            if(unlikely(r->od[c] & RRDR_DIMENSION_HIDDEN)) continue;
-            if(unlikely((options & RRDR_OPTION_NONZERO) && !(r->od[c] & RRDR_DIMENSION_NONZERO))) continue;
+        for(c = 0; c < used ;c++) {
+            if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
 
             NETDATA_DOUBLE n;
             if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
@@ -253,7 +247,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
-                buffer_sprintf(wb, "%s%s%s: ", kq, rd->name, kq);
+                buffer_sprintf(wb, "%s%s%s: ", kq, string2str(qt->query.array[c].dimension.name), kq);
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))
@@ -277,7 +271,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable,  struct
                     if(n > r->max) r->max = n;
                 }
 
-                buffer_rrd_value(wb, n);
+                buffer_print_netdata_double(wb, n);
             }
 
             buffer_fast_strcat(wb, post_value, post_value_len);

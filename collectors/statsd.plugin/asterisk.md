@@ -1,8 +1,9 @@
 <!--
 title: "Asterisk monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/asterisk.md
-
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/statsd.plugin/asterisk.md"
 sidebar_label: "Asterisk"
+learn_status: "Published"
+learn_rel_path: "Integrations/Monitor/VoIP"
 -->
 
 # Asterisk monitoring with Netdata

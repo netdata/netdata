@@ -3,156 +3,195 @@
 #ifndef ML_DIMENSION_H
 #define ML_DIMENSION_H
 
-#include "BitBufferCounter.h"
+#include "Mutex.h"
+#include "Stats.h"
+#include "Query.h"
 #include "Config.h"
 
 #include "ml-private.h"
 
 namespace ml {
 
-class RrdDimension {
+static inline std::string getMLDimensionID(RRDDIM *RD) {
+    RRDSET *RS = RD->rrdset;
+
+    std::stringstream SS;
+    SS << rrdset_context(RS) << "|" << rrdset_id(RS) << "|" << rrddim_name(RD);
+    return SS.str();
+}
+
+enum class MachineLearningStatus {
+    // Enable training/prediction
+    Enabled,
+
+    // Disable due to update every being different from the host's
+    DisabledDueToUniqueUpdateEvery,
+
+    // Disable because configuration pattern matches the chart's id
+    DisabledDueToExcludedChart,
+};
+
+enum class TrainingStatus {
+    // We don't have a model for this dimension
+    Untrained,
+
+    // Request for training sent, but we don't have any models yet
+    PendingWithoutModel,
+
+    // Request to update existing models sent
+    PendingWithModel,
+
+    // Have a valid, up-to-date model
+    Trained,
+};
+
+enum class MetricType {
+    // The dimension has constant values, no need to train
+    Constant,
+
+    // The dimension's values fluctuate, we need to generate a model
+    Variable,
+};
+
+struct TrainingRequest {
+    // Chart/dimension we want to train
+    STRING *ChartId;
+    STRING *DimensionId;
+    
+    // Creation time of request
+    time_t RequestTime;
+    
+    // First/last entry of this dimension in DB
+    // at the point the request was made
+    time_t FirstEntryOnRequest;
+    time_t LastEntryOnRequest;
+};
+
+void dumpTrainingRequest(const TrainingRequest &TrainingReq, const char *Prefix);
+
+enum TrainingResult {
+    // We managed to create a KMeans model
+    Ok,
+    // Could not query DB with a correct time range
+    InvalidQueryTimeRange,
+    // Did not gather enough data from DB to run KMeans
+    NotEnoughCollectedValues,
+    // Acquired a null dimension
+    NullAcquiredDimension,
+    // Chart is under replication
+    ChartUnderReplication,
+};
+
+struct TrainingResponse {
+    // Time when the request for this response was made
+    time_t RequestTime;
+
+    // First/last entry of the dimension in DB when generating the request
+    time_t FirstEntryOnRequest;
+    time_t LastEntryOnRequest;
+    
+    // First/last entry of the dimension in DB when generating the response
+    time_t FirstEntryOnResponse;
+    time_t LastEntryOnResponse;
+    
+    // After/Before timestamps of our DB query
+    time_t QueryAfterT;
+    time_t QueryBeforeT;
+    
+    // Actual after/before returned by the DB query ops
+    time_t DbAfterT;
+    time_t DbBeforeT;
+    
+    // Number of doubles returned by the DB query
+    size_t CollectedValues;
+    
+    // Number of values we return to the caller
+    size_t TotalValues;
+
+    // Result of training response
+    TrainingResult Result;
+};
+
+void dumpTrainingResponse(const TrainingResponse &TrainingResp, const char *Prefix);
+
+class Dimension {
 public:
-    RrdDimension(RRDDIM *RD) : RD(RD), Ops(&RD->tiers[0]->query_ops) { }
+    Dimension(RRDDIM *RD) :
+        RD(RD),
+        MT(MetricType::Constant),
+        TS(TrainingStatus::Untrained),
+        TR(),
+        LastTrainingTime(0)
+    {
+        if (simple_pattern_matches(Cfg.SP_ChartsToSkip, rrdset_name(RD->rrdset)))
+            MLS = MachineLearningStatus::DisabledDueToExcludedChart;
+        else if (RD->update_every != RD->rrdset->rrdhost->rrd_update_every)
+            MLS = MachineLearningStatus::DisabledDueToUniqueUpdateEvery;
+        else
+            MLS = MachineLearningStatus::Enabled;
 
-    RRDDIM *getRD() const { return RD; }
-
-    time_t latestTime() { return Ops->latest_time(RD->tiers[0]->db_metric_handle); }
-
-    time_t oldestTime() { return Ops->oldest_time(RD->tiers[0]->db_metric_handle); }
-
-    unsigned updateEvery() const { return RD->update_every; }
-
-    const std::string getID() const {
-        RRDSET *RS = RD->rrdset;
-
-        std::stringstream SS;
-        SS << RS->context << "|" << RS->id << "|" << RD->name;
-        return SS.str();
+        Models.reserve(Cfg.NumModelsToUse);
     }
 
-    bool isActive() const {
-        if (rrdset_flag_check(RD->rrdset, RRDSET_FLAG_OBSOLETE))
-            return false;
-
-        if (rrddim_flag_check(RD, RRDDIM_FLAG_OBSOLETE))
-            return false;
-
-        return true;
+    RRDDIM *getRD() const {
+        return RD;
     }
 
-    void setAnomalyRateRD(RRDDIM *ARRD) { AnomalyRateRD = ARRD; }
-    RRDDIM *getAnomalyRateRD() const { return AnomalyRateRD; }
-
-    void setAnomalyRateRDName(const char *Name) const {
-        rrddim_set_name(AnomalyRateRD->rrdset, AnomalyRateRD, Name);
+    unsigned updateEvery() const {
+        return RD->update_every;
     }
 
-    virtual ~RrdDimension() {
-        rrddim_free(AnomalyRateRD->rrdset, AnomalyRateRD);
+    MetricType getMT() const {
+        return MT;
+    }
+
+    TrainingStatus getTS() const {
+        return TS;
+    }
+
+    MachineLearningStatus getMLS() const {
+        return MLS;
+    }
+
+    TrainingResult trainModel(const TrainingRequest &TR);
+
+    void scheduleForTraining(time_t CurrT);
+
+    bool predict(time_t CurrT, CalculatedNumber Value, bool Exists);
+
+    std::vector<KMeans> getModels();
+    
+    void dump() const;
+
+private:
+    TrainingRequest getTrainingRequest(time_t CurrT) const {
+        return TrainingRequest {
+                string_dup(RD->rrdset->id),
+                string_dup(RD->id),
+                CurrT,
+                rrddim_first_entry_s(RD),
+                rrddim_last_entry_s(RD)
+        };
     }
 
 private:
+    std::pair<CalculatedNumber *, TrainingResponse> getCalculatedNumbers(const TrainingRequest &TrainingReq);
+
+public:
     RRDDIM *RD;
-    RRDDIM *AnomalyRateRD;
+    MetricType MT;
+    TrainingStatus TS;
+    TrainingResponse TR;
 
-    struct rrddim_query_ops *Ops;
+    time_t LastTrainingTime;
 
-    std::string ID;
-};
-
-enum class MLResult {
-    Success = 0,
-    MissingData,
-    NaN,
-};
-
-class TrainableDimension : public RrdDimension {
-public:
-    TrainableDimension(RRDDIM *RD) :
-        RrdDimension(RD), TrainEvery(Cfg.TrainEvery * updateEvery()) {}
-
-    MLResult trainModel();
-
-    CalculatedNumber computeAnomalyScore(SamplesBuffer &SB) {
-        return Trained ? KM.anomalyScore(SB) : 0.0;
-    }
-
-    bool shouldTrain(const TimePoint &TP) const {
-        if (ConstantModel)
-            return false;
-
-        return (LastTrainedAt + TrainEvery) < TP;
-    }
-
-    bool isTrained() const { return Trained; }
-
-private:
-    std::pair<CalculatedNumber *, size_t> getCalculatedNumbers();
-
-public:
-    TimePoint LastTrainedAt{Seconds{0}};
-
-protected:
-    std::atomic<bool> ConstantModel{false};
-
-private:
-    Seconds TrainEvery;
-    KMeans KM;
-
-    std::atomic<bool> Trained{false};
-};
-
-class PredictableDimension : public TrainableDimension {
-public:
-    PredictableDimension(RRDDIM *RD) : TrainableDimension(RD) {}
-
-    std::pair<MLResult, bool> predict();
-
-    void addValue(CalculatedNumber Value, bool Exists);
-
-    bool isAnomalous() { return AnomalyBit; }
-
-    void updateAnomalyBitCounter(RRDSET *RS, unsigned Elapsed, bool IsAnomalous) {
-        AnomalyBitCounter += IsAnomalous;
-
-        if (Elapsed == Cfg.DBEngineAnomalyRateEvery) {
-            double AR = static_cast<double>(AnomalyBitCounter) / Cfg.DBEngineAnomalyRateEvery;
-            rrddim_set_by_pointer(RS, getAnomalyRateRD(), AR * 1000);
-            AnomalyBitCounter = 0;
-        }
-    }
-
-private:
-    CalculatedNumber AnomalyScore{0.0};
-    std::atomic<bool> AnomalyBit{false};
-    unsigned AnomalyBitCounter{0};
+    MachineLearningStatus MLS;
 
     std::vector<CalculatedNumber> CNs;
+    DSample Feature;
+    std::vector<KMeans> Models;
+    Mutex M;
 };
-
-class DetectableDimension : public PredictableDimension {
-public:
-    DetectableDimension(RRDDIM *RD) : PredictableDimension(RD) {}
-
-    std::pair<bool, double> detect(size_t WindowLength, bool Reset) {
-        bool AnomalyBit = isAnomalous();
-
-        if (Reset)
-            NumSetBits = BBC.numSetBits();
-
-        NumSetBits += AnomalyBit;
-        BBC.insert(AnomalyBit);
-
-        double AnomalyRate = static_cast<double>(NumSetBits) / WindowLength;
-        return { AnomalyBit, AnomalyRate };
-    }
-
-private:
-    BitBufferCounter BBC{static_cast<size_t>(Cfg.ADMinWindowSize)};
-    size_t NumSetBits{0};
-};
-
-using Dimension = DetectableDimension;
 
 } // namespace ml
 

@@ -1,7 +1,10 @@
 <!--
 title: "Storage devices monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/smartd_log/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/smartd_log/README.md"
 sidebar_label: "S.M.A.R.T. attributes"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
 # Storage devices monitoring with Netdata
@@ -106,7 +109,7 @@ Otherwise, all the smartd `.csv` files may get written to `/var/lib/smartmontool
 ## Configuration
 
 Edit the `python.d/smartd_log.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

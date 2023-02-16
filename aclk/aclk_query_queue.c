@@ -26,7 +26,7 @@ static inline int _aclk_queue_query(aclk_query_t query)
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
-        if(!netdata_exit)
+        if(service_running(SERVICE_ACLK | ABILITY_DATA_QUERIES))
             error("Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         aclk_query_free(query);
         return 1;
@@ -66,7 +66,7 @@ aclk_query_t aclk_queue_pop(void)
     ACLK_QUEUE_LOCK;
     if (aclk_query_queue.block_push) {
         ACLK_QUEUE_UNLOCK;
-        if(!netdata_exit)
+        if(service_running(SERVICE_ACLK | ABILITY_DATA_QUERIES))
             error("POP Query Queue is blocked from accepting new requests. This is normally the case when ACLK prepares to shutdown.");
         return NULL;
     }
@@ -109,22 +109,6 @@ void aclk_query_free(aclk_query_t query)
         freez(query->data.http_api_v2.payload);
         if (query->data.http_api_v2.query != query->dedup_id)
             freez(query->data.http_api_v2.query);
-        break;
-
-    case NODE_STATE_UPDATE:
-    case REGISTER_NODE:
-    case CHART_DIMS_UPDATE:
-    case CHART_CONFIG_UPDATED:
-    case CHART_RESET:
-    case RETENTION_UPDATED:
-    case UPDATE_NODE_INFO:
-    case ALARM_LOG_HEALTH:
-    case ALARM_PROVIDE_CFG:
-    case ALARM_SNAPSHOT:
-    case UPDATE_NODE_COLLECTORS:
-    case PROTO_BIN_MESSAGE:
-        if (!use_mqtt_5)
-            freez(query->data.bin_payload.payload);
         break;
 
     default:

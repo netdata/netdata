@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_MDFLUSH "mdflush"
 
-#define NETDATA_MDFLUSH_SLEEP_MS 850000ULL
-
 // charts
 #define NETDATA_MDFLUSH_GLOBAL_CHART "mdflush"
 
@@ -35,7 +33,7 @@ typedef struct netdata_mdflush {
     uint64_t cnt;
 } netdata_mdflush_t;
 
-extern void *ebpf_mdflush_thread(void *ptr);
+void *ebpf_mdflush_thread(void *ptr);
 
 extern struct config mdflush_config;
 

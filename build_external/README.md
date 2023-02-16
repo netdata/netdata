@@ -1,7 +1,10 @@
 <!--
 title: "External build-system"
-date: 2020-03-31
 custom_edit_url: https://github.com/netdata/netdata/edit/master/build_external/README.md
+sidebar_label: "External build-system"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers"
 -->
 
 # External build-system

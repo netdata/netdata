@@ -6,61 +6,77 @@
 // system functions
 // to retrieve settings of the system
 
-int processors = 1;
-long get_system_cpus(void) {
-    processors = 1;
+#define CPUS_FOR_COLLECTORS 0
+#define CPUS_FOR_NETDATA 1
 
-#ifdef __APPLE__
+long get_system_cpus_with_cache(bool cache, bool for_netdata) {
+    static long processors[2] = { 0, 0 };
+
+    int index = for_netdata ? CPUS_FOR_NETDATA : CPUS_FOR_COLLECTORS;
+
+    if(likely(cache && processors[index] > 0))
+        return processors[index];
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__)
+#define HW_CPU_NAME "hw.logicalcpu"
+#else
+#define HW_CPU_NAME "hw.ncpu"
+#endif
+
     int32_t tmp_processors;
+    bool error = false;
 
-        if (unlikely(GETSYSCTL_BY_NAME("hw.logicalcpu", tmp_processors))) {
-            error("Assuming system has %d processors.", processors);
-        } else {
-            processors = tmp_processors;
-        }
+    if (unlikely(GETSYSCTL_BY_NAME(HW_CPU_NAME, tmp_processors)))
+        error = true;
+    else
+        processors[index] = tmp_processors;
 
-        return processors;
-#elif __FreeBSD__
-    int32_t tmp_processors;
+    if(processors[index] < 1) {
+        processors[index] = 1;
 
-        if (unlikely(GETSYSCTL_BY_NAME("hw.ncpu", tmp_processors))) {
-            error("Assuming system has %d processors.", processors);
-        } else {
-            processors = tmp_processors;
-        }
+        if(error)
+            error("Assuming system has %d processors.", processors[index]);
+    }
 
-        return processors;
+    return processors[index];
 #else
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/stat", netdata_configured_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/stat",
+              (!for_netdata && netdata_configured_host_prefix) ? netdata_configured_host_prefix : "");
 
     procfile *ff = procfile_open(filename, NULL, PROCFILE_FLAG_DEFAULT);
     if(!ff) {
-        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
-        return processors;
+        processors[index] = 1;
+        error("Cannot open file '%s'. Assuming system has %ld processors.", filename, processors[index]);
+        return processors[index];
     }
 
     ff = procfile_readall(ff);
     if(!ff) {
-        error("Cannot open file '%s'. Assuming system has %d processors.", filename, processors);
-        return processors;
+        processors[index] = 1;
+        error("Cannot open file '%s'. Assuming system has %ld processors.", filename, processors[index]);
+        return processors[index];
     }
 
-    processors = 0;
+    long tmp_processors = 0;
     unsigned int i;
     for(i = 0; i < procfile_lines(ff); i++) {
         if(!procfile_linewords(ff, i)) continue;
 
-        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0) processors++;
+        if(strncmp(procfile_lineword(ff, i, 0), "cpu", 3) == 0)
+            tmp_processors++;
     }
-    processors--;
-    if(processors < 1) processors = 1;
-
     procfile_close(ff);
 
-    debug(D_SYSTEM, "System has %d processors.", processors);
-    return processors;
+    processors[index] = --tmp_processors;
+
+    if(processors[index] < 1)
+        processors[index] = 1;
+
+    debug(D_SYSTEM, "System has %ld processors.", processors[index]);
+    return processors[index];
 
 #endif /* __APPLE__, __FreeBSD__ */
 }
@@ -90,7 +106,7 @@ pid_t get_system_pid_max(void) {
     read = 1;
 
     char filename[FILENAME_MAX + 1];
-    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", netdata_configured_host_prefix);
+    snprintfz(filename, FILENAME_MAX, "%s/proc/sys/kernel/pid_max", netdata_configured_host_prefix?netdata_configured_host_prefix:"");
 
     unsigned long long max = 0;
     if(read_single_number_file(filename, &max) != 0) {
@@ -118,6 +134,56 @@ void get_system_HZ(void) {
     }
 
     system_hz = (unsigned int) ticks;
+}
+
+static inline unsigned long cpuset_str2ul(char **s) {
+    unsigned long n = 0;
+    char c;
+    for(c = **s; c >= '0' && c <= '9' ; c = *(++*s)) {
+        n *= 10;
+        n += c - '0';
+    }
+    return n;
+}
+
+unsigned long read_cpuset_cpus(const char *filename, long system_cpus) {
+    static char *buf = NULL;
+    static size_t buf_size = 0;
+
+    if(!buf) {
+        buf_size = 100U + 6 * system_cpus; // taken from kernel/cgroup/cpuset.c
+        buf = mallocz(buf_size + 1);
+    }
+
+    int ret = read_file(filename, buf, buf_size);
+
+    if(!ret) {
+        char *s = buf;
+        unsigned long ncpus = 0;
+
+        // parse the cpuset string and calculate the number of cpus the cgroup is allowed to use
+        while(*s) {
+            unsigned long n = cpuset_str2ul(&s);
+            ncpus++;
+            if(*s == ',') {
+                s++;
+                continue;
+            }
+            if(*s == '-') {
+                s++;
+                unsigned long m = cpuset_str2ul(&s);
+                ncpus += m - n; // calculate the number of cpus in the region
+            }
+            s++;
+        }
+
+        if(!ncpus)
+            return 0;
+
+        return ncpus;
+    }
+
+    return 0;
 }
 
 // =====================================================================================================================

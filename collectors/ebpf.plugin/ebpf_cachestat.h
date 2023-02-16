@@ -19,8 +19,6 @@
 #define EBPF_CACHESTAT_DIMENSION_HITS "hits/s"
 #define EBPF_CACHESTAT_DIMENSION_MISSES "misses/s"
 
-#define NETDATA_LATENCY_CACHESTAT_SLEEP_MS 600000ULL
-
 // configuration file
 #define NETDATA_CACHESTAT_CONFIG_FILE "cachestat.conf"
 
@@ -48,7 +46,9 @@ enum cachestat_counters {
 enum cachestat_account_dirty_pages {
     NETDATA_CACHESTAT_ACCOUNT_PAGE_DIRTY,
     NETDATA_CACHESTAT_SET_PAGE_DIRTY,
-    NETDATA_CACHESTAT_FOLIO_DIRTY
+    NETDATA_CACHESTAT_FOLIO_DIRTY,
+
+    NETDATA_CACHESTAT_ACCOUNT_DIRTY_END
 };
 
 enum cachestat_indexes {
@@ -81,7 +81,7 @@ typedef struct netdata_publish_cachestat {
     netdata_cachestat_pid_t prev;
 } netdata_publish_cachestat_t;
 
-extern void *ebpf_cachestat_thread(void *ptr);
+void *ebpf_cachestat_thread(void *ptr);
 
 extern struct config cachestat_config;
 extern netdata_ebpf_targets_t cachestat_targets[];

@@ -46,10 +46,10 @@ typedef struct silencers {
 
 extern SILENCERS *silencers;
 
-extern SILENCER *create_silencer(void);
-extern int health_silencers_json_read_callback(JSON_ENTRY *e);
-extern void health_silencers_add(SILENCER *silencer);
-extern SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
-extern int health_initialize_global_silencers();
+SILENCER *create_silencer(void);
+int health_silencers_json_read_callback(JSON_ENTRY *e);
+void health_silencers_add(SILENCER *silencer);
+SILENCER * health_silencers_addparam(SILENCER *silencer, char *key, char *value);
+int health_initialize_global_silencers();
 
 #endif

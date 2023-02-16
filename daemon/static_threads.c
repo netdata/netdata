@@ -2,20 +2,24 @@
 
 #include "common.h"
 
-extern void *aclk_main(void *ptr);
-extern void *analytics_main(void *ptr);
-extern void *checks_main(void *ptr);
-extern void *cpuidlejitter_main(void *ptr);
-extern void *global_statistics_main(void *ptr);
-extern void *health_main(void *ptr);
-extern void *pluginsd_main(void *ptr);
-extern void *service_main(void *ptr);
-extern void *statsd_main(void *ptr);
-extern void *timex_main(void *ptr);
+void *aclk_main(void *ptr);
+void *analytics_main(void *ptr);
+void *cpuidlejitter_main(void *ptr);
+void *global_statistics_main(void *ptr);
+void *global_statistics_workers_main(void *ptr);
+void *global_statistics_sqlite3_main(void *ptr);
+void *health_main(void *ptr);
+void *pluginsd_main(void *ptr);
+void *service_main(void *ptr);
+void *statsd_main(void *ptr);
+void *timex_main(void *ptr);
+void *replication_thread_main(void *ptr __maybe_unused);
+
+extern bool global_statistics_enabled;
 
 const struct netdata_static_thread static_threads_common[] = {
     {
-        .name = "PLUGIN[timex]",
+        .name = "P[timex]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "timex",
         .enabled = 1,
@@ -24,22 +28,22 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = timex_main
     },
     {
-        .name = "PLUGIN[check]",
-        .config_section = CONFIG_SECTION_PLUGINS,
-        .config_name = "checks",
-        .enabled = 0,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = checks_main
-    },
-    {
-        .name = "PLUGIN[idlejitter]",
+        .name = "P[idlejitter]",
         .config_section = CONFIG_SECTION_PLUGINS,
         .config_name = "idlejitter",
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = cpuidlejitter_main
+    },
+    {
+        .name = "HEALTH",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = health_main
     },
     {
         .name = "ANALYTICS",
@@ -51,22 +55,37 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = analytics_main
     },
     {
-        .name = "GLOBAL_STATS",
-        .config_section = NULL,
-        .config_name = NULL,
+        .name = "STATS_GLOBAL",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
         .start_routine = global_statistics_main
     },
     {
-        .name = "HEALTH",
-        .config_section = NULL,
-        .config_name = NULL,
+        .name = "STATS_WORKERS",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
         .enabled = 1,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = health_main
+        .start_routine = global_statistics_workers_main
+    },
+    {
+        .name = "STATS_SQLITE3",
+        .config_section = CONFIG_SECTION_PLUGINS,
+        .config_name = "netdata monitoring",
+        .env_name = "NETDATA_INTERNALS_MONITORING",
+        .global_variable = &global_statistics_enabled,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = global_statistics_sqlite3_main
     },
     {
         .name = "PLUGINSD",
@@ -87,7 +106,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = service_main
     },
     {
-        .name = "STATSD",
+        .name = "STATSD_FLUSH",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
@@ -105,7 +124,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = exporting_main
     },
     {
-        .name = "STREAM",
+        .name = "SNDR[localhost]",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
@@ -114,7 +133,7 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = rrdpush_sender_thread
     },
     {
-        .name = "WEB_SERVER[static1]",
+        .name = "WEB[1]",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
@@ -125,7 +144,7 @@ const struct netdata_static_thread static_threads_common[] = {
 
 #ifdef ENABLE_ACLK
     {
-        .name = "ACLK_Main",
+        .name = "ACLK_MAIN",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
@@ -136,7 +155,7 @@ const struct netdata_static_thread static_threads_common[] = {
 #endif
 
     {
-        .name = "rrdcontext",
+        .name = "RRDCONTEXT",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 1,
@@ -145,7 +164,27 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = rrdcontext_main
     },
 
-    {NULL, NULL, NULL, 0, NULL, NULL, NULL}
+    {
+        .name = "REPLAY[1]",
+        .config_section = NULL,
+        .config_name = NULL,
+        .enabled = 1,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = replication_thread_main
+    },
+
+    // terminator
+    {
+        .name = NULL,
+        .config_section = NULL,
+        .config_name = NULL,
+        .env_name = NULL,
+        .enabled = 0,
+        .thread = NULL,
+        .init_routine = NULL,
+        .start_routine = NULL
+    }
 };
 
 struct netdata_static_thread *

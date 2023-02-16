@@ -135,10 +135,29 @@ static hardirq_ebpf_val_t *hardirq_ebpf_vals = NULL;
 // tmp store for static hard IRQ values we get from a per-CPU eBPF map.
 static hardirq_ebpf_static_val_t *hardirq_ebpf_static_vals = NULL;
 
-static struct netdata_static_thread hardirq_threads = {"HARDIRQ KERNEL",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, NULL };
-static enum ebpf_threads_status ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNING;
+/**
+ * Hardirq Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_hardirq_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
+        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
+    }
+    freez(hardirq_ebpf_vals);
+    freez(hardirq_ebpf_static_vals);
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
 
 /**
  * Hardirq Exit
@@ -150,37 +169,7 @@ static enum ebpf_threads_status ebpf_hardirq_exited = NETDATA_THREAD_EBPF_RUNNIN
 static void hardirq_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Hardirq clean up
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void hardirq_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    if (ebpf_hardirq_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(hardirq_threads.thread);
-    for (int i = 0; hardirq_tracepoints[i].class != NULL; i++) {
-        ebpf_disable_tracepoint(&hardirq_tracepoints[i]);
-    }
-    freez(hardirq_ebpf_vals);
-    freez(hardirq_ebpf_static_vals);
-
-    hardirq_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_hardirq_free(em);
 }
 
 /*****************************************************************
@@ -314,28 +303,10 @@ static void hardirq_read_latency_static_map(int mapfd)
 /**
  * Read eBPF maps for hard IRQ.
  */
-static void *hardirq_reader(void *ptr)
+static void hardirq_reader()
 {
-    netdata_thread_cleanup_push(hardirq_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_HARDIRQ_SLEEP_MS * em->update_every;
-    while (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        UNUSED(dt);
-        if (ebpf_hardirq_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
-        hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
-    }
-    ebpf_hardirq_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
+    hardirq_read_latency_map(hardirq_maps[HARDIRQ_MAP_LATENCY].map_fd);
+    hardirq_read_latency_static_map(hardirq_maps[HARDIRQ_MAP_LATENCY_STATIC].map_fd);
 }
 
 static void hardirq_create_charts(int update_every)
@@ -415,17 +386,6 @@ static void hardirq_collector(ebpf_module_t *em)
 
     avl_init_lock(&hardirq_pub, hardirq_val_cmp);
 
-    // create reader thread.
-    hardirq_threads.thread = mallocz(sizeof(netdata_thread_t));
-    hardirq_threads.start_routine = hardirq_reader;
-    netdata_thread_create(
-        hardirq_threads.thread,
-        hardirq_threads.name,
-        NETDATA_THREAD_OPTION_DEFAULT,
-        hardirq_reader,
-        em
-    );
-
     // create chart and static dims.
     pthread_mutex_lock(&lock);
     hardirq_create_charts(em->update_every);
@@ -436,13 +396,17 @@ static void hardirq_collector(ebpf_module_t *em)
     // loop and read from published data until ebpf plugin is closed.
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = em->update_every * USEC_PER_SEC;
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     //This will be cancelled by its parent
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        counter = 0;
+        hardirq_reader();
         pthread_mutex_lock(&lock);
 
         // write dims now for all hitherto discovered IRQs.
@@ -472,26 +436,21 @@ void *ebpf_hardirq_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = hardirq_maps;
 
-    if (!em->enabled) {
-        goto endhardirq;
-    }
-
     if (ebpf_enable_tracepoints(hardirq_tracepoints) == 0) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endhardirq;
     }
 
     hardirq_collector(em);
 
 endhardirq:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
 

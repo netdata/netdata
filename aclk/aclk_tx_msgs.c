@@ -5,6 +5,7 @@
 #include "aclk_util.h"
 #include "aclk_stats.h"
 #include "aclk.h"
+#include "aclk_capas.h"
 
 #include "schema-wrappers/proto_2_json.h"
 
@@ -14,6 +15,13 @@
 
 // version for aclk legacy (old cloud arch)
 #define ACLK_VERSION 2
+
+static void freez_aclk_publish5a(void *ptr) {
+    freez(ptr);
+}
+static void freez_aclk_publish5b(void *ptr) {
+    freez(ptr);
+}
 
 uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, size_t msg_len, enum aclk_topics subtopic, const char *msgname)
 {
@@ -28,17 +36,17 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
         return 0;
     }
 
-    if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
-    else
-        mqtt_wss_publish_pid(client, topic, msg, msg_len,  MQTT_WSS_PUB_QOS1, &packet_id);
+    mqtt_wss_publish5(client, (char*)topic, NULL, msg, &freez_aclk_publish5a, msg_len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
-    char *json = protomsg_to_json(msg, msg_len, msgname);
-    log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
-    freez(json);
 #endif
+
+    if (aclklog_enabled) {
+        char *json = protomsg_to_json(msg, msg_len, msgname);
+        log_aclk_message_bin(json, strlen(json), 1, topic, msgname);
+        freez(json);
+    }
 
     return packet_id;
 }
@@ -57,7 +65,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
     uint16_t packet_id;
     const char *str;
     char *full_msg = NULL;
-    int len, rc;
+    int len;
 
     if (unlikely(!topic || topic[0] != '/')) {
         error ("Full topic required!");
@@ -80,21 +88,7 @@ static int aclk_send_message_with_bin_payload(mqtt_wss_client client, json_objec
         len += payload_len;
     }
 
-    if (use_mqtt_5)
-        mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
-    else {
-        rc = mqtt_wss_publish_pid_block(client, topic, payload_len ? full_msg : str, len,  MQTT_WSS_PUB_QOS1, &packet_id, 5000);
-        freez(full_msg);
-        json_object_put(msg);
-        if (rc == MQTT_WSS_ERR_BLOCK_TIMEOUT) {
-            error("Timeout sending binpacked message");
-            return HTTP_RESP_BACKEND_FETCH_FAILED;
-        }
-        if (rc == MQTT_WSS_ERR_TX_BUF_TOO_SMALL) {
-            error("Message is bigger than allowed maximum");
-            return HTTP_RESP_FORBIDDEN;
-        }
-    }
+    mqtt_wss_publish5(client, (char*)topic, NULL, (char*)(payload_len ? full_msg : str), (payload_len ? &freez_aclk_publish5b : &json_object_put_wrapper), len, MQTT_WSS_PUB_QOS1, &packet_id);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     aclk_stats_msg_published(packet_id);
@@ -218,22 +212,11 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     size_t len;
     uint16_t pid;
 
-    struct capability agent_capabilities[] = {
-        { .name = "json",  .version = 2, .enabled = 0 },
-        { .name = "proto", .version = 1, .enabled = 1 },
-#ifdef ENABLE_ML
-        { .name = "ml",    .version = 1, .enabled = ml_enabled(localhost) },
-#endif
-        { .name = "mc",    .version = enable_metric_correlations ? metric_correlations_version : 0, .enabled = enable_metric_correlations },
-        { .name = "ctx",   .version = 1, .enabled = rrdcontext_enabled },
-        { .name = NULL,    .version = 0, .enabled = 0 }
-    };
-
     update_agent_connection_t conn = {
         .reachable = (reachable ? 1 : 0),
         .lwt = 0,
         .session_id = aclk_session_newarch,
-        .capabilities = agent_capabilities
+        .capabilities = aclk_get_agent_capas()
     };
 
     rrdhost_aclk_state_lock(localhost);
@@ -256,8 +239,6 @@ uint16_t aclk_send_agent_connection_update(mqtt_wss_client client, int reachable
     }
 
     pid = aclk_send_bin_message_subtopic_pid(client, msg, len, ACLK_TOPICID_AGENT_CONN, "UpdateAgentConnection");
-    if (!use_mqtt_5)
-        freez(msg);
     if (localhost->aclk_state.prev_claimed_id) {
         freez(localhost->aclk_state.prev_claimed_id);
         localhost->aclk_state.prev_claimed_id = NULL;

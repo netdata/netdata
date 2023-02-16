@@ -33,10 +33,6 @@ static netdata_syscall_stat_t disk_aggregated_data[NETDATA_EBPF_HIST_MAX_BINS];
 static netdata_publish_syscall_t disk_publish_aggregated[NETDATA_EBPF_HIST_MAX_BINS];
 
 static netdata_idx_t *disk_hash_values = NULL;
-static struct netdata_static_thread disk_threads = {"DISK KERNEL",
-                                                    NULL, NULL, 1, NULL,
-                                                    NULL, NULL };
-static enum ebpf_threads_status ebpf_disk_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 ebpf_publish_disk_t *plot_disks = NULL;
 pthread_mutex_t plot_mutex;
@@ -424,6 +420,35 @@ static void ebpf_cleanup_disk_list()
 }
 
 /**
+ * DISK Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_disk_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    ebpf_disk_disable_tracepoints();
+
+    if (dimensions)
+        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
+
+    freez(disk_hash_values);
+    pthread_mutex_destroy(&plot_mutex);
+
+    ebpf_cleanup_plot_disks();
+    ebpf_cleanup_disk_list();
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Disk exit.
  *
  * Cancel child and exit.
@@ -433,41 +458,7 @@ static void ebpf_cleanup_disk_list()
 static void ebpf_disk_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Disk Cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_disk_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_disk_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    ebpf_disk_disable_tracepoints();
-
-    if (dimensions)
-        ebpf_histogram_dimension_cleanup(dimensions, NETDATA_EBPF_HIST_MAX_BINS);
-
-    freez(disk_hash_values);
-    freez(disk_threads.thread);
-    pthread_mutex_destroy(&plot_mutex);
-
-    ebpf_cleanup_plot_disks();
-    ebpf_cleanup_disk_list();
-
-    disk_threads.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_disk_free(em);
 }
 
 /*****************************************************************
@@ -569,40 +560,6 @@ static void read_hard_disk_tables(int table)
 
         key = next_key;
     }
-}
-
-/**
- * Disk read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data on very busy socket.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_disk_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_disk_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_DISK_SLEEP_MS * em->update_every;
-    while (ebpf_disk_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_disk_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
-    }
-
-    ebpf_disk_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -728,21 +685,19 @@ static void ebpf_latency_send_hd_data(int update_every)
 static void disk_collector(ebpf_module_t *em)
 {
     disk_hash_values = callocz(ebpf_nprocs, sizeof(netdata_idx_t));
-    disk_threads.thread = mallocz(sizeof(netdata_thread_t));
-    disk_threads.start_routine = ebpf_disk_read_hash;
-
-    netdata_thread_create(disk_threads.thread, disk_threads.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_disk_read_hash, em);
 
     int update_every = em->update_every;
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = update_every * USEC_PER_SEC;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
 
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
+
+        counter = 0;
+        read_hard_disk_tables(disk_maps[NETDATA_DISK_READ].map_fd);
         pthread_mutex_lock(&lock);
         ebpf_remove_pointer_from_plot_disk(em);
         ebpf_latency_send_hd_data(update_every);
@@ -805,29 +760,26 @@ void *ebpf_disk_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = disk_maps;
 
-    if (!em->enabled)
-        goto enddisk;
-
     if (ebpf_disk_enable_tracepoints()) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 
     avl_init_lock(&disk_tree, ebpf_compare_disks);
     if (read_local_disks()) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 
     if (pthread_mutex_init(&plot_mutex, NULL)) {
-        em->enabled = 0;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         error("Cannot initialize local mutex");
         goto enddisk;
     }
 
     em->probe_links = ebpf_load_program(ebpf_plugin_dir, em, running_on_kernel, isrh, &em->objects);
     if (!em->probe_links) {
-        em->enabled = 0;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto enddisk;
     }
 
@@ -845,8 +797,7 @@ void *ebpf_disk_thread(void *ptr)
     disk_collector(em);
 
 enddisk:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
 

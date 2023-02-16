@@ -64,25 +64,25 @@ typedef struct arl_base {
 } ARL_BASE;
 
 // create a new ARL
-extern ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
+ARL_BASE *arl_create(const char *name, void (*processor)(const char *, uint32_t, const char *, void *), size_t rechecks);
 
 // free an ARL
-extern void arl_free(ARL_BASE *arl_base);
+void arl_free(ARL_BASE *arl_base);
 
 // register an expected keyword to the ARL
 // together with its destination ( i.e. the output of the processor() )
-extern ARL_ENTRY *arl_expect_custom(ARL_BASE *base, const char *keyword, void (*processor)(const char *name, uint32_t hash, const char *value, void *dst), void *dst);
+ARL_ENTRY *arl_expect_custom(ARL_BASE *base, const char *keyword, void (*processor)(const char *name, uint32_t hash, const char *value, void *dst), void *dst);
 #define arl_expect(base, keyword, dst) arl_expect_custom(base, keyword, NULL, dst)
 
 // an internal call to complete the check() call
-extern int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
+int arl_find_or_create_and_relink(ARL_BASE *base, const char *s, const char *value);
 
 // begin an ARL iteration
-extern void arl_begin(ARL_BASE *base);
+void arl_begin(ARL_BASE *base);
 
-extern void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst);
-extern void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
-extern void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst);
+void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, void *dst);
+void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
+void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst);
 
 // check a keyword against the ARL
 // this is to be called for each keyword read from source data

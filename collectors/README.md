@@ -1,48 +1,71 @@
 <!--
-title: "Collecting metrics"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/README.md
+title: "Collectors"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/README.md"
 id: "collectors-ref"
+sidebar_label: "Collectors"
+learn_status: "Published"
+learn_rel_path: "Concepts"
 -->
 
 # Collecting metrics
 
-Netdata can collect metrics from hundreds of different sources, be they internal data created by the system itself, or
-external data created by services or applications. To see _all_ of the sources Netdata collects from, view our [list of
-supported collectors](/collectors/COLLECTORS.md).
+When Netdata starts, and with zero configuration, it auto-detects thousands of data sources and immediately collects
+per-second metrics.
 
-There are two essential points to understand about how collecting metrics works in Netdata:
+Netdata can immediately collect metrics from these endpoints thanks to 300+ **collectors**, which all come pre-installed
+when you [install Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
 
--   All collectors are **installed by default** with every installation of Netdata. You do not need to install
-    collectors manually to collect metrics from new sources.
--   Upon startup, Netdata will **auto-detect** any application or service that has a
-    [collector](/collectors/COLLECTORS.md), as long as both the collector and the app/service are configured correctly.
+All collectors are **installed by default** with every installation of Netdata. You do not need to install
+collectors manually to collect metrics from new sources. See our 
+[list of supported collectors](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md).
 
-Most users will want to enable a new Netdata collector for their app/service. For those details, see
-our [collectors' configuration reference](/collectors/REFERENCE.md).
+Upon startup, Netdata will **auto-detect** any application or service that has a collector, as long as both the collector
+and the app/service are configured correctly. If you don't see charts for your application, see
+our [collectors' configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md).
 
-## Take your next steps with collectors
+## How Netdata's metrics collectors work
 
-[Supported collectors list](/collectors/COLLECTORS.md)
+Every collector has two primary jobs:
 
-[Collectors configuration reference](/collectors/REFERENCE.md)
+-   Look for exposed metrics at a pre- or user-defined endpoint.
+-   Gather exposed metrics and use additional logic to build meaningful, interactive visualizations.
 
-## Guides
+If the collector finds compatible metrics exposed on the configured endpoint, it begins a per-second collection job. The
+Netdata Agent gathers these metrics, sends them to the 
+[database engine for storage](https://github.com/netdata/netdata/blob/master/docs/store/change-metrics-storage.md)
+, and immediately 
+[visualizes them meaningfully](https://github.com/netdata/netdata/blob/master/docs/visualize/interact-dashboards-charts.md) 
+on dashboards.
 
-[Monitor Nginx or Apache web server log files with Netdata](/docs/guides/collect-apache-nginx-web-logs.md)
+Each collector comes with a pre-defined configuration that matches the default setup for that application. This endpoint
+can be a URL and port, a socket, a file, a web page, and more. The endpoint is user-configurable, as are many other 
+specifics of what a given collector does.
 
-[Monitor CockroachDB metrics with Netdata](/docs/guides/monitor-cockroachdb.md)
+## Collector architecture and terminology
 
-[Monitor Unbound DNS servers with Netdata](/docs/guides/collect-unbound-metrics.md)
+-   **Collectors** are the processes/programs that actually gather metrics from various sources. 
 
-[Monitor a Hadoop cluster with Netdata](/docs/guides/monitor-hadoop-cluster.md)
+-   **Plugins** help manage all the independent data collection processes in a variety of programming languages, based on 
+    their purpose  and performance requirements. There are three types of plugins:
 
-## Related features
+    -   **Internal** plugins organize collectors that gather metrics from `/proc`, `/sys` and other Linux kernel sources.
+        They are written in `C`, and run as threads within the Netdata daemon.
 
-**[Dashboards](/web/README.md)**: Visualize your newly-collect metrics in real-time using Netdata's [built-in
-dashboard](/web/gui/README.md). 
+    -   **External** plugins organize collectors that gather metrics from external processes, such as a MySQL database or
+        Nginx web server. They can be written in any language, and the `netdata` daemon spawns them as long-running
+        independent processes. They communicate with the daemon via pipes. All external plugins are managed by
+        [plugins.d](https://github.com/netdata/netdata/blob/master/collectors/plugins.d/README.md), which provides additional management options.
 
-**[Exporting](/exporting/README.md)**: Extend our built-in [database engine](/database/engine/README.md), which supports
-long-term metrics storage, by archiving metrics to external databases like Graphite, Prometheus, MongoDB, TimescaleDB, and more.
-It can export metrics to multiple databases simultaneously.
+-   **Orchestrators** are external plugins that run and manage one or more modules. They run as independent processes.
+    The Go orchestrator is in active development.
 
+    -   [go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md): An orchestrator for data
+        collection modules written in `go`.
 
+    -   [python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md): 
+        An orchestrator for data collection modules written in `python` v2/v3.
+
+    -   [charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md): 
+        An orchestrator for data collection modules written in`bash` v4+.
+
+-   **Modules** are the individual programs controlled by an orchestrator to collect data from a specific application, or type of endpoint.

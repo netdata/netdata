@@ -20,7 +20,6 @@ fi
 PACKAGES_NETDATA=${PACKAGES_NETDATA-1}
 PACKAGES_NETDATA_PYTHON=${PACKAGES_NETDATA_PYTHON-0}
 PACKAGES_NETDATA_PYTHON3=${PACKAGES_NETDATA_PYTHON3-1}
-PACKAGES_NETDATA_PYTHON_MONGO=${PACKAGES_NETDATA_PYTHON_MONGO-0}
 PACKAGES_DEBUG=${PACKAGES_DEBUG-0}
 PACKAGES_IPRANGE=${PACKAGES_IPRANGE-0}
 PACKAGES_FIREHOL=${PACKAGES_FIREHOL-0}
@@ -104,8 +103,6 @@ Supported packages (you can append many of them):
     - python         install python
 
     - python3        install python3
-
-    - python-pymongo install python-pymongo (or python3-pymongo for python3)
 
     - sensors        install lm_sensors for monitoring h/w sensors
 
@@ -715,6 +712,7 @@ declare -A pkg_tar=(
   ['gentoo']="app-arch/tar"
   ['clearlinux']="os-core-update"
   ['macos']="NOTREQUIRED"
+  ['freebsd']="NOTREQUIRED"
   ['default']="tar"
 )
 
@@ -878,26 +876,6 @@ declare -A pkg_make=(
   ['default']="make"
 )
 
-declare -A pkg_netcat=(
-  ['alpine']="netcat-openbsd"
-  ['arch']="netcat"
-  ['centos']="nmap-ncat"
-  ['debian']="netcat"
-  ['gentoo']="net-analyzer/netcat"
-  ['sabayon']="net-analyzer/gnu-netcat"
-  ['rhel']="nmap-ncat"
-  ['ol']="nmap-ncat"
-  ['suse']="netcat-openbsd"
-  ['clearlinux']="sysadmin-basic"
-  ['arch']="gnu-netcat"
-  ['macos']="NOTREQUIRED"
-  ['default']="netcat"
-
-  # exceptions
-  ['centos-6']="nc"
-  ['rhel-6']="nc"
-)
-
 declare -A pkg_nginx=(
   ['gentoo']="www-servers/nginx"
   ['default']="nginx"
@@ -952,41 +930,6 @@ declare -A pkg_python3_pip=(
   ['clearlinux']="python3-basic"
   ['macos']="NOTREQUIRED"
   ['default']="python3-pip"
-)
-
-declare -A pkg_python_pymongo=(
-  ['alpine']="WARNING|"
-  ['arch']="python2-pymongo"
-  ['centos']="WARNING|"
-  ['debian']="python-pymongo"
-  ['gentoo']="dev-python/pymongo"
-  ['suse']="python-pymongo"
-  ['clearlinux']="WARNING|"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['macos']="WARNING|"
-  ['default']="python-pymongo"
-)
-
-declare -A pkg_python3_pymongo=(
-  ['alpine']="WARNING|"
-  ['arch']="python-pymongo"
-  ['centos']="WARNING|"
-  ['debian']="python3-pymongo"
-  ['gentoo']="dev-python/pymongo"
-  ['suse']="python3-pymongo"
-  ['clearlinux']="WARNING|"
-  ['rhel']="WARNING|"
-  ['ol']="WARNING|"
-  ['freebsd']="py37-pymongo"
-  ['macos']="WARNING|"
-  ['default']="python3-pymongo"
-
-  ['centos-7']="python36-pymongo"
-  ['centos-8']="python3-pymongo"
-  ['rhel-7']="python36-pymongo"
-  ['rhel-8']="python3-pymongo"
-  ['ol-8']="python3-pymongo"
 )
 
 declare -A pkg_python_requests=(
@@ -1253,7 +1196,6 @@ packages() {
     require_cmd tar || suitable_package tar
     require_cmd curl || suitable_package curl
     require_cmd gzip || suitable_package gzip
-    require_cmd nc || suitable_package netcat
   fi
 
   # -------------------------------------------------------------------------
@@ -1314,7 +1256,6 @@ packages() {
   if [ "${PACKAGES_NETDATA_PYTHON}" -ne 0 ]; then
     require_cmd python || suitable_package python
 
-    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python-pymongo
     # suitable_package python-requests
     # suitable_package python-pip
   fi
@@ -1325,7 +1266,6 @@ packages() {
   if [ "${PACKAGES_NETDATA_PYTHON3}" -ne 0 ]; then
     require_cmd python3 || suitable_package python3
 
-    [ "${PACKAGES_NETDATA_PYTHON_MONGO}" -ne 0 ] && suitable_package python3-pymongo
     # suitable_package python3-requests
     # suitable_package python3-pip
   fi
@@ -1436,6 +1376,7 @@ validate_tree_freebsd() {
   echo >&2 " > Checking for gmake ..."
   if ! pkg query %n-%v | grep -q gmake; then
     if prompt "gmake is required to build on FreeBSD and is not installed. Shall I install it?"; then
+      # shellcheck disable=2086
       run ${sudo} pkg install ${opts} gmake
     fi
   fi
@@ -1485,13 +1426,16 @@ validate_tree_centos() {
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} dnf config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} dnf ${opts} install 'dnf-command(config-manager)'
       fi
     fi
 
     echo >&2 " > Checking for CRB ..."
+    # shellcheck disable=2086
     if ! run dnf ${sudo} repolist | grep CRB; then
       if prompt "CRB not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} dnf ${opts} config-manager --set-enabled crb
       fi
     fi
@@ -1499,24 +1443,29 @@ validate_tree_centos() {
     echo >&2 " > Checking for config-manager ..."
     if ! run ${sudo} yum config-manager --help; then
       if prompt "config-manager not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install 'dnf-command(config-manager)'
       fi
     fi
 
     echo >&2 " > Checking for PowerTools ..."
+    # shellcheck disable=2086
     if ! run yum ${sudo} repolist | grep PowerTools; then
       if prompt "PowerTools not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} config-manager --set-enabled powertools
       fi
     fi
 
     echo >&2 " > Updating libarchive ..."
+    # shellcheck disable=2086
     run ${sudo} yum ${opts} install libarchive
 
   elif [[ "${version}" =~ ^7(\..*)?$ ]]; then
     echo >&2 " > Checking for EPEL ..."
     if ! rpm -qa | grep epel-release > /dev/null; then
       if prompt "EPEL not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install epel-release
       fi
     fi
@@ -1525,6 +1474,7 @@ validate_tree_centos() {
     echo >&2 " > Checking for Okay ..."
     if ! rpm -qa | grep okay > /dev/null; then
       if prompt "okay not found, shall I install it?"; then
+        # shellcheck disable=2086
         run ${sudo} yum ${opts} install http://repo.okay.com.mx/centos/6/x86_64/release/okay-release-1-3.el6.noarch.rpm
       fi
     fi
@@ -1687,7 +1637,7 @@ install_equo() {
 PACMAN_DB_SYNCED=0
 validate_install_pacman() {
 
-  if [ ${PACMAN_DB_SYNCED} -eq 0 ]; then
+  if [ "${PACMAN_DB_SYNCED}" -eq 0 ]; then
     echo >&2 " > Running pacman -Sy to sync the database"
     local x
     x=$(pacman -Sy)
@@ -1867,7 +1817,7 @@ EOF
 remote_log() {
   # log success or failure on our system
   # to help us solve installation issues
-  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&pymongo=${PACKAGES_NETDATA_PYTHON_MONGO}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
+  curl > /dev/null 2>&1 -Ss --max-time 3 "https://registry.my-netdata.io/log/installer?status=${1}&error=${2}&distribution=${distribution}&version=${version}&installer=${package_installer}&tree=${tree}&detection=${detection}&netdata=${PACKAGES_NETDATA}&python=${PACKAGES_NETDATA_PYTHON}&python3=${PACKAGES_NETDATA_PYTHON3}&sensors=${PACKAGES_NETDATA_SENSORS}&database=${PACKAGES_NETDATA_DATABASE}&ebpf=${PACKAGES_NETDATA_EBPF}&firehol=${PACKAGES_FIREHOL}&fireqos=${PACKAGES_FIREQOS}&iprange=${PACKAGES_IPRANGE}&update_ipsets=${PACKAGES_UPDATE_IPSETS}&demo=${PACKAGES_NETDATA_DEMO_SITE}"
 }
 
 if [ -z "${1}" ]; then
@@ -1930,10 +1880,8 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_NETDATA_SENSORS=1
       PACKAGES_NETDATA_DATABASE=1
@@ -1955,16 +1903,6 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA_PYTHON3=1
       ;;
 
-    python-pymongo)
-      if [ "${pv}" -eq 2 ]; then
-        PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
-      else
-        PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
-      fi
-      ;;
-
     sensors | netdata-sensors)
       PACKAGES_NETDATA=1
       PACKAGES_NETDATA_PYTHON3=1
@@ -1984,10 +1922,8 @@ while [ -n "${1}" ]; do
       PACKAGES_NETDATA=1
       if [ "${pv}" -eq 2 ]; then
         PACKAGES_NETDATA_PYTHON=1
-        PACKAGES_NETDATA_PYTHON_MONGO=1
       else
         PACKAGES_NETDATA_PYTHON3=1
-        PACKAGES_NETDATA_PYTHON3_MONGO=1
       fi
       PACKAGES_DEBUG=1
       PACKAGES_IPRANGE=1

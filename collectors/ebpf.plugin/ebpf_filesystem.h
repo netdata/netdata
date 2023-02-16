@@ -11,7 +11,6 @@
 #define NETDATA_FS_MAX_DIST_NAME 64UL
 
 #define NETDATA_FILESYSTEM_CONFIG_NAME "filesystem"
-#define NETDATA_FILESYSTEM_READ_SLEEP_MS 600000ULL
 
 // Process configuration name
 #define NETDATA_FILESYSTEM_CONFIG_FILE "filesystem.conf"
@@ -43,7 +42,7 @@ enum netdata_filesystem_table {
     NETDATA_ADDR_FS_TABLE
 };
 
-extern void *ebpf_filesystem_thread(void *ptr);
+void *ebpf_filesystem_thread(void *ptr);
 extern struct config fs_config;
 
 #endif /* NETDATA_EBPF_FILESYSTEM_H */

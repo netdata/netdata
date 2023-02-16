@@ -34,8 +34,6 @@ area/build:
   - "**/Makefile.am"
 
 area/ci:
-  - .travis/*
-  - .travis/**/*
   - .github/*
   - .github/**/*
 
@@ -87,10 +85,6 @@ collectors/diskspace:
 collectors/ebpf:
   - collectors/ebpf.plugin/*
   - collectors/ebpf.plugin/**/*
-
-collectors/fping:
-  - collectors/fping.plugin/*
-  - collectors/fping.plugin/**/*
 
 collectors/freebsd:
   - collectors/freebsd.plugin/*

@@ -23,7 +23,6 @@ package_tree="
   tar
   curl
   gzip
-  netcat
   zlib1g-dev
   uuid-dev
   libmnl-dev

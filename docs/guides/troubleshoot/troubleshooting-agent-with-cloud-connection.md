@@ -1,7 +1,11 @@
 <!--
 title: "Troubleshoot Agent-Cloud connectivity issues"
+sidebar_label: "Troubleshoot Agent-Cloud connectivity issues"
 description: "A simple guide to troubleshoot occurrences where the Agent is showing as offline after claiming."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
+custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/troubleshoot/troubleshooting-agent-with-cloud-connection.md
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Guides/Troubleshoot"
 -->
 
 # Troubleshoot Agent-Cloud connectivity issues
@@ -13,9 +17,13 @@ We identified some scenarios that might cause this delay and possible actions yo
 
 The most common explanation for the delay usually falls into one of the following three categories:
 
-- [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
-- [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
-- [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
+- [Troubleshoot Agent-Cloud connectivity issues](#troubleshoot-agent-cloud-connectivity-issues)
+  - [The claiming process of the kickstart script was unsuccessful](#the-claiming-process-of-the-kickstart-script-was-unsuccessful)
+    - [The kickstart script auto-claimed the Agent but there was no error message displayed](#the-kickstart-script-auto-claimed-the-agent-but-there-was-no-error-message-displayed)
+  - [Claiming on an older, deprecated version of the Agent](#claiming-on-an-older-deprecated-version-of-the-agent)
+  - [Network issues while connecting to the Cloud](#network-issues-while-connecting-to-the-cloud)
+    - [Verify that your IP is whitelisted from Netdata Cloud](#verify-that-your-ip-is-whitelisted-from-netdata-cloud)
+    - [Make sure that your node has internet connectivity and can resolve network domains](#make-sure-that-your-node-has-internet-connectivity-and-can-resolve-network-domains)
 
 ## The claiming process of the kickstart script was unsuccessful
 
@@ -51,7 +59,7 @@ and you must do it manually, using the following steps:
 :::note
 
 In some cases a simple restart of the Agent can fix the issue.  
-Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/start-stop-restart.md).
+Read more about [Starting, Stopping and Restarting the Agent](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 :::
 
@@ -59,13 +67,13 @@ Read more about [Starting, Stopping and Restarting the Agent](/docs/configure/st
 
 Make sure that you are using the latest version of Netdata if you are using the [Claiming script](https://learn.netdata.cloud/docs/agent/claim#claiming-script).
 
-With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://learn.netdata.cloud/docs/agent/packaging/installer/update) to the latest stable version.
+With the introduction of our new architecture, Agents running versions lower than `v1.32.0` can face claiming problems, so we recommend you [update the Netdata Agent](https://github.com/netdata/netdata/blob/master/packaging/installer/UPDATE.md) to the latest stable version.
 
 ## Network issues while connecting to the Cloud
 
 ### Verify that your IP is whitelisted from Netdata Cloud
 
-Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `app.netdata.cloud` due to security concerns.
+Most of the nodes change IPs dynamically. It is possible that your current IP has been restricted from accessing `api.netdata.cloud` due to security concerns.
 
 To verify this:
 
@@ -75,7 +83,7 @@ To verify this:
     sudo netdatacli aclk-state | grep "Banned By Cloud"
     ```
 
-    The output will contain a line indicating if the IP is banned from `app.netdata.cloud`:
+    The output will contain a line indicating if the IP is banned from `api.netdata.cloud`:
 
     ```bash
     Banned By Cloud: yes
@@ -97,13 +105,13 @@ To verify this:
 2. If you can reach external IPs, then check your domain resolution.
 
     ```bash
-    host app.netdata.cloud
+    host api.netdata.cloud
     ```
 
     The expected output should be something like this:
 
     ```bash
-    app.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
+    api.netdata.cloud is an alias for main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com.
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 54.198.178.11
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.207.131.212
     main-ingress-545609a41fcaf5d6.elb.us-east-1.amazonaws.com has address 44.196.50.41
@@ -111,7 +119,7 @@ To verify this:
 
     :::info
 
-    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist the `app.netdata.cloud` domain to be able to see your nodes in Netdata Cloud.  
+    There will be cases in which the firewall restricts network access. In those cases, you need to whitelist `api.netdata.cloud` and `mqtt.netdata.cloud` domains to be able to see your nodes in Netdata Cloud.  
     If you can't whitelist domains in your firewall, you can whitelist the IPs that the above command will produce, but keep in mind that they can change without any notice.
 
     :::

@@ -59,9 +59,9 @@ static inline void registry_set_person_cookie(struct web_client *w, REGISTRY_PER
 
 static inline void registry_json_header(RRDHOST *host, struct web_client *w, const char *action, const char *status) {
     buffer_flush(w->response.data);
-    w->response.data->contenttype = CT_APPLICATION_JSON;
+    w->response.data->content_type = CT_APPLICATION_JSON;
     buffer_sprintf(w->response.data, "{\n\t\"action\": \"%s\",\n\t\"status\": \"%s\",\n\t\"hostname\": \"%s\",\n\t\"machine_guid\": \"%s\"",
-            action, status, host->registry_hostname, host->machine_guid);
+            action, status, rrdhost_registry_hostname(host), host->machine_guid);
 }
 
 static inline void registry_json_footer(struct web_client *w) {
@@ -108,9 +108,7 @@ static int registry_json_person_url_callback(void *entry, void *data) {
 }
 
 // callback for rendering MACHINE_URLs
-static int registry_json_machine_url_callback(const char *name, void *entry, void *data) {
-    (void)name;
-
+static int registry_json_machine_url_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data) {
     REGISTRY_MACHINE_URL *mu = (REGISTRY_MACHINE_URL *)entry;
     struct registry_json_walk_person_urls_callback *c = (struct registry_json_walk_person_urls_callback *)data;
     struct web_client *w = c->w;
@@ -166,10 +164,12 @@ void registry_update_cloud_base_url()
 int registry_request_hello_json(RRDHOST *host, struct web_client *w) {
     registry_json_header(host, w, "hello", REGISTRY_STATUS_OK);
 
+    const char *cloud_ui_url = appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud ui url", DEFAULT_CLOUD_UI_URL);
+
     buffer_sprintf(w->response.data,
             ",\n\t\"registry\": \"%s\",\n\t\"cloud_base_url\": \"%s\",\n\t\"anonymous_statistics\": %s",
             registry.registry_to_announce,
-            registry.cloud_base_url, netdata_anonymous_statistics_enabled?"true":"false");
+            cloud_ui_url, netdata_anonymous_statistics_enabled?"true":"false");
 
     registry_json_footer(w);
     return 200;
@@ -191,7 +191,7 @@ int registry_request_access_json(RRDHOST *host, struct web_client *w, char *pers
     if(registry.verify_cookies_redirects > 0 && !person_guid[0]) {
         buffer_flush(w->response.data);
         registry_set_cookie(w, REGISTRY_VERIFY_COOKIES_GUID);
-        w->response.data->contenttype = CT_APPLICATION_JSON;
+        w->response.data->content_type = CT_APPLICATION_JSON;
         buffer_sprintf(w->response.data, "{ \"status\": \"redirect\", \"registry\": \"%s\" }", registry.registry_to_announce);
         return 200;
     }
@@ -379,7 +379,6 @@ void registry_statistics(void) {
 
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(sts);
 
     rrddim_set(sts, "sessions", registry.usages_count);
     rrdset_done(sts);
@@ -408,7 +407,6 @@ void registry_statistics(void) {
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stc);
 
     rrddim_set(stc, "persons",       registry.persons_count);
     rrddim_set(stc, "machines",      registry.machines_count);
@@ -441,10 +439,9 @@ void registry_statistics(void) {
         rrddim_add(stm, "persons_urls",   NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
-    else rrdset_next(stm);
 
-    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_allocated_memory(registry.persons));
-    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_allocated_memory(registry.machines));
+    rrddim_set(stm, "persons",       registry.persons_memory + dictionary_stats_for_registry(registry.persons));
+    rrddim_set(stm, "machines",      registry.machines_memory + dictionary_stats_for_registry(registry.machines));
     rrddim_set(stm, "urls",          registry.urls_memory);
     rrddim_set(stm, "persons_urls",  registry.persons_urls_memory);
     rrddim_set(stm, "machines_urls", registry.machines_urls_memory);

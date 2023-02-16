@@ -3,6 +3,8 @@
 # Author: Ilya Mashchenko (ilyam8)
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+import os
+
 from bases.collection import safe_print
 
 CHART_PARAMS = ['type', 'id', 'name', 'title', 'units', 'family', 'context', 'chart_type', 'hidden']
@@ -18,14 +20,23 @@ CHART_CREATE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{cont
 CHART_OBSOLETE = "CHART {type}.{id} '{name}' '{title}' '{units}' '{family}' '{context}' " \
                  "{chart_type} {priority} {update_every} '{hidden} obsolete'\n"
 
+CLABEL_COLLECT_JOB = "CLABEL '_collect_job' '{actual_job_name}' '0'\n"
+CLABEL_COMMIT = "CLABEL_COMMIT\n"
+
 DIMENSION_CREATE = "DIMENSION '{id}' '{name}' {algorithm} {multiplier} {divisor} '{hidden} {obsolete}'\n"
 DIMENSION_SET = "SET '{id}' = {value}\n"
 
 CHART_VARIABLE_SET = "VARIABLE CHART '{id}' = {value}\n"
 
+# 1 is label source auto
+# https://github.com/netdata/netdata/blob/cc2586de697702f86a3c34e60e23652dd4ddcb42/database/rrd.h#L205
 RUNTIME_CHART_CREATE = "CHART netdata.runtime_{job_name} '' 'Execution time' 'ms' 'python.d' " \
                        "netdata.pythond_runtime line 145000 {update_every} '' 'python.d.plugin' '{module_name}'\n" \
+                       "CLABEL '_collect_job' '{actual_job_name}' '1'\n" \
+                       "CLABEL_COMMIT\n" \
                        "DIMENSION run_time 'run time' absolute 1 1\n"
+
+ND_INTERNAL_MONITORING_DISABLED = os.getenv("NETDATA_INTERNALS_MONITORING") == "NO"
 
 
 def create_runtime_chart(func):
@@ -42,12 +53,14 @@ def create_runtime_chart(func):
 
     def wrapper(*args, **kwargs):
         self = args[0]
-        chart = RUNTIME_CHART_CREATE.format(
-            job_name=self.name,
-            update_every=self._runtime_counters.update_every,
-            module_name=self.module_name,
-        )
-        safe_print(chart)
+        if not ND_INTERNAL_MONITORING_DISABLED:
+            chart = RUNTIME_CHART_CREATE.format(
+                job_name=self.name,
+                actual_job_name=self.actual_job_name,
+                update_every=self._runtime_counters.update_every,
+                module_name=self.module_name,
+            )
+            safe_print(chart)
         ok = func(*args, **kwargs)
         return ok
 
@@ -77,13 +90,14 @@ class Charts:
     Chart is a instance of Chart class.
     Charts adding must be done using Charts.add_chart() method only"""
 
-    def __init__(self, job_name, priority, cleanup, get_update_every, module_name):
+    def __init__(self, job_name, actual_job_name, priority, cleanup, get_update_every, module_name):
         """
         :param job_name: <bound method>
         :param priority: <int>
         :param get_update_every: <bound method>
         """
         self.job_name = job_name
+        self.actual_job_name = actual_job_name
         self.priority = priority
         self.cleanup = cleanup
         self.get_update_every = get_update_every
@@ -131,6 +145,7 @@ class Charts:
         new_chart.params['update_every'] = self.get_update_every()
         new_chart.params['priority'] = self.priority
         new_chart.params['module_name'] = self.module_name
+        new_chart.params['actual_job_name'] = self.actual_job_name
 
         self.priority += 1
         self.charts[new_chart.id] = new_chart
@@ -230,13 +245,14 @@ class Chart:
         :return:
         """
         chart = CHART_CREATE.format(**self.params)
+        labels = CLABEL_COLLECT_JOB.format(**self.params) + CLABEL_COMMIT
         dimensions = ''.join([dimension.create() for dimension in self.dimensions])
         variables = ''.join([var.set(var.value) for var in self.variables if var])
 
         self.flags.push = False
         self.flags.created = True
 
-        safe_print(chart + dimensions + variables)
+        safe_print(chart + labels + dimensions + variables)
 
     def can_be_updated(self, data):
         for dim in self.dimensions:

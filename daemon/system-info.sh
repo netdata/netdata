@@ -33,7 +33,8 @@ if [ -z "${VIRTUALIZATION}" ]; then
   if command -v systemd-detect-virt >/dev/null 2>&1; then
     VIRTUALIZATION="$(systemd-detect-virt -v)"
     VIRT_DETECTION="systemd-detect-virt"
-    CONTAINER=${CONTAINER:-$(systemd-detect-virt -c)}
+    CONTAINER_DETECT_TMP="$(systemd-detect-virt -c)"
+    [ -n "$CONTAINER_DETECT_TMP" ] && CONTAINER="$CONTAINER_DETECT_TMP"
     CONT_DETECTION="systemd-detect-virt"
   elif command -v lscpu >/dev/null 2>&1; then
     VIRTUALIZATION=$(lscpu | grep "Hypervisor vendor:" | cut -d: -f 2 | awk '{$1=$1};1')
@@ -216,6 +217,9 @@ if [ -n "${lscpu}" ] && lscpu > /dev/null 2>&1; then
   LCPU_COUNT="$(echo "${lscpu_output}" | grep "^CPU(s):" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_VENDOR="$(echo "${lscpu_output}" | grep "^Vendor ID:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
   CPU_MODEL="$(echo "${lscpu_output}" | grep "^Model name:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if grep -q "^lxcfs /proc" /proc/self/mounts 2>/dev/null && count=$(grep -c ^processor /proc/cpuinfo 2>/dev/null); then
+    LCPU_COUNT="$count"
+  fi
   possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU max MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*')"
   if [ -z "$possible_cpu_freq" ]; then
     possible_cpu_freq="$(echo "${lscpu_output}" | grep -F "CPU MHz:" | cut -f 2 -d ':' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | grep -o '^[0-9]*')"
@@ -436,7 +440,7 @@ CLOUD_INSTANCE_TYPE="unknown"
 CLOUD_INSTANCE_REGION="unknown"
 
 if [ "${VIRTUALIZATION}" != "none" ] && command -v curl > /dev/null 2>&1; then
-  # Returned HTTP status codes: GCP is 200, AWS is 200, DO is 404. 
+  # Returned HTTP status codes: GCP is 200, AWS is 200, DO is 404.
   curl --fail -s -m 1 --noproxy "*" http://169.254.169.254 >/dev/null 2>&1
   ret=$?
   # anything but operation timeout.

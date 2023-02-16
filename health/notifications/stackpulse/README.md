@@ -2,7 +2,11 @@
 title: "Send notifications to StackPulse"
 description: "Send alerts to your StackPulse Netdata integration any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "StackPulse"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/health/notifications/stackpulse/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/stackpulse/README.md"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Integrations/Notify/Agent alert notifications"
+learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
 # Send notifications to StackPulse
@@ -40,7 +44,7 @@ STACKPULSE_WEBHOOK="https://hooks.stackpulse.io/v1/webhooks/YOUR_UNIQUE_ID"
 ```
 
 4.  Now restart Netdata using `sudo systemctl restart netdata`, or the [appropriate
-    method](/docs/configure/start-stop-restart.md) for your system. When your node creates an alarm, you can see the
+    method](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md) for your system. When your node creates an alarm, you can see the
     associated notification on your StackPulse Administration Portal 
 
 ## React to alarms with playbooks

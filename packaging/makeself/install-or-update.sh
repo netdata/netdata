@@ -27,7 +27,7 @@ fi
 
 STARTIT=1
 REINSTALL_OPTIONS=""
-RELEASE_CHANNEL="nightly" # check .travis/create_artifacts.sh before modifying
+RELEASE_CHANNEL="nightly"
 
 while [ "${1}" ]; do
   case "${1}" in
@@ -121,6 +121,11 @@ if portable_add_group netdata; then
         run_failed "Failed to add netdata user to secondary groups"
       fi
     done
+    # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/*
+    # for reading VMs/containers names, CPU and memory limits on Proxmox.
+    if [ -d "/etc/pve" ]; then
+      portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
+    fi
     NETDATA_USER="netdata"
     NETDATA_GROUP="netdata"
   else
@@ -174,7 +179,7 @@ dir_should_be_link() {
   fi
 
   run ln -s "${t}" "${d}"
-  cd "${old}"
+  cd "${old}" || true
 }
 
 dir_should_be_link . bin sbin
@@ -215,13 +220,7 @@ for x in apps.plugin freeipmi.plugin ioping cgroup-network ebpf.plugin perf.plug
 done
 
 if [ -f "usr/libexec/netdata/plugins.d/go.d.plugin" ] && command -v setcap 1>/dev/null 2>&1; then
-  run setcap cap_net_admin+epi "usr/libexec/netdata/plugins.d/go.d.plugin"
-fi
-
-# fix the fping binary
-if [ -f bin/fping ]; then
-  run chown root:${NETDATA_GROUP} bin/fping
-  run chmod 4750 bin/fping
+  run setcap "cap_net_admin+epi cap_net_raw=eip" "usr/libexec/netdata/plugins.d/go.d.plugin"
 fi
 
 # -----------------------------------------------------------------------------

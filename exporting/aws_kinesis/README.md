@@ -1,8 +1,10 @@
 <!--
 title: "Export metrics to AWS Kinesis Data Streams"
 description: "Archive your Agent's metrics to AWS Kinesis Data Streams for long-term storage, further analysis, or correlation with data from other sources."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/exporting/aws_kinesis/README.md
-sidebar_label: AWS Kinesis Data Streams
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/exporting/aws_kinesis/README.md"
+sidebar_label: "AWS Kinesis Data Streams"
+learn_status: "Published"
+learn_rel_path: "Integrations/Export"
 -->
 
 # Export metrics to AWS Kinesis Data Streams
@@ -50,7 +52,8 @@ Set AWS credentials and stream name:
     stream name = your_stream_name
 ```
 
-Alternatively, you can set AWS credentials for the `netdata` user using AWS SDK for C++ [standard methods](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html).
+Alternatively, you can set AWS credentials for the `netdata` user using AWS SDK for
+C++ [standard methods](https://docs.aws.amazon.com/sdk-for-cpp/v1/developer-guide/credentials.html).
 
 Netdata automatically computes a partition key for every record with the purpose to distribute records across
 available shards evenly.

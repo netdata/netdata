@@ -1,6 +1,9 @@
 <!--
 title: "Alarms"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/alarms/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/alarms/README.md"
+sidebar_label: "Alarms"
+learn_status: "Published"
+learn_rel_path: "Integrations/Monitor/Netdata"
 -->
 
 # Alarms - graphing Netdata alarm states over time
@@ -23,7 +26,7 @@ Below is an example of the chart produced when running `stress-ng --all 2` for a
 
 ## Configuration
 
-Enable the collector and [restart Netdata](/docs/configure/start-stop-restart.md).
+Enable the collector and [restart Netdata](https://github.com/netdata/netdata/blob/master/docs/configure/start-stop-restart.md).
 
 ```bash
 cd /etc/netdata/
@@ -33,7 +36,7 @@ sudo systemctl restart netdata
 ```
 
 If needed, edit the `python.d/alarms.conf` configuration file using `edit-config` from the your agent's [config
-directory](/docs/configure/nodes.md), which is usually at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is usually at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -58,6 +61,9 @@ local:
   # a "," separated list of words you want to filter alarm names for. For example 'cpu,load' would filter for only
   # alarms with "cpu" or "load" in alarm name. Default includes all.
   alarm_contains_words: ''
+  # a "," separated list of words you want to exclude based on alarm name. For example 'cpu,load' would exclude 
+  # all alarms with "cpu" or "load" in alarm name. Default excludes None.
+  alarm_excludes_words: ''
 ```
 
 It will default to pulling all alarms at each time step from the Netdata rest api at `http://127.0.0.1:19999/api/v1/alarms?all`

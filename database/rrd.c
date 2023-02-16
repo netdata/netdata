@@ -135,7 +135,7 @@ const char *rrdset_type_name(RRDSET_TYPE chart_type) {
 // ----------------------------------------------------------------------------
 // RRD - cache directory
 
-char *rrdset_cache_dir(RRDHOST *host, const char *id) {
+char *rrdhost_cache_dir_for_rrdset_alloc(RRDHOST *host, const char *id) {
     char *ret = NULL;
 
     char b[FILENAME_MAX + 1];
@@ -154,3 +154,15 @@ char *rrdset_cache_dir(RRDHOST *host, const char *id) {
     return ret;
 }
 
+// ----------------------------------------------------------------------------
+// RRD - string management
+
+STRING *rrd_string_strdupz(const char *s) {
+    if(unlikely(!s || !*s)) return string_strdupz(s);
+
+    char *tmp = strdupz(s);
+    json_fix_string(tmp);
+    STRING *ret = string_strdupz(tmp);
+    freez(tmp);
+    return ret;
+}

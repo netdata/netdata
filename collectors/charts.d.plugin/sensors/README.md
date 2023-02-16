@@ -1,21 +1,20 @@
 <!--
 title: "Linux machine sensors monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/charts.d.plugin/sensors/README.md"
+sidebar_label: "lm-sensors"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
 # Linux machine sensors monitoring with Netdata
 
-> THIS MODULE IS OBSOLETE.
-> USE [THE PYTHON ONE](/collectors/python.d.plugin/sensors) - IT SUPPORTS MULTIPLE JOBS AND IT IS MORE EFFICIENT
->
-> Unlike the python one, this module can collect temperature on RPi.
+Use this collector when `lm-sensors` doesn't work on your device (e.g. for RPi temperatures). 
+For all other cases use the [Python collector](/collectors/python.d.plugin/sensors), which supports multiple 
+jobs, is more efficient and performs calculations on top of the kernel provided values.
 
-The plugin will provide charts for all configured system sensors
-
-> This plugin is reading sensors directly from the kernel.
-> The `lm-sensors` package is able to perform calculations on the
-> kernel provided values, this plugin will not perform.
-> So, the values graphed, are the raw hardware values of the sensors.
+This plugin will provide charts for all configured system sensors, by reading sensors directly from the kernel.
+The values graphed are the raw hardware values of the sensors.
 
 The plugin will create Netdata charts for:
 
@@ -32,7 +31,7 @@ One chart for every sensor chip found and each of the above will be created.
 ## Enable the collector
 
 The `sensors` collector is disabled by default. To enable it, edit the `charts.d.conf` file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -49,7 +48,7 @@ sensors=force
 ## Configuration
 
 Edit the `charts.d/sensors.conf` configuration file using `edit-config` from the
-Netdata [config directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

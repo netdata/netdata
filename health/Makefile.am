@@ -36,13 +36,14 @@ dist_healthconfig_DATA = \
     health.d/cgroups.conf \
     health.d/cpu.conf \
     health.d/cockroachdb.conf \
+    health.d/consul.conf \
     health.d/disks.conf \
     health.d/dnsmasq_dhcp.conf \
     health.d/dns_query.conf \
     health.d/dockerd.conf \
+    health.d/elasticsearch.conf \
     health.d/entropy.conf \
     health.d/exporting.conf \
-    health.d/fping.conf \
     health.d/geth.conf \
     health.d/ioping.conf \
     health.d/gearman.conf \
@@ -65,8 +66,11 @@ dist_healthconfig_DATA = \
     health.d/mysql.conf \
     health.d/net.conf \
     health.d/netfilter.conf \
+    health.d/nvme.conf \
     health.d/nut.conf \
     health.d/pihole.conf \
+    health.d/ping.conf \
+    health.d/postgres.conf \
     health.d/portcheck.conf \
     health.d/processes.conf \
     health.d/python.d.plugin.conf \

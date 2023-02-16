@@ -79,7 +79,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
     static RRDSET **st_nodezonetype = NULL;
 
     // Local temp variables
-    size_t l, o, p;
+    long unsigned int l, o, p;
     struct pageline *pgl = NULL;
 
     // --------------------------------------------------------------------
@@ -112,7 +112,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
         ff_lines = procfile_lines(ff);
         if(unlikely(!ff_lines)) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Cannot read %s, zero lines reported.", ff_path);
             return 1;
         }
 
@@ -135,21 +135,22 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pagelines_cnt++;
         }
         if (pagelines_cnt == 0) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse any valid line in %s", ff_path);
             return 1;
         }
 
         // 4th line is the "Free pages count per migrate type at order". Just subtract these 8 words.
         pageorders_cnt = procfile_linewords(ff, 3);
         if (pageorders_cnt < 9) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to parse Line 4 of %s", ff_path);
             return 1;
         }
 
         pageorders_cnt -= 9;
 
         if (pageorders_cnt > MAX_PAGETYPE_ORDER) {
-            error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d", pageorders_cnt, MAX_PAGETYPE_ORDER);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: pageorder found (%lu) is higher than max %d",
+                  (long unsigned int) pageorders_cnt, MAX_PAGETYPE_ORDER);
             return 1;
         }
 
@@ -157,7 +158,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         if (!pagelines) {
             pagelines = callocz(pagelines_cnt, sizeof(struct pageline));
             if (!pagelines) {
-                error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B", pagelines_cnt, sizeof(struct pageline));
+                collector_error("PLUGIN: PROC_PAGETYPEINFO: Cannot allocate %lu pagelines of %lu B",
+                      (long unsigned int) pagelines_cnt, (long unsigned int) sizeof(struct pageline));
                 return 1;
             }
         }
@@ -186,7 +188,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             pgl->type = typename;
             pgl->zone = zonename;
             for (o = 0; o < pageorders_cnt; o++)
-                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+                pgl->free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             p++;
         }
@@ -261,9 +263,9 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
             char node[50+1];
             snprintfz(node, 50, "node%d", pgl->node);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_id", node, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
-            rrdlabels_add(st_nodezonetype[p]->state->chart_labels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_id", node, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_zone", pgl->zone, RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st_nodezonetype[p]->rrdlabels, "node_type", pgl->type, RRDLABEL_SRC_AUTO);
 
             for (o = 0; o < pageorders_cnt; o++) {
                 char dimid[3+1];
@@ -289,7 +291,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
         size_t words = procfile_linewords(ff, l);
 
         if (words != 7+pageorders_cnt) {
-            error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu", l+1, words, 7+pageorders_cnt);
+            collector_error("PLUGIN: PROC_PAGETYPEINFO: Unable to read line %lu, %lu words found instead of %lu",
+                            l+1, (long unsigned int) words, (long unsigned int) 7+pageorders_cnt);
             break;
         }
 
@@ -299,7 +302,7 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
                 systemorders[o].size = 0;
 
             // Update orders of the current line
-            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o+6)) * 1 << o;
+            pagelines[p].free_pages_size[o] = str2uint64_t(procfile_lineword(ff, l, o + 6), NULL) * 1 << o;
 
             // Update sum by order
             systemorders[o].size += pagelines[p].free_pages_size[o];
@@ -313,10 +316,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
 
     // Global system per order
     if (st_order) {
-        rrdset_next(st_order);
-        for (o = 0; o < pageorders_cnt; o++) {
+        for (o = 0; o < pageorders_cnt; o++)
             rrddim_set_by_pointer(st_order, systemorders[o].rd, systemorders[o].size);
-        }
         rrdset_done(st_order);
     }
 
@@ -327,10 +328,8 @@ int do_proc_pagetypeinfo(int update_every, usec_t dt) {
             if (!st_nodezonetype[p])
                 continue;
 
-            rrdset_next(st_nodezonetype[p]);
             for (o = 0; o < pageorders_cnt; o++)
                 rrddim_set_by_pointer(st_nodezonetype[p], pagelines[p].rd[o], pagelines[p].free_pages_size[o]);
-
             rrdset_done(st_nodezonetype[p]);
         }
     }

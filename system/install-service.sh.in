@@ -1,0 +1,786 @@
+#!/usr/bin/env sh
+
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Handle installation of the Netdata agent as a system service.
+#
+# Exit codes:
+# 0 - Successfully installed service.
+# 1 - Invalid arguments or other internal error.
+# 2 - Unable to detect system service type.
+# 3 - Detected system service type, but type not supported.
+# 4 - Detected system service type, but could not install due to other issues.
+# 5 - Platform not supported.
+
+set -e
+
+SCRIPT_SOURCE="$(
+    self=${0}
+    while [ -L "${self}" ]
+    do
+        cd "${self%/*}" || exit 1
+        self=$(readlink "${self}")
+    done
+    cd "${self%/*}" || exit 1
+    echo "$(pwd -P)/${self##*/}"
+)"
+
+DUMP_CMDS=0
+ENABLE="auto"
+EXPORT_CMDS=0
+INSTALL=1
+LINUX_INIT_TYPES="systemd openrc lsb initd runit"
+PLATFORM="$(uname -s)"
+SHOW_SVC_TYPE=0
+SVC_SOURCE="@libsysdir_POST@"
+SVC_TYPE="detect"
+WSL_ERROR_MSG="We appear to be running in WSL and were unable to find a usable service manager. We currently support systemd, LSB init scripts, and traditional init.d style init scripts when running under WSL."
+
+# =====================================================================
+# Utility functions
+
+cleanup() {
+  ec="${?}"
+
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
+      export NETDATA_WARNINGS="${NETDATA_WARNINGS}${SAVED_WARNINGS}"
+    fi
+  fi
+
+  trap - EXIT
+
+  exit "${ec}"
+}
+
+info() {
+  printf >&2 "%s\n" "${*}"
+}
+
+warning() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${*}"
+  fi
+  printf >&2 "WARNING: %s\n" "${*}"
+}
+
+error() {
+  if [ -n "${NETDATA_SAVE_WARNINGS}" ]; then
+    SAVED_WARNINGS="${SAVED_WARNINGS}\n  - ${*}"
+  fi
+  printf >&2 "ERROR: %s\n" "${*}"
+}
+
+get_os_key() {
+  if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release || return 1
+    echo "${ID}-${VERSION_ID}"
+
+  elif [ -f /etc/redhat-release ]; then
+    cat /etc/redhat-release
+  else
+    echo "unknown"
+  fi
+}
+
+valid_types() {
+  case "${PLATFORM}" in
+    Linux)
+      echo "detect systemd openrc lsb initd"
+      ;;
+    FreeBSD)
+      echo "detect freebsd"
+      ;;
+    Darwin)
+      echo "detect launchd"
+      ;;
+    *)
+      echo "detect"
+      ;;
+  esac
+}
+
+install_generic_service() {
+  svc_type="${1}"
+  svc_type_name="${2}"
+  svc_file="${3}"
+  svc_enable_hook="${4}"
+  svc_disable_hook="${5}"
+
+  info "Installing ${svc_type_name} service file."
+  if [ ! -f "${svc_file}" ] && [ "${ENABLE}" = "auto" ]; then
+    ENABLE="enable"
+  fi
+
+  if ! install -p -m 0755 -o 0 -g 0 "${SVC_SOURCE}/netdata-${svc_type}" "${svc_file}"; then
+    error "Failed to install service file."
+    exit 4
+  fi
+
+  case "${ENABLE}" in
+    auto) true ;;
+    disable)
+      info "Disabling Netdata service."
+      ${svc_disable_hook}
+      ;;
+    enable)
+      info "Enabling Netdata service."
+      ${svc_enable_hook}
+      ;;
+  esac
+}
+
+dump_cmds() {
+  [ -n "${NETDATA_START_CMD}" ] && echo "NETDATA_START_CMD='${NETDATA_START_CMD}'"
+  [ -n "${NETDATA_STOP_CMD}" ] && echo "NETDATA_STOP_CMD='${NETDATA_STOP_CMD}'"
+  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && echo "NETDATA_INSTALLER_START_CMD='${NETDATA_INSTALLER_START_CMD}'"
+  return 0
+}
+
+export_cmds() {
+  [ -n "${NETDATA_START_CMD}" ] && export NETDATA_START_CMD="${NETDATA_START_CMD}"
+  [ -n "${NETDATA_STOP_CMD}" ] && export NETDATA_STOP_CMD="${NETDATA_STOP_CMD}"
+  [ -n "${NETDATA_INSTALLER_START_CMD}" ] && export NETDATA_INSTALLER_START_CMD="${NETDATA_INSTALLER_START_COMMAND}"
+  return 0
+}
+
+save_cmds() {
+  dump_cmds > "${SAVE_CMDS_PATH}"
+}
+
+# =====================================================================
+# Help functions
+
+usage() {
+  cat << HEREDOC
+USAGE: install-service.sh [options]
+       where options include:
+
+  --source      Specify where to find the service files to install (default ${SVC_SOURCE}).
+  --type        Specify the type of service file to install. Specify a type of 'help' to get a list of valid types for your platform.
+  --show-type   Display information about what service managers are detected.
+  --cmds        Additionally print a list of commands for starting and stopping the agent with the detected service type.
+  --export-cmds Export the variables that would be printed by the --cmds option.
+  --cmds-only   Don't install, just handle the --cmds or --export-cmds option.
+  --enable      Explicitly enable the service on install (default is to enable if not already installed).
+  --disable     Explicitly disable the service on install.
+  --help        Print this help information.
+HEREDOC
+}
+
+help_types() {
+  cat << HEREDOC
+Valid service types for ${PLATFORM} are:
+$(valid_types)
+HEREDOC
+}
+
+# =====================================================================
+# systemd support functions
+
+_check_systemd() {
+  pids=''
+  p=''
+  myns=''
+  ns=''
+
+  # if the directory /lib/systemd/system OR /usr/lib/systemd/system (SLES 12.x) does not exit, it is not systemd
+  if [ ! -d /lib/systemd/system ] && [ ! -d /usr/lib/systemd/system ]; then
+    echo "NO" && return 0
+  fi
+
+  # if there is no systemctl command, it is not systemd
+  [ -z "$(command -v systemctl 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # if pid 1 is systemd, it is systemd
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "systemd" ] && echo "YES" && return 0
+
+  # it ‘is’ systemd at this point, but systemd might not be running
+  # if not, return 2 to indicate ‘systemd, but not running’
+  pids=$(safe_pidof systemd 2> /dev/null)
+  [ -z "${pids}" ] && echo "OFFLINE" && return 0
+
+  # check if the running systemd processes are not in our namespace
+  myns="$(readlink /proc/self/ns/pid 2> /dev/null)"
+  for p in ${pids}; do
+    ns="$(readlink "/proc/${p}/ns/pid" 2> /dev/null)"
+
+    # if pid of systemd is in our namespace, it is systemd
+    [ -n "${myns}" ] && [ "${myns}" = "${ns}" ] && echo "YES" && return 0
+  done
+
+  # else, it is not systemd
+  echo "NO"
+}
+
+check_systemd() {
+  if [ -z "${IS_SYSTEMD}" ]; then
+    IS_SYSTEMD="$(_check_systemd)"
+  fi
+
+  echo "${IS_SYSTEMD}"
+}
+
+get_systemd_service_dir() {
+  if [ -w "/lib/systemd/system" ]; then
+    echo "/lib/systemd/system"
+  elif [ -w "/usr/lib/systemd/system" ]; then
+    echo "/usr/lib/systemd/system"
+  elif [ -w "/etc/systemd/system" ]; then
+    echo "/etc/systemd/system"
+  else
+    error "Unable to detect systemd service directory."
+    exit 4
+  fi
+}
+
+install_systemd_service() {
+  SRCFILE="${SVC_SOURCE}/netdata.service"
+
+  if [ "$(systemctl --version | head -n 1 | cut -f 2 -d ' ')" -le 235 ]; then
+    SRCFILE="${SVC_SOURCE}/netdata.service.v235"
+  fi
+
+  if [ "${ENABLE}" = "auto" ]; then
+    if [ "$(check_systemd)" = "YES" ]; then
+      IS_NETDATA_ENABLED="$(systemctl is-enabled netdata 2> /dev/null || echo "Netdata not there")"
+    fi
+
+    if [ "${IS_NETDATA_ENABLED}" = "disabled" ]; then
+      ENABLE="disable"
+    else
+      ENABLE="enable"
+    fi
+  fi
+
+  info "Installing systemd service..."
+  if ! install -p -m 0644 -o 0 -g 0 "${SRCFILE}" "$(get_systemd_service_dir)/netdata.service"; then
+    error "Failed to install systemd service file."
+    exit 4
+  fi
+
+  if [ "$(check_systemd)" = "YES" ]; then
+    if ! systemctl daemon-reload; then
+        warning "Failed to reload systemd unit files."
+    fi
+
+    if ! systemctl "${ENABLE}" netdata; then
+        warning "Failed to ${ENABLE} Netdata service."
+    fi
+  fi
+}
+
+systemd_cmds() {
+  if [ "$(check_systemd)" = "YES" ]; then
+    NETDATA_START_CMD='systemctl start netdata'
+    NETDATA_STOP_CMD='systemctl stop netdata'
+  else # systemd is not running, use external defaults by providing no commands
+    warning "Detected systemd, but not booted using systemd. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
+}
+
+# =====================================================================
+# OpenRC support functions
+
+_check_openrc() {
+  # if /lib/rc/sh/functions.sh does not exist, it's not OpenRC
+  [ ! -f /lib/rc/sh/functions.sh ] && echo "NO" && return 0
+
+  # if there is no /etc/init.d, it's not OpenRC
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
+
+  # if there is no rc-update command, it's not OpenRC
+  [ -z "$(command -v rc-update 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # If /run/openrc/softlevel exists, it's OpenRC
+  [ -f /run/openrc/softlevel ] && echo "YES" && return 0
+
+  # if PID 1 is openrc-init, it's OpenRC
+  [ "$(basename "$(readlink /proc/1/exe)" 2> /dev/null)" = "openrc-init" ] && echo "YES" && return 0
+
+  # if there is an openrc command, it's OpenRC, but not booted as such
+  [ -n "$(command -v openrc 2>/dev/null || true)" ] && echo "OFFLINE" && return 0
+
+  # if /etc/init.d/local exists and has `openrc-run` in it's shebang line, it’s OpenRC, but not booted as such
+  [ -r /etc/init.d/local ] && head -n 1 /etc/init.d/local | grep -q openrc-run && echo "OFFLINE" && return 0
+
+  # Otherwise, it’s not OpenRC
+  echo "NO" && return 0
+}
+
+check_openrc() {
+  if [ -z "${IS_OPENRC}" ]; then
+    IS_OPENRC="$(_check_openrc)"
+  fi
+
+  echo "${IS_OPENRC}"
+}
+
+enable_openrc() {
+  if [ "$(check_openrc)" = "YES" ]; then
+    runlevel="$(rc-status -r)"
+  fi
+
+  runlevel="${runlevel:-default}"
+
+  if ! rc-update add netdata "${runlevel}"; then
+    warning "Failed to enable Netdata service in runlevel ${runlevel}."
+  fi
+}
+
+disable_openrc() {
+  for runlevel in /etc/runlevels/*; do
+    if [ -e "${runlevel}/netdata" ]; then
+      runlevel="$(basename "${runlevel}")"
+      if ! rc-update del netdata "${runlevel}"; then
+        warning "Failed to disable Netdata service in runlevel ${runlevel}."
+      fi
+    fi
+  done
+}
+
+install_openrc_service() {
+  install_generic_service openrc OpenRC /etc/init.d/netdata enable_openrc disable_openrc
+}
+
+openrc_cmds() {
+  if [ "$(check_openrc)" = "YES" ]; then
+    NETDATA_START_CMD='rc-service netdata start'
+    NETDATA_STOP_CMD='rc-service netdata stop'
+  else # Not booted using OpenRC, use external defaults by not providing commands.
+    warning "Detected OpenRC, but the system is not booted using OpenRC. Unable to provide commands to start or stop Netdata using the service manager."
+  fi
+}
+
+# =====================================================================
+# LSB init script support functions
+
+_check_lsb_ignore_systemd() {
+  # if there is no /etc/init.d directory, it’s not an LSB system
+  [ ! -d /etc/init.d ] && echo "NO" && return 0
+
+  # If it's an OpenRC system, then it's not an LSB system
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
+
+  # If /lib/lsb/init-functions exists, it’s an LSB system
+  [ -f /lib/lsb/init-functions ] && echo "YES" && return 0
+
+  echo "NO" && return 0
+}
+
+_check_lsb() {
+  # if there is _any_ systemd, it’s not an LSB system
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
+
+  _check_lsb_ignore_systemd
+}
+
+check_lsb() {
+  if [ -z "${IS_LSB}" ]; then
+    IS_LSB="$(_check_lsb)"
+  fi
+
+  echo "${IS_LSB}"
+}
+
+enable_lsb() {
+  if ! update-rc.d netdata defaults; then
+    warning "Failed to enable Netdata service."
+  elif ! update-rc.d netdata defaults-disabled; then
+    warning "Failed to fully enable Netdata service."
+  fi
+}
+
+disable_lsb() {
+  if ! update-rc.d netdata remove; then
+    warning "Failed to disable Netdata service."
+  fi
+}
+
+install_lsb_service() {
+  install_generic_service lsb LSB /etc/init.d/netdata enable_lsb disable_lsb
+}
+
+lsb_cmds() {
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
+}
+
+# =====================================================================
+# init.d init script support functions
+
+_check_initd_ignore_systemd() {
+  # if there is no /etc/init.d directory, it’s not an init.d system
+  [ ! -d /etc/init.d ] && echo "NO" && return 1
+
+  # if there is no chkconfig command, it's not a (usable) init.d system
+  [ -z "$(command -v chkconfig 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # if there is _any_ openrc, it’s not init.d
+  [ "$(check_openrc)" != "NO" ] && echo "NO" && return 0
+
+  # if it's not an LSB setup, it’s init.d
+  [ "$(check_lsb)" != "NO" ] && echo "NO" && return 0
+
+  echo "YES" && return 0
+}
+
+_check_initd() {
+  # if there is _any_ systemd, it’s not init.d
+  [ "$(check_systemd)" != "NO" ] && echo "NO" && return 0
+
+  _check_initd_ignore_systemd
+}
+
+check_initd() {
+  if [ -z "${IS_INITD}" ]; then
+    IS_INITD="$(_check_initd)"
+  fi
+
+  echo "${IS_INITD}"
+}
+
+enable_initd() {
+  if ! chkconfig netdata on; then
+    warning "Failed to enable Netdata service."
+  fi
+}
+
+disable_initd() {
+  if ! chkconfig netdata off; then
+    warning "Failed to disable Netdata service."
+  fi
+}
+
+install_initd_service() {
+  install_generic_service init-d init.d /etc/init.d/netdata enable_initd disable_initd
+}
+
+initd_cmds() {
+  NETDATA_START_CMD='/etc/init.d/netdata start'
+  NETDATA_STOP_CMD='/etc/init.d/netdata stop'
+}
+
+# =====================================================================
+# runit support functions
+#
+# Currently not supported, this exists to provide useful error messages.
+
+_check_runit() {
+  # if there is no runsvdir command, then it's not runit
+  [ -z "$(command -v runsvdir 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # if there is no runit command, then it's not runit
+  [ -z "$(command -v runit 2>/dev/null || true)" ] && echo "NO" && return 0
+
+  # if /run/runit exists, then it's runit
+  [ -d /run/runit ] && echo "YES" && return 0
+
+  # if /etc/runit/1 exists and is executable, then it's runit
+  [ -x /etc/runit/1 ] && echo "YES" && return 0
+
+  echo "NO" && return 0
+}
+
+check_runit() {
+  if [ -z "${IS_RUNIT}" ]; then
+    IS_RUNIT="$(_check_runit)"
+  fi
+
+  echo "${IS_RUNIT}"
+}
+
+install_runit_service() {
+  error "Detected runit, which we do not currently support."
+  exit 3
+}
+
+runit_cmds() {
+  error "Detected runit, which we do not currently support."
+  exit 3
+}
+
+# =====================================================================
+# WSL support functions
+#
+# Cannot be supported, this exists to provide useful error messages.
+
+_check_wsl() {
+  # If uname -r contains the string WSL, then it's WSL.
+  uname -r | grep -q 'WSL' && echo "YES" && return 0
+
+  # If uname -r contains the string Microsoft, then it's WSL.
+  # This probably throws a false positive on CBL-Mariner, but it's part of what MS officially recommends for
+  # detecting if you're running under WSL.
+  uname -r | grep -q "Microsoft" && echo "YES" && return 0
+
+  echo "NO" && return 0
+}
+
+check_wsl() {
+  if [ -z "${IS_WSL}" ]; then
+    IS_WSL="$(_check_wsl)"
+  fi
+
+  echo "${IS_WSL}"
+}
+
+install_wsl_service() {
+  error "${WSL_ERROR_MSG}"
+  exit 3
+}
+
+wsl_cmds() {
+  error "${WSL_ERROR_MSG}"
+  exit 3
+}
+
+# =====================================================================
+# FreeBSD support functions
+
+enable_freebsd() {
+  if ! sysrc netdata_enable=YES; then
+    warning "Failed to enable netdata service."
+  fi
+}
+
+disable_freebsd() {
+  if ! sysrc netdata_enable=NO; then
+    warning "Failed to disable netdata service."
+  fi
+}
+
+install_freebsd_service() {
+  install_generic_service freebsd "FreeBSD rc.d" /usr/local/etc/rc.d/netdata enable_freebsd disable_freebsd
+}
+
+freebsd_cmds() {
+  NETDATA_START_CMD='service netdata start'
+  NETDATA_STOP_CMD='service netdata stop'
+  NETDATA_INSTALLER_START_CMD='service netdata onestart'
+}
+
+# =====================================================================
+# macOS support functions
+
+install_darwin_service() {
+  info "Installing macOS plist file for launchd."
+  if ! install -C -S -p -m 0644 -o 0 -g 0 system/netdata.plist /Library/LaunchDaemons/com.github.netdata.plist; then
+    error "Failed to copy plist file."
+    exit 4
+  fi
+
+  if ! launchctl load /Library/LaunchDaemons/com.github.netdata.plist; then
+    error "Failed to load plist file."
+    exit 4
+  fi
+}
+
+darwin_cmds() {
+  NETDATA_START_CMD='launchctl start com.github.netdata'
+  NETDATA_STOP_CMD='launchctl stop com.github.netdata'
+}
+
+# =====================================================================
+# Linux support functions
+
+detect_linux_svc_type() {
+  if [ "${SVC_TYPE}" = "detect" ]; then
+    found_types=''
+
+    for t in wsl ${LINUX_INIT_TYPES}; do
+      case "$("check_${t}")" in
+        YES)
+          SVC_TYPE="${t}"
+          break
+          ;;
+        NO) continue ;;
+        OFFLINE)
+          if [ -z "${found_types}" ]; then
+            found_types="${t}"
+          else
+            found_types="${found_types} ${t}"
+          fi
+          ;;
+      esac
+    done
+
+    if [ "${SVC_TYPE}" = "detect" ]; then
+      if [ -z "${found_types}" ]; then
+        error "Failed to detect what type of service manager is in use."
+      else
+        SVC_TYPE="$(echo "${found_types}" | cut -f 1 -d ' ')"
+        warning "Failed to detect a running service manager, using detected (but not running) ${SVC_TYPE}."
+      fi
+    elif [ "${SVC_TYPE}" = "wsl" ]; then
+      if [ "$(check_systemd)" = "YES" ]; then
+        # Support for systemd in WSL.
+        SVC_TYPE="systemd"
+      elif [ "$(_check_lsb_ignore_systemd)" = "YES" ]; then
+        # Support for LSB init.d in WSL.
+        SVC_TYPE="lsb"
+      elif [ "$(_check_initd_ignore_systemd)" = "YES" ]; then
+        # Support for ‘generic’ init.d in WSL.
+        SVC_TYPE="initd"
+      fi
+    fi
+  fi
+
+  echo "${SVC_TYPE}"
+}
+
+install_linux_service() {
+  t="$(detect_linux_svc_type)"
+
+  if [ -z "${t}" ]; then
+    exit 2
+  fi
+
+  "install_${t}_service"
+}
+
+linux_cmds() {
+  t="$(detect_linux_svc_type)"
+
+  if [ -z "${t}" ]; then
+    exit 2
+  fi
+
+  "${t}_cmds"
+}
+
+# =====================================================================
+# Service type display function
+
+show_service_type() {
+  info "Detected platform: ${PLATFORM}"
+
+  case "${PLATFORM}" in
+    FreeBSD)
+      info "Detected service managers:"
+      info "  - freebsd: YES"
+      info "Would use freebsd service management."
+      ;;
+    Darwin)
+      info "Detected service managers:"
+      info "  - launchd: YES"
+      info "Would use launchd service management."
+      ;;
+    Linux)
+      [ "$(check_wsl)" = "YES" ] && info "Detected WSL environment."
+      info "Detected service managers:"
+      for t in ${LINUX_INIT_TYPES}; do
+        info "  - ${t}: $("check_${t}")"
+      done
+      info "Would use $(detect_linux_svc_type) service management."
+      ;;
+    *)
+      info "${PLATFORM} is not supported by this script. No service file would be installed."
+  esac
+
+  exit 0
+}
+
+# =====================================================================
+# Argument handling
+
+parse_args() {
+  while [ -n "${1}" ]; do
+    case "${1}" in
+      "--source" | "-s")
+        SVC_SOURCE="${2}"
+        shift 1
+        ;;
+      "--type" | "-t")
+        if [ "${2}" = "help" ]; then
+          help_types
+          exit 0
+        else
+          SVC_TYPE="${2}"
+          shift 1
+        fi
+        ;;
+      "--show-type") SHOW_SVC_TYPE=1 ; INSTALL=0 ;;
+      "--save-cmds")
+        if [ -z "${2}" ]; then
+          info "No path specified to save command variables."
+          exit 1
+        else
+          SAVE_CMDS_PATH="${2}"
+          shift 1
+        fi
+        ;;
+      "--cmds" | "-c") DUMP_CMDS=1 ;;
+      "--cmds-only") INSTALL=0 ;;
+      "--export-cmds") EXPORT_CMDS=1 ;;
+      "--enable" | "-e") ENABLE="enable" ;;
+      "--disable" | "-d") ENABLE="disable" ;;
+      "--help" | "-h")
+        usage
+        exit 0
+        ;;
+      *)
+        info "Unrecognized option '${1}'."
+        exit 1
+        ;;
+    esac
+    shift 1
+  done
+
+  if [ "${SVC_SOURCE#@}" = "libsysdir_POST@" ]; then
+    SVC_SOURCE="$(dirname "${SCRIPT_SOURCE}")/../../lib/netdata/system"
+    warning "SVC_SOURCE not templated, using ${SVC_SOURCE} as source directory."
+  fi
+
+  if [ ! -d "${SVC_SOURCE}" ] && [ "${INSTALL}" -eq 1 ]; then
+    error "${SVC_SOURCE} does not appear to be a directory. Please specify a valid source for service files with the --source option."
+    exit 1
+  fi
+
+  if valid_types | grep -vw "${SVC_TYPE}"; then
+    error "${SVC_TYPE} is not supported on this platform."
+    help_types
+    exit 1
+  fi
+}
+
+# =====================================================================
+# Core logic
+
+main() {
+  trap "cleanup" EXIT
+
+  parse_args "${@}"
+
+  if [ "${SHOW_SVC_TYPE}" -eq 1 ]; then
+    show_service_type
+  else
+    case "${PLATFORM}" in
+      FreeBSD)
+        [ "${INSTALL}" -eq 1 ] && install_freebsd_service
+        freebsd_cmds
+        ;;
+      Darwin)
+        [ "${INSTALL}" -eq 1 ] && install_darwin_service
+        darwin_cmds
+        ;;
+      Linux)
+        [ "${INSTALL}" -eq 1 ] && install_linux_service
+        linux_cmds
+        ;;
+      *)
+        error "${PLATFORM} is not supported by this script."
+        exit 5
+        ;;
+    esac
+
+    [ "${DUMP_CMDS}" -eq 1 ] && dump_cmds
+    [ "${EXPORT_CMDS}" -eq 1 ] && export_cmds
+    [ -n "${SAVE_CMDS_PATH}" ] && save_cmds
+  fi
+
+  exit 0
+}
+
+main "${@}"

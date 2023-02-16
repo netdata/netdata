@@ -101,7 +101,7 @@ collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_number 
     return 0;
 }
 
-RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name)
+const RRDSETVAR_ACQUIRED *rrdsetvar_custom_chart_variable_add_and_acquire(RRDSET *st, const char *name)
 {
     UNUSED(st);
     UNUSED(name);
@@ -109,9 +109,10 @@ RRDSETVAR *rrdsetvar_custom_chart_variable_create(RRDSET *st, const char *name)
     return NULL;
 }
 
-void rrdsetvar_custom_chart_variable_set(RRDSETVAR *rs, NETDATA_DOUBLE value)
+void rrdsetvar_custom_chart_variable_set(RRDSET *st, const RRDSETVAR_ACQUIRED *rsa, NETDATA_DOUBLE value)
 {
-    UNUSED(rs);
+    UNUSED(st);
+    UNUSED(rsa);
     UNUSED(value);
 }
 
@@ -146,14 +147,11 @@ void netdev_rename_device_del(const char *host_device)
     UNUSED(host_device);
 }
 
-void sql_store_chart_label(uuid_t *chart_uuid, int source_type, char *label, char *value)
-{
-    UNUSED(chart_uuid);
-    UNUSED(source_type);
-    UNUSED(label);
-    UNUSED(value);
-}
-
 void rrdcalc_update_rrdlabels(RRDSET *st) {
     (void)st;
+}
+
+void db_execute(const char *cmd)
+{
+    UNUSED(cmd);
 }

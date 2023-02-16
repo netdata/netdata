@@ -1,9 +1,13 @@
 <!--
-title: "External plugins overview"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md
+title: "External plugins"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/plugins.d/README.md"
+sidebar_label: "External plugins"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Developers/External plugins"
 -->
 
-# External plugins overview
+# External plugins
 
 `plugins.d` is the Netdata internal plugin that collects metrics
 from external processes, thus allowing Netdata to use **external plugins**.
@@ -12,17 +16,18 @@ from external processes, thus allowing Netdata to use **external plugins**.
 
 |plugin|language|O/S|description|
 |:----:|:------:|:-:|:----------|
-|[apps.plugin](/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
-|[charts.d.plugin](/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
-|[cups.plugin](/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
-|[fping.plugin](/collectors/fping.plugin/README.md)|`C`|all|measures network latency, jitter and packet loss between the monitored node and any number of remote network end points.|
-|[ioping.plugin](/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
-|[freeipmi.plugin](/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
-|[nfacct.plugin](/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
-|[xenstat.plugin](/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
-|[perf.plugin](/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
-|[python.d.plugin](/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
-|[slabinfo.plugin](/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
+|[apps.plugin](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)|`C`|linux, freebsd|monitors the whole process tree on Linux and FreeBSD and breaks down system resource usage by **process**, **user** and **user group**.|
+|[charts.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)|`BASH`|all|a **plugin orchestrator** for data collection modules written in `BASH` v4+.|
+|[cups.plugin](https://github.com/netdata/netdata/blob/master/collectors/cups.plugin/README.md)|`C`|all|monitors **CUPS**|
+|[ebpf.plugin](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)|`C`|linux|monitors different metrics on environments using kernel internal functions.|
+|[go.d.plugin](https://github.com/netdata/go.d.plugin/blob/master/README.md)|`GO`|all|collects metrics from the system, applications, or third-party APIs.|
+|[ioping.plugin](https://github.com/netdata/netdata/blob/master/collectors/ioping.plugin/README.md)|`C`|all|measures disk latency.|
+|[freeipmi.plugin](https://github.com/netdata/netdata/blob/master/collectors/freeipmi.plugin/README.md)|`C`|linux|collects metrics from enterprise hardware sensors, on Linux servers.|
+|[nfacct.plugin](https://github.com/netdata/netdata/blob/master/collectors/nfacct.plugin/README.md)|`C`|linux|collects netfilter firewall, connection tracker and accounting metrics using `libmnl` and `libnetfilter_acct`.|
+|[xenstat.plugin](https://github.com/netdata/netdata/blob/master/collectors/xenstat.plugin/README.md)|`C`|linux|collects XenServer and XCP-ng metrics using `lxenstat`.|
+|[perf.plugin](https://github.com/netdata/netdata/blob/master/collectors/perf.plugin/README.md)|`C`|linux|collects CPU performance metrics using performance monitoring units (PMU).|
+|[python.d.plugin](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md)|`python`|all|a **plugin orchestrator** for data collection modules written in `python` v2 or v3 (both are supported).|
+|[slabinfo.plugin](https://github.com/netdata/netdata/blob/master/collectors/slabinfo.plugin/README.md)|`C`|linux|collects kernel internal cache objects (SLAB) metrics.|
 
 Plugin orchestrators may also be described as **modular plugins**. They are modular since they accept custom made modules to be included. Writing modules for these plugins is easier than accessing the native Netdata API directly. You will find modules already available for each orchestrator under the directory of the particular modular plugin (e.g. under python.d.plugin for the python orchestrator).
 Each of these modular plugins has each own methods for defining modules. Please check the examples and their documentation.
@@ -71,7 +76,6 @@ Example:
 	# check for new plugins every = 60
 
 	# charts.d = yes
-	# fping = yes
 	# ioping = yes
 	# python.d = yes
 ```
@@ -116,17 +120,19 @@ For example, if your plugin wants to monitor `squid`, you can search for it on p
 
 Any program that can print a few values to its standard output can become a Netdata external plugin.
 
-Netdata parses 9 lines starting with:
+Netdata parses lines starting with:
 
 -    `CHART` - create or update a chart
 -    `DIMENSION` - add or update a dimension to the chart just created
+-    `VARIABLE` - define a variable (to be used in health calculations)
+-    `CLABEL` - add a label to a chart
+-    `CLABEL_COMMIT` - commit added labels to the chart
+-    `FUNCTION` - define a function that can be called later to execute it
 -    `BEGIN` - initialize data collection for a chart
 -    `SET` - set the value of a dimension for the initialized chart
 -    `END` - complete data collection for the initialized chart
 -    `FLUSH` - ignore the last collected values
 -    `DISABLE` - disable this plugin
--    `CLABEL` - add a label to a chart
--    `CLABEL_COMMIT` - commit added labels to the chart.
 
 a single program can produce any number of charts with any number of dimensions each.
 
@@ -168,6 +174,83 @@ The plugin should output instructions for Netdata to its output (`stdout`). Sinc
 #### DISABLE
 
 `DISABLE` will disable this plugin. This will prevent Netdata from restarting the plugin. You can also exit with the value `1` to have the same effect.
+
+#### HOST_DEFINE
+
+`HOST_DEFINE` defines a new (or updates an existing) virtual host.
+
+The template is:
+
+> HOST_DEFINE machine_guid hostname
+
+where:
+
+-   `machine_guid`
+
+    uniquely identifies the host, this is what will be needed to add charts to the host.
+
+-   `hostname`
+
+    is the hostname of the virtual host
+
+#### HOST_LABEL
+
+`HOST_LABEL` adds a key-value pair to the virtual host labels. It has to be given between `HOST_DEFINE` and `HOST_DEFINE_END`.
+
+The template is:
+
+> HOST_LABEL key value
+
+where:
+
+-   `key`
+
+    uniquely identifies the key of the label
+
+-   `value`
+
+    is the value associated with this key
+
+There are a few special keys that are used to define the system information of the monitored system:
+
+- `_cloud_provider_type`
+- `_cloud_instance_type`
+- `_cloud_instance_region`
+- `_os_name`
+- `_os_version`
+- `_kernel_version`
+- `_system_cores`
+- `_system_cpu_freq`
+- `_system_ram_total`
+- `_system_disk_space`
+- `_architecture`
+- `_virtualization`
+- `_container`
+- `_container_detection`
+- `_virt_detection`
+- `_is_k8s_node`
+- `_install_type`
+- `_prebuilt_arch`
+- `_prebuilt_dist`
+
+#### HOST_DEFINE_END
+
+`HOST_DEFINE_END` commits the host information, creating a new host entity, or updating an existing one with the same `machine_guid`.
+
+#### HOST 
+
+`HOST` switches data collection between hosts.
+
+The template is:
+
+> HOST machine_guid
+
+where:
+
+-   `machine_guid`
+
+    is the UUID of the host to switch to. After this command, every other command following it is assumed to be associated with this host.
+    Setting machine_guid to `localhost` switches data collection to the local host.
 
 #### CHART
 
@@ -362,6 +445,80 @@ The `source` is an integer field that can have the following values:
 
 `CLABEL_COMMIT` indicates that all labels were defined and the chart can be updated.
 
+#### FUNCTION
+
+> FUNCTION [GLOBAL] "name and parameters of the function" timeout "help string for users"
+
+A function can be used by users to ask for more information from the collector. Netdata maintains a registry of functions in 2 levels:
+
+- per node
+- per chart
+
+Both node and chart functions are exactly the same, but chart functions allow Netdata to relate functions with charts and therefore present a context sensitive menu of functions related to the chart the user is using.
+
+A function is identified by a string. The allowed characters in the function definition are:
+
+| Character         | Symbol | In Functions |
+|-------------------|:------:|:------------:|
+| UTF-8 character   | UTF-8  |     keep     |
+| Lower case letter | [a-z]  |     keep     |
+| Upper case letter | [A-Z]  |     keep     |
+| Digit             | [0-9]  |     keep     |
+| Underscore        |   _    |     keep     |
+| Comma             |   ,    |     keep     |
+| Minus             |   -    |     keep     |
+| Period            |   .    |     keep     |
+| Colon             |   :    |     keep     |
+| Slash             |   /    |     keep     |
+| Space             |  ' '   |     keep     |
+| Semicolon         |   ;    |      :       |
+| Equal             |   =    |      :       |
+| Backslash         |   \    |      /       |
+| Anything else     |        |      _       |
+
+Uses can get a list of all the registered functions using the `/api/v1/functions` end point of Netdata.
+
+Users can call functions using the `/api/v1/function` end point of Netdata.
+Once a function is called, the plugin will receive at its standard input a command that looks like this:
+
+> FUNCTION transaction_id timeout "name and parameters of the function"
+
+The plugin is expected to parse and validate `name and parameters of the function`. Netdata allows users to edit this string, append more parameters or even change the ones the plugin originally exposed. To minimize the security risk, Netdata guarantees that only the characters shown above are accepted in function definitions, but still the plugin should carefully inspect the `name and parameters of the function` to ensure that it is valid and not harmful.
+
+If the plugin rejects the request, it should respond with this:
+
+```
+FUNCTION_RESULT_BEGIN transaction_id 400 application/json
+{
+   "status": 400,
+   "error_message": "description of the rejection reasons"
+}
+FUNCTION_RESULT_END
+```
+
+If the plugin prepares a response, it should send (via its standard output, together with the collected data, but not interleaved with them):
+
+> FUNCTION_RESULT_BEGIN transaction_id http_error_code content_type expiration
+
+Where:
+
+  - `transaction_id` is the transaction id that Netdata sent for this function execution
+  - `http_error` is the http error code Netdata should respond with, 200 is the "ok" response
+  - `content_type` is the content type of the response
+  - `expiration` is the absolute timestamp (number, unix epoch) this response expires
+
+Immediately after this, all text is assumed to be the response content.
+The content is text and line oriented. The maximum line length accepted is 15kb. Longer lines will be truncated.
+The type of the context itself depends on the plugin and the UI.
+
+To terminate the message, Netdata seeks a line with just this:
+
+> FUNCTION_RESULT_END
+
+This defines the end of the message. `FUNCTION_RESULT_END` should appear in a line alone, without any other text, so it is wise to add `\n` before and after it.
+
+After this line, Netdata resumes processing collected metrics from the plugin.
+
 ## Data collection
 
 data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
@@ -428,12 +585,12 @@ or do not output the line at all.
 ## Modular Plugins
 
 1.  **python**, use `python.d.plugin`, there are many examples in the [python.d
-    directory](/collectors/python.d.plugin/README.md)
+    directory](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/README.md)
 
     python is ideal for Netdata plugins. It is a simple, yet powerful way to collect data, it has a very small memory footprint, although it is not the most CPU efficient way to do it.
 
 2.  **BASH**, use `charts.d.plugin`, there are many examples in the [charts.d
-    directory](/collectors/charts.d.plugin/README.md)
+    directory](https://github.com/netdata/netdata/blob/master/collectors/charts.d.plugin/README.md)
 
     BASH is the simplest scripting language for collecting values. It is the less efficient though in terms of CPU resources. You can use it to collect data quickly, but extensive use of it might use a lot of system resources.
 
@@ -463,7 +620,7 @@ There are a few rules for writing plugins properly:
    readConfiguration();
 
    if(!verifyWeCanCollectValues()) {
-      print "DISABLE";
+      print("DISABLE");
       exit(1);
    }
 
@@ -475,7 +632,7 @@ There are a few rules for writing plugins properly:
    var dt_since_last_run = 0;
    var now = 0;
 
-   FOREVER {
+   while(true) {
        /* find the current time in milliseconds */
        now = currentTimeStampInMilliseconds();
 

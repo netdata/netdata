@@ -25,73 +25,71 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_shell();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !simple_pattern_matches(filter, st->name))
+        if (filter && !simple_pattern_matches(filter, rrdset_name(st)))
             continue;
 
         NETDATA_DOUBLE total = 0.0;
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, st->name?st->name:st->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, st->name?rrdset_name(st):rrdset_id(st), SHELL_ELEMENT_MAX);
 
-        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", st->id, st->name);
+        buffer_sprintf(wb, "\n# chart: %s (name: %s)\n", rrdset_id(st), rrdset_name(st));
         if(rrdset_is_available_for_viewers(st)) {
-            rrdset_rdlock(st);
-
             // for each dimension
             RRDDIM *rd;
             rrddim_foreach_read(rd, st) {
                 if(rd->collections_counter && !rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)) {
                     char dimension[SHELL_ELEMENT_MAX + 1];
-                    shell_name_copy(dimension, rd->name?rd->name:rd->id, SHELL_ELEMENT_MAX);
+                    shell_name_copy(dimension, rd->name?rrddim_name(rd):rrddim_id(rd), SHELL_ELEMENT_MAX);
 
                     NETDATA_DOUBLE n = rd->last_stored_value;
 
                     if(isnan(n) || isinf(n))
-                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, st->units);
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"\"      # %s\n", chart, dimension, rrdset_units(st));
                     else {
                         if(rd->multiplier < 0 || rd->divisor < 0) n = -n;
                         n = roundndd(n);
-                        if(!rrddim_flag_check(rd, RRDDIM_FLAG_HIDDEN)) total += n;
-                        buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, st->units);
+                        if(!rrddim_option_check(rd, RRDDIM_OPTION_HIDDEN)) total += n;
+                        buffer_sprintf(wb, "NETDATA_%s_%s=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, dimension, n, rrdset_units(st));
                     }
                 }
             }
+            rrddim_foreach_done(rd);
 
             total = roundndd(total);
-            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, total, st->units);
-            rrdset_unlock(st);
+            buffer_sprintf(wb, "NETDATA_%s_VISIBLETOTAL=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, total, rrdset_units(st));
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n# NETDATA ALARMS RUNNING\n");
 
     RRDCALC *rc;
-    for(rc = host->alarms; rc ;rc = rc->next) {
+    foreach_rrdcalc_in_rrdhost_read(host, rc) {
         if(!rc->rrdset) continue;
 
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, rc->rrdset->name?rc->rrdset->name:rc->rrdset->id, SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rrdset_id(rc->rrdset), SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(alarm, rc->name, SHELL_ELEMENT_MAX);
+        shell_name_copy(alarm, rrdcalc_name(rc), SHELL_ELEMENT_MAX);
 
         NETDATA_DOUBLE n = rc->value;
 
         if(isnan(n) || isinf(n))
-            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rc->units);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"\"      # %s\n", chart, alarm, rrdcalc_units(rc));
         else {
             n = roundndd(n);
-            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, alarm, n, rc->units);
+            buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_VALUE=\"" NETDATA_DOUBLE_FORMAT_ZERO "\"      # %s\n", chart, alarm, n, rrdcalc_units(rc));
         }
 
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
     }
+    foreach_rrdcalc_in_rrdhost_done(rc);
 
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 
@@ -100,7 +98,6 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT);
-    rrdhost_rdlock(host);
 
     buffer_strcat(wb, "{");
 
@@ -110,12 +107,10 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
     // for each chart
     RRDSET *st;
     rrdset_foreach_read(st, host) {
-        if (filter && !(simple_pattern_matches(filter, st->id) || simple_pattern_matches(filter, st->name)))
+        if (filter && !(simple_pattern_matches(filter, rrdset_id(st)) || simple_pattern_matches(filter, rrdset_name(st))))
             continue;
 
         if(rrdset_is_available_for_viewers(st)) {
-            rrdset_rdlock(st);
-
             buffer_sprintf(
                 wb,
                 "%s\n"
@@ -127,12 +122,12 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                 "\t\t\"last_updated\": %"PRId64",\n"
                 "\t\t\"dimensions\": {",
                 chart_counter ? "," : "",
-                st->id,
-                st->name,
-                st->family,
-                st->context,
-                st->units,
-                (int64_t)rrdset_last_entry_t_nolock(st));
+                rrdset_id(st),
+                rrdset_name(st),
+                rrdset_family(st),
+                rrdset_context(st),
+                rrdset_units(st),
+                (int64_t) rrdset_last_entry_s(st));
 
             chart_counter++;
             dimension_counter = 0;
@@ -148,8 +143,8 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                         "\t\t\t\t\"name\": \"%s\",\n"
                         "\t\t\t\t\"value\": ",
                         dimension_counter ? "," : "",
-                        rd->id,
-                        rd->name);
+                        rrddim_id(rd),
+                        rrddim_name(rd));
 
                     if(isnan(rd->last_stored_value))
                         buffer_strcat(wb, "null");
@@ -161,14 +156,14 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                     dimension_counter++;
                 }
             }
+            rrddim_foreach_done(rd);
 
             buffer_strcat(wb, "\n\t\t}\n\t}");
-            rrdset_unlock(st);
         }
     }
+    rrdset_foreach_done(st);
 
     buffer_strcat(wb, "\n}");
-    rrdhost_unlock(host);
     simple_pattern_free(filter);
 }
 

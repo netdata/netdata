@@ -1,12 +1,17 @@
 <!--
 title: "Nvidia GPU monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md
-sidebar_label: "Nvidia GPUs"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/nvidia_smi/README.md"
+sidebar_label: "nvidia_smi-python.d.plugin"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Devices"
 -->
 
 # Nvidia GPU monitoring with Netdata
 
 Monitors performance metrics (memory usage, fan speed, pcie bandwidth utilization, temperature, etc.) using `nvidia-smi` cli tool.
+
+> **Warning**: this collector does not work when the Netdata Agent is [running in a container](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md).
 
 
 ## Requirements and Notes
@@ -46,7 +51,7 @@ It produces the following charts:
 ## Configuration
 
 Edit the `python.d/nvidia_smi.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different

@@ -1,7 +1,11 @@
 <!--
 title: "Install Netdata on Linux from a Git checkout"
 description: "Use the Netdata Agent source code from GitHub, plus helper scripts to set up your system, to install Netdata without packages or binaries."
-custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/packaging/installer/methods/manual.md"
+sidebar_label: "Install Netdata on Linux from a Git checkout"
+learn_status: "Published"
+learn_topic_type: "Tasks"
+learn_rel_path: "Installation"
 -->
 
 # Install Netdata on Linux from a Git checkout
@@ -96,10 +100,7 @@ Netdata plugins and various aspects of Netdata can be enabled or benefit when th
 | `python`|for most of the external plugins|
 | `python-yaml`|used for monitoring **beanstalkd**|
 | `python-beanstalkc`|used for monitoring **beanstalkd**|
-| `python-dnspython`|used for monitoring DNS query time|
-| `python-ipaddress`|used for monitoring **DHCPd**<br/>this package is required only if the system has python v2. python v3 has this functionality embedded|
 | `python-mysqldb`<br/>or<br/>`python-pymysql`|used for monitoring **mysql** or **mariadb** databases<br/>`python-mysqldb` is a lot faster and thus preferred|
-| `python-pymongo`|used for monitoring **mongodb** databases|
 | `nodejs`|used for `node.js` plugins for monitoring **named** and **SNMP** devices|
 | `lm-sensors`|for monitoring **hardware sensors**|
 | `libelf`|for monitoring kernel-level metrics using eBPF|
@@ -123,7 +124,7 @@ Netdata Cloud support may require the following packages to be installed:
 |:---------:|--------------------------------------------------------------------------------------------------------------------------------------|
 |  `cmake`  | Needed at build time if you aren't using your distribution's version of libwebsockets or are building on a platform other than Linux |
 | `openssl` | Needed to secure communications with the Netdata Cloud                                                                               |
-| `protobuf`| Used for the new Cloud<->Agent binary protocol
+| `protobuf`| Used for the new Cloud<->Agent binary protocol |
 
 *Netdata will greatly benefit if you have the above packages installed, but it will still work without them.*
 
@@ -189,7 +190,7 @@ cd netdata
 
 -   You can also append `--stable-channel` to fetch and install only the official releases from GitHub, instead of the nightly builds.
 
--   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install /opt`. This one will install Netdata in `/opt/netdata`.
+-   If you don't want to install it on the default directories, you can run the installer like this: `./netdata-installer.sh --install-prefix /opt`. This one will install Netdata in `/opt/netdata`.
 
 -   If your server does not have access to the internet and you have manually put the installation directory on your server, you will need to pass the option `--disable-go` to the installer. The option will prevent the installer from attempting to download and install `go.d.plugin`. 
 
@@ -201,22 +202,22 @@ cd netdata
 -   `--dont-start-it`: Prevent the installer from starting Netdata automatically.
 -   `--stable-channel`: Automatically update only on the release of new major versions.
 -   `--nightly-channel`: Automatically update on every new nightly build.
--   `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/anonymous-statistics.md) we use to make
+-   `--disable-telemetry`: Opt-out of [anonymous statistics](https://github.com/netdata/netdata/blob/master/docs/anonymous-statistics.md) we use to make
     Netdata better.
 -   `--no-updates`: Prevent automatic updates of any kind.
 -   `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
     cannot be used to change installation types.
--   `--local-files`: Used for [offline installations](offline.md). Pass four file paths: the Netdata
+-   `--local-files`: Used for [offline installations](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
     tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
     process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
     `--stable-channel`, Netdata will use the local files.
 
 ### Connect node to Netdata Cloud during installation
 
-Unlike the [`kickstart.sh`](/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
-not allow you to automatically [connect](/claim/README.md) your node to Netdata Cloud immediately after installation.
+Unlike the [`kickstart.sh`](https://github.com/netdata/netdata/blob/master/packaging/installer/methods/kickstart.md), the `netdata-installer.sh` script does
+not allow you to automatically [connect](https://github.com/netdata/netdata/blob/master/claim/README.md) your node to Netdata Cloud immediately after installation.
 
-See the [connect to cloud](/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
+See the [connect to cloud](https://github.com/netdata/netdata/blob/master/claim/README.md) doc for details on connecting a node with a manual installation of Netdata.
 
 ### 'nonrepresentable section on output' errors
 
@@ -228,13 +229,8 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ## What's next?
 
-When you're finished with installation, check out our [single-node](/docs/quickstart/single-node.md) or
-[infrastructure](/docs/quickstart/infrastructure.md) monitoring quickstart guides based on your use case.
-
-Or, skip straight to [configuring the Netdata Agent](/docs/configure/nodes.md).
+When you're finished with installation, check out [how to monitor your infrastructure](https://github.com/netdata/netdata/blob/master/docs/quickstart/infrastructure.md), or skip straight to [configuring the Netdata Agent](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md).
 
 Read through Netdata's [documentation](https://learn.netdata.cloud/docs), which is structured based on actions and
 solutions, to enable features like health monitoring, alarm notifications, long-term metrics storage, exporting to
 external databases, and more.
-
-

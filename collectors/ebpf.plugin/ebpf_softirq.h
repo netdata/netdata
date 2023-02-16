@@ -20,7 +20,6 @@ typedef struct softirq_ebpf_val {
  *****************************************************************/
 
 #define NETDATA_EBPF_MODULE_NAME_SOFTIRQ "softirq"
-#define NETDATA_SOFTIRQ_SLEEP_MS 650000ULL
 #define NETDATA_SOFTIRQ_CONFIG_FILE "softirq.conf"
 
 typedef struct sofirq_val {
@@ -29,6 +28,6 @@ typedef struct sofirq_val {
 } softirq_val_t;
 
 extern struct config softirq_config;
-extern void *ebpf_softirq_thread(void *ptr);
+void *ebpf_softirq_thread(void *ptr);
 
 #endif /* NETDATA_EBPF_SOFTIRQ_H */

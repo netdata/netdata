@@ -34,6 +34,9 @@ set -e
 
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 
+NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
+NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
+
 script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if [ -x "${script_dir}/netdata-updater" ]; then
@@ -85,9 +88,17 @@ exit_reason() {
     EXIT_REASON="${1}"
     EXIT_CODE="${2}"
     if [ -n "${NETDATA_PROPAGATE_WARNINGS}" ]; then
-      export EXIT_REASON
-      export EXIT_CODE
-      export NETDATA_WARNINGS
+      if [ -n "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        {
+          echo "EXIT_REASON=\"${EXIT_REASON}\""
+          echo "EXIT_CODE=\"${EXIT_CODE}\""
+          echo "NETDATA_WARNINGS=\"${NETDATA_WARNINGS}\""
+        } >> "${NETDATA_SCRIPT_STATUS_PATH}"
+      else
+        export EXIT_REASON
+        export EXIT_CODE
+        export NETDATA_WARNINGS
+      fi
     fi
   fi
 }
@@ -330,11 +341,20 @@ create_tmp_directory() {
   fi
 }
 
+check_for_curl() {
+  if [ -z "${curl}" ]; then
+    curl="$(PATH="${PATH}:/opt/netdata/bin" command -v curl 2>/dev/null && true)"
+  fi
+}
+
 _safe_download() {
   url="${1}"
   dest="${2}"
-  if command -v curl > /dev/null 2>&1; then
-    curl -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
+
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    "${curl}" -sSL --connect-timeout 10 --retry 3 "${url}" > "${dest}"
     return $?
   elif command -v wget > /dev/null 2>&1; then
     wget -T 15 -O - "${url}" > "${dest}"
@@ -361,13 +381,15 @@ download() {
 }
 
 get_netdata_latest_tag() {
-  dest="${1}"
-  url="https://github.com/netdata/netdata/releases/latest"
+  url="${1}/latest"
+  dest="${2}"
 
-  if command -v curl >/dev/null 2>&1; then
-    tag=$(curl "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
+  check_for_curl
+
+  if [ -n "${curl}" ]; then
+    tag=$("${curl}" "${url}" -s -L -I -o /dev/null -w '%{url_effective}' | grep -m 1 -o '[^/]*$')
   elif command -v wget >/dev/null 2>&1; then
-    tag=$(wget --max-redirect=0 "${url}" 2>&1 | grep Location | cut -d ' ' -f2 | grep -m 1 -o '[^/]*$')
+    tag=$(wget -S -O /dev/null "${url}" 2>&1 | grep -m 1 Location | grep -o '[^/]*$')
   else
     fatal "I need curl or wget to proceed, but neither of them are available on this system." U0006
   fi
@@ -431,7 +453,12 @@ self_update() {
 
 parse_version() {
   r="${1}"
-  if echo "${r}" | grep -q '^v.*'; then
+  if [ "${r}" = "latest" ]; then
+    # If we get ‘latest’ as a version, return the largest possible
+    # version value.
+    printf "99999999999999"
+    return 0
+  elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
     # XXX: Need a regex group substitution here.
     r="$(echo "${r}" | sed -e 's/^v\(.*\)/\1/')"
@@ -455,9 +482,9 @@ parse_version() {
 
 get_latest_version() {
   if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    get_netdata_latest_tag /dev/stdout
+    get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout
   else
-    download "$NETDATA_NIGHTLIES_BASEURL/latest-version.txt" /dev/stdout
+    get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout
   fi
 }
 
@@ -521,12 +548,13 @@ set_tarball_urls() {
   fi
 
   if [ "$1" = "stable" ]; then
-    latest="$(get_netdata_latest_tag /dev/stdout)"
-    export NETDATA_TARBALL_URL="https://github.com/netdata/netdata/releases/download/$latest/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="https://github.com/netdata/netdata/releases/download/$latest/sha256sums.txt"
+    latest="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}" /dev/stdout)"
+    export NETDATA_TARBALL_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_STABLE_BASE_URL}/download/$latest/sha256sums.txt"
   else
-    export NETDATA_TARBALL_URL="$NETDATA_NIGHTLIES_BASEURL/${filename}"
-    export NETDATA_TARBALL_CHECKSUM_URL="$NETDATA_NIGHTLIES_BASEURL/sha256sums.txt"
+    tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}" /dev/stdout)"
+    export NETDATA_TARBALL_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/${filename}"
+    export NETDATA_TARBALL_CHECKSUM_URL="${NETDATA_NIGHTLY_BASE_URL}/download/${tag}/sha256sums.txt"
   fi
 }
 
@@ -602,15 +630,20 @@ update_build() {
     export NETDATA_SAVE_WARNINGS=1
     export NETDATA_PROPAGATE_WARNINGS=1
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
+    export NETDATA_SCRIPT_STATUS_PATH="${NETDATA_SCRIPT_STATUS_PATH}"
     # shellcheck disable=SC2086
     if ! ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then
+      if [ -r "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
+        # shellcheck disable=SC1090
+        . "${NETDATA_SCRIPT_STATUS_PATH}"
+        rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
+      fi
       if [ -n "${EXIT_REASON}" ]; then
         fatal "Failed to rebuild existing netdata install: ${EXIT_REASON}" "U${EXIT_CODE}"
       else
         fatal "Failed to rebuild existing netdata reinstall." UI0000
       fi
     fi
-    eval "${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start}" >&3 2>&3 || fatal "FAILED TO COMPILE/INSTALL NETDATA" U0009
 
     # We no longer store checksum info here. but leave this so that we clean up all environment files upon next update.
     sed -i '/NETDATA_TARBALL/d' "${ENVIRONMENT_FILE}"
@@ -650,7 +683,7 @@ update_static() {
 
     # Do not pass any options other than the accept, for now
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS}; then
+    if sh "${ndtmpdir}/netdata-${sysarch}-latest.gz.run" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
       rm -r "${ndtmpdir}"
     else
       info "NOTE: did not remove: ${ndtmpdir}"
@@ -691,7 +724,7 @@ update_binpkg() {
       opensuse-leap)
         DISTRO_COMPAT_NAME="opensuse"
         ;;
-      almalinux|rocky|rhel)
+      cloudlinux|almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
         ;;
       *)
@@ -756,8 +789,8 @@ update_binpkg() {
     opensuse)
       pm_cmd="zypper"
       repo_subcmd="--gpg-auto-import-keys refresh"
-      upgrade_cmd="upgrade"
-      pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
+      upgrade_cmd="update"
+      pkg_install_opts="${interactive_opts}"
       repo_update_opts=""
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
@@ -893,9 +926,6 @@ export NETDATA_LIB_DIR="${NETDATA_LIB_DIR:-${NETDATA_PREFIX}/var/lib/netdata}"
 
 # Source the tarball checksum, if not already available from environment (for existing installations with the old logic)
 [ -z "${NETDATA_TARBALL_CHECKSUM}" ] && [ -f "${NETDATA_LIB_DIR}/netdata.tarball.checksum" ] && NETDATA_TARBALL_CHECKSUM="$(cat "${NETDATA_LIB_DIR}/netdata.tarball.checksum")"
-
-# Grab the nightlies baseurl (defaulting to our Google Storage bucket)
-export NETDATA_NIGHTLIES_BASEURL="${NETDATA_NIGHTLIES_BASEURL:-https://storage.googleapis.com/netdata-nightlies}"
 
 if echo "$INSTALL_TYPE" | grep -qv ^binpkg && [ "${INSTALL_UID}" != "$(id -u)" ]; then
   fatal "You are running this script as user with uid $(id -u). We recommend to run this script as root (user with uid 0)" U0011

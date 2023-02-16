@@ -1,16 +1,27 @@
 #include "../libnetdata.h"
 
-struct circular_buffer *cbuffer_new(size_t initial, size_t max) {
-    struct circular_buffer *result = mallocz(sizeof(*result));
-    result->size = initial;
-    result->data = mallocz(initial);
-    result->write = 0;
-    result->read = 0;
-    result->max_size = max;
-    return result;
+struct circular_buffer *cbuffer_new(size_t initial, size_t max, size_t *statistics) {
+    struct circular_buffer *buf = mallocz(sizeof(struct circular_buffer));
+    buf->size = initial;
+    buf->data = mallocz(initial);
+    buf->write = 0;
+    buf->read = 0;
+    buf->max_size = max;
+    buf->statistics = statistics;
+
+    if(buf->statistics)
+        __atomic_add_fetch(buf->statistics, sizeof(struct circular_buffer) + buf->size, __ATOMIC_RELAXED);
+
+    return buf;
 }
 
 void cbuffer_free(struct circular_buffer *buf) {
+    if (unlikely(!buf))
+        return;
+
+    if(buf->statistics)
+        __atomic_sub_fetch(buf->statistics, sizeof(struct circular_buffer) + buf->size, __ATOMIC_RELAXED);
+
     freez(buf->data);
     freez(buf);
 }
@@ -19,6 +30,8 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
     // Check that we can grow
     if (buf->size >= buf->max_size)
         return 1;
+
+    size_t old_size = buf->size;
     size_t new_size = buf->size * 2;
     if (new_size > buf->max_size)
         new_size = buf->max_size;
@@ -43,7 +56,16 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
     freez(buf->data);
     buf->data = new_data;
     buf->size = new_size;
+
+    if(buf->statistics)
+        __atomic_add_fetch(buf->statistics, new_size - old_size, __ATOMIC_RELAXED);
+
     return 0;
+}
+
+size_t cbuffer_available_size_unsafe(struct circular_buffer *buf) {
+    size_t len = (buf->write >= buf->read) ? (buf->write - buf->read) : (buf->size - buf->read + buf->write);
+    return buf->max_size - len;
 }
 
 int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len) {
@@ -78,8 +100,14 @@ void cbuffer_remove_unsafe(struct circular_buffer *buf, size_t num) {
 size_t cbuffer_next_unsafe(struct circular_buffer *buf, char **start) {
     if (start != NULL)
       *start = buf->data + buf->read;
+
     if (buf->read <= buf->write) {
         return buf->write - buf->read;      // Includes empty case
     }
     return buf->size - buf->read;
+}
+
+void cbuffer_flush(struct circular_buffer*buf) {
+    buf->write = 0;
+    buf->read = 0;
 }

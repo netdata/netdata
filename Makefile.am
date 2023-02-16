@@ -23,7 +23,6 @@ CLEANFILES = \
 
 EXTRA_DIST = \
     .gitignore \
-    .csslintrc \
     .eslintignore \
     .eslintrc \
     .github/CODEOWNERS \
@@ -38,7 +37,7 @@ EXTRA_DIST = \
     build/m4/ax_c_mallopt.m4 \
     build/m4/tcmalloc.m4 \
     build/m4/ax_c__generic.m4 \
-    ml/kmeans/dlib \
+    ml/dlib \
     README.md \
     LICENSE \
     REDISTRIBUTED.md \
@@ -79,6 +78,7 @@ dist_noinst_DATA = \
     packaging/protobuf.checksums \
     packaging/protobuf.version \
     packaging/version \
+    database/engine/journalfile_v2.ksy.in \
     $(NULL)
 
 # until integrated within build
@@ -107,9 +107,7 @@ SUBDIRS += \
     streaming \
     web \
     claim \
-    parser \
     spawn \
-    ml \
     $(NULL)
 
 AM_CFLAGS = \
@@ -133,8 +131,8 @@ LIBNETDATA_FILES = \
     libnetdata/adaptive_resortable_list/adaptive_resortable_list.h \
     libnetdata/config/appconfig.c \
     libnetdata/config/appconfig.h \
-    libnetdata/arrayalloc/arrayalloc.c \
-    libnetdata/arrayalloc/arrayalloc.h \
+    libnetdata/aral/aral.c \
+    libnetdata/aral/aral.h \
     libnetdata/avl/avl.c \
     libnetdata/avl/avl.h \
     libnetdata/buffer/buffer.c \
@@ -150,6 +148,8 @@ LIBNETDATA_FILES = \
     libnetdata/eval/eval.c \
     libnetdata/eval/eval.h \
     libnetdata/inlined.h \
+    libnetdata/july/july.c \
+    libnetdata/july/july.h \
     libnetdata/libnetdata.c \
     libnetdata/libnetdata.h \
     libnetdata/required_dummies.h \
@@ -159,6 +159,8 @@ LIBNETDATA_FILES = \
     libnetdata/log/log.h \
     libnetdata/onewayalloc/onewayalloc.c \
     libnetdata/onewayalloc/onewayalloc.h \
+    libnetdata/parser/parser.c \
+    libnetdata/parser/parser.h \
     libnetdata/popen/popen.c \
     libnetdata/popen/popen.h \
     libnetdata/procfile/procfile.c \
@@ -173,6 +175,8 @@ LIBNETDATA_FILES = \
     libnetdata/socket/security.h \
     libnetdata/statistical/statistical.c \
     libnetdata/statistical/statistical.h \
+    libnetdata/string/string.c \
+    libnetdata/string/string.h \
     libnetdata/storage_number/storage_number.c \
     libnetdata/storage_number/storage_number.h \
     libnetdata/threads/threads.c \
@@ -200,10 +204,6 @@ endif
 APPS_PLUGIN_FILES = \
     collectors/apps.plugin/apps_plugin.c \
     $(LIBNETDATA_FILES) \
-    $(NULL)
-
-CHECKS_PLUGIN_FILES = \
-    collectors/checks.plugin/plugin_checks.c \
     $(NULL)
 
 FREEBSD_PLUGIN_FILES = \
@@ -235,40 +235,39 @@ ML_FILES = \
 if ENABLE_ML
 
 ML_FILES += \
-    ml/BitBufferCounter.h \
-    ml/BitBufferCounter.cc \
-    ml/BitRateWindow.h \
-    ml/BitRateWindow.cc \
+    ml/ADCharts.h \
+    ml/ADCharts.cc \
     ml/Config.h \
     ml/Config.cc \
-    ml/Database.h \
-    ml/Database.cc \
+    ml/Chart.cc \
+    ml/Chart.h \
+    ml/Stats.h \
     ml/Dimension.cc \
     ml/Dimension.h \
     ml/Host.h \
     ml/Host.cc \
+    ml/Mutex.h \
+    ml/Queue.h \
     ml/Query.h \
-    ml/kmeans/KMeans.h \
-    ml/kmeans/KMeans.cc \
-    ml/kmeans/SamplesBuffer.h \
-    ml/kmeans/SamplesBuffer.cc \
-    ml/kmeans/dlib/dlib/all/source.cpp \
+    ml/KMeans.h \
+    ml/KMeans.cc \
+    ml/SamplesBuffer.h \
+    ml/SamplesBuffer.cc \
+    ml/dlib/dlib/all/source.cpp \
     ml/json/single_include/nlohmann/json.hpp \
     ml/ml.cc \
     ml/ml-private.h \
     $(NULL)
 
 # Disable warnings from dlib library
-ml/kmeans/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow
+ml/dlib/dlib/all/source.$(OBJEXT) : CXXFLAGS += -Wno-sign-compare -Wno-type-limits -Wno-aggressive-loop-optimizations -Wno-stringop-overflow -Wno-psabi
 
-endif
+# Disable ml warnings
+ml/Dimension.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/Host.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/KMeans.$(OBJEXT) : CXXFLAGS += -Wno-psabi
+ml/ml.$(OBJEXT) : CXXFLAGS += -Wno-psabi
 
-
-if ENABLE_ML_TESTS
-ML_TESTS_FILES = \
-    ml/kmeans/Tests.cc \
-    ml/Tests.cc \
-    $(NULL)
 endif
 
 IDLEJITTER_PLUGIN_FILES = \
@@ -384,8 +383,6 @@ PROC_PLUGIN_FILES = \
     collectors/proc.plugin/proc_net_netstat.c \
     collectors/proc.plugin/proc_net_rpc_nfs.c \
     collectors/proc.plugin/proc_net_rpc_nfsd.c \
-    collectors/proc.plugin/proc_net_snmp.c \
-    collectors/proc.plugin/proc_net_snmp6.c \
     collectors/proc.plugin/proc_net_sctp_snmp.c \
     collectors/proc.plugin/proc_net_sockstat.c \
     collectors/proc.plugin/proc_net_sockstat6.c \
@@ -445,6 +442,8 @@ RRD_PLUGIN_FILES = \
     database/rrd.c \
     database/rrd.h \
     database/rrdset.c \
+    database/rrdfunctions.c \
+    database/rrdfunctions.h \
     database/rrdsetvar.c \
     database/rrdsetvar.h \
     database/rrdvar.c \
@@ -460,13 +459,13 @@ RRD_PLUGIN_FILES = \
     database/sqlite/sqlite_db_migration.c \
     database/sqlite/sqlite_db_migration.h \
     database/sqlite/sqlite_aclk.c \
-    database/sqlite/sqlite_aclk.h \
+	database/sqlite/sqlite_aclk.h \
+    database/sqlite/sqlite_metadata.c \
+    database/sqlite/sqlite_metadata.h \
     database/sqlite/sqlite_health.c \
     database/sqlite/sqlite_health.h \
     database/sqlite/sqlite_aclk_node.c \
     database/sqlite/sqlite_aclk_node.h \
-    database/sqlite/sqlite_aclk_chart.c \
-    database/sqlite/sqlite_aclk_chart.h \
     database/sqlite/sqlite_aclk_alert.c \
     database/sqlite/sqlite_aclk_alert.h \
     database/sqlite/sqlite3.c \
@@ -478,65 +477,65 @@ RRD_PLUGIN_FILES = \
 database/sqlite/sqlite3.$(OBJEXT) : CFLAGS += -Wno-cast-function-type
 database/KolmogorovSmirnovDist.$(OBJEXT) : CFLAGS += -Wno-maybe-uninitialized
 
-if ENABLE_DBENGINE
-    noinst_LIBRARIES = libjudy.a
+noinst_LIBRARIES = libjudy.a
 
-    libjudy_a_SOURCES = libnetdata/libjudy/src/Judy.h \
-        libnetdata/libjudy/src/JudyCommon/JudyMalloc.c \
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate.h \
-        libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h \
-        libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h \
-        libnetdata/libjudy/src/JudyL/JudyL.h \
-        libnetdata/libjudy/src/JudyL/JudyLByCount.c \
-        libnetdata/libjudy/src/JudyL/JudyLCascade.c \
-        libnetdata/libjudy/src/JudyL/JudyLCount.c \
-        libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c \
-        libnetdata/libjudy/src/JudyL/JudyLDecascade.c \
-        libnetdata/libjudy/src/JudyL/JudyLDel.c \
-        libnetdata/libjudy/src/JudyL/JudyLFirst.c \
-        libnetdata/libjudy/src/JudyL/JudyLFreeArray.c \
-        libnetdata/libjudy/src/JudyL/j__udyLGet.c \
-        libnetdata/libjudy/src/JudyL/JudyLGet.c \
-        libnetdata/libjudy/src/JudyL/JudyLInsArray.c \
-        libnetdata/libjudy/src/JudyL/JudyLIns.c \
-        libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c \
-        libnetdata/libjudy/src/JudyL/JudyLMallocIF.c \
-        libnetdata/libjudy/src/JudyL/JudyLMemActive.c \
-        libnetdata/libjudy/src/JudyL/JudyLMemUsed.c \
-        libnetdata/libjudy/src/JudyL/JudyLNext.c \
-        libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c \
-        libnetdata/libjudy/src/JudyL/JudyLPrev.c \
-        libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c \
-        libnetdata/libjudy/src/JudyHS/JudyHS.c \
-        $(NULL)
+libjudy_a_SOURCES = libnetdata/libjudy/src/Judy.h \
+    libnetdata/libjudy/src/JudyCommon/JudyMalloc.c \
+    libnetdata/libjudy/src/JudyCommon/JudyPrivate.h \
+    libnetdata/libjudy/src/JudyCommon/JudyPrivate1L.h \
+    libnetdata/libjudy/src/JudyCommon/JudyPrivateBranch.h \
+    libnetdata/libjudy/src/JudyL/JudyL.h \
+    libnetdata/libjudy/src/JudyL/JudyLByCount.c \
+    libnetdata/libjudy/src/JudyL/JudyLCascade.c \
+    libnetdata/libjudy/src/JudyL/JudyLCount.c \
+    libnetdata/libjudy/src/JudyL/JudyLCreateBranch.c \
+    libnetdata/libjudy/src/JudyL/JudyLDecascade.c \
+    libnetdata/libjudy/src/JudyL/JudyLDel.c \
+    libnetdata/libjudy/src/JudyL/JudyLFirst.c \
+    libnetdata/libjudy/src/JudyL/JudyLFreeArray.c \
+    libnetdata/libjudy/src/JudyL/j__udyLGet.c \
+    libnetdata/libjudy/src/JudyL/JudyLGet.c \
+    libnetdata/libjudy/src/JudyL/JudyLInsArray.c \
+    libnetdata/libjudy/src/JudyL/JudyLIns.c \
+    libnetdata/libjudy/src/JudyL/JudyLInsertBranch.c \
+    libnetdata/libjudy/src/JudyL/JudyLMallocIF.c \
+    libnetdata/libjudy/src/JudyL/JudyLMemActive.c \
+    libnetdata/libjudy/src/JudyL/JudyLMemUsed.c \
+    libnetdata/libjudy/src/JudyL/JudyLNext.c \
+    libnetdata/libjudy/src/JudyL/JudyLNextEmpty.c \
+    libnetdata/libjudy/src/JudyL/JudyLPrev.c \
+    libnetdata/libjudy/src/JudyL/JudyLPrevEmpty.c \
+    libnetdata/libjudy/src/JudyHS/JudyHS.c \
+    $(NULL)
 
-    nodist_libjudy_a_SOURCES = JudyLTables.c
+nodist_libjudy_a_SOURCES = JudyLTables.c
 
-    BUILT_SOURCES += JudyLTables.c
+BUILT_SOURCES += JudyLTables.c
 
-    CLEANFILES += JudyLTables.c
+CLEANFILES += JudyLTables.c
 
-    libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+libjudy_a_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
 
-    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrev.$(OBJEXT) : CFLAGS += -DJUDYPREV
-    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrevEmpty.$(OBJEXT) : CFLAGS += -DJUDYPREV
-    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNext.$(OBJEXT) : CFLAGS += -DJUDYNEXT
-    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNextEmpty.$(OBJEXT) : CFLAGS += -DJUDYNEXT
-    libnetdata/libjudy/src/JudyL/libjudy_a-JudyLByCount.$(OBJEXT) : CFLAGS +=  -DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB
-    libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYGETINLINE
+libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrev.$(OBJEXT) : CFLAGS += -DJUDYPREV
+libnetdata/libjudy/src/JudyL/libjudy_a-JudyLPrevEmpty.$(OBJEXT) : CFLAGS += -DJUDYPREV
+libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNext.$(OBJEXT) : CFLAGS += -DJUDYNEXT
+libnetdata/libjudy/src/JudyL/libjudy_a-JudyLNextEmpty.$(OBJEXT) : CFLAGS += -DJUDYNEXT
+libnetdata/libjudy/src/JudyL/libjudy_a-JudyLByCount.$(OBJEXT) : CFLAGS +=  -DNOSMARTJBB -DNOSMARTJBU -DNOSMARTJLB
+libnetdata/libjudy/src/JudyL/libjudy_a-j__udyLGet.$(OBJEXT) : CFLAGS +=  -DJUDYGETINLINE
 
-    noinst_PROGRAMS = judyltablesgen
+noinst_PROGRAMS = judyltablesgen
 
-    judyltablesgen_SOURCES = libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
-    judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
+judyltablesgen_SOURCES = libnetdata/libjudy/src/JudyL/JudyLTablesGen.c
+judyltablesgen_CFLAGS = $(LIBJUDY_CFLAGS) -DJUDYL -I$(abs_top_srcdir)/libnetdata/libjudy/src -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyCommon -Wno-sign-compare -Wno-implicit-fallthrough
 
-    judyltablesgen$(EXEEXT) : CFLAGS += -Wno-format -Wno-format-security
+$(builddir)/judyltablesgen$(EXEEXT) : CFLAGS += -Wno-format -Wno-format-security
 
 JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $(builddir)/judyltablesgen$(EXEEXT)
 	$(builddir)/judyltablesgen$(EXEEXT)
 
-    libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyL
+libjudy_a-JudyLTables.$(OBJEXT) : CFLAGS += -I$(abs_top_srcdir)/libnetdata/libjudy/src/JudyL
 
+if ENABLE_DBENGINE
     RRD_PLUGIN_FILES += \
         database/engine/rrdengine.c \
         database/engine/rrdengine.h \
@@ -551,19 +550,27 @@ JudyLTables.c: $(abs_top_srcdir)/libnetdata/libjudy/src/JudyL/JudyLTablesGen.c $
         database/engine/rrdengineapi.h \
         database/engine/pagecache.c \
         database/engine/pagecache.h \
-        database/engine/rrdenglocking.c \
-        database/engine/rrdenglocking.h \
-        database/engine/metadata_log/metadatalog.h \
-        database/engine/metadata_log/metadatalogapi.c \
-        database/engine/metadata_log/metadatalogapi.h \
-        database/engine/metadata_log/logfile.h \
-        database/engine/metadata_log/logfile.c \
-        database/engine/metadata_log/metadatalogprotocol.h \
-        database/engine/metadata_log/metalogpluginsd.c \
-        database/engine/metadata_log/metalogpluginsd.h \
-        database/engine/metadata_log/compaction.c \
-        database/engine/metadata_log/compaction.h \
+        database/engine/cache.c \
+        database/engine/cache.h \
+        database/engine/metric.c \
+        database/engine/metric.h \
+        database/engine/pdc.c \
+        database/engine/pdc.h \
         $(NULL)
+    
+    RRD_PLUGIN_KSY_BUILTFILES = \
+        database/engine/journalfile_v2.ksy \
+        database/engine/journalfile_v2_virtmemb.ksy \
+        $(NULL)
+
+    BUILT_SOURCES += $(RRD_PLUGIN_KSY_BUILTFILES)
+    CLEANFILES += $(RRD_PLUGIN_KSY_BUILTFILES)
+
+database/engine/journalfile_v2.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
+
+database/engine/journalfile_v2_virtmemb.ksy: $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in
+	m4 -DVIRT_MEMBERS $(abs_top_srcdir)/database/engine/journalfile_v2.ksy.in > $@
 endif
 
 API_PLUGIN_FILES = \
@@ -630,6 +637,8 @@ STREAMING_PLUGIN_FILES = \
     streaming/compression.c \
     streaming/sender.c \
     streaming/receiver.c \
+    streaming/replication.h \
+    streaming/replication.c \
     streaming/rrdpush.h \
     $(NULL)
 
@@ -669,11 +678,6 @@ CLAIM_FILES = \
     claim/claim.h \
     $(NULL)
 
-PARSER_FILES = \
-    parser/parser.c \
-    parser/parser.h \
-    $(NULL)
-
 if ENABLE_ACLK
 ACLK_FILES = \
     aclk/aclk_util.c \
@@ -692,38 +696,20 @@ ACLK_FILES = \
     aclk/aclk_rx_msgs.h \
     aclk/https_client.c \
     aclk/https_client.h \
-    mqtt_websockets/src/mqtt_wss_client.c \
-    mqtt_websockets/src/include/mqtt_wss_client.h \
-    mqtt_websockets/src/mqtt_wss_log.c \
-    mqtt_websockets/src/include/mqtt_wss_log.h \
-    mqtt_websockets/src/ws_client.c \
-    mqtt_websockets/src/include/ws_client.h \
-    mqtt_websockets/src/mqtt_ng.c \
-    mqtt_websockets/src/include/mqtt_ng.h \
-    mqtt_websockets/src/common_public.c \
-    mqtt_websockets/src/include/common_public.h \
-    mqtt_websockets/src/include/common_internal.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer.c \
-    mqtt_websockets/c-rbuf/include/ringbuffer.h \
-    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
-    mqtt_websockets/MQTT-C/src/mqtt.c \
-    mqtt_websockets/MQTT-C/include/mqtt.h \
-    aclk/aclk_charts_api.c \
-    aclk/aclk_charts_api.h \
     aclk/aclk_alarm_api.c \
     aclk/aclk_alarm_api.h \
     aclk/aclk_contexts_api.c \
     aclk/aclk_contexts_api.h \
+    aclk/aclk_capas.c \
+    aclk/aclk_capas.h \
+    aclk/helpers/mqtt_wss_pal.h \
+    aclk/helpers/ringbuffer_pal.h \
     aclk/schema-wrappers/connection.cc \
     aclk/schema-wrappers/connection.h \
     aclk/schema-wrappers/node_connection.cc \
     aclk/schema-wrappers/node_connection.h \
     aclk/schema-wrappers/node_creation.cc \
     aclk/schema-wrappers/node_creation.h \
-    aclk/schema-wrappers/chart_stream.cc \
-    aclk/schema-wrappers/chart_stream.h \
-    aclk/schema-wrappers/chart_config.cc \
-    aclk/schema-wrappers/chart_config.h \
     aclk/schema-wrappers/alarm_stream.cc \
     aclk/schema-wrappers/alarm_stream.h \
     aclk/schema-wrappers/alarm_config.cc \
@@ -743,6 +729,33 @@ ACLK_FILES = \
     aclk/schema-wrappers/context.h \
     $(NULL)
 
+noinst_LIBRARIES += libmqttwebsockets.a
+
+libmqttwebsockets_a_SOURCES = \
+    mqtt_websockets/src/mqtt_wss_client.c \
+    mqtt_websockets/src/include/mqtt_wss_client.h \
+    mqtt_websockets/src/mqtt_wss_log.c \
+    mqtt_websockets/src/include/mqtt_wss_log.h \
+    mqtt_websockets/src/ws_client.c \
+    mqtt_websockets/src/include/ws_client.h \
+    mqtt_websockets/src/mqtt_ng.c \
+    mqtt_websockets/src/include/mqtt_ng.h \
+    mqtt_websockets/src/common_public.c \
+    mqtt_websockets/src/include/common_public.h \
+    mqtt_websockets/src/include/common_internal.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer.c \
+    mqtt_websockets/c-rbuf/include/ringbuffer.h \
+    mqtt_websockets/c-rbuf/src/ringbuffer_internal.h \
+    mqtt_websockets/c_rhash/src/c_rhash.c \
+    mqtt_websockets/c_rhash/include/c_rhash.h \
+    mqtt_websockets/c_rhash/src/c_rhash_internal.h
+
+libmqttwebsockets_a_CFLAGS = $(CFLAGS) -DMQTT_WSS_CUSTOM_ALLOC -DRBUF_CUSTOM_MALLOC -DMQTT_WSS_CPUSTATS -I$(srcdir)/aclk/helpers -I$(srcdir)/mqtt_websockets/c_rhash/include
+
+if MQTT_WSS_DEBUG
+libmqttwebsockets_a_CFLAGS += -DMQTT_WSS_DEBUG
+endif
+
 mqtt_websockets/src/mqtt_wss_client.$(OBJEXT) : CFLAGS += -Wno-unused-result
 
 ACLK_PROTO_DEFINITIONS = \
@@ -751,10 +764,6 @@ ACLK_PROTO_DEFINITIONS = \
     aclk/aclk-schemas/proto/agent/v1/connection.proto \
     aclk/aclk-schemas/proto/alarm/v1/config.proto \
     aclk/aclk-schemas/proto/alarm/v1/stream.proto \
-    aclk/aclk-schemas/proto/chart/v1/config.proto \
-    aclk/aclk-schemas/proto/chart/v1/dimension.proto \
-    aclk/aclk-schemas/proto/chart/v1/instance.proto \
-    aclk/aclk-schemas/proto/chart/v1/stream.proto \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.proto \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto \
     aclk/aclk-schemas/proto/nodeinstance/info/v1/info.proto \
@@ -770,14 +779,6 @@ ACLK_PROTO_BUILT_FILES = aclk/aclk-schemas/proto/agent/v1/connection.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
     aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/stream.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/instance.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/dimension.pb.h \
-    aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
-    aclk/aclk-schemas/proto/chart/v1/config.pb.h \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
     aclk/aclk-schemas/proto/aclk/v1/lib.pb.h \
     aclk/aclk-schemas/proto/agent/v1/disconnect.pb.cc \
@@ -808,22 +809,6 @@ aclk/aclk-schemas/proto/nodeinstance/connection/v1/connection.pb.h: aclk/aclk-sc
 
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.cc \
 aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.pb.h: aclk/aclk-schemas/proto/nodeinstance/create/v1/creation.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/stream.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/stream.pb.h: aclk/aclk-schemas/proto/chart/v1/stream.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/instance.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/instance.pb.h: aclk/aclk-schemas/proto/chart/v1/instance.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/dimension.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/dimension.pb.h: aclk/aclk-schemas/proto/chart/v1/dimension.proto
-	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
-
-aclk/aclk-schemas/proto/chart/v1/config.pb.cc \
-aclk/aclk-schemas/proto/chart/v1/config.pb.h: aclk/aclk-schemas/proto/chart/v1/config.proto
 	$(PROTOC) -I=aclk/aclk-schemas --cpp_out=$(builddir)/aclk/aclk-schemas $^
 
 aclk/aclk-schemas/proto/aclk/v1/lib.pb.cc \
@@ -925,6 +910,8 @@ DAEMON_FILES = \
     daemon/common.h \
     daemon/daemon.c \
     daemon/daemon.h \
+	daemon/event_loop.c \
+    daemon/event_loop.h \
     daemon/global_statistics.c \
     daemon/global_statistics.h \
     daemon/analytics.c \
@@ -948,10 +935,8 @@ NETDATA_FILES = \
     $(LIBNETDATA_FILES) \
     $(API_PLUGIN_FILES) \
     $(EXPORTING_ENGINE_FILES) \
-    $(CHECKS_PLUGIN_FILES) \
     $(HEALTH_PLUGIN_FILES) \
     $(ML_FILES) \
-    $(ML_TESTS_FILES) \
     $(IDLEJITTER_PLUGIN_FILES) \
     $(PLUGINSD_PLUGIN_FILES) \
     $(REGISTRY_PLUGIN_FILES) \
@@ -960,7 +945,6 @@ NETDATA_FILES = \
     $(STATSD_PLUGIN_FILES) \
     $(WEB_PLUGIN_FILES) \
     $(CLAIM_FILES) \
-    $(PARSER_FILES) \
     $(ACLK_ALWAYS_BUILD_FILES) \
     $(ACLK_FILES) \
     $(SPAWN_PLUGIN_FILES) \
@@ -1000,15 +984,15 @@ NETDATA_COMMON_LIBS = \
     $(OPTIONAL_MQTT_LIBS) \
     $(OPTIONAL_UV_LIBS) \
     $(OPTIONAL_LZ4_LIBS) \
-    $(OPTIONAL_JUDY_LIBS) \
+    libjudy.a \
     $(OPTIONAL_SSL_LIBS) \
     $(OPTIONAL_JSONC_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
+    $(OPTIONAL_DL_LIBS) \
     $(NULL)
 
-if ENABLE_DBENGINE
-    NETDATA_COMMON_LIBS += libjudy.a \
-    $(NULL)
+if ENABLE_ACLK
+    NETDATA_COMMON_LIBS += libmqttwebsockets.a
 endif
 
 if LINK_STATIC_JSONC
@@ -1037,11 +1021,6 @@ if ENABLE_ACLK
     netdata_LDADD += $(OPTIONAL_PROTOBUF_LIBS) \
     $(OPTIONAL_ATOMIC_LIBS) \
     $(NULL)
-endif
-
-if ENABLE_ML_TESTS
-    netdata_LDADD += $(OPTIONAL_ML_TESTS_LIBS) \
-        $(NULL)
 endif
 
 netdata_LINK = $(CXXLD) $(CXXFLAGS) $(LDFLAGS) -o $@
@@ -1252,6 +1231,7 @@ if ENABLE_UNITTESTS
         $(EXPORTING_ENGINE_FILES) \
         $(LIBNETDATA_FILES) \
         database/rrdlabels.c \
+        database/rrdvar.c \
         $(NULL)
     exporting_tests_exporting_engine_testdriver_CFLAGS = \
         $(AM_CFLAGS) \

@@ -2,6 +2,10 @@
 title: "Netdata static binary build"
 description: "Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes."
 custom_edit_url: https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md
+sidebar_label: "Netdata static binary build"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Installation"
 -->
 
 # Netdata static binary build

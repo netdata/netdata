@@ -26,6 +26,12 @@ struct netdata_static_thread {
 
     // the threaded worker
     void *(*start_routine) (void *);
+
+    // the environment variable to create
+    char *env_name;
+
+    // global variable
+    bool *global_variable;
 };
 
 #define NETDATA_MAIN_THREAD_RUNNING     CONFIG_BOOLEAN_YES

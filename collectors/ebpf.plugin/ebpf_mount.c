@@ -22,14 +22,9 @@ static netdata_idx_t *mount_values = NULL;
 
 static netdata_idx_t mount_hash_values[NETDATA_MOUNT_END];
 
-struct netdata_static_thread mount_thread = {"MOUNT KERNEL",
-                                              NULL, NULL, 1, NULL,
-                                              NULL,  NULL};
-
 netdata_ebpf_targets_t mount_targets[] = { {.name = "mount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = "umount", .mode = EBPF_LOAD_TRAMPOLINE},
                                            {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
-static enum ebpf_threads_status ebpf_mount_exited = NETDATA_THREAD_EBPF_RUNNING;
 
 #ifdef LIBBPF_MAJOR_VERSION
 #include "includes/mount.skel.h" // BTF code
@@ -181,7 +176,7 @@ static void ebpf_mount_set_hash_tables(struct mount_bpf *obj)
  * @param obj is the main structure for bpf objects.
  * @param em  structure with configuration
  *
- * @return it returns 0 on succes and -1 otherwise
+ * @return it returns 0 on success and -1 otherwise
  */
 static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_t *em)
 {
@@ -224,6 +219,31 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
  *****************************************************************/
 
 /**
+ * Mount Free
+ *
+ * Cleanup variables after child threads to stop
+ *
+ * @param ptr thread data.
+ */
+static void ebpf_mount_free(ebpf_module_t *em)
+{
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPING;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+
+    freez(mount_values);
+
+#ifdef LIBBPF_MAJOR_VERSION
+    if (bpf_obj)
+        mount_bpf__destroy(bpf_obj);
+#endif
+
+    pthread_mutex_lock(&ebpf_exit_cleanup);
+    em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
+    pthread_mutex_unlock(&ebpf_exit_cleanup);
+}
+
+/**
  * Mount Exit
  *
  * Cancel child thread.
@@ -233,37 +253,7 @@ static inline int ebpf_mount_load_and_attach(struct mount_bpf *obj, ebpf_module_
 static void ebpf_mount_exit(void *ptr)
 {
     ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (!em->enabled) {
-        em->enabled = NETDATA_MAIN_THREAD_EXITED;
-        return;
-    }
-
-    ebpf_mount_exited = NETDATA_THREAD_EBPF_STOPPING;
-}
-
-/**
- * Mount cleanup
- *
- * Clean up allocated memory.
- *
- * @param ptr thread data.
- */
-static void ebpf_mount_cleanup(void *ptr)
-{
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-    if (ebpf_mount_exited != NETDATA_THREAD_EBPF_STOPPED)
-        return;
-
-    freez(mount_thread.thread);
-    freez(mount_values);
-
-#ifdef LIBBPF_MAJOR_VERSION
-    if (bpf_obj)
-        mount_bpf__destroy(bpf_obj);
-#endif
-
-    mount_thread.enabled = NETDATA_MAIN_THREAD_EXITED;
-    em->enabled = NETDATA_MAIN_THREAD_EXITED;
+    ebpf_mount_free(em);
 }
 
 /*****************************************************************
@@ -277,7 +267,7 @@ static void ebpf_mount_cleanup(void *ptr)
  *
  * Read the table with number of calls for all functions
  */
-static void read_global_table()
+static void ebpf_mount_read_global_table()
 {
     uint32_t idx;
     netdata_idx_t *val = mount_hash_values;
@@ -295,41 +285,6 @@ static void read_global_table()
             val[idx] = total;
         }
     }
-}
-
-/**
- * Mount read hash
- *
- * This is the thread callback.
- * This thread is necessary, because we cannot freeze the whole plugin to read the data.
- *
- * @param ptr It is a NULL value for this thread.
- *
- * @return It always returns NULL.
- */
-void *ebpf_mount_read_hash(void *ptr)
-{
-    netdata_thread_cleanup_push(ebpf_mount_cleanup, ptr);
-    heartbeat_t hb;
-    heartbeat_init(&hb);
-
-    ebpf_module_t *em = (ebpf_module_t *)ptr;
-
-    usec_t step = NETDATA_LATENCY_MOUNT_SLEEP_MS * em->update_every;
-    //This will be cancelled by its parent
-    while (ebpf_mount_exited == NETDATA_THREAD_EBPF_RUNNING) {
-        usec_t dt = heartbeat_next(&hb, step);
-        (void)dt;
-        if (ebpf_mount_exited == NETDATA_THREAD_EBPF_STOPPING)
-            break;
-
-        read_global_table();
-    }
-
-    ebpf_mount_exited = NETDATA_THREAD_EBPF_STOPPED;
-
-    netdata_thread_cleanup_pop(1);
-    return NULL;
 }
 
 /**
@@ -356,23 +311,20 @@ static void ebpf_mount_send_data()
 */
 static void mount_collector(ebpf_module_t *em)
 {
-    mount_thread.thread = mallocz(sizeof(netdata_thread_t));
-    mount_thread.start_routine = ebpf_mount_read_hash;
-    memset(mount_hash_values, 0, sizeof(mount_hash_values));
-
     mount_values = callocz((size_t)ebpf_nprocs, sizeof(netdata_idx_t));
-
-    netdata_thread_create(mount_thread.thread, mount_thread.name, NETDATA_THREAD_OPTION_DEFAULT,
-                          ebpf_mount_read_hash, em);
+    memset(mount_hash_values, 0, sizeof(mount_hash_values));
 
     heartbeat_t hb;
     heartbeat_init(&hb);
-    usec_t step = em->update_every * USEC_PER_SEC;
+    int update_every = em->update_every;
+    int counter = update_every - 1;
     while (!ebpf_exit_plugin) {
-        (void)heartbeat_next(&hb, step);
-        if (ebpf_exit_plugin)
-            break;
+        (void)heartbeat_next(&hb, USEC_PER_SEC);
+        if (ebpf_exit_plugin || ++counter != update_every)
+            continue;
 
+        counter = 0;
+        ebpf_mount_read_global_table();
         pthread_mutex_lock(&lock);
 
         ebpf_mount_send_data();
@@ -474,14 +426,11 @@ void *ebpf_mount_thread(void *ptr)
     ebpf_module_t *em = (ebpf_module_t *)ptr;
     em->maps = mount_maps;
 
-    if (!em->enabled)
-        goto endmount;
-
 #ifdef LIBBPF_MAJOR_VERSION
     ebpf_adjust_thread_load(em, default_btf);
 #endif
     if (ebpf_mount_load_bpf(em)) {
-        em->enabled = CONFIG_BOOLEAN_NO;
+        em->thread->enabled = NETDATA_THREAD_EBPF_STOPPED;
         goto endmount;
     }
 
@@ -498,8 +447,7 @@ void *ebpf_mount_thread(void *ptr)
     mount_collector(em);
 
 endmount:
-    if (!em->enabled)
-        ebpf_update_disabled_plugin_stats(em);
+    ebpf_update_disabled_plugin_stats(em);
 
     netdata_thread_cleanup_pop(1);
     return NULL;

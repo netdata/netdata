@@ -21,7 +21,6 @@ package_tree="
   app-arch/tar
   net-misc/curl
   app-arch/gzip
-  net-analyzer/netcat
   sys-apps/util-linux
   net-libs/libmnl
   dev-libs/json-c

@@ -18,7 +18,7 @@ struct capability {
 
 #include "proto/aclk/v1/lib.pb.h"
 
-void capability_set(aclk_lib::v1::Capability *proto_capa, struct capability *c_capa);
+void capability_set(aclk_lib::v1::Capability *proto_capa, const struct capability *c_capa);
 #endif
 
 #endif /* ACLK_SCHEMA_CAPABILITY_H */

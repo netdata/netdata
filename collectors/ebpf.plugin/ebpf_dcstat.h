@@ -28,8 +28,6 @@
 #define NETDATA_SYSTEMD_DC_NOT_CACHE_CONTEXT "services.dc_not_cache"
 #define NETDATA_SYSTEMD_DC_NOT_FOUND_CONTEXT "services.dc_not_found"
 
-#define NETDATA_LATENCY_DCSTAT_SLEEP_MS 700000ULL
-
 enum directory_cache_indexes {
     NETDATA_DCSTAT_IDX_RATIO,
     NETDATA_DCSTAT_IDX_REFERENCE,
@@ -75,8 +73,8 @@ typedef struct netdata_publish_dcstat {
     netdata_dcstat_pid_t prev;
 } netdata_publish_dcstat_t;
 
-extern void *ebpf_dcstat_thread(void *ptr);
-extern void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
+void *ebpf_dcstat_thread(void *ptr);
+void ebpf_dcstat_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern struct config dcstat_config;
 extern netdata_ebpf_targets_t dc_targets[];
 extern ebpf_local_maps_t dcstat_maps[];

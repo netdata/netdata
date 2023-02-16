@@ -5,16 +5,6 @@
 
 #include "web/api/web_api_v1.h"
 
-typedef struct query_params {
-    struct context_param *context_param_list;
-    BUFFER *wb;
-    char *chart_label_key;
-    int max_anomaly_rates;
-    int timeout;
-    int show_dimensions;
-} QUERY_PARAMS;
-
-
 #include "web/api/exporters/allmetrics.h"
 #include "web/api/queries/rrdr.h"
 
@@ -34,19 +24,20 @@ typedef struct query_params {
 #define API_RELATIVE_TIME_MAX (3 * 365 * 86400)
 
 // type of JSON generations
-#define DATASOURCE_INVALID (-1)
-#define DATASOURCE_JSON 0
-#define DATASOURCE_DATATABLE_JSON 1
-#define DATASOURCE_DATATABLE_JSONP 2
-#define DATASOURCE_SSV 3
-#define DATASOURCE_CSV 4
-#define DATASOURCE_JSONP 5
-#define DATASOURCE_TSV 6
-#define DATASOURCE_HTML 7
-#define DATASOURCE_JS_ARRAY 8
-#define DATASOURCE_SSV_COMMA 9
-#define DATASOURCE_CSV_JSON_ARRAY 10
-#define DATASOURCE_CSV_MARKDOWN 11
+typedef enum {
+    DATASOURCE_JSON             = 0,
+    DATASOURCE_DATATABLE_JSON   = 1,
+    DATASOURCE_DATATABLE_JSONP  = 2,
+    DATASOURCE_SSV              = 3,
+    DATASOURCE_CSV              = 4,
+    DATASOURCE_JSONP            = 5,
+    DATASOURCE_TSV              = 6,
+    DATASOURCE_HTML             = 7,
+    DATASOURCE_JS_ARRAY         = 8,
+    DATASOURCE_SSV_COMMA        = 9,
+    DATASOURCE_CSV_JSON_ARRAY   = 10,
+    DATASOURCE_CSV_MARKDOWN     = 11,
+} DATASOURCE_FORMAT;
 
 #define DATASOURCE_FORMAT_JSON "json"
 #define DATASOURCE_FORMAT_DATATABLE_JSON "datatable"
@@ -61,37 +52,22 @@ typedef struct query_params {
 #define DATASOURCE_FORMAT_CSV_JSON_ARRAY "csvjsonarray"
 #define DATASOURCE_FORMAT_CSV_MARKDOWN "markdown"
 
-extern void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
-extern void rrdr_buffer_print_format(BUFFER *wb, uint32_t format);
+void rrd_stats_api_v1_chart(RRDSET *st, BUFFER *wb);
+const char *rrdr_format_to_string(uint32_t format);
 
-extern int rrdset2anything_api_v1(
-          ONEWAYALLOC *owa
-        , RRDSET *st
-        , QUERY_PARAMS *query_params
-        , BUFFER *dimensions
-        , uint32_t format
-        , long points
-        , long long after
-        , long long before
-        , int group_method
-        , const char *group_options
-        , long group_time
-        , uint32_t options
-        , time_t *latest_timestamp
-        , int tier
-);
+int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, struct query_target *qt, time_t *latest_timestamp);
 
-extern int rrdset2value_api_v1(
-          RRDSET *st
+int rrdset2value_api_v1(
+        RRDSET *st
         , BUFFER *wb
         , NETDATA_DOUBLE *n
         , const char *dimensions
-        , long points
-        , long long after
-        , long long before
-        , int group_method
+        , size_t points
+        , time_t after
+        , time_t before
+        , RRDR_TIME_GROUPING group_method
         , const char *group_options
-        , long group_time
+        , time_t resampling_time
         , uint32_t options
         , time_t *db_after
         , time_t *db_before
@@ -100,12 +76,17 @@ extern int rrdset2value_api_v1(
         , size_t *result_points_generated
         , int *value_is_null
         , NETDATA_DOUBLE *anomaly_rate
-        , int timeout
-        , int tier
+        , time_t timeout
+        , size_t tier
+        , QUERY_SOURCE query_source
+        , STORAGE_PRIORITY priority
 );
 
-extern void build_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list, RRDSET *st);
-extern void rebuild_context_param_list(ONEWAYALLOC *owa, struct context_param *context_param_list, time_t after_requested);
-extern void free_context_param_list(ONEWAYALLOC *owa, struct context_param **param_list);
+static inline bool rrdr_dimension_should_be_exposed(RRDR_DIMENSION_FLAGS rrdr_dim_flags, RRDR_OPTIONS options) {
+    if(unlikely(rrdr_dim_flags & RRDR_DIMENSION_HIDDEN)) return false;
+    if(unlikely(!(rrdr_dim_flags & RRDR_DIMENSION_QUERIED))) return false;
+    if(unlikely((options & RRDR_OPTION_NONZERO) && !(rrdr_dim_flags & RRDR_DIMENSION_NONZERO))) return false;
+    return true;
+}
 
 #endif /* NETDATA_RRD2JSON_H */

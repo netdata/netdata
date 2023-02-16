@@ -15,7 +15,6 @@ declare -a package_tree=(
   libtool
   pkgconfig
   cmake
-  nmap-ncat
   zlib-devel
   libuuid-devel
   libmnl-devel
@@ -97,7 +96,7 @@ check_flags() {
 
 validate_tree_centos() {
   local opts=
-  export local package_manager=
+  package_manager=
   if [[ "${NON_INTERACTIVE}" == "1" ]]; then
     echo >&2 "Running in non-interactive mode"
     opts="-y"

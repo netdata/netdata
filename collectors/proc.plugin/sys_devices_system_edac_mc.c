@@ -30,7 +30,7 @@ static void find_all_mc() {
 
     DIR *dir = opendir(dirname);
     if(unlikely(!dir)) {
-        error("Cannot read ECC memory errors directory '%s'", dirname);
+        collector_error("Cannot read ECC memory errors directory '%s'", dirname);
         return;
     }
 
@@ -78,8 +78,8 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
     struct mc *m;
 
     if(unlikely(do_ce == -1)) {
-        do_ce = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory correctable errors", CONFIG_BOOLEAN_AUTO);
-        do_ue = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory uncorrectable errors", CONFIG_BOOLEAN_AUTO);
+        do_ce = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory correctable errors", CONFIG_BOOLEAN_YES);
+        do_ue = config_get_boolean_ondemand("plugin:proc:/sys/devices/system/edac/mc", "enable ECC memory uncorrectable errors", CONFIG_BOOLEAN_YES);
     }
 
     if(do_ce != CONFIG_BOOLEAN_NO) {
@@ -97,7 +97,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                 if(unlikely(!m->ce_ff || procfile_lines(m->ce_ff) < 1 || procfile_linewords(m->ce_ff, 0) < 1))
                     continue;
 
-                m->ce_count = str2ull(procfile_lineword(m->ce_ff, 0, 0));
+                m->ce_count = str2ull(procfile_lineword(m->ce_ff, 0, 0), NULL);
                 ce_sum += m->ce_count;
                 m->ce_updated = 1;
             }
@@ -119,7 +119,7 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                 if(unlikely(!m->ue_ff || procfile_lines(m->ue_ff) < 1 || procfile_linewords(m->ue_ff, 0) < 1))
                     continue;
 
-                m->ue_count = str2ull(procfile_lineword(m->ue_ff, 0, 0));
+                m->ue_count = str2ull(procfile_lineword(m->ue_ff, 0, 0), NULL);
                 ue_sum += m->ue_count;
                 m->ue_updated = 1;
             }
@@ -150,8 +150,6 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
         }
-        else
-            rrdset_next(ce_st);
 
         for(m = mc_root; m; m = m->next) {
             if (m->ce_count_filename && m->ce_updated) {
@@ -189,8 +187,6 @@ int do_proc_sys_devices_system_edac_mc(int update_every, usec_t dt) {
                     , RRDSET_TYPE_LINE
             );
         }
-        else
-            rrdset_next(ue_st);
 
         for(m = mc_root; m; m = m->next) {
             if (m->ue_count_filename && m->ue_updated) {

@@ -11,9 +11,7 @@ int registry_db_should_be_saved(void) {
 // ----------------------------------------------------------------------------
 // INTERNAL FUNCTIONS FOR SAVING REGISTRY OBJECTS
 
-static int registry_machine_save_url(const char *name, void *entry, void *file) {
-    (void)name;
-
+static int registry_machine_save_url(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
     REGISTRY_MACHINE_URL *mu = entry;
     FILE *fp = file;
 
@@ -32,8 +30,7 @@ static int registry_machine_save_url(const char *name, void *entry, void *file) 
     return ret;
 }
 
-static int registry_machine_save(const char *name, void *entry, void *file) {
-    (void)name;
+static int registry_machine_save(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
 
     REGISTRY_MACHINE *m = entry;
     FILE *fp = file;
@@ -79,9 +76,7 @@ static inline int registry_person_save_url(void *entry, void *file) {
     return ret;
 }
 
-static inline int registry_person_save(const char *name, void *entry, void *file) {
-    (void)name;
-
+static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *file) {
     REGISTRY_PERSON *p = entry;
     FILE *fp = file;
 

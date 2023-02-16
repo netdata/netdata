@@ -1,7 +1,10 @@
 <!--
 title: "Tor monitoring with Netdata"
-custom_edit_url: https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/collectors/python.d.plugin/tor/README.md"
 sidebar_label: "Tor"
+learn_status: "Published"
+learn_topic_type: "References"
+learn_rel_path: "Integrations/Monitor/Apps"
 -->
 
 # Tor monitoring with Netdata
@@ -23,7 +26,7 @@ It produces only one chart:
 ## Configuration
 
 Edit the `python.d/tor.conf` configuration file using `edit-config` from the Netdata [config
-directory](/docs/configure/nodes.md), which is typically at `/etc/netdata`.
+directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md), which is typically at `/etc/netdata`.
 
 ```bash
 cd /etc/netdata   # Replace this path with your Netdata config directory, if different
@@ -41,10 +44,12 @@ priority     : 60000
 local_tcp:
  name: 'local'
  control_port: 9051
+ password: <password> # if required
 
 local_socket:
  name: 'local'
  control_port: '/var/run/tor/control'
+ password: <password> # if required
 ```
 
 ### prerequisite

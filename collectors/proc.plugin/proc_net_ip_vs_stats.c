@@ -39,9 +39,6 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
     InBytes     = strtoull(procfile_lineword(ff, 2, 3), NULL, 16);
     OutBytes    = strtoull(procfile_lineword(ff, 2, 4), NULL, 16);
 
-
-    // --------------------------------------------------------------------
-
     if(do_sockets) {
         static RRDSET *st = NULL;
 
@@ -63,13 +60,10 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
 
             rrddim_add(st, "connections", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "connections", entries);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_packets) {
         static RRDSET *st = NULL;
@@ -92,14 +86,11 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
             rrddim_add(st, "received", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "received", InPackets);
         rrddim_set(st, "sent", OutPackets);
         rrdset_done(st);
     }
-
-    // --------------------------------------------------------------------
 
     if(do_bandwidth) {
         static RRDSET *st = NULL;
@@ -122,7 +113,6 @@ int do_proc_net_ip_vs_stats(int update_every, usec_t dt) {
             rrddim_add(st, "received", NULL, 8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
             rrddim_add(st, "sent", NULL,    -8, BITS_IN_A_KILOBIT, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st);
 
         rrddim_set(st, "received", InBytes);
         rrddim_set(st, "sent", OutBytes);

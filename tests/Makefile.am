@@ -4,32 +4,32 @@ AUTOMAKE_OPTIONS = subdir-objects
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 
 CLEANFILES = \
-    health_mgmtapi/health-cmdapi-test.sh \
-    acls/acl.sh \
-    urls/request.sh \
-    alarm_repetition/alarm.sh \
-    template_dimension/template_dim.sh \
+    $(srcdir)/health_mgmtapi/health-cmdapi-test.sh \
+    $(srcdir)/acls/acl.sh \
+    $(srcdir)/urls/request.sh \
+    $(srcdir)/alarm_repetition/alarm.sh \
+    $(srcdir)/template_dimension/template_dim.sh \
     $(NULL)
 
 include $(top_srcdir)/build/subst.inc
 SUFFIXES = .in
 
 dist_noinst_DATA = \
-    health_mgmtapi/health-cmdapi-test.sh.in \
-    acls/acl.sh.in \
-    urls/request.sh.in \
-    alarm_repetition/alarm.sh.in \
-    template_dimension/template_dim.sh.in \
+    $(srcdir)/health_mgmtapi/health-cmdapi-test.sh.in \
+    $(srcdir)/acls/acl.sh.in \
+    $(srcdir)/urls/request.sh.in \
+    $(srcdir)/alarm_repetition/alarm.sh.in \
+    $(srcdir)/template_dimension/template_dim.sh.in \
     $(NULL)
 
 dist_plugins_SCRIPTS = \
-    health_mgmtapi/health-cmdapi-test.sh \
-    acls/acl.sh \
-    urls/request.sh \
-    alarm_repetition/alarm.sh \
-    template_dimension/template_dim.sh \
+    $(srcdir)/health_mgmtapi/health-cmdapi-test.sh \
+    $(srcdir)/acls/acl.sh \
+    $(srcdir)/urls/request.sh \
+    $(srcdir)/alarm_repetition/alarm.sh \
+    $(srcdir)/template_dimension/template_dim.sh \
     $(NULL)
 
 dist_noinst_SCRIPTS = \
-    stress.sh \
+    $(srcdir)/stress.sh \
     $(NULL)

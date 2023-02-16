@@ -214,7 +214,7 @@ static unsigned long long int bcache_read_number_with_units(const char *filename
             else if(*end == 'T')
                 return (unsigned long long int)(value * 1024.0 * 1024.0 * 1024.0 * 1024.0);
             else if(unknown_units_error > 0) {
-                error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
+                collector_error("bcache file '%s' provides value '%s' with unknown units '%s'", filename, buffer, end);
                 unknown_units_error--;
             }
         }
@@ -269,7 +269,7 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
     for(l = 0; l < lines ;l++) {
         size_t words = procfile_linewords(ff, l);
         if(unlikely(words < 2)) {
-            if(unlikely(words)) error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
+            if(unlikely(words)) collector_error("Cannot read '%s' line %zu. Expected 2 params, read %zu.", d->bcache_filename_priority_stats, l, words);
             continue;
         }
 
@@ -306,7 +306,6 @@ void bcache_read_priority_stats(struct disk *d, const char *family, int update_e
 
             d->bcache_priority_stats_update_every_usec = update_every * USEC_PER_SEC;
         }
-        else rrdset_next(d->st_bcache_cache_allocations);
 
         rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_unused, unused);
         rrddim_set_by_pointer(d->st_bcache_cache_allocations, d->rd_bcache_cache_allocations_dirty, dirty);
@@ -345,7 +344,7 @@ static inline int is_major_enabled(int major) {
 }
 
 static inline int get_disk_name_from_path(const char *path, char *result, size_t result_size, unsigned long major, unsigned long minor, char *disk, char *prefix, int depth) {
-    //info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
+    //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): examining directory '%s' (allowed depth %d).", disk, major, minor, path, depth);
 
     int found = 0, preferred = 0;
 
@@ -353,7 +352,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
     DIR *dir = opendir(path);
     if (!dir) {
-        error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
+        collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot open directory '%s'.", disk, major, minor, path);
         goto failed;
     }
 
@@ -364,7 +363,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 continue;
 
             if(depth <= 0) {
-                error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s/%s'. Ignoring path.", disk, major, minor, path, de->d_name);
+                collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Depth limit reached for path '%s/%s'. Ignoring path.", disk, major, minor, path, de->d_name);
                 break;
             }
             else {
@@ -394,7 +393,7 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
                 snprintfz(filename, FILENAME_MAX, "%s/%s", path, de->d_name);
                 ssize_t len = readlink(filename, result, result_size - 1);
                 if(len <= 0) {
-                    error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
+                    collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot read link '%s'.", disk, major, minor, filename);
                     continue;
                 }
 
@@ -410,21 +409,21 @@ static inline int get_disk_name_from_path(const char *path, char *result, size_t
 
             struct stat sb;
             if(stat(filename, &sb) == -1) {
-                error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
+                collector_error("DEVICE-MAPPER ('%s', %lu:%lu): Cannot stat() file '%s'.", disk, major, minor, filename);
                 continue;
             }
 
             if((sb.st_mode & S_IFMT) != S_IFBLK) {
-                //info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
+                //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): file '%s' is not a block device.", disk, major, minor, filename);
                 continue;
             }
 
             if(major(sb.st_rdev) != major || minor(sb.st_rdev) != minor || strcmp(basename(filename), disk)) {
-                //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
+                //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' does not match %lu:%lu.", disk, major, minor, filename, (unsigned long)major(sb.st_rdev), (unsigned long)minor(sb.st_rdev));
                 continue;
             }
 
-            //info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
+            //collector_info("DEVICE-MAPPER ('%s', %lu:%lu): filename '%s' matches.", disk, major, minor, filename);
 
             snprintfz(result, result_size - 1, "%s%s%s", (prefix)?prefix:"", (prefix)?"_":"", de->d_name);
 
@@ -673,7 +672,7 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
                     break;
                 }
                 if (unlikely(closedir(dirp) == -1))
-                    error("Unable to close dir %s", buffer);
+                    collector_error("Unable to close dir %s", buffer);
             }
         }
     }
@@ -722,15 +721,15 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
             if(likely(tmp)) {
                 d->sector_size = str2i(tmp);
                 if(unlikely(d->sector_size <= 0)) {
-                    error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
+                    collector_error("Invalid sector size %d for device %s in %s. Assuming 512.", d->sector_size, d->device, buffer);
                     d->sector_size = 512;
                 }
             }
-            else error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
+            else collector_error("Cannot read data for sector size for device %s from %s. Assuming 512.", d->device, buffer);
 
             fclose(fpss);
         }
-        else error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
+        else collector_error("Cannot read sector size for device %s from %s. Assuming 512.", d->device, buffer);
     }
     */
 
@@ -749,103 +748,103 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_congested = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/readahead", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_readaheads = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/priority_stats", buffer); // only one cache is supported by bcache
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_priority_stats = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/internal/cache_read_races", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_read_races = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache0/io_errors", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_io_errors = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/dirty_data", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_dirty_data = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/writeback_rate", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_writeback_rate = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/cache/cache_available_percent", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_cache_available_percent = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_hits", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_hits = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_five_minute/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_five_minute_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_hour/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_hour_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_day/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_day_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_hit_ratio", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_hit_ratio = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_misses", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_misses = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_hits", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_bypass_hits = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_bypass_misses", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_bypass_misses = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
 
         snprintfz(buffer2, FILENAME_MAX, "%s/stats_total/cache_miss_collisions", buffer);
         if(access(buffer2, R_OK) == 0)
             d->bcache_filename_stats_total_cache_miss_collisions = strdupz(buffer2);
         else
-            error("bcache file '%s' cannot be read.", buffer2);
+            collector_error("bcache file '%s' cannot be read.", buffer2);
     }
 
     get_disk_config(d);
@@ -853,29 +852,27 @@ static struct disk *get_disk(unsigned long major, unsigned long minor, char *dis
 }
 
 static void add_labels_to_disk(struct disk *d, RRDSET *st) {
-    rrdlabels_add(st->state->chart_labels, "device", d->disk, RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->state->chart_labels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "device", d->disk, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
 
     switch (d->type) {
         default:
         case DISK_TYPE_UNKNOWN:
-            rrdlabels_add(st->state->chart_labels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "unknown", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_PHYSICAL:
-            rrdlabels_add(st->state->chart_labels, "device_type", "physical", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "physical", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_PARTITION:
-            rrdlabels_add(st->state->chart_labels, "device_type", "partition", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "partition", RRDLABEL_SRC_AUTO);
             break;
 
         case DISK_TYPE_VIRTUAL:
-            rrdlabels_add(st->state->chart_labels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
+            rrdlabels_add(st->rrdlabels, "device_type", "virtual", RRDLABEL_SRC_AUTO);
             break;
     }
-
-    rrdcalc_update_rrdlabels(st);
 }
 
 int do_proc_diskstats(int update_every, usec_t dt) {
@@ -996,35 +993,35 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
         // # of reads completed # of writes completed
         // This is the total number of reads or writes completed successfully.
-        reads           = str2ull(procfile_lineword(ff, l, 3));  // rd_ios
-        writes          = str2ull(procfile_lineword(ff, l, 7));  // wr_ios
+        reads           = str2ull(procfile_lineword(ff, l, 3), NULL);  // rd_ios
+        writes          = str2ull(procfile_lineword(ff, l, 7), NULL);  // wr_ios
 
         // # of reads merged # of writes merged
         // Reads and writes which are adjacent to each other may be merged for
         // efficiency.  Thus two 4K reads may become one 8K read before it is
         // ultimately handed to the disk, and so it will be counted (and queued)
-        mreads          = str2ull(procfile_lineword(ff, l, 4));  // rd_merges_or_rd_sec
-        mwrites         = str2ull(procfile_lineword(ff, l, 8));  // wr_merges
+        mreads          = str2ull(procfile_lineword(ff, l, 4), NULL);  // rd_merges_or_rd_sec
+        mwrites         = str2ull(procfile_lineword(ff, l, 8), NULL);  // wr_merges
 
         // # of sectors read # of sectors written
         // This is the total number of sectors read or written successfully.
-        readsectors     = str2ull(procfile_lineword(ff, l, 5));  // rd_sec_or_wr_ios
-        writesectors    = str2ull(procfile_lineword(ff, l, 9));  // wr_sec
+        readsectors     = str2ull(procfile_lineword(ff, l, 5), NULL);  // rd_sec_or_wr_ios
+        writesectors    = str2ull(procfile_lineword(ff, l, 9), NULL);  // wr_sec
 
         // # of milliseconds spent reading # of milliseconds spent writing
         // This is the total number of milliseconds spent by all reads or writes (as
         // measured from __make_request() to end_that_request_last()).
-        readms          = str2ull(procfile_lineword(ff, l, 6));  // rd_ticks_or_wr_sec
-        writems         = str2ull(procfile_lineword(ff, l, 10)); // wr_ticks
+        readms          = str2ull(procfile_lineword(ff, l, 6), NULL);  // rd_ticks_or_wr_sec
+        writems         = str2ull(procfile_lineword(ff, l, 10), NULL); // wr_ticks
 
         // # of I/Os currently in progress
         // The only field that should go to zero. Incremented as requests are
         // given to appropriate struct request_queue and decremented as they finish.
-        queued_ios      = str2ull(procfile_lineword(ff, l, 11)); // ios_pgr
+        queued_ios      = str2ull(procfile_lineword(ff, l, 11), NULL); // ios_pgr
 
         // # of milliseconds spent doing I/Os
         // This field increases so long as field queued_ios is nonzero.
-        busy_ms         = str2ull(procfile_lineword(ff, l, 12)); // tot_ticks
+        busy_ms         = str2ull(procfile_lineword(ff, l, 12), NULL); // tot_ticks
 
         // weighted # of milliseconds spent doing I/Os
         // This field is incremented at each I/O start, I/O completion, I/O
@@ -1032,27 +1029,27 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         // (field queued_ios) times the number of milliseconds spent doing I/O since the
         // last update of this field.  This can provide an easy measure of both
         // I/O completion time and the backlog that may be accumulating.
-        backlog_ms      = str2ull(procfile_lineword(ff, l, 13)); // rq_ticks
+        backlog_ms      = str2ull(procfile_lineword(ff, l, 13), NULL); // rq_ticks
 
         if (unlikely(words > 13)) {
             do_dc_stats = 1;
 
             // # of discards completed
             // This is the total number of discards completed successfully.
-            discards       = str2ull(procfile_lineword(ff, l, 14)); // dc_ios
+            discards       = str2ull(procfile_lineword(ff, l, 14), NULL); // dc_ios
 
             // # of discards merged
             // See the description of mreads/mwrites
-            mdiscards      = str2ull(procfile_lineword(ff, l, 15)); // dc_merges
+            mdiscards      = str2ull(procfile_lineword(ff, l, 15), NULL); // dc_merges
 
             // # of sectors discarded
             // This is the total number of sectors discarded successfully.
-            discardsectors = str2ull(procfile_lineword(ff, l, 16)); // dc_sec
+            discardsectors = str2ull(procfile_lineword(ff, l, 16), NULL); // dc_sec
 
             // # of milliseconds spent discarding
             // This is the total number of milliseconds spent by all discards (as
             // measured from __make_request() to end_that_request_last()).
-            discardms      = str2ull(procfile_lineword(ff, l, 17)); // dc_ticks
+            discardms      = str2ull(procfile_lineword(ff, l, 17), NULL); // dc_ticks
         }
 
         if (unlikely(words > 17)) {
@@ -1062,10 +1059,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             // These values increment when an flush I/O request completes.
             // Block layer combines flush requests and executes at most one at a time.
             // This counts flush requests executed by disk. Not tracked for partitions.
-            flushes        = str2ull(procfile_lineword(ff, l, 18)); // fl_ios
+            flushes        = str2ull(procfile_lineword(ff, l, 18), NULL); // fl_ios
 
             // total wait time for flush requests
-            flushms        = str2ull(procfile_lineword(ff, l, 19)); // fl_ticks
+            flushms        = str2ull(procfile_lineword(ff, l, 19), NULL); // fl_ticks
         }
 
         // --------------------------------------------------------------------------
@@ -1118,14 +1115,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_io);
             }
-            else rrdset_next(d->st_io);
 
             last_readsectors  = rrddim_set_by_pointer(d->st_io, d->rd_io_reads, readsectors);
             last_writesectors = rrddim_set_by_pointer(d->st_io, d->rd_io_writes, writesectors);
             rrdset_done(d->st_io);
         }
-
-        // --------------------------------------------------------------------
 
         if (do_dc_stats && d->do_io == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if (unlikely(!d->st_ext_io)) {
@@ -1147,14 +1141,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
                 d->rd_io_discards = rrddim_add(d->st_ext_io, "discards", NULL, d->sector_size, 1024, RRD_ALGORITHM_INCREMENTAL);
 
                 add_labels_to_disk(d, d->st_ext_io);
-            } else
-                rrdset_next(d->st_ext_io);
+            }
 
             last_discardsectors = rrddim_set_by_pointer(d->st_ext_io, d->rd_io_discards, discardsectors);
             rrdset_done(d->st_ext_io);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_ops == CONFIG_BOOLEAN_YES || (d->do_ops == CONFIG_BOOLEAN_AUTO &&
                                                (reads || writes || discards || flushes ||
@@ -1184,14 +1175,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ops);
             }
-            else rrdset_next(d->st_ops);
 
             last_reads  = rrddim_set_by_pointer(d->st_ops, d->rd_ops_reads, reads);
             last_writes = rrddim_set_by_pointer(d->st_ops, d->rd_ops_writes, writes);
             rrdset_done(d->st_ops);
         }
-
-        // --------------------------------------------------------------------
 
         if (do_dc_stats && d->do_ops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if (unlikely(!d->st_ext_ops)) {
@@ -1218,16 +1206,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_ops);
             }
-            else
-                rrdset_next(d->st_ext_ops);
 
             last_discards = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_discards, discards);
             if (do_fl_stats)
                 last_flushes = rrddim_set_by_pointer(d->st_ext_ops, d->rd_ops_flushes, flushes);
             rrdset_done(d->st_ext_ops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_qops == CONFIG_BOOLEAN_YES || (d->do_qops == CONFIG_BOOLEAN_AUTO &&
                                                 (queued_ios || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1255,13 +1239,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_qops);
             }
-            else rrdset_next(d->st_qops);
 
             rrddim_set_by_pointer(d->st_qops, d->rd_qops_operations, queued_ios);
             rrdset_done(d->st_qops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_backlog == CONFIG_BOOLEAN_YES || (d->do_backlog == CONFIG_BOOLEAN_AUTO &&
                                                    (backlog_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1289,13 +1270,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_backlog);
             }
-            else rrdset_next(d->st_backlog);
 
             rrddim_set_by_pointer(d->st_backlog, d->rd_backlog_backlog, backlog_ms);
             rrdset_done(d->st_backlog);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_util == CONFIG_BOOLEAN_YES || (d->do_util == CONFIG_BOOLEAN_AUTO &&
                                                 (busy_ms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1323,12 +1301,9 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_busy);
             }
-            else rrdset_next(d->st_busy);
 
             last_busy_ms = rrddim_set_by_pointer(d->st_busy, d->rd_busy_busy, busy_ms);
             rrdset_done(d->st_busy);
-
-        // --------------------------------------------------------------------
 
             if(unlikely(!d->st_util)) {
                 d->st_util = rrdset_create_localhost(
@@ -1352,7 +1327,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_util);
             }
-            else rrdset_next(d->st_util);
 
             collected_number disk_utilization = (busy_ms - last_busy_ms) / (10 * update_every);
             if (disk_utilization > 100)
@@ -1361,8 +1335,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrddim_set_by_pointer(d->st_util, d->rd_util_utilization, disk_utilization);
             rrdset_done(d->st_util);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_mops == CONFIG_BOOLEAN_YES || (d->do_mops == CONFIG_BOOLEAN_AUTO &&
                                                 (mreads || mwrites || mdiscards ||
@@ -1392,14 +1364,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_mops);
             }
-            else rrdset_next(d->st_mops);
 
             rrddim_set_by_pointer(d->st_mops, d->rd_mops_reads,  mreads);
             rrddim_set_by_pointer(d->st_mops, d->rd_mops_writes, mwrites);
             rrdset_done(d->st_mops);
         }
-
-        // --------------------------------------------------------------------
 
         if(do_dc_stats && d->do_mops == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             d->do_mops = CONFIG_BOOLEAN_YES;
@@ -1426,14 +1395,10 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_mops);
             }
-            else
-                rrdset_next(d->st_ext_mops);
 
             rrddim_set_by_pointer(d->st_ext_mops, d->rd_mops_discards, mdiscards);
             rrdset_done(d->st_ext_mops);
         }
-
-        // --------------------------------------------------------------------
 
         if(d->do_iotime == CONFIG_BOOLEAN_YES || (d->do_iotime == CONFIG_BOOLEAN_AUTO &&
                                                   (readms || writems || discardms || flushms || netdata_zero_metrics_enabled == CONFIG_BOOLEAN_YES))) {
@@ -1462,14 +1427,11 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_iotime);
             }
-            else rrdset_next(d->st_iotime);
 
             last_readms  = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_reads, readms);
             last_writems = rrddim_set_by_pointer(d->st_iotime, d->rd_iotime_writes, writems);
             rrdset_done(d->st_iotime);
         }
-
-        // --------------------------------------------------------------------
 
         if(do_dc_stats && d->do_iotime == CONFIG_BOOLEAN_YES && d->do_ext != CONFIG_BOOLEAN_NO) {
             if(unlikely(!d->st_ext_iotime)) {
@@ -1496,8 +1458,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                 add_labels_to_disk(d, d->st_ext_iotime);
             }
-            else
-                rrdset_next(d->st_ext_iotime);
 
             last_discardms = rrddim_set_by_pointer(d->st_ext_iotime, d->rd_iotime_discards, discardms);
             if (do_fl_stats)
@@ -1505,7 +1465,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rrdset_done(d->st_ext_iotime);
         }
 
-        // --------------------------------------------------------------------
         // calculate differential charts
         // only if this is not the first time we run
 
@@ -1540,7 +1499,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_await);
                 }
-                else rrdset_next(d->st_await);
 
                 rrddim_set_by_pointer(d->st_await, d->rd_await_reads,  (reads  - last_reads)  ? (readms  - last_readms)  / (reads  - last_reads)  : 0);
                 rrddim_set_by_pointer(d->st_await, d->rd_await_writes, (writes - last_writes) ? (writems - last_writems) / (writes - last_writes) : 0);
@@ -1572,8 +1530,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_ext_await);
                 }
-                else
-                    rrdset_next(d->st_ext_await);
 
                 rrddim_set_by_pointer(
                     d->st_ext_await, d->rd_await_discards,
@@ -1615,7 +1571,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_avgsz);
                 }
-                else rrdset_next(d->st_avgsz);
 
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_reads,  (reads  - last_reads)  ? (readsectors  - last_readsectors)  / (reads  - last_reads)  : 0);
                 rrddim_set_by_pointer(d->st_avgsz, d->rd_avgsz_writes, (writes - last_writes) ? (writesectors - last_writesectors) / (writes - last_writes) : 0);
@@ -1645,8 +1600,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_ext_avgsz);
                 }
-                else
-                    rrdset_next(d->st_ext_avgsz);
 
                 rrddim_set_by_pointer(
                     d->st_ext_avgsz, d->rd_avgsz_discards,
@@ -1684,15 +1637,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_svctm);
                 }
-                else
-                    rrdset_next(d->st_svctm);
 
                 rrddim_set_by_pointer(d->st_svctm, d->rd_svctm_svctm, ((reads - last_reads) + (writes - last_writes)) ? (busy_ms - last_busy_ms) / ((reads - last_reads) + (writes - last_writes)) : 0);
                 rrdset_done(d->st_svctm);
             }
         }
 
-        // --------------------------------------------------------------------------
         // read bcache metrics and generate the bcache charts
 
         if(d->device_is_bcache && d->do_bcache != CONFIG_BOOLEAN_NO) {
@@ -1793,8 +1743,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_hit_ratio);
                 }
-                else
-                    rrdset_next(d->st_bcache_hit_ratio);
 
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_5min, stats_five_minute_cache_hit_ratio);
                 rrddim_set_by_pointer(d->st_bcache_hit_ratio, d->rd_bcache_hit_ratio_1hour, stats_hour_cache_hit_ratio);
@@ -1826,8 +1774,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_rates);
                 }
-                else
-                    rrdset_next(d->st_bcache_rates);
 
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_writeback, writeback_rate);
                 rrddim_set_by_pointer(d->st_bcache_rates, d->rd_bcache_rate_congested, cache_congested);
@@ -1855,8 +1801,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_size);
                 }
-                else
-                    rrdset_next(d->st_bcache_size);
 
                 rrddim_set_by_pointer(d->st_bcache_size, d->rd_bcache_dirty_size, dirty_data);
                 rrdset_done(d->st_bcache_size);
@@ -1883,8 +1827,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_usage);
                 }
-                else
-                    rrdset_next(d->st_bcache_usage);
 
                 rrddim_set_by_pointer(d->st_bcache_usage, d->rd_bcache_available_percent, cache_available_percent);
                 rrdset_done(d->st_bcache_usage);
@@ -1913,8 +1855,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_cache_read_races);
                 }
-                else
-                    rrdset_next(d->st_bcache_cache_read_races);
 
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_read_races, cache_read_races);
                 rrddim_set_by_pointer(d->st_bcache_cache_read_races, d->rd_bcache_cache_io_errors, cache_io_errors);
@@ -1952,8 +1892,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache);
                 }
-                else
-                    rrdset_next(d->st_bcache);
 
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_hits, stats_total_cache_hits);
                 rrddim_set_by_pointer(d->st_bcache, d->rd_bcache_misses, stats_total_cache_misses);
@@ -1990,7 +1928,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
 
                     add_labels_to_disk(d, d->st_bcache_bypass);
                 }
-                else rrdset_next(d->st_bcache_bypass);
 
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_hits, stats_total_cache_bypass_hits);
                 rrddim_set_by_pointer(d->st_bcache_bypass, d->rd_bcache_bypass_misses, stats_total_cache_bypass_misses);
@@ -1999,8 +1936,6 @@ int do_proc_diskstats(int update_every, usec_t dt) {
         }
     }
 
-
-    // ------------------------------------------------------------------------
     // update the system total I/O
 
     if(global_do_io == CONFIG_BOOLEAN_YES || (global_do_io == CONFIG_BOOLEAN_AUTO &&
@@ -2028,15 +1963,12 @@ int do_proc_diskstats(int update_every, usec_t dt) {
             rd_in  = rrddim_add(st_io, "in",  NULL,  1, 1, RRD_ALGORITHM_INCREMENTAL);
             rd_out = rrddim_add(st_io, "out", NULL, -1, 1, RRD_ALGORITHM_INCREMENTAL);
         }
-        else rrdset_next(st_io);
 
         rrddim_set_by_pointer(st_io, rd_in, system_read_kb);
         rrddim_set_by_pointer(st_io, rd_out, system_write_kb);
         rrdset_done(st_io);
     }
 
-
-    // ------------------------------------------------------------------------
     // cleanup removed disks
 
     struct disk *d = disk_root, *last = NULL;

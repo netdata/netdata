@@ -4,8 +4,16 @@
 #include "buildinfo.h"
 #include "static_threads.h"
 
+#if defined(ENV32BIT)
+#warning COMPILING 32BIT NETDATA
+#endif
+
+bool unittest_running = false;
 int netdata_zero_metrics_enabled;
 int netdata_anonymous_statistics_enabled;
+
+int libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+bool ieee754_doubles = false;
 
 struct netdata_static_thread *static_threads;
 
@@ -22,15 +30,301 @@ struct config netdata_config = {
         }
 };
 
+typedef struct service_thread {
+    pid_t tid;
+    SERVICE_THREAD_TYPE type;
+    SERVICE_TYPE services;
+    char name[NETDATA_THREAD_NAME_MAX + 1];
+    bool cancelled;
+
+    union {
+        netdata_thread_t netdata_thread;
+        uv_thread_t uv_thread;
+    };
+
+    force_quit_t force_quit_callback;
+    request_quit_t request_quit_callback;
+    void *data;
+} SERVICE_THREAD;
+
+struct service_globals {
+    SERVICE_TYPE running;
+    SPINLOCK lock;
+    Pvoid_t pid_judy;
+} service_globals = {
+        .running = ~0,
+        .pid_judy = NULL,
+};
+
+SERVICE_THREAD *service_register(SERVICE_THREAD_TYPE thread_type, request_quit_t request_quit_callback, force_quit_t force_quit_callback, void *data, bool update __maybe_unused) {
+    SERVICE_THREAD *sth = NULL;
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLIns(&service_globals.pid_judy, tid, PJE0);
+    if(!*PValue) {
+        sth = callocz(1, sizeof(SERVICE_THREAD));
+        sth->tid = tid;
+        sth->type = thread_type;
+        sth->request_quit_callback = request_quit_callback;
+        sth->force_quit_callback = force_quit_callback;
+        sth->data = data;
+        os_thread_get_current_name_np(sth->name);
+        *PValue = sth;
+
+        switch(thread_type) {
+            default:
+            case SERVICE_THREAD_TYPE_NETDATA:
+                sth->netdata_thread = netdata_thread_self();
+                break;
+
+            case SERVICE_THREAD_TYPE_EVENT_LOOP:
+            case SERVICE_THREAD_TYPE_LIBUV:
+                sth->uv_thread = uv_thread_self();
+                break;
+        }
+    }
+    else {
+        sth = *PValue;
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+
+    return sth;
+}
+
+void service_exits(void) {
+    pid_t tid = gettid();
+
+    netdata_spinlock_lock(&service_globals.lock);
+    Pvoid_t *PValue = JudyLGet(service_globals.pid_judy, tid, PJE0);
+    if(PValue) {
+        freez(*PValue);
+        JudyLDel(&service_globals.pid_judy, tid, PJE0);
+    }
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+bool service_running(SERVICE_TYPE service) {
+    static __thread SERVICE_THREAD *sth = NULL;
+
+    if(unlikely(!sth))
+        sth = service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, NULL, NULL, false);
+
+    if(netdata_exit)
+        __atomic_store_n(&service_globals.running, 0, __ATOMIC_RELAXED);
+
+    if(service == 0)
+        service = sth->services;
+
+    sth->services |= service;
+
+    return ((__atomic_load_n(&service_globals.running, __ATOMIC_RELAXED) & service) == service);
+}
+
+void service_signal_exit(SERVICE_TYPE service) {
+    __atomic_and_fetch(&service_globals.running, ~(service), __ATOMIC_RELAXED);
+
+    netdata_spinlock_lock(&service_globals.lock);
+
+    Pvoid_t *PValue;
+    Word_t tid = 0;
+    bool first = true;
+    while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+        SERVICE_THREAD *sth = *PValue;
+
+        if((sth->services & service) && sth->request_quit_callback) {
+            netdata_spinlock_unlock(&service_globals.lock);
+            sth->request_quit_callback(sth->data);
+            netdata_spinlock_lock(&service_globals.lock);
+            continue;
+        }
+    }
+
+    netdata_spinlock_unlock(&service_globals.lock);
+}
+
+static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
+    if(service & SERVICE_MAINTENANCE)
+        buffer_strcat(wb, "MAINTENANCE ");
+    if(service & SERVICE_COLLECTORS)
+        buffer_strcat(wb, "COLLECTORS ");
+    if(service & SERVICE_ML_TRAINING)
+        buffer_strcat(wb, "ML_TRAINING ");
+    if(service & SERVICE_ML_PREDICTION)
+        buffer_strcat(wb, "ML_PREDICTION ");
+    if(service & SERVICE_REPLICATION)
+        buffer_strcat(wb, "REPLICATION ");
+    if(service & ABILITY_DATA_QUERIES)
+        buffer_strcat(wb, "DATA_QUERIES ");
+    if(service & ABILITY_WEB_REQUESTS)
+        buffer_strcat(wb, "WEB_REQUESTS ");
+    if(service & SERVICE_WEB_SERVER)
+        buffer_strcat(wb, "WEB_SERVER ");
+    if(service & SERVICE_ACLK)
+        buffer_strcat(wb, "ACLK ");
+    if(service & SERVICE_HEALTH)
+        buffer_strcat(wb, "HEALTH ");
+    if(service & SERVICE_STREAMING)
+        buffer_strcat(wb, "STREAMING ");
+    if(service & ABILITY_STREAMING_CONNECTIONS)
+        buffer_strcat(wb, "STREAMING_CONNECTIONS ");
+    if(service & SERVICE_CONTEXT)
+        buffer_strcat(wb, "CONTEXT ");
+    if(service & SERVICE_ANALYTICS)
+        buffer_strcat(wb, "ANALYTICS ");
+    if(service & SERVICE_EXPORTERS)
+        buffer_strcat(wb, "EXPORTERS ");
+}
+
+static bool service_wait_exit(SERVICE_TYPE service, usec_t timeout_ut) {
+    BUFFER *service_list = buffer_create(1024, NULL);
+    BUFFER *thread_list = buffer_create(1024, NULL);
+    usec_t started_ut = now_monotonic_usec(), ended_ut;
+    size_t running;
+    SERVICE_TYPE running_services = 0;
+
+    // cancel the threads
+    running = 0;
+    running_services = 0;
+    {
+        buffer_flush(thread_list);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid() && !sth->cancelled) {
+                sth->cancelled = true;
+
+                switch(sth->type) {
+                    default:
+                    case SERVICE_THREAD_TYPE_NETDATA:
+                        netdata_thread_cancel(sth->netdata_thread);
+                        break;
+
+                    case SERVICE_THREAD_TYPE_EVENT_LOOP:
+                    case SERVICE_THREAD_TYPE_LIBUV:
+                        break;
+                }
+
+                if(running)
+                    buffer_strcat(thread_list, ", ");
+
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+
+                running++;
+                running_services |= sth->services & service;
+
+                if(sth->force_quit_callback) {
+                    netdata_spinlock_unlock(&service_globals.lock);
+                    sth->force_quit_callback(sth->data);
+                    netdata_spinlock_lock(&service_globals.lock);
+                    continue;
+                }
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+    }
+
+    service_signal_exit(service);
+
+    // signal them to stop
+    size_t last_running = 0;
+    size_t stale_time_ut = 0;
+    usec_t sleep_ut = 50 * USEC_PER_MS;
+    size_t log_countdown_ut = sleep_ut;
+    do {
+        if(running != last_running)
+            stale_time_ut = 0;
+
+        last_running = running;
+        running = 0;
+        running_services = 0;
+        buffer_flush(thread_list);
+
+        netdata_spinlock_lock(&service_globals.lock);
+
+        Pvoid_t *PValue;
+        Word_t tid = 0;
+        bool first = true;
+        while((PValue = JudyLFirstThenNext(service_globals.pid_judy, &tid, &first))) {
+            SERVICE_THREAD *sth = *PValue;
+            if(sth->services & service && sth->tid != gettid()) {
+                if(running)
+                    buffer_strcat(thread_list, ", ");
+
+                buffer_sprintf(thread_list, "'%s' (%d)", sth->name, sth->tid);
+
+                running_services |= sth->services & service;
+                running++;
+            }
+        }
+
+        netdata_spinlock_unlock(&service_globals.lock);
+
+        if(running) {
+            log_countdown_ut -= (log_countdown_ut >= sleep_ut) ? sleep_ut : log_countdown_ut;
+            if(log_countdown_ut == 0 || running != last_running) {
+                log_countdown_ut = 20 * sleep_ut;
+
+                buffer_flush(service_list);
+                service_to_buffer(service_list, running_services);
+                info("SERVICE CONTROL: waiting for the following %zu services [ %s] to exit: %s",
+                     running, buffer_tostring(service_list),
+                     running <= 10 ? buffer_tostring(thread_list) : "");
+            }
+
+            sleep_usec(sleep_ut);
+            stale_time_ut += sleep_ut;
+        }
+
+        ended_ut = now_monotonic_usec();
+    } while(running && (ended_ut - started_ut < timeout_ut || stale_time_ut < timeout_ut));
+
+    if(running) {
+        buffer_flush(service_list);
+        service_to_buffer(service_list, running_services);
+        info("SERVICE CONTROL: "
+             "the following %zu service(s) [ %s] take too long to exit: %s; "
+             "giving up on them...",
+             running, buffer_tostring(service_list),
+             buffer_tostring(thread_list));
+    }
+
+    buffer_free(thread_list);
+    buffer_free(service_list);
+
+    return (running == 0);
+}
+
+#define delta_shutdown_time(msg)                        \
+    {                                                   \
+        usec_t now_ut = now_monotonic_usec();           \
+        if(prev_msg)                                    \
+            info("NETDATA SHUTDOWN: in %7llu ms, %s%s - next: %s", (now_ut - last_ut) / USEC_PER_MS, (timeout)?"(TIMEOUT) ":"", prev_msg, msg); \
+        else                                            \
+            info("NETDATA SHUTDOWN: next: %s", msg);    \
+        last_ut = now_ut;                               \
+        prev_msg = msg;                                 \
+        timeout = false;                                \
+    }
+
 void netdata_cleanup_and_exit(int ret) {
-    // enabling this, is wrong
-    // because the threads will be cancelled while cleaning up
-    // netdata_exit = 1;
+    usec_t started_ut = now_monotonic_usec();
+    usec_t last_ut = started_ut;
+    const char *prev_msg = NULL;
+    bool timeout = false;
 
     error_log_limit_unlimited();
-    info("EXIT: netdata prepares to exit with code %d...", ret);
+    info("NETDATA SHUTDOWN: initializing shutdown with code %d...", ret);
 
     send_statistics("EXIT", ret?"ERROR":"OK","-");
+
+    delta_shutdown_time("create shutdown file");
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
@@ -38,47 +332,159 @@ void netdata_cleanup_and_exit(int ret) {
     snprintfz(agent_incomplete_shutdown_file, FILENAME_MAX, "%s/.agent_incomplete_shutdown", netdata_configured_varlib_dir);
     (void) rename(agent_crash_file, agent_incomplete_shutdown_file);
 
-    // cleanup/save the database and exit
-    info("EXIT: cleaning up the database...");
+#ifdef ENABLE_DBENGINE
+    if(dbengine_enabled) {
+        delta_shutdown_time("dbengine exit mode");
+        for (size_t tier = 0; tier < storage_tiers; tier++)
+            rrdeng_exit_mode(multidb_ctx[tier]);
+    }
+#endif
+
+    delta_shutdown_time("disable maintenance, new queries, new web requests, new streaming connections and aclk");
+
+    service_signal_exit(
+            SERVICE_MAINTENANCE
+            | ABILITY_DATA_QUERIES
+            | ABILITY_WEB_REQUESTS
+            | ABILITY_STREAMING_CONNECTIONS
+            | SERVICE_ACLK
+            );
+
+    delta_shutdown_time("stop replication, exporters, ML training, health and web servers threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_REPLICATION
+            | SERVICE_EXPORTERS
+            | SERVICE_ML_TRAINING
+            | SERVICE_HEALTH
+            | SERVICE_WEB_SERVER
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop collectors and streaming threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_COLLECTORS
+            | SERVICE_STREAMING
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop ML prediction and context threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_ML_PREDICTION
+            | SERVICE_CONTEXT
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop maintenance thread");
+
+    timeout = !service_wait_exit(
+            SERVICE_MAINTENANCE
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("clean rrdhost database");
+
     rrdhost_cleanup_all();
+
+    delta_shutdown_time("prepare metasync shutdown");
+
+    metadata_sync_shutdown_prepare();
+
+#ifdef ENABLE_ACLK
+    delta_shutdown_time("signal aclk sync to stop");
+    aclk_sync_exit_all();
+#endif
+
+    delta_shutdown_time("stop aclk threads");
+
+    timeout = !service_wait_exit(
+            SERVICE_ACLK
+            , 3 * USEC_PER_SEC);
+
+    delta_shutdown_time("stop all remaining worker threads");
+
+    timeout = !service_wait_exit(~0, 10 * USEC_PER_SEC);
+
+    delta_shutdown_time("cancel main threads");
+
+    cancel_main_threads();
 
     if(!ret) {
         // exit cleanly
 
-        // stop everything
-        info("EXIT: stopping static threads...");
-#ifdef ENABLE_ACLK
-        aclk_sync_exit_all();
+#ifdef ENABLE_DBENGINE
+        if(dbengine_enabled) {
+            delta_shutdown_time("flush dbengine tiers");
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                rrdeng_prepare_exit(multidb_ctx[tier]);
+        }
 #endif
-        cancel_main_threads();
 
         // free the database
-        info("EXIT: freeing database memory...");
+        delta_shutdown_time("stop collection for all hosts");
+
+        // rrdhost_free_all();
+        rrd_finalize_collection_for_all_hosts();
+
+        delta_shutdown_time("stop metasync threads");
+
+        metadata_sync_shutdown();
+
 #ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_prepare_exit(multidb_ctx[tier]);
-#endif
-        rrdhost_free_all();
-#ifdef ENABLE_DBENGINE
-        for(int tier = 0; tier < storage_tiers ; tier++)
-            rrdeng_exit(multidb_ctx[tier]);
+        if(dbengine_enabled) {
+            delta_shutdown_time("wait for dbengine collectors to finish");
+
+            size_t running = 1;
+            while(running) {
+                running = 0;
+                for (size_t tier = 0; tier < storage_tiers; tier++)
+                    running += rrdeng_collectors_running(multidb_ctx[tier]);
+
+                if(running)
+                    sleep_usec(100 * USEC_PER_MS);
+            }
+
+            delta_shutdown_time("wait for dbengine main cache to finish flushing");
+
+            while (pgc_hot_and_dirty_entries(main_cache)) {
+                pgc_flush_all_hot_and_dirty_pages(main_cache, PGC_SECTION_ALL);
+                sleep_usec(100 * USEC_PER_MS);
+            }
+
+            delta_shutdown_time("stop dbengine tiers");
+            for (size_t tier = 0; tier < storage_tiers; tier++)
+                rrdeng_exit(multidb_ctx[tier]);
+        }
 #endif
     }
+
+    delta_shutdown_time("close SQL context db");
+
     sql_close_context_database();
+
+    delta_shutdown_time("closed SQL main db");
+
     sql_close_database();
 
     // unlink the pid
     if(pidfile[0]) {
-        info("EXIT: removing netdata PID file '%s'...", pidfile);
+        delta_shutdown_time("remove pid file");
+
         if(unlink(pidfile) != 0)
             error("EXIT: cannot unlink pidfile '%s'.", pidfile);
     }
 
 #ifdef ENABLE_HTTPS
+    delta_shutdown_time("free openssl structures");
     security_clean_openssl();
 #endif
-    info("EXIT: all done - netdata is now exiting - bye bye...");
+
+    delta_shutdown_time("remove incomplete shutdown file");
+
     (void) unlink(agent_incomplete_shutdown_file);
+
+    delta_shutdown_time("exit");
+
+    usec_t ended_ut = now_monotonic_usec();
+    info("NETDATA SHUTDOWN: completed in %llu ms - netdata is now exiting - bye bye...", (ended_ut - started_ut) / USEC_PER_MS);
     exit(ret);
 }
 
@@ -218,6 +624,32 @@ int killpid(pid_t pid) {
     return ret;
 }
 
+static void set_nofile_limit(struct rlimit *rl) {
+    // get the num files allowed
+    if(getrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("getrlimit(RLIMIT_NOFILE) failed");
+        return;
+    }
+
+    info("resources control: allowed file descriptors: soft = %zu, max = %zu",
+         (size_t) rl->rlim_cur, (size_t) rl->rlim_max);
+
+    // make the soft/hard limits equal
+    rl->rlim_cur = rl->rlim_max;
+    if (setrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("setrlimit(RLIMIT_NOFILE, { %zu, %zu }) failed", (size_t)rl->rlim_cur, (size_t)rl->rlim_max);
+    }
+
+    // sanity check to make sure we have enough file descriptors available to open
+    if (getrlimit(RLIMIT_NOFILE, rl) != 0) {
+        error("getrlimit(RLIMIT_NOFILE) failed");
+        return;
+    }
+
+    if (rl->rlim_cur < 1024)
+        error("Number of open file descriptors allowed for this process is too low (RLIMIT_NOFILE=%zu)", (size_t)rl->rlim_cur);
+}
+
 void cancel_main_threads() {
     error_log_limit_unlimited();
 
@@ -255,7 +687,8 @@ void cancel_main_threads() {
 
     for (i = 0; static_threads[i].name != NULL ; i++)
         freez(static_threads[i].thread);
-    free(static_threads);
+
+    freez(static_threads);
 }
 
 struct option_def option_definitions[] = {
@@ -303,7 +736,7 @@ int help(int exitcode) {
             " |   '-'   '-'   '-'   '-'   real-time performance monitoring, done right!   \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
-            " Copyright (C) 2016-2020, Netdata, Inc. <info@netdata.cloud>\n"
+            " Copyright (C) 2016-2022, Netdata, Inc. <info@netdata.cloud>\n"
             " Released under GNU General Public License v3 or later.\n"
             " All rights reserved.\n"
             "\n"
@@ -314,7 +747,8 @@ int help(int exitcode) {
             " License    : https://github.com/netdata/netdata/blob/master/LICENSE.md\n"
             "\n"
             " Twitter    : https://twitter.com/linuxnetdata\n"
-            " Facebook   : https://www.facebook.com/linuxnetdata/\n"
+            " LinkedIn   : https://linkedin.com/company/netdata-cloud/\n"
+            " Facebook   : https://facebook.com/linuxnetdata/\n"
             "\n"
             "\n"
     );
@@ -379,10 +813,10 @@ int help(int exitcode) {
 static void security_init(){
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/ssl/key.pem",netdata_configured_user_config_dir);
-    security_key    = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
+    netdata_ssl_security_key = config_get(CONFIG_SECTION_WEB, "ssl key",  filename);
 
     snprintfz(filename, FILENAME_MAX, "%s/ssl/cert.pem",netdata_configured_user_config_dir);
-    security_cert    = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
+    netdata_ssl_security_cert = config_get(CONFIG_SECTION_WEB, "ssl certificate",  filename);
 
     tls_version    = config_get(CONFIG_SECTION_WEB, "tls version",  "1.3");
     tls_ciphers    = config_get(CONFIG_SECTION_WEB, "tls ciphers",  "none");
@@ -399,8 +833,14 @@ static void log_init(void) {
     snprintfz(filename, FILENAME_MAX, "%s/error.log", netdata_configured_log_dir);
     stderr_filename    = config_get(CONFIG_SECTION_LOGS, "error",  filename);
 
+    snprintfz(filename, FILENAME_MAX, "%s/collector.log", netdata_configured_log_dir);
+    stdcollector_filename = config_get(CONFIG_SECTION_LOGS, "collector", filename);
+
     snprintfz(filename, FILENAME_MAX, "%s/access.log", netdata_configured_log_dir);
     stdaccess_filename = config_get(CONFIG_SECTION_LOGS, "access", filename);
+
+    snprintfz(filename, FILENAME_MAX, "%s/health.log", netdata_configured_log_dir);
+    stdhealth_filename = config_get(CONFIG_SECTION_LOGS, "health", filename);
 
 #ifdef ENABLE_ACLK
     aclklog_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "conversation log", CONFIG_BOOLEAN_NO);
@@ -667,8 +1107,9 @@ static void get_netdata_configured_variables() {
     // ------------------------------------------------------------------------
     // get default Database Engine page cache size in MiB
 
-    db_engine_use_malloc = config_get_boolean(CONFIG_SECTION_DB, "dbengine page cache with malloc", CONFIG_BOOLEAN_NO);
     default_rrdeng_page_cache_mb = (int) config_get_number(CONFIG_SECTION_DB, "dbengine page cache size MB", default_rrdeng_page_cache_mb);
+    db_engine_journal_check = config_get_boolean(CONFIG_SECTION_DB, "dbengine enable journal integrity check", CONFIG_BOOLEAN_NO);
+
     if(default_rrdeng_page_cache_mb < RRDENG_MIN_PAGE_CACHE_SIZE_MB) {
         error("Invalid page cache size %d given. Defaulting to %d.", default_rrdeng_page_cache_mb, RRDENG_MIN_PAGE_CACHE_SIZE_MB);
         default_rrdeng_page_cache_mb = RRDENG_MIN_PAGE_CACHE_SIZE_MB;
@@ -719,14 +1160,14 @@ static void get_netdata_configured_variables() {
 
     // --------------------------------------------------------------------
 
-    rrdset_free_obsolete_time = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+    rrdset_free_obsolete_time_s = config_get_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     // Current chart locking and invalidation scheme doesn't prevent Netdata from segmentation faults if a short
     // cleanup delay is set. Extensive stress tests showed that 10 seconds is quite a safe delay. Look at
     // https://github.com/netdata/netdata/pull/11222#issuecomment-868367920 for more information.
-    if (rrdset_free_obsolete_time < 10) {
-        rrdset_free_obsolete_time = 10;
+    if (rrdset_free_obsolete_time_s < 10) {
+        rrdset_free_obsolete_time_s = 10;
         info("The \"cleanup obsolete charts after seconds\" option was set to 10 seconds.");
-        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time);
+        config_set_number(CONFIG_SECTION_DB, "cleanup obsolete charts after secs", rrdset_free_obsolete_time_s);
     }
 
     gap_when_lost_iterations_above = (int)config_get_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
@@ -734,18 +1175,13 @@ static void get_netdata_configured_variables() {
         gap_when_lost_iterations_above = 1;
         config_set_number(CONFIG_SECTION_DB, "gap when lost iterations above", gap_when_lost_iterations_above);
     }
-
-    // --------------------------------------------------------------------
-    // rrdcontext
-
-    rrdcontext_enabled = config_get_boolean(CONFIG_SECTION_CLOUD, "rrdcontexts", rrdcontext_enabled);
-
+    gap_when_lost_iterations_above += 2;
 
     // --------------------------------------------------------------------
     // get various system parameters
 
     get_system_HZ();
-    get_system_cpus();
+    get_system_cpus_uncached();
     get_system_pid_max();
 
 
@@ -801,12 +1237,13 @@ int get_system_info(struct rrdhost_system_info *system_info) {
 
     info("Executing %s", script);
 
-    FILE *fp = mypopen(script, &command_pid);
-    if(fp) {
+    FILE *fp_child_input;
+    FILE *fp_child_output = netdata_popen(script, &command_pid, &fp_child_input);
+    if(fp_child_output) {
         char line[200 + 1];
         // Removed the double strlens, if the Coverity tainted string warning reappears I'll revert.
         // One time init code, but I'm curious about the warning...
-        while (fgets(line, 200, fp) != NULL) {
+        while (fgets(line, 200, fp_child_output) != NULL) {
             char *value=line;
             while (*value && *value != '=') value++;
             if (*value=='=') {
@@ -827,7 +1264,7 @@ int get_system_info(struct rrdhost_system_info *system_info) {
                 }
             }
         }
-        mypclose(fp, command_pid);
+        netdata_pclose(fp_child_input, fp_child_output, command_pid);
     }
     freez(script);
     return 0;
@@ -867,7 +1304,32 @@ void post_conf_load(char **user)
     appconfig_get(&cloud_config, CONFIG_SECTION_GLOBAL, "cloud base url", DEFAULT_CLOUD_BASE_URL);
 }
 
+#define delta_startup_time(msg)                         \
+    {                                                   \
+        usec_t now_ut = now_monotonic_usec();           \
+        if(prev_msg)                                    \
+            info("NETDATA STARTUP: in %7llu ms, %s - next: %s", (now_ut - last_ut) / USEC_PER_MS, prev_msg, msg); \
+        else                                            \
+            info("NETDATA STARTUP: next: %s", msg);    \
+        last_ut = now_ut;                               \
+        prev_msg = msg;                                 \
+    }
+
+int buffer_unittest(void);
+int pgc_unittest(void);
+int mrg_unittest(void);
+int julytest(void);
+int pluginsd_parser_unittest(void);
+
 int main(int argc, char **argv) {
+    // initialize the system clocks
+    clocks_init();
+    usec_t started_ut = now_monotonic_usec();
+    usec_t last_ut = started_ut;
+    const char *prev_msg = NULL;
+    // Initialize stderror avoiding coredump when info() or error() is called
+    stderror = stderr;
+
     int i;
     int config_loaded = 0;
     int dont_fork = 0;
@@ -976,24 +1438,30 @@ int main(int argc, char **argv) {
                         }
 
                         if(strcmp(optarg, "unittest") == 0) {
+                            unittest_running = true;
+
+                            if (pluginsd_parser_unittest())
+                                return 1;
+
                             if (unit_test_static_threads())
                                 return 1;
                             if (unit_test_buffer())
                                 return 1;
                             if (unit_test_str2ld())
                                 return 1;
+                            if (buffer_unittest())
+                                return 1;
                             if (unit_test_bitmap256())
                                 return 1;
                             // No call to load the config file on this code-path
                             post_conf_load(&user);
                             get_netdata_configured_variables();
-                            rrdcontext_enabled = CONFIG_BOOLEAN_NO;
                             default_rrd_update_every = 1;
                             default_rrd_memory_mode = RRD_MEMORY_MODE_RAM;
                             default_health_enabled = 0;
                             storage_tiers = 1;
                             registry_init();
-                            if(rrd_init("unittest", NULL)) {
+                            if(rrd_init("unittest", NULL, true)) {
                                 fprintf(stderr, "rrd_init failed for unittest\n");
                                 return 1;
                             }
@@ -1004,7 +1472,10 @@ int main(int argc, char **argv) {
                             if(test_dbengine()) return 1;
 #endif
                             if(test_sqlite()) return 1;
+                            if(string_unittest(10000)) return 1;
                             if (dictionary_unittest(10000))
+                                return 1;
+                            if(aral_unittest(10000))
                                 return 1;
                             if (rrdlabels_unittest())
                                 return 1;
@@ -1013,27 +1484,65 @@ int main(int argc, char **argv) {
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
                             return 0;
                         }
-#ifdef ENABLE_ML_TESTS
-                        else if(strcmp(optarg, "mltest") == 0) {
-                            return test_ml(argc, argv);
+                        else if(strcmp(optarg, "escapetest") == 0) {
+                            return command_argument_sanitization_tests();
                         }
-#endif
+                        else if(strcmp(optarg, "dicttest") == 0) {
+                            unittest_running = true;
+                            return dictionary_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "araltest") == 0) {
+                            unittest_running = true;
+                            return aral_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "stringtest") == 0) {
+                            unittest_running = true;
+                            return string_unittest(10000);
+                        }
+                        else if(strcmp(optarg, "rrdlabelstest") == 0) {
+                            unittest_running = true;
+                            return rrdlabels_unittest();
+                        }
+                        else if(strcmp(optarg, "buffertest") == 0) {
+                            unittest_running = true;
+                            return buffer_unittest();
+                        }
 #ifdef ENABLE_DBENGINE
                         else if(strcmp(optarg, "mctest") == 0) {
+                            unittest_running = true;
                             return mc_unittest();
                         }
                         else if(strcmp(optarg, "ctxtest") == 0) {
+                            unittest_running = true;
                             return ctx_unittest();
                         }
-                        else if(strcmp(optarg, "dicttest") == 0) {
-                            return dictionary_unittest(10000);
+                        else if(strcmp(optarg, "metatest") == 0) {
+                            unittest_running = true;
+                            return metadata_unittest();
                         }
-                        else if(strcmp(optarg, "rrdlabelstest") == 0) {
-                            return rrdlabels_unittest();
+                        else if(strcmp(optarg, "pgctest") == 0) {
+                            unittest_running = true;
+                            return pgc_unittest();
+                        }
+                        else if(strcmp(optarg, "mrgtest") == 0) {
+                            unittest_running = true;
+                            return mrg_unittest();
+                        }
+                        else if(strcmp(optarg, "julytest") == 0) {
+                            unittest_running = true;
+                            return julytest();
                         }
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);
+                            post_conf_load(&user);
+                            get_netdata_configured_variables();
+                            default_rrd_update_every = 1;
+                            registry_init();
+                            if(rrd_init("dbengine-dataset", NULL, true)) {
+                                fprintf(stderr, "rrd_init failed for unittest\n");
+                                return 1;
+                            }
                             generate_dbengine_dataset(history_seconds);
                             return 0;
                         }
@@ -1274,23 +1783,23 @@ int main(int argc, char **argv) {
         }
     }
 
-#ifdef _SC_OPEN_MAX
     if (close_open_fds == true) {
         // close all open file descriptors, except the standard ones
         // the caller may have left open files (lxc-attach has this issue)
-        for(int fd = (int) (sysconf(_SC_OPEN_MAX) - 1); fd > 2; fd--)
-            if(fd_is_valid(fd))
-                close(fd);
+        for_each_open_fd(OPEN_FD_ACTION_CLOSE, OPEN_FD_EXCLUDE_STDIN | OPEN_FD_EXCLUDE_STDOUT | OPEN_FD_EXCLUDE_STDERR);
     }
-#endif
 
-    if(!config_loaded)
-    {
+
+    if(!config_loaded) {
         load_netdata_conf(NULL, 0);
         post_conf_load(&user);
         load_cloud_conf(0);
     }
 
+    char *nd_disable_cloud = getenv("NETDATA_DISABLE_CLOUD");
+    if (nd_disable_cloud && !strncmp(nd_disable_cloud, "1", 1)) {
+        appconfig_set(&cloud_config, CONFIG_SECTION_GLOBAL, "enabled", "false");
+    }
 
     // ------------------------------------------------------------------------
     // initialize netdata
@@ -1303,14 +1812,37 @@ int main(int argc, char **argv) {
         i = (int)config_get_number(CONFIG_SECTION_GLOBAL, "glibc malloc arena max for netdata", 1);
         if(i > 0)
             mallopt(M_ARENA_MAX, 1);
+
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        mallopt(M_PERTURB, 0x5A);
+        // mallopt(M_MXFAST, 0);
+#endif
 #endif
 
-        // initialize the system clocks
-        clocks_init();
+        // set libuv worker threads
+        libuv_worker_threads = (int)get_netdata_cpus() * 2;
+
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+
+        if(libuv_worker_threads > MAX_LIBUV_WORKER_THREADS)
+            libuv_worker_threads = MAX_LIBUV_WORKER_THREADS;
+
+
+        libuv_worker_threads = config_get_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        if(libuv_worker_threads < MIN_LIBUV_WORKER_THREADS) {
+            libuv_worker_threads = MIN_LIBUV_WORKER_THREADS;
+            config_set_number(CONFIG_SECTION_GLOBAL, "libuv worker threads", libuv_worker_threads);
+        }
+
+        {
+            char buf[20 + 1];
+            snprintfz(buf, 20, "%d", libuv_worker_threads);
+            setenv("UV_THREADPOOL_SIZE", buf, 1);
+        }
 
         // prepare configuration environment variables for the plugins
-
-        setenv("UV_THREADPOOL_SIZE", config_get(CONFIG_SECTION_GLOBAL, "libuv worker threads", "16"), 1);
         get_netdata_configured_variables();
         set_global_environment();
 
@@ -1354,6 +1886,10 @@ int main(int argc, char **argv) {
         // initialize the log files
         open_all_log_files();
 
+        ieee754_doubles = is_system_ieee754_double();
+
+        aral_judy_init();
+
         get_system_timezone();
 
         // --------------------------------------------------------------------
@@ -1372,6 +1908,7 @@ int main(int argc, char **argv) {
         // --------------------------------------------------------------------
         // Initialize ML configuration
 
+        delta_startup_time("initialize ML");
         ml_init();
 
         // --------------------------------------------------------------------
@@ -1380,18 +1917,17 @@ int main(int argc, char **argv) {
         // block signals while initializing threads.
         // this causes the threads to block signals.
 
+        delta_startup_time("initialize signals");
         signals_block();
-
-        // setup the signals we want to use
-
-        signals_init();
-
-        // setup threads configs
-        default_stacksize = netdata_threads_init();
-
+        signals_init(); // setup the signals we want to use
 
         // --------------------------------------------------------------------
         // check which threads are enabled and initialize them
+
+        delta_startup_time("initialize static threads");
+
+        // setup threads configs
+        default_stacksize = netdata_threads_init();
 
         for (i = 0; static_threads[i].name != NULL ; i++) {
             struct netdata_static_thread *st = &static_threads[i];
@@ -1401,19 +1937,27 @@ int main(int argc, char **argv) {
 
             if(st->enabled && st->init_routine)
                 st->init_routine();
-        }
 
+            if(st->env_name)
+                setenv(st->env_name, st->enabled?"YES":"NO", 1);
+
+            if(st->global_variable)
+                *st->global_variable = (st->enabled) ? true : false;
+        }
 
         // --------------------------------------------------------------------
         // create the listening sockets
+
+        delta_startup_time("initialize web server");
 
         web_client_api_v1_init();
         web_server_threading_selection();
 
         if(web_server_mode != WEB_SERVER_MODE_NONE)
             api_listen_sockets_setup();
-
     }
+
+    delta_startup_time("set resource limits");
 
 #ifdef NETDATA_INTERNAL_CHECKS
     if(debug_flags != 0) {
@@ -1426,11 +1970,9 @@ int main(int argc, char **argv) {
     }
 #endif /* NETDATA_INTERNAL_CHECKS */
 
-    // get the max file limit
-    if(getrlimit(RLIMIT_NOFILE, &rlimit_nofile) != 0)
-        error("getrlimit(RLIMIT_NOFILE) failed");
-    else
-        info("resources control: allowed file descriptors: soft = %zu, max = %zu", (size_t)rlimit_nofile.rlim_cur, (size_t)rlimit_nofile.rlim_max);
+    set_nofile_limit(&rlimit_nofile);
+
+    delta_startup_time("become daemon");
 
     // fork, switch user, create pid file, set process priority
     if(become_daemon(dont_fork, user) == -1)
@@ -1438,12 +1980,18 @@ int main(int argc, char **argv) {
 
     info("netdata started on pid %d.", getpid());
 
+    delta_startup_time("initialize threads after fork");
+
     netdata_threads_init_after_fork((size_t)config_get_number(CONFIG_SECTION_GLOBAL, "pthread stack size", (long)default_stacksize));
 
     // initialize internal registry
+    delta_startup_time("initialize registry");
     registry_init();
+
     // fork the spawn server
+    delta_startup_time("fork the spawn server");
     spawn_init();
+
     /*
      * Libuv uv_spawn() uses SIGCHLD internally:
      * https://github.com/libuv/libuv/blob/cc51217a317e96510fbb284721d5e6bc2af31e33/src/unix/process.c#L485
@@ -1456,14 +2004,21 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // initialize rrd, registry, health, rrdpush, etc.
 
+    delta_startup_time("collecting system info");
+
     netdata_anonymous_statistics_enabled=-1;
     struct rrdhost_system_info *system_info = callocz(1, sizeof(struct rrdhost_system_info));
+    __atomic_sub_fetch(&netdata_buffers_statistics.rrdhost_allocations_size, sizeof(struct rrdhost_system_info), __ATOMIC_RELAXED);
     get_system_info(system_info);
     system_info->hops = 0;
     get_install_type(&system_info->install_type, &system_info->prebuilt_arch, &system_info->prebuilt_dist);
 
-    if(rrd_init(netdata_configured_hostname, system_info))
+    delta_startup_time("initialize RRD structures");
+
+    if(rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
+
+    delta_startup_time("check for incomplete shutdown");
 
     char agent_crash_file[FILENAME_MAX + 1];
     char agent_incomplete_shutdown_file[FILENAME_MAX + 1];
@@ -1479,6 +2034,8 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Claim netdata agent to a cloud endpoint
 
+    delta_startup_time("collect claiming info");
+
     if (claiming_pending_arguments)
          claim_agent(claiming_pending_arguments);
     load_claiming_state();
@@ -1489,10 +2046,13 @@ int main(int argc, char **argv) {
     error_log_limit_reset();
 
     // Load host labels
+    delta_startup_time("collect host labels");
     reload_host_labels();
 
     // ------------------------------------------------------------------------
     // spawn the threads
+
+    delta_startup_time("start the static threads");
 
     web_server_config_options();
 
@@ -1514,9 +2074,14 @@ int main(int argc, char **argv) {
     // ------------------------------------------------------------------------
     // Initialize netdata agent command serving from cli and signals
 
+    delta_startup_time("initialize commands API");
+
     commands_init();
 
-    info("netdata initialization completed. Enjoy real-time performance monitoring!");
+    delta_startup_time("ready");
+
+    usec_t ready_ut = now_monotonic_usec();
+    info("NETDATA STARTUP: completed in %llu ms. Enjoy real-time performance monitoring!", (ready_ut - started_ut) / USEC_PER_MS);
     netdata_ready = 1;
 
     send_statistics("START", "-",  "-");

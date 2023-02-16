@@ -6,8 +6,6 @@
 // Module name
 #define NETDATA_EBPF_MODULE_NAME_SHM "shm"
 
-#define NETDATA_SHM_SLEEP_MS 850000ULL
-
 // charts
 #define NETDATA_SHM_GLOBAL_CHART "shared_memory_calls"
 #define NETDATA_SHMGET_CHART "shmget_call"
@@ -54,8 +52,8 @@ enum shm_counters {
 
 extern netdata_publish_shm_t **shm_pid;
 
-extern void *ebpf_shm_thread(void *ptr);
-extern void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
+void *ebpf_shm_thread(void *ptr);
+void ebpf_shm_create_apps_charts(struct ebpf_module *em, void *ptr);
 extern netdata_ebpf_targets_t shm_targets[];
 
 extern struct config shm_config;

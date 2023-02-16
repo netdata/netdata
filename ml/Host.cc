@@ -1,555 +1,387 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <dlib/statistics.h>
-
 #include "Config.h"
 #include "Host.h"
+#include "Queue.h"
+#include "ADCharts.h"
 
 #include "json/single_include/nlohmann/json.hpp"
 
 using namespace ml;
 
-static void updateDimensionsChart(RRDHOST *RH,
-                                  collected_number NumTrainedDimensions,
-                                  collected_number NumNormalDimensions,
-                                  collected_number NumAnomalousDimensions) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *NumTotalDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumTrainedDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumNormalDimensionsRD = nullptr;
-    static thread_local RRDDIM *NumAnomalousDimensionsRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "dimensions_on_" << localhost->machine_guid;
-        NameSS << "dimensions_on_" << localhost->hostname;
-
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "dimensions", // family
-            "anomaly_detection.dimensions", // ctx
-            "Anomaly detection dimensions", // title
-            "dimensions", // units
-            "netdata", // plugin
-            "ml", // module
-            39183, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        NumTotalDimensionsRD = rrddim_add(RS, "total", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumTrainedDimensionsRD = rrddim_add(RS, "trained", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumNormalDimensionsRD = rrddim_add(RS, "normal", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NumAnomalousDimensionsRD = rrddim_add(RS, "anomalous", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
-
-    rrddim_set_by_pointer(RS, NumTotalDimensionsRD, NumNormalDimensions + NumAnomalousDimensions);
-    rrddim_set_by_pointer(RS, NumTrainedDimensionsRD, NumTrainedDimensions);
-    rrddim_set_by_pointer(RS, NumNormalDimensionsRD, NumNormalDimensions);
-    rrddim_set_by_pointer(RS, NumAnomalousDimensionsRD, NumAnomalousDimensions);
-
-    rrdset_done(RS);
+void Host::addChart(Chart *C) {
+    std::lock_guard<Mutex> L(M);
+    Charts[C->getRS()] = C;
 }
 
-static void updateRateChart(RRDHOST *RH, collected_number AnomalyRate) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *AnomalyRateRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "anomaly_rate_on_" << localhost->machine_guid;
-        NameSS << "anomaly_rate_on_" << localhost->hostname;
-
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "anomaly_rate", // family
-            "anomaly_detection.anomaly_rate", // ctx
-            "Percentage of anomalous dimensions", // title
-            "percentage", // units
-            "netdata", // plugin
-            "ml", // module
-            39184, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        AnomalyRateRD = rrddim_add(RS, "anomaly_rate", NULL,
-                1, 100, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
-
-    rrddim_set_by_pointer(RS, AnomalyRateRD, AnomalyRate);
-
-    rrdset_done(RS);
+void Host::removeChart(Chart *C) {
+    std::lock_guard<Mutex> L(M);
+    Charts.erase(C->getRS());
 }
 
-static void updateWindowLengthChart(RRDHOST *RH, collected_number WindowLength) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *WindowLengthRD = nullptr;
+void Host::getConfigAsJson(BUFFER *wb) const {
+    buffer_json_member_add_uint64(wb, "version", 1);
 
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
+    buffer_json_member_add_boolean(wb, "enabled", Cfg.EnableAnomalyDetection);
 
-        IdSS << "detector_window_on_" << localhost->machine_guid;
-        NameSS << "detector_window_on_" << localhost->hostname;
+    buffer_json_member_add_uint64(wb, "min-train-samples", Cfg.MinTrainSamples);
+    buffer_json_member_add_uint64(wb, "max-train-samples", Cfg.MaxTrainSamples);
+    buffer_json_member_add_uint64(wb, "train-every", Cfg.TrainEvery);
 
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "detector_window", // family
-            "anomaly_detection.detector_window", // ctx
-            "Anomaly detector window length", // title
-            "seconds", // units
-            "netdata", // plugin
-            "ml", // module
-            39185, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
+    buffer_json_member_add_uint64(wb, "diff-n", Cfg.DiffN);
+    buffer_json_member_add_uint64(wb, "smooth-n", Cfg.SmoothN);
+    buffer_json_member_add_uint64(wb, "lag-n", Cfg.LagN);
 
-        WindowLengthRD = rrddim_add(RS, "duration", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
+    buffer_json_member_add_double(wb, "random-sampling-ratio", Cfg.RandomSamplingRatio);
+    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.MaxKMeansIters);
 
-    rrddim_set_by_pointer(RS, WindowLengthRD, WindowLength * RH->rrd_update_every);
-    rrdset_done(RS);
+    buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.DimensionAnomalyScoreThreshold);
+
+    buffer_json_member_add_double(wb, "host-anomaly-rate-threshold", Cfg.HostAnomalyRateThreshold);
+    buffer_json_member_add_string(wb, "anomaly-detection-grouping-method", time_grouping_method2string(Cfg.AnomalyDetectionGroupingMethod));
+    buffer_json_member_add_time_t(wb, "anomaly-detection-query-duration", Cfg.AnomalyDetectionQueryDuration);
+
+    buffer_json_member_add_string(wb, "hosts-to-skip", Cfg.HostsToSkip.c_str());
+    buffer_json_member_add_string(wb, "charts-to-skip", Cfg.ChartsToSkip.c_str());
 }
 
-static void updateEventsChart(RRDHOST *RH,
-                              std::pair<BitRateWindow::Edge, size_t> P,
-                              bool ResetBitCounter,
-                              bool NewAnomalyEvent) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *AboveThresholdRD = nullptr;
-    static thread_local RRDDIM *ResetBitCounterRD = nullptr;
-    static thread_local RRDDIM *NewAnomalyEventRD = nullptr;
+void Host::getModelsAsJson(nlohmann::json &Json) {
+    std::lock_guard<Mutex> L(M);
 
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "detector_events_on_" << localhost->machine_guid;
-        NameSS << "detector_events_on_" << localhost->hostname;
-
-        RS = rrdset_create(
-            RH,
-            "anomaly_detection", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "detector_events", // family
-            "anomaly_detection.detector_events", // ctx
-            "Anomaly events triggered", // title
-            "boolean", // units
-            "netdata", // plugin
-            "ml", // module
-            39186, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_LINE // chart_type
-        );
-        rrdset_flag_set(RS, RRDSET_FLAG_ANOMALY_DETECTION);
-
-        AboveThresholdRD = rrddim_add(RS, "above_threshold", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        ResetBitCounterRD = rrddim_add(RS, "reset_bit_counter", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-        NewAnomalyEventRD = rrddim_add(RS, "new_anomaly_event", NULL,
-                1, 1, RRD_ALGORITHM_ABSOLUTE);
-    } else
-        rrdset_next(RS);
-
-    BitRateWindow::Edge E = P.first;
-    bool AboveThreshold = E.second == BitRateWindow::State::AboveThreshold;
-
-    rrddim_set_by_pointer(RS, AboveThresholdRD, AboveThreshold);
-    rrddim_set_by_pointer(RS, ResetBitCounterRD, ResetBitCounter);
-    rrddim_set_by_pointer(RS, NewAnomalyEventRD, NewAnomalyEvent);
-
-    rrdset_done(RS);
-}
-
-static void updateDetectionChart(RRDHOST *RH) {
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *UserRD, *SystemRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "prediction_stats_" << RH->machine_guid;
-        NameSS << "prediction_stats_for_" << RH->hostname;
-
-        RS = rrdset_create_localhost(
-            "netdata", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "ml", // family
-            "netdata.prediction_stats", // ctx
-            "Prediction thread CPU usage", // title
-            "milliseconds/s", // units
-            "netdata", // plugin
-            "ml", // module
-            136000, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_STACKED // chart_type
-        );
-
-        UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(RS);
-
-    struct rusage TRU;
-    getrusage(RUSAGE_THREAD, &TRU);
-
-    rrddim_set_by_pointer(RS, UserRD, TRU.ru_utime.tv_sec * 1000000ULL + TRU.ru_utime.tv_usec);
-    rrddim_set_by_pointer(RS, SystemRD, TRU.ru_stime.tv_sec * 1000000ULL + TRU.ru_stime.tv_usec);
-    rrdset_done(RS);
-}
-
-static void updateTrainingChart(RRDHOST *RH, struct rusage *TRU)
-{
-    static thread_local RRDSET *RS = nullptr;
-    static thread_local RRDDIM *UserRD = nullptr;
-    static thread_local RRDDIM *SystemRD = nullptr;
-
-    if (!RS) {
-        std::stringstream IdSS, NameSS;
-
-        IdSS << "training_stats_" << RH->machine_guid;
-        NameSS << "training_stats_for_" << RH->hostname;
-
-        RS = rrdset_create_localhost(
-            "netdata", // type
-            IdSS.str().c_str(), // id
-            NameSS.str().c_str(), // name
-            "ml", // family
-            "netdata.training_stats", // ctx
-            "Training thread CPU usage", // title
-            "milliseconds/s", // units
-            "netdata", // plugin
-            "ml", // module
-            136001, // priority
-            RH->rrd_update_every, // update_every
-            RRDSET_TYPE_STACKED // chart_type
-        );
-
-        UserRD = rrddim_add(RS, "user", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-        SystemRD = rrddim_add(RS, "system", NULL, 1, 1000, RRD_ALGORITHM_INCREMENTAL);
-    } else
-        rrdset_next(RS);
-
-    rrddim_set_by_pointer(RS, UserRD, TRU->ru_utime.tv_sec * 1000000ULL + TRU->ru_utime.tv_usec);
-    rrddim_set_by_pointer(RS, SystemRD, TRU->ru_stime.tv_sec * 1000000ULL + TRU->ru_stime.tv_usec);
-    rrdset_done(RS);
-}
-
-void RrdHost::addDimension(Dimension *D) {
-	RRDDIM *AnomalyRateRD = rrddim_add(AnomalyRateRS, D->getID().c_str(), NULL,
-                                       1, 1000, RRD_ALGORITHM_ABSOLUTE);
-    D->setAnomalyRateRD(AnomalyRateRD);
-
-	{
-		std::lock_guard<std::mutex> Lock(Mutex);
-
-		DimensionsMap[D->getRD()] = D;
-
-		// Default construct mutex for dimension
-	    LocksMap[D];
-	}
-}
-
-void RrdHost::removeDimension(Dimension *D) {
-    // Remove the dimension from the hosts map.
-    {
-        std::lock_guard<std::mutex> Lock(Mutex);
-        DimensionsMap.erase(D->getRD());
-    }
-
-    // Delete the dimension by locking the mutex that protects it.
-    {
-        std::lock_guard<std::mutex> Lock(LocksMap[D]);
-        delete D;
-    }
-
-    // Remove the lock entry for the deleted dimension.
-    {
-        std::lock_guard<std::mutex> Lock(Mutex);
-        LocksMap.erase(D);
+    for (auto &CP : Charts) {
+        Chart *C = CP.second;
+        C->getModelsAsJson(Json);
     }
 }
 
-void RrdHost::getConfigAsJson(nlohmann::json &Json) const {
-    Json["version"] = 1;
+#define WORKER_JOB_DETECTION_PREP 0
+#define WORKER_JOB_DETECTION_DIM_CHART 1
+#define WORKER_JOB_DETECTION_HOST_CHART 2
+#define WORKER_JOB_DETECTION_STATS 3
+#define WORKER_JOB_DETECTION_RESOURCES 4
 
-    Json["enabled"] = Cfg.EnableAnomalyDetection;
+void Host::detectOnce() {
+    worker_is_busy(WORKER_JOB_DETECTION_PREP);
 
-    Json["min-train-samples"] = Cfg.MinTrainSamples;
-    Json["max-train-samples"] = Cfg.MaxTrainSamples;
-    Json["train-every"] = Cfg.TrainEvery;
+    MLS = {};
+    MachineLearningStats MLSCopy = {};
+    TrainingStats TSCopy = {};
 
-    Json["diff-n"] = Cfg.DiffN;
-    Json["smooth-n"] = Cfg.SmoothN;
-    Json["lag-n"] = Cfg.LagN;
+    {
+        std::lock_guard<Mutex> L(M);
 
-    Json["random-sampling-ratio"] = Cfg.RandomSamplingRatio;
-    Json["max-kmeans-iters"] = Cfg.MaxKMeansIters;
+        /*
+         * prediction/detection stats
+        */
+        for (auto &CP : Charts) {
+            Chart *C = CP.second;
 
-    Json["dimension-anomaly-score-threshold"] = Cfg.DimensionAnomalyScoreThreshold;
-    Json["host-anomaly-rate-threshold"] = Cfg.HostAnomalyRateThreshold;
+            if (!C->isAvailableForML())
+                continue;
 
-    Json["min-window-size"] = Cfg.ADMinWindowSize;
-    Json["max-window-size"] = Cfg.ADMaxWindowSize;
-    Json["idle-window-size"] = Cfg.ADIdleWindowSize;
-    Json["window-rate-threshold"] = Cfg.ADWindowRateThreshold;
-    Json["dimension-rate-threshold"] = Cfg.ADDimensionRateThreshold;
+            MachineLearningStats ChartMLS = C->getMLS();
 
-    Json["hosts-to-skip"] = Cfg.HostsToSkip;
-    Json["charts-to-skip"] = Cfg.ChartsToSkip;
-}
+            MLS.NumMachineLearningStatusEnabled += ChartMLS.NumMachineLearningStatusEnabled;
+            MLS.NumMachineLearningStatusDisabledUE += ChartMLS.NumMachineLearningStatusDisabledUE;
+            MLS.NumMachineLearningStatusDisabledSP += ChartMLS.NumMachineLearningStatusDisabledSP;
 
-std::pair<Dimension *, Duration<double>>
-TrainableHost::findDimensionToTrain(const TimePoint &NowTP) {
-    std::lock_guard<std::mutex> Lock(Mutex);
+            MLS.NumMetricTypeConstant += ChartMLS.NumMetricTypeConstant;
+            MLS.NumMetricTypeVariable += ChartMLS.NumMetricTypeVariable;
 
-    Duration<double> AllottedDuration = Duration<double>{Cfg.TrainEvery * updateEvery()} / (DimensionsMap.size()  + 1);
+            MLS.NumTrainingStatusUntrained += ChartMLS.NumTrainingStatusUntrained;
+            MLS.NumTrainingStatusPendingWithoutModel += ChartMLS.NumTrainingStatusPendingWithoutModel;
+            MLS.NumTrainingStatusTrained += ChartMLS.NumTrainingStatusTrained;
+            MLS.NumTrainingStatusPendingWithModel += ChartMLS.NumTrainingStatusPendingWithModel;
 
-    for (auto &DP : DimensionsMap) {
-        Dimension *D = DP.second;
-
-        if (D->shouldTrain(NowTP)) {
-            LocksMap[D].lock();
-            return { D, AllottedDuration };
+            MLS.NumAnomalousDimensions += ChartMLS.NumAnomalousDimensions;
+            MLS.NumNormalDimensions += ChartMLS.NumNormalDimensions;
         }
+
+        HostAnomalyRate = 0.0;
+        size_t NumActiveDimensions = MLS.NumAnomalousDimensions + MLS.NumNormalDimensions;
+        if (NumActiveDimensions)
+              HostAnomalyRate = static_cast<double>(MLS.NumAnomalousDimensions) / NumActiveDimensions;
+
+        MLSCopy = MLS;
+
+        /*
+         * training stats
+        */
+        TSCopy = TS;
+
+        TS.QueueSize = 0;
+        TS.NumPoppedItems = 0;
+
+        TS.AllottedUT = 0;
+        TS.ConsumedUT = 0;
+        TS.RemainingUT = 0;
+
+        TS.TrainingResultOk = 0;
+        TS.TrainingResultInvalidQueryTimeRange = 0;
+        TS.TrainingResultNotEnoughCollectedValues = 0;
+        TS.TrainingResultNullAcquiredDimension = 0;
+        TS.TrainingResultChartUnderReplication = 0;
     }
 
-    return { nullptr, AllottedDuration };
-}
+    // Calc the avg values
+    if (TSCopy.NumPoppedItems) {
+        TSCopy.QueueSize /= TSCopy.NumPoppedItems;
+        TSCopy.AllottedUT /= TSCopy.NumPoppedItems;
+        TSCopy.ConsumedUT /= TSCopy.NumPoppedItems;
+        TSCopy.RemainingUT /= TSCopy.NumPoppedItems;
 
-void TrainableHost::trainDimension(Dimension *D, const TimePoint &NowTP) {
-    if (D == nullptr)
+        TSCopy.TrainingResultOk /= TSCopy.NumPoppedItems;
+        TSCopy.TrainingResultInvalidQueryTimeRange /= TSCopy.NumPoppedItems;
+        TSCopy.TrainingResultNotEnoughCollectedValues /= TSCopy.NumPoppedItems;
+        TSCopy.TrainingResultNullAcquiredDimension /= TSCopy.NumPoppedItems;
+        TSCopy.TrainingResultChartUnderReplication /= TSCopy.NumPoppedItems;
+    } else {
+        TSCopy.QueueSize = 0;
+        TSCopy.AllottedUT = 0;
+        TSCopy.ConsumedUT = 0;
+        TSCopy.RemainingUT = 0;
+    }
+
+    if(!RH)
         return;
 
-    D->LastTrainedAt = NowTP + Seconds{D->updateEvery()};
-    D->trainModel();
+    worker_is_busy(WORKER_JOB_DETECTION_DIM_CHART);
+    updateDimensionsChart(RH, MLSCopy);
 
-    {
-        std::lock_guard<std::mutex> Lock(Mutex);
-        LocksMap[D].unlock();
-    }
+    worker_is_busy(WORKER_JOB_DETECTION_HOST_CHART);
+    updateHostAndDetectionRateCharts(RH, HostAnomalyRate * 10000.0);
+
+#ifdef NETDATA_ML_RESOURCE_CHARTS
+    worker_is_busy(WORKER_JOB_DETECTION_RESOURCES);
+    struct rusage PredictionRU;
+    getrusage(RUSAGE_THREAD, &PredictionRU);
+    updateResourceUsageCharts(RH, PredictionRU, TSCopy.TrainingRU);
+#endif
+
+    worker_is_busy(WORKER_JOB_DETECTION_STATS);
+    updateTrainingStatisticsChart(RH, TSCopy);
 }
 
-void TrainableHost::train() {
-    Duration<double> MaxSleepFor = Seconds{10 * updateEvery()};
+class AcquiredDimension {
+public:
+    static AcquiredDimension find(RRDHOST *RH, STRING *ChartId, STRING *DimensionId) {
+        RRDDIM_ACQUIRED *AcqRD = nullptr;
+        Dimension *D = nullptr;
 
+        RRDSET *RS = rrdset_find(RH, string2str(ChartId));
+        if (RS) {
+            AcqRD = rrddim_find_and_acquire(RS, string2str(DimensionId));
+            if (AcqRD) {
+                RRDDIM *RD = rrddim_acquired_to_rrddim(AcqRD);
+                if (RD)
+                    D = reinterpret_cast<Dimension *>(RD->ml_dimension);
+            }
+        }
+
+        return AcquiredDimension(AcqRD, D);
+    }
+
+private:
+    AcquiredDimension(RRDDIM_ACQUIRED *AcqRD, Dimension *D) : AcqRD(AcqRD), D(D) {}
+
+public:
+    TrainingResult train(const TrainingRequest &TR) {
+        if (!D)
+            return TrainingResult::NullAcquiredDimension;
+
+        return D->trainModel(TR);
+    }
+
+    ~AcquiredDimension() {
+        if (AcqRD)
+            rrddim_acquired_release(AcqRD);
+    }
+
+private:
+    RRDDIM_ACQUIRED *AcqRD;
+    Dimension *D;
+};
+
+void Host::scheduleForTraining(TrainingRequest TR) {
+    TrainingQueue.push(TR);
+}
+
+#define WORKER_JOB_TRAINING_FIND 0
+#define WORKER_JOB_TRAINING_TRAIN 1
+#define WORKER_JOB_TRAINING_STATS 2
+
+void Host::train() {
     worker_register("MLTRAIN");
-    worker_register_job_name(0, "dimensions");
+    worker_register_job_name(WORKER_JOB_TRAINING_FIND, "find");
+    worker_register_job_name(WORKER_JOB_TRAINING_TRAIN, "train");
+    worker_register_job_name(WORKER_JOB_TRAINING_STATS, "stats");
 
-    worker_is_busy(0);
-    while (!netdata_exit) {
-        netdata_thread_testcancel();
-        netdata_thread_disable_cancelability();
+    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, (force_quit_t )ml_cancel_anomaly_detection_threads, RH, true);
 
-        updateResourceUsage();
+    while (service_running(SERVICE_ML_TRAINING)) {
+        auto P = TrainingQueue.pop();
+        TrainingRequest TrainingReq = P.first;
+        size_t Size = P.second;
 
-        TimePoint NowTP = SteadyClock::now();
+        if (ThreadsCancelled) {
+            info("Stopping training thread because it was cancelled.");
+            break;
+        }
 
-        auto P = findDimensionToTrain(NowTP);
-        trainDimension(P.first, NowTP);
+        usec_t AllottedUT = (Cfg.TrainEvery * RH->rrd_update_every * USEC_PER_SEC) / Size;
+        if (AllottedUT > USEC_PER_SEC)
+            AllottedUT = USEC_PER_SEC;
 
-        netdata_thread_enable_cancelability();
+        usec_t StartUT = now_monotonic_usec();
+        TrainingResult TrainingRes;
+        {
+            worker_is_busy(WORKER_JOB_TRAINING_FIND);
+            AcquiredDimension AcqDim = AcquiredDimension::find(RH, TrainingReq.ChartId, TrainingReq.DimensionId);
 
-        Duration<double> AllottedDuration = P.second;
-        Duration<double> RealDuration = SteadyClock::now() - NowTP;
+            worker_is_busy(WORKER_JOB_TRAINING_TRAIN);
+            TrainingRes = AcqDim.train(TrainingReq);
 
-        Duration<double> SleepFor;
-        if (RealDuration >= AllottedDuration)
-            continue;
+            string_freez(TrainingReq.ChartId);
+            string_freez(TrainingReq.DimensionId);
+        }
+        usec_t ConsumedUT = now_monotonic_usec() - StartUT;
+
+        worker_is_busy(WORKER_JOB_TRAINING_STATS);
+
+        usec_t RemainingUT = 0;
+        if (ConsumedUT < AllottedUT)
+            RemainingUT = AllottedUT - ConsumedUT;
+
+        {
+            std::lock_guard<Mutex> L(M);
+
+            if (TS.AllottedUT == 0) {
+                struct rusage TRU;
+                getrusage(RUSAGE_THREAD, &TRU);
+                TS.TrainingRU = TRU;
+            }
+
+            TS.QueueSize += Size;
+            TS.NumPoppedItems += 1;
+
+            TS.AllottedUT += AllottedUT;
+            TS.ConsumedUT += ConsumedUT;
+            TS.RemainingUT += RemainingUT;
+
+            switch (TrainingRes) {
+                case TrainingResult::Ok:
+                    TS.TrainingResultOk += 1;
+                    break;
+                case TrainingResult::InvalidQueryTimeRange:
+                    TS.TrainingResultInvalidQueryTimeRange += 1;
+                    break;
+                case TrainingResult::NotEnoughCollectedValues:
+                    TS.TrainingResultNotEnoughCollectedValues += 1;
+                    break;
+                case TrainingResult::NullAcquiredDimension:
+                    TS.TrainingResultNullAcquiredDimension += 1;
+                    break;
+                case TrainingResult::ChartUnderReplication:
+                    TS.TrainingResultChartUnderReplication += 1;
+                    break;
+            }
+        }
 
         worker_is_idle();
-        SleepFor = std::min(AllottedDuration - RealDuration, MaxSleepFor);
-        std::this_thread::sleep_for(SleepFor);
+        std::this_thread::sleep_for(std::chrono::microseconds{RemainingUT});
         worker_is_busy(0);
     }
 }
 
-#define WORKER_JOB_DETECT_DIMENSION       0
-#define WORKER_JOB_UPDATE_DETECTION_CHART 1
-#define WORKER_JOB_UPDATE_ANOMALY_RATES   2
-#define WORKER_JOB_UPDATE_CHARTS          3
-#define WORKER_JOB_SAVE_ANOMALY_EVENT     4
-
-#if WORKER_UTILIZATION_MAX_JOB_TYPES < 5
-#error WORKER_UTILIZATION_MAX_JOB_TYPES has to be at least 5
-#endif
-
-void DetectableHost::detectOnce() {
-    auto P = BRW.insert(WindowAnomalyRate >= Cfg.HostAnomalyRateThreshold);
-    BitRateWindow::Edge Edge = P.first;
-    size_t WindowLength = P.second;
-
-    bool ResetBitCounter = (Edge.first != BitRateWindow::State::AboveThreshold);
-    bool NewAnomalyEvent = (Edge.first == BitRateWindow::State::AboveThreshold) &&
-                           (Edge.second == BitRateWindow::State::Idle);
-
-    std::vector<std::pair<double, std::string>> DimsOverThreshold;
-
-    size_t NumAnomalousDimensions = 0;
-    size_t NumNormalDimensions = 0;
-    size_t NumTrainedDimensions = 0;
-    size_t NumActiveDimensions = 0;
-
-    bool CollectAnomalyRates = (++AnomalyRateTimer == Cfg.DBEngineAnomalyRateEvery);
-    if (CollectAnomalyRates)
-        rrdset_next(AnomalyRateRS);
-
-    {
-        std::lock_guard<std::mutex> Lock(Mutex);
-
-        DimsOverThreshold.reserve(DimensionsMap.size());
-
-        for (auto &DP : DimensionsMap) {
-            worker_is_busy(WORKER_JOB_DETECT_DIMENSION);
-
-            Dimension *D = DP.second;
-
-            if (!D->isActive()) {
-                D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, false);
-                continue;
-            }
-
-            NumActiveDimensions++;
-
-            auto P = D->detect(WindowLength, ResetBitCounter);
-            bool IsAnomalous = P.first;
-            double AnomalyScore = P.second;
-
-            NumTrainedDimensions += D->isTrained();
-
-            if (IsAnomalous)
-                NumAnomalousDimensions += 1;
-
-            if (NewAnomalyEvent && (AnomalyScore >= Cfg.ADDimensionRateThreshold))
-                DimsOverThreshold.push_back({ AnomalyScore, D->getID() });
-
-            D->updateAnomalyBitCounter(AnomalyRateRS, AnomalyRateTimer, IsAnomalous);
-        }
-
-        if (NumAnomalousDimensions)
-            WindowAnomalyRate = static_cast<double>(NumAnomalousDimensions) / NumActiveDimensions;
-        else
-            WindowAnomalyRate = 0.0;
-
-        NumNormalDimensions = NumActiveDimensions - NumAnomalousDimensions;
-    }
-
-    if (CollectAnomalyRates) {
-        worker_is_busy(WORKER_JOB_UPDATE_ANOMALY_RATES);
-        AnomalyRateTimer = 0;
-        rrdset_done(AnomalyRateRS);
-    }
-
-    this->NumAnomalousDimensions = NumAnomalousDimensions;
-    this->NumNormalDimensions = NumNormalDimensions;
-    this->NumTrainedDimensions = NumTrainedDimensions;
-    this->NumActiveDimensions = NumActiveDimensions;
-
-    worker_is_busy(WORKER_JOB_UPDATE_CHARTS);
-    updateDimensionsChart(getRH(), NumTrainedDimensions, NumNormalDimensions, NumAnomalousDimensions);
-    updateRateChart(getRH(), WindowAnomalyRate * 10000.0);
-    updateWindowLengthChart(getRH(), WindowLength);
-    updateEventsChart(getRH(), P, ResetBitCounter, NewAnomalyEvent);
-
-    struct rusage TRU;
-    getResourceUsage(&TRU);
-    updateTrainingChart(getRH(), &TRU);
-
-    if (!NewAnomalyEvent || (DimsOverThreshold.size() == 0))
-        return;
-
-    worker_is_busy(WORKER_JOB_SAVE_ANOMALY_EVENT);
-
-    std::sort(DimsOverThreshold.begin(), DimsOverThreshold.end());
-    std::reverse(DimsOverThreshold.begin(), DimsOverThreshold.end());
-
-    // Make sure the JSON response won't grow beyond a specific number
-    // of dimensions. Log an error message if this happens, because it
-    // most likely means that the user specified a very-low anomaly rate
-    // threshold.
-    size_t NumMaxDimsOverThreshold = 2000;
-    if (DimsOverThreshold.size() > NumMaxDimsOverThreshold) {
-        error("Found %zu dimensions over threshold. Reducing JSON result to %zu dimensions.",
-              DimsOverThreshold.size(), NumMaxDimsOverThreshold);
-        DimsOverThreshold.resize(NumMaxDimsOverThreshold);
-    }
-
-    nlohmann::json JsonResult = DimsOverThreshold;
-
-    time_t Before = now_realtime_sec();
-    time_t After = Before - (WindowLength * updateEvery());
-    DB.insertAnomaly("AD1", 1, getUUID(), After, Before, JsonResult.dump(4));
-}
-
-void DetectableHost::detect() {
+void Host::detect() {
     worker_register("MLDETECT");
-    worker_register_job_name(WORKER_JOB_DETECT_DIMENSION,       "dimensions");
-    worker_register_job_name(WORKER_JOB_UPDATE_DETECTION_CHART, "detection chart");
-    worker_register_job_name(WORKER_JOB_UPDATE_ANOMALY_RATES,   "anomaly rates");
-    worker_register_job_name(WORKER_JOB_UPDATE_CHARTS,          "charts");
-    worker_register_job_name(WORKER_JOB_SAVE_ANOMALY_EVENT,     "anomaly event");
+    worker_register_job_name(WORKER_JOB_DETECTION_PREP, "prep");
+    worker_register_job_name(WORKER_JOB_DETECTION_DIM_CHART, "dim chart");
+    worker_register_job_name(WORKER_JOB_DETECTION_HOST_CHART, "host chart");
+    worker_register_job_name(WORKER_JOB_DETECTION_STATS, "stats");
+    worker_register_job_name(WORKER_JOB_DETECTION_RESOURCES, "resources");
 
-    std::this_thread::sleep_for(Seconds{10});
+    service_register(SERVICE_THREAD_TYPE_NETDATA, NULL, (force_quit_t )ml_cancel_anomaly_detection_threads, RH, true);
 
     heartbeat_t HB;
     heartbeat_init(&HB);
 
-    while (!netdata_exit) {
-        netdata_thread_testcancel();
+    while (service_running((SERVICE_TYPE)(SERVICE_ML_PREDICTION | SERVICE_COLLECTORS))) {
         worker_is_idle();
-        heartbeat_next(&HB, updateEvery() * USEC_PER_SEC);
-
-        netdata_thread_disable_cancelability();
+        heartbeat_next(&HB, (RH ? RH->rrd_update_every : default_rrd_update_every) * USEC_PER_SEC);
         detectOnce();
-
-        worker_is_busy(WORKER_JOB_UPDATE_DETECTION_CHART);
-        updateDetectionChart(getRH());
-        netdata_thread_enable_cancelability();
     }
 }
 
-void DetectableHost::getDetectionInfoAsJson(nlohmann::json &Json) const {
+void Host::getDetectionInfoAsJson(nlohmann::json &Json) const {
     Json["version"] = 1;
-    Json["anomalous-dimensions"] = NumAnomalousDimensions;
-    Json["normal-dimensions"] = NumNormalDimensions;
-    Json["total-dimensions"] = NumAnomalousDimensions + NumNormalDimensions;
-    Json["trained-dimensions"] = NumTrainedDimensions;
+    Json["anomalous-dimensions"] = MLS.NumAnomalousDimensions;
+    Json["normal-dimensions"] = MLS.NumNormalDimensions;
+    Json["total-dimensions"] = MLS.NumAnomalousDimensions + MLS.NumNormalDimensions;
+    Json["trained-dimensions"] = MLS.NumTrainingStatusTrained + MLS.NumTrainingStatusPendingWithModel;
 }
 
-void DetectableHost::startAnomalyDetectionThreads() {
-    TrainingThread = std::thread(&TrainableHost::train, this);
-    DetectionThread = std::thread(&DetectableHost::detect, this);
+void *train_main(void *Arg) {
+    Host *H = reinterpret_cast<Host *>(Arg);
+    H->train();
+    return nullptr;
 }
 
-void DetectableHost::stopAnomalyDetectionThreads() {
-    netdata_thread_cancel(TrainingThread.native_handle());
-    netdata_thread_cancel(DetectionThread.native_handle());
+void *detect_main(void *Arg) {
+    Host *H = reinterpret_cast<Host *>(Arg);
+    H->detect();
+    return nullptr;
+}
 
-    TrainingThread.join();
-    DetectionThread.join();
+void Host::startAnomalyDetectionThreads() {
+    if (ThreadsRunning) {
+        error("Anomaly detections threads for host %s are already-up and running.", rrdhost_hostname(RH));
+        return;
+    }
+
+    ThreadsRunning = true;
+    ThreadsCancelled = false;
+    ThreadsJoined = false;
+
+    char Tag[NETDATA_THREAD_TAG_MAX + 1];
+
+// #define ML_DISABLE_JOINING
+
+    snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "MLTR[%s]", rrdhost_hostname(RH));
+    netdata_thread_create(&TrainingThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, train_main, static_cast<void *>(this));
+
+    snprintfz(Tag, NETDATA_THREAD_TAG_MAX, "MLDT[%s]", rrdhost_hostname(RH));
+    netdata_thread_create(&DetectionThread, Tag, NETDATA_THREAD_OPTION_JOINABLE, detect_main, static_cast<void *>(this));
+}
+
+void Host::stopAnomalyDetectionThreads(bool join) {
+    if (!ThreadsRunning) {
+        error("Anomaly detections threads for host %s have already been stopped.", rrdhost_hostname(RH));
+        return;
+    }
+
+    if(!ThreadsCancelled) {
+        ThreadsCancelled = true;
+
+        // Signal the training queue to stop popping-items
+        TrainingQueue.signal();
+        netdata_thread_cancel(TrainingThread);
+        netdata_thread_cancel(DetectionThread);
+    }
+
+    if (join && !ThreadsJoined) {
+        ThreadsJoined = true;
+        ThreadsRunning = false;
+
+        // these fail on alpine linux and our CI hangs forever
+        // failing to compile static builds
+
+        // commenting them, until we find a solution
+
+        // to enable again:
+        // NETDATA_THREAD_OPTION_DEFAULT needs to become NETDATA_THREAD_OPTION_JOINABLE
+
+        netdata_thread_join(TrainingThread, nullptr);
+        netdata_thread_join(DetectionThread, nullptr);
+    }
 }
