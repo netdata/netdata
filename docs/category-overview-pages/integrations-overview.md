@@ -21,15 +21,10 @@ either centrally, via the
 , or by configuring individual 
 [agent notifications](https://github.com/netdata/netdata/blobl/master/health/notifications/README.md).
 
-
 We designed Netdata with interoperability in mind. The Agent collects thousands of metrics every second, and then what
 you do with them is up to you. You can 
 [store metrics in the database engine](https://github.com/netdata/netdata/blob/master/docs/guides/longer-metrics-storage.md),
 or send them to another time series database for long-term storage or further analysis using
 Netdata's [exporting engine](https://github.com/netdata/netdata/edit/master/exporting/README.md).
-
-
-
-
 
 

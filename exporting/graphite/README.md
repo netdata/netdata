@@ -127,7 +127,7 @@ others you've customized in Netdata Cloud.
 
 ![Exporting engine metrics in Netdata Cloud](https://user-images.githubusercontent.com/1153921/83902769-db139e00-a711-11ea-828e-aa7e32b04c75.png)
 
-## What's next?
+## What's next
 
 What you do with your exported metrics is entirely up to you, but as you might have seen in the Graphite connector
 configuration block, there are many other ways to tweak and customize which metrics you export to Graphite and how
@@ -135,5 +135,3 @@ often.
 
 For full details about each configuration option and what it does, see 
 the [exporting reference guide](https://github.com/netdata/netdata/blob/master/exporting/README.md).
-
-

@@ -29,8 +29,8 @@ production-grade collectors.
 
 ## What you need to get started
 
-- A physical or virtual Linux system, which we'll call a _node_.
-- A working [installation of Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
+  - A physical or virtual Linux system, which we'll call a _node_.
+  - A working [installation of Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md) monitoring agent.
 
 ### Quick start
 
@@ -567,9 +567,9 @@ Classes implement `_get_raw_data` which should be used to grab raw data. This me
 
 ### `SimpleService`
 
-_This is last resort class, if a new module cannot be written by using other framework class this one can be used._
+This is last resort class, if a new module cannot be written by using other framework class this one can be used.
 
-_Example: `ceph`, `sensors`_
+Example: `ceph`, `sensors`
 
 It is the lowest-level class which implements most of module logic, like:
 
@@ -581,17 +581,17 @@ It is the lowest-level class which implements most of module logic, like:
 
 ### `LogService`
 
-_Examples: `apache_cache`, `nginx_log`_
+Examples: `apache_cache`, `nginx_log`_
 
-_Variable from config file_: `log_path`.
+Variable from config file: `log_path`.
 
 Object created from this class reads new lines from file specified in `log_path` variable. It will check if file exists and is readable. Also `_get_raw_data` returns list of strings where each string is one line from file specified in `log_path`.
 
 ### `ExecutableService`
 
-_Examples: `exim`, `postfix`_
+Examples: `exim`, `postfix`_
 
-_Variable from config file_: `command`.
+Variable from config file: `command`.
 
 This allows to execute a shell command in a secure way. It will check for invalid characters in `command` variable and won't proceed if there is one of:
 
@@ -607,9 +607,9 @@ For additional security it uses python `subprocess.Popen` (without `shell=True` 
 
 ### UrlService
 
-_Examples: `apache`, `nginx`, `tomcat`_
+Examples: `apache`, `nginx`, `tomcat`_
 
-_Variables from config file_: `url`, `user`, `pass`.
+Variables from config file: `url`, `user`, `pass`.
 
 If data is grabbed by accessing service via HTTP protocol, this class can be used. It can handle HTTP Basic Auth when specified with `user` and `pass` credentials.
 
@@ -619,9 +619,9 @@ Please note that the config file can use different variables according to the sp
 
 ### SocketService
 
-_Examples: `dovecot`, `redis`_
+Examples: `dovecot`, `redis`
 
-_Variables from config file_: `unix_socket`, `host`, `port`, `request`.
+Variables from config file: `unix_socket`, `host`, `port`, `request`.
 
 Object will try execute `request` using either `unix_socket` or TCP/IP socket with combination of `host` and `port`. This can access unix sockets with SOCK_STREAM or SOCK_DGRAM protocols and TCP/IP sockets in version 4 and 6 with SOCK_STREAM setting.
 
@@ -630,5 +630,3 @@ Sockets are accessed in non-blocking mode with 15 second timeout.
 After every execution of `_get_raw_data` socket is closed, to prevent this module needs to set `_keep_alive` variable to `True` and implement custom `_check_raw_data` method.
 
 `_check_raw_data` should take raw data and return `True` if all data is received otherwise it should return `False`. Also it should do it in fast and efficient way.
-
-
