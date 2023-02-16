@@ -4,7 +4,7 @@
 MAINTAINERCLEANFILES = $(srcdir)/Makefile.in
 CLEANFILES = \
     netdata.logrotate \
-    netdata.crontab \
+    cron/netdata-updater-daily.in \
     freebsd/rc.d/netdata \
     initd/init.d/netdata \
     launchd/netdata.plist \
@@ -26,6 +26,7 @@ dist_config_DATA = \
     .install-type \
     $(NULL)
 
+libsyscrondir=$(libsysdir)/cron
 libsysfreebsddir=$(libsysdir)/freebsd
 libsysfreebsdrcddir=$(libsysfreebsddir)/rc.d
 libsysinitddir=$(libsysdir)/initd
@@ -41,6 +42,7 @@ libsyssystemddir=$(libsysdir)/systemd
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)$(configdir)
 	$(INSTALL) -d $(DESTDIR)$(libsysdir)
+	$(INSTALL) -d $(DESTDIR)$(libsyscrondir)
 	$(INSTALL) -d $(DESTDIR)$(libsysfreebsdrcddir)
 	$(INSTALL) -d $(DESTDIR)$(libsysinitdinitddir)
 	$(INSTALL) -d $(DESTDIR)$(libsyslaunchddir)
@@ -55,7 +57,10 @@ nodist_libexecnetdata_SCRIPTS = \
 
 nodist_libsys_DATA = \
     netdata.logrotate \
-    netdata.crontab \
+    $(NULL)
+
+nodist_libsyscron_DATA = \
+    cron/netdata-updater-daily \
     $(NULL)
 
 nodist_libsysfreebsdrcd_DATA = \
@@ -92,7 +97,7 @@ dist_noinst_DATA = \
     install-service.sh.in \
     netdata.logrotate.in \
     netdata.conf \
-    netdata.crontab.in \
+    cron/netdata-updater-daily.in \
     freebsd/rc.d/netdata.in \
     initd/init.d/netdata.in \
     launchd/netdata.plist.in \

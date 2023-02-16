@@ -116,8 +116,8 @@ web/gui/version.txt
 /coverage/
 
 system/install-service.sh
-system/netdata.crontab
 system/netdata.logrotate
+system/cron/netdata-updater-daily
 system/freebsd/rc.d/netdata
 system/initd/init.d/netdata
 system/launchd/netdata.plist
