@@ -265,7 +265,7 @@ install_systemd_service() {
         warning "Failed to reload systemd unit files."
     fi
 
-    if ! systemctl ${ENABLE} netdata; then
+    if ! systemctl "${ENABLE}" netdata; then
         warning "Failed to ${ENABLE} Netdata service."
     fi
   fi

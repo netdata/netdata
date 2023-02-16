@@ -179,7 +179,7 @@ dir_should_be_link() {
   fi
 
   run ln -s "${t}" "${d}"
-  cd "${old}"
+  cd "${old}" || true
 }
 
 dir_should_be_link . bin sbin
