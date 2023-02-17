@@ -123,9 +123,11 @@ static inline RRDHOST *rrdhost_index_add_hostname(RRDHOST *host) {
         rrdhost_option_set(host, RRDHOST_OPTION_INDEXED_HOSTNAME);
     else {
         //have the same hostname but it's not the same host
-        //keep the new one
-        rrdhost_index_del_hostname(ret_hostname);
-        rrdhost_index_add_hostname(host);
+        //keep the new one only if the old one is orphan or archived
+        if (rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ORPHAN) || rrdhost_flag_check(ret_hostname, RRDHOST_FLAG_ARCHIVED)) {
+            rrdhost_index_del_hostname(ret_hostname);
+            rrdhost_index_add_hostname(host);
+        }
     }
 
     return host;
