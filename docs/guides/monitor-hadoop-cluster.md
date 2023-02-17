@@ -190,6 +190,3 @@ sudo /etc/netdata/edit-config health.d/zookeeper.conf
 
 For more information about editing the defaults or writing new alarm entities, see our 
 [health monitoring documentation](https://github.com/netdata/netdata/blob/master/health/README.md).
-
-
-

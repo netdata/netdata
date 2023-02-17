@@ -1,15 +1,12 @@
 <!--
-title: "Health configuration reference"
+title: "Configure agent alerts"
 sidebar_label: "Health"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/REFERENCE.md"
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Operations/Alerts"
+learn_rel_path: "Configuration"
 -->
 
-# Health configuration reference
-
-# Configure health alarms
+# Configure agent alerts
 
 Netdata's health watchdog is highly configurable, with support for dynamic thresholds, hysteresis, alarm templates, and
 more. You can tweak any of the existing alarms based on your infrastructure's topology or specific monitoring needs, or
@@ -39,7 +36,6 @@ You can configure the Agent's health watchdog service by editing files in two lo
 
 Navigate to your [Netdata config directory](https://github.com/netdata/netdata/blob/master/docs/configure/nodes.md) and
 use `edit-config` to make changes to any of these files.
-
 
 For example, to edit the `cpu.conf` health configuration file, run:
 
@@ -122,18 +118,24 @@ Let's look into each of the lines to see how they create a working health entity
     -   Any alphabet letter or number.
     -   The symbols `.` and `_`.
     -   Cannot be `chart name`, `dimension name`, `family name`, or `chart variable names`.  
+
 -   `on`: Which chart the entity listens to.
+
 -   `lookup`: Which metrics the alarm monitors, the duration of time to monitor, and how to process the metrics into a
     usable format.
     -   `average`: Calculate the average of all the metrics collected.
     -   `-1m`: Use metrics from 1 minute ago until now to calculate that average.
     -   `percentage`: Clarify that we're calculating a percentage of RAM usage.
     -   `of used`: Specify which dimension (`used`) on the `system.ram` chart you want to monitor with this entity.
+
 -   `units`: Use percentages rather than absolute units.
+
 -   `every`: How often to perform the `lookup` calculation to decide whether or not to trigger this alarm.
+
 -   `warn`/`crit`: The value at which Netdata should trigger a warning or critical alarm. This example uses simple
     syntax, but most pre-configured health entities use
     [hysteresis](#special-use-of-the-conditional-operator) to avoid superfluous notifications.
+
 -   `info`: A description of the alarm, which will appear in the dashboard and notifications.
 
 In human-readable format: 
@@ -1149,7 +1151,6 @@ to temporary disable notifications (for instance when running backups triggers a
 notifications are runtime. The health checks can be controlled at runtime via the 
 [health management API](https://github.com/netdata/netdata/blob/master/web/api/health/README.md).
 
-
 ## Use dimension templates to create dynamic alarms
 
 In v1.18 of Netdata, we introduced **dimension templates** for alarms, which simplifies the process of 
@@ -1286,15 +1287,19 @@ dimensions:
     -   `cpu_template_user`
     -   `cpu_template_system`
     -   `cpu_template_nice`
+
 -   `cpu.cpu1`
     -   `cpu_template_user`
     -   `cpu_template_system`
     -   `cpu_template_nice`
+
 -   `cpu.cpu2`
     -   `cpu_template_user`
     -   `cpu_template_system`
     -   `cpu_template_nice`
+
 -   ...
+
 -   `cpu.cpu11`
     -   `cpu_template_user`
     -   `cpu_template_system`
@@ -1306,4 +1311,3 @@ And how just a few of those dimension template-generated alarms look like in the
 
 All in all, this single entity creates 36 individual alarms. Much easier than writing 36 separate entities in your
 health configuration files!
-
