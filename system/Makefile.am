@@ -27,6 +27,10 @@ dist_config_DATA = \
     .install-type \
     $(NULL)
 
+dist_libconfig_DATA = \
+    vnodes/vnodes.yaml
+    $(NULL)
+
 libsyscrondir=$(libsysdir)/cron
 libsysfreebsddir=$(libsysdir)/freebsd
 libsysfreebsdrcddir=$(libsysfreebsddir)/rc.d
