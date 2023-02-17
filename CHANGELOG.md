@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
+- Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
+- Reorg markdown files for learn [\#14547](https://github.com/netdata/netdata/pull/14547) ([cakrit](https://github.com/cakrit))
+- Remove unused config options and functions [\#14542](https://github.com/netdata/netdata/pull/14542) ([stelfrag](https://github.com/stelfrag))
 - Add renamed markdown files [\#14540](https://github.com/netdata/netdata/pull/14540) ([cakrit](https://github.com/cakrit))
 - Fix broken svgs and improve database queries API doc [\#14539](https://github.com/netdata/netdata/pull/14539) ([cakrit](https://github.com/cakrit))
 - Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
@@ -15,6 +19,7 @@
 - Add Debian 12 to our CI and platform support document. [\#14529](https://github.com/netdata/netdata/pull/14529) ([Ferroin](https://github.com/Ferroin))
 - Update role-based-access.md [\#14528](https://github.com/netdata/netdata/pull/14528) ([cakrit](https://github.com/cakrit))
 - added section to explain impacts on member role [\#14527](https://github.com/netdata/netdata/pull/14527) ([hugovalente-pm](https://github.com/hugovalente-pm))
+- fix setting go.d.plugin capabilities [\#14525](https://github.com/netdata/netdata/pull/14525) ([ilyam8](https://github.com/ilyam8))
 - Simplify parser README.md and add parser files to CMakeLists.txt [\#14523](https://github.com/netdata/netdata/pull/14523) ([stelfrag](https://github.com/stelfrag))
 - Fix broken links in markdown files [\#14513](https://github.com/netdata/netdata/pull/14513) ([Ancairon](https://github.com/Ancairon))
 - Make external plugins a category page in learn [\#14511](https://github.com/netdata/netdata/pull/14511) ([cakrit](https://github.com/cakrit))
@@ -378,10 +383,6 @@
 - Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
 - Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
 - bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
-- apps.plugin function add max value on all value columns [\#13899](https://github.com/netdata/netdata/pull/13899) ([ktsaou](https://github.com/ktsaou))
-- Reduce unnecessary alert events to the cloud [\#13897](https://github.com/netdata/netdata/pull/13897) ([MrZammler](https://github.com/MrZammler))
-- add pandas collector to collectors.md [\#13895](https://github.com/netdata/netdata/pull/13895) ([andrewm4894](https://github.com/andrewm4894))
-- Fix reading health "enable" from the configuration [\#13894](https://github.com/netdata/netdata/pull/13894) ([stelfrag](https://github.com/stelfrag))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
