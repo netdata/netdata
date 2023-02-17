@@ -14,6 +14,9 @@ You need a working `sendmail` command for email alerts to work. Almost all MTAs 
 
 Netdata sends all emails as user `netdata`, so make sure your `sendmail` works for local users.
 
+If you are using our Docker images, or are running Netdata on a system that does not have a working `sendmail`
+command, see [the section below about using msmtp in place of sendmail](#using-msmtp-instead-of-sendmail).
+
 email notifications look like this:
 
 ![image](https://user-images.githubusercontent.com/1905463/133216974-a2ca0e4f-787b-4dce-b1b2-9996a8c5f718.png)
@@ -57,26 +60,29 @@ X-Netdata-Host: winterland
 X-Netdata-Role: sysadmin
 ```
 
-## Simple SMTP transport configuration
+## Using msmtp instead of sendmail
 
-If you want an alternative to `sendmail` in order to have a simple MTA configuration for sending emails and auth to an existing SMTP server, you can do the following:
+[msmtp](https://marlam.de/msmtp/) provides a simple alternative to a full-blown local mail server and `sendmail`
+that will still allow you to send email notifications. It comes pre-installed in our Docker images, and is available
+on most distributions in the system package repositories.
 
-- Install `msmtp`.
-- Modify the `sendmail` path in `health_alarm_notify.conf` to point to the location of `msmtp`:
+To use msmtp with Netdata for sending email alerts:
+
+1. If it’s not already installed, install msmtp. Most distributions have it in their package repositories with the
+   package name `msmtp`.
+2. Modify the `sendmail` path in `health_alarm_notify.conf` to point to the location of `msmtp`:
 ```
 # The full path to the sendmail command.
 # If empty, the system $PATH will be searched for it.
 # If not found, email notifications will be disabled (silently).
 sendmail="/usr/bin/msmtp"
 ```
-- Login as netdata :
+3. Login as netdata:
 ```sh
 (sudo) su -s /bin/bash netdata
 ```
-- Configure `~/.msmtprc` as shown [in the documentation](https://marlam.de/msmtp/documentation/).
-- Finally set the appropriate permissions on the `.msmtprc` file :
+4. Configure `~/.msmtprc` as shown [in the documentation](https://marlam.de/msmtp/documentation/).
+5. Finally set the appropriate permissions on the `.msmtprc` file :
 ```sh
 chmod 600 ~/.msmtprc
 ```
-
-
