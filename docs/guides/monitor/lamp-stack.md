@@ -3,13 +3,9 @@ title: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
 sidebar_label: "LAMP stack monitoring (Linux, Apache, MySQL, PHP) with Netdata"
 description: "Set up robust LAMP stack monitoring (Linux, Apache, MySQL, PHP) in just a few minutes using a free, open-source monitoring tool that collects metrics every second."
 image: /img/seo/guides/monitor/lamp-stack.png
-author: "Joel Hans"
-author_title: "Editorial Director, Technical & Educational Resources"
-author_img: "/img/authors/joel-hans.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/lamp-stack.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Miscellaneous"
 -->
 import { OneLineInstallWget } from '@site/src/components/OneLineInstall/'
 

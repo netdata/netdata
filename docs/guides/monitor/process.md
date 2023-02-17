@@ -5,8 +5,7 @@ description: "Tap into Netdata's powerful collectors, with per-second utilizatio
 image: /img/seo/guides/monitor/process.png
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/process.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Operations"
 -->
 
 # Monitor any process in real-time with Netdata
@@ -267,46 +266,5 @@ relevant data.
 ![Per-process eBPF charts](https://user-images.githubusercontent.com/1153921/101412395-c8844800-389f-11eb-86d2-20c8a0f7b3c0.png)
 
 `ebpf.plugin` visualizes additional eBPF metrics, which are system-wide and not per-process, under the **eBPF** section.
-
-## What's next?
-
-Now that you have `apps_groups.conf` configured correctly, and know where to find per-process visualizations throughout
-Netdata's ecosystem, you can precisely monitor the health and performance of any process on your node using per-second
-metrics.
-
-For even more in-depth troubleshooting, see our guide
-on [monitoring and debugging applications with eBPF](https://github.com/netdata/netdata/blob/master/docs/guides/troubleshoot/monitor-debug-applications-ebpf.md).
-
-If the process you're monitoring also has
-a [supported collector](https://github.com/netdata/netdata/blob/master/collectors/COLLECTORS.md), now is a great time to
-set
-that up if it wasn't autodetected. With both process utilization and application-specific metrics, you should have every
-piece of data needed to discover the root cause of an incident. See
-the [collectors configuration reference](https://github.com/netdata/netdata/blob/master/collectors/REFERENCE.md) documentation for details.
-
-[Create new dashboards](https://github.com/netdata/netdata/blob/master/docs/visualize/create-dashboards.md) in Netdata
-Cloud using charts from `apps.plugin`,
-`ebpf.plugin`, and application-specific collectors to build targeted dashboards for monitoring key processes across your
-infrastructure.
-
-Try
-running [Metric Correlations](https://github.com/netdata/netdata/blob/master/docs/cloud/insights/metric-correlations.md)
-on a node that's running the process(es) you're monitoring. Even if nothing is going wrong at the moment, Netdata
-Cloud's embedded intelligence helps you better understand how a MySQL database, for example, might influence a system's
-volume of memory page faults. And when an incident is afoot, use Metric Correlations to reduce mean time to resolution (
-MTTR) and cognitive load.
-
-If you want more specific metrics from your custom application, check out
-Netdata's [statsd support](https://github.com/netdata/netdata/blob/master/collectors/statsd.plugin/README.md). With statd, you can send detailed metrics from your
-application to Netdata and visualize them with per-second granularity. Netdata's statsd collector works with dozens of 
-[statsd server implementations](https://github.com/etsy/statsd/wiki#client-implementations), which work with most application
-frameworks.
-
-### Related reference documentation
-
-- [Netdata Agent · `apps.plugin`](https://github.com/netdata/netdata/blob/master/collectors/apps.plugin/README.md)
-- [Netdata Agent · `ebpf.plugin`](https://github.com/netdata/netdata/blob/master/collectors/ebpf.plugin/README.md)
-- [Netdata Agent · Dashboards](https://github.com/netdata/netdata/blob/master/web/README.md#dimensions)
-- [Netdata Agent · MySQL collector](https://github.com/netdata/go.d.plugin/blob/master/modules/mysql/README.md)
 
 
