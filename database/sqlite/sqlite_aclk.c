@@ -10,7 +10,6 @@ struct aclk_sync_config_s {
     uv_loop_t loop;
     uv_timer_t timer_req;
     time_t cleanup_after;          // Start a cleanup after this timestamp
-    time_t startup_time;           // When the sync thread started
     uv_async_t async;
     /* FIFO command queue */
     uv_mutex_t cmd_mutex;
@@ -64,7 +63,7 @@ static int is_host_available(uuid_t *host_id)
 
     rc = sqlite3_bind_blob(res, 1, host_id, sizeof(*host_id), SQLITE_STATIC);
     if (unlikely(rc != SQLITE_OK)) {
-        error_report("Failed to bind host_id parameter to select node instance information");
+        error_report("Failed to bind host_id parameter to check host existence");
         goto failed;
     }
     rc = sqlite3_step_monitored(res);
@@ -77,7 +76,7 @@ failed:
 }
 
 // OPCODE: ACLK_DATABASE_DELETE_HOST
-void sql_delete_aclk_table_list(char *host_guid)
+static void sql_delete_aclk_table_list(char *host_guid)
 {
     char uuid_str[GUID_LEN + 1];
     char host_str[GUID_LEN + 1];
@@ -402,8 +401,7 @@ static void aclk_synchronization(void *arg __maybe_unused)
 
     info("Starting ACLK synchronization thread");
 
-    config->startup_time = now_realtime_sec();
-    config->cleanup_after = config->startup_time + ACLK_DATABASE_CLEANUP_FIRST;
+    config->cleanup_after = now_realtime_sec() + ACLK_DATABASE_CLEANUP_FIRST;
     config->initialized = true;
 
     while (likely(service_running(SERVICE_ACLKSYNC))) {
@@ -411,8 +409,6 @@ static void aclk_synchronization(void *arg __maybe_unused)
         struct aclk_database_cmd cmd;
         worker_is_idle();
         uv_run(loop, UV_RUN_DEFAULT);
-
-//        info("ACLK SYNC: Event loop run shutdown = %d", config->is_shutting_down);
 
         /* wait for commands */
         do {
@@ -501,20 +497,18 @@ void sql_create_aclk_table(RRDHOST *host __maybe_unused, uuid_t *host_uuid __may
     uuid_unparse_lower_fix(host_uuid, uuid_str);
     uuid_unparse_lower(*host_uuid, host_guid);
 
-    BUFFER *sql = buffer_create(ACLK_SYNC_QUERY_SIZE, &netdata_buffers_statistics.buffers_sqlite);
+    char sql[ACLK_SYNC_QUERY_SIZE];
 
-    buffer_sprintf(sql, TABLE_ACLK_ALERT, uuid_str);
-    rc = db_execute(buffer_tostring(sql));
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE-1, TABLE_ACLK_ALERT, uuid_str);
+    rc = db_execute(sql);
     if (unlikely(rc))
         error_report("Failed to create ACLK alert table for host %s", host ? rrdhost_hostname(host) : host_guid);
     else {
-        buffer_flush(sql);
-        buffer_sprintf(sql, INDEX_ACLK_ALERT, uuid_str, uuid_str);
-        rc = db_execute(buffer_tostring(sql));
+        snprintfz(sql, ACLK_SYNC_QUERY_SIZE -1, INDEX_ACLK_ALERT, uuid_str, uuid_str);
+        rc = db_execute(sql);
         if (unlikely(rc))
             error_report("Failed to create ACLK alert table index for host %s", host ? string2str(host->hostname) : host_guid);
     }
-    buffer_free(sql);
     if (likely(host) && unlikely(host->aclk_sync_host_config))
         return;
 

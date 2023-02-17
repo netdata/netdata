@@ -184,18 +184,17 @@ int sql_queue_alarm_to_aclk(RRDHOST *host, ALARM_ENTRY *ae, int skip_filter)
     char uuid_str[GUID_LEN + 1];
     uuid_unparse_lower_fix(&host->host_uuid, uuid_str);
 
-    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    char sql[ACLK_SYNC_QUERY_SIZE];
 
-    buffer_sprintf(
-        sql,
+    snprintfz(
+        sql, ACLK_SYNC_QUERY_SIZE - 1,
         "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) "
         "VALUES (@alert_unique_id, unixepoch(), @alert_unique_id) on conflict (alert_unique_id) do nothing; ",
         uuid_str);
 
-    int rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res_alert, 0);
+    int rc = sqlite3_prepare_v2(db_meta, sql, -1, &res_alert, 0);
     if (unlikely(rc != SQLITE_OK)) {
         error_report("Failed to prepare statement to store alert event");
-        buffer_free(sql);
         return 1;
     }
 
@@ -216,7 +215,6 @@ bind_fail:
     if (unlikely(sqlite3_finalize(res_alert) != SQLITE_OK))
         error_report("Failed to reset statement in store alert event, rc = %d", rc);
 
-    buffer_free(sql);
     return 0;
 }
 
@@ -469,8 +467,8 @@ void aclk_push_alert_events_for_all_hosts(void)
         rrdhost_flag_clear(host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 
         struct aclk_sync_host_config *wc = host->aclk_sync_host_config;
-        aclk_push_alert_event(wc);
-
+        if (likely(wc))
+            aclk_push_alert_event(wc);
     }
     dfe_done(host);
 }
@@ -543,17 +541,17 @@ void aclk_push_alarm_health_log(char *node_id __maybe_unused)
     struct timeval first_timestamp;
     struct timeval last_timestamp;
 
-    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    char sql[ACLK_SYNC_QUERY_SIZE];
 
     sqlite3_stmt *res = NULL;
 
     //TODO: make this better: include info from health log too
-    buffer_sprintf(sql, "SELECT MIN(sequence_id), MIN(date_created), MAX(sequence_id), MAX(date_created) FROM aclk_alert_%s;", wc->uuid_str);
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, "SELECT MIN(sequence_id), MIN(date_created), " \
+            "MAX(sequence_id), MAX(date_created) FROM aclk_alert_%s;", wc->uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to get health log statistics from the database");
-        buffer_free(sql);
         freez(claim_id);
         return;
     }
@@ -597,7 +595,6 @@ void aclk_push_alarm_health_log(char *node_id __maybe_unused)
 
     freez(claim_id);
     freez(node_id);
-    buffer_free(sql);
 
     aclk_alert_reloaded = 1;
 #endif
@@ -789,21 +786,20 @@ void sql_process_queue_removed_alerts_to_aclk(char *node_id)
     if (unlikely(!host || !(wc = host->aclk_sync_host_config)))
         return;
 
-    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    char sql[ACLK_SYNC_QUERY_SIZE * 2];
 
-    buffer_sprintf(sql,"insert into aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
-        "select unique_id alert_unique_id, unixepoch(), unique_id alert_unique_id from health_log_%s " \
-        "where new_status = -2 and updated_by_id = 0 and unique_id not in " \
-        "(select alert_unique_id from aclk_alert_%s) order by unique_id asc " \
-        "on conflict (alert_unique_id) do nothing;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
+    snprintfz(sql,ACLK_SYNC_QUERY_SIZE * 2 - 1, "INSERT INTO aclk_alert_%s (alert_unique_id, date_created, filtered_alert_unique_id) " \
+        "SELECT unique_id alert_unique_id, UNIXEPOCH(), unique_id alert_unique_id FROM health_log_%s " \
+        "WHERE new_status = -2 AND updated_by_id = 0 AND unique_id NOT IN " \
+        "(SELECT alert_unique_id FROM aclk_alert_%s) ORDER BY unique_id ASC " \
+        "ON CONFLICT (alert_unique_id) DO NOTHING;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
-    if (unlikely(db_execute(buffer_tostring(sql)))) {
+    if (unlikely(db_execute(sql))) {
         log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS FAILED", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
         error_report("Failed to queue ACLK alert removed entries for host %s", wc->host ? rrdhost_hostname(wc->host) : wc->host_guid);
     }
     else
         log_access("ACLK STA [%s (%s)]: QUEUED REMOVED ALERTS", wc->node_id, wc->host ? rrdhost_hostname(wc->host) : "N/A");
-    buffer_free(sql);
     rrdhost_flag_set(wc->host, RRDHOST_FLAG_ACLK_STREAM_ALERTS);
 }
 
@@ -1088,18 +1084,17 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     proto_alert_status->alert_updates = wc->alert_updates;
     proto_alert_status->alerts_batch_id = wc->alerts_batch_id;
 
-    BUFFER *sql = buffer_create(1024, &netdata_buffers_statistics.buffers_sqlite);
+    char sql[ACLK_SYNC_QUERY_SIZE];
     sqlite3_stmt *res = NULL;
 
-    buffer_sprintf(sql, "SELECT MIN(sequence_id), MAX(sequence_id), " \
+    snprintfz(sql, ACLK_SYNC_QUERY_SIZE - 1, "SELECT MIN(sequence_id), MAX(sequence_id), " \
                    "(select MAX(sequence_id) from aclk_alert_%s where date_cloud_ack is not NULL), " \
                    "(select MAX(sequence_id) from aclk_alert_%s where date_submitted is not NULL) " \
                    "FROM aclk_alert_%s where date_submitted is null;", wc->uuid_str, wc->uuid_str, wc->uuid_str);
 
-    rc = sqlite3_prepare_v2(db_meta, buffer_tostring(sql), -1, &res, 0);
+    rc = sqlite3_prepare_v2(db_meta, sql, -1, &res, 0);
     if (rc != SQLITE_OK) {
         error_report("Failed to prepare statement to get alert log status from the database.");
-        buffer_free(sql);
         return 1;
     }
 
@@ -1114,6 +1109,5 @@ int get_proto_alert_status(RRDHOST *host, struct proto_alert_status *proto_alert
     if (unlikely(rc != SQLITE_OK))
         error_report("Failed to finalize statement to get alert log status from the database, rc = %d", rc);
 
-    buffer_free(sql);
     return 0;
 }
