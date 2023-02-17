@@ -185,8 +185,18 @@ Requires(pre): /usr/sbin/useradd
 # #####################################################################
 # Functionality-dependent package dependencies
 # #####################################################################
-# Note: Some or all of the Packages may be found in the EPEL repo, 
+# Note: Some or all of the Packages may be found in the EPEL repo,
 # rather than the standard ones
+
+# epbf dependencies
+%if 0%{?_have_ebpf}
+%if 0%{?suse_version}
+BuildRequires:	libelf-devel
+%else
+BuildRequires:	elfutils-libelf-devel
+%endif
+%endif
+# end - ebpf dependencies
 
 # nfacct plugin dependencies
 BuildRequires:  libmnl-devel
@@ -565,14 +575,16 @@ Requires: netdata = %{version}
 
 %description plugin-freeipmi
  The IPMI specification defines a set of interfaces for platform management.
-It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in 
+It is implemented by a number vendors for system management. The features of IPMI that most users will be interested in
 are sensor monitoring, system event monitoring, power control, and serial-over-LAN (SOL).
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
 
 %changelog
-* Wed Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
+* Thu Feb 16 2023 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-17
+- Added eBPF build dependency
+* Fri Feb 03 2022 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-16
 - Bundle updater script in native packages.
 * Mon Oct 11 2021 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-15
 - Remove support code for legacy ACLK implementation.
@@ -609,9 +621,8 @@ First draft refactor on package dependencies section
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-3
 - Temporary set version statically
 - Fix changelog ordering
-- Comment-out node.d configuration directory 
+- Comment-out node.d configuration directory
 * Wed Jan 02 2019 Pawel Krupa <pkrupa@redhat.com> - 0.0.0-2
 - Fix permissions for log files
 * Sun Nov 15 2015 Alon Bar-Lev <alonbl@redhat.com> - 0.0.0-1
 - Initial add.
-
