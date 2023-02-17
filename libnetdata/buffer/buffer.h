@@ -6,6 +6,8 @@
 #include "../string/utf8.h"
 #include "../libnetdata.h"
 
+#include "h2o/memory.h"
+
 #define WEB_DATA_LENGTH_INCREASE_STEP 1024
 
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
@@ -128,6 +130,8 @@ void buffer_strcat_htmlescape(BUFFER *wb, const char *txt);
 void buffer_char_replace(BUFFER *wb, char from, char to);
 
 void buffer_print_sn_flags(BUFFER *wb, SN_FLAGS flags, bool send_anomaly_bit);
+
+h2o_iovec_t buffer_to_h2o_iovec(BUFFER *wb);
 
 static inline void buffer_need_bytes(BUFFER *buffer, size_t needed_free_size) {
     if(unlikely(buffer->len + needed_free_size >= buffer->size))
