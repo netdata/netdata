@@ -13,6 +13,15 @@ At Netdata, we believe in providing free and unrestricted access to high-quality
 
 We also provide paid subscriptions that designed to provide additional features and capabilities for businesses that need tighter and customizable integration of the free monitoring solution to their processes. These are divided into three different plans: **Pro**, **Business**, and **Enterprise**. Each plan will offers a different set of features and capabilities to meet the needs of businesses of different sizes and with different monitoring requirements.
 
+:::note
+To not disrupt current users space's access rights we will be keeping their current plan as the **Early Bird** plan. The reason for this is to allow users to 
+keep using the legacy **Member** role with the exact same permissions as it has currently.
+
+If you move from the **Early Bird** plan to a paid plan, you will not be able to return to the **Early Bird** plan again. The **Community** free plan will always be available to you, but it does not allow
+you to invite or change users using the Member role. See more details on our [roles and plans](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access-model.md#what-roles-are-available) documentation.
+
+:::
+
 ### Plans
 
 The plan is an attribute that is directly attached to your space(s) and that dictates what capabilities and customizations you have on your space. If you have different spaces you can have different Netdata plans on them. This gives you flexibility to chose what is more adequate for your needs on each of your spaces.
@@ -68,13 +77,14 @@ To achieve this you will need to:
 
 Depending on the plan associated to your space you will have different roles available:
 
-| **Role** | **Community** | **Pro** | **Business** |
-| :-- | :--: | :--: | :--: |
-| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: |
-| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: |
-| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: |
-| **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: |
+| **Role** | **Community** | **Pro** | **Business** | **Early Bird** |
+| :-- | :--: | :--: | :--: | :--: |
+| **Administrators**<p>This role allows users to manage Spaces, War Rooms, Nodes, and Users, this includes the Plan & Billing settings.</p><p>Provides access to all War Rooms in the space</p> | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| **Managers**<p>This role allows users to manage War Rooms and Users.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | - | :heavy_check_mark: | - | 
+| **Troubleshooters**<p>This role is for users that will be just focused on using Netdata to troubleshoot, not manage entities.</p><p>Provides access to all War Rooms and Nodes in the space.</p> | - | :heavy_check_mark: | :heavy_check_mark: | - | 
+| **Observers**<p>This role is for read-only access with restricted access to explicit War Rooms and only the Nodes that appear in those War Rooms.</p>💡 Ideal for restricting your customer's access to their own dedicated rooms.<p></p> | - | - | :heavy_check_mark: | - | 
+| **Billing**<p>This role is for users that need to manage billing options and see invoices, with no further access to the system.</p> | - | - | :heavy_check_mark: | - | 
+| **Member** ⚠️ Legacy role<p>This role allows users to manage War Rooms and invite fellow Member teammates.</p><p>These users cannot see all War Rooms in the Space but can see all Nodes since they are always on the _All Nodes_ room.</p>| - | - | - | :heavy_check_mark: | 
 
 For more details check the documentation under [Role-Based Access model](https://github.com/netdata/netdata/blob/master/docs/cloud/manage/role-based-access.md).
 
