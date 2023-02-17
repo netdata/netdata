@@ -1,5 +1,5 @@
 <!--
-title: "alerta.io"
+title: "Alerta agent alert notifications"
 sidebar_label: "Alerta"
 description: "Send alarm notifications to Alerta to see the latest health status updates from multiple nodes in a single interface."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/alerta/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# alerta.io
+# Alerta agent alert notifications
 
 The [Alerta](https://alerta.io) monitoring system is a tool used to
 consolidate and de-duplicate alerts from multiple sources for quick

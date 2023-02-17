@@ -4,7 +4,7 @@ custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-sec
 sidebar_label: "Security Design"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 sidebar_position: 20
 -->
 

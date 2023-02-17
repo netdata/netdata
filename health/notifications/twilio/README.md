@@ -1,5 +1,5 @@
 <!--
-title: "Twilio"
+title: "Twilio agent alert notifications"
 sidebar_label: "Twilio"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/twilio/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Twilio
+# Twilio agent alert notifications
 
 Will look like this on your Android device:
 

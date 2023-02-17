@@ -1,5 +1,5 @@
 <!--
-title: "SMS Server Tools 3"
+title: "SMS Server Tools 3 agent alert notifications"
 sidebar_label: "SMS server"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/smstools3/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# SMS Server Tools 3
+# SMS Server Tools 3 agent alert notifications
 
 The [SMS Server Tools 3](http://smstools3.kekekasvi.com/) is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 

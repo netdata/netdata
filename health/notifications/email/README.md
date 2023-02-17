@@ -1,5 +1,5 @@
 <!--
-title: "Email"
+title: "Email agent alert notifications"
 sidebar_label: "Email"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/email/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': True, 'part_of_agent': True}"
 -->
 
-# Email
+# Email agent alert notifications
 
 You need a working `sendmail` command for email alerts to work. Almost all MTAs provide a `sendmail` interface.
 

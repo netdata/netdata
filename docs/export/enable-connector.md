@@ -5,7 +5,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/export/ena
 sidebar_label: "Enable an exporting connector"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 -->
 
 # Enable an exporting connector

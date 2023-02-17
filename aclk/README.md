@@ -6,7 +6,7 @@ custom_edit_url: "https://github.com/netdata/netdata/edit/master/aclk/README.md"
 sidebar_label: "Agent-Cloud link (ACLK)"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 -->
 
 # Agent-cloud link (ACLK)

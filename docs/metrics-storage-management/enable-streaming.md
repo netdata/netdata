@@ -9,7 +9,7 @@ custom_edit_url: "https://github.com/netdata/netdata/blob/master/docs/metrics-st
 sidebar_label: "Enable streaming between nodes"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 -->
 
 # Enable streaming between nodes

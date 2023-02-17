@@ -1,5 +1,5 @@
 <!--
-title: "Send alert notifications to PagerDuty"
+title: "PagerDuty agent alert notifications"
 description: "Send alerts to your PagerDuty dashboard any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "PagerDuty"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/pagerduty/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Send alert notifications to PagerDuty
+# PagerDuty agent alert notifications
 
 [PagerDuty](https://www.pagerduty.com/company/) is an enterprise incident resolution service that integrates with ITOps
 and DevOps monitoring stacks to improve operational reliability and agility. From enriching and aggregating events to

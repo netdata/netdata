@@ -1,5 +1,5 @@
 <!--
-title: "Send notifications to Opsgenie"
+title: "Opsgenie agent alert notifications"
 description: "Send alerts to your Opsgenie incident response account any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "Opsgenie"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/opsgenie/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Send notifications to Opsgenie
+# Opsgenie agent alert notifications
 
 [Opsgenie](https://www.atlassian.com/software/opsgenie) is an alerting and incident response tool. It is designed to
 group and filter alarms, build custom routing rules for on-call teams, and correlate deployments and commits to

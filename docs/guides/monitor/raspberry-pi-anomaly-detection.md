@@ -3,13 +3,9 @@ title: "Unsupervised anomaly detection for Raspberry Pi monitoring"
 sidebar_label: "Unsupervised anomaly detection for Raspberry Pi monitoring"
 description: "Use a low-overhead machine learning algorithm and an open-source monitoring tool to detect anomalous metrics on a Raspberry Pi."
 image: /img/seo/guides/monitor/raspberry-pi-anomaly-detection.png
-author: "Andy Maguire"
-author_title: "Senior Machine Learning Engineer"
-author_img: "/img/authors/andy-maguire.jpg"
 custom_edit_url: https://github.com/netdata/netdata/edit/master/docs/guides/monitor/raspberry-pi-anomaly-detection.md
 learn_status: "Published"
-learn_topic_type: "Tasks"
-learn_rel_path: "Guides/Monitor"
+learn_rel_path: "Miscellaneous"
 -->
 
 We love IoT and edge at Netdata, we also love machine learning. Even better if we can combine the two to ease the pain
@@ -103,27 +99,5 @@ during training. By default, the anomalies collector, along with all other runni
 
 ![RAM utilization of anomaly detection on the Raspberry
 Pi](https://user-images.githubusercontent.com/1153921/110149720-9e0d3280-7d9b-11eb-883d-b1d4d9b9b5e1.png)
-
-## What's next?
-
-So, all in all, with a small little bit of extra set up and a small overhead on the Pi itself, the anomalies collector
-looks like a potentially useful addition to enable unsupervised anomaly detection on your Pi.
-
-See our two-part guide series for a more complete picture of configuring the anomalies collector, plus some best
-practices on using the charts it automatically generates:
-
-- [_Detect anomalies in systems and applications_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/anomaly-detection-python.md)
-- [_Monitor and visualize anomalies with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/visualize-monitor-anomalies.md)
-
-If you're using your Raspberry Pi for other purposes, like blocking ads/trackers with Pi-hole, check out our companions
-Pi guide: [_Monitor Pi-hole (and a Raspberry Pi) with Netdata_](https://github.com/netdata/netdata/blob/master/docs/guides/monitor/pi-hole-raspberry-pi.md).
-
-Once you've had a chance to give unsupervised anomaly detection a go, share your use cases and let us know of any
-feedback on our [community forum](https://community.netdata.cloud/t/anomalies-collector-feedback-megathread/767).  
-
-### Related reference documentation
-
-- [Netdata Agent · Get Netdata](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md)
-- [Netdata Agent · Anomalies collector](https://github.com/netdata/netdata/blob/master/collectors/python.d.plugin/anomalies/README.md)
 
 

@@ -1,5 +1,5 @@
 <!--
-title: "Send notifications to StackPulse"
+title: "StackPulse agent alert notifications"
 description: "Send alerts to your StackPulse Netdata integration any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "StackPulse"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/stackpulse/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Send notifications to StackPulse
+# StackPulse agent alert notifications
 
 [StackPulse](https://stackpulse.com/) is a software-as-a-service platform for site reliability engineering.
 It helps SREs, DevOps Engineers and Software Developers reduce toil and alert fatigue while improving reliability of 
