@@ -952,6 +952,7 @@ AC_CHECK_HEADER(
     [have_nfnetlink_conntrack=no]
 )
 
+LIBS_BAK="${LIBS}"
 LIBS="${LIBS} -lmnl"
 
 PKG_CHECK_MODULES(
@@ -981,6 +982,8 @@ PKG_CHECK_MODULES(
     )],
     [have_libnetfilter_acct=no]
 )
+
+LIBS="${LIBS_BAK}"
 
 test "${enable_plugin_nfacct}" = "yes" -a "${have_nfnetlink_conntrack}" != "yes" && \
     AC_MSG_ERROR([nfnetlink_conntrack.h required but not found or too old])
