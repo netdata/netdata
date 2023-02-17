@@ -2,10 +2,10 @@
 title: "Configure the Netdata Agent"
 description: "Netdata is zero-configuration for most users, but complex infrastructures may require you to tweak some of the Agent's granular settings."
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/configure/nodes.md"
-sidebar_label: "Setup"
+sidebar_label: "Configuration"
 learn_status: "Published"
 learn_topic_type: "Tasks"
-learn_rel_path: "Setup"
+learn_rel_path: "Configuration"
 sidebar_position: 30
 -->
 
