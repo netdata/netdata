@@ -712,6 +712,7 @@ static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_clien
     long      group_time = (group_time_str && *group_time_str)?str2l(group_time_str):0;
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .after = after,
             .before = before,
             .host = host,

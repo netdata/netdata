@@ -2237,6 +2237,7 @@ RRDR *rrd2rrdr_legacy(
         STORAGE_PRIORITY priority) {
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .st = st,
             .points = points,
             .after = after,

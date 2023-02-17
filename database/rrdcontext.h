@@ -26,11 +26,16 @@ typedef struct rrdcontext_acquired RRDCONTEXT_ACQUIRED;
 const char *rrdmetric_acquired_id(RRDMETRIC_ACQUIRED *rma);
 const char *rrdmetric_acquired_name(RRDMETRIC_ACQUIRED *rma);
 NETDATA_DOUBLE rrdmetric_acquired_last_stored_value(RRDMETRIC_ACQUIRED *rma);
+time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma);
+time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma);
+bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria);
 
 const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
+
+bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost
@@ -67,6 +72,7 @@ int rrdcontexts_to_json(RRDHOST *host, BUFFER *wb, time_t after, time_t before, 
 // public API for rrdcontexts
 
 const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca);
+bool rrdcontext_acquired_belongs_to_host(RRDCONTEXT_ACQUIRED *rca, RRDHOST *host);
 
 // ----------------------------------------------------------------------------
 // public API for rrddims
@@ -172,6 +178,8 @@ typedef struct query_metric {
 #define MAX_QUERY_TARGET_ID_LENGTH 255
 
 typedef struct query_target_request {
+    size_t version;
+
     // selecting / filtering metrics to be queried
     RRDHOST *host;                      // the host to be queried (can be NULL, hosts will be used)
     RRDCONTEXT_ACQUIRED *rca;           // the context to be queried (can be NULL)

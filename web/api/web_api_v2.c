@@ -21,7 +21,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
 
     char *hosts = NULL;
     char *contexts = NULL;
-    char *charts = NULL;
+    char *instances = NULL;
     char *dimensions = NULL;
     char *before_str = NULL;
     char *after_str = NULL;
@@ -53,7 +53,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
 
         if(!strcmp(name, "hosts")) hosts = value;
         else if(!strcmp(name, "contexts")) contexts = value;
-        else if(!strcmp(name, "charts")) charts = value;
+        else if(!strcmp(name, "instances")) instances = value;
         else if(!strcmp(name, "dimensions")) dimensions = value;
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
@@ -124,17 +124,6 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET *qt = NULL;
 
-    if(!is_valid_sp(charts) && !is_valid_sp(contexts)) {
-        buffer_sprintf(w->response.data, "No chart or context is given.");
-        goto cleanup;
-    }
-
-    if(charts && !contexts) {
-        // check if this is a specific chart
-        st = rrdset_find(host, charts);
-        if (!st) st = rrdset_find_byname(host, charts);
-    }
-
     long long before = (before_str && *before_str)?str2l(before_str):0;
     long long after  = (after_str  && *after_str) ?str2l(after_str):-600;
     int       points = (points_str && *points_str)?str2i(points_str):0;
@@ -142,13 +131,14 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     long      group_time = (resampling_time_str && *resampling_time_str) ? str2l(resampling_time_str) : 0;
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 2,
             .after = after,
             .before = before,
             .host = (hosts && *hosts) ? NULL : host,
             .st = st,
             .hosts = hosts,
             .contexts = contexts,
-            .charts = charts,
+            .charts = instances,
             .dimensions = dimensions,
             .timeout = timeout,
             .points = points,

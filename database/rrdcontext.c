@@ -384,6 +384,36 @@ const char *rrdcontext_acquired_id(RRDCONTEXT_ACQUIRED *rca) {
     return string2str(rc->id);
 }
 
+bool rrdcontext_acquired_belongs_to_host(RRDCONTEXT_ACQUIRED *rca, RRDHOST *host) {
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return rc->rrdhost == host;
+}
+
+bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    return ri->rc == rc;
+}
+
+bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE_ACQUIRED *ria) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return rm->ri == ri;
+}
+
+time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+    return rm->first_time_s;
+}
+time_t rrdmetric_acquired_last_entry(RRDMETRIC_ACQUIRED *rma) {
+    RRDMETRIC *rm = rrdmetric_acquired_value(rma);
+
+    if(rrd_flag_check(rm, RRD_FLAG_COLLECTED))
+        return 0;
+
+    return rm->last_time_s;
+}
+
 static inline RRDCONTEXT_ACQUIRED *rrdcontext_acquired_dup(RRDCONTEXT_ACQUIRED *rca) {
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     return (RRDCONTEXT_ACQUIRED *)dictionary_acquired_item_dup((DICTIONARY *)rc->rrdhost->rrdctx, (DICTIONARY_ITEM *)rca);
@@ -2695,7 +2725,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
         snprintfz(tier_buffer, 20, "/tier:%zu", qt->request.tier);
 
     if(qt->request.st)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://host:%s/instance:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://hosts:%s/instance:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                   , rrdhost_hostname(qt->request.st->rrdhost)
                   , rrdset_name(qt->request.st)
                   , (qt->request.dimensions) ? qt->request.dimensions : "*"
@@ -2709,7 +2739,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                   , tier_buffer
                   );
     else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://host:%s/context:%s/instance:%s/dimension:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://hosts:%s/context:%s/instance:%s/dimension:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                 , rrdhost_hostname(qt->request.host)
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
@@ -2724,7 +2754,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , tier_buffer
                 );
     else
-        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://host:%s/contexts:%s/instances:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
+        snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://hosts:%s/contexts:%s/instances:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
                 , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.hosts) ? qt->request.hosts : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.charts) ? qt->request.charts : "*"
@@ -2811,10 +2841,21 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         qtl.hosts = rrdhost_hostname(qtl.host);
     }
     else {
+        char uuid[UUID_STR_LEN];
+
         // multi host query
         rrd_rdlock();
         rrdhost_foreach_read(qtl.host) {
-            if(!qt->hosts.pattern || simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(qtl.host)))
+
+            if(!qtl.host->node_id)
+                uuid_unparse_lower(*qtl.host->node_id, uuid);
+            else
+                uuid[0] = '\0';
+
+            if(!qt->hosts.pattern ||
+                simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(qtl.host)) ||
+                simple_pattern_matches(qt->hosts.pattern, qtl.host->machine_guid) ||
+                (*uuid && simple_pattern_matches(qt->hosts.pattern, uuid)))
                 query_target_add_host(&qtl, qtl.host);
         }
         rrd_unlock();

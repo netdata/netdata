@@ -110,6 +110,7 @@ QUERY_VALUE rrdmetric2value(RRDHOST *host,
                             size_t tier, time_t timeout, QUERY_SOURCE query_source, STORAGE_PRIORITY priority
 ) {
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .host = host,
             .rca = rca,
             .ria = ria,

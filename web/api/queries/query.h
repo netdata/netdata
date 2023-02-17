@@ -53,7 +53,7 @@ RRDR_TIME_GROUPING time_grouping_parse(const char *name, RRDR_TIME_GROUPING def)
 const char *time_grouping_tostring(RRDR_TIME_GROUPING group);
 
 typedef enum rrdr_group_by {
-    RRDR_GROUP_BY_UNDEFINED = 0,
+    RRDR_GROUP_BY_NONE = 0,
     RRDR_GROUP_BY_DIMENSION,
     RRDR_GROUP_BY_NODE,
     RRDR_GROUP_BY_INSTANCE,

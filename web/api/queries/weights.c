@@ -477,6 +477,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     NETDATA_DOUBLE *ret = NULL;
 
     QUERY_TARGET_REQUEST qtr = {
+            .version = 1,
             .host = host,
             .rca = rca,
             .ria = ria,
