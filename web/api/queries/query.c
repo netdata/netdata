@@ -659,6 +659,78 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     }
 }
 
+RRDR_GROUP_BY group_by_parse(const char *s) {
+    if(strcmp(s, "dimension") == 0)
+        return RRDR_GROUP_BY_DIMENSION;
+
+    if(strcmp(s, "node") == 0)
+        return RRDR_GROUP_BY_NODE;
+
+    if(strcmp(s, "instance") == 0)
+        return RRDR_GROUP_BY_INSTANCE;
+
+    if(strcmp(s, "label") == 0)
+        return RRDR_GROUP_BY_LABEL;
+
+    return RRDR_GROUP_BY_DIMENSION;
+}
+
+const char *group_by_to_string(RRDR_GROUP_BY group_by) {
+    switch(group_by) {
+        default:
+        case RRDR_GROUP_BY_DIMENSION:
+            return "dimension";
+
+        case RRDR_GROUP_BY_NODE:
+            return "node";
+
+        case RRDR_GROUP_BY_INSTANCE:
+            return "instance";
+
+        case RRDR_GROUP_BY_LABEL:
+            return "label";
+    }
+}
+
+RRDR_GROUP_BY_FUNCTION group_by_function_parse(const char *s) {
+    if(strcmp(s, "sum-count") == 0)
+        return RRDR_GROUP_BY_FUNCTION_SUM_COUNT;
+
+    if(strcmp(s, "average") == 0)
+        return RRDR_GROUP_BY_FUNCTION_AVERAGE;
+
+    if(strcmp(s, "min") == 0)
+        return RRDR_GROUP_BY_FUNCTION_MIN;
+
+    if(strcmp(s, "max") == 0)
+        return RRDR_GROUP_BY_FUNCTION_MAX;
+
+    if(strcmp(s, "sum") == 0)
+        return RRDR_GROUP_BY_FUNCTION_SUM;
+
+    return RRDR_GROUP_BY_FUNCTION_AVERAGE;
+}
+
+const char *group_by_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function) {
+    switch(group_by_function) {
+        default:
+        case RRDR_GROUP_BY_FUNCTION_AVERAGE:
+            return "average";
+
+        case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
+            return "sum-count";
+
+        case RRDR_GROUP_BY_FUNCTION_MIN:
+            return "min";
+
+        case RRDR_GROUP_BY_FUNCTION_MAX:
+            return "max";
+
+        case RRDR_GROUP_BY_FUNCTION_SUM:
+            return "sum";
+    }
+}
+
 // ----------------------------------------------------------------------------
 // helpers to find our way in RRDR
 

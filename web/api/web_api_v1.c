@@ -565,18 +565,8 @@ inline int web_client_api_request_v1_chart(RRDHOST *host, struct web_client *w, 
     return web_client_api_request_single_chart(host, w, url, rrd_stats_api_v1_chart);
 }
 
-void fix_google_param(char *s) {
-    if(unlikely(!s)) return;
-
-    for( ; *s ;s++) {
-        if(!isalnum(*s) && *s != '.' && *s != '_' && *s != '-')
-            *s = '_';
-    }
-}
-
-
 // returns the HTTP code
-inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
+static inline int web_client_api_request_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     debug(D_WEB_CLIENT, "%llu: API v1 data with URL '%s'", w->id, url);
 
     int ret = HTTP_RESP_BAD_REQUEST;
@@ -1528,12 +1518,7 @@ int web_client_api_request_v1_dbengine_stats(RRDHOST *host __maybe_unused, struc
 #define ACL_DEV_OPEN_ACCESS 0
 #endif
 
-static struct api_command {
-    const char *command;
-    uint32_t hash;
-    WEB_CLIENT_ACL acl;
-    int (*callback)(RRDHOST *host, struct web_client *w, char *url);
-} api_commands[] = {
+static struct web_api_command api_commands_v1[] = {
         { "info",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_info                       },
         { "data",            0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_data                       },
         { "chart",           0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_chart                      },
@@ -1555,8 +1540,8 @@ static struct api_command {
         { "allmetrics",      0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_allmetrics                },
 
 #if defined(ENABLE_ML)
-      { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
-      { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
+        { "ml_info",         0, WEB_CLIENT_ACL_DASHBOARD | WEB_CLIENT_ACL_ACLK, web_client_api_request_v1_ml_info            },
+        { "ml_models",       0, WEB_CLIENT_ACL_DASHBOARD, web_client_api_request_v1_ml_models          },
 #endif
 
         { "manage/health",       0, WEB_CLIENT_ACL_MGMT | WEB_CLIENT_ACL_ACLK,      web_client_api_request_v1_mgmt_health           },
@@ -1575,38 +1560,13 @@ static struct api_command {
 
 inline int web_client_api_request_v1(RRDHOST *host, struct web_client *w, char *url) {
     static int initialized = 0;
-    int i;
 
     if(unlikely(initialized == 0)) {
         initialized = 1;
 
-        for(i = 0; api_commands[i].command ; i++)
-            api_commands[i].hash = simple_hash(api_commands[i].command);
+        for(int i = 0; api_commands_v1[i].command ; i++)
+            api_commands_v1[i].hash = simple_hash(api_commands_v1[i].command);
     }
 
-    // get the command
-    if(url) {
-        debug(D_WEB_CLIENT, "%llu: Searching for API v1 command '%s'.", w->id, url);
-        uint32_t hash = simple_hash(url);
-
-        for(i = 0; api_commands[i].command ;i++) {
-            if(unlikely(hash == api_commands[i].hash && !strcmp(url, api_commands[i].command))) {
-                if(unlikely(api_commands[i].acl != WEB_CLIENT_ACL_NOCHECK) &&  !(w->acl & api_commands[i].acl))
-                    return web_client_permission_denied(w);
-
-                //return api_commands[i].callback(host, w, url);
-                return api_commands[i].callback(host, w, (w->decoded_query_string + 1));
-            }
-        }
-
-        buffer_flush(w->response.data);
-        buffer_strcat(w->response.data, "Unsupported v1 API command: ");
-        buffer_strcat_htmlescape(w->response.data, url);
-        return HTTP_RESP_NOT_FOUND;
-    }
-    else {
-        buffer_flush(w->response.data);
-        buffer_sprintf(w->response.data, "Which API v1 command?");
-        return HTTP_RESP_BAD_REQUEST;
-    }
+    return web_client_api_request_vX(host, w, url, api_commands_v1);
 }

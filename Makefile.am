@@ -628,8 +628,12 @@ API_PLUGIN_FILES = \
     web/api/formatters/rrdset2json.h \
     web/api/health/health_cmdapi.c \
     web/api/health/health_cmdapi.h \
+    web/api/web_api.c \
+    web/api/web_api.h \
     web/api/web_api_v1.c \
     web/api/web_api_v1.h \
+    web/api/web_api_v2.c \
+    web/api/web_api_v2.h \
     $(NULL)
 
 STREAMING_PLUGIN_FILES = \

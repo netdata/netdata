@@ -54,10 +54,14 @@ const char *time_grouping_tostring(RRDR_TIME_GROUPING group);
 
 typedef enum rrdr_group_by {
     RRDR_GROUP_BY_UNDEFINED = 0,
+    RRDR_GROUP_BY_DIMENSION,
     RRDR_GROUP_BY_NODE,
     RRDR_GROUP_BY_INSTANCE,
     RRDR_GROUP_BY_LABEL,
 } RRDR_GROUP_BY;
+
+RRDR_GROUP_BY group_by_parse(const char *s);
+const char *group_by_to_string(RRDR_GROUP_BY group_by);
 
 typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_AVERAGE,
@@ -66,6 +70,9 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_SUM,
     RRDR_GROUP_BY_FUNCTION_SUM_COUNT,
 } RRDR_GROUP_BY_FUNCTION;
+
+RRDR_GROUP_BY_FUNCTION group_by_function_parse(const char *s);
+const char *group_by_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
 
 #ifdef __cplusplus
 }
