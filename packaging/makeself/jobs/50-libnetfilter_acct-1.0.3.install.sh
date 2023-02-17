@@ -12,7 +12,7 @@ version="1.0.3"
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::building libnetfilter_acct" || true
 
-export CFLAGS="-I/usr/include/libmnl -pipe"
+export CFLAGS="-static -I/usr/include/libmnl -pipe"
 export LDFLAGS="-static -L/usr/lib -lmnl"
 export PKG_CONFIG="pkg-config --static"
 export PKG_CONFIG_PATH="/usr/lib/pkgconfig"
@@ -24,9 +24,8 @@ fetch "libnetfilter_acct-${version}" "https://www.netfilter.org/projects/libnetf
 if [ "${CACHE_HIT:-0}" -eq 0 ]; then
     run ./configure \
         --prefix="/libnetfilter-acct-static" \
-        --disable-dependency-tracking \
-        --enable-static
-    
+        --exec-prefix="/libnetfilter-acct-static"
+
     run make clean
     run make -j "$(nproc)" 
 fi
