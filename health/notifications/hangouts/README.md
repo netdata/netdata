@@ -1,5 +1,5 @@
 <!--
-title: "Send notifications to Google Hangouts"
+title: "Google Hangouts agent alert notifications"
 description: "Send alerts to Send notifications to Google Hangouts any time an anomaly or performance issue strikes a node in your infrastructure."
 sidebar_label: "Google Hangouts"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/hangouts/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Send notifications to Google Hangouts
+# Google Hangouts agent alert notifications
 
 [Google Hangouts](https://hangouts.google.com/) is a cross-platform messaging app developed by Google. You can configure
 Netdata to send alarm notifications to a Hangouts room in order to stay aware of possible health or performance issues

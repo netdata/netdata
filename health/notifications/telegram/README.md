@@ -1,5 +1,5 @@
 <!--
-title: "Telegram"
+title: "Telegram agent alert notifications"
 sidebar_label: "Telegram"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/telegram/README.md"
 learn_status: "Published"
@@ -8,7 +8,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Telegram
+# Telegram agent alert notifications
 
 [Telegram](https://telegram.org/) is a messaging app with a focus on speed and security, it’s super-fast, simple and free. You can use Telegram on all your devices at the same time — your messages sync seamlessly across any number of your phones, tablets or computers.
 

@@ -1,5 +1,5 @@
 <!--
-title: "Amazon SNS"
+title: "Amazon SNS agent alert notifications"
 sidebar_label: "Amazon SNS"
 description: "hello"
 custom_edit_url: "https://github.com/netdata/netdata/edit/master/health/notifications/awssns/README.md"
@@ -9,7 +9,7 @@ learn_rel_path: "Integrations/Notify/Agent alert notifications"
 learn_autogeneration_metadata: "{'part_of_cloud': False, 'part_of_agent': True}"
 -->
 
-# Amazon SNS
+# Amazon SNS agent alert notifications
 
 As part of its AWS suite, Amazon provides a notification broker service called 'Simple Notification Service' (SNS). Amazon SNS works similarly to Netdata's own notification system, allowing to dispatch a single notification to multiple subscribers of different types. While Amazon SNS supports sending differently formatted messages for different delivery methods, Netdata does not currently support this functionality.
 Among other things, SNS supports sending notifications to:
