@@ -401,6 +401,10 @@ bool rrdmetric_acquired_belongs_to_instance(RRDMETRIC_ACQUIRED *rma, RRDINSTANCE
     return rm->ri == ri;
 }
 
+time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return ri->update_every_s;
+}
 time_t rrdmetric_acquired_first_entry(RRDMETRIC_ACQUIRED *rma) {
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
     return rm->first_time_s;

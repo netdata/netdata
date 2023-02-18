@@ -36,6 +36,7 @@ DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 
 bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
+time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
 
 // ----------------------------------------------------------------------------
 // public API for rrdhost

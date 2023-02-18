@@ -55,6 +55,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         else if(!strcmp(name, "contexts")) contexts = value;
         else if(!strcmp(name, "instances")) instances = value;
         else if(!strcmp(name, "dimensions")) dimensions = value;
+            // else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
+        else if(!strcmp(name, "labels")) chart_labels_filter = value;
         else if(!strcmp(name, "after")) after_str = value;
         else if(!strcmp(name, "before")) before_str = value;
         else if(!strcmp(name, "points")) points_str = value;
@@ -65,10 +67,8 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
         else if(!strcmp(name, "options")) options |= web_client_api_request_v1_data_options(value);
         else if(!strcmp(name, "time_group")) time_group = time_grouping_parse(value, RRDR_GROUPING_AVERAGE);
         else if(!strcmp(name, "time_group_options")) time_group_options = value;
-        else if(!strcmp(name, "resampling_time")) resampling_time_str = value;
+        else if(!strcmp(name, "time_resampling")) resampling_time_str = value;
         else if(!strcmp(name, "tier")) tier_str = value;
-        else if(!strcmp(name, "chart_label_key")) chart_label_key = value;
-        else if(!strcmp(name, "chart_labels_filter")) chart_labels_filter = value;
         else if(!strcmp(name, "callback")) responseHandler = value;
         else if(!strcmp(name, "filename")) outFileName = value;
         else if(!strcmp(name, "tqx")) {
