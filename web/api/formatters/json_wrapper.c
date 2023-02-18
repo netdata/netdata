@@ -569,8 +569,15 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
                             buffer_json_member_add_time_t(wb, "first_entry", first_entry_s);
                             buffer_json_member_add_time_t(wb, "last_entry", last_entry_s ? last_entry_s : now_s);
 
-                            if(qm && options & RRDR_OPTION_SHOW_PLAN)
-                                jsonwrap_query_metric_plan(wb, qm);
+                            if(qm) {
+                                if(qm->dimension.options & RRDR_DIMENSION_GROUPED) {
+                                    // buffer_json_member_add_string(wb, "grouped_as_id", string2str(qm->grouped_as.id));
+                                    buffer_json_member_add_string(wb, "grouped_as", string2str(qm->grouped_as.name));
+                                }
+
+                                if(options & RRDR_OPTION_SHOW_PLAN)
+                                    jsonwrap_query_metric_plan(wb, qm);
+                            }
                         }
                         buffer_json_object_close(wb); // metric
                     }

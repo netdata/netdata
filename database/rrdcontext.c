@@ -2517,6 +2517,10 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             }
             QUERY_METRIC *qm = &qt->query.array[qt->query.used++];
 
+            qm->grouped_as.slot = 0;
+            qm->grouped_as.id = NULL;
+            qm->grouped_as.name = NULL;
+
             qm->plan.used = 0;
             qm->dimension.options = options;
 

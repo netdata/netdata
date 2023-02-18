@@ -2268,7 +2268,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     // qt.window members are the WANTED ones.
     // qt.request members are the REQUESTED ones.
 
-    RRDR *r = rrdr_create(owa, qt);
+    RRDR *r = rrdr_create(owa, qt, qt->query.used, qt->window.points);
     if(unlikely(!r)) {
         internal_error(true, "QUERY: cannot create RRDR for %s, after=%ld, before=%ld, points=%zu",
                        qt->id, qt->window.after, qt->window.before, qt->window.points);
@@ -2347,6 +2347,8 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
+            r->di[c] = string_dup(qt->query.array[c].dimension.id);
+            r->dn[c] = string_dup(qt->query.array[c].dimension.name);
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
         else

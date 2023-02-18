@@ -58,7 +58,8 @@ typedef enum rrdr_dimension_flag {
     RRDR_DIMENSION_DEFAULT  = 0x00,
     RRDR_DIMENSION_HIDDEN   = 0x04, // the dimension is hidden (not to be presented to callers)
     RRDR_DIMENSION_NONZERO  = 0x08, // the dimension is non zero (contains non-zero values)
-    RRDR_DIMENSION_QUERIED = 0x10, // the dimension is selected for evaluation in this RRDR
+    RRDR_DIMENSION_QUERIED  = 0x10, // the dimension is selected for evaluation in this RRDR
+    RRDR_DIMENSION_GROUPED  = 0x20, // the dimension has been grouped in this RRDR
 } RRDR_DIMENSION_FLAGS;
 
 // RRDR result options
@@ -80,10 +81,14 @@ typedef struct rrdresult {
 
     RRDR_DIMENSION_FLAGS *od; // the options for the dimensions
 
+    STRING **di;              // array of d dimension names
+    STRING **dn;              // array of d dimension names
+
     time_t *t;                // array of n timestamps
     NETDATA_DOUBLE *v;        // array n x d values
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
+    uint32_t *gbc;            // array n x d of group by count
 
     size_t group;             // how many collected values were grouped for each row
     time_t update_every;      // what is the suggested update frequency in seconds
@@ -130,7 +135,7 @@ typedef struct rrdresult {
 
 #include "database/rrd.h"
 void rrdr_free(ONEWAYALLOC *owa, RRDR *r);
-RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt);
+RRDR *rrdr_create(ONEWAYALLOC *owa, struct query_target *qt, size_t dimensions, size_t points);
 
 #include "../web_api_v1.h"
 #include "web/api/queries/query.h"

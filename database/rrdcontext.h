@@ -174,6 +174,12 @@ typedef struct query_metric {
         STRING *name;
     } chart;
 
+    struct {
+        size_t slot;
+        STRING *id;
+        STRING *name;
+    } grouped_as;
+
 } QUERY_METRIC;
 
 #define MAX_QUERY_TARGET_ID_LENGTH 255

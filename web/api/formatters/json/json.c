@@ -104,9 +104,8 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
     // -------------------------------------------------------------------------
     // print the JSON header
 
-    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
-    const long used = qt->query.used;
+    const long used = (long)r->d;
 
     // print the header lines
     for(c = 0, i = 0; c < used ; c++) {
@@ -114,7 +113,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             continue;
 
         buffer_fast_strcat(wb, pre_label, pre_label_len);
-        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
+        buffer_strcat(wb, string2str(r->dn[c]));
         buffer_fast_strcat(wb, post_label, post_label_len);
         i++;
     }
@@ -247,7 +246,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             buffer_fast_strcat(wb, pre_value, pre_value_len);
 
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
-                buffer_sprintf(wb, "%s%s%s: ", kq, string2str(qt->query.array[c].dimension.name), kq);
+                buffer_sprintf(wb, "%s%s%s: ", kq, string2str(r->dn[c]), kq);
 
             if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))

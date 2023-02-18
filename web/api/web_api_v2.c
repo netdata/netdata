@@ -35,7 +35,7 @@ static inline int web_client_api_request_v2_data(RRDHOST *host, struct web_clien
     char *group_by_key = NULL;
     size_t tier = 0;
     RRDR_TIME_GROUPING time_group = RRDR_GROUPING_AVERAGE;
-    RRDR_GROUP_BY group_by = RRDR_GROUP_BY_DIMENSION;
+    RRDR_GROUP_BY group_by = RRDR_GROUP_BY_NONE;
     RRDR_GROUP_BY_FUNCTION group_by_function = RRDR_GROUP_BY_FUNCTION_AVERAGE;
     DATASOURCE_FORMAT format = DATASOURCE_JSON;
     RRDR_OPTIONS options = 0;

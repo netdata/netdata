@@ -144,6 +144,191 @@ cleanup:
     return ret;
 }
 
+struct group_by_entry {
+    STRING *id;
+    STRING *name;
+};
+
+RRDR *data_query_group_by(RRDR *r) {
+    QUERY_TARGET *qt = r->internal.qt;
+    RRDR_OPTIONS options = qt->request.options;
+    size_t used = qt->query.used;
+    size_t rows = rrdr_rows(r);
+
+    if(qt->request.group_by == RRDR_GROUP_BY_NONE || !rows)
+        return r;
+
+    struct group_by_entry *entries = onewayalloc_callocz(r->internal.owa, qt->query.used, sizeof(struct group_by_entry));
+    DICTIONARY *groups = dictionary_create(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE);
+
+    int added = 0;
+    STRING *unset = string_strdupz("[unset]");
+    for(size_t c = 0; c < used ;c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        int pos = -1, *set;
+        QUERY_METRIC *qm = &qt->query.array[c];
+
+        switch(qt->request.group_by) {
+            default:
+            case RRDR_GROUP_BY_DIMENSION:
+                set = dictionary_set(groups, string2str(qm->dimension.id), &pos, sizeof(int));
+                if(*set == -1) {
+                    *set = pos = added++;
+                    entries[pos].id = string_dup(qm->dimension.id);
+                    entries[pos].name = string_dup(qm->dimension.name);
+                }
+                else
+                    pos = *set;
+                break;
+
+            case RRDR_GROUP_BY_INSTANCE:
+                set = dictionary_set(groups, string2str(qm->chart.id), &pos, sizeof(int));
+                if(*set == -1) {
+                    *set = pos = added++;
+                    entries[pos].id = string_dup(qm->chart.id);
+                    entries[pos].name = string_dup(qm->chart.name);
+                }
+                else
+                    pos = *set;
+                break;
+
+            case RRDR_GROUP_BY_NODE:
+                set = dictionary_set(groups, qm->link.host->machine_guid, &pos, sizeof(int));
+                if(*set == -1) {
+                    *set = pos = added++;
+                    entries[pos].id = string_strdupz(qm->link.host->machine_guid);
+                    entries[pos].name = string_dup(qm->link.host->hostname);
+                }
+                else
+                    pos = *set;
+                break;
+
+            case RRDR_GROUP_BY_LABEL: {
+                DICTIONARY *labels = rrdinstance_acquired_labels(qm->link.ria);
+                STRING *s = rrdlabels_get_value_string_dup(labels, qt->request.group_by_key);
+                if(!s)
+                    s = string_dup(unset);
+
+                set = dictionary_set(groups, string2str(s), &pos, sizeof(int));
+                if(*set == -1) {
+                    *set = pos = added++;
+                    entries[pos].id = s;
+                    entries[pos].name = string_dup(entries[pos].id);
+                }
+                else {
+                    pos = *set;
+                    string_freez(s);
+                }
+            }
+        }
+
+        qm->grouped_as.slot = pos;
+        qm->grouped_as.id = entries[pos].id;
+        qm->grouped_as.name = entries[pos].name;
+        qm->dimension.options |= RRDR_DIMENSION_GROUPED;
+    }
+
+    RRDR *r2 = rrdr_create(r->internal.owa, qt, added, rows);
+    if(!r2)
+        goto cleanup;
+
+    r->gbc = onewayalloc_callocz(r->internal.owa, r->n * r->d, sizeof(uint32_t));
+
+    for(size_t c = 0; c < used ;c++) {
+        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
+            continue;
+
+        QUERY_METRIC *qm = &qt->query.array[c];
+        size_t c2 = qm->grouped_as.slot;
+
+        r2->od[c2] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
+        r2->di[c2] = qm->grouped_as.id;
+        r2->dn[c2] = qm->grouped_as.name;
+    }
+
+    for(size_t i = 0; i != rows ;i++) {
+        RRDR_VALUE_FLAGS *co2 = &r->o[i * r->d];
+
+        // copy the timestamp
+        r2->t[i] = r->t[i];
+
+        for (size_t c = 0; c < used; c++)
+            co2[c] = RRDR_VALUE_EMPTY;
+    }
+
+    for(size_t i = 0; i != rows ;i++) {
+        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
+        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
+
+        NETDATA_DOUBLE *cn2 = &r->v[ i * r->d ];
+        RRDR_VALUE_FLAGS *co2 = &r->o[ i * r->d ];
+        uint32_t *gbc2 = &r->gbc[ i * r->d ];
+
+        for(size_t c = 0; c < used ;c++) {
+            if (!rrdr_dimension_should_be_exposed(r->od[c], options))
+                continue;
+
+            NETDATA_DOUBLE n = cn[c];
+            RRDR_VALUE_FLAGS o = co[c];
+
+            if(o & RRDR_VALUE_EMPTY) {
+                if(options & RRDR_OPTION_NULL2ZERO)
+                    n = 0.0;
+                else
+                    continue;
+            }
+
+            if(unlikely((options & RRDR_OPTION_ABSOLUTE) && n < 0))
+                n = -n;
+
+            QUERY_METRIC *qm = &qt->query.array[c];
+            size_t c2 = qm->grouped_as.slot;
+
+            switch(qt->request.group_by_function) {
+                default:
+                case RRDR_GROUP_BY_FUNCTION_AVERAGE:
+                case RRDR_GROUP_BY_FUNCTION_SUM:
+                case RRDR_GROUP_BY_FUNCTION_SUM_COUNT:
+                    cn2[c2] += n;
+                    break;
+
+                case RRDR_GROUP_BY_FUNCTION_MIN:
+                    if(n < cn2[c2])
+                        cn2[c2] = n;
+                    break;
+
+                case RRDR_GROUP_BY_FUNCTION_MAX:
+                    if(n > cn2[c2])
+                        cn2[c2] = n;
+                    break;
+            }
+
+            co2[c2] &= ~RRDR_VALUE_EMPTY;
+
+            if(o & RRDR_VALUE_RESET)
+                co2[c2] |= RRDR_VALUE_RESET;
+
+            gbc2[c2]++;
+        }
+    }
+
+    r2->rows = rows;
+
+cleanup:
+    string_freez(unset);
+    if(!r2 && entries && added) {
+        for(long c = 0; c < added ;c++) {
+            string_freez(entries[c].id);
+            string_freez(entries[c].name);
+        }
+    }
+    onewayalloc_freez(r->internal.owa, entries);
+
+    return r2;
+}
+
 int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *latest_timestamp) {
     wrapper_begin_t wrapper_begin = rrdr_json_wrapper_begin;
     wrapper_end_t wrapper_end = rrdr_json_wrapper_end;
@@ -151,28 +336,30 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
     if(qt->request.version == 2)
         wrapper_begin = rrdr_json_wrapper_begin2;
 
-    RRDR *r = rrd2rrdr(owa, qt);
-    if(!r) {
+    RRDR *r1 = rrd2rrdr(owa, qt);
+    if(!r1) {
         buffer_strcat(wb, "Cannot generate output with these parameters on this chart.");
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    if (r->result_options & RRDR_RESULT_OPTION_CANCEL) {
-        rrdr_free(owa, r);
+    if (r1->result_options & RRDR_RESULT_OPTION_CANCEL) {
+        rrdr_free(owa, r1);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if(r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+    if(r1->result_options & RRDR_RESULT_OPTION_RELATIVE)
         buffer_no_cacheable(wb);
-    else if(r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+    else if(r1->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
         buffer_cacheable(wb);
 
-    if(latest_timestamp && rrdr_rows(r) > 0)
-        *latest_timestamp = r->before;
+    if(latest_timestamp && rrdr_rows(r1) > 0)
+        *latest_timestamp = r1->before;
 
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->request.options;
     RRDR_TIME_GROUPING group_method = qt->request.time_group_method;
+
+    RRDR *r = data_query_group_by(r1);
 
     switch(format) {
     case DATASOURCE_SSV:
@@ -341,6 +528,9 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         break;
     }
 
-    rrdr_free(owa, r);
+    if(r != r1)
+        rrdr_free(owa, r);
+
+    rrdr_free(owa, r1);
     return HTTP_RESP_OK;
 }

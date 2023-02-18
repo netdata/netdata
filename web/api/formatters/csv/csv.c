@@ -5,9 +5,8 @@
 
 void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const char *startline, const char *separator, const char *endline, const char *betweenlines) {
     //info("RRD2CSV(): %s: BEGIN", r->st->id);
-    QUERY_TARGET *qt = r->internal.qt;
     long c, i;
-    const long used = qt->query.used;
+    const long used = (long)r->d;
 
     // print the csv header
     for(c = 0, i = 0; c < used ; c++) {
@@ -22,7 +21,7 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         }
         buffer_strcat(wb, separator);
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
-        buffer_strcat(wb, string2str(qt->query.array[c].dimension.name));
+        buffer_strcat(wb, string2str(r->dn[c]));
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }
