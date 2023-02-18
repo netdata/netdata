@@ -6,6 +6,13 @@
 
 **Merged pull requests:**
 
+- Fix kickstart link [\#14559](https://github.com/netdata/netdata/pull/14559) ([cakrit](https://github.com/cakrit))
+- Make secure nodes a category landing page [\#14558](https://github.com/netdata/netdata/pull/14558) ([cakrit](https://github.com/cakrit))
+- Add misc landing page and move proxy guides [\#14557](https://github.com/netdata/netdata/pull/14557) ([cakrit](https://github.com/cakrit))
+- Reorg learn 021723 [\#14556](https://github.com/netdata/netdata/pull/14556) ([cakrit](https://github.com/cakrit))
+- Update email notification docs with info about setup in Docker. [\#14555](https://github.com/netdata/netdata/pull/14555) ([Ferroin](https://github.com/Ferroin))
+- Fix broken links in integrations-overview [\#14554](https://github.com/netdata/netdata/pull/14554) ([Ancairon](https://github.com/Ancairon))
+- More reorg learn 021623 [\#14550](https://github.com/netdata/netdata/pull/14550) ([cakrit](https://github.com/cakrit))
 - Update learn path of python plugin readme [\#14549](https://github.com/netdata/netdata/pull/14549) ([cakrit](https://github.com/cakrit))
 - Hide netdata for IoT from learn. [\#14548](https://github.com/netdata/netdata/pull/14548) ([cakrit](https://github.com/cakrit))
 - Reorg markdown files for learn [\#14547](https://github.com/netdata/netdata/pull/14547) ([cakrit](https://github.com/cakrit))
@@ -13,6 +20,7 @@
 - Add renamed markdown files [\#14540](https://github.com/netdata/netdata/pull/14540) ([cakrit](https://github.com/cakrit))
 - Fix broken svgs and improve database queries API doc [\#14539](https://github.com/netdata/netdata/pull/14539) ([cakrit](https://github.com/cakrit))
 - Reorganize learn documents under Integrations part 2 [\#14538](https://github.com/netdata/netdata/pull/14538) ([cakrit](https://github.com/cakrit))
+- Roles docs: Add Early Bird and Member role [\#14537](https://github.com/netdata/netdata/pull/14537) ([hugovalente-pm](https://github.com/hugovalente-pm))
 - Fix broken Alma Linux entries in build matrix generation. [\#14536](https://github.com/netdata/netdata/pull/14536) ([Ferroin](https://github.com/Ferroin))
 - Use BoxListItemRegexLink component in docs/quickstart/insfrastructure.md [\#14533](https://github.com/netdata/netdata/pull/14533) ([Ancairon](https://github.com/Ancairon))
 - Update main metric retention docs [\#14530](https://github.com/netdata/netdata/pull/14530) ([cakrit](https://github.com/cakrit))
@@ -377,12 +385,6 @@
 - enable dbengine tiering by default [\#13914](https://github.com/netdata/netdata/pull/13914) ([ktsaou](https://github.com/ktsaou))
 - bump go.d.plugin to v0.42.0 [\#13913](https://github.com/netdata/netdata/pull/13913) ([ilyam8](https://github.com/ilyam8))
 - do not free hosts if a change on db mode is not needed [\#13912](https://github.com/netdata/netdata/pull/13912) ([ktsaou](https://github.com/ktsaou))
-- timeframe matching should take into account the update frequency of the chart [\#13911](https://github.com/netdata/netdata/pull/13911) ([ktsaou](https://github.com/ktsaou))
-- WMI Process \(Dashboard, Documentation\) [\#13910](https://github.com/netdata/netdata/pull/13910) ([thiagoftsm](https://github.com/thiagoftsm))
-- feat\(packaging\): add CAP\_NET\_RAW to go.d.plugin [\#13909](https://github.com/netdata/netdata/pull/13909) ([ilyam8](https://github.com/ilyam8))
-- Reference the bash collector for RPi [\#13907](https://github.com/netdata/netdata/pull/13907) ([cakrit](https://github.com/cakrit))
-- Improve intro paragraph [\#13906](https://github.com/netdata/netdata/pull/13906) ([cakrit](https://github.com/cakrit))
-- bump go.d.plugin v0.41.2 [\#13903](https://github.com/netdata/netdata/pull/13903) ([ilyam8](https://github.com/ilyam8))
 
 ## [v1.36.1](https://github.com/netdata/netdata/tree/v1.36.1) (2022-08-15)
 
