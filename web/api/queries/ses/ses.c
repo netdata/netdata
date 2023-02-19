@@ -29,13 +29,13 @@ static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_ses *g) {
     (void)g;
 
     NETDATA_DOUBLE points;
-    if(r->group == 1) {
+    if(r->view.group == 1) {
         // provide a running DES
-        points = (NETDATA_DOUBLE)r->internal.points_wanted;
+        points = (NETDATA_DOUBLE)r->grouping.points_wanted;
     }
     else {
         // provide a SES with flush points
-        points = (NETDATA_DOUBLE)r->group;
+        points = (NETDATA_DOUBLE)r->view.group;
     }
 
     return (points > (NETDATA_DOUBLE)max_window_size) ? (NETDATA_DOUBLE)max_window_size : points;
@@ -52,24 +52,24 @@ void grouping_create_ses(RRDR *r, const char *options __maybe_unused) {
     struct grouping_ses *g = (struct grouping_ses *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_ses));
     set_alpha(r, g);
     g->level = 0.0;
-    r->internal.grouping_data = g;
+    r->grouping.data = g;
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_ses(RRDR *r) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+    struct grouping_ses *g = (struct grouping_ses *)r->grouping.data;
     g->level = 0.0;
     g->count = 0;
 }
 
 void grouping_free_ses(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_ses(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+    struct grouping_ses *g = (struct grouping_ses *)r->grouping.data;
 
     if(unlikely(!g->count))
         g->level = value;
@@ -79,7 +79,7 @@ void grouping_add_ses(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_ses(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_ses *g = (struct grouping_ses *)r->internal.grouping_data;
+    struct grouping_ses *g = (struct grouping_ses *)r->grouping.data;
 
     if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;

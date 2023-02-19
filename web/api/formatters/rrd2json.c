@@ -105,15 +105,15 @@ int rrdset2value_api_v1(
     }
 
     if(db_points_read)
-        *db_points_read += r->internal.db_points_read;
+        *db_points_read += r->stats.db_points_read;
 
     if(db_points_per_tier) {
         for(size_t t = 0; t < storage_tiers ;t++)
-            db_points_per_tier[t] += r->internal.tier_points_read[t];
+            db_points_per_tier[t] += r->stats.tier_points_read[t];
     }
 
     if(result_points_generated)
-        *result_points_generated += r->internal.result_points_generated;
+        *result_points_generated += r->stats.result_points_generated;
 
     if(rrdr_rows(r) == 0) {
         if(db_after)  *db_after  = 0;
@@ -125,14 +125,14 @@ int rrdset2value_api_v1(
     }
 
     if(wb) {
-        if (r->result_options & RRDR_RESULT_OPTION_RELATIVE)
+        if (r->view.flags & RRDR_RESULT_FLAG_RELATIVE)
             buffer_no_cacheable(wb);
-        else if (r->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+        else if (r->view.flags & RRDR_RESULT_FLAG_ABSOLUTE)
             buffer_cacheable(wb);
     }
 
-    if(db_after)  *db_after  = r->after;
-    if(db_before) *db_before = r->before;
+    if(db_after)  *db_after  = r->view.after;
+    if(db_before) *db_before = r->view.before;
 
     long i = (!(options & RRDR_OPTION_REVERSED))?(long)rrdr_rows(r) - 1:0;
     *n = rrdr2value(r, i, options, value_is_null, anomaly_rate);
@@ -152,7 +152,6 @@ struct group_by_entry {
 RRDR *data_query_group_by(RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->request.options;
-    size_t used = qt->query.used;
     size_t rows = rrdr_rows(r);
 
     if(qt->request.group_by == RRDR_GROUP_BY_NONE || !rows)
@@ -163,7 +162,7 @@ RRDR *data_query_group_by(RRDR *r) {
 
     int added = 0;
     STRING *unset = string_strdupz("[unset]");
-    for(size_t c = 0; c < used ;c++) {
+    for(size_t c = 0; c < qt->query.used ;c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
@@ -234,39 +233,30 @@ RRDR *data_query_group_by(RRDR *r) {
     if(!r2)
         goto cleanup;
 
-    r->gbc = onewayalloc_callocz(r->internal.owa, r->n * r->d, sizeof(uint32_t));
+    r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(uint32_t));
 
-    for(size_t c = 0; c < used ;c++) {
-        if(!rrdr_dimension_should_be_exposed(r->od[c], options))
-            continue;
-
-        QUERY_METRIC *qm = &qt->query.array[c];
-        size_t c2 = qm->grouped_as.slot;
-
-        r2->od[c2] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
-        r2->di[c2] = qm->grouped_as.id;
-        r2->dn[c2] = qm->grouped_as.name;
+    for(size_t c = 0; c < (size_t)added ;c++) {
+        r2->od[c] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
+        r2->di[c] = entries[c].id;
+        r2->dn[c] = entries[c].name;
     }
 
     for(size_t i = 0; i != rows ;i++) {
-        RRDR_VALUE_FLAGS *co2 = &r->o[i * r->d];
 
         // copy the timestamp
         r2->t[i] = r->t[i];
 
-        for (size_t c = 0; c < used; c++)
-            co2[c] = RRDR_VALUE_EMPTY;
-    }
-
-    for(size_t i = 0; i != rows ;i++) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
 
-        NETDATA_DOUBLE *cn2 = &r->v[ i * r->d ];
-        RRDR_VALUE_FLAGS *co2 = &r->o[ i * r->d ];
-        uint32_t *gbc2 = &r->gbc[ i * r->d ];
+        NETDATA_DOUBLE *cn2 = &r2->v[ i * r2->d ];
+        RRDR_VALUE_FLAGS *co2 = &r2->o[ i * r2->d ];
+        uint32_t *gbc2 = &r2->gbc[ i * r2->d ];
 
-        for(size_t c = 0; c < used ;c++) {
+        for (size_t c = 0; c < r2->d; c++)
+            co2[c] = RRDR_VALUE_EMPTY;
+
+        for(size_t c = 0; c < r->d ;c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
                 continue;
 
@@ -285,6 +275,8 @@ RRDR *data_query_group_by(RRDR *r) {
 
             QUERY_METRIC *qm = &qt->query.array[c];
             size_t c2 = qm->grouped_as.slot;
+
+            internal_fatal(c2 >= r2->d, "QUERY GROUP BY: wrong slot");
 
             switch(qt->request.group_by_function) {
                 default:
@@ -314,6 +306,8 @@ RRDR *data_query_group_by(RRDR *r) {
         }
     }
 
+    r2->view = r->view;
+    r2->stats = r->stats;
     r2->rows = rows;
 
 cleanup:
@@ -342,18 +336,18 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
     }
 
-    if (r1->result_options & RRDR_RESULT_OPTION_CANCEL) {
+    if (r1->view.flags & RRDR_RESULT_FLAG_CANCEL) {
         rrdr_free(owa, r1);
         return HTTP_RESP_BACKEND_FETCH_FAILED;
     }
 
-    if(r1->result_options & RRDR_RESULT_OPTION_RELATIVE)
+    if(r1->view.flags & RRDR_RESULT_FLAG_RELATIVE)
         buffer_no_cacheable(wb);
-    else if(r1->result_options & RRDR_RESULT_OPTION_ABSOLUTE)
+    else if(r1->view.flags & RRDR_RESULT_FLAG_ABSOLUTE)
         buffer_cacheable(wb);
 
     if(latest_timestamp && rrdr_rows(r1) > 0)
-        *latest_timestamp = r1->before;
+        *latest_timestamp = r1->view.before;
 
     DATASOURCE_FORMAT format = qt->request.format;
     RRDR_OPTIONS options = qt->request.options;

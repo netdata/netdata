@@ -125,12 +125,12 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
                     n = n * 100 / total;
 
                     if(unlikely(set_min_max)) {
-                        r->min = r->max = n;
+                        r->view.min = r->view.max = n;
                         set_min_max = 0;
                     }
 
-                    if(n < r->min) r->min = n;
-                    if(n > r->max) r->max = n;
+                    if(n < r->view.min) r->view.min = n;
+                    if(n > r->view.max) r->view.max = n;
                 }
 
                 buffer_print_netdata_double(wb, n);

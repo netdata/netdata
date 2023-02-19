@@ -638,24 +638,24 @@ static void rrdr_set_grouping_function(RRDR *r, RRDR_TIME_GROUPING group_method)
     int i, found = 0;
     for(i = 0; !found && api_v1_data_groups[i].name ;i++) {
         if(api_v1_data_groups[i].value == group_method) {
-            r->internal.grouping_create  = api_v1_data_groups[i].create;
-            r->internal.grouping_reset   = api_v1_data_groups[i].reset;
-            r->internal.grouping_free    = api_v1_data_groups[i].free;
-            r->internal.grouping_add     = api_v1_data_groups[i].add;
-            r->internal.grouping_flush   = api_v1_data_groups[i].flush;
-            r->internal.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
+            r->grouping.create  = api_v1_data_groups[i].create;
+            r->grouping.reset   = api_v1_data_groups[i].reset;
+            r->grouping.free    = api_v1_data_groups[i].free;
+            r->grouping.add     = api_v1_data_groups[i].add;
+            r->grouping.flush   = api_v1_data_groups[i].flush;
+            r->grouping.tier_query_fetch = api_v1_data_groups[i].tier_query_fetch;
             found = 1;
         }
     }
     if(!found) {
         errno = 0;
         internal_error(true, "QUERY: grouping method %u not found. Using 'average'", (unsigned int)group_method);
-        r->internal.grouping_create  = grouping_create_average;
-        r->internal.grouping_reset   = grouping_reset_average;
-        r->internal.grouping_free    = grouping_free_average;
-        r->internal.grouping_add     = grouping_add_average;
-        r->internal.grouping_flush   = grouping_flush_average;
-        r->internal.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
+        r->grouping.create  = grouping_create_average;
+        r->grouping.reset   = grouping_reset_average;
+        r->grouping.free    = grouping_free_average;
+        r->grouping.add     = grouping_add_average;
+        r->grouping.flush   = grouping_flush_average;
+        r->grouping.tier_query_fetch = TIER_QUERY_FETCH_AVERAGE;
     }
 }
 
@@ -1190,7 +1190,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     // put our selected tier as the first plan
     size_t selected_tier;
 
-    if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER
+    if(ops->r->view.options & RRDR_OPTION_SELECTED_TIER
        && ops->r->internal.qt->window.tier < storage_tiers
        && query_metric_is_valid_tier(qm, ops->r->internal.qt->window.tier)) {
         selected_tier = ops->r->internal.qt->window.tier;
@@ -1198,8 +1198,8 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     else {
         selected_tier = query_metric_best_tier_for_timeframe(qm, after_wanted, before_wanted, points_wanted);
 
-        if(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)
-            ops->r->internal.query_options &= ~RRDR_OPTION_SELECTED_TIER;
+        if(ops->r->view.options & RRDR_OPTION_SELECTED_TIER)
+            ops->r->view.options &= ~RRDR_OPTION_SELECTED_TIER;
 
         if(!query_metric_is_valid_tier(qm, selected_tier))
             return false;
@@ -1214,7 +1214,7 @@ static bool query_plan(QUERY_ENGINE_OPS *ops, time_t after_wanted, time_t before
     qm->plan.array[0].after = (qm->tiers[selected_tier].db_first_time_s < after_wanted) ? after_wanted : qm->tiers[selected_tier].db_first_time_s;
     qm->plan.array[0].before = (qm->tiers[selected_tier].db_last_time_s > before_wanted) ? before_wanted : qm->tiers[selected_tier].db_last_time_s;
 
-    if(!(ops->r->internal.query_options & RRDR_OPTION_SELECTED_TIER)) {
+    if(!(ops->r->view.options & RRDR_OPTION_SELECTED_TIER)) {
         // the selected tier
         time_t selected_tier_first_time_s = qm->plan.array[0].after;
         time_t selected_tier_last_time_s = qm->plan.array[0].before;
@@ -1353,11 +1353,11 @@ static QUERY_ENGINE_OPS *rrd2rrdr_query_prep(RRDR *r, size_t dim_id_in_rrdr) {
     *ops = (QUERY_ENGINE_OPS) {
             .r = r,
             .qm = &qt->query.array[dim_id_in_rrdr],
-            .grouping_add = r->internal.grouping_add,
-            .grouping_flush = r->internal.grouping_flush,
-            .tier_query_fetch = r->internal.tier_query_fetch,
-            .view_update_every = r->update_every,
-            .query_granularity = (time_t)(r->update_every / r->group),
+            .grouping_add = r->grouping.add,
+            .grouping_flush = r->grouping.flush,
+            .tier_query_fetch = r->grouping.tier_query_fetch,
+            .view_update_every = r->view.update_every,
+            .query_granularity = (time_t)(r->view.update_every / r->view.group),
             .group_value_flags = RRDR_VALUE_NOTHING,
     };
 
@@ -1384,9 +1384,9 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     size_t points_added = 0;
 
     long rrdr_line = -1;
-    bool use_anomaly_bit_as_value = (r->internal.query_options & RRDR_OPTION_ANOMALY_BIT) ? true : false;
+    bool use_anomaly_bit_as_value = (r->view.options & RRDR_OPTION_ANOMALY_BIT) ? true : false;
 
-    NETDATA_DOUBLE min = r->min, max = r->max;
+    NETDATA_DOUBLE min = r->view.min, max = r->view.max;
 
     QUERY_POINT last2_point = QUERY_POINT_EMPTY;
     QUERY_POINT last1_point = QUERY_POINT_EMPTY;
@@ -1712,15 +1712,15 @@ static void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY_ENGINE_
     }
     query_planer_finalize_remaining_plans(ops);
 
-    r->internal.result_points_generated += points_added;
-    r->internal.db_points_read += ops->db_total_points_read;
+    r->stats.result_points_generated += points_added;
+    r->stats.db_points_read += ops->db_total_points_read;
     for(size_t tr = 0; tr < storage_tiers ; tr++)
-        r->internal.tier_points_read[tr] += ops->db_points_read_per_tier[tr];
+        r->stats.tier_points_read[tr] += ops->db_points_read_per_tier[tr];
 
-    r->min = min;
-    r->max = max;
-    r->before = max_date;
-    r->after = min_date - ops->view_update_every + ops->query_granularity;
+    r->view.min = min;
+    r->view.max = max;
+    r->view.before = max_date;
+    r->view.after = min_date - ops->view_update_every + ops->query_granularity;
     rrdr_done(r, rrdr_line);
 
     internal_error(points_added != points_wanted,
@@ -1831,19 +1831,19 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
          , resampling_group
 
          // after
-         , r->after
+         , r->view.after
          , after_wanted
          , after_requested
          , first_entry_s
 
          // before
-         , r->before
+         , r->view.before
          , before_wanted
          , before_requested
          , last_entry_s
 
          // duration
-         , (long)(r->before - r->after + r->internal.qt->window.query_granularity)
+         , (long)(r->view.before - r->view.after + r->internal.qt->window.query_granularity)
          , (long)(before_wanted - after_wanted + r->internal.qt->window.query_granularity)
          , (long)before_requested - after_requested
          , (long)((last_entry_s - first_entry_s) + r->internal.qt->window.query_granularity)
@@ -2282,28 +2282,28 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     }
 
     if(qt->window.relative)
-        r->result_options |= RRDR_RESULT_OPTION_RELATIVE;
+        r->view.flags |= RRDR_RESULT_FLAG_RELATIVE;
     else
-        r->result_options |= RRDR_RESULT_OPTION_ABSOLUTE;
+        r->view.flags |= RRDR_RESULT_FLAG_ABSOLUTE;
 
     // -------------------------------------------------------------------------
     // initialize RRDR
 
-    r->group = qt->window.group;
-    r->update_every = (int) (qt->window.group * qt->window.query_granularity);
-    r->before = qt->window.before;
-    r->after = qt->window.after;
-    r->internal.points_wanted = qt->window.points;
-    r->internal.resampling_group = qt->window.resampling_group;
-    r->internal.resampling_divisor = qt->window.resampling_divisor;
-    r->internal.query_options = qt->window.options;
+    r->view.group = qt->window.group;
+    r->view.update_every = (int) (qt->window.group * qt->window.query_granularity);
+    r->view.before = qt->window.before;
+    r->view.after = qt->window.after;
+    r->grouping.points_wanted = qt->window.points;
+    r->grouping.resampling_group = qt->window.resampling_group;
+    r->grouping.resampling_divisor = qt->window.resampling_divisor;
+    r->view.options = qt->window.options;
 
     // -------------------------------------------------------------------------
     // assign the processor functions
     rrdr_set_grouping_function(r, qt->window.group_method);
 
     // allocate any memory required by the grouping method
-    r->internal.grouping_create(r, qt->window.group_options);
+    r->grouping.create(r, qt->window.group_options);
 
     // -------------------------------------------------------------------------
     // do the work for each dimension
@@ -2343,7 +2343,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         r->od[c] = qt->query.array[c].dimension.options;
 
         // reset the grouping for the new dimension
-        r->internal.grouping_reset(r);
+        r->grouping.reset(r);
 
         if(ops[c]) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
@@ -2356,12 +2356,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         global_statistics_rrdr_query_completed(
                 1,
-                r->internal.db_points_read - last_db_points_read,
-                r->internal.result_points_generated - last_result_points_generated,
+                r->stats.db_points_read - last_db_points_read,
+                r->stats.result_points_generated - last_result_points_generated,
                 qt->request.query_source);
 
-        last_db_points_read = r->internal.db_points_read;
-        last_result_points_generated = r->internal.result_points_generated;
+        last_db_points_read = r->stats.db_points_read;
+        last_result_points_generated = r->stats.result_points_generated;
 
         if (qt->request.timeout)
             now_realtime_timeval(&query_current_time);
@@ -2371,23 +2371,23 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         // verify all dimensions are aligned
         if(unlikely(!dimensions_used)) {
-            min_before = r->before;
-            max_after = r->after;
+            min_before = r->view.before;
+            max_after = r->view.after;
             max_rows = r->rows;
         }
         else {
-            if(r->after != max_after) {
+            if(r->view.after != max_after) {
                 internal_error(true, "QUERY: 'after' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qt->query.array[c].dimension.id), (size_t)max_after, string2str(qt->query.array[c].dimension.name), (size_t)r->after);
+                               string2str(qt->query.array[c].dimension.id), (size_t)max_after, string2str(qt->query.array[c].dimension.name), (size_t)r->view.after);
 
-                r->after = (r->after > max_after) ? r->after : max_after;
+                r->view.after = (r->view.after > max_after) ? r->view.after : max_after;
             }
 
-            if(r->before != min_before) {
+            if(r->view.before != min_before) {
                 internal_error(true, "QUERY: 'before' mismatch between dimensions for chart '%s': max is %zu, dimension '%s' has %zu",
-                               string2str(qt->query.array[c].dimension.id), (size_t)min_before, string2str(qt->query.array[c].dimension.name), (size_t)r->before);
+                               string2str(qt->query.array[c].dimension.id), (size_t)min_before, string2str(qt->query.array[c].dimension.name), (size_t)r->view.before);
 
-                r->before = (r->before < min_before) ? r->before : min_before;
+                r->view.before = (r->view.before < min_before) ? r->view.before : min_before;
             }
 
             if(r->rows != max_rows) {
@@ -2402,7 +2402,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         if (qt->request.timeout && ((NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout) {
             log_access("QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)dt_usec(&query_start_time, &query_current_time) / 1000.0, (long long)qt->request.timeout);
-            r->result_options |= RRDR_RESULT_OPTION_CANCEL;
+            r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
 
             for(size_t i = c + 1; i < queries_prepared ; i++) {
                 if(ops[i])
@@ -2427,7 +2427,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
                                                    "got 'points' is not wanted 'points'");
 
-        if(qt->window.aligned && (r->before % (qt->window.group * qt->window.query_granularity)) != 0)
+        if(qt->window.aligned && (r->view.before % (qt->window.group * qt->window.query_granularity)) != 0)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before,qt->request.before,
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
@@ -2437,20 +2437,20 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         //if(qt->window.aligned && (r->after % group) != 0)
         //    rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group, qt->window.after, after_requested, before_wanted, before_requested, points_requested, points_wanted, after_slot, before_slot, "'after' is not aligned but alignment is required");
 
-        if(r->before != qt->window.before)
+        if(r->view.before != qt->window.before)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before, qt->request.before,
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
                                                    "chart is not aligned to requested 'before'");
 
-        if(r->before != qt->window.before)
+        if(r->view.before != qt->window.before)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before, qt->request.before,
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
                                                    "got 'before' is not wanted 'before'");
 
         // reported 'after' varies, depending on group
-        if(r->after != qt->window.after)
+        if(r->view.after != qt->window.after)
             rrd2rrdr_log_request_response_metadata(r, qt->window.options, qt->window.group_method, qt->window.aligned, qt->window.group, qt->request.resampling_time, qt->window.resampling_group,
                                                    qt->window.after, qt->request.after, qt->window.before, qt->request.before,
                                                    qt->request.points, qt->window.points, /*after_slot, before_slot,*/
@@ -2460,12 +2460,12 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 #endif
 
     // free all resources used by the grouping method
-    r->internal.grouping_free(r);
+    r->grouping.free(r);
 
     if(likely(dimensions_used)) {
         // when all the dimensions are zero, we should return all of them
         if (unlikely((qt->window.options & RRDR_OPTION_NONZERO) && !dimensions_nonzero &&
-                     !(r->result_options & RRDR_RESULT_OPTION_CANCEL))) {
+                     !(r->view.flags & RRDR_RESULT_FLAG_CANCEL))) {
             // all the dimensions are zero
             // mark them as NONZERO to send them all
             for (size_t c = 0, max = qt->query.used; c < max; c++) {

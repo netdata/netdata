@@ -42,7 +42,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         strcpy(post_value,         "}");
         strcpy(post_line,          "]}");
         snprintfz(data_begin, 100, "\n  ],\n    %srows%s:\n [\n", kq, kq);
-        strcpy(finish,             "\n  ]\n }");
+        strcpy(finish,             "\n        ]\n    }");
 
         snprintfz(overflow_annotation, 200, ",{%sv%s:%sRESET OR OVERFLOW%s},{%sv%s:%sThe counters have been wrapped.%s}", kq, kq, sq, sq, kq, kq, sq, sq);
         snprintfz(normal_annotation,   200, ",{%sv%s:null},{%sv%s:null}", kq, kq, kq, kq);
@@ -69,9 +69,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             dates_with_new = 0;
         }
         if( options & RRDR_OPTION_OBJECTSROWS )
-            strcpy(pre_date, "   {");
+            strcpy(pre_date, "            {");
         else
-            strcpy(pre_date, "   [");
+            strcpy(pre_date, "            [");
         strcpy(pre_label,  ",\"");
         strcpy(post_label, "\"");
         strcpy(pre_value,  ",");
@@ -79,10 +79,10 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             strcpy(post_line, "}");
         else
             strcpy(post_line, "]");
-        snprintfz(data_begin, 100, "],\n  %sdata%s:[\n", kq, kq);
-        strcpy(finish,             "\n  ]\n }");
+        snprintfz(data_begin, 100, "],\n        %sdata%s:[\n", kq, kq);
+        strcpy(finish,             "\n        ]\n    }");
 
-        buffer_sprintf(wb, "{\n  %slabels%s:[", kq, kq);
+        buffer_sprintf(wb, "{\n        %slabels%s:[", kq, kq);
         buffer_sprintf(wb, "%stime%s", sq, sq);
 
         if( options & RRDR_OPTION_OBJECTSROWS )
@@ -262,12 +262,12 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                     n = n * 100 / total;
 
                     if(unlikely(set_min_max)) {
-                        r->min = r->max = n;
+                        r->view.min = r->view.max = n;
                         set_min_max = 0;
                     }
 
-                    if(n < r->min) r->min = n;
-                    if(n > r->max) r->max = n;
+                    if(n < r->view.min) r->view.min = n;
+                    if(n > r->view.max) r->view.max = n;
                 }
 
                 buffer_print_netdata_double(wb, n);

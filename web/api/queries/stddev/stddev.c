@@ -15,23 +15,23 @@ struct grouping_stddev {
 };
 
 void grouping_create_stddev(RRDR *r, const char *options __maybe_unused) {
-    r->internal.grouping_data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_stddev));
+    r->grouping.data = onewayalloc_callocz(r->internal.owa, 1, sizeof(struct grouping_stddev));
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_stddev(RRDR *r) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.data;
     g->count = 0;
 }
 
 void grouping_free_stddev(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_stddev(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.data;
 
     g->count++;
 
@@ -62,7 +62,7 @@ static inline NETDATA_DOUBLE stddev(struct grouping_stddev *g) {
 }
 
 NETDATA_DOUBLE grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.data;
 
     NETDATA_DOUBLE value;
 
@@ -89,7 +89,7 @@ NETDATA_DOUBLE grouping_flush_stddev(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_optio
 
 // https://en.wikipedia.org/wiki/Coefficient_of_variation
 NETDATA_DOUBLE grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.data;
 
     NETDATA_DOUBLE value;
 
@@ -122,7 +122,7 @@ NETDATA_DOUBLE grouping_flush_coefficient_of_variation(RRDR *r, RRDR_VALUE_FLAGS
  * Mean = average
  *
 NETDATA_DOUBLE grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.grouping_data;
 
     NETDATA_DOUBLE value;
 
@@ -149,7 +149,7 @@ NETDATA_DOUBLE grouping_flush_mean(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options
  * It is not advised to use this version of variance directly
  *
 NETDATA_DOUBLE grouping_flush_variance(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_stddev *g = (struct grouping_stddev *)r->internal.grouping_data;
+    struct grouping_stddev *g = (struct grouping_stddev *)r->grouping.grouping_data;
 
     NETDATA_DOUBLE value;
 

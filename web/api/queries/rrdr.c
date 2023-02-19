@@ -86,9 +86,9 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     r->internal.owa = owa;
     r->internal.qt = qt;
 
-    r->before = qt->window.before;
-    r->after = qt->window.after;
-    r->internal.points_wanted = points;
+    r->view.before = qt->window.before;
+    r->view.after = qt->window.after;
+    r->grouping.points_wanted = points;
     r->d = (int)dimensions;
     r->n = (int)points;
 
@@ -100,8 +100,8 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
     r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
 
-    r->group = 1;
-    r->update_every = 1;
+    r->view.group = 1;
+    r->view.update_every = 1;
 
     return r;
 }

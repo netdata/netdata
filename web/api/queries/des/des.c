@@ -35,13 +35,13 @@ static inline NETDATA_DOUBLE window(RRDR *r, struct grouping_des *g) {
     (void)g;
 
     NETDATA_DOUBLE points;
-    if(r->group == 1) {
+    if(r->view.group == 1) {
         // provide a running DES
-        points = (NETDATA_DOUBLE)r->internal.points_wanted;
+        points = (NETDATA_DOUBLE)r->grouping.points_wanted;
     }
     else {
         // provide a SES with flush points
-        points = (NETDATA_DOUBLE)r->group;
+        points = (NETDATA_DOUBLE)r->view.group;
     }
 
     // https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -76,13 +76,13 @@ void grouping_create_des(RRDR *r, const char *options __maybe_unused) {
     g->level = 0.0;
     g->trend = 0.0;
     g->count = 0;
-    r->internal.grouping_data = g;
+    r->grouping.data = g;
 }
 
 // resets when switches dimensions
 // so, clear everything to restart
 void grouping_reset_des(RRDR *r) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+    struct grouping_des *g = (struct grouping_des *)r->grouping.data;
     g->level = 0.0;
     g->trend = 0.0;
     g->count = 0;
@@ -92,12 +92,12 @@ void grouping_reset_des(RRDR *r) {
 }
 
 void grouping_free_des(RRDR *r) {
-    onewayalloc_freez(r->internal.owa, r->internal.grouping_data);
-    r->internal.grouping_data = NULL;
+    onewayalloc_freez(r->internal.owa, r->grouping.data);
+    r->grouping.data = NULL;
 }
 
 void grouping_add_des(RRDR *r, NETDATA_DOUBLE value) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+    struct grouping_des *g = (struct grouping_des *)r->grouping.data;
 
     if(likely(g->count > 0)) {
         // we have at least a number so far
@@ -124,7 +124,7 @@ void grouping_add_des(RRDR *r, NETDATA_DOUBLE value) {
 }
 
 NETDATA_DOUBLE grouping_flush_des(RRDR *r, RRDR_VALUE_FLAGS *rrdr_value_options_ptr) {
-    struct grouping_des *g = (struct grouping_des *)r->internal.grouping_data;
+    struct grouping_des *g = (struct grouping_des *)r->grouping.data;
 
     if(unlikely(!g->count || !netdata_double_isnumber(g->level))) {
         *rrdr_value_options_ptr |= RRDR_VALUE_EMPTY;

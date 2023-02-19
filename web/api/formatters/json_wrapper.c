@@ -40,17 +40,16 @@ void jsonwrap_query_plan(RRDR *r, BUFFER *wb) {
     buffer_json_object_close(wb);
 }
 
-static inline long jsonwrap_dimension_names(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
-    QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i;
+static inline size_t rrdr_dimension_names(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    const size_t dimensions = r->d;
+    size_t c, i;
 
     buffer_json_member_add_array(wb, key);
-    for(c = 0, i = 0; c < query_used ; c++) {
+    for(c = 0, i = 0; c < dimensions ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        buffer_json_add_array_item_string(wb, string2str(qt->query.array[c].dimension.name));
+        buffer_json_add_array_item_string(wb, string2str(r->dn[c]));
         i++;
     }
     buffer_json_array_close(wb);
@@ -58,17 +57,16 @@ static inline long jsonwrap_dimension_names(BUFFER *wb, const char *key, RRDR *r
     return i;
 }
 
-static inline long jsonwrap_dimension_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
-    QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i;
+static inline size_t rrdr_dimension_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    const size_t dimensions = r->d;
+    size_t c, i;
 
     buffer_json_member_add_array(wb, key);
-    for(c = 0, i = 0; c < query_used ; c++) {
+    for(c = 0, i = 0; c < dimensions ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
-        buffer_json_add_array_item_string(wb, string2str(qt->query.array[c].dimension.id));
+        buffer_json_add_array_item_string(wb, string2str(r->di[c]));
         i++;
     }
     buffer_json_array_close(wb);
@@ -76,7 +74,7 @@ static inline long jsonwrap_dimension_ids(BUFFER *wb, const char *key, RRDR *r, 
     return i;
 }
 
-static inline long jsonwrap_chart_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+static inline long jsonwrap_v1_chart_ids(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
     const long query_used = qt->query.used;
     long c, i;
@@ -121,7 +119,7 @@ static int rrdlabels_formatting_v2(const char *name, const char *value, RRDLABEL
     return 1;
 }
 
-static inline void jsonwrap_full_dimension_list(BUFFER *wb, RRDR *r, const char *key_dimensions, const char *key_instances, const char *key_labels) {
+static inline void query_target_dimensions_instances_labels(BUFFER *wb, RRDR *r, const char *key_dimensions, const char *key_instances, const char *key_labels) {
     QUERY_TARGET *qt = r->internal.qt;
 
     char name[RRD_ID_LENGTH_MAX * 2 + 2];
@@ -183,7 +181,7 @@ static inline void jsonwrap_full_dimension_list(BUFFER *wb, RRDR *r, const char 
     buffer_json_array_close(wb);
 }
 
-static inline void jsonwrap_functions(BUFFER *wb, const char *key, RRDR *r) {
+static inline void query_target_functions(BUFFER *wb, const char *key, RRDR *r) {
     QUERY_TARGET *qt = r->internal.qt;
     const long query_used = qt->query.used;
 
@@ -207,7 +205,7 @@ static inline void jsonwrap_functions(BUFFER *wb, const char *key, RRDR *r) {
     buffer_json_array_close(wb);
 }
 
-static inline long jsonwrap_chart_labels_filter(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+static inline long query_target_chart_labels_filter(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
     const long query_used = qt->query.used;
     long c, i = 0;
@@ -235,7 +233,7 @@ static inline long jsonwrap_chart_labels_filter(BUFFER *wb, const char *key, RRD
     return i;
 }
 
-static inline long jsonwrap_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+static inline long query_target_metrics_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
     QUERY_TARGET *qt = r->internal.qt;
     const long query_used = qt->query.used;
     long c, i;
@@ -256,10 +254,8 @@ static inline long jsonwrap_latest_values(BUFFER *wb, const char *key, RRDR *r, 
     return i;
 }
 
-static inline long jsonwrap_view_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
-    QUERY_TARGET *qt = r->internal.qt;
-    const long query_used = qt->query.used;
-    long c, i;
+static inline size_t rrdr_latest_values(BUFFER *wb, const char *key, RRDR *r, RRDR_OPTIONS options) {
+    size_t c, i;
 
     buffer_json_member_add_array(wb, key);
 
@@ -267,7 +263,7 @@ static inline long jsonwrap_view_latest_values(BUFFER *wb, const char *key, RRDR
 
     if(unlikely(options & RRDR_OPTION_PERCENTAGE)) {
         total = 0;
-        for(c = 0; c < query_used ;c++) {
+        for(c = 0; c < r->d ; c++) {
             if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
 
             NETDATA_DOUBLE *cn = &r->v[ (rrdr_rows(r) - 1) * r->d ];
@@ -282,7 +278,7 @@ static inline long jsonwrap_view_latest_values(BUFFER *wb, const char *key, RRDR
         if(total == 0) total = 1;
     }
 
-    for(c = 0, i = 0; c < query_used ;c++) {
+    for(c = 0, i = 0; c < r->d ; c++) {
         if(!rrdr_dimension_should_be_exposed(r->od[c], options))
             continue;
 
@@ -338,36 +334,36 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
     buffer_json_member_add_uint64(wb, "api", 1);
     buffer_json_member_add_string(wb, "id", qt->id);
     buffer_json_member_add_string(wb, "name", qt->id);
-    buffer_json_member_add_time_t(wb, "view_update_every", r->update_every);
+    buffer_json_member_add_time_t(wb, "view_update_every", r->view.update_every);
     buffer_json_member_add_time_t(wb, "update_every", qt->db.minimum_latest_update_every_s);
     buffer_json_member_add_time_t(wb, "first_entry", qt->db.first_time_s);
     buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
-    buffer_json_member_add_time_t(wb, "after", r->after);
-    buffer_json_member_add_time_t(wb, "before", r->before);
+    buffer_json_member_add_time_t(wb, "after", r->view.after);
+    buffer_json_member_add_time_t(wb, "before", r->view.before);
     buffer_json_member_add_string(wb, "group", time_grouping_tostring(group_method));
-    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->internal.query_options);
+    web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->view.options);
 
-    if(!jsonwrap_dimension_names(wb, "dimension_names", r, options))
+    if(!rrdr_dimension_names(wb, "dimension_names", r, options))
         rows = 0;
 
-    if(!jsonwrap_dimension_ids(wb, "dimension_ids", r, options))
+    if(!rrdr_dimension_ids(wb, "dimension_ids", r, options))
         rows = 0;
 
-    if (r->internal.query_options & RRDR_OPTION_ALL_DIMENSIONS)
-        jsonwrap_full_dimension_list(wb, r, "full_dimension_list", "full_chart_list", "full_chart_labels");
+    if (r->view.options & RRDR_OPTION_ALL_DIMENSIONS)
+        query_target_dimensions_instances_labels(wb, r, "full_dimension_list", "full_chart_list", "full_chart_labels");
 
-    jsonwrap_functions(wb, "functions", r);
+    query_target_functions(wb, "functions", r);
 
-    if (!qt->request.st && !jsonwrap_chart_ids(wb, "chart_ids", r, options))
+    if (!qt->request.st && !jsonwrap_v1_chart_ids(wb, "chart_ids", r, options))
         rows = 0;
 
-    if (qt->instances.chart_label_key_pattern && !jsonwrap_chart_labels_filter(wb, "chart_labels", r, options))
+    if (qt->instances.chart_label_key_pattern && !query_target_chart_labels_filter(wb, "chart_labels", r, options))
         rows = 0;
 
-    if(!jsonwrap_latest_values(wb, "latest_values", r, options))
+    if(!query_target_metrics_latest_values(wb, "latest_values", r, options))
         rows = 0;
 
-    long dimensions = jsonwrap_view_latest_values(wb, "view_latest_values", r, options);
+    size_t dimensions = rrdr_latest_values(wb, "view_latest_values", r, options);
     if(!dimensions)
         rows = 0;
 
@@ -377,13 +373,13 @@ void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR
 
     buffer_json_member_add_array(wb, "db_points_per_tier");
     for(size_t tier = 0; tier < storage_tiers ; tier++)
-        buffer_json_add_array_item_uint64(wb, r->internal.tier_points_read[tier]);
+        buffer_json_add_array_item_uint64(wb, r->stats.tier_points_read[tier]);
     buffer_json_array_close(wb);
 
     if(options & RRDR_OPTION_SHOW_PLAN)
         jsonwrap_query_plan(r, wb);
 
-    buffer_sprintf(wb, ",\n %sresult%s:", kq, kq);
+    buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
     if(string_value) buffer_strcat(wb, sq);
 }
 
@@ -454,10 +450,11 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
     buffer_json_member_add_object(wb, "metadata");
     {
-        jsonwrap_functions(wb, "functions", r);
-        if (r->internal.query_options & RRDR_OPTION_ALL_DIMENSIONS) {
+        query_target_functions(wb, "functions", r);
+
+        if (r->view.options & RRDR_OPTION_ALL_DIMENSIONS) {
             buffer_json_member_add_object(wb, "aggregated");
-            jsonwrap_full_dimension_list(wb, r, "dimensions", "instances", "labels");
+            query_target_dimensions_instances_labels(wb, r, "dimensions", "instances", "labels");
             buffer_json_object_close(wb); // aggregated
         }
         buffer_json_member_add_object(wb, "hosts");
@@ -611,7 +608,7 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
         buffer_json_member_add_time_t(wb, "last_entry", qt->db.last_time_s);
         buffer_json_member_add_array(wb, "points_per_tier");
         for(size_t tier = 0; tier < storage_tiers ; tier++)
-            buffer_json_add_array_item_uint64(wb, r->internal.tier_points_read[tier]);
+            buffer_json_add_array_item_uint64(wb, r->stats.tier_points_read[tier]);
         buffer_json_array_close(wb);
 
     }
@@ -620,37 +617,22 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
     buffer_json_member_add_object(wb, "view");
     {
         buffer_json_member_add_string(wb, "format", rrdr_format_to_string(format));
-        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->internal.query_options);
+        web_client_api_request_v1_data_options_to_buffer_json_array(wb, "options", r->view.options);
         buffer_json_member_add_string(wb, "time_group", time_grouping_tostring(group_method));
-        buffer_json_member_add_time_t(wb, "update_every", r->update_every);
-        buffer_json_member_add_time_t(wb, "after", r->after);
-        buffer_json_member_add_time_t(wb, "before", r->before);
+        buffer_json_member_add_time_t(wb, "update_every", r->view.update_every);
+        buffer_json_member_add_time_t(wb, "after", r->view.after);
+        buffer_json_member_add_time_t(wb, "before", r->view.before);
         buffer_json_member_add_uint64(wb, "points", rows);
     }
     buffer_json_object_close(wb);
 
-    if (!jsonwrap_dimension_names(wb, "dimension_names", r, options))
-        rows = 0;
-
-    if (!jsonwrap_dimension_ids(wb, "dimension_ids", r, options))
-        rows = 0;
-
-    if (!qt->request.st && !jsonwrap_chart_ids(wb, "chart_ids", r, options))
-        rows = 0;
-
-    if (qt->instances.chart_label_key_pattern && !jsonwrap_chart_labels_filter(wb, "chart_labels", r, options))
-        rows = 0;
-
-    if(!jsonwrap_latest_values(wb, "latest_values", r, options))
-        rows = 0;
-
-    long dimensions = jsonwrap_view_latest_values(wb, "view_latest_values", r, options);
-    if(!dimensions)
-        rows = 0;
+    rrdr_dimension_names(wb, "dimension_names", r, options);
+    rrdr_dimension_ids(wb, "dimension_ids", r, options);
+    size_t dimensions = rrdr_latest_values(wb, "view_latest_values", r, options);
 
     buffer_json_member_add_uint64(wb, "dimensions", dimensions);
 
-    buffer_sprintf(wb, ",\n %sresult%s:", kq, kq);
+    buffer_sprintf(wb, ",\n    %sresult%s:", kq, kq);
     if(string_value) buffer_strcat(wb, sq);
 }
 
@@ -686,7 +668,7 @@ void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format __maybe
 
     if(string_value) buffer_strcat(wb, sq);
 
-    buffer_json_member_add_double(wb, "min", r->min);
-    buffer_json_member_add_double(wb, "max", r->max);
+    buffer_json_member_add_double(wb, "min", r->view.min);
+    buffer_json_member_add_double(wb, "max", r->view.max);
     buffer_json_finalize(wb);
 }
