@@ -154,6 +154,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
         NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
         RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
         NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
+        uint32_t *gbc = &r->gbc [ i * r->d ];
 
         time_t now = r->t[i];
 
@@ -217,7 +218,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 if(unlikely(!(r->od[c] & RRDR_DIMENSION_QUERIED))) continue;
 
                 NETDATA_DOUBLE n;
-                if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+                if(unlikely(options & RRDR_OPTION_INTERNAL_GBC))
+                    n = gbc[c];
+                else if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                     n = ar[c];
                 else
                     n = cn[c];
@@ -238,7 +241,9 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
                 continue;
 
             NETDATA_DOUBLE n;
-            if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
+            if(unlikely(options & RRDR_OPTION_INTERNAL_GBC))
+                n = gbc[c];
+            else if(unlikely(options & RRDR_OPTION_INTERNAL_AR))
                 n = ar[c];
             else
                 n = cn[c];
@@ -248,7 +253,7 @@ void rrdr2json(RRDR *r, BUFFER *wb, RRDR_OPTIONS options, int datatable) {
             if(unlikely( options & RRDR_OPTION_OBJECTSROWS ))
                 buffer_sprintf(wb, "%s%s%s: ", kq, string2str(r->dn[c]), kq);
 
-            if(co[c] & RRDR_VALUE_EMPTY && !(options & RRDR_OPTION_INTERNAL_AR)) {
+            if(co[c] & RRDR_VALUE_EMPTY && !(options & (RRDR_OPTION_INTERNAL_AR | RRDR_OPTION_INTERNAL_GBC))) {
                 if(unlikely(options & RRDR_OPTION_NULL2ZERO))
                     buffer_fast_strcat(wb, "0", 1);
                 else

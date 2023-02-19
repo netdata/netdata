@@ -183,11 +183,11 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
 
             case RRDR_GROUP_BY_INSTANCE:
-                set = dictionary_set(groups, string2str(qm->chart.id), &pos, sizeof(int));
+                set = dictionary_set(groups, string2str(qm->link.qi->id_fqdn), &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
-                    entries[pos].id = string_dup(qm->chart.id);
-                    entries[pos].name = string_dup(qm->chart.name);
+                    entries[pos].id = string_dup(qm->link.qi->id_fqdn);
+                    entries[pos].name = string_dup(qm->link.qi->name_fqdn);
                 }
                 else
                     pos = *set;
@@ -205,7 +205,7 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
 
             case RRDR_GROUP_BY_LABEL: {
-                DICTIONARY *labels = rrdinstance_acquired_labels(qm->link.ria);
+                DICTIONARY *labels = rrdinstance_acquired_labels(qm->link.qi->ria);
                 STRING *s = rrdlabels_get_value_string_dup(labels, qt->request.group_by_key);
                 if(!s)
                     s = string_dup(unset);
@@ -233,28 +233,50 @@ RRDR *data_query_group_by(RRDR *r) {
     if(!r2)
         goto cleanup;
 
-    r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(uint32_t));
+    r2->gbc = onewayalloc_callocz(r2->internal.owa, r2->n * r2->d, sizeof(*r2->gbc));
 
-    for(size_t c = 0; c < (size_t)added ;c++) {
-        r2->od[c] = RRDR_DIMENSION_QUERIED | RRDR_DIMENSION_NONZERO;
-        r2->di[c] = entries[c].id;
-        r2->dn[c] = entries[c].name;
+    // copy from previous rrdr
+    r2->view = r->view;
+    r2->stats = r->stats;
+    r2->rows = rows;
+    r2->stats.result_points_generated = r2->d * r2->n;
+
+    // initialize r2 (dimension options, names, and ids)
+    for(size_t c2 = 0; c2 < r2->d ; c2++) {
+        r2->od[c2] = RRDR_DIMENSION_QUERIED;
+        r2->di[c2] = entries[c2].id;
+        r2->dn[c2] = entries[c2].name;
     }
 
+    // initialize r2 (timestamps and value flags)
     for(size_t i = 0; i != rows ;i++) {
-
         // copy the timestamp
         r2->t[i] = r->t[i];
 
-        NETDATA_DOUBLE *cn = &r->v[ i * r->d ];
-        RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
-
+        // make all values empty
         NETDATA_DOUBLE *cn2 = &r2->v[ i * r2->d ];
         RRDR_VALUE_FLAGS *co2 = &r2->o[ i * r2->d ];
-        uint32_t *gbc2 = &r2->gbc[ i * r2->d ];
+        NETDATA_DOUBLE *ar2 = &r2->ar[ i * r2->d ];
+        for (size_t c2 = 0; c2 < r2->d; c2++) {
+            cn2[c2] = 0.0;
+            ar2[c2] = 0.0;
+            co2[c2] = RRDR_VALUE_EMPTY;
+        }
+    }
 
-        for (size_t c = 0; c < r2->d; c++)
-            co2[c] = RRDR_VALUE_EMPTY;
+    // do the group_by
+    for(size_t i = 0; i != rows ;i++) {
+        size_t idx = i * r->d;
+        size_t idx2 = i * r2->d;
+
+        NETDATA_DOUBLE *cn = &r->v[ idx ];
+        RRDR_VALUE_FLAGS *co = &r->o[ idx ];
+        NETDATA_DOUBLE *ar = &r->ar[ idx ];
+
+        NETDATA_DOUBLE *cn2 = &r2->v[ idx2 ];
+        RRDR_VALUE_FLAGS *co2 = &r2->o[ idx2 ];
+        NETDATA_DOUBLE *ar2 = &r2->ar[ idx2 ];
+        uint32_t *gbc2 = &r2->gbc[ idx2 ];
 
         for(size_t c = 0; c < r->d ;c++) {
             if (!rrdr_dimension_should_be_exposed(r->od[c], options))
@@ -276,8 +298,6 @@ RRDR *data_query_group_by(RRDR *r) {
             QUERY_METRIC *qm = &qt->query.array[c];
             size_t c2 = qm->grouped_as.slot;
 
-            internal_fatal(c2 >= r2->d, "QUERY GROUP BY: wrong slot");
-
             switch(qt->request.group_by_function) {
                 default:
                 case RRDR_GROUP_BY_FUNCTION_AVERAGE:
@@ -297,18 +317,68 @@ RRDR *data_query_group_by(RRDR *r) {
                     break;
             }
 
-            co2[c2] &= ~RRDR_VALUE_EMPTY;
-
             if(o & RRDR_VALUE_RESET)
                 co2[c2] |= RRDR_VALUE_RESET;
 
+            ar2[c2] += ar[c];
             gbc2[c2]++;
         }
     }
 
-    r2->view = r->view;
-    r2->stats = r->stats;
-    r2->rows = rows;
+    // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
+    size_t values = 0;
+    NETDATA_DOUBLE min = NAN, max = NAN;
+    for (size_t c2 = 0; c2 < r2->d; c2++) {
+        size_t non_zero = 0;
+
+        for(size_t i = 0; i != rows ;i++) {
+            size_t idx2 = i * r2->d + c2;
+
+            NETDATA_DOUBLE *cn2 = &r2->v[ idx2 ];
+            RRDR_VALUE_FLAGS *co2 = &r2->o[ idx2 ];
+            NETDATA_DOUBLE *ar2 = &r2->ar[ idx2 ];
+            uint32_t *gbc2 = &r2->gbc[ idx2 ];
+
+            if(likely(*gbc2)) {
+                *co2 &= ~RRDR_VALUE_EMPTY;
+
+                *ar2 /= *gbc2;
+
+                NETDATA_DOUBLE n;
+
+                if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+                    n = *cn2 / *gbc2;
+                }
+                else if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_AVERAGE) {
+                    n = *cn2 / *gbc2;
+                    *cn2 = n;
+                }
+                else
+                    n = *cn2;
+
+                if(islessgreater(n, 0.0))
+                    non_zero++;
+
+                if(unlikely(!values++)) {
+                    min = n;
+                    max = n;
+                }
+                else {
+                    if(n < min)
+                        min = n;
+
+                    if(n > max)
+                        max = n;
+                }
+            }
+        }
+
+        if(non_zero)
+            r2->od[c2] |= RRDR_DIMENSION_NONZERO;
+    }
+
+    r2->view.min = min;
+    r2->view.max = max;
 
 cleanup:
     string_freez(unset);
@@ -513,6 +583,10 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         rrdr2json(r, wb, options, 0);
 
         if(options & RRDR_OPTION_JSON_WRAP) {
+            if(qt->request.group_by_function == RRDR_GROUP_BY_FUNCTION_SUM_COUNT) {
+                rrdr_json_wrapper_group_by_count(r, wb, format, options, 0);
+                rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_GBC, 0);
+            }
             if(options & RRDR_OPTION_RETURN_JWAR) {
                 rrdr_json_wrapper_anomaly_rates(r, wb, format, options, 0);
                 rrdr2json(r, wb, options | RRDR_OPTION_INTERNAL_AR, 0);

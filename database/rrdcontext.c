@@ -372,6 +372,11 @@ DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria) {
     return ri->rrdset->functions_view;
 }
 
+RRDHOST *rrdinstance_acquired_host(RRDINSTANCE_ACQUIRED *ria) {
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return ri->rc->rrdhost;
+}
+
 // ----------------------------------------------------------------------------
 // helper one-liners for RRDCONTEXT
 
@@ -2251,7 +2256,6 @@ typedef struct query_target_locals {
 
     RRDHOST *host;
     RRDCONTEXT_ACQUIRED *rca;
-    RRDINSTANCE_ACQUIRED *ria;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
 } QUERY_TARGET_LOCALS;
@@ -2281,39 +2285,40 @@ void query_target_release(QUERY_TARGET *qt) {
 
     // release the query
     for(size_t i = 0, used = qt->query.used; i < used ;i++) {
-        string_freez(qt->query.array[i].dimension.id);
-        qt->query.array[i].dimension.id = NULL;
+        QUERY_METRIC *qm = &qt->query.array[i];
 
-        string_freez(qt->query.array[i].dimension.name);
-        qt->query.array[i].dimension.name = NULL;
+        string_freez(qm->dimension.id);
+        qm->dimension.id = NULL;
 
-        string_freez(qt->query.array[i].chart.id);
-        qt->query.array[i].chart.id = NULL;
-
-        string_freez(qt->query.array[i].chart.name);
-        qt->query.array[i].chart.name = NULL;
+        string_freez(qm->dimension.name);
+        qm->dimension.name = NULL;
 
         // reset the plans
-        for(size_t p = 0; p < qt->query.array[i].plan.used; p++) {
-            internal_fatal(qt->query.array[i].plan.array[p].initialized &&
-                            !qt->query.array[i].plan.array[p].finalized,
+        for(size_t p = 0; p < qm->plan.used; p++) {
+            internal_fatal(qm->plan.array[p].initialized &&
+                            !qm->plan.array[p].finalized,
                            "QUERY: left-over initialized plan");
 
-            qt->query.array[i].plan.array[p].initialized = false;
-            qt->query.array[i].plan.array[p].finalized = false;
+            qm->plan.array[p].initialized = false;
+            qm->plan.array[p].finalized = false;
         }
-        qt->query.array[i].plan.used = 0;
+        qm->plan.used = 0;
 
         // reset the tiers
         for(size_t tier = 0; tier < storage_tiers ;tier++) {
-            if(qt->query.array[i].tiers[tier].db_metric_handle) {
-                STORAGE_ENGINE *eng = qt->query.array[i].tiers[tier].eng;
-                eng->api.metric_release(qt->query.array[i].tiers[tier].db_metric_handle);
-                qt->query.array[i].tiers[tier].db_metric_handle = NULL;
-                qt->query.array[i].tiers[tier].weight = 0;
-                qt->query.array[i].tiers[tier].eng = NULL;
+            if(qm->tiers[tier].db_metric_handle) {
+                STORAGE_ENGINE *eng = qm->tiers[tier].eng;
+                eng->api.metric_release(qm->tiers[tier].db_metric_handle);
+                qm->tiers[tier].db_metric_handle = NULL;
+                qm->tiers[tier].weight = 0;
+                qm->tiers[tier].eng = NULL;
             }
         }
+
+        qm->link.host = NULL;
+        qm->link.rca = NULL;
+        qm->link.rma = NULL;
+        qm->link.qi = NULL;
     }
 
     // release the metrics
@@ -2324,8 +2329,15 @@ void query_target_release(QUERY_TARGET *qt) {
 
     // release the instances
     for(size_t i = 0, used = qt->instances.used; i < used ;i++) {
-        rrdinstance_release(qt->instances.array[i]);
-        qt->instances.array[i] = NULL;
+        QUERY_INSTANCE *qi = &qt->instances.array[i];
+        rrdinstance_release(qi->ria);
+        qi->ria = NULL;
+
+        string_freez(qi->id_fqdn);
+        qi->id_fqdn = NULL;
+
+        string_freez(qi->name_fqdn);
+        qi->name_fqdn = NULL;
     }
 
     // release the contexts
@@ -2386,7 +2398,7 @@ void query_target_free(void) {
 }
 
 static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri,
-                                    bool queryable_instance) {
+                                    QUERY_INSTANCE *qi, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDMETRIC *rm = rrdmetric_acquired_value(rma);
@@ -2394,9 +2406,9 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         return;
 
     if(qt->metrics.used == qt->metrics.size) {
-        size_t old_mem = qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *);
+        size_t old_mem = qt->metrics.size * sizeof(*qt->metrics.array);
         qt->metrics.size = (qt->metrics.size) ? qt->metrics.size * 2 : 1;
-        size_t new_mem = qt->metrics.size * sizeof(RRDMETRIC_ACQUIRED *);
+        size_t new_mem = qt->metrics.size * sizeof(*qt->metrics.array);
         qt->metrics.array = reallocz(qt->metrics.array, new_mem);
 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
@@ -2508,9 +2520,9 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
                 ri->rrdset->last_accessed_time_s = qtl->start_s;
 
             if (qt->query.used == qt->query.size) {
-                size_t old_mem = qt->query.size * sizeof(QUERY_METRIC);
+                size_t old_mem = qt->query.size * sizeof(*qt->query.array);
                 qt->query.size = (qt->query.size) ? qt->query.size * 2 : 1;
-                size_t new_mem = qt->query.size * sizeof(QUERY_METRIC);
+                size_t new_mem = qt->query.size * sizeof(*qt->query.array);
                 qt->query.array = reallocz(qt->query.array, new_mem);
 
                 __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
@@ -2526,11 +2538,8 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
 
             qm->link.host = qtl->host;
             qm->link.rca = qtl->rca;
-            qm->link.ria = qtl->ria;
+            qm->link.qi = qi;
             qm->link.rma = rma;
-
-            qm->chart.id = string_dup(ri->id);
-            qm->chart.name = string_dup(ri->name);
 
             qm->dimension.id = string_dup(rm->id);
             qm->dimension.name = string_dup(rm->name);
@@ -2562,6 +2571,43 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
         }
     }
 }
+static inline STRING *rrdinstance_id_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
+    if(unlikely(!ria))
+        return NULL;
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string_dup(ri->id);
+}
+
+static inline STRING *rrdinstance_name_fqdn_v1(RRDINSTANCE_ACQUIRED *ria) {
+    if(unlikely(!ria))
+        return NULL;
+
+    RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    return string_dup(ri->name);
+}
+
+static inline STRING *rrdinstance_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
+    if(unlikely(!ria))
+        return NULL;
+
+    char buffer[RRD_ID_LENGTH_MAX + 1];
+
+    RRDHOST *host = rrdinstance_acquired_host(ria);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_id(ria), host->machine_guid);
+    return string_strdupz(buffer);
+}
+
+static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
+    if(unlikely(!ria))
+        return NULL;
+
+    char buffer[RRD_ID_LENGTH_MAX + 1];
+
+    RRDHOST *host = rrdinstance_acquired_host(ria);
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), rrdhost_hostname(host));
+    return string_strdupz(buffer);
+}
 
 static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
@@ -2571,15 +2617,27 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
         return;
 
     if(qt->instances.used == qt->instances.size) {
-        size_t old_mem = qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *);
+        size_t old_mem = qt->instances.size * sizeof(*qt->instances.array);
         qt->instances.size = (qt->instances.size) ? qt->instances.size * 2 : 1;
-        size_t new_mem = qt->instances.size * sizeof(RRDINSTANCE_ACQUIRED *);
+        size_t new_mem = qt->instances.size * sizeof(*qt->instances.array);
         qt->instances.array = reallocz(qt->instances.array, new_mem);
 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
 
-    qtl->ria = qt->instances.array[qt->instances.used++] = rrdinstance_acquired_dup(ria);
+    QUERY_INSTANCE *qi = &qt->instances.array[qt->instances.used];
+    qi->slot = qt->instances.used++;
+    qi->ria = rrdinstance_acquired_dup(ria);
+    qi->queried = 0;
+
+    if(qt->request.version <= 1) {
+        qi->id_fqdn = rrdinstance_id_fqdn_v1(ria);
+        qi->name_fqdn = rrdinstance_name_fqdn_v1(ria);
+    }
+    else {
+        qi->id_fqdn = rrdinstance_id_fqdn_v2(ria);
+        qi->name_fqdn = rrdinstance_name_fqdn_v2(ria);
+    }
 
     if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
         qt->db.minimum_latest_update_every_s = ri->update_every_s;
@@ -2593,13 +2651,13 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     size_t added = 0;
 
     if(unlikely(qt->request.rma)) {
-        query_target_add_metric(qtl, qt->request.rma, ri, queryable_instance);
+        query_target_add_metric(qtl, qt->request.rma, ri, qi, queryable_instance);
         added++;
     }
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri, queryable_instance);
+            query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri, qi, queryable_instance);
             added++;
         }
         dfe_done(rm);
@@ -2608,6 +2666,13 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     if(!added) {
         qt->instances.used--;
         rrdinstance_release(ria);
+        qi->ria = NULL;
+
+        string_freez(qi->id_fqdn);
+        qi->id_fqdn = NULL;
+
+        string_freez(qi->name_fqdn);
+        qi->name_fqdn = NULL;
     }
 }
 
@@ -2630,7 +2695,7 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
-        query_target_add_instance(qtl, qt->request.ria, true);
+         query_target_add_instance(qtl, qt->request.ria, true);
         added++;
     }
     else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {

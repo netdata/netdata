@@ -34,6 +34,7 @@ const char *rrdinstance_acquired_id(RRDINSTANCE_ACQUIRED *ria);
 const char *rrdinstance_acquired_name(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
+RRDHOST *rrdinstance_acquired_host(RRDINSTANCE_ACQUIRED *ria);
 
 bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
 time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);
@@ -141,6 +142,14 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
+typedef struct query_instance {
+    size_t slot;
+    RRDINSTANCE_ACQUIRED *ria;
+    STRING *id_fqdn;
+    STRING *name_fqdn;
+    size_t queried;             // number of dimensions queried
+} QUERY_INSTANCE;
+
 typedef struct query_metric {
     struct query_metric_tier {
         struct storage_engine *eng;
@@ -159,7 +168,7 @@ typedef struct query_metric {
     struct {
         RRDHOST *host;
         RRDCONTEXT_ACQUIRED *rca;
-        RRDINSTANCE_ACQUIRED *ria;
+        QUERY_INSTANCE *qi;
         RRDMETRIC_ACQUIRED *rma;
     } link;
 
@@ -168,11 +177,6 @@ typedef struct query_metric {
         STRING *name;
         RRDR_DIMENSION_FLAGS options;
     } dimension;
-
-    struct {
-        STRING *id;
-        STRING *name;
-    } chart;
 
     struct {
         size_t slot;
@@ -269,7 +273,7 @@ typedef struct query_target {
     } metrics;
 
     struct {
-        RRDINSTANCE_ACQUIRED **array;
+        QUERY_INSTANCE *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;

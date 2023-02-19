@@ -45,6 +45,7 @@ typedef enum rrdr_options {
 
     // internal ones - not to be exposed to the API
     RRDR_OPTION_INTERNAL_AR     = 0x10000000, // internal use only, to let the formatters we want to render the anomaly rate
+    RRDR_OPTION_INTERNAL_GBC    = 0x20000000, // internal use only, to let the formatters we want to render the group by count
     RRDR_OPTION_HEALTH_RSRVD1   = 0x80000000, // reserved for RRDCALC_OPTION_NO_CLEAR_NOTIFICATION
 } RRDR_OPTIONS;
 

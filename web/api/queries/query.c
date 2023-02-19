@@ -2349,6 +2349,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
             r->di[c] = string_dup(qt->query.array[c].dimension.id);
             r->dn[c] = string_dup(qt->query.array[c].dimension.name);
+            qt->query.array[c].link.qi->queried++;
             rrd2rrdr_query_execute(r, c, ops[c]);
         }
         else

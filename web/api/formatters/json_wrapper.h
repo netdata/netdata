@@ -11,6 +11,7 @@ typedef void (*wrapper_end_t)(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRD
 
 void rrdr_json_wrapper_begin(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value, RRDR_TIME_GROUPING group_method);
 void rrdr_json_wrapper_anomaly_rates(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value);
+void rrdr_json_wrapper_group_by_count(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value);
 void rrdr_json_wrapper_end(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value);
 
 void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb, DATASOURCE_FORMAT format, RRDR_OPTIONS options, bool string_value, RRDR_TIME_GROUPING group_method);
