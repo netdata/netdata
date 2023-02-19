@@ -169,6 +169,7 @@ RRDR *data_query_group_by(RRDR *r) {
         int pos = -1, *set;
         QUERY_METRIC *qm = query_metric(qt, c);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
         switch(qt->request.group_by) {
             default:
@@ -195,11 +196,11 @@ RRDR *data_query_group_by(RRDR *r) {
                 break;
 
             case RRDR_GROUP_BY_NODE:
-                set = dictionary_set(groups, qm->link.host->machine_guid, &pos, sizeof(int));
+                set = dictionary_set(groups, qh->host->machine_guid, &pos, sizeof(int));
                 if(*set == -1) {
                     *set = pos = added++;
-                    entries[pos].id = string_strdupz(qm->link.host->machine_guid);
-                    entries[pos].name = string_dup(qm->link.host->hostname);
+                    entries[pos].id = string_strdupz(qh->host->machine_guid);
+                    entries[pos].name = string_dup(qh->host->hostname);
                 }
                 else
                     pos = *set;

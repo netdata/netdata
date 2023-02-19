@@ -142,6 +142,12 @@ typedef struct query_plan_entry {
 
 #define QUERY_PLANS_MAX (RRD_STORAGE_TIERS * 2)
 
+typedef struct query_host {
+    size_t slot;
+    RRDHOST *host;
+    size_t queried;
+} QUERY_HOST;
+
 typedef struct query_instance {
     size_t slot;
     RRDINSTANCE_ACQUIRED *ria;
@@ -166,7 +172,7 @@ typedef struct query_metric {
     } plan;
 
     struct {
-        RRDHOST *host;
+        size_t query_host_id;
         RRDCONTEXT_ACQUIRED *rca;
         RRDMETRIC_ACQUIRED *rma;
         size_t query_instance_id;
@@ -289,13 +295,18 @@ typedef struct query_target {
     } contexts;
 
     struct {
-        RRDHOST **array;
+        QUERY_HOST *array;
         uint32_t used;                      // how many items of the array are used
         uint32_t size;                      // the size of the array
         SIMPLE_PATTERN *pattern;
     } hosts;
 
 } QUERY_TARGET;
+
+static inline NEVERNULL QUERY_HOST *query_host(QUERY_TARGET *qt, size_t id) {
+    internal_fatal(id >= qt->hosts.used, "QUERY: invalid query host id");
+    return &qt->hosts.array[id];
+}
 
 static inline NEVERNULL QUERY_METRIC *query_metric(QUERY_TARGET *qt, size_t id) {
     internal_fatal(id >= qt->query.used, "QUERY: invalid query metric id");

@@ -2334,6 +2334,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     for(size_t c = 0, max = qt->query.used; c < max ; c++) {
         QUERY_METRIC *qm = query_metric(qt, c);
         QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
+        QUERY_HOST *qh = query_host(qt, qm->link.query_host_id);
 
         if(queries_prepared < max) {
             // preload another query
@@ -2351,7 +2352,9 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             r->od[c] |= RRDR_DIMENSION_QUERIED;
             r->di[c] = string_dup(qm->dimension.id);
             r->dn[c] = string_dup(qm->dimension.name);
+
             qi->queried++;
+            qh->queried++;
 
             rrd2rrdr_query_execute(r, c, ops[c]);
         }

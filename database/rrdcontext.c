@@ -2254,7 +2254,6 @@ typedef struct query_target_locals {
     bool match_ids;
     bool match_names;
 
-    RRDHOST *host;
     RRDCONTEXT_ACQUIRED *rca;
 
     size_t metrics_skipped_due_to_not_matching_timeframe;
@@ -2315,10 +2314,10 @@ void query_target_release(QUERY_TARGET *qt) {
             }
         }
 
-        qm->link.host = NULL;
+        qm->link.query_host_id = 0;
+        qm->link.query_instance_id = 0;
         qm->link.rca = NULL;
         qm->link.rma = NULL;
-        qm->link.query_instance_id = 0;
     }
 
     // release the metrics
@@ -2348,7 +2347,9 @@ void query_target_release(QUERY_TARGET *qt) {
 
     // release the hosts
     for(size_t i = 0, used = qt->hosts.used; i < used ;i++) {
-        qt->hosts.array[i] = NULL;
+        qt->hosts.array[i].slot = 0;
+        qt->hosts.array[i].host = NULL;
+        qt->hosts.array[i].queried = 0;
     }
 
     qt->query.used = 0;
@@ -2397,7 +2398,7 @@ void query_target_free(void) {
     qt->hosts.size = 0;
 }
 
-static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri,
+static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, RRDMETRIC_ACQUIRED *rma, RRDINSTANCE *ri,
                                     QUERY_INSTANCE *qi, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
@@ -2431,14 +2432,14 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
     } tier_retention[storage_tiers];
 
     for (size_t tier = 0; tier < storage_tiers; tier++) {
-        STORAGE_ENGINE *eng = qtl->host->db[tier].eng;
+        STORAGE_ENGINE *eng = qh->host->db[tier].eng;
         tier_retention[tier].eng = eng;
-        tier_retention[tier].db_update_every_s = (time_t) (qtl->host->db[tier].tier_grouping * ri->update_every_s);
+        tier_retention[tier].db_update_every_s = (time_t) (qh->host->db[tier].tier_grouping * ri->update_every_s);
 
         if(rm->rrddim && rm->rrddim->tiers[tier].db_metric_handle)
             tier_retention[tier].db_metric_handle = eng->api.metric_dup(rm->rrddim->tiers[tier].db_metric_handle);
         else
-            tier_retention[tier].db_metric_handle = eng->api.metric_get(qtl->host->db[tier].instance, &rm->uuid);
+            tier_retention[tier].db_metric_handle = eng->api.metric_get(qh->host->db[tier].instance, &rm->uuid);
 
         if(tier_retention[tier].db_metric_handle) {
             tier_retention[tier].db_first_time_s = tier_retention[tier].eng->api.query_ops.oldest_time_s(tier_retention[tier].db_metric_handle);
@@ -2536,10 +2537,10 @@ static void query_target_add_metric(QUERY_TARGET_LOCALS *qtl, RRDMETRIC_ACQUIRED
             qm->plan.used = 0;
             qm->dimension.options = options;
 
-            qm->link.host = qtl->host;
+            qm->link.query_host_id = qh->slot;
+            qm->link.query_instance_id = qi->slot;
             qm->link.rca = qtl->rca;
             qm->link.rma = rma;
-            qm->link.query_instance_id = qi->slot;
 
             qm->dimension.id = string_dup(rm->id);
             qm->dimension.name = string_dup(rm->name);
@@ -2609,7 +2610,7 @@ static inline STRING *rrdinstance_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQUIRED *ria, bool queryable_instance) {
+static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, RRDINSTANCE_ACQUIRED *ria, bool queryable_instance) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
@@ -2652,13 +2653,13 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     size_t added = 0;
 
     if(unlikely(qt->request.rma)) {
-        query_target_add_metric(qtl, qt->request.rma, ri, qi, queryable_instance);
+        query_target_add_metric(qtl, qh, qt->request.rma, ri, qi, queryable_instance);
         added++;
     }
     else {
         RRDMETRIC *rm;
         dfe_start_read(ri->rrdmetrics, rm) {
-            query_target_add_metric(qtl, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri, qi, queryable_instance);
+            query_target_add_metric(qtl, qh, (RRDMETRIC_ACQUIRED *) rm_dfe.item, ri, qi, queryable_instance);
             added++;
         }
         dfe_done(rm);
@@ -2677,7 +2678,7 @@ static void query_target_add_instance(QUERY_TARGET_LOCALS *qtl, RRDINSTANCE_ACQU
     }
 }
 
-static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIRED *rca) {
+static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, QUERY_HOST *qh, RRDCONTEXT_ACQUIRED *rca) {
     QUERY_TARGET *qt = qtl->qt;
 
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
@@ -2696,11 +2697,11 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
 
     size_t added = 0;
     if(unlikely(qt->request.ria)) {
-         query_target_add_instance(qtl, qt->request.ria, true);
+         query_target_add_instance(qtl, qh, qt->request.ria, true);
         added++;
     }
     else if(unlikely(qtl->st && qtl->st->rrdcontext == rca && qtl->st->rrdinstance)) {
-        query_target_add_instance(qtl, qtl->st->rrdinstance, true);
+        query_target_add_instance(qtl, qh, qtl->st->rrdinstance, true);
         added++;
     }
     else {
@@ -2713,7 +2714,7 @@ static void query_target_add_context(QUERY_TARGET_LOCALS *qtl, RRDCONTEXT_ACQUIR
                 )
                 queryable_instance = true;
 
-            query_target_add_instance(qtl, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_instance);
+            query_target_add_instance(qtl, qh, (RRDINSTANCE_ACQUIRED *)ri_dfe.item, queryable_instance);
             added++;
         }
         dfe_done(ri);
@@ -2729,14 +2730,17 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
     QUERY_TARGET *qt = qtl->qt;
 
     if(qt->hosts.used == qt->hosts.size) {
-        size_t old_mem = qt->hosts.size * sizeof(RRDHOST *);
+        size_t old_mem = qt->hosts.size * sizeof(*qt->hosts.array);
         qt->hosts.size = (qt->hosts.size) ? qt->hosts.size * 2 : 1;
-        size_t new_mem = qt->hosts.size * sizeof(RRDHOST *);
+        size_t new_mem = qt->hosts.size * sizeof(*qt->hosts.array);
         qt->hosts.array = reallocz(qt->hosts.array, new_mem);
 
         __atomic_add_fetch(&netdata_buffers_statistics.query_targets_size, new_mem - old_mem, __ATOMIC_RELAXED);
     }
-    qtl->host = qt->hosts.array[qt->hosts.used++] = host;
+    QUERY_HOST *qh = &qt->hosts.array[qt->hosts.used];
+    qh->slot = qt->hosts.used++;
+    qh->host = host;
+    qh->queried = 0;
 
     // is the chart given valid?
     if(unlikely(qtl->st && (!qtl->st->rrdinstance || !qtl->st->rrdcontext))) {
@@ -2750,31 +2754,31 @@ static void query_target_add_host(QUERY_TARGET_LOCALS *qtl, RRDHOST *host) {
 
     size_t added = 0;
     if(unlikely(qt->request.rca)) {
-        query_target_add_context(qtl, qt->request.rca);
+        query_target_add_context(qtl, qh, qt->request.rca);
         added++;
     }
     else if(unlikely(qtl->st)) {
         // single chart data queries
-        query_target_add_context(qtl, qtl->st->rrdcontext);
+        query_target_add_context(qtl, qh, qtl->st->rrdcontext);
         added++;
     }
     else {
         // context pattern queries
-        RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)qtl->host->rrdctx, qtl->contexts);
+        RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_get_and_acquire_item((DICTIONARY *)host->rrdctx, qtl->contexts);
         if(likely(rca)) {
             // we found it!
-            query_target_add_context(qtl, rca);
+            query_target_add_context(qtl, qh, rca);
             rrdcontext_release(rca);
             added++;
         }
         else {
             // Probably it is a pattern, we need to search for it...
             RRDCONTEXT *rc;
-            dfe_start_read((DICTIONARY *)qtl->host->rrdctx, rc) {
+            dfe_start_read((DICTIONARY *)host->rrdctx, rc) {
                 if(qt->contexts.pattern && !simple_pattern_matches(qt->contexts.pattern, string2str(rc->id)))
                     continue;
 
-                query_target_add_context(qtl, (RRDCONTEXT_ACQUIRED *)rc_dfe.item);
+                query_target_add_context(qtl, qh, (RRDCONTEXT_ACQUIRED *)rc_dfe.item);
                 added++;
             }
             dfe_done(rc);
@@ -2870,7 +2874,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     QUERY_TARGET_LOCALS qtl = {
         .qt = qt,
         .start_s = now_realtime_sec(),
-        .host = qt->request.host,
         .st = qt->request.st,
         .hosts = qt->request.hosts,
         .contexts = qt->request.contexts,
@@ -2879,6 +2882,8 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         .chart_label_key = qt->request.chart_label_key,
         .charts_labels_filter = qt->request.charts_labels_filter,
     };
+
+    RRDHOST *host = qt->request.host;
 
     qt->db.minimum_latest_update_every_s = 0; // it will be updated by query_target_add_query()
 
@@ -2897,40 +2902,40 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // verify that the chart belongs to the host we are interested
     if(qtl.st) {
-        if (!qtl.host) {
+        if (!host) {
             // It is NULL, set it ourselves.
-            qtl.host = qtl.st->rrdhost;
+            host = qtl.st->rrdhost;
         }
-        else if (unlikely(qtl.host != qtl.st->rrdhost)) {
+        else if (unlikely(host != qtl.st->rrdhost)) {
             // Oops! A different host!
             error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
-                  rrdset_name(qtl.st), rrdhost_hostname(qtl.host), rrdhost_hostname(qtl.st->rrdhost));
-            qtl.host = qtl.st->rrdhost;
+                  rrdset_name(qtl.st), rrdhost_hostname(host), rrdhost_hostname(qtl.st->rrdhost));
+            host = qtl.st->rrdhost;
         }
     }
 
-    if(qtl.host) {
+    if(host) {
         // single host query
-        query_target_add_host(&qtl, qtl.host);
-        qtl.hosts = rrdhost_hostname(qtl.host);
+        query_target_add_host(&qtl, host);
+        qtl.hosts = rrdhost_hostname(host);
     }
     else {
         char uuid[UUID_STR_LEN];
 
         // multi host query
         rrd_rdlock();
-        rrdhost_foreach_read(qtl.host) {
+        rrdhost_foreach_read(host) {
 
-            if(!qtl.host->node_id)
-                uuid_unparse_lower(*qtl.host->node_id, uuid);
+            if(!host->node_id)
+                uuid_unparse_lower(*host->node_id, uuid);
             else
                 uuid[0] = '\0';
 
             if(!qt->hosts.pattern ||
-                simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(qtl.host)) ||
-                simple_pattern_matches(qt->hosts.pattern, qtl.host->machine_guid) ||
+                simple_pattern_matches(qt->hosts.pattern, rrdhost_hostname(host)) ||
+                simple_pattern_matches(qt->hosts.pattern, host->machine_guid) ||
                 (*uuid && simple_pattern_matches(qt->hosts.pattern, uuid)))
-                query_target_add_host(&qtl, qtl.host);
+                query_target_add_host(&qtl, host);
         }
         rrd_unlock();
     }
